@@ -1,0 +1,60 @@
+// Core Descriptive Metadata
+
+	FFTitle       = "title"        // Main title of the content
+	FFDescription = "description"  // Content description, similar to plot/summary
+	FFGenre       = "genre"        // Genre classification, e.g., Drama, Comedy
+	FFAlbum       = "album"        // Album name (for music or collections)
+	FFArtist      = "artist"       // Main artist or lead performer (e.g., actor)
+	FFComposer    = "composer"     // Composer of the background score
+	FFWriter      = "writer"       // Screenwriter or primary writer
+	FFDirector    = "director"     // Director of the content
+	FFPublisher   = "publisher"    // Content publisher or studio name
+	FFCopyright   = "copyright"    // Copyright information
+	FFAlbumArtist = "album_artist" // Album artist for music albums or collections
+	FFTrack       = "track"        // Track number in an album or playlist
+	FFLanguage    = "language"     // Language of the primary audio
+	FFShow        = "show"         // Series or show title (for episodic content)
+	FFEpisodeSort = "episode_sort" // Episode number for sorting
+
+	// Episode-Specific Tags
+
+	FFSeasonNumber    = "season_number" // Season number for TV shows
+	FFEpisodeID       = "episode_id"    // Episode ID or number
+	FFEpisodicContent = "episodic"      // Flag for episodic content if supported
+
+	// Date and Time Metadata
+
+	FFDate      = "date"       // Release date or aired date
+	FFYear      = "year"       // Year of release or production
+	FFTrackDate = "track_date" // Track recording or album release date
+
+	// Ratings and Classification
+
+	FFRating      = "rating"       // Parental or content rating, e.g., PG-13
+	FFMediaRating = "media_rating" // Additional rating if applicable
+	FFMPAA        = "mpaa"         // MPAA rating (or similar for other regions)
+
+	// Thumbnail, Artwork, and Fan Art
+
+	FFCoverArt = "cover_art" // Cover art or poster image
+	FFFanArt   = "fanart"    // Background artwork
+
+	// Sorting and Display Titles
+
+	FFSortTitle     = "sort_title"     // Alternate title for sorting
+	FFOriginalTitle = "original_title" // Original title (if different from main title)
+	FFTagline       = "tagline"        // Short tagline or subtitle
+	FFSubTitle      = "subtitle"       // Subtitle for secondary title info
+
+	// Technical and Miscellaneous
+
+	FFEncoder     = "encoder"     // Software or tool used for encoding
+	FFEncodedBy   = "encoded_by"  // Name of the person or software encoding
+	FFCompilation = "compilation" // Compilation flag, often used in music
+	FFComment     = "comment"     // General-purpose comment or notes
+	FFLocation    = "location"    // Filming or content location
+	FFRatingURL   = "rating_url"  // URL linking to rating information
+	FFCategory    = "category"    // Category (often used in online content)
+	FFMood        = "mood"        // Mood or tone of the content
+	FFLicense     = "license"     // Content license type
+	FFURL         = "url"         // URL associated with the content, e.g., webpage
