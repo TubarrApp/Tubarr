@@ -260,9 +260,7 @@ func (mc *MetarrCommand) renameStyle(c string) []string {
 // removeEmptyLines strips empty lines from the result
 func (mc *MetarrCommand) removeEmptyLines(lines []string) []string {
 	var rtn []string
-
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
 		if line == "" || line == "\n" {
 			continue
 		}
