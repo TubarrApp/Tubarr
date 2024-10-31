@@ -1,8 +1,8 @@
 package utils
 
 import (
-	consts "Metarr/internal/domain/constants"
-	logging "Metarr/internal/utils/logging"
+	consts "Tubarr/internal/domain/constants"
+	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-// createBackup creates a backup copy of the original file before modifying it.
+// BackupFile creates a backup copy of the original file before modifying it.
+// helps save important data if the program fails in some way
 func BackupFile(file *os.File) error {
 
 	// Get the original filename

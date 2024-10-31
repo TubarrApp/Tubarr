@@ -1,14 +1,91 @@
+package domain
+
+import (
+	"Tubarr/internal/models"
+	logging "Tubarr/internal/utils/logging"
+	"fmt"
+	"os/exec"
+	"strings"
+)
+
+type VideoCommandBuilder struct {
+	Model *models.DownloadedFiles
+}
+
+func NewVideoCommandBuilder(d *models.DownloadedFiles) *VideoCommandBuilder {
+	return &VideoCommandBuilder{
+		Model: d,
+	}
+}
+
+// BuildVideoFetchCommand builds the command for yt-dlp
+func (vf *VideoCommandBuilder) VideoFetchCommand() (*exec.Cmd, error) {
+
+	if vf.Model == nil {
+		return nil, fmt.Errorf("model passed in null, returning no command")
+	}
+
+	vDir := vf.Model.VideoDirectory
+	cookieSource := vf.Model.CookieSource
+	url := vf.Model.URL
+	eDl := vf.Model.ExternalDler
+	eDlArgs := vf.Model.ExternalDlerArgs
+
+	var args []string
+
+	switch {
+	case strings.Contains(url, "censored.tv"):
+		// Not implemented
+	default:
+		// Use default
+	}
+
+	args = append(args, writeJsonLocation(vDir)...)
+	args = append(args, "--restrict-filenames", "-o", "%(title)s.%(ext)s")
+	args = append(args, "--retries", "999", "--retry-sleep", "10")
+	args = append(args, "--print", "after_move:%(filepath)s")
+
+	if len(cookieSource) > 0 {
+		args = append(args, "--cookies-from-browser", cookieSource)
+	}
+	if len(eDl) > 0 {
+		args = append(args, "--external-downloader", eDl)
+	}
+	if len(eDlArgs) > 0 {
+		args = append(args, "--external-downloader-args", eDlArgs)
+	}
+	if len(url) != 0 {
+		args = append(args, url)
+	}
+
+	logging.PrintD(1, "Built argument list: %v", args)
+
+	return exec.Command("yt-dlp", args...), nil
+}
+
+func writeJsonLocation(s string) []string {
+	if s != "" {
+		return []string{"--write-info-json", "-P", s}
+	}
+	return nil
+}
 package command
 
 import (
+	builder "Tubarr/internal/command/builder"
 	"Tubarr/internal/config"
-	consts "Tubarr/internal/domain/constants"
 	keys "Tubarr/internal/domain/keys"
 	"Tubarr/internal/models"
+	utils "Tubarr/internal/utils/fs/write"
 	logging "Tubarr/internal/utils/logging"
+	"bufio"
+	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -20,7 +97,7 @@ func DownloadVideos(urls []string) ([]models.DownloadedFiles, error) {
 	muDl.Lock()
 	defer muDl.Unlock()
 
-	cookies := config.GetString(keys.CookieSource)
+	cookieSource := config.GetString(keys.CookieSource)
 	if len(urls) == 0 {
 		return nil, nil
 	}
@@ -32,36 +109,131 @@ func DownloadVideos(urls []string) ([]models.DownloadedFiles, error) {
 	var dlFiles []models.DownloadedFiles
 
 	for _, entry := range urls {
-		var dlFile models.DownloadedFiles
-		if entry != "" {
-			dlFile.URL = entry
-		}
-		command := consts.GrabLatestCommand(vDir, entry, cookies, eDl, eDlArgs, dlFile)
-		if command != nil {
-			dlFile.DownloadCommand = command
-		}
-		logging.PrintI(command.String())
-
-		command.Stdin = os.Stdin
-		command.Stdout = os.Stdout
-		command.Stderr = os.Stderr
-
-		if output, err := command.Output(); err != nil {
-			logging.PrintE(0, "Error running command for URL '%s': %v", entry, err)
+		if entry == "" {
 			continue
-		} else if len(output) > 0 {
-			outputLines := strings.Split(strings.TrimSpace(string(output)), "\n")
-			if len(outputLines) >= 2 {
-				dlFile.VideoFilename = strings.TrimSpace(outputLines[0]) // Video filename
-				dlFile.JSONFilename = strings.TrimSpace(outputLines[1])  // JSON filename
-				logging.PrintS(0, "Successfully downloaded file '%s' with metadata '%s'", dlFile.VideoFilename, dlFile.JSONFilename)
-			} else {
-				logging.PrintE(0, "Expected two output lines for URL '%s', but got: %v", entry, outputLines)
-			}
 		}
+
+		dlFile := models.DownloadedFiles{
+			CookieSource:     cookieSource,
+			ExternalDler:     eDl,
+			ExternalDlerArgs: eDlArgs,
+			URL:              entry,
+			VideoDirectory:   vDir,
+		}
+
+		vcb := builder.NewVideoCommandBuilder(&dlFile)
+
+		cmd, err := vcb.VideoFetchCommand()
+		if err != nil {
+			logging.PrintE(0, "Failed to build command for URL '%s': %v", dlFile.URL, err)
+		}
+
+		// Create pipes for stdout and stderr
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			logging.PrintE(0, "Failed to create stdout pipe: %v", err)
+			continue
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			logging.PrintE(0, "Failed to create stderr pipe: %v", err)
+			continue
+		}
+
+		// Start command
+		logging.PrintI("Executing download command: %s", cmd.String())
+		if err := cmd.Start(); err != nil {
+			logging.PrintE(0, "Failed to start download: %v", err)
+			continue
+		}
+
+		// Create output scanner
+		scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
+		var outputFilename string
+
+		// Read output in real-time
+		go func() {
+			for scanner.Scan() {
+				line := scanner.Text()
+				fmt.Println(line)
+				// Capture the actual output filename
+				if strings.HasPrefix(line, "/") {
+					switch {
+					case strings.HasSuffix(line, ".avi"),
+						strings.HasSuffix(line, ".mkv"),
+						strings.HasSuffix(line, ".mov"),
+						strings.HasSuffix(line, ".mp4"),
+						strings.HasSuffix(line, ".webm"),
+						strings.HasSuffix(line, ".wmv"):
+
+						outputFilename = line
+
+					default:
+						logging.PrintD(1, "Did not find video format in output %s", line)
+					}
+				}
+			}
+		}()
+
+		// Wait for command to complete
+		if err := cmd.Wait(); err != nil {
+			logging.PrintE(0, "Download failed: %v", err)
+			continue
+		}
+
+		// Wait a moment for filesystem to sync
+		time.Sleep(1 * time.Second)
+
+		if outputFilename == "" {
+			logging.PrintE(0, "No output filename captured for URL: %s", entry)
+			continue
+		}
+
+		dlFile.VideoFilename = outputFilename
+		baseName := strings.TrimSuffix(filepath.Base(outputFilename), filepath.Ext(outputFilename))
+		dlFile.JSONFilename = filepath.Join(vDir, baseName+".info.json")
+
+		// Verify the download
+		if err := verifyDownload(dlFile.VideoFilename, dlFile.JSONFilename); err != nil {
+			logging.PrintE(0, "Download verification failed: %v", err)
+			continue
+		}
+
+		logging.PrintS(0, "Successfully downloaded files:\nVideo: %s\nJSON: %s",
+			dlFile.VideoFilename, dlFile.JSONFilename)
 		dlFiles = append(dlFiles, dlFile)
 	}
+
+	if len(dlFiles) == 0 {
+		return nil, fmt.Errorf("no files were successfully downloaded")
+	} else {
+		utils.AppendURLsToFile(config.GetString(keys.ChannelFile), urls)
+	}
+
 	return dlFiles, nil
+}
+
+// verifyDownload checks if the specified files exist and are non-empty
+func verifyDownload(videoPath, jsonPath string) error {
+	// Check video file
+	videoInfo, err := os.Stat(videoPath)
+	if err != nil {
+		return fmt.Errorf("video file verification failed: %w", err)
+	}
+	if videoInfo.Size() == 0 {
+		return fmt.Errorf("video file is empty: %s", videoPath)
+	}
+
+	// Check JSON file
+	jsonInfo, err := os.Stat(jsonPath)
+	if err != nil {
+		return fmt.Errorf("JSON file verification failed: %w", err)
+	}
+	if jsonInfo.Size() == 0 {
+		return fmt.Errorf("JSON file is empty: %s", jsonPath)
+	}
+
+	return nil
 }
 package command
 
@@ -111,7 +283,6 @@ func (mc *MetarrCommand) ParseMetarrPreset(d []models.DownloadedFiles) (map[stri
 	var fileCommandMap = make(map[string][]string)
 
 	for _, model := range d {
-
 		mPresetFilepath := config.GetString(keys.MetarrPreset)
 
 		content, err := os.ReadFile(mPresetFilepath)
@@ -131,6 +302,10 @@ func (mc *MetarrCommand) ParseMetarrPreset(d []models.DownloadedFiles) (map[stri
 		args = append(args, mc.dateTagFormat(cStr)...)
 		args = append(args, mc.renameStyle(cStr)...)
 		args = append(args, "--meta-overwrite")
+
+		if config.IsSet(keys.MoveOnComplete) {
+			args = append(args, "--move-on-complete", config.GetString(keys.MoveOnComplete))
+		}
 
 		fileCommandMap[model.VideoFilename] = args
 	}
@@ -391,6 +566,12 @@ func init() {
 
 	rootCmd.PersistentFlags().String(keys.ExternalDownloaderArgs, "", "Arguments for external downloader (e.g. \"-x 16 -s 16\")")
 	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
+
+	rootCmd.PersistentFlags().String(keys.MoveOnComplete, "", "Move files to given directory on program completion")
+	viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete))
+
+	rootCmd.PersistentFlags().IntP(keys.DebugLevel, "d", 0, "Set the logging level")
+	viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel))
 }
 
 // Execute is the primary initializer of Viper
@@ -434,14 +615,27 @@ func execute() error {
 	channelsCheckNew := strings.Split(string(content), "\n")
 	viper.Set(keys.ChannelCheckNew, channelsCheckNew)
 
-	cookieSource := GetString(keys.CookieSource)
+	if IsSet(keys.CookieSource) {
+		cookieSource := GetString(keys.CookieSource)
 
-	switch cookieSource {
-	case "brave", "chrome", "edge", "firefox", "opera", "safari", "vivaldi", "whale":
-		logging.PrintI("Using %s for cookies", cookieSource)
-	default:
-		return fmt.Errorf("invalid cookie source set. yt-dlp supports firefox, chrome, vivaldi, opera, edge, and brave")
+		switch cookieSource {
+		case "brave", "chrome", "edge", "firefox", "opera", "safari", "vivaldi", "whale":
+			logging.PrintI("Using %s for cookies", cookieSource)
+		default:
+			return fmt.Errorf("invalid cookie source set. yt-dlp supports firefox, chrome, vivaldi, opera, edge, and brave")
+		}
 	}
+
+	dLevel := GetInt(keys.DebugLevel)
+	switch {
+	case dLevel <= 0:
+		logging.Level = 0
+	case dLevel >= 3:
+		logging.Level = 3
+	default:
+		logging.Level = dLevel
+	}
+
 	return nil
 }
 package config
@@ -530,52 +724,6 @@ var RedError string = fmt.Sprintf("%v[ERROR] %v", ColorRed, ColorReset)
 var YellowDebug string = fmt.Sprintf("%v[DEBUG] %v", ColorYellow, ColorReset)
 var GreenSuccess string = fmt.Sprintf("%v[SUCCESS] %v", ColorGreen, ColorReset)
 var BlueInfo string = fmt.Sprintf("%v[Info] %v", ColorCyan, ColorReset)
-package domain
-
-import (
-	"Tubarr/internal/models"
-	"os/exec"
-	"strings"
-)
-
-var ()
-
-func GrabLatestCommand(vDir, url, cookies, eDl, eDlArgs string, d models.DownloadedFiles) *exec.Cmd {
-
-	var args []string
-
-	switch {
-	case strings.Contains(d.URL, "censored.tv"):
-	default:
-		// Use default
-	}
-
-	args = append(args, writeJsonLocation(vDir)...)
-	args = append(args, "--restrict-filenames", "-o", "%(title)s.%(ext)s")
-	args = append(args, "--retries", "999", "--retry-sleep", "10")
-	args = append(args, "--print", "filename")
-
-	if len(cookies) > 0 {
-		args = append(args, "--cookies-from-browser", cookies)
-	}
-	if len(eDl) > 0 {
-		args = append(args, "--external-downloader", eDl)
-	}
-	if len(eDlArgs) > 0 {
-		args = append(args, "--external-downloader-args", eDlArgs)
-	}
-	if len(url) != 0 {
-		args = append(args, url)
-	}
-	return exec.Command("yt-dlp", args...)
-}
-
-func writeJsonLocation(s string) []string {
-	if s != "" {
-		return []string{"--write-info-json", "-P", s}
-	}
-	return nil
-}
 package domain
 
 // File prefix and suffix
@@ -819,90 +967,6 @@ const (
 )
 package domain
 
-// User selection of filetypes to convert from
-type ConvertFromFiletype int
-
-const (
-	IN_ALL_EXTENSIONS ConvertFromFiletype = iota
-	IN_MKV            ConvertFromFiletype = iota
-	IN_MP4            ConvertFromFiletype = iota
-	IN_WEBM           ConvertFromFiletype = iota
-	IN_MKVWEBM        ConvertFromFiletype = iota
-)
-
-// User system graphics hardware for transcoding
-type SysGPU int
-
-const (
-	NVIDIA      SysGPU = iota
-	AMD         SysGPU = iota
-	INTEL       SysGPU = iota
-	NO_HW_ACCEL SysGPU = iota
-)
-
-// Naming syle
-type ReplaceToStyle int
-
-const (
-	SPACES      ReplaceToStyle = iota
-	UNDERSCORES ReplaceToStyle = iota
-	SKIP        ReplaceToStyle = iota
-)
-
-// Date formats
-type FilenameDateFormat int
-
-const (
-	FILEDATE_YYYY_MM_DD FilenameDateFormat = iota
-	FILEDATE_YY_MM_DD   FilenameDateFormat = iota
-	FILEDATE_YYYY_DD_MM FilenameDateFormat = iota
-	FILEDATE_YY_DD_MM   FilenameDateFormat = iota
-	FILEDATE_DD_MM_YYYY FilenameDateFormat = iota
-	FILEDATE_DD_MM_YY   FilenameDateFormat = iota
-	FILEDATE_MM_DD_YYYY FilenameDateFormat = iota
-	FILEDATE_MM_DD_YY   FilenameDateFormat = iota
-	FILEDATE_SKIP       FilenameDateFormat = iota
-)
-
-// Web tags
-type MetaFileTypeEnum int
-
-const (
-	METAFILE_JSON MetaFileTypeEnum = iota
-	METAFILE_NFO  MetaFileTypeEnum = iota
-	WEBCLASS_XML  MetaFileTypeEnum = iota
-)
-
-// Viper variable types
-type ViperVarTypes int
-
-const (
-	VIPER_ANY          ViperVarTypes = iota
-	VIPER_BOOL         ViperVarTypes = iota
-	VIPER_INT          ViperVarTypes = iota
-	VIPER_STRING       ViperVarTypes = iota
-	VIPER_STRING_SLICE ViperVarTypes = iota
-)
-
-// Web tags
-type WebClassTags int
-
-const (
-	WEBCLASS_DATE        WebClassTags = iota
-	WEBCLASS_TITLE       WebClassTags = iota
-	WEBCLASS_DESCRIPTION WebClassTags = iota
-	WEBCLASS_CREDITS     WebClassTags = iota
-	WEBCLASS_WEBINFO     WebClassTags = iota
-)
-
-// Presets
-type SitePresets int
-
-const (
-	PRESET_CENSOREDTV SitePresets = iota
-)
-package domain
-
 // Terminal keys
 const (
 	VideoDir               string = "video-dir"
@@ -914,6 +978,7 @@ const (
 	CookieSource           string = "cookie-source"
 	ExternalDownloader     string = "external-downloader"
 	ExternalDownloaderArgs string = "external-downloader-args"
+	MoveOnComplete         string = "move-on-complete"
 )
 
 // Primary program
@@ -934,17 +999,21 @@ const (
 
 // Logging
 var (
-	DebugLevel string
+	DebugLevel string = "debug-level"
 )
 package models
 
 import "os/exec"
 
 type DownloadedFiles struct {
-	VideoFilename   string
-	JSONFilename    string
-	URL             string
-	DownloadCommand *exec.Cmd
+	VideoDirectory   string
+	VideoFilename    string
+	JSONFilename     string
+	URL              string
+	CookieSource     string
+	ExternalDler     string
+	ExternalDlerArgs string
+	DownloadCommand  *exec.Cmd
 }
 package utils
 
@@ -959,6 +1028,8 @@ import (
 	_ "github.com/browserutils/kooky/browser/all"
 )
 
+// GetBrowserCookies sets cookies input by the user. Useful for getting URLs
+// from websites which require authentication!
 func GetBrowserCookies(url string) ([]*http.Cookie, error) {
 
 	baseURL, err := extractBaseDomain(url)
@@ -1058,7 +1129,6 @@ func GetNewReleases() []string {
 		if url == "" {
 			continue
 		}
-
 		if cookies, err := GetBrowserCookies(url); err != nil {
 			logging.PrintE(0, "Could not get cookies (%v)", err)
 		} else if urls, err := newEpisodeURLs(url, cookies); err != nil {
@@ -1082,17 +1152,41 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 
 	var episodeURLs []string
 
+	// Video URL link pattern
 	switch {
 	case strings.Contains(targetURL, "censored.tv"):
-		episodeURLs = censoredTvEpisodes(c, episodeURLs)
+		logging.PrintI("Detected censored.tv link")
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if strings.Contains(link, "/episode/") {
+				episodeURLs = append(episodeURLs, link)
+			}
+		})
+	case strings.Contains(targetURL, "rumble.com"):
+		logging.PrintI("Detected Rumble link")
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if strings.Contains(link, "/v/") {
+				episodeURLs = append(episodeURLs, link)
+			}
+		})
+	case strings.Contains(targetURL, "odysee.com"):
+		logging.PrintI("Detected Odysee link")
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if strings.Contains(link, "/@") && !strings.Contains(link, "/playlist/") {
+				episodeURLs = append(episodeURLs, link)
+			}
+		})
+	default:
+		logging.PrintI("Using default link detection")
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if strings.Contains(link, "/episode/") {
+				episodeURLs = append(episodeURLs, link)
+			}
+		})
 	}
-
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if strings.Contains(link, "/episode/") {
-			episodeURLs = append(episodeURLs, link)
-		}
-	})
 
 	// Visit the target URL
 	err := c.Visit(targetURL)
@@ -1114,20 +1208,16 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 		}
 	}
 
-	// Append new URLs to the file and return them
-	if len(newURLs) > 0 {
-		if err := appendURLsToFile("grabbed-urls.txt", newURLs); err != nil {
-			return nil, fmt.Errorf("error appending new URLs to file: %v", err)
-		}
-	} else {
+	// Check if any new URLs are present
+	if len(newURLs) == 0 {
 		logging.PrintI("No new videos at %s, exiting...", targetURL)
-		// NO NEW VIDEOS, EXIT
 		os.Exit(0)
 	}
+
 	return newURLs, nil
 }
 
-// loadURLsFromFile reads URLs from a file and returns them as a map for quick lookup
+// loadGrabbedURLsFromFile reads URLs from a file and returns them as a map for quick lookup
 func loadGrabbedURLsFromFile(filename string) (map[string]struct{}, error) {
 	videoDir := config.GetString(keys.VideoDir)
 	var filepath string
@@ -1158,68 +1248,34 @@ func loadGrabbedURLsFromFile(filename string) (map[string]struct{}, error) {
 
 	return urlMap, nil
 }
-
-// appendURLsToFile appends new URLs to the specified file
-func appendURLsToFile(filename string, urls []string) error {
-	logging.PrintD(2, "Appending URLs to file... %v", urls)
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Track URLs that have already been written
-	written := make(map[string]bool)
-
-	// Load existing URLs from the file into the map
-	existingFile, err := os.Open(filename)
-	if err == nil {
-		defer existingFile.Close()
-		var line string
-		for scanner := bufio.NewScanner(existingFile); scanner.Scan(); {
-			line = scanner.Text()
-			written[line] = true
-		}
-	}
-
-	// Append only new URLs to the file
-	for _, url := range urls {
-		if !written[url] {
-			if _, err := file.WriteString(url + "\n"); err != nil {
-				return err
-			}
-			written[url] = true
-		}
-	}
-
-	return nil
-}
 package utils
 
 import (
+	logging "Tubarr/internal/utils/logging"
 	"strings"
 
 	"github.com/gocolly/colly"
 )
 
 // censoredTvEpisodes looks for episode links on Censored.TV channel pages
-func censoredTvEpisodes(c *colly.Collector, s []string) []string {
+func censoredTvEpisodes(c *colly.Collector) []string {
+	var episodes []string
 
-	// Scrape all links that contain "/episode/"
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Request.AbsoluteURL(e.Attr("href"))
 		if strings.Contains(link, "/episode/") {
-			s = append(s, link)
+			logging.PrintD(2, "Found episode URL: %s", link)
+			episodes = append(episodes, link)
 		}
 	})
 
-	return s
+	return episodes
 }
 package utils
 
 import (
-	consts "Metarr/internal/domain/constants"
-	logging "Metarr/internal/utils/logging"
+	consts "Tubarr/internal/domain/constants"
+	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"io"
 	"os"
@@ -1227,7 +1283,8 @@ import (
 	"strings"
 )
 
-// createBackup creates a backup copy of the original file before modifying it.
+// BackupFile creates a backup copy of the original file before modifying it.
+// helps save important data if the program fails in some way
 func BackupFile(file *os.File) error {
 
 	// Get the original filename
@@ -1283,345 +1340,43 @@ func RenameToBackup(filename string) error {
 package utils
 
 import (
-	"Metarr/internal/config"
-	consts "Metarr/internal/domain/constants"
-	enums "Metarr/internal/domain/enums"
-	keys "Metarr/internal/domain/keys"
-	"Metarr/internal/types"
-	logging "Metarr/internal/utils/logging"
-	"fmt"
+	logging "Tubarr/internal/utils/logging"
+	"bufio"
 	"os"
-	"path/filepath"
-	"regexp"
-	"strings"
 )
 
-// GetVideoFiles fetches video files from a directory
-func GetVideoFiles(videoDir *os.File) (map[string]*types.FileData, error) {
-	files, err := videoDir.ReadDir(-1)
+// appendURLsToFile appends new URLs to the specified file
+func AppendURLsToFile(filename string, urls []string) error {
+	logging.PrintD(2, "Appending URLs to file... %v", urls)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("error reading video directory: %w", err)
+		return err
 	}
+	defer file.Close()
 
-	convertFrom := config.Get(keys.InputExtsEnum).([]enums.ConvertFromFiletype)
-	videoExtensions := SetExtensions(convertFrom)
-	inputPrefixFilters := config.GetStringSlice(keys.FilePrefixes)
-	inputPrefixes := SetPrefixFilter(inputPrefixFilters)
+	// Track URLs that have already been written
+	written := make(map[string]bool)
 
-	fmt.Printf(`
-
-Filtering directory: %s:
-
-File extensions: %v
-File prefixes: %v
-
-`, videoDir.Name(),
-		videoExtensions,
-		inputPrefixes)
-
-	videoFiles := make(map[string]*types.FileData)
-
-	for _, file := range files {
-		if !file.IsDir() && HasFileExtension(file.Name(), videoExtensions) && HasPrefix(file.Name(), inputPrefixes) {
-			filenameBase := filepath.Base(file.Name())
-
-			m := types.NewFileData()
-			m.OriginalVideoPath = filepath.Join(videoDir.Name(), file.Name())
-			m.OriginalVideoBaseName = strings.TrimSuffix(filenameBase, filepath.Ext(file.Name()))
-			m.VideoDirectory = videoDir.Name()
-
-			if !strings.HasSuffix(m.OriginalVideoBaseName, consts.OldTag) {
-				videoFiles[file.Name()] = m
-			} else {
-				logging.PrintI("Skipping file '%s' containing backup tag ('%s')", m.OriginalVideoBaseName, consts.OldTag)
+	// Load existing URLs from the file into the map
+	existingFile, err := os.Open(filename)
+	if err == nil {
+		defer existingFile.Close()
+		var line string
+		for scanner := bufio.NewScanner(existingFile); scanner.Scan(); {
+			line = scanner.Text()
+			written[line] = true
+		}
+	}
+	// Append only new URLs to the file
+	for _, url := range urls {
+		if !written[url] {
+			if _, err := file.WriteString(url + "\n"); err != nil {
+				return err
 			}
-
-			logging.PrintI(`Added video to queue: %v`, filenameBase)
+			written[url] = true
 		}
 	}
-
-	if len(videoFiles) == 0 {
-		return nil, fmt.Errorf("no video files with extensions: %v and prefixes: %v found in directory: %s", videoExtensions, inputPrefixes, videoDir.Name())
-	}
-	return videoFiles, nil
-}
-
-// GetMetadataFiles fetches metadata files from a directory
-func GetMetadataFiles(metaDir *os.File) (map[string]*types.FileData, error) {
-	files, err := metaDir.ReadDir(-1)
-	if err != nil {
-		return nil, fmt.Errorf("error reading metadata directory: %w", err)
-	}
-
-	metaExtensions := []string{".json", ".nfo"}
-	inputPrefixFilters := config.GetStringSlice(keys.FilePrefixes)
-	inputPrefixes := SetPrefixFilter(inputPrefixFilters)
-
-	metaFiles := make(map[string]*types.FileData)
-
-	for _, extension := range metaExtensions {
-		for _, file := range files {
-			if !file.IsDir() && strings.HasSuffix(file.Name(), extension) && HasPrefix(file.Name(), inputPrefixes) {
-
-				logging.PrintD(3, "Iterating over file '%s'", file.Name())
-
-				filenameBase := filepath.Base(file.Name())
-
-				logging.PrintD(3, "Made base name for file: %s", filenameBase)
-
-				m := types.NewFileData()
-
-				filePath := filepath.Join(metaDir.Name(), file.Name())
-				baseName := strings.TrimSuffix(filenameBase, filepath.Ext(file.Name()))
-
-				logging.PrintD(3, "Filepath and base name: %s, %s", filePath, baseName)
-
-				switch filepath.Ext(filePath) {
-				case ".json":
-					logging.PrintD(1, "Detected JSON file '%s'", file.Name())
-					m.JSONFilePath = filePath
-					m.JSONBaseName = baseName
-					m.JSONDirectory = metaDir.Name()
-
-					m.MetaFileType = enums.METAFILE_JSON
-
-					logging.PrintD(3, "Meta file type set in model to %v", m.MetaFileType)
-
-				case ".nfo":
-					logging.PrintD(1, "Detected NFO file '%s'", file.Name())
-					m.NFOFilePath = filePath
-					m.NFOBaseName = baseName
-					m.NFODirectory = metaDir.Name()
-
-					m.MetaFileType = enums.METAFILE_NFO
-
-					logging.PrintD(3, "Meta file type set in model to %v", m.MetaFileType)
-				}
-
-				if !strings.Contains(baseName, consts.OldTag) {
-					metaFiles[file.Name()] = m
-				} else {
-					logging.PrintI("Skipping file '%s' containing backup tag ('%s')", m.JSONBaseName, consts.OldTag)
-				}
-			}
-		}
-	}
-	if len(metaFiles) == 0 {
-		return nil, fmt.Errorf("no meta files with extensions: %v and prefixes: %v found in directory: %s", metaExtensions, inputPrefixes, metaDir.Name())
-	}
-
-	logging.PrintD(3, "Returning meta files %v", metaFiles)
-	return metaFiles, nil
-}
-
-// MatchVideoWithMetadata matches video files with their corresponding metadata files
-func MatchVideoWithMetadata(videoFiles, metaFiles map[string]*types.FileData) (map[string]*types.FileData, error) {
-
-	logging.PrintD(3, "Entering metadata and video file matching loop...")
-
-	matchedFiles := make(map[string]*types.FileData)
-
-	specialChars := regexp.MustCompile(`[^\w\s-]`)
-	extraSpaces := regexp.MustCompile(`\s+`)
-
-	for videoName, videoData := range videoFiles {
-
-		// Normalize video name
-		videoBase := strings.TrimSuffix(videoName, filepath.Ext(videoName))
-		normalizedVideoBase := NormalizeFilename(videoBase, specialChars, extraSpaces)
-		logging.PrintD(3, "Normalized video base: %s", normalizedVideoBase)
-
-		for metaName, metaData := range metaFiles {
-
-			metaBase := TrimMetafileSuffixes(metaName, videoBase)
-			normalizedMetaBase := NormalizeFilename(metaBase, specialChars, extraSpaces)
-			logging.PrintD(3, "Normalized metadata base: %s", normalizedMetaBase)
-
-			if strings.Contains(normalizedMetaBase, normalizedVideoBase) {
-				matchedFiles[videoName] = videoData
-				matchedFiles[videoName].MetaFileType = metaData.MetaFileType
-
-				logging.PrintD(3, "Entering meta filetype switch for matching videos and metadata...")
-
-				switch videoData.MetaFileType {
-
-				case enums.METAFILE_JSON:
-
-					logging.PrintD(3, "Detected JSON")
-					matchedFiles[videoName].JSONFilePath = metaData.JSONFilePath
-					matchedFiles[videoName].JSONBaseName = metaData.JSONBaseName
-					matchedFiles[videoName].JSONDirectory = metaData.JSONDirectory
-
-				case enums.METAFILE_NFO:
-
-					logging.PrintD(3, "Detected NFO")
-					matchedFiles[videoName].NFOFilePath = metaData.NFOFilePath
-					matchedFiles[videoName].NFOBaseName = metaData.NFOBaseName
-					matchedFiles[videoName].NFODirectory = metaData.NFODirectory
-				}
-			}
-		}
-	}
-
-	if len(matchedFiles) == 0 {
-		return nil, fmt.Errorf("no matching metadata files found for any videos")
-	}
-
-	return matchedFiles, nil
-}
-package utils
-
-import (
-	enums "Metarr/internal/domain/enums"
-	logging "Metarr/internal/utils/logging"
-	"strings"
-)
-
-// hasVideoExtension checks if the file has a valid video extension
-func HasFileExtension(fileName string, extensions []string) bool {
-
-	if extensions == nil {
-		logging.PrintE(0, "NO EXTENSIONS PICKED.")
-		return false
-	}
-
-	for _, ext := range extensions {
-		if strings.HasSuffix(strings.ToLower(fileName), strings.ToLower(ext)) {
-			return true
-		}
-	}
-
-	// No matches
-	return false
-}
-
-// hasPrefix determines if the input file has the desired prefix
-func HasPrefix(fileName string, prefixes []string) bool {
-
-	if prefixes == nil {
-		prefixes = append(prefixes, "")
-	}
-
-	for _, data := range prefixes {
-		if strings.HasPrefix(strings.ToLower(fileName), strings.ToLower(data)) {
-			return true
-		}
-	}
-
-	// No matches
-	return false
-}
-
-// setExtensions creates a list of extensions to filter
-func SetExtensions(convertFrom []enums.ConvertFromFiletype) []string {
-
-	var videoExtensions []string
-
-	for _, arg := range convertFrom {
-
-		switch arg {
-		case enums.IN_ALL_EXTENSIONS:
-			videoExtensions = append(videoExtensions, ".mp4",
-				".mkv",
-				".avi",
-				".wmv",
-				".webm")
-
-		case enums.IN_MKV:
-			videoExtensions = append(videoExtensions, ".mkv")
-
-		case enums.IN_MP4:
-			videoExtensions = append(videoExtensions, ".mp4")
-
-		case enums.IN_WEBM:
-			videoExtensions = append(videoExtensions, ".webm")
-
-		default:
-			logging.PrintE(0, "Incorrect file format selected, reverting to default (convert from all)")
-			videoExtensions = append(videoExtensions, ".mp4",
-				".mkv",
-				".avi",
-				".wmv",
-				".webm")
-		}
-	}
-
-	return videoExtensions
-}
-
-// setPrefixFilter sets a list of prefixes to filter
-func SetPrefixFilter(inputPrefixFilters []string) []string {
-
-	var prefixFilters []string
-
-	prefixFilters = append(prefixFilters, inputPrefixFilters...)
-
-	return prefixFilters
-}
-package utils
-
-import (
-	logging "Metarr/internal/utils/logging"
-	"regexp"
-	"strings"
-)
-
-// normalizeFilename removes special characters and normalizes spacing
-func NormalizeFilename(filename string, specialChars, extraSpaces *regexp.Regexp) string {
-
-	normalized := strings.ToLower(filename)
-	normalized = specialChars.ReplaceAllString(normalized, "")
-	normalized = extraSpaces.ReplaceAllString(normalized, " ")
-	normalized = strings.TrimSpace(normalized)
-
-	return normalized
-}
-
-// trimJsonSuffixes normalizes away common json string suffixes
-// e.g. ".info" for yt-dlp outputted JSON files
-func TrimMetafileSuffixes(metaBase, videoBase string) string {
-
-	switch {
-
-	case strings.HasSuffix(metaBase, ".info.json"): // FFmpeg
-		if !strings.HasSuffix(videoBase, ".info") {
-			metaBase = strings.TrimSuffix(metaBase, ".info.json")
-		} else {
-			metaBase = strings.TrimSuffix(metaBase, ".json")
-		}
-
-	case strings.HasSuffix(metaBase, ".metadata.json"): // Angular
-		if !strings.HasSuffix(videoBase, ".metadata") {
-			metaBase = strings.TrimSuffix(metaBase, ".metadata.json")
-		} else {
-			metaBase = strings.TrimSuffix(metaBase, ".json")
-		}
-
-	case strings.HasSuffix(metaBase, ".model.json"):
-		if !strings.HasSuffix(videoBase, ".model") {
-			metaBase = strings.TrimSuffix(metaBase, ".model.json")
-		} else {
-			metaBase = strings.TrimSuffix(metaBase, ".json")
-		}
-
-	case strings.HasSuffix(metaBase, ".manifest.cdfd.json"):
-		if !strings.HasSuffix(videoBase, ".manifest.cdm") {
-			metaBase = strings.TrimSuffix(metaBase, ".manifest.cdfd.json")
-		} else {
-			metaBase = strings.TrimSuffix(metaBase, ".json")
-		}
-
-	default:
-		switch {
-		case !strings.HasSuffix(videoBase, ".json"): // Edge cases where metafile extension is in the suffix of the video file
-			metaBase = strings.TrimSuffix(metaBase, ".json")
-		case !strings.HasSuffix(videoBase, ".nfo"):
-			metaBase = strings.TrimSuffix(metaBase, ".nfo")
-		default:
-			logging.PrintD(1, "Common suffix not found for metafile (%s)", metaBase)
-		}
-	}
-	return metaBase
+	return nil
 }
 package utils
 
@@ -1782,7 +1537,7 @@ var mu sync.Mutex
 var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 // SetupLogging creates and/or opens the log file
-func SetupLogging(targetDir string, logFile *os.File) error {
+func SetupLogging(logFile *os.File) error {
 
 	Logger = log.New(logFile, "", log.LstdFlags)
 	Loggable = true
@@ -1865,154 +1620,10 @@ func WriteArray(tag string, infoMsg []string, err []error, args ...interface{}) 
 func stripAnsiCodes(input string) string {
 	return ansiEscape.ReplaceAllString(input, "")
 }
-package print
-
-import (
-	consts "Metarr/internal/domain/constants"
-	"Metarr/internal/types"
-	logging "Metarr/internal/utils/logging"
-	"fmt"
-	"reflect"
-	"sync"
-)
-
-var muPrint sync.Mutex
-
-// CreateModelPrintout prints out the values stored in a struct.
-// taskName allows you to enter your own identifier for this task.
-func CreateModelPrintout(model any, filename, taskName string, args ...interface{}) {
-	muPrint.Lock()
-	defer muPrint.Unlock()
-
-	output := "\n\n================= " + consts.ColorCyan + "Printing metadata fields for:" + consts.ColorReset + " '" + consts.ColorReset + filename + "' =================\n"
-
-	if taskName != "" {
-		str := fmt.Sprintf("'"+taskName+"'", args...)
-		output += "\n" + consts.ColorGreen + "Printing model at point of task " + consts.ColorReset + str + "\n"
-	}
-
-	// Add fields from the struct
-	output += consts.ColorYellow + "\nFile Information:\n" + consts.ColorReset
-	output += printStructFields(model)
-
-	if m, ok := model.(*types.FileData); ok {
-		output += consts.ColorYellow + "\nCredits:\n" + consts.ColorReset
-		output += printStructFields(m.MCredits)
-
-		output += consts.ColorYellow + "\nTitles and descriptions:\n" + consts.ColorReset
-		output += printStructFields(m.MTitleDesc)
-
-		output += consts.ColorYellow + "\nDates and timestamps:\n" + consts.ColorReset
-		output += printStructFields(m.MDates)
-
-		output += consts.ColorYellow + "\nWebpage data:\n" + consts.ColorReset
-		output += printStructFields(m.MWebData)
-
-		output += consts.ColorYellow + "\nShow data:\n" + consts.ColorReset
-		output += printStructFields(m.MShowData)
-
-		output += consts.ColorYellow + "\nOther data:\n" + consts.ColorReset
-		output += printStructFields(m.MOther)
-	} else if n, ok := model.(*types.NFOData); ok {
-		output += consts.ColorYellow + "\nCredits:\n" + consts.ColorReset
-		for _, actor := range n.Actors {
-			output += printStructFields(actor.Name)
-		}
-		for _, director := range n.Directors {
-			output += printStructFields(director)
-		}
-		for _, producer := range n.Producers {
-			output += printStructFields(producer)
-		}
-		for _, publisher := range n.Publishers {
-			output += printStructFields(publisher)
-		}
-		for _, studio := range n.Studios {
-			output += printStructFields(studio)
-		}
-		for _, writer := range n.Writers {
-			output += printStructFields(writer)
-		}
-
-		output += consts.ColorYellow + "\nTitles and descriptions:\n" + consts.ColorReset
-		output += printStructFields(n.Title)
-		output += printStructFields(n.Description)
-		output += printStructFields(n.Plot)
-
-		output += consts.ColorYellow + "\nWebpage data:\n" + consts.ColorReset
-		output += printStructFields(n.WebpageInfo)
-
-		output += consts.ColorYellow + "\nShow data:\n" + consts.ColorReset
-		output += printStructFields(n.ShowInfo.Show)
-		output += printStructFields(n.ShowInfo.EpisodeID)
-		output += printStructFields(n.ShowInfo.EpisodeTitle)
-		output += printStructFields(n.ShowInfo.SeasonNumber)
-	}
-
-	output += "\n\n================= " + consts.ColorYellow + "End metadata fields for:" + consts.ColorReset + " '" + filename + "' =================\n\n"
-
-	logging.Print(output)
-}
-
-// Function to print the fields of a struct using reflection
-func printStructFields(s interface{}) string {
-	val := reflect.ValueOf(s)
-
-	// Dereference pointer
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
-
-	if val.Kind() != reflect.Struct {
-		return fmt.Sprintf("Expected a struct, got %s\n", val.Kind())
-	}
-
-	typ := val.Type()
-	output := ""
-
-	for i := 0; i < val.NumField(); i++ {
-		field := typ.Field(i)      // Get field metadata
-		fieldValue := val.Field(i) // Get field value
-
-		// Skip zero or empty fields
-		if fieldValue.IsZero() {
-			output += field.Name + consts.ColorRed + " [empty]\n" + consts.ColorReset
-			continue
-		}
-
-		fieldName := field.Name
-		fieldValueStr := fmt.Sprintf("%v", fieldValue.Interface()) // Convert the value to a string
-
-		// Append the field name and value in key-value format
-		output += fmt.Sprintf("%s: %s\n", fieldName, fieldValueStr)
-	}
-
-	return output
-}
-
-// Print out the fetched fields
-func PrintGrabbedFields(fieldType string, p *map[string]string) {
-
-	printMap := *p
-
-	muPrint.Lock()
-	defer muPrint.Unlock()
-
-	fmt.Println()
-	logging.PrintI("Found and stored %s metadata fields from metafile:", fieldType)
-	fmt.Println()
-
-	for printKey, printVal := range printMap {
-		if printKey != "" && printVal != "" {
-			fmt.Printf(consts.ColorGreen + "Key: " + consts.ColorReset + printKey + consts.ColorYellow + "\nValue: " + consts.ColorReset + printVal + "\n")
-		}
-	}
-	fmt.Println()
-}
 package utils
 
 import (
-	logging "Metarr/internal/utils/logging"
+	logging "Tubarr/internal/utils/logging"
 	"bufio"
 	"context"
 	"fmt"
@@ -2077,7 +1688,7 @@ func PromptMetaReplace(promptMsg, fileName string, overwriteAll, preserveAll *bo
 package main
 
 import (
-	"Tubarr/internal/command"
+	execute "Tubarr/internal/command/execute"
 	"Tubarr/internal/config"
 	keys "Tubarr/internal/domain/keys"
 	"Tubarr/internal/models"
@@ -2085,46 +1696,86 @@ import (
 	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/viper"
 )
 
-// main is the program entrypoint
+// main is the program entrypoint (duh!)
 func main() {
 	if err := config.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Println()
 		os.Exit(1)
 	}
+
 	if !viper.GetBool("execute") {
 		fmt.Println()
 		return // Exit early if not meant to execute
 	}
+
+	if config.IsSet(keys.VideoDir) {
+		vDir := config.GetString(keys.VideoDir)
+		if !strings.HasSuffix(vDir, "/") {
+			vDir += "/"
+		}
+
+		// Create directory if it doesn't exist
+		if err := os.MkdirAll(vDir, 0755); err != nil {
+			logging.PrintE(0, "Failed to create directory structure: %v", err)
+			os.Exit(1)
+		}
+
+		// Open file with create flag
+		logFile, err := os.OpenFile(vDir+"tubarr-log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			logging.PrintE(0, "Encountered an error opening/creating the log file: %v", err)
+			os.Exit(1)
+		}
+		defer logFile.Close()
+
+		if err := logging.SetupLogging(logFile); err != nil {
+			logging.PrintE(0, "Encountered error setting up logging: %v", err)
+			os.Exit(1)
+		}
+	} else {
+		logging.Print("No video directory sent in. Skipping logging")
+	}
+
 	if err := process(); err != nil {
 		logging.PrintE(0, err.Error())
 		os.Exit(1)
 	}
 }
 
-// process begins the main Tubarr program
+// process begins the main Tubarr program:
+// Grabs and downloads new releases and
+// sends to Metarr for post-processing
 func process() error {
 
 	var dlFiles []models.DownloadedFiles
 	var err error
 
+	// Get new releases and download videos
 	if config.IsSet(keys.ChannelCheckNew) {
 		urls := browser.GetNewReleases()
-		dlFiles, err = command.DownloadVideos(urls)
+		logging.PrintD(2, "Got URLs: %v", urls)
+
+		dlFiles, err = execute.DownloadVideos(urls)
 		if err != nil {
 			return fmt.Errorf("error downloading new videos: %w", err)
 		}
 	}
-	mcb := command.NewMetarrCommandBuilder()
+	// Send to Metarr for tagging (or conversion to desired format)
+	mcb := execute.NewMetarrCommandBuilder()
 	if config.IsSet(keys.MetarrPreset) {
 		mappedCommands, err := mcb.ParseMetarrPreset(dlFiles)
 		if err != nil {
 			return err
-		} else if err := mcb.RunMetarr(mappedCommands); err != nil {
+		}
+		logging.PrintD(2, "Got mapped commands: %v", mappedCommands)
+
+		if err := mcb.RunMetarr(mappedCommands); err != nil {
 			return err
 		}
 	}

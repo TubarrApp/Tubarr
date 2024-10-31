@@ -51,6 +51,12 @@ func init() {
 
 	rootCmd.PersistentFlags().String(keys.ExternalDownloaderArgs, "", "Arguments for external downloader (e.g. \"-x 16 -s 16\")")
 	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
+
+	rootCmd.PersistentFlags().String(keys.MoveOnComplete, "", "Move files to given directory on program completion")
+	viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete))
+
+	rootCmd.PersistentFlags().IntP(keys.DebugLevel, "d", 0, "Set the logging level")
+	viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel))
 }
 
 // Execute is the primary initializer of Viper
@@ -104,5 +110,16 @@ func execute() error {
 			return fmt.Errorf("invalid cookie source set. yt-dlp supports firefox, chrome, vivaldi, opera, edge, and brave")
 		}
 	}
+
+	dLevel := GetInt(keys.DebugLevel)
+	switch {
+	case dLevel <= 0:
+		logging.Level = 0
+	case dLevel >= 3:
+		logging.Level = 3
+	default:
+		logging.Level = dLevel
+	}
+
 	return nil
 }

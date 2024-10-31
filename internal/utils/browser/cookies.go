@@ -11,6 +11,8 @@ import (
 	_ "github.com/browserutils/kooky/browser/all"
 )
 
+// GetBrowserCookies sets cookies input by the user. Useful for getting URLs
+// from websites which require authentication!
 func GetBrowserCookies(url string) ([]*http.Cookie, error) {
 
 	baseURL, err := extractBaseDomain(url)

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	logging "Metarr/internal/utils/logging"
+	logging "Tubarr/internal/utils/logging"
 	"bufio"
 	"context"
 	"fmt"

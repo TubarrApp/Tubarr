@@ -18,7 +18,7 @@ var mu sync.Mutex
 var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 // SetupLogging creates and/or opens the log file
-func SetupLogging(targetDir string, logFile *os.File) error {
+func SetupLogging(logFile *os.File) error {
 
 	Logger = log.New(logFile, "", log.LstdFlags)
 	Loggable = true

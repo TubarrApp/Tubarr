@@ -11,6 +11,7 @@ const (
 	CookieSource           string = "cookie-source"
 	ExternalDownloader     string = "external-downloader"
 	ExternalDownloaderArgs string = "external-downloader-args"
+	MoveOnComplete         string = "move-on-complete"
 )
 
 // Primary program
@@ -31,5 +32,5 @@ const (
 
 // Logging
 var (
-	DebugLevel string
+	DebugLevel string = "debug-level"
 )
