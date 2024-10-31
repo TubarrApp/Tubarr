@@ -27,7 +27,7 @@ func censoredTvPreset(args []string, url string) []string {
 	creator := ""
 
 	for i, entry := range splitUrl {
-		if !strings.HasSuffix(entry, ".com/") {
+		if !strings.HasSuffix(entry, ".com") {
 			continue
 		}
 		if len(splitUrl) >= i+1 {
@@ -38,10 +38,10 @@ func censoredTvPreset(args []string, url string) []string {
 	if creator != "" { // Should ensure the segment directly after .com/ was grabbed
 
 		titleCase := cases.Title(language.English)
-		creator := titleCase.String(creator)
+		creator = titleCase.String(creator)
 
 		switch strings.ToLower(creator) {
-		case "atheism is unstoppable": // Devon Tracey uses a hyphenated username
+		case "atheism is unstoppable": // Special case for Atheism-is-Unstoppable
 			creator = "Atheism-is-Unstoppable"
 		}
 
