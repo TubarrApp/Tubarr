@@ -4,57 +4,339 @@ import (
 	"Tubarr/internal/config"
 	consts "Tubarr/internal/domain/constants"
 	keys "Tubarr/internal/domain/keys"
+	"Tubarr/internal/models"
 	logging "Tubarr/internal/utils/logging"
-	"fmt"
 	"os"
+	"strings"
+	"sync"
+)
+
+var (
+	muDl sync.Mutex
 )
 
 // DownloadVideos takes in a list of URLs
-func DownloadVideos(urls []string) error {
+func DownloadVideos(urls []string) ([]models.DownloadedFiles, error) {
+	muDl.Lock()
+	defer muDl.Unlock()
 
-	cookieSource := config.GetString(keys.CookieSource)
-
+	cookies := config.GetString(keys.CookieSource)
 	if len(urls) == 0 {
-		return fmt.Errorf("function called but no URLs passed in? (URL list: %v)", urls)
+		return nil, nil
 	}
 
-	for _, entry := range urls {
-		command := consts.GrabLatestCommand(config.GetString(keys.VideoDir), entry, cookieSource)
+	vDir := config.GetString(keys.VideoDir)
+	eDl := config.GetString(keys.ExternalDownloader)
+	eDlArgs := config.GetString(keys.ExternalDownloaderArgs)
 
+	var dlFiles []models.DownloadedFiles
+
+	for _, entry := range urls {
+		var dlFile models.DownloadedFiles
+		if entry != "" {
+			dlFile.URL = entry
+		}
+		command := consts.GrabLatestCommand(vDir, entry, cookies, eDl, eDlArgs, dlFile)
+		if command != nil {
+			dlFile.DownloadCommand = command
+		}
 		logging.PrintI(command.String())
 
+		command.Stdin = os.Stdin
 		command.Stdout = os.Stdout
 		command.Stderr = os.Stderr
 
-		if err := command.Run(); err != nil {
-			return fmt.Errorf("error running command for URL '%s': %v", entry, err)
+		if output, err := command.Output(); err != nil {
+			logging.PrintE(0, "Error running command for URL '%s': %v", entry, err)
+			continue
+		} else if len(output) > 0 {
+			outputLines := strings.Split(strings.TrimSpace(string(output)), "\n")
+			if len(outputLines) >= 2 {
+				dlFile.VideoFilename = strings.TrimSpace(outputLines[0]) // Video filename
+				dlFile.JSONFilename = strings.TrimSpace(outputLines[1])  // JSON filename
+				logging.PrintS(0, "Successfully downloaded file '%s' with metadata '%s'", dlFile.VideoFilename, dlFile.JSONFilename)
+			} else {
+				logging.PrintE(0, "Expected two output lines for URL '%s', but got: %v", entry, outputLines)
+			}
 		}
+		dlFiles = append(dlFiles, dlFile)
 	}
-
-	return nil
+	return dlFiles, nil
 }
 package command
 
 import (
+	config "Tubarr/internal/config"
+	keys "Tubarr/internal/domain/keys"
+	"Tubarr/internal/models"
 	logging "Tubarr/internal/utils/logging"
+	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
-func RunMetarr(args []string) error {
+type MetarrCommand struct{}
 
-	command := exec.Command("Metarr", args...)
-	logging.PrintI("Running command: %s", command.String())
+// NewMetarrCommandBuilder returns a new command builder to build and run Metarr commands
+func NewMetarrCommandBuilder() *MetarrCommand {
+	return &MetarrCommand{}
+}
 
-	command.Stderr = os.Stderr
-	command.Stdout = os.Stdout
+// RunMetarr runs a Metarr command with a built argument list
+func (mc *MetarrCommand) RunMetarr(commands map[string][]string) error {
 
-	if err := command.Run(); err != nil {
-		logging.PrintE(0, "Encountered error running command '%s': %v", command.String(), err)
-		return err
+	var err error
+
+	for _, args := range commands {
+		command := exec.Command("metarr", args...)
+		logging.PrintI("Running command: %s", command.String())
+
+		command.Stderr = os.Stderr
+		command.Stdout = os.Stdout
+		command.Stdin = os.Stdin
+
+		if err = command.Run(); err != nil {
+			logging.PrintE(0, "Encountered error running command '%s': %w", command.String(), err)
+		}
+	}
+	return err // Nil by default
+}
+
+// ParseMetarrPreset parses the Metarr from a preset file
+func (mc *MetarrCommand) ParseMetarrPreset(d []models.DownloadedFiles) (map[string][]string, error) {
+
+	logging.PrintI("Sending to Metarr for metadata insertion")
+
+	var fileCommandMap = make(map[string][]string)
+
+	for _, model := range d {
+
+		mPresetFilepath := config.GetString(keys.MetarrPreset)
+
+		content, err := os.ReadFile(mPresetFilepath)
+		if err != nil {
+			return nil, fmt.Errorf("error reading file '%s': %w", mPresetFilepath, err)
+		}
+		cStr := string(content)
+
+		var args []string
+
+		args = append(args, "-V", model.VideoFilename)
+		args = append(args, "-J", model.JSONFilename)
+
+		args = append(args, mc.filenameReplaceSuffix(cStr)...)
+		args = append(args, mc.metaReplaceSuffix(cStr)...)
+		args = append(args, mc.metaAddField(cStr)...)
+		args = append(args, mc.dateTagFormat(cStr)...)
+		args = append(args, mc.renameStyle(cStr)...)
+		args = append(args, "--meta-overwrite")
+
+		fileCommandMap[model.VideoFilename] = args
 	}
 
-	return nil
+	return fileCommandMap, nil
+}
+
+// dateTagFormat builds the date tag format to prefix filenames with
+func (mc *MetarrCommand) dateTagFormat(c string) []string {
+	var args []string
+	if fDateTag := strings.Index(c, "[filename-date-tag]"); fDateTag != -1 {
+
+		content := c[fDateTag+len("[filename-date-tag]")+1:]
+
+		endIdx := strings.Index(content, "[")
+		if endIdx != -1 {
+			content = content[:endIdx-1]
+		}
+		lines := strings.Split(content, "\n")
+
+		lines = mc.removeEmptyLines(lines)
+
+		if len(lines) > 0 {
+			args = append(args, "--filename-date-tag")
+		}
+		for i, line := range lines {
+			if line == "" {
+				continue
+			}
+			if i == 0 {
+				switch line {
+				case "Ymd", "ymd", "mdY", "mdy", "dmY", "dmy":
+					args = append(args, line)
+				default:
+					logging.PrintE(0, "Date tag format entry syntax is incorrect, should be in a format such as Ymd (for yyyy-mm-dd) or ymd (for yy-mm-dd) and so on...")
+					args = append(args, "")
+				}
+			}
+		}
+	}
+	return args
+}
+
+// metaAddField builds the argument for insertion of a new metafield
+func (mc *MetarrCommand) metaAddField(c string) []string {
+	var args []string
+	if mAddField := strings.Index(c, "[meta-add-field]"); mAddField != -1 {
+
+		content := c[mAddField+len("[meta-add-field]")+1:]
+
+		endIdx := strings.Index(content, "[")
+		if endIdx != -1 {
+			content = content[:endIdx-1]
+		}
+		lines := strings.Split(content, "\n")
+
+		lines = mc.removeEmptyLines(lines)
+
+		for i, line := range lines {
+			if line == "" {
+				continue
+			}
+			entry := strings.SplitN(line, ":", 2)
+			if len(entry) != 2 {
+				logging.PrintE(0, "Error in meta-add-field entry, please use syntax 'metatag:value'")
+			} else {
+				if i == 0 {
+					args = append(args, "--meta-add-field")
+				}
+				args = append(args, line)
+			}
+		}
+	}
+	return args
+}
+
+// filenameReplaceSuffix builds the metadata suffix replacement argument for Metarr
+func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
+	var args []string
+	if fReplaceSfxIdx := strings.Index(c, "[filename-replace-suffix]"); fReplaceSfxIdx != -1 {
+
+		content := c[fReplaceSfxIdx+len("[filename-replace-suffix]")+1:]
+
+		endIdx := strings.Index(content, "[")
+		if endIdx != -1 {
+			content = content[:endIdx-1]
+		}
+		lines := strings.Split(content, "\n")
+
+		lines = mc.removeEmptyLines(lines)
+
+		for i, line := range lines {
+			if line == "" {
+				continue
+			}
+			entry := strings.SplitN(line, ":", 2)
+			if len(entry) != 2 {
+				logging.PrintE(0, "Error in filename-replace-suffix entry, please use syntax 'suffix:replacement'")
+			} else {
+				if i == 0 {
+					args = append(args, "--filename-replace-suffix")
+				}
+				switch {
+				case i < len(lines)-1:
+					args = append(args, line)
+				default:
+					args = append(args, line)
+				}
+			}
+		}
+	}
+	return args
+}
+
+// metaReplaceSuffix builds the metadata suffix replacement argument for Metarr
+func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
+	var args []string
+	if mReplaceSfxIdx := strings.Index(c, "[meta-replace-suffix]"); mReplaceSfxIdx != -1 {
+
+		content := c[mReplaceSfxIdx+len("[meta-replace-suffix]")+1:]
+
+		endIdx := strings.Index(content, "[")
+		if endIdx != -1 {
+			content = content[:endIdx-1]
+		}
+		lines := strings.Split(content, "\n")
+
+		lines = mc.removeEmptyLines(lines)
+
+		for i, line := range lines {
+			if line == "" {
+				continue
+			}
+			entry := strings.SplitN(line, ":", 3)
+			if len(entry) != 3 {
+				logging.PrintE(0, "Error in meta-replace-suffix entry, please use syntax 'metatag:suffix:replacement'")
+			} else {
+				if i == 0 {
+					args = append(args, "--meta-replace-suffix")
+				}
+				switch {
+				case i < len(lines)-1:
+					args = append(args, line)
+				default:
+					args = append(args, line)
+				}
+			}
+		}
+	}
+	return args
+}
+
+// renameStyle is the chosen style of renaming, e.g. spaces, underscores
+func (mc *MetarrCommand) renameStyle(c string) []string {
+	var args []string
+	if rStyle := strings.Index(c, "[rename-style]"); rStyle != -1 {
+
+		content := c[rStyle+len("[rename-style]")+1:]
+
+		endIdx := strings.Index(content, "[")
+		if endIdx != -1 {
+			content = content[:endIdx-1]
+		}
+		lines := strings.Split(content, "\n")
+
+		lines = mc.removeEmptyLines(lines)
+
+		if len(lines) > 0 {
+			args = append(args, "-r")
+		}
+		for i, line := range lines {
+			if line == "" {
+				continue
+			}
+			if i == 0 {
+				switch line {
+				case "spaces", "underscores", "skip":
+					args = append(args, line)
+				default:
+					logging.PrintE(0, "Rename style entry syntax is incorrect, should be spaces, underscores, or skip.")
+					args = append(args, "skip")
+				}
+			}
+		}
+	}
+	return args
+}
+
+// removeEmptyLines strips empty lines from the result
+func (mc *MetarrCommand) removeEmptyLines(lines []string) []string {
+	var rtn []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "\n" {
+			continue
+		}
+		rtn = append(rtn, line)
+	}
+	switch {
+	case len(rtn) > 0:
+		return rtn
+	default:
+		rtn = append(rtn, "")
+		return rtn
+	}
 }
 package config
 
@@ -92,6 +374,10 @@ func init() {
 	rootCmd.PersistentFlags().StringP(keys.MetaDir, "m", ".", "Metadata directory location")
 	viper.BindPFlag(keys.MetaDir, rootCmd.PersistentFlags().Lookup(keys.MetaDir))
 
+	// Channels to check
+	rootCmd.PersistentFlags().StringP(keys.ChannelFile, "c", "", "File of channels to check for new videos")
+	viper.BindPFlag(keys.ChannelFile, rootCmd.PersistentFlags().Lookup(keys.ChannelFile))
+
 	// Cookie source
 	rootCmd.PersistentFlags().String(keys.CookieSource, "", "Browser to grab cookies from for sites requiring authentication (e.g. firefox)")
 	viper.BindPFlag(keys.CookieSource, rootCmd.PersistentFlags().Lookup(keys.CookieSource))
@@ -100,9 +386,11 @@ func init() {
 	rootCmd.PersistentFlags().String(keys.MetarrPreset, "", "Metarr preset file location")
 	viper.BindPFlag(keys.MetarrPreset, rootCmd.PersistentFlags().Lookup(keys.MetarrPreset))
 
-	// Channels to check
-	rootCmd.PersistentFlags().StringP(keys.ChannelFile, "c", "", "File of channels to check for new videos")
-	viper.BindPFlag(keys.ChannelFile, rootCmd.PersistentFlags().Lookup(keys.ChannelFile))
+	rootCmd.PersistentFlags().String(keys.ExternalDownloader, "", "External downloader to use for yt-dlp (e.g. aria2c)")
+	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
+
+	rootCmd.PersistentFlags().String(keys.ExternalDownloaderArgs, "", "Arguments for external downloader (e.g. \"-x 16 -s 16\")")
+	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
 }
 
 // Execute is the primary initializer of Viper
@@ -143,10 +431,17 @@ func execute() error {
 	if err != nil {
 		logging.PrintE(0, "Unable to read file '%s'", channelFile)
 	}
-
 	channelsCheckNew := strings.Split(string(content), "\n")
 	viper.Set(keys.ChannelCheckNew, channelsCheckNew)
 
+	cookieSource := GetString(keys.CookieSource)
+
+	switch cookieSource {
+	case "brave", "chrome", "edge", "firefox", "opera", "safari", "vivaldi", "whale":
+		logging.PrintI("Using %s for cookies", cookieSource)
+	default:
+		return fmt.Errorf("invalid cookie source set. yt-dlp supports firefox, chrome, vivaldi, opera, edge, and brave")
+	}
 	return nil
 }
 package config
@@ -238,38 +533,48 @@ var BlueInfo string = fmt.Sprintf("%v[Info] %v", ColorCyan, ColorReset)
 package domain
 
 import (
+	"Tubarr/internal/models"
 	"os/exec"
+	"strings"
 )
 
-func GrabLatestCommand(videoDir, targetURL, cookieBrowser string) *exec.Cmd {
-	if len(cookieBrowser) > 0 {
-		return exec.Command(
-			"yt-dlp",
-			"--write-info-json",
-			"-P", videoDir,
-			"--external-downloader", "aria2c",
-			"--external-downloader-args", "-x 16 -s 16",
-			"--restrict-filenames",
-			"-o", "%(title)s.%(ext)s",
-			"--retries", "999",
-			"--retry-sleep", "10",
-			"--cookies-from-browser", cookieBrowser,
-			targetURL,
-		)
-	} else {
-		return exec.Command(
-			"yt-dlp",
-			"--write-info-json",
-			"-P", videoDir,
-			"--external-downloader", "aria2c",
-			"--external-downloader-args", "-x 16 -s 16",
-			"--restrict-filenames",
-			"-o", "%(title)s.%(ext)s",
-			"--retries", "999",
-			"--retry-sleep", "10",
-			targetURL,
-		)
+var ()
+
+func GrabLatestCommand(vDir, url, cookies, eDl, eDlArgs string, d models.DownloadedFiles) *exec.Cmd {
+
+	var args []string
+
+	switch {
+	case strings.Contains(d.URL, "censored.tv"):
+	default:
+		// Use default
 	}
+
+	args = append(args, writeJsonLocation(vDir)...)
+	args = append(args, "--restrict-filenames", "-o", "%(title)s.%(ext)s")
+	args = append(args, "--retries", "999", "--retry-sleep", "10")
+	args = append(args, "--print", "filename")
+
+	if len(cookies) > 0 {
+		args = append(args, "--cookies-from-browser", cookies)
+	}
+	if len(eDl) > 0 {
+		args = append(args, "--external-downloader", eDl)
+	}
+	if len(eDlArgs) > 0 {
+		args = append(args, "--external-downloader-args", eDlArgs)
+	}
+	if len(url) != 0 {
+		args = append(args, url)
+	}
+	return exec.Command("yt-dlp", args...)
+}
+
+func writeJsonLocation(s string) []string {
+	if s != "" {
+		return []string{"--write-info-json", "-P", s}
+	}
+	return nil
 }
 package domain
 
@@ -600,13 +905,15 @@ package domain
 
 // Terminal keys
 const (
-	VideoDir     string = "video-dir"
-	MetaDir      string = "metadata-dir"
-	InputExts    string = "input-exts"
-	InputPreset  string = "preset"
-	MetarrPreset string = "metarr-preset"
-	ChannelFile  string = "check-channels"
-	CookieSource string = "cookie-source"
+	VideoDir               string = "video-dir"
+	MetaDir                string = "metadata-dir"
+	InputExts              string = "input-exts"
+	InputPreset            string = "preset"
+	MetarrPreset           string = "metarr-preset"
+	ChannelFile            string = "check-channels"
+	CookieSource           string = "cookie-source"
+	ExternalDownloader     string = "external-downloader"
+	ExternalDownloaderArgs string = "external-downloader-args"
 )
 
 // Primary program
@@ -629,6 +936,16 @@ const (
 var (
 	DebugLevel string
 )
+package models
+
+import "os/exec"
+
+type DownloadedFiles struct {
+	VideoFilename   string
+	JSONFilename    string
+	URL             string
+	DownloadCommand *exec.Cmd
+}
 package utils
 
 import (
@@ -732,20 +1049,26 @@ import (
 	"github.com/gocolly/colly"
 )
 
-func GetNewChannelReleases() []string {
-
+// GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded
+func GetNewReleases() []string {
 	var newURLs []string
-
 	urlsToCheck := config.GetStringSlice(keys.ChannelCheckNew)
+
 	for _, url := range urlsToCheck {
+		if url == "" {
+			continue
+		}
+
 		if cookies, err := GetBrowserCookies(url); err != nil {
 			logging.PrintE(0, "Could not get cookies (%v)", err)
-		} else if newURLs, err = newEpisodeURLs(url, cookies); err != nil {
+		} else if urls, err := newEpisodeURLs(url, cookies); err != nil {
 			logging.PrintE(0, "Could not grab new episode (%v)", err)
+		} else {
+			newURLs = append(newURLs, urls...)
 		}
 	}
-	logging.PrintI("Grabbed new episode URLs: %v", newURLs)
 
+	logging.PrintI("Grabbed new episode URLs: %v", newURLs)
 	return newURLs
 }
 
@@ -763,6 +1086,13 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	case strings.Contains(targetURL, "censored.tv"):
 		episodeURLs = censoredTvEpisodes(c, episodeURLs)
 	}
+
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Request.AbsoluteURL(e.Attr("href"))
+		if strings.Contains(link, "/episode/") {
+			episodeURLs = append(episodeURLs, link)
+		}
+	})
 
 	// Visit the target URL
 	err := c.Visit(targetURL)
@@ -790,7 +1120,9 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			return nil, fmt.Errorf("error appending new URLs to file: %v", err)
 		}
 	} else {
-		logging.PrintI("No new videos at %s", targetURL)
+		logging.PrintI("No new videos at %s, exiting...", targetURL)
+		// NO NEW VIDEOS, EXIT
+		os.Exit(0)
 	}
 	return newURLs, nil
 }
@@ -1533,187 +1865,6 @@ func WriteArray(tag string, infoMsg []string, err []error, args ...interface{}) 
 func stripAnsiCodes(input string) string {
 	return ansiEscape.ReplaceAllString(input, "")
 }
-package metarr
-
-import (
-	config "Tubarr/internal/config"
-	keys "Tubarr/internal/domain/keys"
-	logging "Tubarr/internal/utils/logging"
-	"fmt"
-	"os"
-	"strings"
-)
-
-// ParseMetarrPreset parses the Metarr from a preset file
-func ParseMetarrPreset() ([]string, error) {
-
-	logging.PrintI("Sending to Metarr for metadata insertion")
-
-	mPresetFilepath := config.GetString(keys.MetarrPreset)
-
-	file, err := os.OpenFile(mPresetFilepath, os.O_RDONLY, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("unable to open Metarr preset file '%s': %v", mPresetFilepath, err)
-	}
-	defer file.Close()
-
-	content, err := os.ReadFile(mPresetFilepath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading file '%s': %v", mPresetFilepath, err)
-	}
-	cStr := string(content)
-
-	var args []string
-
-	vDir := config.GetString(keys.VideoDir)
-	mDir := config.GetString(keys.MetaDir)
-
-	args = append(args, "-v", vDir)
-	args = append(args, "-j", mDir)
-
-	args = append(args, metaReplaceSuffix(cStr)...)
-	args = append(args, metaAddField(cStr)...)
-	args = append(args, dateTagFormat(cStr)...)
-	args = append(args, renameStyle(cStr)...)
-
-	return args, nil
-}
-
-// dateTagFormat builds the date tag format to prefix filenames with
-func dateTagFormat(c string) []string {
-	var args []string
-	if fDateTag := strings.Index(c, "[filename-date-tag]"); fDateTag != -1 {
-
-		content := c[fDateTag+len("[filename-date-tag]")+1:]
-
-		endIdx := strings.Index(content, "[")
-		if endIdx != -1 {
-			content = content[:endIdx-1]
-		}
-		lines := strings.Split(content, "\n")
-
-		if len(lines) > 0 {
-			args = append(args, "--filename-date-tag")
-		}
-
-		if len(lines) > 1 {
-			logging.PrintE(0, "Please do not put multiple lines in the filename date tag format category. Using first line only...")
-		}
-		for i, line := range lines {
-			if i == 0 {
-				switch line {
-				case "Ymd", "ymd", "mdY", "mdy", "dmY", "dmy":
-					args = append(args, line)
-				default:
-					logging.PrintE(0, "Date tag format entry syntax is incorrect, should be in a format such as Ymd (for yyyy-mm-dd) or ymd (for yy-mm-dd) and so on...")
-					args = append(args, "")
-				}
-			}
-		}
-	}
-	return args
-}
-
-// metaAddField builds the argument for insertion of a new metafield
-func metaAddField(c string) []string {
-	var args []string
-	if mAddField := strings.Index(c, "[meta-add-field]"); mAddField != -1 {
-
-		content := c[mAddField+len("[meta-add-field]")+1:]
-
-		endIdx := strings.Index(content, "[")
-		if endIdx != -1 {
-			content = content[:endIdx-1]
-		}
-		lines := strings.Split(content, "\n")
-
-		for i, line := range lines {
-			entry := strings.SplitN(line, ":", 2)
-			if len(entry) != 2 {
-				logging.PrintE(0, "Error in meta-add-field entry, please use syntax 'metatag:value'")
-			} else {
-				if i == 0 {
-					args = append(args, "--meta-add-field")
-				}
-				switch {
-				case i < len(lines)-1:
-					args = append(args, line+",")
-				default:
-					args = append(args, line)
-				}
-			}
-		}
-	}
-	return args
-}
-
-// metaReplaceSuffix builds the metadata suffix replacement argument for Metarr
-func metaReplaceSuffix(c string) []string {
-	var args []string
-	if mReplaceSfxIdx := strings.Index(c, "[meta-replace-suffix]"); mReplaceSfxIdx != -1 {
-
-		content := c[mReplaceSfxIdx+len("[meta-replace-suffix]")+1:]
-
-		endIdx := strings.Index(content, "[")
-		if endIdx != -1 {
-			content = content[:endIdx-1]
-		}
-		lines := strings.Split(content, "\n")
-
-		for i, line := range lines {
-			entry := strings.SplitN(line, ":", 3)
-			if len(entry) != 3 {
-				logging.PrintE(0, "Error in meta-replace-suffix entry, please use syntax 'metatag:suffix:replacement'")
-			} else {
-				if i == 0 {
-					args = append(args, "--meta-replace-suffix")
-				}
-				switch {
-				case i < len(lines)-1:
-					args = append(args, line+",")
-				default:
-					args = append(args, line)
-				}
-			}
-		}
-	}
-	return args
-}
-
-// renameStyle is the chosen style of renaming, e.g. spaces, underscores
-func renameStyle(c string) []string {
-	var args []string
-	if rStyle := strings.Index(c, "[rename-style]"); rStyle != -1 {
-
-		content := c[rStyle+len("[rename-style]")+1:]
-
-		endIdx := strings.Index(content, "[")
-		if endIdx != -1 {
-			content = content[:endIdx-1]
-		}
-		lines := strings.Split(content, "\n")
-
-		if len(lines) > 0 {
-			args = append(args, "-r")
-		}
-
-		if len(lines) > 1 {
-			logging.PrintE(0, "Please do not put multiple lines in the rename style category. Using first line only...")
-		}
-		for i, line := range lines {
-			if i == 0 {
-				switch line {
-				case "spaces", "underscores", "skip":
-					args = append(args, line)
-				default:
-					logging.PrintE(0, "Rename style entry syntax is incorrect, should be spaces, underscores, or skip.")
-					args = append(args, "skip")
-				}
-			}
-		}
-	}
-	return args
-}
 package print
 
 import (
@@ -1929,49 +2080,53 @@ import (
 	"Tubarr/internal/command"
 	"Tubarr/internal/config"
 	keys "Tubarr/internal/domain/keys"
+	"Tubarr/internal/models"
 	browser "Tubarr/internal/utils/browser"
 	logging "Tubarr/internal/utils/logging"
-	metarr "Tubarr/internal/utils/metarr"
 	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
 )
 
+// main is the program entrypoint
 func main() {
-
 	if err := config.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Println()
 		os.Exit(1)
 	}
-
 	if !viper.GetBool("execute") {
 		fmt.Println()
 		return // Exit early if not meant to execute
 	}
-
-	process()
+	if err := process(); err != nil {
+		logging.PrintE(0, err.Error())
+		os.Exit(1)
+	}
 }
 
-func process() {
+// process begins the main Tubarr program
+func process() error {
+
+	var dlFiles []models.DownloadedFiles
+	var err error
 
 	if config.IsSet(keys.ChannelCheckNew) {
-		urls := browser.GetNewChannelReleases()
-		if err := command.DownloadVideos(urls); err != nil {
-			logging.PrintE(0, "Error downloading new videos: %v", err)
-		}
-	}
-
-	if config.IsSet(keys.MetarrPreset) {
-		args, err := metarr.ParseMetarrPreset()
+		urls := browser.GetNewReleases()
+		dlFiles, err = command.DownloadVideos(urls)
 		if err != nil {
-			logging.PrintE(0, err.Error())
-			return
-		}
-		if err := command.RunMetarr(args); err != nil {
-			logging.PrintE(0, err.Error())
-			return
+			return fmt.Errorf("error downloading new videos: %w", err)
 		}
 	}
+	mcb := command.NewMetarrCommandBuilder()
+	if config.IsSet(keys.MetarrPreset) {
+		mappedCommands, err := mcb.ParseMetarrPreset(dlFiles)
+		if err != nil {
+			return err
+		} else if err := mcb.RunMetarr(mappedCommands); err != nil {
+			return err
+		}
+	}
+	return nil
 }

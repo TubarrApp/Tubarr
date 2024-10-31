@@ -34,6 +34,10 @@ func init() {
 	rootCmd.PersistentFlags().StringP(keys.MetaDir, "m", ".", "Metadata directory location")
 	viper.BindPFlag(keys.MetaDir, rootCmd.PersistentFlags().Lookup(keys.MetaDir))
 
+	// Channels to check
+	rootCmd.PersistentFlags().StringP(keys.ChannelFile, "c", "", "File of channels to check for new videos")
+	viper.BindPFlag(keys.ChannelFile, rootCmd.PersistentFlags().Lookup(keys.ChannelFile))
+
 	// Cookie source
 	rootCmd.PersistentFlags().String(keys.CookieSource, "", "Browser to grab cookies from for sites requiring authentication (e.g. firefox)")
 	viper.BindPFlag(keys.CookieSource, rootCmd.PersistentFlags().Lookup(keys.CookieSource))
@@ -42,9 +46,11 @@ func init() {
 	rootCmd.PersistentFlags().String(keys.MetarrPreset, "", "Metarr preset file location")
 	viper.BindPFlag(keys.MetarrPreset, rootCmd.PersistentFlags().Lookup(keys.MetarrPreset))
 
-	// Channels to check
-	rootCmd.PersistentFlags().StringP(keys.ChannelFile, "c", "", "File of channels to check for new videos")
-	viper.BindPFlag(keys.ChannelFile, rootCmd.PersistentFlags().Lookup(keys.ChannelFile))
+	rootCmd.PersistentFlags().String(keys.ExternalDownloader, "", "External downloader to use for yt-dlp (e.g. aria2c)")
+	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
+
+	rootCmd.PersistentFlags().String(keys.ExternalDownloaderArgs, "", "Arguments for external downloader (e.g. \"-x 16 -s 16\")")
+	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
 }
 
 // Execute is the primary initializer of Viper
@@ -85,9 +91,18 @@ func execute() error {
 	if err != nil {
 		logging.PrintE(0, "Unable to read file '%s'", channelFile)
 	}
-
 	channelsCheckNew := strings.Split(string(content), "\n")
 	viper.Set(keys.ChannelCheckNew, channelsCheckNew)
 
+	if IsSet(keys.CookieSource) {
+		cookieSource := GetString(keys.CookieSource)
+
+		switch cookieSource {
+		case "brave", "chrome", "edge", "firefox", "opera", "safari", "vivaldi", "whale":
+			logging.PrintI("Using %s for cookies", cookieSource)
+		default:
+			return fmt.Errorf("invalid cookie source set. yt-dlp supports firefox, chrome, vivaldi, opera, edge, and brave")
+		}
+	}
 	return nil
 }

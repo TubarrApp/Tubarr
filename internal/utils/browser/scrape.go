@@ -13,7 +13,8 @@ import (
 	"github.com/gocolly/colly"
 )
 
-func GetNewChannelReleases() []string {
+// GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded
+func GetNewReleases() []string {
 	var newURLs []string
 	urlsToCheck := config.GetStringSlice(keys.ChannelCheckNew)
 
@@ -83,7 +84,9 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			return nil, fmt.Errorf("error appending new URLs to file: %v", err)
 		}
 	} else {
-		logging.PrintI("No new videos at %s", targetURL)
+		logging.PrintI("No new videos at %s, exiting...", targetURL)
+		// NO NEW VIDEOS, EXIT
+		os.Exit(0)
 	}
 	return newURLs, nil
 }

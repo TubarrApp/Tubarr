@@ -2,13 +2,15 @@ package domain
 
 // Terminal keys
 const (
-	VideoDir     string = "video-dir"
-	MetaDir      string = "metadata-dir"
-	InputExts    string = "input-exts"
-	InputPreset  string = "preset"
-	MetarrPreset string = "metarr-preset"
-	ChannelFile  string = "check-channels"
-	CookieSource string = "cookie-source"
+	VideoDir               string = "video-dir"
+	MetaDir                string = "metadata-dir"
+	InputExts              string = "input-exts"
+	InputPreset            string = "preset"
+	MetarrPreset           string = "metarr-preset"
+	ChannelFile            string = "check-channels"
+	CookieSource           string = "cookie-source"
+	ExternalDownloader     string = "external-downloader"
+	ExternalDownloaderArgs string = "external-downloader-args"
 )
 
 // Primary program

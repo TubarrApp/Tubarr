@@ -4,15 +4,16 @@ import (
 	"Tubarr/internal/command"
 	"Tubarr/internal/config"
 	keys "Tubarr/internal/domain/keys"
+	"Tubarr/internal/models"
 	browser "Tubarr/internal/utils/browser"
 	logging "Tubarr/internal/utils/logging"
-	metarr "Tubarr/internal/utils/metarr"
 	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
 )
 
+// main is the program entrypoint
 func main() {
 	if err := config.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -23,26 +24,33 @@ func main() {
 		fmt.Println()
 		return // Exit early if not meant to execute
 	}
-	process()
+	if err := process(); err != nil {
+		logging.PrintE(0, err.Error())
+		os.Exit(1)
+	}
 }
 
-func process() {
+// process begins the main Tubarr program
+func process() error {
+
+	var dlFiles []models.DownloadedFiles
+	var err error
 
 	if config.IsSet(keys.ChannelCheckNew) {
-		urls := browser.GetNewChannelReleases()
-		if err := command.DownloadVideos(urls); err != nil {
-			logging.PrintE(0, "Error downloading new videos: %v", err)
-		}
-	}
-	if config.IsSet(keys.MetarrPreset) {
-		args, err := metarr.ParseMetarrPreset()
+		urls := browser.GetNewReleases()
+		dlFiles, err = command.DownloadVideos(urls)
 		if err != nil {
-			logging.PrintE(0, err.Error())
-			return
-		}
-		if err := command.RunMetarr(args); err != nil {
-			logging.PrintE(0, err.Error())
-			return
+			return fmt.Errorf("error downloading new videos: %w", err)
 		}
 	}
+	mcb := command.NewMetarrCommandBuilder()
+	if config.IsSet(keys.MetarrPreset) {
+		mappedCommands, err := mcb.ParseMetarrPreset(dlFiles)
+		if err != nil {
+			return err
+		} else if err := mcb.RunMetarr(mappedCommands); err != nil {
+			return err
+		}
+	}
+	return nil
 }
