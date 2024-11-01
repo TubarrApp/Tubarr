@@ -3,12 +3,12 @@ package models
 import "os/exec"
 
 type DownloadedFiles struct {
-	VideoDirectory   string
-	VideoFilename    string
-	JSONFilename     string
-	URL              string
 	CookieSource     string
+	DownloadCommand  *exec.Cmd
 	ExternalDler     string
 	ExternalDlerArgs string
-	DownloadCommand  *exec.Cmd
+	JSONFilename     string
+	URL              string
+	VideoDirectory   string
+	VideoFilename    string
 }

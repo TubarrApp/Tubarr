@@ -15,7 +15,6 @@ import (
 
 // GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded
 func GetNewReleases() []string {
-	// Use a map to ensure URL uniqueness
 	uniqueURLs := make(map[string]struct{})
 	urlsToCheck := config.GetStringSlice(keys.ChannelCheckNew)
 
@@ -23,25 +22,39 @@ func GetNewReleases() []string {
 		if url == "" {
 			continue
 		}
-		if cookies, err := GetBrowserCookies(url); err != nil {
-			logging.PrintE(0, "Could not get cookies (%v)", err)
-		} else if urls, err := newEpisodeURLs(url, cookies); err != nil {
-			logging.PrintE(0, "Could not grab new episode (%v)", err)
-		} else {
-			// Add to map to ensure uniqueness
-			for _, newURL := range urls {
+
+		cookies, err := GetBrowserCookies(url)
+		if err != nil {
+			logging.PrintE(0, "Could not get cookies for %s: %v", url, err)
+			continue
+		}
+
+		urls, err := newEpisodeURLs(url, cookies)
+		if err != nil {
+			logging.PrintE(0, "Could not grab episodes from %s: %v", url, err)
+			continue
+		}
+
+		// Add unique URLs to map
+		for _, newURL := range urls {
+			if newURL != "" {
 				uniqueURLs[newURL] = struct{}{}
 			}
 		}
 	}
-
-	// Convert map back to slice
+	// Convert map to slice
 	var newURLs []string
 	for url := range uniqueURLs {
 		newURLs = append(newURLs, url)
 	}
 
-	logging.PrintI("Grabbed new episode URLs: %v", newURLs)
+	// Log results
+	if len(newURLs) > 0 {
+		logging.PrintI("Grabbed %d new episode URLs: %v", len(newURLs), newURLs)
+	} else {
+		logging.PrintD(1, "No new URLs found")
+	}
+
 	return newURLs
 }
 
@@ -55,9 +68,16 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	for _, cookie := range cookies {
 		c.SetCookies(targetURL, []*http.Cookie{cookie})
 	}
-
 	// Video URL link pattern
 	switch {
+	case strings.Contains(targetURL, "bitchute.com"):
+		logging.PrintI("Detected bitchute.com link")
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if strings.Contains(link, "/video/") {
+				uniqueEpisodeURLs[link] = struct{}{}
+			}
+		})
 	case strings.Contains(targetURL, "censored.tv"):
 		logging.PrintI("Detected censored.tv link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -66,19 +86,23 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
 		})
-	case strings.Contains(targetURL, "rumble.com"):
-		logging.PrintI("Detected Rumble link")
-		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-			link := e.Request.AbsoluteURL(e.Attr("href"))
-			if strings.Contains(link, "/v/") {
-				uniqueEpisodeURLs[link] = struct{}{}
-			}
-		})
 	case strings.Contains(targetURL, "odysee.com"):
 		logging.PrintI("Detected Odysee link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))
-			if strings.Contains(link, "/@") {
+			parts := strings.Split(link, "/")
+			if len(parts) > 1 {
+				lastPart := parts[len(parts)-1]
+				if strings.Contains(link, "@") && strings.Contains(link, lastPart+"/") {
+					uniqueEpisodeURLs[link] = struct{}{}
+				}
+			}
+		})
+	case strings.Contains(targetURL, "rumble.com"):
+		logging.PrintI("Detected Rumble link")
+		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if strings.Contains(link, "/v") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
 		})
@@ -122,17 +146,14 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 				break
 			}
 		}
-
 		if !exists {
 			newURLs = append(newURLs, url)
 		}
 	}
-
 	if len(newURLs) == 0 {
 		logging.PrintI("No new videos at %s", targetURL)
 		return nil, nil
 	}
-
 	return newURLs, nil
 }
 

@@ -7,16 +7,18 @@ import (
 	"golang.org/x/text/language"
 )
 
+// AutoPreset is the entrypoint for command presets
 func AutoPreset(url string) []string {
-
-	var args []string
+	args := make([]string, 0)
 	switch {
 	case strings.Contains(url, "censored.tv"):
 		return censoredTvPreset(args, url)
+	default:
+		return defaultArgs(args)
 	}
-	return nil
 }
 
+// censoredTvPreset sets common presets for censored.tv links
 func censoredTvPreset(args []string, url string) []string {
 
 	// Titles come appended with " (1)"
@@ -53,6 +55,14 @@ func censoredTvPreset(args []string, url string) []string {
 	args = append(args, "-r", "spaces")
 	args = append(args, "--filename-replace-suffix", " 1:")
 	args = append(args, "--meta-overwrite")
+
+	return args
+}
+
+// defaultArgs provides default Metarr arguments
+func defaultArgs(args []string) []string {
+
+	// Currently returns no arguments
 
 	return args
 }

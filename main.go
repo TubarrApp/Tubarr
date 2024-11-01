@@ -1,10 +1,10 @@
 package main
 
 import (
+	build "Tubarr/internal/command/builder"
 	execute "Tubarr/internal/command/execute"
 	"Tubarr/internal/config"
 	keys "Tubarr/internal/domain/keys"
-	"Tubarr/internal/models"
 	browser "Tubarr/internal/utils/browser"
 	logging "Tubarr/internal/utils/logging"
 	"fmt"
@@ -61,36 +61,35 @@ func main() {
 	}
 }
 
-// process begins the main Tubarr program:
-// Grabs and downloads new releases and
-// sends to Metarr for post-processing
+// process begins the main Tubarr program
 func process() error {
+	if !config.IsSet(keys.ChannelCheckNew) {
+		return fmt.Errorf("no channels configured to check")
+	}
 
-	var dlFiles []models.DownloadedFiles
-	var err error
+	urls := browser.GetNewReleases()
 
-	// Get new releases and download videos
-	if config.IsSet(keys.ChannelCheckNew) {
-		urls := browser.GetNewReleases()
-		logging.PrintD(2, "Got URLs: %v", urls)
+	if len(urls) == 0 {
+		logging.PrintI("No new URLs received from crawl")
+		return nil
+	}
 
-		dlFiles, err = execute.DownloadVideos(urls)
+	dlFiles, err := execute.DownloadVideos(urls)
+	if err != nil {
+		return fmt.Errorf("error downloading new videos: %w", err)
+	}
+
+	if config.IsSet(keys.MetarrPreset) && len(dlFiles) > 0 {
+		mcb := build.NewMetarrCommandBuilder()
+		commands, err := mcb.MakeMetarrCommands(dlFiles)
 		if err != nil {
-			return fmt.Errorf("error downloading new videos: %w", err)
+			return fmt.Errorf("failed to build metarr commands: %w", err)
+		}
+
+		if err := execute.RunMetarr(commands); err != nil {
+			return fmt.Errorf("failed to run metarr commands: %w", err)
 		}
 	}
-	// Send to Metarr for tagging (or conversion to desired format)
-	mcb := execute.NewMetarrCommandBuilder()
-	if config.IsSet(keys.MetarrPreset) {
-		mappedCommands, err := mcb.ParseMetarrPreset(dlFiles)
-		if err != nil {
-			return err
-		}
-		logging.PrintD(2, "Got mapped commands: %v", mappedCommands)
 
-		if err := mcb.RunMetarr(mappedCommands); err != nil {
-			return err
-		}
-	}
 	return nil
 }
