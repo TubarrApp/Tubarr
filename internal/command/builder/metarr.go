@@ -58,8 +58,6 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 		}
 	}
 
-	var fileCommandMap = make(map[string][]string)
-
 	for _, model := range d {
 		if model == nil {
 			continue
@@ -106,9 +104,11 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 		if outputExt != "" {
 			args = append(args, "--ext", outputExt)
 		}
+
+		var fileCommandMap = make(map[string][]string, len(args))
 		fileCommandMap[model.VideoFilename] = args
+		mc.Commands = fileCommandMap
 	}
-	mc.Commands = fileCommandMap
 	return nil
 }
 

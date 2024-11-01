@@ -20,11 +20,11 @@ func GetBrowserCookies(url string) ([]*http.Cookie, error) {
 		return nil, fmt.Errorf("failed to extract base domain: %v", err)
 	}
 
-	allCookies := []*http.Cookie{}
-	attemptedBrowsers := make(map[string]bool)
-
 	// Find all cookie stores
 	allStores := kooky.FindAllCookieStores()
+	allCookies := []*http.Cookie{}
+	attemptedBrowsers := make(map[string]bool, len(allStores))
+
 	for _, store := range allStores {
 		browserName := store.Browser()
 		logging.PrintD(2, "Attempting to read cookies from %s", browserName)
