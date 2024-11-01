@@ -38,6 +38,10 @@ func init() {
 	rootCmd.PersistentFlags().StringP(keys.ChannelFile, "c", "", "File of channels to check for new videos")
 	viper.BindPFlag(keys.ChannelFile, rootCmd.PersistentFlags().Lookup(keys.ChannelFile))
 
+	// Output filetype
+	rootCmd.PersistentFlags().StringP(keys.OutputFiletype, "o", "", "Output filetype (e.g. mp4)")
+	viper.BindPFlag(keys.OutputFiletype, rootCmd.PersistentFlags().Lookup(keys.OutputFiletype))
+
 	// Cookie source
 	rootCmd.PersistentFlags().String(keys.CookieSource, "", "Browser to grab cookies from for sites requiring authentication (e.g. firefox)")
 	viper.BindPFlag(keys.CookieSource, rootCmd.PersistentFlags().Lookup(keys.CookieSource))
@@ -121,5 +125,24 @@ func execute() error {
 		logging.Level = dLevel
 	}
 
+	verifyOutputFiletype()
+
 	return nil
+}
+
+// Verify the output filetype is valid for FFmpeg
+func verifyOutputFiletype() {
+	o := GetString(keys.OutputFiletype)
+	if !strings.HasPrefix(o, ".") {
+		o = "." + o
+		Set(keys.OutputFiletype, o)
+	}
+	switch o {
+	case ".3gp", ".avi", ".f4v", ".flv", ".m4v", ".mkv",
+		".mov", ".mp4", ".mpeg", ".mpg", ".ogm", ".ogv",
+		".ts", ".vob", ".webm", ".wmv":
+		logging.PrintI("Outputting files as %s", o)
+	default:
+		Set(keys.OutputFiletype, "")
+	}
 }

@@ -47,6 +47,9 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 	for _, model := range d {
 		args := make([]string, 0)
 
+		outputPath := config.GetString(keys.MoveOnComplete)
+		outputExt := config.GetString(keys.OutputFiletype)
+
 		args = append(args, "-V", model.VideoFilename)
 		args = append(args, "-J", model.JSONFilename)
 
@@ -63,13 +66,27 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 			args = append(args, mc.metaAddField(cStr)...)
 			args = append(args, mc.dateTagFormat(cStr)...)
 			args = append(args, mc.renameStyle(cStr)...)
+
+			if outputPath == "" {
+				if rtn, err := mc.outputLocation(cStr); err == nil {
+					args = append(args, rtn...)
+				}
+			}
+			if outputExt == "" {
+				if rtn, err := mc.outputExtension(cStr); err == nil {
+					args = append(args, rtn...)
+				}
+			}
 		} else { // Fallback to auto-preset detection
 			args = preset.AutoPreset(model.URL)
 		}
 		args = append(args, "--meta-overwrite")
 
-		if config.IsSet(keys.MoveOnComplete) {
-			args = append(args, "--move-on-complete", config.GetString(keys.MoveOnComplete))
+		if outputPath != "" {
+			args = append(args, "--move-on-complete", outputPath)
+		}
+		if outputExt != "" {
+			args = append(args, "-o", outputExt)
 		}
 		fileCommandMap[model.VideoFilename] = args
 	}
@@ -294,6 +311,73 @@ func (mc *MetarrCommand) renameStyle(c string) []string {
 		}
 	}
 	return args
+}
+
+// outputLocation designates the output directory
+func (mc *MetarrCommand) outputLocation(c string) ([]string, error) {
+	var args []string
+	if oDir := strings.Index(c, "[output-directory]"); oDir != -1 {
+
+		content := c[oDir+len("[output-directory]")+1:]
+
+		endIdx := strings.Index(content, "[")
+		if endIdx != -1 {
+			content = content[:endIdx-1]
+		}
+		lines := strings.Split(content, "\n")
+
+		lines = mc.removeEmptyLines(lines)
+
+		if len(lines) > 0 {
+			if lines[0] != "" {
+				dir, err := os.Stat(lines[0])
+				if err != nil {
+					return args, fmt.Errorf("error with output directory: %w", err)
+				} else if os.IsNotExist(err) {
+					return args, fmt.Errorf("target output directory does not exist: %w", err)
+				}
+
+				if !dir.IsDir() {
+					return args, fmt.Errorf("output location is not a directory")
+				}
+
+				args = append(args, "--move-on-complete", lines[0])
+			}
+		}
+	}
+	return args, nil
+}
+
+// renameStyle is the chosen style of renaming, e.g. spaces, underscores
+func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
+	var args []string
+	if oExt := strings.Index(c, "[output-extension]"); oExt != -1 {
+
+		content := c[oExt+len("[output-extension]")+1:]
+
+		endIdx := strings.Index(content, "[")
+		if endIdx != -1 {
+			content = content[:endIdx-1]
+		}
+		lines := strings.Split(content, "\n")
+
+		lines = mc.removeEmptyLines(lines)
+
+		if len(lines) > 0 {
+			lines[0] = strings.TrimPrefix(lines[0], ".")
+			switch lines[0] {
+			case "3gp", "avi", "f4v", "flv", "m4v", "mkv",
+				"mov", "mp4", "mpeg", "mpg", "ogm", "ogv",
+				"ts", "vob", "webm", "wmv":
+
+				args = append(args, "-o", lines[0])
+			default:
+				return args, fmt.Errorf("incorrect syntax for file extension")
+			}
+
+		}
+	}
+	return args, nil
 }
 
 // removeEmptyLines strips empty lines from the result
