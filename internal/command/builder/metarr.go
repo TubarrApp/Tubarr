@@ -117,6 +117,8 @@ func (mc *MetarrCommand) dateTagFormat(c string) []string {
 	var args []string
 	if lines, exists := mc.getFieldContent(c, tags.MetarrFilenameDate, enums.L_SINGLE); exists && len(lines) > 0 {
 
+		lines[0] = strings.TrimSpace(lines[0])
+
 		switch lines[0] {
 		case "Ymd", "ymd", "mdY", "mdy", "dmY", "dmy":
 			args = append(args, "--filename-date-tag", lines[0])
@@ -239,6 +241,8 @@ func (mc *MetarrCommand) renameStyle(c string) []string {
 	var args []string
 	if lines, exists := mc.getFieldContent(c, tags.MetarrRenameStyle, enums.L_SINGLE); exists && len(lines) > 0 {
 
+		lines[0] = strings.TrimSpace(lines[0])
+
 		switch lines[0] {
 		case "spaces", "underscores", "skip":
 			args = append(args, "-r", lines[0])
@@ -277,6 +281,8 @@ func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
 	var args []string
 	if lines, exists := mc.getFieldContent(c, tags.MetarrOutputExt, enums.L_SINGLE); exists && len(lines) > 0 {
 
+		lines[0] = strings.TrimSpace(lines[0])
+
 		lines[0] = strings.TrimPrefix(lines[0], ".")
 		switch lines[0] {
 		case "3gp", "avi", "f4v", "flv", "m4v", "mkv",
@@ -292,21 +298,15 @@ func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
 }
 
 // removeEmptyLines strips empty lines from the result
-func (mc *MetarrCommand) removeEmptyLines(lines []string) []string {
-	var rtn []string
-	for _, line := range lines {
-		if line == "" || line == "\n" {
+func (mc *MetarrCommand) removeEmptyLines(input []string) []string {
+	var lines []string
+	for _, line := range input {
+		if line == "" || line == "\r" { // \n delimiter already removed by strings.Split
 			continue
 		}
-		rtn = append(rtn, line)
+		lines = append(lines, line)
 	}
-	switch {
-	case len(rtn) > 0:
-		return rtn
-	default:
-		rtn = append(rtn, "")
-		return rtn
-	}
+	return lines
 }
 
 // getFieldContent extracts the content inside the field
@@ -319,17 +319,18 @@ func (mc *MetarrCommand) getFieldContent(c, tag string, selectType enums.LineSel
 		if endIdx != -1 {
 			content = content[:endIdx-1]
 		}
+		gotLines := strings.Split(content, "\n")
+		lines := mc.removeEmptyLines(gotLines)
 
-		var lines []string
-		if selectType == enums.L_SINGLE {
-			lines = strings.SplitN(content, "\n", 1)
-		} else {
-			lines = strings.Split(content, "\n")
+		if len(lines) > 0 {
+			if selectType == enums.L_SINGLE {
+				return []string{lines[0]}, true
+			}
+			return lines, true
 		}
-		lines = mc.removeEmptyLines(lines)
-
-		return lines, true
-	} else {
+		logging.PrintD(2, "Lines grabbed empty for tag '%s' and content '%s'", tag, c)
 		return nil, false
 	}
+	logging.PrintD(2, "Tag '%s' not found in content '%s'", tag, c)
+	return nil, false
 }
