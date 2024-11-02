@@ -132,10 +132,8 @@ func (mc *MetarrCommand) dateTagFormat(c string) []string {
 // metaAddField adds the command to add new fields to metadata
 func (mc *MetarrCommand) metaAddField(c string) []string {
 	var args []string
+
 	if lines, exists := mc.getFieldContent(c, tags.MetarrMetaAddField, enums.L_MULTI); exists && len(lines) > 0 {
-
-		var validEntries bool
-
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -144,26 +142,20 @@ func (mc *MetarrCommand) metaAddField(c string) []string {
 			if len(entry) != 2 {
 				logging.PrintE(0, "Error in new metadata field entry, please use syntax 'metatag:value'")
 			} else {
-				if !validEntries {
-					args = append(args, "--meta-overwrite")
-					args = append(args, "--meta-add-field")
-					validEntries = true
-				}
-				args = append(args, line)
+				args = append(args, "--meta-add-field", line)
 			}
 		}
 
 	}
+	args = append(args, "--meta-overwrite")
 	return args
 }
 
 // filenameReplaceSuffix builds the command to strip selected suffixes from filenames
 func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
 	var args []string
+
 	if lines, exists := mc.getFieldContent(c, tags.MetarrFilenameReplaceSfx, enums.L_MULTI); exists && len(lines) > 0 {
-
-		var validEntries bool
-
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -172,12 +164,7 @@ func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
 			if len(entry) != 2 {
 				logging.PrintE(0, "Error in filename-replace-suffix entry, please use syntax 'suffix:replacement'")
 			} else {
-				if !validEntries {
-					args = append(args, "--filename-replace-suffix")
-					validEntries = true
-				}
-
-				args = append(args, line)
+				args = append(args, "--filename-replace-suffix", line)
 			}
 		}
 	}
@@ -187,10 +174,8 @@ func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
 // metaReplaceSuffix builds the metadata suffix replacement argument for Metarr
 func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
 	var args []string
+
 	if lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplaceSfx, enums.L_MULTI); exists && len(lines) > 0 {
-
-		var validEntries bool
-
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -199,11 +184,7 @@ func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
 			if len(entry) != 3 {
 				logging.PrintE(0, "Error in meta-replace-suffix entry, please use syntax 'metatag:suffix:replacement'")
 			} else {
-				if !validEntries {
-					args = append(args, "--meta-replace-suffix")
-					validEntries = true
-				}
-				args = append(args, line)
+				args = append(args, "--meta-replace-suffix", line)
 			}
 		}
 	}
@@ -213,10 +194,8 @@ func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
 // metaReplacePrefix builds the metadata prefix replacement argument for Metarr
 func (mc *MetarrCommand) metaReplacePrefix(c string) []string {
 	var args []string
+
 	if lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplacePfx, enums.L_MULTI); exists && len(lines) > 0 {
-
-		var validEntries bool
-
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -225,11 +204,7 @@ func (mc *MetarrCommand) metaReplacePrefix(c string) []string {
 			if len(entry) != 3 {
 				logging.PrintE(0, "Error in meta-replace-prefix entry, please use syntax 'metatag:prefix:replacement'")
 			} else {
-				if !validEntries {
-					args = append(args, "--meta-replace-prefix")
-					validEntries = true
-				}
-				args = append(args, line)
+				args = append(args, "--meta-replace-prefix", line)
 			}
 		}
 	}
