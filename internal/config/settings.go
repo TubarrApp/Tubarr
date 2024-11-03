@@ -1,6 +1,7 @@
 package config
 
 import (
+	consts "Tubarr/internal/domain/constants"
 	keys "Tubarr/internal/domain/keys"
 	logging "Tubarr/internal/utils/logging"
 	"fmt"
@@ -137,12 +138,12 @@ func verifyOutputFiletype() {
 		o = "." + o
 		Set(keys.OutputFiletype, o)
 	}
-	switch o {
-	case ".3gp", ".avi", ".f4v", ".flv", ".m4v", ".mkv",
-		".mov", ".mp4", ".mpeg", ".mpg", ".ogm", ".ogv",
-		".ts", ".vob", ".webm", ".wmv":
-		logging.PrintI("Outputting files as %s", o)
-	default:
-		Set(keys.OutputFiletype, "")
+
+	for _, ext := range consts.AllVidExtensions {
+		if o == ext {
+			logging.PrintI("Outputting files as %s", o)
+			return // Must return on match or overwrites with ""
+		}
 	}
+	Set(keys.OutputFiletype, "")
 }

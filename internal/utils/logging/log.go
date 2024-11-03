@@ -9,13 +9,15 @@ import (
 	"time"
 )
 
-var ErrorArray []error
-var Loggable bool = false
-var Logger *log.Logger
-var mu sync.Mutex
+var (
+	ErrorArray []error
+	Loggable   bool = false
+	Logger     *log.Logger
+	mu         sync.Mutex
 
-// Regular expression to match ANSI escape codes
-var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	// Regular expression to match ANSI escape codes
+	ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+)
 
 // SetupLogging creates and/or opens the log file
 func SetupLogging(logFile *os.File) error {
@@ -34,8 +36,10 @@ func Write(tag, infoMsg string, err error, args ...interface{}) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		var errMsg string
-		var info string
+		var (
+			errMsg,
+			info string
+		)
 
 		if err != nil {
 			if tag == "" {
@@ -62,7 +66,10 @@ func WriteArray(tag string, infoMsg []string, err []error, args ...interface{}) 
 		mu.Lock()
 		defer mu.Unlock()
 
-		var errMsg, info string
+		var (
+			errMsg,
+			info string
+		)
 
 		if len(err) != 0 && err != nil {
 

@@ -1,7 +1,5 @@
 package domain
 
-import "fmt"
-
 // Colors
 const (
 	ColorReset  = "\033[0m"
@@ -14,7 +12,9 @@ const (
 	ColorWhite  = "\033[37m"
 )
 
-var RedError string = fmt.Sprintf("%v[ERROR] %v", ColorRed, ColorReset)
-var YellowDebug string = fmt.Sprintf("%v[DEBUG] %v", ColorYellow, ColorReset)
-var GreenSuccess string = fmt.Sprintf("%v[SUCCESS] %v", ColorGreen, ColorReset)
-var BlueInfo string = fmt.Sprintf("%v[Info] %v", ColorCyan, ColorReset)
+const (
+	RedError     string = ColorRed + "[ERROR] " + ColorReset
+	GreenSuccess string = ColorGreen + "[SUCCESS] " + ColorReset
+	YellowDebug  string = ColorYellow + "[DEBUG] " + ColorReset
+	BlueInfo     string = ColorCyan + "[Info] " + ColorReset
+)

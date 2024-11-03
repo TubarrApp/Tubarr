@@ -27,8 +27,10 @@ func (vf *VideoDLCommandBuilder) VideoFetchCommand() (*exec.Cmd, error) {
 		return nil, fmt.Errorf("yt-dlp command not found: %w", err)
 	}
 
-	m := vf.Model
-	var args []string
+	var (
+		args []string
+		m    = vf.Model
+	)
 
 	switch {
 	case strings.Contains(m.URL, "censored.tv"):

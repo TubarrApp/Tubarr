@@ -43,7 +43,7 @@ func GetNewReleases() []string {
 		}
 	}
 	// Convert map to slice
-	var newURLs []string
+	var newURLs = make([]string, len(uniqueURLs))
 	for url := range uniqueURLs {
 		newURLs = append(newURLs, url)
 	}
@@ -123,7 +123,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	}
 
 	// Convert unique URLs map to slice
-	var episodeURLs []string
+	var episodeURLs = make([]string, len(uniqueEpisodeURLs))
 	for url := range uniqueEpisodeURLs {
 		episodeURLs = append(episodeURLs, url)
 	}
@@ -135,7 +135,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	}
 
 	// Filter out URLs that are already in grabbed-urls.txt
-	var newURLs []string
+	var newURLs = make([]string, len(episodeURLs))
 	for _, url := range episodeURLs {
 		normalizedURL := normalizeURL(url)
 		exists := false
@@ -159,8 +159,11 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 
 // loadGrabbedURLsFromFile reads URLs from a file and returns them as a map for quick lookup
 func loadGrabbedURLsFromFile(filename string) (map[string]struct{}, error) {
-	videoDir := config.GetString(keys.VideoDir)
-	var filepath string
+
+	var (
+		videoDir = config.GetString(keys.VideoDir)
+		filepath string
+	)
 
 	switch strings.HasSuffix(videoDir, "/") {
 	case false:

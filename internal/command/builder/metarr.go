@@ -3,6 +3,7 @@ package command
 import (
 	"Tubarr/internal/config"
 	preset "Tubarr/internal/config/presets"
+	consts "Tubarr/internal/domain/constants"
 	enums "Tubarr/internal/domain/enums"
 	keys "Tubarr/internal/domain/keys"
 	tags "Tubarr/internal/domain/tags"
@@ -114,8 +115,11 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 
 // dateTagFormat builds the date tag format to prefix filenames with
 func (mc *MetarrCommand) dateTagFormat(c string) []string {
-	var args []string
-	if lines, exists := mc.getFieldContent(c, tags.MetarrFilenameDate, enums.L_SINGLE); exists && len(lines) > 0 {
+
+	lines, exists := mc.getFieldContent(c, tags.MetarrFilenameDate, enums.L_SINGLE)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 
 		lines[0] = strings.TrimSpace(lines[0])
 
@@ -131,9 +135,11 @@ func (mc *MetarrCommand) dateTagFormat(c string) []string {
 
 // metaAddField adds the command to add new fields to metadata
 func (mc *MetarrCommand) metaAddField(c string) []string {
-	var args []string
 
-	if lines, exists := mc.getFieldContent(c, tags.MetarrMetaAddField, enums.L_MULTI); exists && len(lines) > 0 {
+	lines, exists := mc.getFieldContent(c, tags.MetarrMetaAddField, enums.L_MULTI)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -153,9 +159,11 @@ func (mc *MetarrCommand) metaAddField(c string) []string {
 
 // filenameReplaceSuffix builds the command to strip selected suffixes from filenames
 func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
-	var args []string
 
-	if lines, exists := mc.getFieldContent(c, tags.MetarrFilenameReplaceSfx, enums.L_MULTI); exists && len(lines) > 0 {
+	lines, exists := mc.getFieldContent(c, tags.MetarrFilenameReplaceSfx, enums.L_MULTI)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -173,9 +181,11 @@ func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
 
 // metaReplaceSuffix builds the metadata suffix replacement argument for Metarr
 func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
-	var args []string
 
-	if lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplaceSfx, enums.L_MULTI); exists && len(lines) > 0 {
+	lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplaceSfx, enums.L_MULTI)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -193,9 +203,11 @@ func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
 
 // metaReplacePrefix builds the metadata prefix replacement argument for Metarr
 func (mc *MetarrCommand) metaReplacePrefix(c string) []string {
-	var args []string
 
-	if lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplacePfx, enums.L_MULTI); exists && len(lines) > 0 {
+	lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplacePfx, enums.L_MULTI)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 		for _, line := range lines {
 			if line == "" {
 				continue
@@ -213,9 +225,11 @@ func (mc *MetarrCommand) metaReplacePrefix(c string) []string {
 
 // renameStyle is the chosen style of renaming, e.g. spaces, underscores
 func (mc *MetarrCommand) renameStyle(c string) []string {
-	var args []string
-	if lines, exists := mc.getFieldContent(c, tags.MetarrRenameStyle, enums.L_SINGLE); exists && len(lines) > 0 {
 
+	lines, exists := mc.getFieldContent(c, tags.MetarrRenameStyle, enums.L_SINGLE)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 		lines[0] = strings.TrimSpace(lines[0])
 
 		switch lines[0] {
@@ -231,8 +245,11 @@ func (mc *MetarrCommand) renameStyle(c string) []string {
 
 // outputLocation designates the output directory
 func (mc *MetarrCommand) outputLocation(c string) ([]string, error) {
-	var args []string
-	if lines, exists := mc.getFieldContent(c, tags.MetarrOutputDir, enums.L_SINGLE); exists && len(lines) > 0 {
+
+	lines, exists := mc.getFieldContent(c, tags.MetarrOutputDir, enums.L_SINGLE)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 		if lines[0] != "" {
 			dir, err := os.Stat(lines[0])
 			if err != nil {
@@ -253,19 +270,22 @@ func (mc *MetarrCommand) outputLocation(c string) ([]string, error) {
 
 // outputExtension is the filetype extension to output files as
 func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
-	var args []string
-	if lines, exists := mc.getFieldContent(c, tags.MetarrOutputExt, enums.L_SINGLE); exists && len(lines) > 0 {
 
+	lines, exists := mc.getFieldContent(c, tags.MetarrOutputExt, enums.L_SINGLE)
+	var args = make([]string, len(lines)*2)
+
+	if exists && len(lines) > 0 {
 		lines[0] = strings.TrimSpace(lines[0])
-
 		lines[0] = strings.TrimPrefix(lines[0], ".")
-		switch lines[0] {
-		case "3gp", "avi", "f4v", "flv", "m4v", "mkv",
-			"mov", "mp4", "mpeg", "mpg", "ogm", "ogv",
-			"ts", "vob", "webm", "wmv":
 
-			args = append(args, "--ext", lines[0])
-		default:
+		filled := false
+		for _, ext := range consts.AllVidExtensions {
+			if ext == lines[0] {
+				args = append(args, "--ext", ext)
+				filled = true
+			}
+		}
+		if !filled {
 			return args, fmt.Errorf("incorrect file extension '%s' entered for yt-dlp", lines[0])
 		}
 	}
@@ -274,7 +294,7 @@ func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
 
 // removeEmptyLines strips empty lines from the result
 func (mc *MetarrCommand) removeEmptyLines(input []string) []string {
-	var lines []string
+	var lines = make([]string, len(input))
 	for _, line := range input {
 		if line == "" || line == "\r" { // \n delimiter already removed by strings.Split
 			continue

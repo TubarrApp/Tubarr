@@ -22,6 +22,7 @@ const (
 	SingleFile string = "SingleFile"
 )
 
+// Check channels for new uploads
 const (
 	ChannelCheckNew string = "CheckChannelsForNew"
 )
@@ -32,6 +33,6 @@ const (
 )
 
 // Logging
-var (
+const (
 	DebugLevel string = "debug-level"
 )

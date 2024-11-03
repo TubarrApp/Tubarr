@@ -1,5 +1,6 @@
 package domain
 
+// Preset tag in file
 const (
 	MetarrFilenameDate       = "[filename-date-tag]"
 	MetarrMetaAddField       = "[meta-add-field]"

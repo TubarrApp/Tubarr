@@ -3,6 +3,7 @@ package command
 import (
 	builder "Tubarr/internal/command/builder"
 	"Tubarr/internal/config"
+	consts "Tubarr/internal/domain/constants"
 	keys "Tubarr/internal/domain/keys"
 	"Tubarr/internal/models"
 	utils "Tubarr/internal/utils/fs/write"
@@ -32,13 +33,14 @@ func DownloadVideos(urls []string) ([]*models.DownloadedFiles, error) {
 	}
 
 	// Get configuration values
-	vDir := config.GetString(keys.VideoDir)
-	cookieSource := config.GetString(keys.CookieSource)
-	eDl := config.GetString(keys.ExternalDownloader)
-	eDlArgs := config.GetString(keys.ExternalDownloaderArgs)
-
-	var dlFiles []*models.DownloadedFiles
-	var successfulURLs []string
+	var (
+		vDir           = config.GetString(keys.VideoDir)
+		cookieSource   = config.GetString(keys.CookieSource)
+		eDl            = config.GetString(keys.ExternalDownloader)
+		eDlArgs        = config.GetString(keys.ExternalDownloaderArgs)
+		dlFiles        []*models.DownloadedFiles
+		successfulURLs []string
+	)
 
 	for _, entry := range urls {
 		if entry == "" {
@@ -87,23 +89,26 @@ func DownloadVideos(urls []string) ([]*models.DownloadedFiles, error) {
 
 				// Capture the actual output filename
 				if strings.HasPrefix(line, "/") {
-					ext := filepath.Ext(line)
-					switch ext {
-					case ".3gp", ".avi", ".f4v", ".flv", ".m4v", ".mkv",
-						".mov", ".mp4", ".mpeg", ".mpg", ".ogm", ".ogv",
-						".ts", ".vob", ".webm", ".wmv":
-						select {
-						case filenameChan <- line:
-						default:
-							// Channel already has a filename
+					lineExt := filepath.Ext(line)
+
+					var match bool
+					for _, ext := range consts.AllVidExtensions {
+						if lineExt == ext {
+							match = true
+							select {
+							case filenameChan <- line:
+							default:
+								// Channel already has a filename
+							}
 						}
-					default:
-						logging.PrintD(1, "Did not find yt-dlp supported video format in output %s", line)
+						if !match {
+							logging.PrintD(1, "Did not find yt-dlp supported video format in output %s", line)
+						}
 					}
 				}
-			}
-			if err := scanner.Err(); err != nil {
-				logging.PrintE(0, "Scanner error: %v", err)
+				if err := scanner.Err(); err != nil {
+					logging.PrintE(0, "Scanner error: %v", err)
+				}
 			}
 		}()
 
