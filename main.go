@@ -10,9 +10,17 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
+
+var startTime time.Time
+
+func init() {
+	startTime = time.Now()
+	logging.PrintI("Tubarr started at: %v", startTime.Format("2006-01-02 15:04:05.00 MST"))
+}
 
 // main is the program entrypoint (duh!)
 func main() {
@@ -62,6 +70,10 @@ func main() {
 		logging.PrintE(0, err.Error())
 		os.Exit(1)
 	}
+
+	endTime := time.Now()
+	logging.PrintI("Tubarr finished at: %v", endTime.Format("2006-01-02 15:04:05.00 MST"))
+	logging.PrintI("Time elapsed: %v", endTime.Sub(startTime))
 }
 
 // process begins the main Tubarr program
