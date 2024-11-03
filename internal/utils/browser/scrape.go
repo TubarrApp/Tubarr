@@ -159,9 +159,10 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 func loadGrabbedURLsFromFile(filename string) (map[string]struct{}, error) {
 
 	var (
-		videoDir = config.GetString(keys.VideoDir)
 		filepath string
 	)
+
+	videoDir := config.GetString(keys.VideoDir)
 
 	switch strings.HasSuffix(videoDir, "/") {
 	case false:

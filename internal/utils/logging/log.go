@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	ErrorArray []error
 	Loggable   bool = false
 	Logger     *log.Logger
+	ErrorArray []error
 	mu         sync.Mutex
 
 	// Regular expression to match ANSI escape codes

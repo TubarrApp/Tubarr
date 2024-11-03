@@ -34,13 +34,14 @@ func DownloadVideos(urls []string) ([]*models.DownloadedFiles, error) {
 
 	// Get configuration values
 	var (
-		vDir           = config.GetString(keys.VideoDir)
-		cookieSource   = config.GetString(keys.CookieSource)
-		eDl            = config.GetString(keys.ExternalDownloader)
-		eDlArgs        = config.GetString(keys.ExternalDownloaderArgs)
 		dlFiles        []*models.DownloadedFiles
 		successfulURLs []string
 	)
+
+	vDir := config.GetString(keys.VideoDir)
+	cookieSource := config.GetString(keys.CookieSource)
+	eDl := config.GetString(keys.ExternalDownloader)
+	eDlArgs := config.GetString(keys.ExternalDownloaderArgs)
 
 	for _, entry := range urls {
 		if entry == "" {
