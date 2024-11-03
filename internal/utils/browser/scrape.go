@@ -51,8 +51,6 @@ func GetNewReleases() []string {
 	// Log results
 	if len(newURLs) > 0 {
 		logging.PrintI("Grabbed %d new episode URLs: %v", len(newURLs), newURLs)
-	} else {
-		logging.PrintD(1, "No new URLs found")
 	}
 
 	return newURLs
