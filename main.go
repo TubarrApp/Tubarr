@@ -27,32 +27,35 @@ func main() {
 		return // Exit early if not meant to execute
 	}
 
+	var (
+		directory,
+		vDir string
+	)
+
 	if config.IsSet(keys.VideoDir) {
-		vDir := config.GetString(keys.VideoDir)
-		if !strings.HasSuffix(vDir, "/") {
+		vDir = config.GetString(keys.VideoDir)
+		if !strings.HasSuffix(directory, "/") {
 			vDir += "/"
+			directory = vDir
 		}
-
 		// Create directory if it doesn't exist
-		if err := os.MkdirAll(vDir, 0755); err != nil {
-			logging.PrintE(0, "Failed to create directory structure: %v", err)
-			os.Exit(1)
-		}
-
-		// Open file with create flag
-		logFile, err := os.OpenFile(vDir+"tubarr-log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
-		if err != nil {
-			logging.PrintE(0, "Encountered an error opening/creating the log file: %v", err)
-			os.Exit(1)
-		}
-		defer logFile.Close()
-
-		if err := logging.SetupLogging(logFile); err != nil {
-			logging.PrintE(0, "Encountered error setting up logging: %v", err)
+		if err := os.MkdirAll(directory, 0755); err != nil {
+			fmt.Println("Failed to create directory structure:", err)
+			fmt.Println()
 			os.Exit(1)
 		}
 	} else {
 		logging.Print("No video directory sent in. Skipping logging")
+	}
+
+	if directory != "" {
+		if err := logging.SetupLogging(directory); err != nil {
+			fmt.Printf("\n\nNotice: Log file was not created\nReason: %s\n\n", err)
+		}
+	} else {
+		fmt.Println("Directory and file strings were entered empty. Exiting...")
+		fmt.Println()
+		os.Exit(1)
 	}
 
 	if err := process(); err != nil {

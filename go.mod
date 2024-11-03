@@ -8,6 +8,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	golang.org/x/text v0.19.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

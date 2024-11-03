@@ -3,10 +3,12 @@ package utils
 import (
 	"fmt"
 	"log"
-	"os"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"time"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
@@ -20,8 +22,16 @@ var (
 )
 
 // SetupLogging creates and/or opens the log file
-func SetupLogging(logFile *os.File) error {
+func SetupLogging(targetDir string) error {
 
+	logFile := &lumberjack.Logger{
+		Filename:   filepath.Join(targetDir, "/tubarr.log"), // Log file path
+		MaxSize:    1,                                       // Max size in MB before rotation
+		MaxBackups: 3,                                       // Number of backups to retain
+		Compress:   true,                                    // Gzip compression
+	}
+
+	// Assign lumberjack logger to standard log output
 	Logger = log.New(logFile, "", log.LstdFlags)
 	Loggable = true
 

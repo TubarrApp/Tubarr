@@ -32,7 +32,7 @@ func init() {
 	viper.BindPFlag(keys.VideoDir, rootCmd.PersistentFlags().Lookup(keys.VideoDir))
 
 	// Metadata directory
-	rootCmd.PersistentFlags().StringP(keys.MetaDir, "m", ".", "Metadata directory location")
+	rootCmd.PersistentFlags().StringP(keys.MetaDir, "m", ".", "Metadata directory location (NOT CURRENTLY IMPLEMENTED)")
 	viper.BindPFlag(keys.MetaDir, rootCmd.PersistentFlags().Lookup(keys.MetaDir))
 
 	// Channels to check
