@@ -16,7 +16,7 @@ var (
 
 // Video files
 var (
-	AllVidExtensions = []string{"3gp", "avi", "f4v", "flv", "m4v", "mkv",
-		"mov", "mp4", "mpeg", "mpg", "ogm", "ogv",
-		"ts", "vob", "webm", "wmv"}
+	AllVidExtensions = []string{".3gp", ".avi", ".f4v", ".flv", ".m4v", ".mkv",
+		".mov", ".mp4", ".mpeg", ".mpg", ".ogm", ".ogv",
+		".ts", ".vob", ".webm", ".wmv"}
 )

@@ -94,6 +94,7 @@ func DownloadVideos(urls []string) ([]*models.DownloadedFiles, error) {
 
 					var match bool
 					for _, ext := range consts.AllVidExtensions {
+						logging.PrintD(2, "Comparing extension %s to %s", ext, lineExt)
 						if lineExt == ext {
 							match = true
 							select {

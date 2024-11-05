@@ -73,7 +73,7 @@ func main() {
 
 	endTime := time.Now()
 	logging.PrintI("Tubarr finished at: %v", endTime.Format("2006-01-02 15:04:05.00 MST"))
-	logging.PrintI("Time elapsed: %v", endTime.Sub(startTime))
+	logging.PrintI("Time elapsed: %.2f seconds", endTime.Sub(startTime).Seconds())
 }
 
 // process begins the main Tubarr program

@@ -47,14 +47,18 @@ func censoredTvPreset(args []string, url string) []string {
 			creator = "Atheism-is-Unstoppable"
 		}
 
-		args = append(args, "--meta-add-field", "author:"+creator, "actor:"+creator, "publisher:"+creator)
+		args = append(args, "--meta-add-field",
+			"author:"+creator,
+			"actor:"+creator,
+			"publisher:"+creator,
+			"uploader:"+creator,
+			"channel:"+creator)
+
+		args = append(args, "--meta-overwrite")
 	}
 
-	args = append(args, "--filename-date-tag", "ymd")
 	args = append(args, "--meta-replace-suffix", "title: (1):", "fulltitle: (1):", "id:-1:", "display_id:-1:")
-	args = append(args, "-r", "spaces")
-	args = append(args, "--filename-replace-suffix", " 1:")
-	args = append(args, "--meta-overwrite")
+	args = append(args, "--filename-replace-suffix", "_1:")
 
 	return args
 }

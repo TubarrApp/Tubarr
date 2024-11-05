@@ -117,7 +117,7 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 func (mc *MetarrCommand) dateTagFormat(c string) []string {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrFilenameDate, enums.L_SINGLE)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 
@@ -137,7 +137,7 @@ func (mc *MetarrCommand) dateTagFormat(c string) []string {
 func (mc *MetarrCommand) metaAddField(c string) []string {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrMetaAddField, enums.L_MULTI)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 		for _, line := range lines {
@@ -161,7 +161,7 @@ func (mc *MetarrCommand) metaAddField(c string) []string {
 func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrFilenameReplaceSfx, enums.L_MULTI)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 		for _, line := range lines {
@@ -183,7 +183,7 @@ func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
 func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplaceSfx, enums.L_MULTI)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 		for _, line := range lines {
@@ -205,7 +205,7 @@ func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
 func (mc *MetarrCommand) metaReplacePrefix(c string) []string {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplacePfx, enums.L_MULTI)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 		for _, line := range lines {
@@ -227,7 +227,7 @@ func (mc *MetarrCommand) metaReplacePrefix(c string) []string {
 func (mc *MetarrCommand) renameStyle(c string) []string {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrRenameStyle, enums.L_SINGLE)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 		lines[0] = strings.TrimSpace(lines[0])
@@ -247,7 +247,7 @@ func (mc *MetarrCommand) renameStyle(c string) []string {
 func (mc *MetarrCommand) outputLocation(c string) ([]string, error) {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrOutputDir, enums.L_SINGLE)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 		if lines[0] != "" {
@@ -272,7 +272,7 @@ func (mc *MetarrCommand) outputLocation(c string) ([]string, error) {
 func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
 
 	lines, exists := mc.getFieldContent(c, tags.MetarrOutputExt, enums.L_SINGLE)
-	var args = make([]string, len(lines)*2)
+	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
 		lines[0] = strings.TrimSpace(lines[0])
@@ -294,7 +294,7 @@ func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
 
 // removeEmptyLines strips empty lines from the result
 func (mc *MetarrCommand) removeEmptyLines(input []string) []string {
-	var lines = make([]string, len(input))
+	var lines = make([]string, 0, len(input))
 	for _, line := range input {
 		if line == "" || line == "\r" { // \n delimiter already removed by strings.Split
 			continue

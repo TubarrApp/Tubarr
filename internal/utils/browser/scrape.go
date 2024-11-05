@@ -43,7 +43,7 @@ func GetNewReleases() []string {
 		}
 	}
 	// Convert map to slice
-	var newURLs = make([]string, len(uniqueURLs))
+	var newURLs = make([]string, 0, len(uniqueURLs))
 	for url := range uniqueURLs {
 		newURLs = append(newURLs, url)
 	}
@@ -121,7 +121,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	}
 
 	// Convert unique URLs map to slice
-	var episodeURLs = make([]string, len(uniqueEpisodeURLs))
+	var episodeURLs = make([]string, 0, len(uniqueEpisodeURLs))
 	for url := range uniqueEpisodeURLs {
 		episodeURLs = append(episodeURLs, url)
 	}
@@ -133,7 +133,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	}
 
 	// Filter out URLs that are already in grabbed-urls.txt
-	var newURLs = make([]string, len(episodeURLs))
+	var newURLs = make([]string, 0, len(episodeURLs))
 	for _, url := range episodeURLs {
 		normalizedURL := normalizeURL(url)
 		exists := false
