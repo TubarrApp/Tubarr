@@ -312,9 +312,12 @@ func (mc *MetarrCommand) getFieldContent(c, tag string, selectType enums.LineSel
 
 		endIdx := strings.Index(content, "[")
 		if endIdx != -1 {
-			content = content[:endIdx-1]
+			content = content[:endIdx]
 		}
+
+		content = cleanNewLines(content)
 		gotLines := strings.Split(content, "\n")
+
 		lines := mc.removeEmptyLines(gotLines)
 
 		if len(lines) > 0 {
@@ -328,4 +331,11 @@ func (mc *MetarrCommand) getFieldContent(c, tag string, selectType enums.LineSel
 	}
 	logging.PrintD(2, "Tag '%s' not found in content '%s'", tag, c)
 	return nil, false
+}
+
+// cleanNewLines normalizes the newline patterns across different OS's
+func cleanNewLines(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	return s
 }
