@@ -1,12 +1,12 @@
 package utils
 
 import (
-	logging "Tubarr/internal/utils/logging"
 	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"strings"
+	logging "tubarr/internal/utils/logging"
 )
 
 var (

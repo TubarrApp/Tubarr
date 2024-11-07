@@ -1,18 +1,18 @@
 package command
 
 import (
-	"Tubarr/internal/config"
-	preset "Tubarr/internal/config/presets"
-	consts "Tubarr/internal/domain/constants"
-	enums "Tubarr/internal/domain/enums"
-	keys "Tubarr/internal/domain/keys"
-	tags "Tubarr/internal/domain/tags"
-	"Tubarr/internal/models"
-	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"tubarr/internal/config"
+	preset "tubarr/internal/config/presets"
+	consts "tubarr/internal/domain/constants"
+	enums "tubarr/internal/domain/enums"
+	keys "tubarr/internal/domain/keys"
+	tags "tubarr/internal/domain/tags"
+	"tubarr/internal/models"
+	logging "tubarr/internal/utils/logging"
 )
 
 type MetarrCommand struct {
@@ -335,7 +335,7 @@ func (mc *MetarrCommand) getFieldContent(c, tag string, selectType enums.LineSel
 
 // cleanNewLines normalizes the newline patterns across different OS's
 func cleanNewLines(s string) string {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.ReplaceAll(s, "\r", "\n")
+	rep := strings.NewReplacer("\r\n", "\n", "\r", "\n")
+	rep.Replace(s)
 	return s
 }

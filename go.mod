@@ -1,4 +1,4 @@
-module Tubarr
+module tubarr
 
 go 1.23.0
 

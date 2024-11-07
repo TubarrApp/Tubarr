@@ -1,14 +1,14 @@
 package utils
 
 import (
-	"Tubarr/internal/config"
-	keys "Tubarr/internal/domain/keys"
-	logging "Tubarr/internal/utils/logging"
 	"bufio"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
+	"tubarr/internal/config"
+	keys "tubarr/internal/domain/keys"
+	logging "tubarr/internal/utils/logging"
 
 	"github.com/gocolly/colly"
 )
@@ -23,7 +23,7 @@ func GetNewReleases() []string {
 			continue
 		}
 
-		cookies, err := GetBrowserCookies(url)
+		cookies, err := getBrowserCookies(url)
 		if err != nil {
 			logging.PrintE(0, "Could not get cookies for %s: %v", url, err)
 			continue
@@ -58,9 +58,13 @@ func GetNewReleases() []string {
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
 func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) {
-	c := colly.NewCollector()
 
-	// Use a map for collecting URLs to ensure uniqueness during scraping
+	var (
+		authorized bool
+		authTag    string
+	)
+
+	c := colly.NewCollector()
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	for _, cookie := range cookies {
@@ -75,7 +79,9 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			if strings.Contains(link, "/video/") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
+			authorized = true
 		})
+
 	case strings.Contains(targetURL, "censored.tv"):
 		logging.PrintI("Detected censored.tv link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -84,6 +90,15 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
 		})
+		c.OnHTML(".dropdown-toggle-image.spark-nav-profile-photo", func(e *colly.HTMLElement) {
+			authTag = "Found sign of authentication: '<img :src=\"user.photo_url\" class=\"dropdown-toggle-image spark-nav-profile-photo\" alt=\"User Photo\" />'"
+			authorized = true
+		})
+		c.OnHTML("spark-notifications", func(e *colly.HTMLElement) {
+			authTag = "Found sign of authentication '<spark-notifications'"
+			authorized = true
+		})
+
 	case strings.Contains(targetURL, "odysee.com"):
 		logging.PrintI("Detected Odysee link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -95,7 +110,9 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 					uniqueEpisodeURLs[link] = struct{}{}
 				}
 			}
+			authorized = true
 		})
+
 	case strings.Contains(targetURL, "rumble.com"):
 		logging.PrintI("Detected Rumble link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -103,7 +120,9 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			if strings.Contains(link, "/v") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
+			authorized = true
 		})
+
 	default:
 		logging.PrintI("Using default link detection")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -111,6 +130,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			if strings.Contains(link, "/watch") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
+			authorized = true
 		})
 	}
 
@@ -118,6 +138,12 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	err := c.Visit(targetURL)
 	if err != nil {
 		return nil, fmt.Errorf("error visiting webpage (%s): %v", targetURL, err)
+	}
+
+	if !authorized {
+		logging.PrintE(0, "'%s' link seems to be unauthenticated?", targetURL)
+	} else {
+		logging.PrintS(1, "Found sign of successful authentication: %s", authTag)
 	}
 
 	// Convert unique URLs map to slice

@@ -5,6 +5,7 @@ import (
 	"log"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -81,13 +82,21 @@ func WriteArray(tag string, infoMsg []string, err []error, args ...interface{}) 
 			info string
 		)
 
+		var b strings.Builder
+
 		if len(err) != 0 && err != nil {
+			b.Grow(len(err) * 50)
+			defer b.Reset()
 
 			var errOut string
+			for i, errValue := range err {
 
-			for _, errValue := range err {
-				errOut += errValue.Error()
+				b.WriteString(errValue.Error())
+				if i != len(err)-2 {
+					b.WriteString("; ")
+				}
 			}
+			errOut = b.String()
 
 			if tag == "" {
 				errMsg = fmt.Sprintf(errOut+"\n", args...)
@@ -96,13 +105,22 @@ func WriteArray(tag string, infoMsg []string, err []error, args ...interface{}) 
 			}
 			Logger.Print(stripAnsiCodes(errMsg))
 
-		} else if len(infoMsg) != 0 && infoMsg != nil {
+			return
+		}
+
+		if len(infoMsg) != 0 && infoMsg != nil {
+			b.Grow(len(infoMsg) * 50)
+			defer b.Reset()
 
 			var infoOut string
+			for i, infoValue := range infoMsg {
 
-			for _, infoValue := range err {
-				infoOut += infoValue.Error()
+				b.WriteString(infoValue)
+				if i != len(infoMsg)-2 {
+					b.WriteString("; ")
+				}
 			}
+			infoOut = b.String()
 
 			if tag == "" {
 				info = fmt.Sprintf(infoOut+"\n", args...)

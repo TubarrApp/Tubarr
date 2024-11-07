@@ -1,11 +1,11 @@
 package utils
 
 import (
-	logging "Tubarr/internal/utils/logging"
 	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	logging "tubarr/internal/utils/logging"
 )
 
 // appendURLsToFile appends new URLs to the specified file

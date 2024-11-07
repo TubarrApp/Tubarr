@@ -13,6 +13,7 @@ const (
 	ExternalDownloaderArgs string = "external-downloader-args"
 	MoveOnComplete         string = "move-on-complete"
 	OutputFiletype         string = "output-filetype"
+	CookiePath             string = "cookie-file"
 )
 
 // Primary program

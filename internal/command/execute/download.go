@@ -1,13 +1,6 @@
 package command
 
 import (
-	builder "Tubarr/internal/command/builder"
-	"Tubarr/internal/config"
-	consts "Tubarr/internal/domain/constants"
-	keys "Tubarr/internal/domain/keys"
-	"Tubarr/internal/models"
-	utils "Tubarr/internal/utils/fs/write"
-	logging "Tubarr/internal/utils/logging"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -17,6 +10,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+	builder "tubarr/internal/command/builder"
+	"tubarr/internal/config"
+	consts "tubarr/internal/domain/constants"
+	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/models"
+	utils "tubarr/internal/utils/fs/write"
+	logging "tubarr/internal/utils/logging"
 )
 
 var (

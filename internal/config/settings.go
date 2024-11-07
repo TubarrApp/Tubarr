@@ -1,12 +1,12 @@
 package config
 
 import (
-	consts "Tubarr/internal/domain/constants"
-	keys "Tubarr/internal/domain/keys"
-	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"os"
 	"strings"
+	consts "tubarr/internal/domain/constants"
+	keys "tubarr/internal/domain/keys"
+	logging "tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -46,6 +46,9 @@ func init() {
 	// Cookie source
 	rootCmd.PersistentFlags().String(keys.CookieSource, "", "Browser to grab cookies from for sites requiring authentication (e.g. firefox)")
 	viper.BindPFlag(keys.CookieSource, rootCmd.PersistentFlags().Lookup(keys.CookieSource))
+
+	rootCmd.PersistentFlags().String(keys.CookiePath, "", "Specify a custom cookie file to use")
+	viper.BindPFlag(keys.CookiePath, rootCmd.PersistentFlags().Lookup(keys.CookiePath))
 
 	// Metarr preset file
 	rootCmd.PersistentFlags().String(keys.MetarrPreset, "", "Metarr preset file location")

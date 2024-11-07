@@ -1,11 +1,13 @@
 package command
 
 import (
-	"Tubarr/internal/models"
-	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"os/exec"
 	"strings"
+	"tubarr/internal/config"
+	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/models"
+	logging "tubarr/internal/utils/logging"
 )
 
 type VideoDLCommandBuilder struct {
@@ -30,6 +32,13 @@ func (vf *VideoDLCommandBuilder) VideoFetchCommand() (*exec.Cmd, error) {
 	var args []string
 	m := vf.Model
 
+	var cookieFile string
+	if config.IsSet(keys.CookiePath) {
+		cookieFile = config.GetString(cookieFile)
+	}
+
+	m.CustomCookieFile = cookieFile
+
 	switch {
 	case strings.Contains(m.URL, "censored.tv"):
 		// Not implemented
@@ -41,15 +50,20 @@ func (vf *VideoDLCommandBuilder) VideoFetchCommand() (*exec.Cmd, error) {
 	args = append(args, "--retries", "999", "--retry-sleep", "10")
 	args = append(args, "--print", "after_move:%(filepath)s")
 
-	if len(m.CookieSource) > 0 {
+	if len(m.CookieSource) > 0 && cookieFile == "" {
 		args = append(args, "--cookies-from-browser", m.CookieSource)
+	} else if cookieFile != "" {
+		args = append(args, "--cookies", cookieFile)
 	}
+
 	if len(m.ExternalDler) > 0 {
 		args = append(args, "--external-downloader", m.ExternalDler)
 	}
+
 	if len(m.ExternalDlerArgs) > 0 {
 		args = append(args, "--external-downloader-args", m.ExternalDlerArgs)
 	}
+
 	if len(m.URL) != 0 {
 		args = append(args, m.URL)
 	}

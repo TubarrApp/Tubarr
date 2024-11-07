@@ -1,10 +1,10 @@
 package command
 
 import (
-	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"os"
 	"os/exec"
+	logging "tubarr/internal/utils/logging"
 )
 
 // RunMetarr runs a Metarr command with a built argument list

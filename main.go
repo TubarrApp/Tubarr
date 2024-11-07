@@ -1,16 +1,16 @@
 package main
 
 import (
-	build "Tubarr/internal/command/builder"
-	execute "Tubarr/internal/command/execute"
-	"Tubarr/internal/config"
-	keys "Tubarr/internal/domain/keys"
-	browser "Tubarr/internal/utils/browser"
-	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+	build "tubarr/internal/command/builder"
+	execute "tubarr/internal/command/execute"
+	"tubarr/internal/config"
+	keys "tubarr/internal/domain/keys"
+	browser "tubarr/internal/utils/browser"
+	logging "tubarr/internal/utils/logging"
 
 	"github.com/spf13/viper"
 )
@@ -19,7 +19,7 @@ var startTime time.Time
 
 func init() {
 	startTime = time.Now()
-	logging.PrintI("Tubarr started at: %v", startTime.Format("2006-01-02 15:04:05.00 MST"))
+	logging.PrintI("tubarr started at: %v", startTime.Format("2006-01-02 15:04:05.00 MST"))
 }
 
 // main is the program entrypoint (duh!)
@@ -72,11 +72,11 @@ func main() {
 	}
 
 	endTime := time.Now()
-	logging.PrintI("Tubarr finished at: %v", endTime.Format("2006-01-02 15:04:05.00 MST"))
+	logging.PrintI("tubarr finished at: %v", endTime.Format("2006-01-02 15:04:05.00 MST"))
 	logging.PrintI("Time elapsed: %.2f seconds", endTime.Sub(startTime).Seconds())
 }
 
-// process begins the main Tubarr program
+// process begins the main tubarr program
 func process() error {
 	if !config.IsSet(keys.ChannelCheckNew) {
 		return fmt.Errorf("no channels configured to check")

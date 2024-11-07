@@ -1,13 +1,13 @@
 package utils
 
 import (
-	consts "Tubarr/internal/domain/constants"
-	logging "Tubarr/internal/utils/logging"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	consts "tubarr/internal/domain/constants"
+	logging "tubarr/internal/utils/logging"
 )
 
 // BackupFile creates a backup copy of the original file before modifying it.
