@@ -23,7 +23,7 @@ func censoredTvPreset(args []string, url string) []string {
 
 	// Titles come appended with " (1)"
 	// Ids come appended with "-1"
-	// Filenames come appended with " 1"
+	// Filenames come appended with "_1"
 
 	splitUrl := strings.Split(url, "/")
 	creator := ""
@@ -47,17 +47,17 @@ func censoredTvPreset(args []string, url string) []string {
 			creator = "Atheism-is-Unstoppable"
 		}
 
-		args = append(args, "--meta-add-field",
-			"author:"+creator,
-			"actor:"+creator,
-			"publisher:"+creator,
-			"uploader:"+creator,
-			"channel:"+creator)
+		args = append(args, "--meta-ops",
+			"author:"+"set:"+creator,
+			"actor:"+"set:"+creator,
+			"publisher:"+"set:"+creator,
+			"uploader:"+"set:"+creator,
+			"channel:"+"set:"+creator)
 
 		args = append(args, "--meta-overwrite")
 	}
 
-	args = append(args, "--meta-replace-suffix", "title: (1):", "fulltitle: (1):", "id:-1:", "display_id:-1:")
+	args = append(args, "--meta-ops", "title:trim-suffix: (1)", "fulltitle:trim-suffix: (1)", "id:trim-suffix:-1", "display_id:trim-suffix:-1")
 	args = append(args, "--filename-replace-suffix", "_1:")
 
 	return args
