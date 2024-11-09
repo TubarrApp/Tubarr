@@ -35,9 +35,8 @@ func (vf *VideoDLCommandBuilder) VideoFetchCommand() (*exec.Cmd, error) {
 	var cookieFile string
 	if config.IsSet(keys.CookiePath) {
 		cookieFile = config.GetString(cookieFile)
+		m.CustomCookieFile = cookieFile
 	}
-
-	m.CustomCookieFile = cookieFile
 
 	switch {
 	case strings.Contains(m.URL, "censored.tv"):
@@ -45,12 +44,13 @@ func (vf *VideoDLCommandBuilder) VideoFetchCommand() (*exec.Cmd, error) {
 	default:
 		// Use default
 	}
+
 	args = append(args, writeJsonLocation(m.VideoDirectory)...)
 	args = append(args, "--restrict-filenames", "-o", "%(title)s.%(ext)s")
 	args = append(args, "--retries", "999", "--retry-sleep", "10")
 	args = append(args, "--print", "after_move:%(filepath)s")
 
-	if len(m.CookieSource) > 0 && cookieFile == "" {
+	if len(m.CookieSource) > 0 {
 		args = append(args, "--cookies-from-browser", m.CookieSource)
 	} else if cookieFile != "" {
 		args = append(args, "--cookies", cookieFile)

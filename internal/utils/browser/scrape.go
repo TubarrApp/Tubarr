@@ -59,10 +59,10 @@ func GetNewReleases() []string {
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
 func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) {
 
-	var (
-		authorized bool
-		authTag    string
-	)
+	// var (
+	// 	authorized bool
+	// 	authTag    string
+	// )
 
 	c := colly.NewCollector()
 	uniqueEpisodeURLs := make(map[string]struct{})
@@ -79,7 +79,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			if strings.Contains(link, "/video/") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
-			authorized = true
+			// authorized = true
 		})
 
 	case strings.Contains(targetURL, "censored.tv"):
@@ -90,14 +90,15 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
 		})
-		c.OnHTML(".dropdown-toggle-image.spark-nav-profile-photo", func(e *colly.HTMLElement) {
-			authTag = "Found sign of authentication: '<img :src=\"user.photo_url\" class=\"dropdown-toggle-image spark-nav-profile-photo\" alt=\"User Photo\" />'"
-			authorized = true
-		})
-		c.OnHTML("spark-notifications", func(e *colly.HTMLElement) {
-			authTag = "Found sign of authentication '<spark-notifications'"
-			authorized = true
-		})
+		// authorized = true
+		// c.OnHTML(".dropdown-toggle-image.spark-nav-profile-photo", func(e *colly.HTMLElement) {
+		// 	authTag = "Found sign of authentication: '<img :src=\"user.photo_url\" class=\"dropdown-toggle-image spark-nav-profile-photo\" alt=\"User Photo\" />'"
+		// 	authorized = true
+		// })
+		// c.OnHTML("spark-notifications", func(e *colly.HTMLElement) {
+		// 	authTag = "Found sign of authentication '<spark-notifications'"
+		// 	authorized = true
+		// })
 
 	case strings.Contains(targetURL, "odysee.com"):
 		logging.PrintI("Detected Odysee link")
@@ -110,7 +111,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 					uniqueEpisodeURLs[link] = struct{}{}
 				}
 			}
-			authorized = true
+			// authorized = true
 		})
 
 	case strings.Contains(targetURL, "rumble.com"):
@@ -120,7 +121,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			if strings.Contains(link, "/v") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
-			authorized = true
+			// authorized = true
 		})
 
 	default:
@@ -130,7 +131,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 			if strings.Contains(link, "/watch") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
-			authorized = true
+			// authorized = true
 		})
 	}
 
@@ -139,12 +140,11 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	if err != nil {
 		return nil, fmt.Errorf("error visiting webpage (%s): %v", targetURL, err)
 	}
+	c.Wait()
 
-	if !authorized {
-		logging.PrintE(0, "'%s' link seems to be unauthenticated?", targetURL)
-	} else {
-		logging.PrintS(1, "Found sign of successful authentication: %s", authTag)
-	}
+	// if authorized {
+	// 	logging.PrintS(1, "Found sign of successful authentication: %s", authTag)
+	// }
 
 	// Convert unique URLs map to slice
 	var episodeURLs = make([]string, 0, len(uniqueEpisodeURLs))

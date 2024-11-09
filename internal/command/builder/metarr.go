@@ -78,10 +78,7 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 			}
 			cStr := string(content)
 
-			args = append(args, mc.filenameReplaceSuffix(cStr)...)
-			args = append(args, mc.metaReplaceSuffix(cStr)...)
-			args = append(args, mc.metaReplacePrefix(cStr)...)
-			args = append(args, mc.metaAddField(cStr)...)
+			args = append(args, mc.metaOps(cStr)...)
 			args = append(args, mc.dateTagFormat(cStr)...)
 			args = append(args, mc.renameStyle(cStr)...)
 
@@ -133,10 +130,12 @@ func (mc *MetarrCommand) dateTagFormat(c string) []string {
 	return args
 }
 
-// metaAddField adds the command to add new fields to metadata
-func (mc *MetarrCommand) metaAddField(c string) []string {
+// metaOps adds the commands for manipulating metadata
+func (mc *MetarrCommand) metaOps(c string) []string {
 
-	lines, exists := mc.getFieldContent(c, tags.MetarrMetaAddField, enums.L_MULTI)
+	var shouldOW bool
+
+	lines, exists := mc.getFieldContent(c, tags.MetarrMetaOps, enums.L_MULTI)
 	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
@@ -144,82 +143,23 @@ func (mc *MetarrCommand) metaAddField(c string) []string {
 			if line == "" {
 				continue
 			}
-			entry := strings.SplitN(line, ":", 2)
-			if len(entry) != 2 {
-				logging.PrintE(0, "Error in new metadata field entry, please use syntax 'metatag:value'")
+
+			entry := strings.Split(line, ":")
+			if len(entry) < 3 {
+				logging.PrintE(0, "Error in new metadata field entry, entry shorter than 3 (should be at least 'field:operation:value')")
 			} else {
-				args = append(args, "--meta-add-field", line)
-			}
-		}
-
-	}
-	args = append(args, "--meta-overwrite")
-	return args
-}
-
-// filenameReplaceSuffix builds the command to strip selected suffixes from filenames
-func (mc *MetarrCommand) filenameReplaceSuffix(c string) []string {
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrFilenameReplaceSfx, enums.L_MULTI)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-			entry := strings.SplitN(line, ":", 2)
-			if len(entry) != 2 {
-				logging.PrintE(0, "Error in filename-replace-suffix entry, please use syntax 'suffix:replacement'")
-			} else {
-				args = append(args, "--filename-replace-suffix", line)
+				args = append(args, "--meta-ops", line)
+				if entry[1] == "set" {
+					shouldOW = true
+				}
 			}
 		}
 	}
-	return args
-}
 
-// metaReplaceSuffix builds the metadata suffix replacement argument for Metarr
-func (mc *MetarrCommand) metaReplaceSuffix(c string) []string {
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplaceSfx, enums.L_MULTI)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-			entry := strings.SplitN(line, ":", 3)
-			if len(entry) != 3 {
-				logging.PrintE(0, "Error in meta-replace-suffix entry, please use syntax 'metatag:suffix:replacement'")
-			} else {
-				args = append(args, "--meta-replace-suffix", line)
-			}
-		}
+	if shouldOW {
+		args = append(args, "--meta-overwrite")
 	}
-	return args
-}
 
-// metaReplacePrefix builds the metadata prefix replacement argument for Metarr
-func (mc *MetarrCommand) metaReplacePrefix(c string) []string {
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrMetaReplacePfx, enums.L_MULTI)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-			entry := strings.SplitN(line, ":", 3)
-			if len(entry) != 3 {
-				logging.PrintE(0, "Error in meta-replace-prefix entry, please use syntax 'metatag:prefix:replacement'")
-			} else {
-				args = append(args, "--meta-replace-prefix", line)
-			}
-		}
-	}
 	return args
 }
 
@@ -324,6 +264,7 @@ func (mc *MetarrCommand) getFieldContent(c, tag string, selectType enums.LineSel
 			if selectType == enums.L_SINGLE {
 				return []string{lines[0]}, true
 			}
+			// Returns multi
 			return lines, true
 		}
 		logging.PrintD(2, "Lines grabbed empty for tag '%s' and content '%s'", tag, c)

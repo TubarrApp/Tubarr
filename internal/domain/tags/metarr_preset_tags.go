@@ -3,10 +3,8 @@ package domain
 // Preset tag in file
 const (
 	MetarrFilenameDate       = "[filename-date-tag]"
-	MetarrMetaAddField       = "[meta-add-field]"
 	MetarrFilenameReplaceSfx = "[filename-replace-suffix]"
-	MetarrMetaReplaceSfx     = "[meta-replace-suffix]"
-	MetarrMetaReplacePfx     = "[meta-replace-prefix]"
+	MetarrMetaOps            = "[meta-ops]"
 	MetarrRenameStyle        = "[rename-style]"
 	MetarrOutputDir          = "[output-directory]"
 	MetarrOutputExt          = "[output-extension]"

@@ -37,16 +37,18 @@ func getBrowserCookies(url string) ([]*http.Cookie, error) {
 		return nil, fmt.Errorf("failed to extract base domain: %v", err)
 	}
 
-	cookieFilePath := config.GetString(keys.CookiePath)
+	if config.IsSet(keys.CookiePath) {
+		cookieFilePath := config.GetString(keys.CookiePath)
 
-	// If a cookie file path is provided, use it
-	if cookieFilePath != "" {
-		logging.PrintD(2, "Reading cookies from specified file: %s", cookieFilePath)
-		kookyCookies, err := readCookieFile(cookieFilePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read cookies from file: %v", err)
+		// If a cookie file path is provided, use it
+		if cookieFilePath != "" {
+			logging.PrintD(2, "Reading cookies from specified file: %s", cookieFilePath)
+			kookyCookies, err := readCookieFile(cookieFilePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read cookies from file: %v", err)
+			}
+			return convertToHTTPCookies(kookyCookies), nil
 		}
-		return convertToHTTPCookies(kookyCookies), nil
 	}
 
 	// Otherwise, proceed to use browser cookie stores
