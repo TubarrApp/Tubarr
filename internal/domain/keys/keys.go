@@ -12,7 +12,7 @@ const (
 	ExternalDownloader     string = "external-downloader"
 	ExternalDownloaderArgs string = "external-downloader-args"
 	MoveOnComplete         string = "move-on-complete"
-	OutputFiletype         string = "output-filetype"
+	OutputFiletype         string = "ext"
 	CookiePath             string = "cookie-file"
 )
 

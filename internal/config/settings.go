@@ -40,8 +40,8 @@ func init() {
 	viper.BindPFlag(keys.ChannelFile, rootCmd.PersistentFlags().Lookup(keys.ChannelFile))
 
 	// Output filetype
-	rootCmd.PersistentFlags().StringP(keys.OutputFiletype, "o", "", "Output filetype (e.g. mp4)")
-	viper.BindPFlag(keys.OutputFiletype, rootCmd.PersistentFlags().Lookup(keys.OutputFiletype))
+	rootCmd.PersistentFlags().StringP(keys.MoveOnComplete, "o", "", "Location to move file to upon completion")
+	viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete))
 
 	// Cookie source
 	rootCmd.PersistentFlags().String(keys.CookieSource, "", "Browser to grab cookies from for sites requiring authentication (e.g. firefox)")
@@ -60,8 +60,8 @@ func init() {
 	rootCmd.PersistentFlags().String(keys.ExternalDownloaderArgs, "", "Arguments for external downloader (e.g. \"-x 16 -s 16\")")
 	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
 
-	rootCmd.PersistentFlags().String(keys.MoveOnComplete, "", "Move files to given directory on program completion")
-	viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete))
+	rootCmd.PersistentFlags().String(keys.OutputFiletype, "", "Filetype to output as")
+	viper.BindPFlag(keys.OutputFiletype, rootCmd.PersistentFlags().Lookup(keys.OutputFiletype))
 
 	rootCmd.PersistentFlags().IntP(keys.DebugLevel, "d", 0, "Set the logging level")
 	viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel))

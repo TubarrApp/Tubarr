@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"tubarr/internal/config"
 	preset "tubarr/internal/config/presets"
@@ -21,9 +22,12 @@ type MetarrCommand struct {
 
 // NewMetarrCommandBuilder returns a new command builder to build and run Metarr commands
 func NewMetarrCommandBuilder() *MetarrCommand {
-	return &MetarrCommand{}
+	return &MetarrCommand{
+		Commands: make(map[string][]string),
+	}
 }
 
+// MakeMetarrCommands builds the command list for Metarr
 func (mc *MetarrCommand) MakeMetarrCommands(d []*models.DownloadedFiles) ([]*exec.Cmd, error) {
 	if len(d) == 0 {
 		return nil, fmt.Errorf("no downloaded file models")
@@ -37,7 +41,7 @@ func (mc *MetarrCommand) MakeMetarrCommands(d []*models.DownloadedFiles) ([]*exe
 		return nil, fmt.Errorf("failed to parse command presets")
 	}
 
-	commands := make([]*exec.Cmd, 0)
+	commands := make([]*exec.Cmd, 0, len(mc.Commands))
 	for _, args := range mc.Commands {
 		command := exec.Command("metarr", args...)
 		commands = append(commands, command)
@@ -59,14 +63,28 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 		}
 	}
 
+	if mc.Commands == nil {
+		mc.Commands = make(map[string][]string)
+	}
+
 	for _, model := range d {
 		if model == nil {
 			continue
 		}
-		args := make([]string, 0)
 
-		outputPath := config.GetString(keys.MoveOnComplete)
-		outputExt := config.GetString(keys.OutputFiletype)
+		args := []string{}
+
+		var (
+			outputPath, outputExt string
+		)
+
+		if config.IsSet(keys.MoveOnComplete) {
+			outputPath = config.GetString(keys.MoveOnComplete)
+		}
+
+		if config.IsSet(keys.OutputFiletype) {
+			outputExt = config.GetString(keys.OutputFiletype)
+		}
 
 		args = append(args, "-V", model.VideoFilename)
 		args = append(args, "-J", model.JSONFilename)
@@ -99,13 +117,17 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 		if outputPath != "" {
 			args = append(args, "-o", outputPath)
 		}
+
 		if outputExt != "" {
 			args = append(args, "--ext", outputExt)
 		}
 
-		var fileCommandMap = make(map[string][]string, len(args))
-		fileCommandMap[model.VideoFilename] = args
-		mc.Commands = fileCommandMap
+		if config.IsSet(keys.DebugLevel) {
+			dLevel := config.GetInt(keys.DebugLevel)
+			args = append(args, "-d", strconv.Itoa(dLevel))
+		}
+
+		mc.Commands[model.VideoFilename] = args
 	}
 	return nil
 }
