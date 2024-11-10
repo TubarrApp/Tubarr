@@ -28,7 +28,6 @@ func RunMetarr(commands []*exec.Cmd) error {
 		if err = command.Run(); err != nil {
 			logging.PrintE(0, "Encountered error running command '%s': %w", command.String(), err)
 		}
-		command.Wait()
 	}
 	return err // Returns nil by default unless an error is grabbed
 }
