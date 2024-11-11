@@ -82,6 +82,8 @@ func execute() error {
 
 	verifyLogLevel()
 
+	verifyConcurrencyLimit()
+
 	if err := verifyFilterOps(); err != nil {
 		return err
 	}
@@ -183,4 +185,19 @@ func verifyFilterOps() error {
 		}
 	}
 	return nil
+}
+
+// verifyConcurrencyLimit verifies the user inputted concurrency limitations
+func verifyConcurrencyLimit() {
+	lim := viper.GetInt(keys.ConcurrencyLimitInput)
+
+	switch {
+	case lim < 1:
+		viper.Set(keys.Concurrency, 1)
+	case lim > 25:
+		viper.Set(keys.Concurrency, 25)
+	default:
+		viper.Set(keys.Concurrency, lim)
+	}
+
 }

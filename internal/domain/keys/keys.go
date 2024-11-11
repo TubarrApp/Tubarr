@@ -13,6 +13,8 @@ const (
 	CookieSource string = "cookie-source"
 	CookiePath   string = "cookie-file"
 
+	ConcurrencyLimitInput string = "concurrency-limit"
+
 	ExternalDownloader     string = "external-downloader"
 	ExternalDownloaderArgs string = "external-downloader-args"
 	MoveOnComplete         string = "move-on-complete"
@@ -37,8 +39,10 @@ const (
 	ChannelCheckNew string = "CheckChannelsForNew"
 )
 
+// Download operations
 const (
-	FilterOps string = "filterOps"
+	FilterOps   string = "filterOps"
+	Concurrency string = "concurrency"
 )
 
 // Filename edits

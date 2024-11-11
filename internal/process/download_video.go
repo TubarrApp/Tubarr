@@ -2,15 +2,17 @@ package process
 
 import (
 	"sync"
+	"tubarr/internal/cfg"
 	build "tubarr/internal/command/builder"
 	execute "tubarr/internal/command/execute"
+	keys "tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
 )
 
 // ProcessVideoDownloads processes video request downloads
 func ProcessVideoDownloads(dls []*models.DLs) ([]*models.DLs, []string, bool) {
-	const maxConcurrent = 3
+	maxConcurrent := cfg.GetInt(keys.Concurrency)
 
 	var (
 		wg sync.WaitGroup
