@@ -3,7 +3,6 @@ module tubarr
 go 1.23.0
 
 require (
-	github.com/BurntSushi/toml v1.4.0
 	github.com/browserutils/kooky v0.2.2
 	github.com/gocolly/colly v1.2.0
 	github.com/spf13/cobra v1.8.1
