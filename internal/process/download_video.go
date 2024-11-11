@@ -11,67 +11,65 @@ import (
 )
 
 // ProcessVideoDownloads processes video request downloads
-func ProcessVideoDownloads(dls []*models.DLs) ([]*models.DLs, []string, bool) {
-	maxConcurrent := cfg.GetInt(keys.Concurrency)
+func ProcessVideoDownloads(dls []*models.DLs) (successfulDLs []*models.DLs, validURLs []string, done bool) {
 
 	var (
 		wg sync.WaitGroup
 		mu sync.Mutex
 	)
 
-	// Create channels for the worker pool
-	jobs := make(chan *models.DLs, len(dls))
+	// Channels and sem
+	validURLs = make([]string, 0, len(dls))
+	successfulDLs = make([]*models.DLs, 0, len(dls))
 
-	validUrls := make([]string, 0, len(dls))
-	successful := make([]*models.DLs, 0, len(dls))
+	sem := make(chan struct{}, cfg.GetInt(keys.Concurrency))
 
-	// Start workers
-	for i := 0; i < maxConcurrent; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-
-			for dl := range jobs {
-				logging.D(2, "Worker %d processing download for URL: %s", workerID, dl.URL)
-
-				vcb := build.NewVideoDLRequest(dl)
-				if err := vcb.VideoFetchCommand(); err != nil {
-					logging.E(0, "Worker %d: %v", workerID, err.Error())
-					continue
-				}
-
-				success, err := execute.ExecuteVideoDownload(dl)
-				if err != nil {
-					logging.E(0, "Worker %d: %v", workerID, err.Error())
-					continue
-				}
-
-				if success {
-					mu.Lock()
-					validUrls = append(validUrls, dl.URL)
-					successful = append(successful, dl)
-					mu.Unlock()
-
-					logging.D(1, "Worker %d successfully processed: %s", workerID, dl.URL)
-				}
-			}
-		}(i)
-	}
-
-	// Send jobs to workers
+	// Initialize sem
 	for _, dl := range dls {
-		if dl != nil {
-			jobs <- dl
+		if dl == nil {
+			logging.E(0, "DL request found nil, skipping...")
+			continue
 		}
-	}
-	close(jobs)
 
-	// Wait for all workers to complete
+		wg.Add(1)
+		go func(dl *models.DLs) {
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+
+			logging.D(2, "Processing download for URL: %s", dl.URL)
+
+			vcb := build.NewVideoDLRequest(dl)
+			if err := vcb.VideoFetchCommand(); err != nil {
+				logging.E(0, err.Error())
+				return
+			}
+
+			success, err := execute.ExecuteVideoDownload(dl)
+			if err != nil {
+				logging.E(0, err.Error())
+				return
+			}
+
+			if success {
+				mu.Lock()
+				validURLs = append(validURLs, dl.URL)
+				successfulDLs = append(successfulDLs, dl)
+				mu.Unlock()
+
+				logging.D(1, "Successfully processed: %s", dl.URL)
+			}
+		}(dl)
+	}
+
+	// Wait for all downloads to complete
 	wg.Wait()
 
-	if len(validUrls) == 0 {
+	if len(validURLs) == 0 {
 		return nil, nil, false
 	}
 
-	return successful, validUrls, true
+	return successfulDLs, validURLs, true
 }

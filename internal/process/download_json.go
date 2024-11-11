@@ -20,67 +20,60 @@ func ProcessMetaDownloads(dls []*models.DLs) (validRequests []*models.DLs, unwan
 	mdl := builder.NewMetaDLRequest(dls)
 	mdl.RequestMetaCommand()
 
-	maxConcurrent := cfg.GetInt(keys.Concurrency)
-
 	var (
 		wg sync.WaitGroup
 		mu sync.Mutex
 	)
 
-	// Worker channel and valid download array
-	jobs := make(chan *models.DLs, len(dls))
-	validDls := make([]*models.DLs, 0, len(dls))
-	unwantedDls := make([]string, 0, len(dls))
+	// Structures and semaphore
+	validRequests = make([]*models.DLs, 0, len(dls))
+	unwantedURLs = make([]string, 0, len(dls))
 
-	// Start workers
-	for i := 0; i < maxConcurrent; i++ {
+	sem := make(chan struct{}, cfg.GetInt(keys.Concurrency))
+
+	for _, dl := range dls {
 		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
+		go func(dl *models.DLs) {
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
 
-			for dl := range jobs {
-				if dl == nil {
-					logging.E(0, "Worker %d: Dl found nil", workerID)
-					continue
-				}
+			logging.D(2, "Processing meta download for URL: %s", dl.URL)
 
-				logging.D(2, "Worker %d processing metadata for URL: %s", workerID, dl.URL)
+			if err := execute.ExecuteMetaDownload(dl); err != nil {
+				logging.E(0, "Got error downloading meta for '%s': %v",
+					dl.URL, err.Error())
+				return
+			}
 
-				if err := execute.ExecuteMetaDownload(dl); err != nil {
-					logging.E(0, "Worker %d: Got error downloading meta for '%s': %v",
-						workerID, dl.URL, err.Error())
-					continue
-				}
+			valid, err := validateJson(dl)
+			if err != nil {
+				logging.E(0, "JSON validation failed for '%s': %v",
+					dl.URL, err.Error())
+				return
+			}
 
-				valid, err := validateJson(dl)
-				if err != nil {
-					logging.E(0, "Worker %d: JSON validation failed for '%s': %v",
-						workerID, dl.URL, err.Error())
-					continue
-				}
-
-				if !valid {
-					logging.D(2, "Worker %d: Filtered out download for URL '%s'",
-						workerID, dl.URL)
-
-					unwantedDls = append(unwantedDls, dl.URL)
-					continue
-				}
+			if !valid {
+				logging.D(2, "Filtered out download for URL '%s'",
+					dl.URL)
 
 				mu.Lock()
-				logging.D(1, "Worker %d: Got valid download request: %v", workerID, dl.URL)
-				validDls = append(validDls, dl)
+				unwantedURLs = append(unwantedURLs, dl.URL)
 				mu.Unlock()
+				return
 			}
-		}(i)
+
+			mu.Lock()
+			logging.D(1, "Got valid download request: %v", dl.URL)
+			validRequests = append(validRequests, dl)
+			mu.Unlock()
+		}(dl)
 	}
 
-	// Send jobs to workers
-	for _, dl := range dls {
-		jobs <- dl
-	}
-	close(jobs)
+	// Wait for all downloads to finish
 	wg.Wait()
 
-	return validDls, unwantedDls, nil
+	return validRequests, unwantedURLs, nil
 }
