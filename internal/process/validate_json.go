@@ -84,13 +84,30 @@ func filterRequests(dl *models.DLs) (valid bool, err error) {
 
 	// Apply filters if any match metadata content
 	for _, filter := range filters {
+
 		val, exists := dl.Metamap[filter.Field]
-		if !exists {
-			if filter.FilterType == enums.DLFILTER_CONTAINS {
+
+		switch {
+		case !exists:
+			if filter.FilterType == enums.DLFILTER_CONTAINSFIELD {
+
 				logging.I("Field '%s' not found in metadata for URL '%s' and filter is set to require it, filtering out", filter.Field, dl.URL)
-				return false, nil
+				if err := removeUnwantedJSON(dl.JSONPath); err != nil {
+					logging.E(0, err.Error())
+				}
+				return false, nil // Does not exist in meta and filter set to contain
 			}
-			continue
+			continue // Skip unfound, non-required field
+
+		default:
+			if filter.FilterType == enums.DLFILTER_OMITFIELD {
+
+				logging.I("Field '%s' found in metadata for URL '%s' and filter is set to omit it, filtering out", filter.Field, dl.URL)
+				if err := removeUnwantedJSON(dl.JSONPath); err != nil {
+					logging.E(0, err.Error())
+				}
+				return false, nil // Does exist in meta and filter set to omit
+			}
 		}
 
 		strVal, ok := val.(string)

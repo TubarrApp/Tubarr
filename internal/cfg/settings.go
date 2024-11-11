@@ -170,33 +170,55 @@ func verifyFilterOps() error {
 		var dlFilters = make([]*models.DLFilter, 0, len(filters))
 
 		for _, filter := range filters {
-			tuple := strings.Split(filter, ":")
-			if len(tuple) != 3 {
-				return fmt.Errorf("please enter filters in format 'field:filter_type:value' (e.g. 'title:omit:frogs','title:contains:lions')")
+			opts := strings.Split(filter, ":")
+
+			if len(opts) < 2 || len(opts) > 3 {
+				return fmt.Errorf("please enter filters in format 'field:filter_type:value' (e.g. 'title:omit:frogs','title:contains:lions' OR 'title:omit' to omit any videos with a title field)")
+
 			}
 
-			field := tuple[0]
-			filterType := tuple[1]
-			value := tuple[2]
-
-			switch filterType {
+			switch opts[1] {
 			case "omit":
-				f := &models.DLFilter{
-					Field:      field,
-					Value:      value,
-					FilterType: enums.DLFILTER_OMIT,
+				var f *models.DLFilter
+
+				switch len(opts) {
+				case 3:
+					f = &models.DLFilter{
+						Field:      opts[0],
+						Value:      opts[2],
+						FilterType: enums.DLFILTER_OMIT,
+					}
+					logging.I("Omitting videos which contain '%s' in the '%s' field", f.Value, f.Field)
+				case 2:
+					f = &models.DLFilter{
+						Field:      opts[0],
+						Value:      "",
+						FilterType: enums.DLFILTER_OMITFIELD,
+					}
+					logging.I("Omitting videos which contain the metafield '%s'", f.Field)
 				}
 				dlFilters = append(dlFilters, f)
-				logging.D(1, "Omitting videos which contain '%s' in the '%s' field", f.Value, f.Field)
 
 			case "contains":
-				f := &models.DLFilter{
-					Field:      field,
-					Value:      value,
-					FilterType: enums.DLFILTER_CONTAINS,
+				var f *models.DLFilter
+
+				switch len(opts) {
+				case 3:
+					f = &models.DLFilter{
+						Field:      opts[0],
+						Value:      opts[2],
+						FilterType: enums.DLFILTER_CONTAINS,
+					}
+					logging.I("Only grabbing videos which contain '%s' in the '%s' field", f.Value, f.Field)
+				case 2:
+					f = &models.DLFilter{
+						Field:      opts[0],
+						Value:      "",
+						FilterType: enums.DLFILTER_CONTAINSFIELD,
+					}
+					logging.I("Only grabbing videos which contain the metafield '%s'", f.Field)
 				}
 				dlFilters = append(dlFilters, f)
-				logging.D(1, "Only including videos which contain '%s' in the '%s' field", f.Value, f.Field)
 
 			default:
 				return fmt.Errorf("invalid filter operation type, should be 'omit' or 'contains'")
