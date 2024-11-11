@@ -87,29 +87,37 @@ func filterRequests(dl *models.DLs) (valid bool, err error) {
 
 		val, exists := dl.Metamap[filter.Field]
 
-		switch {
-		case !exists:
-			if filter.FilterType == enums.DLFILTER_CONTAINSFIELD {
+		// Performing field existent filter checks
+		if !exists {
+			switch filter.FilterType {
+			case enums.DLFILTER_CONTAINS_FIELD:
 
-				logging.I("Field '%s' not found in metadata for URL '%s' and filter is set to require it, filtering out", filter.Field, dl.URL)
+				logging.I("Filtering: Field '%s' not found in metadata for URL '%s' and filter is set to require it, filtering out", filter.Field, dl.URL)
 				if err := removeUnwantedJSON(dl.JSONPath); err != nil {
 					logging.E(0, err.Error())
 				}
-				return false, nil // Does not exist in meta and filter set to contain
-			}
-			continue // Skip unfound, non-required field
+				return false, nil // Failed check (does not exist in meta and filter set to contain)
 
-		default:
-			if filter.FilterType == enums.DLFILTER_OMITFIELD {
-
-				logging.I("Field '%s' found in metadata for URL '%s' and filter is set to omit it, filtering out", filter.Field, dl.URL)
-				if err := removeUnwantedJSON(dl.JSONPath); err != nil {
-					logging.E(0, err.Error())
-				}
-				return false, nil // Does exist in meta and filter set to omit
+			case enums.DLFILTER_OMIT_FIELD:
+				logging.D(2, "Passed check: Field '%s' does not exist", filter.Field)
+				continue // Passed check
 			}
 		}
+		switch filter.FilterType {
+		case enums.DLFILTER_OMIT_FIELD:
 
+			logging.I("Filtering: Field '%s' found in metadata for URL '%s' and filter is set to omit it, filtering out", filter.Field, dl.URL)
+			if err := removeUnwantedJSON(dl.JSONPath); err != nil {
+				logging.E(0, err.Error())
+			}
+			return false, nil // Failed check (does exist in meta and filter set to omit)
+
+		case enums.DLFILTER_CONTAINS_FIELD:
+			logging.D(2, "Passed check: Field '%s' exists", filter.Field)
+			continue // Passed this check
+		}
+
+		// Performing field contents checks
 		strVal, ok := val.(string)
 		if !ok {
 			logging.E(0, "Unexpected type for field %s: expected string, got %T", filter.Field, val)

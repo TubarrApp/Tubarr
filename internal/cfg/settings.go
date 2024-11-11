@@ -192,8 +192,7 @@ func verifyFilterOps() error {
 				case 2:
 					f = &models.DLFilter{
 						Field:      opts[0],
-						Value:      "",
-						FilterType: enums.DLFILTER_OMITFIELD,
+						FilterType: enums.DLFILTER_OMIT_FIELD,
 					}
 					logging.I("Omitting videos which contain the metafield '%s'", f.Field)
 				}
@@ -213,8 +212,7 @@ func verifyFilterOps() error {
 				case 2:
 					f = &models.DLFilter{
 						Field:      opts[0],
-						Value:      "",
-						FilterType: enums.DLFILTER_CONTAINSFIELD,
+						FilterType: enums.DLFILTER_CONTAINS_FIELD,
 					}
 					logging.I("Only grabbing videos which contain the metafield '%s'", f.Field)
 				}

@@ -13,22 +13,19 @@ import (
 
 var (
 	Level int = -1 // Pre initialization
-	muD   sync.Mutex
-	muE   sync.Mutex
-	muI   sync.Mutex
-	muP   sync.Mutex
-	muS   sync.Mutex
+	mu    sync.Mutex
 )
 
 func E(l int, format string, args ...interface{}) string {
 
-	muE.Lock()
-	defer muE.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
-	_, file, line, _ := runtime.Caller(1)
+	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
-	tag := fmt.Sprintf("[File: %s : Line: %d] ", file, line)
+	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
+	tag := fmt.Sprintf("["+consts.ColorBlue+"Function:"+consts.ColorReset+" %s - "+consts.ColorBlue+"File:"+consts.ColorReset+" %s : "+consts.ColorBlue+"Line:"+consts.ColorReset+" %d] ", funcName, file, line)
 
 	if Level < 0 {
 		Level = viper.GetInt(keys.DebugLevel)
@@ -36,13 +33,12 @@ func E(l int, format string, args ...interface{}) string {
 	if l <= viper.GetInt(keys.DebugLevel) {
 
 		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.RedError+format+tag+"\n", args...)
+			msg = fmt.Sprintf(consts.RedError+format+" "+tag+"\n", args...)
 		} else {
-			msg = fmt.Sprintf(consts.RedError + format + tag + "\n")
+			msg = fmt.Sprintf(consts.RedError + format + " " + tag + "\n")
 		}
 		fmt.Print(msg)
-
-		Write(consts.LogError, msg, nil)
+		writeLog(msg, l)
 	}
 
 	return msg
@@ -50,13 +46,9 @@ func E(l int, format string, args ...interface{}) string {
 
 func S(l int, format string, args ...interface{}) string {
 
-	muS.Lock()
-	defer muS.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
-
-	_, file, line, _ := runtime.Caller(1)
-	file = filepath.Base(file)
-	tag := fmt.Sprintf("[File: %s : Line: %d] ", file, line)
 
 	if Level < 0 {
 		Level = viper.GetInt(keys.DebugLevel)
@@ -64,27 +56,26 @@ func S(l int, format string, args ...interface{}) string {
 	if l <= viper.GetInt(keys.DebugLevel) {
 
 		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.GreenSuccess+format+tag+"\n", args...)
+			msg = fmt.Sprintf(consts.GreenSuccess+format+" \n", args...)
 		} else {
-			msg = fmt.Sprintf(consts.GreenSuccess + format + tag + "\n")
+			msg = fmt.Sprintf(consts.GreenSuccess + format + " \n")
 		}
 		fmt.Print(msg)
-
-		Write(consts.LogSuccess, msg, nil)
+		writeLog(msg, l)
 	}
-
 	return msg
 }
 
 func D(l int, format string, args ...interface{}) string {
 
-	muD.Lock()
-	defer muD.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
-	_, file, line, _ := runtime.Caller(1)
+	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
-	tag := fmt.Sprintf("[File: %s : Line: %d] ", file, line)
+	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
+	tag := fmt.Sprintf("["+consts.ColorBlue+"Function:"+consts.ColorReset+" %s - "+consts.ColorBlue+"File:"+consts.ColorReset+" %s : "+consts.ColorBlue+"Line:"+consts.ColorReset+" %d] ", funcName, file, line)
 
 	if Level < 0 {
 		Level = viper.GetInt(keys.DebugLevel)
@@ -92,22 +83,20 @@ func D(l int, format string, args ...interface{}) string {
 	if l <= viper.GetInt(keys.DebugLevel) && l != 0 { // Debug messages don't appear by default
 
 		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.YellowDebug+format+tag+"\n", args...)
+			msg = fmt.Sprintf(consts.YellowDebug+format+" "+tag+"\n", args...)
 		} else {
-			msg = fmt.Sprintf(consts.YellowDebug + format + tag + "\n")
+			msg = fmt.Sprintf(consts.YellowDebug + format + " " + tag + "\n")
 		}
 		fmt.Print(msg)
-
-		Write(consts.LogSuccess, msg, nil)
+		writeLog(msg, l)
 	}
-
 	return msg
 }
 
 func I(format string, args ...interface{}) string {
 
-	muI.Lock()
-	defer muI.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
 	if len(args) != 0 && args != nil {
@@ -116,15 +105,15 @@ func I(format string, args ...interface{}) string {
 		msg = fmt.Sprintf(consts.BlueInfo + format + "\n")
 	}
 	fmt.Print(msg)
-	Write(consts.LogInfo, msg, nil)
+	writeLog(msg, 0)
 
 	return msg
 }
 
 func P(format string, args ...interface{}) string {
 
-	muP.Lock()
-	defer muP.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
 	if len(args) != 0 && args != nil {
@@ -133,7 +122,7 @@ func P(format string, args ...interface{}) string {
 		msg = fmt.Sprintf(format + "\n")
 	}
 	fmt.Print(msg)
-	Write(consts.LogBasic, msg, nil)
+	writeLog(msg, 0)
 
 	return msg
 }

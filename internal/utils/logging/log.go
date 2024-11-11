@@ -1,32 +1,29 @@
 package utils
 
 import (
-	"fmt"
 	"log"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"sync"
 	"time"
+	"tubarr/internal/domain/regex"
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
+	ErrorArray []error
 	Loggable   bool = false
 	Logger     *log.Logger
-	ErrorArray []error
-	mu         sync.Mutex
 
-	// Regular expression to match ANSI escape codes
-	ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	// Matches ANSI escape codes
+	ansiEscape = regex.AnsiEscapeCompile()
 )
 
 // SetupLogging creates and/or opens the log file
 func SetupLogging(targetDir string) error {
 
 	logFile := &lumberjack.Logger{
-		Filename:   filepath.Join(targetDir, "/tubarr.log"), // Log file path
+		Filename:   filepath.Join(targetDir, "/metarr.log"), // Log file path
 		MaxSize:    1,                                       // Max size in MB before rotation
 		MaxBackups: 3,                                       // Number of backups to retain
 		Compress:   true,                                    // Gzip compression
@@ -41,98 +38,30 @@ func SetupLogging(targetDir string) error {
 }
 
 // Write writes error information to the log file
-func Write(tag, infoMsg string, err error, args ...interface{}) {
-
-	if Loggable {
-		mu.Lock()
-		defer mu.Unlock()
-
-		var (
-			errMsg,
-			info string
-		)
-
-		if err != nil {
-			if tag == "" {
-				errMsg = fmt.Sprintf(err.Error()+"\n", args...)
-			} else {
-				errMsg = fmt.Sprintf(tag+err.Error()+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(errMsg))
-
-		} else if infoMsg != "" {
-			if tag == "" {
-				info = fmt.Sprintf(infoMsg+"\n", args...)
-			} else {
-				info = fmt.Sprintf(tag+infoMsg+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(info))
+func writeLog(msg string, level int) {
+	// Do not add mutex
+	if Loggable && level < 2 {
+		if !strings.HasPrefix(msg, "\n") {
+			msg += "\n"
 		}
+
+		if ansiEscape == nil {
+			ansiEscape = regex.AnsiEscapeCompile()
+		}
+
+		Logger.Print(ansiEscape.ReplaceAllString(msg, ""))
 	}
 }
 
 // WriteArray writes an array of error information to the log file
-func WriteArray(tag string, infoMsg []string, err []error, args ...interface{}) {
+func writeLogArray(msgs []string) {
 	if Loggable {
-		mu.Lock()
-		defer mu.Unlock()
 
-		var (
-			errMsg,
-			info string
-		)
-
-		var b strings.Builder
-
-		if len(err) != 0 && err != nil {
-			b.Grow(len(err) * 50)
-			defer b.Reset()
-
-			var errOut string
-			for i, errValue := range err {
-
-				b.WriteString(errValue.Error())
-				if i != len(err)-2 {
-					b.WriteString("; ")
-				}
-			}
-			errOut = b.String()
-
-			if tag == "" {
-				errMsg = fmt.Sprintf(errOut+"\n", args...)
-			} else {
-				errMsg = fmt.Sprintf(tag+errOut+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(errMsg))
-
-			return
+		if ansiEscape == nil {
+			ansiEscape = regex.AnsiEscapeCompile()
 		}
+		out := strings.Join(msgs, ", ")
 
-		if len(infoMsg) != 0 && infoMsg != nil {
-			b.Grow(len(infoMsg) * 50)
-			defer b.Reset()
-
-			var infoOut string
-			for i, infoValue := range infoMsg {
-
-				b.WriteString(infoValue)
-				if i != len(infoMsg)-2 {
-					b.WriteString("; ")
-				}
-			}
-			infoOut = b.String()
-
-			if tag == "" {
-				info = fmt.Sprintf(infoOut+"\n", args...)
-			} else {
-				info = fmt.Sprintf(tag+infoOut+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(info))
-		}
+		Logger.Print(ansiEscape.ReplaceAllString(out, ""))
 	}
-}
-
-// stripAnsiCodes removes ANSI escape codes from a string
-func stripAnsiCodes(input string) string {
-	return ansiEscape.ReplaceAllString(input, "")
 }
