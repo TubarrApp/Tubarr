@@ -14,7 +14,7 @@ func AppendURLsToFile(filename string, urls []string) error {
 		return nil
 	}
 
-	logging.PrintD(2, "Appending URLs to file %s: %v", filename, urls)
+	logging.D(2, "Appending URLs to file %s: %v", filename, urls)
 
 	// Ensure the directory exists
 	dir := filepath.Dir(filename)

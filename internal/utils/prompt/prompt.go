@@ -30,24 +30,24 @@ func InitUserInputReader() {
 // preserve all in the queue, or move through value by value
 func PromptMetaReplace(promptMsg, fileName string, overwriteAll, preserveAll *bool) (string, error) {
 
-	logging.PrintD(3, "Entering PromptUser dialogue...")
+	logging.D(3, "Entering PromptUser dialogue...")
 	ctx := context.Background()
 
 	if decisionMade {
 		// If overwriteAll, return "Y" without waiting
 		if *overwriteAll {
 
-			logging.PrintD(3, "Overwrite all is set...")
+			logging.D(3, "Overwrite all is set...")
 			return "Y", nil
 		} else if *preserveAll {
 
-			logging.PrintD(3, "Preserve all is set...")
+			logging.D(3, "Preserve all is set...")
 			return "N", nil
 		}
 	}
 
 	fmt.Println()
-	logging.PrintI(promptMsg)
+	logging.I(promptMsg)
 
 	// Wait for user input
 	select {
@@ -59,7 +59,7 @@ func PromptMetaReplace(promptMsg, fileName string, overwriteAll, preserveAll *bo
 		return response, nil
 
 	case <-ctx.Done():
-		logging.PrintI("Operation canceled during input.")
+		logging.I("Operation canceled during input.")
 		return "", fmt.Errorf("operation canceled")
 	}
 }

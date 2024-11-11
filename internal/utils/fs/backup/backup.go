@@ -18,7 +18,7 @@ func BackupFile(file *os.File) error {
 	originalFilePath := file.Name()
 
 	backupFilePath := generateBackupFilename(originalFilePath)
-	logging.PrintD(3, "Creating backup of file '%s' as '%s'", originalFilePath, backupFilePath)
+	logging.D(3, "Creating backup of file '%s' as '%s'", originalFilePath, backupFilePath)
 
 	// Open the backup file for writing
 	backupFile, err := os.Create(backupFilePath)
@@ -39,7 +39,7 @@ func BackupFile(file *os.File) error {
 		return fmt.Errorf("failed to copy content to backup file: %w", err)
 	}
 
-	logging.PrintD(3, "Backup successfully created at '%s'", backupFilePath)
+	logging.D(3, "Backup successfully created at '%s'", backupFilePath)
 	return nil
 }
 
@@ -54,7 +54,7 @@ func generateBackupFilename(originalFilePath string) string {
 func RenameToBackup(filename string) error {
 
 	if filename == "" {
-		logging.PrintE(0, "filename was passed in to backup empty")
+		logging.E(0, "filename was passed in to backup empty")
 	}
 
 	backupName := generateBackupFilename(filename)

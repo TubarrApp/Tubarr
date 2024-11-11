@@ -20,7 +20,7 @@ var (
 	muS   sync.Mutex
 )
 
-func PrintE(l int, format string, args ...interface{}) string {
+func E(l int, format string, args ...interface{}) string {
 
 	muE.Lock()
 	defer muE.Unlock()
@@ -48,7 +48,7 @@ func PrintE(l int, format string, args ...interface{}) string {
 	return msg
 }
 
-func PrintS(l int, format string, args ...interface{}) string {
+func S(l int, format string, args ...interface{}) string {
 
 	muS.Lock()
 	defer muS.Unlock()
@@ -76,7 +76,7 @@ func PrintS(l int, format string, args ...interface{}) string {
 	return msg
 }
 
-func PrintD(l int, format string, args ...interface{}) string {
+func D(l int, format string, args ...interface{}) string {
 
 	muD.Lock()
 	defer muD.Unlock()
@@ -104,7 +104,7 @@ func PrintD(l int, format string, args ...interface{}) string {
 	return msg
 }
 
-func PrintI(format string, args ...interface{}) string {
+func I(format string, args ...interface{}) string {
 
 	muI.Lock()
 	defer muI.Unlock()
@@ -121,7 +121,7 @@ func PrintI(format string, args ...interface{}) string {
 	return msg
 }
 
-func Print(format string, args ...interface{}) string {
+func P(format string, args ...interface{}) string {
 
 	muP.Lock()
 	defer muP.Unlock()

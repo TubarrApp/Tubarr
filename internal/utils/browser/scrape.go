@@ -6,17 +6,19 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"tubarr/internal/config"
+	"tubarr/internal/cfg"
 	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
 
 	"github.com/gocolly/colly"
 )
 
 // GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded
-func GetNewReleases() []string {
+func GetNewReleases(vDir, jDir string) []*models.DLs {
+
 	uniqueURLs := make(map[string]struct{})
-	urlsToCheck := config.GetStringSlice(keys.ChannelCheckNew)
+	urlsToCheck := cfg.GetStringSlice(keys.ChannelCheckNew)
 
 	for _, url := range urlsToCheck {
 		if url == "" {
@@ -25,13 +27,13 @@ func GetNewReleases() []string {
 
 		cookies, err := getBrowserCookies(url)
 		if err != nil {
-			logging.PrintE(0, "Could not get cookies for %s: %v", url, err)
+			logging.E(0, "Could not get cookies for %s: %v", url, err)
 			continue
 		}
 
 		urls, err := newEpisodeURLs(url, cookies)
 		if err != nil {
-			logging.PrintE(0, "Could not grab episodes from %s: %v", url, err)
+			logging.E(0, "Could not grab episodes from %s: %v", url, err)
 			continue
 		}
 
@@ -43,26 +45,26 @@ func GetNewReleases() []string {
 		}
 	}
 	// Convert map to slice
-	var newURLs = make([]string, 0, len(uniqueURLs))
+	var newRequests = make([]*models.DLs, 0, len(uniqueURLs))
 	for url := range uniqueURLs {
-		newURLs = append(newURLs, url)
+		newRequests = append(newRequests, &models.DLs{
+			URL: url,
+
+			VideoDir: vDir,
+			JSONDir:  jDir,
+		})
 	}
 
 	// Log results
-	if len(newURLs) > 0 {
-		logging.PrintI("Grabbed %d new episode URLs: %v", len(newURLs), newURLs)
+	if len(newRequests) > 0 {
+		logging.I("Grabbed %d new download requests: %v", len(newRequests), uniqueURLs)
 	}
 
-	return newURLs
+	return newRequests
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
 func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) {
-
-	// var (
-	// 	authorized bool
-	// 	authTag    string
-	// )
 
 	c := colly.NewCollector()
 	uniqueEpisodeURLs := make(map[string]struct{})
@@ -70,38 +72,29 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	for _, cookie := range cookies {
 		c.SetCookies(targetURL, []*http.Cookie{cookie})
 	}
+
 	// Video URL link pattern
 	switch {
 	case strings.Contains(targetURL, "bitchute.com"):
-		logging.PrintI("Detected bitchute.com link")
+		logging.I("Detected bitchute.com link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))
 			if strings.Contains(link, "/video/") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
-			// authorized = true
 		})
 
 	case strings.Contains(targetURL, "censored.tv"):
-		logging.PrintI("Detected censored.tv link")
+		logging.I("Detected censored.tv link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))
 			if strings.Contains(link, "/episode/") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
 		})
-		// authorized = true
-		// c.OnHTML(".dropdown-toggle-image.spark-nav-profile-photo", func(e *colly.HTMLElement) {
-		// 	authTag = "Found sign of authentication: '<img :src=\"user.photo_url\" class=\"dropdown-toggle-image spark-nav-profile-photo\" alt=\"User Photo\" />'"
-		// 	authorized = true
-		// })
-		// c.OnHTML("spark-notifications", func(e *colly.HTMLElement) {
-		// 	authTag = "Found sign of authentication '<spark-notifications'"
-		// 	authorized = true
-		// })
 
 	case strings.Contains(targetURL, "odysee.com"):
-		logging.PrintI("Detected Odysee link")
+		logging.I("Detected Odysee link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))
 			parts := strings.Split(link, "/")
@@ -111,27 +104,24 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 					uniqueEpisodeURLs[link] = struct{}{}
 				}
 			}
-			// authorized = true
 		})
 
 	case strings.Contains(targetURL, "rumble.com"):
-		logging.PrintI("Detected Rumble link")
+		logging.I("Detected Rumble link")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))
 			if strings.Contains(link, "/v") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
-			// authorized = true
 		})
 
 	default:
-		logging.PrintI("Using default link detection")
+		logging.I("Using default link detection")
 		c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 			link := e.Request.AbsoluteURL(e.Attr("href"))
 			if strings.Contains(link, "/watch") {
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
-			// authorized = true
 		})
 	}
 
@@ -141,10 +131,6 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 		return nil, fmt.Errorf("error visiting webpage (%s): %v", targetURL, err)
 	}
 	c.Wait()
-
-	// if authorized {
-	// 	logging.PrintS(1, "Found sign of successful authentication: %s", authTag)
-	// }
 
 	// Convert unique URLs map to slice
 	var episodeURLs = make([]string, 0, len(uniqueEpisodeURLs))
@@ -175,7 +161,7 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 		}
 	}
 	if len(newURLs) == 0 {
-		logging.PrintI("No new videos at %s", targetURL)
+		logging.I("No new videos at %s", targetURL)
 		return nil, nil
 	}
 	return newURLs, nil
@@ -188,7 +174,7 @@ func loadGrabbedURLsFromFile(filename string) (map[string]struct{}, error) {
 		filepath string
 	)
 
-	videoDir := config.GetString(keys.VideoDir)
+	videoDir := cfg.GetString(keys.VideoDir)
 
 	switch strings.HasSuffix(videoDir, "/") {
 	case false:

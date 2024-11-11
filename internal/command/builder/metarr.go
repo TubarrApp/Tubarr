@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"tubarr/internal/config"
-	preset "tubarr/internal/config/presets"
+	"tubarr/internal/cfg"
+	preset "tubarr/internal/cfg/presets"
 	consts "tubarr/internal/domain/constants"
 	enums "tubarr/internal/domain/enums"
 	keys "tubarr/internal/domain/keys"
@@ -28,7 +28,7 @@ func NewMetarrCommandBuilder() *MetarrCommand {
 }
 
 // MakeMetarrCommands builds the command list for Metarr
-func (mc *MetarrCommand) MakeMetarrCommands(d []*models.DownloadedFiles) ([]*exec.Cmd, error) {
+func (mc *MetarrCommand) MakeMetarrCommands(d []*models.DLs) ([]*exec.Cmd, error) {
 	if len(d) == 0 {
 		return nil, fmt.Errorf("no downloaded file models")
 	}
@@ -51,15 +51,15 @@ func (mc *MetarrCommand) MakeMetarrCommands(d []*models.DownloadedFiles) ([]*exe
 }
 
 // ParseMetarrPreset parses the Metarr from a preset file
-func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
+func (mc *MetarrCommand) ParsePresets(dls []*models.DLs) error {
 
-	logging.PrintI("Sending to Metarr for metadata insertion")
+	logging.I("Sending to Metarr for metadata insertion")
 
-	mPresetFilepath := config.GetString(keys.MetarrPreset)
+	mPresetFilepath := cfg.GetString(keys.MetarrPreset)
 	if mPresetFilepath != "" {
 		if _, err := os.Stat(mPresetFilepath); err != nil {
-			logging.PrintE(0, "Preset file not accessible: (%v) Clearing key...", err)
-			config.Set(keys.MetarrPreset, "")
+			logging.E(0, "Preset file not accessible: (%v) Clearing key...", err)
+			cfg.Set(keys.MetarrPreset, "")
 		}
 	}
 
@@ -67,8 +67,8 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 		mc.Commands = make(map[string][]string)
 	}
 
-	for _, model := range d {
-		if model == nil {
+	for _, dl := range dls {
+		if dl == nil {
 			continue
 		}
 
@@ -78,16 +78,16 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 			outputPath, outputExt string
 		)
 
-		if config.IsSet(keys.MoveOnComplete) {
-			outputPath = config.GetString(keys.MoveOnComplete)
+		if cfg.IsSet(keys.MoveOnComplete) {
+			outputPath = cfg.GetString(keys.MoveOnComplete)
 		}
 
-		if config.IsSet(keys.OutputFiletype) {
-			outputExt = config.GetString(keys.OutputFiletype)
+		if cfg.IsSet(keys.OutputFiletype) {
+			outputExt = cfg.GetString(keys.OutputFiletype)
 		}
 
-		args = append(args, "-V", model.VideoFilename)
-		args = append(args, "-J", model.JSONFilename)
+		args = append(args, "-V", dl.VideoPath)
+		args = append(args, "-J", dl.JSONPath)
 
 		if mPresetFilepath != "" { // Parse preset file
 			content, err := os.ReadFile(mPresetFilepath)
@@ -111,7 +111,7 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 				}
 			}
 		} else { // Fallback to auto-preset detection
-			args = preset.AutoPreset(model.URL)
+			args = preset.AutoPreset(dl.URL)
 		}
 
 		if outputPath != "" {
@@ -122,12 +122,12 @@ func (mc *MetarrCommand) ParsePresets(d []*models.DownloadedFiles) error {
 			args = append(args, "--ext", outputExt)
 		}
 
-		if config.IsSet(keys.DebugLevel) {
-			dLevel := config.GetInt(keys.DebugLevel)
+		if cfg.IsSet(keys.DebugLevel) {
+			dLevel := cfg.GetInt(keys.DebugLevel)
 			args = append(args, "-d", strconv.Itoa(dLevel))
 		}
 
-		mc.Commands[model.VideoFilename] = args
+		mc.Commands[dl.VideoPath] = args
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func (mc *MetarrCommand) dateTagFormat(c string) []string {
 		case "Ymd", "ymd", "mdY", "mdy", "dmY", "dmy":
 			args = append(args, "--filename-date-tag", lines[0])
 		default:
-			logging.PrintE(0, "Date tag format entry syntax is incorrect, should be in a format such as Ymd (for yyyy-mm-dd) or ymd (for yy-mm-dd) and so on...")
+			logging.E(0, "Date tag format entry syntax is incorrect, should be in a format such as Ymd (for yyyy-mm-dd) or ymd (for yy-mm-dd) and so on...")
 		}
 	}
 	return args
@@ -168,7 +168,7 @@ func (mc *MetarrCommand) metaOps(c string) []string {
 
 			entry := strings.Split(line, ":")
 			if len(entry) < 3 {
-				logging.PrintE(0, "Error in new metadata field entry, entry shorter than 3 (should be at least 'field:operation:value')")
+				logging.E(0, "Error in new metadata field entry, entry shorter than 3 (should be at least 'field:operation:value')")
 			} else {
 				args = append(args, "--meta-ops", line)
 				if entry[1] == "set" {
@@ -198,7 +198,7 @@ func (mc *MetarrCommand) renameStyle(c string) []string {
 		case "spaces", "underscores", "skip":
 			args = append(args, "-r", lines[0])
 		default:
-			logging.PrintE(0, "Rename style entry syntax is incorrect, should be spaces, underscores, or skip.")
+			logging.E(0, "Rename style entry syntax is incorrect, should be spaces, underscores, or skip.")
 			args = append(args, "-r", "skip")
 		}
 	}
@@ -231,9 +231,9 @@ func (mc *MetarrCommand) outputLocation(c string) ([]string, error) {
 }
 
 // outputExtension is the filetype extension to output files as
-func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
+func (mc *MetarrCommand) outputExtension(e string) ([]string, error) {
 
-	lines, exists := mc.getFieldContent(c, tags.MetarrOutputExt, enums.L_SINGLE)
+	lines, exists := mc.getFieldContent(e, tags.MetarrOutputExt, enums.L_SINGLE)
 	var args = make([]string, 0, len(lines)*2)
 
 	if exists && len(lines) > 0 {
@@ -289,10 +289,10 @@ func (mc *MetarrCommand) getFieldContent(c, tag string, selectType enums.LineSel
 			// Returns multi
 			return lines, true
 		}
-		logging.PrintD(2, "Lines grabbed empty for tag '%s' and content '%s'", tag, c)
+		logging.D(2, "Lines grabbed empty for tag '%s' and content '%s'", tag, c)
 		return nil, false
 	}
-	logging.PrintD(2, "Tag '%s' not found in content '%s'", tag, c)
+	logging.D(2, "Tag '%s' not found in content '%s'", tag, c)
 	return nil, false
 }
 
