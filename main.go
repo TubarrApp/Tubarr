@@ -113,8 +113,25 @@ func initProcess(vDir, jDir string) error {
 		return nil
 	}
 
+	var toAppend []string
+
 	// Returns DLs that pass checks, should be furnished with JSON directories and paths
-	dls := process.ProcessMetaDownloads(requests)
+	dls, unwanted, err := process.ProcessMetaDownloads(requests)
+	if err != nil {
+		return err
+	}
+
+	if len(unwanted) > 0 {
+		toAppend = append(toAppend, unwanted...)
+	}
+
+	if len(dls) == 0 {
+		logging.I("Nothing to download, exiting...")
+		if len(toAppend) > 0 {
+			updateGrabbedUrls(vDir, toAppend)
+		}
+		return nil
+	}
 
 	downloaded, successful, proceed := process.ProcessVideoDownloads(dls)
 	if !proceed {
@@ -122,12 +139,12 @@ func initProcess(vDir, jDir string) error {
 		return nil
 	}
 
-	// Update grabbed URLs file
-	grabbedURLsPath := filepath.Join(vDir, "grabbed-urls.txt")
-	if err := fsWrite.AppendURLsToFile(grabbedURLsPath, successful); err != nil {
-		logging.E(0, "Failed to update grabbed-urls.txt: %v", err)
-		// Don't return error because downloads were successful
+	if len(successful) > 0 {
+		toAppend = append(toAppend, successful...)
+	}
 
+	if len(toAppend) > 0 {
+		updateGrabbedUrls(vDir, toAppend)
 	}
 
 	if cfg.IsSet(keys.MetarrPreset) && len(downloaded) > 0 {
@@ -143,4 +160,12 @@ func initProcess(vDir, jDir string) error {
 	}
 
 	return nil
+}
+
+func updateGrabbedUrls(vDir string, toAppend []string) {
+
+	grabbedURLsPath := filepath.Join(vDir, "grabbed-urls.txt")
+	if err := fsWrite.AppendURLsToFile(grabbedURLsPath, toAppend); err != nil {
+		logging.E(0, "Failed to update grabbed-urls.txt: %v", err)
+	}
 }

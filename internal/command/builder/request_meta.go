@@ -44,6 +44,14 @@ func (mdl *MetaDLRequest) RequestMetaCommand() {
 		buildArgs = append(buildArgs, "--retries", cfg.GetString(keys.DLRetries))
 	}
 
+	if cfg.IsSet(keys.ExternalDownloader) {
+		buildArgs = append(buildArgs, "--external-downloader", cfg.GetString(keys.ExternalDownloader))
+	}
+
+	if cfg.IsSet(keys.ExternalDownloaderArgs) {
+		buildArgs = append(buildArgs, "--external-downloader-args", cfg.GetString(keys.ExternalDownloaderArgs))
+	}
+
 	//buildArgs = append(buildArgs, "--quiet")
 	buildArgs = append(buildArgs, "--restrict-filenames", "-o", "%(title)s.%(ext)s")
 

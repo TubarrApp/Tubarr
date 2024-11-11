@@ -1,6 +1,7 @@
 package process
 
 import (
+	"fmt"
 	"sync"
 	"tubarr/internal/cfg"
 	builder "tubarr/internal/command/builder"
@@ -11,10 +12,9 @@ import (
 )
 
 // ProcessMetaDownloads is the entry point for processing metadata downloads
-func ProcessMetaDownloads(dls []*models.DLs) []*models.DLs {
+func ProcessMetaDownloads(dls []*models.DLs) (validRequests []*models.DLs, unwantedURLs []string, err error) {
 	if dls == nil {
-		logging.E(0, "Dls passed in nil")
-		return nil
+		return nil, nil, fmt.Errorf("download models passed in null")
 	}
 
 	mdl := builder.NewMetaDLRequest(dls)
@@ -30,6 +30,7 @@ func ProcessMetaDownloads(dls []*models.DLs) []*models.DLs {
 	// Worker channel and valid download array
 	jobs := make(chan *models.DLs, len(dls))
 	validDls := make([]*models.DLs, 0, len(dls))
+	unwantedDls := make([]string, 0, len(dls))
 
 	// Start workers
 	for i := 0; i < maxConcurrent; i++ {
@@ -61,6 +62,8 @@ func ProcessMetaDownloads(dls []*models.DLs) []*models.DLs {
 				if !valid {
 					logging.D(2, "Worker %d: Filtered out download for URL '%s'",
 						workerID, dl.URL)
+
+					unwantedDls = append(unwantedDls, dl.URL)
 					continue
 				}
 
@@ -79,5 +82,5 @@ func ProcessMetaDownloads(dls []*models.DLs) []*models.DLs {
 	close(jobs)
 	wg.Wait()
 
-	return validDls
+	return validDls, unwantedDls, nil
 }

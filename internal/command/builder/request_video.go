@@ -54,6 +54,8 @@ func (vf *VideoDLRequest) VideoFetchCommand() error {
 
 	if cfg.IsSet(keys.CookieSource) {
 		args = append(args, "--cookies-from-browser", cfg.GetString(keys.CookieSource))
+	} else if cfg.IsSet(keys.CookiePath) {
+		args = append(args, "--cookies", cfg.GetString(keys.CookiePath))
 	}
 
 	if cfg.IsSet(keys.ExternalDownloader) {
