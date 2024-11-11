@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"tubarr/internal/cfg"
+	enums "tubarr/internal/domain/enums"
 	keys "tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
@@ -45,10 +46,6 @@ func validateJson(dl *models.DLs) (valid bool, err error) {
 
 	logging.D(1, "About to decode JSON to metamap")
 
-	if dl.Metamap == nil {
-		dl.Metamap = make(map[string]interface{})
-	}
-
 	m := make(map[string]interface{})
 	decoder := json.NewDecoder(f)
 	if err := decoder.Decode(&m); err != nil {
@@ -74,22 +71,25 @@ func validateJson(dl *models.DLs) (valid bool, err error) {
 // filterRequests uses user input filters to check if the video should be downloaded
 func filterRequests(dl *models.DLs) (valid bool, err error) {
 
-	// Check if filters are set
+	// Check if filters are set and validate
 	if !cfg.IsSet(keys.FilterOps) {
 		logging.D(1, "No filters set, returning true")
 		return true, nil
 	}
 
-	// Get and validate filter configuration
 	filters, ok := cfg.Get(keys.FilterOps).([]*models.DLFilter)
 	if !ok || filters == nil {
 		return false, fmt.Errorf("filter configuration is nil or has wrong type; expected []*models.DLFilter, got %T", filters)
 	}
 
-	// Apply filters if any
+	// Apply filters if any match metadata content
 	for _, filter := range filters {
 		val, exists := dl.Metamap[filter.Field]
 		if !exists {
+			if filter.FilterType == enums.DLFILTER_CONTAINS {
+				logging.I("Field '%s' not found in metadata for URL '%s' and filter is set to require it, filtering out", filter.Field, dl.URL)
+				return false, nil
+			}
 			continue
 		}
 
@@ -99,18 +99,64 @@ func filterRequests(dl *models.DLs) (valid bool, err error) {
 			continue
 		}
 
-		// Apply the filter logic
-		if strings.Contains(strings.ToLower(strVal), strings.ToLower(filter.Omit)) {
-			logging.D(1, "Filtering out video '%s' which contains '%s' in field '%s'", dl.URL, filter.Omit, filter.Field)
+		lowerStrVal := strings.ToLower(strVal)
+		lowerFilterVal := strings.ToLower(filter.Value)
 
-			if err := os.Remove(dl.JSONPath); err != nil {
-				logging.E(0, "Failed to remove unwanted JSON file '%s' due to error %v", dl.JSONPath, err)
-			} else {
-				logging.S(0, "Removed unwanted JSON file '%s'", dl.JSONPath)
+		// Apply the filter logic
+		switch filter.FilterType {
+
+		case enums.DLFILTER_OMIT:
+			if strings.Contains(lowerStrVal, lowerFilterVal) {
+
+				logging.D(1, "Filtering out video '%s' which contains '%s' in field '%s'", dl.URL, filter.Value, filter.Field)
+				if err := removeUnwantedJSON(dl.JSONPath); err != nil {
+					logging.E(0, err.Error())
+				}
+				return false, nil
 			}
-			return false, nil
+
+		case enums.DLFILTER_CONTAINS:
+			if !strings.Contains(lowerStrVal, lowerFilterVal) {
+
+				logging.D(1, "Filtering out video '%s' which does not contain '%s' in field '%s'", dl.URL, filter.Value, filter.Field)
+				if err := removeUnwantedJSON(dl.JSONPath); err != nil {
+					logging.E(0, err.Error())
+				}
+				return false, nil
+			}
+
+		default:
+			logging.D(1, "Unrecognized filter type, skipping...")
+			continue
 		}
 	}
 	logging.D(1, "Video '%s' passed filter checks", dl.URL)
 	return true, nil
+}
+
+// removeUnwantedJSON removes filtered out JSON files
+func removeUnwantedJSON(path string) error {
+	if path == "" {
+		return fmt.Errorf("path sent in empty, not removing")
+	}
+
+	check, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("not deleting unwanted JSON file, got error: %w", err)
+	}
+
+	switch {
+	case check.IsDir():
+		return fmt.Errorf("JSON path sent in as a directory '%s', not deleting", path)
+	case !check.Mode().IsRegular():
+		return fmt.Errorf("JSON file '%s' is not a regular file, not deleting", path)
+	}
+
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("failed to remove unwanted JSON file '%s' due to error %w", path, err)
+	} else {
+		logging.S(0, "Removed unwanted JSON file '%s'", path)
+	}
+
+	return nil
 }

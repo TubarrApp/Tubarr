@@ -11,7 +11,11 @@ import (
 )
 
 // ProcessVideoDownloads processes video request downloads
-func ProcessVideoDownloads(dls []*models.DLs) (successfulDLs []*models.DLs, validURLs []string, done bool) {
+func ProcessVideoDownloads(dls []*models.DLs) (successfulDLs []*models.DLs, validURLs []string, proceed bool) {
+	if dls == nil {
+		logging.E(0, "DLs passed in nil")
+		return nil, nil, false
+	}
 
 	var (
 		wg sync.WaitGroup

@@ -1,6 +1,9 @@
 package models
 
-import "os/exec"
+import (
+	"os/exec"
+	enums "tubarr/internal/domain/enums"
+)
 
 // DLRequest represents a download request
 type DLRequest struct {
@@ -24,6 +27,7 @@ type DLs struct {
 }
 
 type DLFilter struct {
-	Field string
-	Omit  string
+	Field      string
+	Value      string
+	FilterType enums.DLFilterType
 }

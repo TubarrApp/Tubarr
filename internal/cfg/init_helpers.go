@@ -52,7 +52,7 @@ func initDownloaderSettings() {
 
 func initDLSettings() {
 	// Filtering
-	rootCmd.PersistentFlags().String(keys.FilterOpsInput, "", "Ignore releases if fields contain _ (e.g. 'title:frogs' ignores videos with frogs detected in the title metadata)")
+	rootCmd.PersistentFlags().String(keys.FilterOpsInput, "", "Filters in or out downloads based on metadata (e.g. 'title:omit:frogs','title:contains:lions')")
 	viper.BindPFlag(keys.FilterOpsInput, rootCmd.PersistentFlags().Lookup(keys.FilterOpsInput))
 
 	// Concurrency

@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	consts "tubarr/internal/domain/constants"
+	enums "tubarr/internal/domain/enums"
 	keys "tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
@@ -169,16 +170,37 @@ func verifyFilterOps() error {
 		var dlFilters = make([]*models.DLFilter, 0, len(filters))
 
 		for _, filter := range filters {
-			pair := strings.Split(filter, ":")
-			if len(pair) != 2 {
-				return fmt.Errorf("please enter filters in format 'field:contains_text'")
+			tuple := strings.Split(filter, ":")
+			if len(tuple) != 3 {
+				return fmt.Errorf("please enter filters in format 'field:filter_type:value' (e.g. 'title:omit:frogs','title:contains:lions')")
 			}
 
-			logging.D(1, "Filtering out field '%s' if it contains the value '%s'", pair[0], pair[1])
-			dlFilters = append(dlFilters, &models.DLFilter{
-				Field: pair[0],
-				Omit:  pair[1],
-			})
+			field := tuple[0]
+			filterType := tuple[1]
+			value := tuple[2]
+
+			switch filterType {
+			case "omit":
+				f := &models.DLFilter{
+					Field:      field,
+					Value:      value,
+					FilterType: enums.DLFILTER_OMIT,
+				}
+				dlFilters = append(dlFilters, f)
+				logging.D(1, "Omitting videos which contain '%s' in the '%s' field", f.Value, f.Field)
+
+			case "contains":
+				f := &models.DLFilter{
+					Field:      field,
+					Value:      value,
+					FilterType: enums.DLFILTER_CONTAINS,
+				}
+				dlFilters = append(dlFilters, f)
+				logging.D(1, "Only including videos which contain '%s' in the '%s' field", f.Value, f.Field)
+
+			default:
+				return fmt.Errorf("invalid filter operation type, should be 'omit' or 'contains'")
+			}
 		}
 		if len(dlFilters) > 0 {
 			viper.Set(keys.FilterOps, dlFilters)
