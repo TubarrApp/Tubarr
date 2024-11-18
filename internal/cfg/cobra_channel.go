@@ -215,8 +215,8 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			for _, c := range channels {
-				fmt.Printf("\nChannel ID: %d\n\nName: %s\nURL: %s\nCrawl Frequency: %d minutes\nFilters: %v\n",
-					c.ID, c.Name, c.URL, c.Settings.CrawlFreq, c.Settings.Filters)
+				fmt.Printf("\nChannel ID: %d\n\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\nCrawl Frequency: %d minutes\nFilters: %v\n",
+					c.ID, c.Name, c.URL, c.VDir, c.JDir, c.Settings.CrawlFreq, c.Settings.Filters)
 
 				// Display Metarr operations if they exist
 				if len(c.MetarrArgs.MetaOps) > 0 {
