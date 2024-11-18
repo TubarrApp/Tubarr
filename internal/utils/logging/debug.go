@@ -1,12 +1,12 @@
-package utils
+package logging
 
 import (
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"sync"
-	consts "tubarr/internal/domain/constants"
-	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 
 	"github.com/spf13/viper"
 )

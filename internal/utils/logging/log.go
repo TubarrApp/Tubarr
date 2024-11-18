@@ -1,4 +1,4 @@
-package utils
+package logging
 
 import (
 	"log"
@@ -50,18 +50,5 @@ func writeLog(msg string, level int) {
 		}
 
 		Logger.Print(ansiEscape.ReplaceAllString(msg, ""))
-	}
-}
-
-// WriteArray writes an array of error information to the log file
-func writeLogArray(msgs []string) {
-	if Loggable {
-
-		if ansiEscape == nil {
-			ansiEscape = regex.AnsiEscapeCompile()
-		}
-		out := strings.Join(msgs, ", ")
-
-		Logger.Print(ansiEscape.ReplaceAllString(out, ""))
 	}
 }

@@ -1,19 +1,14 @@
-package utils
+package browser
 
 import (
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
-	config "tubarr/internal/cfg"
-	keys "tubarr/internal/domain/keys"
-	logging "tubarr/internal/utils/logging"
+	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
 	_ "github.com/browserutils/kooky/browser/all"
-	"github.com/browserutils/kooky/browser/chrome"
-	"github.com/browserutils/kooky/browser/firefox"
-	"github.com/browserutils/kooky/browser/safari"
 )
 
 // GetBrowserCookies sets cookies input by the user. Useful for getting URLs
@@ -35,20 +30,6 @@ func getBrowserCookies(url string) ([]*http.Cookie, error) {
 	baseURL, err := extractBaseDomain(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract base domain: %v", err)
-	}
-
-	if config.IsSet(keys.CookiePath) {
-		cookieFilePath := config.GetString(keys.CookiePath)
-
-		// If a cookie file path is provided, use it
-		if cookieFilePath != "" {
-			logging.D(2, "Reading cookies from specified file: %s", cookieFilePath)
-			kookyCookies, err := readCookieFile(cookieFilePath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read cookies from file: %v", err)
-			}
-			return convertToHTTPCookies(kookyCookies), nil
-		}
 	}
 
 	// Otherwise, proceed to use browser cookie stores
@@ -125,33 +106,4 @@ func keysFromMap(m map[string]bool) []string {
 		keys = append(keys, k)
 	}
 	return keys
-}
-
-// readCookieFile reads cookies from the specified cookie file
-func readCookieFile(cookieFilePath string) ([]*kooky.Cookie, error) {
-	var store kooky.CookieStore
-	var err error
-
-	// Attempt to identify and read cookies based on known browser stores
-	if strings.Contains(cookieFilePath, "firefox") || strings.Contains(cookieFilePath, "cookies.sqlite") {
-		store, err = firefox.CookieStore(cookieFilePath)
-	} else if strings.Contains(cookieFilePath, "safari") || strings.Contains(cookieFilePath, "Cookies.binarycookies") {
-		store, err = safari.CookieStore(cookieFilePath)
-	} else if strings.Contains(cookieFilePath, "chrome") || strings.Contains(cookieFilePath, "Cookies") {
-		store, err = chrome.CookieStore(cookieFilePath)
-	} else {
-		return nil, fmt.Errorf("unsupported cookie file format")
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cookie store: %w", err)
-	}
-
-	// Read cookies from the store
-	cookies, err := store.ReadCookies()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cookies: %w", err)
-	}
-
-	return cookies, nil
 }

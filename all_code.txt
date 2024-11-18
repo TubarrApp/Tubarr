@@ -1,149 +1,448 @@
 package cfg
 
 import (
-	keys "tubarr/internal/domain/keys"
-
-	"github.com/spf13/viper"
-)
-
-// initFilesDirs initializes files and directories into Viper
-func initFilesDirs() {
-	// Video directory
-	rootCmd.PersistentFlags().StringP(keys.VideoDir, "v", ".", "Video directory")
-	viper.BindPFlag(keys.VideoDir, rootCmd.PersistentFlags().Lookup(keys.VideoDir))
-
-	// Metadata directory
-	rootCmd.PersistentFlags().StringP(keys.MetaDir, "m", ".", "Metadata directory location (NOT CURRENTLY IMPLEMENTED)")
-	viper.BindPFlag(keys.MetaDir, rootCmd.PersistentFlags().Lookup(keys.MetaDir))
-
-	// Channels to check
-	rootCmd.PersistentFlags().StringP(keys.ChannelFile, "c", "", "File of channels to check for new videos")
-	viper.BindPFlag(keys.ChannelFile, rootCmd.PersistentFlags().Lookup(keys.ChannelFile))
-
-	// Metarr preset file
-	rootCmd.PersistentFlags().String(keys.MetarrPreset, "", "Metarr preset file location")
-	viper.BindPFlag(keys.MetarrPreset, rootCmd.PersistentFlags().Lookup(keys.MetarrPreset))
-
-	// Output filetype
-	rootCmd.PersistentFlags().StringP(keys.MoveOnComplete, "o", "", "Location to move file to upon completion")
-	viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete))
-
-	// Filetype to output
-	rootCmd.PersistentFlags().String(keys.OutputFiletype, "", "Filetype to output as")
-	viper.BindPFlag(keys.OutputFiletype, rootCmd.PersistentFlags().Lookup(keys.OutputFiletype))
-}
-
-// initDownloaderSettings initializes downloader settings
-func initDownloaderSettings() {
-	// Cookie source
-	rootCmd.PersistentFlags().String(keys.CookieSource, "", "Browser to grab cookies from for sites requiring authentication (e.g. firefox)")
-	viper.BindPFlag(keys.CookieSource, rootCmd.PersistentFlags().Lookup(keys.CookieSource))
-
-	rootCmd.PersistentFlags().String(keys.CookiePath, "", "Specify a custom cookie file to use")
-	viper.BindPFlag(keys.CookiePath, rootCmd.PersistentFlags().Lookup(keys.CookiePath))
-
-	// External downloader (e.g. aria2c)
-	rootCmd.PersistentFlags().String(keys.ExternalDownloader, "", "External downloader to use for yt-dlp (e.g. aria2c)")
-	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
-
-	rootCmd.PersistentFlags().String(keys.ExternalDownloaderArgs, "", "Arguments for external downloader (e.g. \"-x 16 -s 16\")")
-	viper.BindPFlag(keys.ExternalDownloader, rootCmd.PersistentFlags().Lookup(keys.ExternalDownloader))
-}
-
-func initDLSettings() {
-	// Filtering
-	rootCmd.PersistentFlags().String(keys.FilterOpsInput, "", "Ignore releases if fields contain _ (e.g. 'title:frogs' ignores videos with frogs detected in the title)")
-	viper.BindPFlag(keys.FilterOpsInput, rootCmd.PersistentFlags().Lookup(keys.FilterOpsInput))
-}
-
-// initProgramSettings initializes program settings into Viper
-func initProgramSettings() {
-	// Debugging
-	rootCmd.PersistentFlags().IntP(keys.DebugLevel, "d", 0, "Set the logging level")
-	viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel))
-}
-package cfg
-
-import (
+	"fmt"
+	"strconv"
 	"strings"
+	"time"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
+	"tubarr/internal/interfaces"
+	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
+	"github.com/spf13/cobra"
 )
 
-// AutoPreset is the entrypoint for command presets
-func AutoPreset(url string) []string {
-	args := make([]string, 0)
-	switch {
-	case strings.Contains(url, "censored.tv"):
-		return censoredTvPreset(args, url)
-	default:
-		return defaultArgs(args)
+// InitChannelCmds is the entrypoint for initializing channel commands
+func initChannelCmds(s interfaces.Store) *cobra.Command {
+	channelCmd := &cobra.Command{
+		Use:   "channel",
+		Short: "Channel commands",
+		Long:  "Manage channels with various subcommands like add, delete, and list.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fmt.Errorf("please specify a subcommand. Use --help to see available subcommands")
+		},
 	}
+
+	cs := s.GetChannelStore()
+
+	// Add subcommands with dependencies
+	channelCmd.AddCommand(addChannelCmd(cs))
+	channelCmd.AddCommand(crawlChannelCmd(cs, s))
+	channelCmd.AddCommand(deleteChannelCmd(cs))
+	channelCmd.AddCommand(listChannelCmd(cs))
+
+	return channelCmd
 }
 
-// censoredTvPreset sets common presets for censored.tv links
-func censoredTvPreset(args []string, url string) []string {
+// addChannelCmd adds a new channel into the database
+func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		url, name, vDir, jDir, cookieSource,
+		externalDownloader, externalDownloaderArgs, dateFmt, renameFlag string
+		filterInput, metaOps, fileSfxReplace []string
+		crawlFreq, concurrency               int
+	)
 
-	// Titles come appended with " (1)"
-	// Ids come appended with "-1"
-	// Filenames come appended with "_1"
+	now := time.Now()
+	addCmd := &cobra.Command{
+		Use:   "add",
+		Short: "Add a channel",
+		Long:  "Add channel adds a new channel to the database using inputted URLs, names, etc.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			switch {
+			case vDir == "", url == "":
+				return fmt.Errorf("must enter both a video directory and url")
+			}
 
-	splitUrl := strings.Split(url, "/")
-	creator := ""
+			// Infer empty fields
+			if jDir == "" {
+				jDir = vDir
+			}
 
-	for i, entry := range splitUrl {
-		if !strings.HasSuffix(entry, ".com") {
-			continue
-		}
-		if len(splitUrl) >= i+1 {
-			creator = strings.ReplaceAll(splitUrl[i+1], "-", " ")
-		}
+			if name == "" {
+				name = url
+			}
+
+			// Verify filters
+			filters, err := verifyChannelOps(filterInput)
+			if err != nil {
+				return err
+			}
+
+			if dateFmt != "" {
+				if !dateFormat(dateFmt) {
+					return fmt.Errorf("invalid Metarr filename date tag format")
+				}
+			}
+
+			if len(metaOps) > 0 {
+				if metaOps, err = validateMetaOps(metaOps); err != nil {
+					return err
+				}
+			}
+
+			if len(fileSfxReplace) > 0 {
+				if fileSfxReplace, err = validateFilenameSuffixReplace(fileSfxReplace); err != nil {
+					return err
+				}
+			}
+
+			if renameFlag != "" {
+				if err := setRenameFlag(renameFlag); err != nil {
+					return err
+				}
+			}
+
+			c := &models.Channel{
+				URL:  url,
+				Name: name,
+				VDir: vDir,
+				JDir: jDir,
+
+				Settings: models.ChannelSettings{
+					CrawlFreq:              crawlFreq,
+					Filters:                filters,
+					CookieSource:           cookieSource,
+					ExternalDownloader:     externalDownloader,
+					ExternalDownloaderArgs: externalDownloaderArgs,
+					Concurrency:            concurrency,
+				},
+
+				MetarrArgs: models.MetarrArgs{
+					MetaOps:            metaOps,
+					FileDatePfx:        dateFmt,
+					RenameStyle:        renameFlag,
+					FilenameReplaceSfx: strings.Join(fileSfxReplace, ","),
+				},
+
+				LastScan:  now,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+
+			id, err := cs.AddChannel(c)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println()
+			logging.S(0, "Successfully added channel (ID: %d)\n\nName: %s\nURL: %s\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %v\nMetarr Operations: %v",
+				id, c.Name, c.URL, c.Settings.CrawlFreq, c.Settings.Filters, c.Settings, c.MetarrArgs)
+			fmt.Println()
+			return nil
+		},
 	}
 
-	if creator != "" { // Should ensure the segment directly after .com/ was grabbed
+	// Primary channel elements
+	addCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	addCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	addCmd.Flags().StringVarP(&vDir, keys.VideoDir, "v", "", "Output directory (videos will be saved here)")
+	addCmd.Flags().StringVarP(&jDir, keys.JSONDir, "j", "", "Output directory (videos will be saved here)")
 
-		titleCase := cases.Title(language.English)
-		creator = titleCase.String(creator)
+	// Channel settings
+	addCmd.Flags().IntVar(&crawlFreq, keys.CrawlFreq, 30, "How often to check for new videos (in minutes)")
+	addCmd.Flags().IntVarP(&concurrency, keys.Concurrency, "l", 3, "Output directory (videos will be saved here)")
+	addCmd.Flags().StringSliceVar(&filterInput, keys.FilterOpsInput, []string{}, "Filter video downloads (e.g. 'title:contains:frogs' ignores downloads without 'frogs' in the title metafield)")
+	addCmd.Flags().StringVar(&cookieSource, keys.CookieSource, "", "Please enter the browser to grab cookies from for sites requiring authentication (e.g. 'firefox')")
+	addCmd.Flags().StringVar(&externalDownloader, keys.ExternalDownloader, "", "External downloader option (e.g. 'aria2c')")
+	addCmd.Flags().StringVar(&externalDownloaderArgs, keys.ExternalDownloaderArgs, "", "External downloader arguments (e.g. '\"-x 16 -s 16\"')")
 
-		switch strings.ToLower(creator) {
-		case "atheism is unstoppable": // Special case for Atheism-is-Unstoppable
-			creator = "Atheism-is-Unstoppable"
-		}
+	// Metarr operations
+	addCmd.Flags().StringSliceVar(&fileSfxReplace, keys.InputFilenameReplaceSfx, nil, "Replace a filename suffix element in Metarr")
+	addCmd.Flags().StringVar(&renameFlag, keys.RenameStyle, "", "Rename style for Metarr (e.g. 'spaces')")
+	addCmd.Flags().StringVar(&dateFmt, keys.InputFileDatePfx, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
+	addCmd.Flags().StringSliceVar(&metaOps, keys.MetaOps, nil, "Meta operations to perform in Metarr")
 
-		args = append(args, "--meta-ops",
-			"author:"+"set:"+creator,
-			"actor:"+"set:"+creator,
-			"publisher:"+"set:"+creator,
-			"uploader:"+"set:"+creator,
-			"channel:"+"set:"+creator)
-
-		args = append(args, "--meta-overwrite")
-	}
-
-	args = append(args, "--meta-ops", "title:trim-suffix: (1)", "fulltitle:trim-suffix: (1)", "id:trim-suffix:-1", "display_id:trim-suffix:-1")
-	args = append(args, "--filename-replace-suffix", "_1:")
-
-	return args
+	return addCmd
 }
 
-// defaultArgs provides default Metarr arguments
-func defaultArgs(args []string) []string {
+// deleteChannelCmd deletes a channel from the database
+func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		url, name string
+	)
 
-	// Currently returns no arguments
+	delCmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete channels",
+		Long:  "Delete a channel by name or URL",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if url == "" && name == "" {
+				return fmt.Errorf("must enter both a video directory and url")
+			}
 
-	return args
+			var key, val string
+			if url != "" {
+				key = consts.QChanURL
+				val = url
+			} else if name != "" {
+				key = consts.QChanName
+				val = name
+			}
+
+			if err := cs.DeleteChannel(key, val); err != nil {
+				return err
+			}
+			logging.S(0, "Successfully deleted channel with key '%s' and value '%s'", key, val)
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	delCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	delCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+
+	return delCmd
+}
+
+// listChannelCmd returns a list of channels in the database
+func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all channels",
+		Long:  "Lists all channels currently saved in the database",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			channels, err, hasRows := cs.ListChannels()
+			if !hasRows {
+				logging.I("No entries in the database")
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+
+			for _, c := range channels {
+				fmt.Printf("\nChannel ID: %d\n\nName: %s\nURL: %s\nCrawl Frequency: %d minutes\nFilters: %v\n",
+					c.ID, c.Name, c.URL, c.Settings.CrawlFreq, c.Settings.Filters)
+
+				// Display Metarr operations if they exist
+				if len(c.MetarrArgs.MetaOps) > 0 {
+					fmt.Printf("Metarr Operations:\n")
+					for _, op := range c.MetarrArgs.MetaOps {
+						fmt.Printf("  - %s\n", op)
+					}
+				}
+				if c.MetarrArgs.FileDatePfx != "" {
+					fmt.Printf("Filename Date Format: %s\n", c.MetarrArgs.FileDatePfx)
+				}
+				if c.MetarrArgs.RenameStyle != "" {
+					fmt.Printf("Rename Style: %s\n", c.MetarrArgs.RenameStyle)
+				}
+				if c.MetarrArgs.FilenameReplaceSfx != "" {
+					fmt.Printf("Filename Suffix Replace: %s\n", c.MetarrArgs.FilenameReplaceSfx)
+				}
+			}
+			return nil
+		},
+	}
+
+	return listCmd
+}
+
+// crawlChannelCmd initiates a crawl of a given channel
+func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
+	var (
+		url, name string
+		id        int
+		key, val  string
+	)
+
+	crawlCmd := &cobra.Command{
+		Use:   "crawl",
+		Short: "Crawl a channel for new URLs",
+		Long:  "Initiate a crawl for new URLs of a channel that have not yet been downloaded",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			switch {
+			case url != "":
+				key = consts.QChanURL
+				val = url
+			case name != "":
+				key = consts.QChanName
+				val = name
+			case id != 0:
+				key = consts.QChanID
+				val = strconv.Itoa(id)
+			default:
+				return fmt.Errorf("please enter either a URL or name")
+			}
+
+			if err := cs.CrawlChannel(key, val, s); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	crawlCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	crawlCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	crawlCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+
+	return crawlCmd
+}
+
+// Private //////////////////////////////////////////////////////////////////////////////////////////
+
+// verifyChannelOps verifies that the user inputted filters are valid
+func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
+
+	var filters = make([]models.DLFilters, 0, len(ops))
+	for _, op := range ops {
+		split := strings.Split(op, ":")
+		if len(split) < 3 {
+			return nil, fmt.Errorf("please enter filters in the format 'field:filter_type:value' (e.g. 'title:omit:frogs' ignores videos with frogs in the metatitle)")
+		}
+		switch len(split) {
+		case 3:
+			switch split[1] {
+			case "contains", "omit":
+				filters = append(filters, models.DLFilters{
+					Field: split[0],
+					Type:  split[1],
+					Value: split[2],
+				})
+			default:
+				return nil, fmt.Errorf("please enter a filter type of either 'contains' or 'omit'")
+			}
+		case 2:
+			switch split[1] {
+			case "contains", "omit":
+				filters = append(filters, models.DLFilters{
+					Field: split[0],
+					Type:  split[1],
+				})
+			default:
+				return nil, fmt.Errorf("please enter a filter type of either 'contains' or 'omit'")
+			}
+		default:
+			return nil, fmt.Errorf("invalid filter. Valid examples: 'title:contains:frogs','date:omit' (contains only metatitles with frogs, and omits downloads including a date metafield)")
+
+		}
+	}
+	return filters, nil
 }
 package cfg
 
 import (
 	"fmt"
-	"os"
-	"strings"
-	consts "tubarr/internal/domain/constants"
-	keys "tubarr/internal/domain/keys"
-	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/interfaces"
+	"tubarr/internal/utils/logging"
+
+	"github.com/spf13/cobra"
+)
+
+// InitChannelCmds is the entrypoint for initializing channel commands
+func initVideoCmds(s interfaces.Store) *cobra.Command {
+	vidCmd := &cobra.Command{
+		Use:   "video",
+		Short: "Video commands",
+		Long:  "Manage videos with various subcommands like delete and list.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return fmt.Errorf("please specify a subcommand. Use --help to see available subcommands")
+		},
+	}
+
+	vs := s.GetVideoStore()
+
+	// Add subcommands with dependencies
+	vidCmd.AddCommand(deleteVideoCmd(vs))
+
+	return vidCmd
+}
+
+// deleteVideoCmd deletes a channel from the database
+func deleteVideoCmd(vs interfaces.VideoStore) *cobra.Command {
+	var url string
+
+	delCmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete video entry",
+		Long:  "Delete a video entry from the database by URL",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if url == "" {
+				return fmt.Errorf("must enter a URL")
+			}
+
+			if err := vs.DeleteVideo(consts.QVidURL, url); err != nil {
+				return err
+			}
+			logging.S(0, "Successfully deleted video with URL '%s'", url)
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	delCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+
+	return delCmd
+}
+package cfg
+
+import (
+	"tubarr/internal/domain/keys"
+
+	"github.com/spf13/viper"
+)
+
+// initAllFileTransformers initializes user flag settings for transformations applying to all files
+func initAllFileTransformers() {
+
+	// Prefix file with metafield
+	rootCmd.PersistentFlags().StringSlice(keys.MFilenamePfx, nil, "Adds a specified metatag's value onto the start of the filename")
+	viper.BindPFlag(keys.MFilenamePfx, rootCmd.PersistentFlags().Lookup(keys.MFilenamePfx))
+
+	// Prefix files with date tag
+	rootCmd.PersistentFlags().String(keys.InputFileDatePfx, "", "Looks for dates in metadata to prefix the video with. (date:format [e.g. Ymd for yyyy-mm-dd])")
+	viper.BindPFlag(keys.InputFileDatePfx, rootCmd.PersistentFlags().Lookup(keys.InputFileDatePfx))
+
+	// Rename convention
+	rootCmd.PersistentFlags().StringP(keys.RenameStyle, "r", "fixes-only", "Rename flag (spaces, underscores, fixes-only, or skip)")
+	viper.BindPFlag(keys.RenameStyle, rootCmd.PersistentFlags().Lookup(keys.RenameStyle))
+
+	// Replace filename suffix
+	rootCmd.PersistentFlags().StringSliceVar(&filenameReplaceSuffixInput, keys.InputFilenameReplaceSfx, nil, "Replaces a specified suffix on filenames. (suffix:replacement)")
+	viper.BindPFlag(keys.InputFilenameReplaceSfx, rootCmd.PersistentFlags().Lookup(keys.InputFilenameReplaceSfx))
+
+	// Output directory (can be external)
+	rootCmd.PersistentFlags().StringP(keys.MoveOnComplete, "o", "", "Move files to given directory on program completion")
+	viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete))
+}
+
+// initMetaTransformers initializes user flag settings for manipulation of metadata
+func initMetaTransformers() {
+
+	// Metadata transformations
+	rootCmd.PersistentFlags().StringSlice(keys.MetaOps, nil, "Metadata operations (field:operation:value) - e.g. title:set:New Title, description:prefix:Draft-, tags:append:newtag")
+	viper.BindPFlag(keys.MetaOps, rootCmd.PersistentFlags().Lookup(keys.MetaOps))
+
+	// Prefix or append description fields with dates
+	rootCmd.PersistentFlags().Bool(keys.MDescDatePfx, false, "Adds the date to the start of the description field.")
+	viper.BindPFlag(keys.MDescDatePfx, rootCmd.PersistentFlags().Lookup(keys.MDescDatePfx))
+
+	rootCmd.PersistentFlags().Bool(keys.MDescDateSfx, false, "Adds the date to the end of the description field.")
+	viper.BindPFlag(keys.MDescDateSfx, rootCmd.PersistentFlags().Lookup(keys.MDescDateSfx))
+
+	rootCmd.PersistentFlags().String(keys.MetaPurge, "", "Delete metadata files (e.g. .json, .nfo) after the video is successfully processed")
+	viper.BindPFlag(keys.MetaPurge, rootCmd.PersistentFlags().Lookup(keys.MetaPurge))
+}
+
+// initVideoTransformers initializes user flag settings for transformation of video files
+func initVideoTransformers() {
+
+	// Output extension type
+	rootCmd.PersistentFlags().String(keys.OutputFiletypeInput, "", "File extension to output files as (mp4 works best for most media servers)")
+	viper.BindPFlag(keys.OutputFiletypeInput, rootCmd.PersistentFlags().Lookup(keys.OutputFiletypeInput))
+}
+package cfg
+
+import (
+	"fmt"
+	"tubarr/internal/domain/keys"
+	"tubarr/internal/interfaces"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -156,329 +455,214 @@ var rootCmd = &cobra.Command{
 		if cmd.Flags().Lookup("help").Changed {
 			return nil // Stop further execution if help is invoked
 		}
+		if len(args) == 0 {
+			viper.Set("check_channels", true)
+		}
 		viper.Set("execute", true)
-		return execute()
+		return nil
 	},
 }
 
-// init sets the initial Viper settings
-func init() {
-
-	// Files and directories
-	initFilesDirs()
-
-	// Download settings
-	initDownloaderSettings()
-
-	// Settings for actual downloads (e.g. filtering out videos from downloading)
-	initDLSettings()
-
-	// Program settings like debug level etc.
-	initProgramSettings()
-
-}
-
-// Execute is the primary initializer of Viper
+// Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
 
-	fmt.Println()
+	initAllFileTransformers()
+	initMetaTransformers()
+	initVideoTransformers()
 
-	err := rootCmd.Execute()
-	if err != nil {
-		logging.E(0, "Failed to execute cobra")
-		return err
+	verify()
 
-	}
-	return nil
+	return rootCmd.Execute()
 }
 
-// execute more thoroughly handles settings created in the Viper init
-func execute() error {
-	if viper.IsSet(keys.MetarrPreset) {
-		if metarrPreset := viper.GetString(keys.MetarrPreset); metarrPreset != "" {
+// InitCommands initializes all commands and their flags
+func InitCommands(s interfaces.Store) {
 
-			if info, err := os.Stat(metarrPreset); err != nil {
-				return fmt.Errorf("metarr preset does not exist")
-			} else {
-				if info.IsDir() {
-					return fmt.Errorf("metarr preset must be a file")
+	// Add channel commands as a subcommand of root
+	rootCmd.AddCommand(initChannelCmds(s))
+	rootCmd.AddCommand(initVideoCmds(s))
+
+	// Set up any root-level flags here if needed
+	rootCmd.PersistentFlags().Int("debug", 0, "Debug level (0-5)")
+	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+}
+
+// verify verifies that the user input flags are valid
+func verify() error {
+	if viper.IsSet(keys.OutputFiletype) {
+		ext := viper.GetString(keys.OutputFiletype)
+		if !verifyOutputFiletype(ext) {
+			return fmt.Errorf("invalid output filetype '%s'", ext)
+		}
+	}
+
+	if viper.IsSet(keys.MetaPurge) {
+		purge := viper.GetString(keys.MetaPurge)
+		if !verifyPurgeMetafiles(purge) {
+			return fmt.Errorf("invalid meta purge type '%s'", purge)
+		}
+	}
+
+	verifyConcurrencyLimit()
+	return nil
+}
+package cfg
+
+import (
+	"fmt"
+	"strings"
+	"tubarr/internal/utils/logging"
+)
+
+var (
+	filenameReplaceSuffixInput []string
+)
+
+// validateMetaOps parses the meta transformation operations
+func validateMetaOps(metaOps []string) ([]string, error) {
+	if len(metaOps) == 0 {
+		logging.I("No meta operations passed in to verification")
+		return metaOps, nil
+	}
+
+	logging.D(1, "Validating meta operations...")
+	valid := make([]string, 0, len(metaOps))
+
+	for _, m := range metaOps {
+		split := strings.Split(m, ":")
+		switch len(split) {
+		case 3:
+			switch split[1] {
+			case "append", "copy-to", "paste-from", "prefix", "trim-prefix", "trim-suffix", "replace", "set":
+				valid = append(valid, m)
+			default:
+				return nil, fmt.Errorf("invalid meta operation '%s'", split[1])
+			}
+		case 4:
+			switch split[1] {
+			case "date-tag":
+				if split[2] == "prefix" || split[2] == "suffix" {
+					if dateFormat(split[3]) {
+						valid = append(valid, m)
+					}
+				} else {
+					return nil, fmt.Errorf("invalid date tag location '%s', use prefix or suffix", split[2])
 				}
 			}
-		}
-	}
-
-	if err := verifyAndReadChannelFile(); err != nil {
-		return err
-	}
-
-	if err := verifyCookieSource(); err != nil {
-		return err
-	}
-
-	verifyOutputFiletype()
-
-	verifyLogLevel()
-
-	if err := verifyFilterOps(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// verifyCookieSource verifies the cookie source is valid for yt-dlp
-func verifyCookieSource() error {
-	if IsSet(keys.CookieSource) {
-		cookieSource := GetString(keys.CookieSource)
-
-		switch cookieSource {
-		case "brave", "chrome", "edge", "firefox", "opera", "safari", "vivaldi", "whale":
-			logging.I("Using %s for cookies", cookieSource)
 		default:
-			return fmt.Errorf("invalid cookie source set. yt-dlp supports firefox, chrome, vivaldi, opera, edge, and brave")
+			return nil, fmt.Errorf("invalid meta op '%s'", m)
 		}
 	}
-	return nil
-}
-
-// verifyChannelFile verifies the channel file is valid
-func verifyAndReadChannelFile() error {
-	if viper.IsSet(keys.ChannelFile) {
-		channelFile := GetString(keys.ChannelFile)
-
-		cFile, err := os.OpenFile(channelFile, os.O_RDWR, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open file '%s'", channelFile)
-		}
-		defer cFile.Close()
-
-		content, err := os.ReadFile(channelFile)
-		if err != nil {
-			logging.E(0, "Unable to read file '%s'", channelFile)
-		}
-		channelsCheckNew := strings.Split(string(content), "\n")
-		viper.Set(keys.ChannelCheckNew, channelsCheckNew)
-		return nil
-	}
-	return fmt.Errorf("please set the file of URLs for Tubarr to download from")
-}
-
-// verifyOutputFiletype verifies the output filetype
-func verifyOutputFiletype() {
-	if viper.IsSet(keys.OutputFiletype) {
-		o := GetString(keys.OutputFiletype)
-		if !strings.HasPrefix(o, ".") {
-			o = "." + o
-			viper.Set(keys.OutputFiletype, o)
-			viper.Set(keys.OutputFiletype, o)
-		}
-
-		for _, ext := range consts.AllVidExtensions {
-			if o == ext {
-				logging.I("Outputting files as %s", o)
-				return // Must return on match or overwrites with ""
-			}
-		}
-		viper.Set(keys.OutputFiletype, "")
-	}
-}
-
-// verifyLogLevel verifies logging level settings, saves into logging.Level var
-func verifyLogLevel() {
-	dLevel := GetInt(keys.DebugLevel)
-	switch {
-	case dLevel <= 0:
-		logging.Level = 0
-	case dLevel >= 5:
-		logging.Level = 5
-	default:
-		logging.Level = dLevel
-	}
-}
-
-// verifyFilterOps verifies the user input filters
-func verifyFilterOps() error {
-	if viper.IsSet(keys.FilterOpsInput) {
-
-		filters := viper.GetStringSlice(keys.FilterOpsInput)
-		var dlFilters = make([]*models.DLFilter, len(filters))
-
-		for _, filter := range filters {
-			pair := strings.Split(filter, ":")
-			if len(pair) != 2 {
-				return fmt.Errorf("please enter filters in format 'field:contains_text'")
-			}
-			dlFilters = append(dlFilters, &models.DLFilter{
-				Field: pair[0],
-				Omit:  pair[1],
-			})
-		}
-		if len(dlFilters) > 0 {
-			viper.Set(keys.FilterOps, dlFilters)
-		}
-	}
-	return nil
-}
-package cfg
-
-import (
-	"fmt"
-	"os"
-	keys "tubarr/internal/domain/keys"
-	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
-
-	"github.com/BurntSushi/toml"
-	"github.com/spf13/viper"
-)
-
-func parseTomlFile() (*models.Config, error) {
-	if !viper.IsSet(keys.TomlPath) {
-		logging.D(3, "No config file sent in")
-		return nil, nil
-	}
-
-	path := viper.GetString(keys.TomlPath)
-	checkPath, err := os.Stat(path)
-
-	switch {
-	case err != nil:
-		return nil, err
-	case checkPath.IsDir():
-		return nil, fmt.Errorf("toml file passed in as directory '%s', should be file", path)
-	case !checkPath.Mode().IsRegular():
-		return nil, fmt.Errorf("'%s' is not a regular file", path)
-	case checkPath.Size() == 0:
-		return nil, fmt.Errorf("file '%s' is empty", path)
-	}
-
-	var config models.Config
-
-	if _, err := toml.DecodeFile(path, &config); err != nil {
-		return nil, err
-	}
-
-	return &config, nil
-}
-package cfg
-
-import (
-	"fmt"
-	"net/http"
-	"net/url"
-	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
-)
-
-// validateConfig validates entries in the config file
-func validateConfig(c *models.Config) (err error) {
-	if c == nil {
-		return fmt.Errorf("model is null")
-	}
-
-	// Trim invalid URLs
-	if c.RawURLs.URLs, err = validateURLs(c.RawURLs.URLs); err != nil {
-		logging.E(0, err.Error())
-	}
-
-	// Check sites
-	for siteName, site := range c.Sites {
-		if site == nil {
-			delete(c.Sites, siteName)
-			logging.E(0, "Site entered null")
-			continue
-		}
-		for chanName, channel := range c.Channels {
-			if channel == nil {
-				delete(c.Channels, chanName)
-				logging.E(0, "Channel entered null")
-				continue
-			}
-			if cUrl := validateURL(channel.URL); cUrl == "" {
-				logging.E(0, "Channel URL '%s' invalid, removing channel...", channel)
-				delete(c.Channels, chanName)
-			} else {
-				channel.URL = cUrl
-			}
-			channel.SkipTitles = append(channel.SkipTitles, site.Settings.SkipTitles...)
-		}
-		if len(c.Channels) == 0 {
-			delete(c.Sites, siteName)
-		}
-	}
-	cleanupConfig(c)
-	return nil
-}
-
-// validateURLs validates a list of URLs
-func validateURLs(rawUrls []string) (valid []string, err error) {
-
-	var failed []string
-
-	count := len(rawUrls)
-	for _, line := range rawUrls {
-		if line == "" || line == "\n" {
-			continue
-		}
-
-		if r := validateURL(line); r != "" {
-			valid = append(valid, r)
-		} else {
-			failed = append(failed, r)
-			count--
-		}
-	}
-
-	if len(valid) == 0 {
-		return nil, fmt.Errorf("no valid URLs passed in. URL list: %v", rawUrls)
-	}
-
-	if len(failed) > 0 {
-		logging.E(0, "Got %d valid URLs. Other URLs seem to be invalid: %v", count, failed)
+	if len(valid) != 0 {
+		return valid, nil
 	} else {
-		logging.S(0, "Retrieved %d valid URLs", count)
+		return nil, fmt.Errorf("no valid meta operations")
 	}
+}
 
+// validateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid
+func validateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
+	valid := make([]string, 0, len(fileSfxReplace))
+
+	for _, pair := range fileSfxReplace {
+		parts := strings.Split(pair, ":")
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
+		}
+		valid = append(valid, pair)
+	}
 	return valid, nil
 }
 
-// validateURL validates a single URL
-func validateURL(rawUrl string) string {
-	if rawUrl == "" {
-		return ""
-	}
+// setRenameFlag sets the rename style to apply
+func setRenameFlag(flag string) error {
 
-	u, err := url.Parse(rawUrl)
-	if err != nil {
-		logging.E(0, "Error '%v' parsing URL '%s', returning empty", err, rawUrl)
-		return ""
-	}
+	// Trim whitespace for more robust validation
+	flag = strings.TrimSpace(flag)
+	flag = strings.ToLower(flag)
 
-	resp, err := http.Get(u.String())
-	if err != nil {
-		logging.E(0, "Encountered error validating URL '%s': Err: %v", u.String(), err)
-		return ""
+	switch flag {
+	case "spaces", "space", "underscores", "underscore", "fixes", "fix", "fixes-only", "fixesonly":
+		return nil
+	default:
+		return fmt.Errorf("'spaces', 'underscores' or 'fixes-only' not selected for renaming style, skipping these modifications")
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		logging.E(0, "Invalid response status '%s' for URL '%s'", resp.Status, u.String())
-		return ""
-	}
-
-	return u.String()
 }
 
-func cleanupConfig(c *models.Config) {
-	if len(c.Sites) == 0 {
-		c.Sites = nil
+// dateEnum returns the date format enum type
+func dateFormat(dateFmt string) bool {
+	if len(dateFmt) > 2 {
+		switch dateFmt {
+		case "Ymd", "ymd", "Ydm", "ydm", "dmY", "dmy", "mdY", "mdy", "md", "dm":
+			return true
+		}
 	}
-	if len(c.Channels) == 0 {
-		c.Channels = nil
+	logging.E(0, "Invalid date format entered as '%s', please enter up to three characters (where 'Y' is yyyy and 'y' is yy)")
+	return false
+}
+package cfg
+
+import (
+	"strings"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
+	"tubarr/internal/utils/logging"
+
+	"github.com/spf13/viper"
+)
+
+// verifyConcurrencyLimit checks and ensures correct concurrency limit input
+func verifyConcurrencyLimit() {
+	maxConcurrentProcesses := viper.GetInt(keys.Concurrency)
+
+	switch {
+	case maxConcurrentProcesses < 1:
+		maxConcurrentProcesses = 1
+		logging.E(2, "Max concurrency set too low, set to minimum value: %d", maxConcurrentProcesses)
+	default:
+		logging.I("Max concurrency: %d", maxConcurrentProcesses)
 	}
-	if len(c.RawURLs.URLs) == 0 {
-		c.RawURLs.URLs = nil
+	viper.Set(keys.Concurrency, maxConcurrentProcesses)
+}
+
+// Verify the output filetype is valid for FFmpeg
+func verifyOutputFiletype(o string) bool {
+	o = strings.TrimSpace(o)
+
+	if !strings.HasPrefix(o, ".") {
+		o = "." + o
+		viper.Set(keys.OutputFiletype, o)
 	}
+
+	valid := false
+	for _, ext := range consts.AllVidExtensions {
+		if o != ext {
+			continue
+		} else {
+			valid = true
+			break
+		}
+	}
+
+	if valid {
+		logging.I("Outputting files as %s", o)
+		return true
+	}
+	return false
+}
+
+// verifyPurgeMetafiles checks and sets the type of metafile purge to perform
+func verifyPurgeMetafiles(purgeType string) bool {
+
+	purgeType = strings.TrimSpace(purgeType)
+	purgeType = strings.ToLower(purgeType)
+	purgeType = strings.ReplaceAll(purgeType, ".", "")
+
+	switch purgeType {
+	case "all", "json", "nfo":
+		return true
+	}
+	return false
 }
 package cfg
 
@@ -488,7 +672,6 @@ import (
 
 // Set sets the value for the key in the override register. Set is case-insensitive for a key. Will be used instead of values obtained via flags, config file, ENV, default, or key/value store.
 func Set(key string, value any) {
-
 	viper.Set(key, value)
 }
 
@@ -536,440 +719,54 @@ func IsSet(key string) bool {
 package command
 
 import (
-	"os/exec"
-	"tubarr/internal/cfg"
-	keys "tubarr/internal/domain/keys"
-	"tubarr/internal/models"
-)
-
-type MetaDLRequest struct {
-	DLs []*models.DLs
-}
-
-func NewMetaDLRequest(dls []*models.DLs) *MetaDLRequest {
-	return &MetaDLRequest{
-		DLs: dls,
-	}
-}
-
-// RequestMetaCommand builds and returns the argument for downloading metadata
-// files for the given URL
-func (mdl *MetaDLRequest) RequestMetaCommand() {
-
-	jsonDir := "."
-	if cfg.IsSet(keys.JsonDir) {
-		jsonDir = cfg.GetString(keys.JsonDir)
-	}
-
-	var buildArgs []string
-	buildArgs = append(buildArgs, "--skip-download", "--write-json", "-P", jsonDir)
-
-	if cfg.IsSet(keys.RestrictFilenames) {
-		buildArgs = append(buildArgs, "--restrict_filenames", cfg.GetString(keys.RestrictFilenames))
-	}
-
-	if cfg.IsSet(keys.DLRetries) {
-		buildArgs = append(buildArgs, "--retries", cfg.GetString(keys.DLRetries))
-	}
-
-	buildArgs = append(buildArgs, "--print", "after_write:%(info_json)s")
-
-	for _, dl := range mdl.DLs {
-		args := buildArgs
-		args = append(args, dl.URL)
-		dl.JSONCommand = exec.Command("yt-dlp", args...)
-	}
-}
-package command
-
-import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
-	"tubarr/internal/cfg"
-	preset "tubarr/internal/cfg/presets"
-	consts "tubarr/internal/domain/constants"
-	enums "tubarr/internal/domain/enums"
-	keys "tubarr/internal/domain/keys"
-	tags "tubarr/internal/domain/tags"
 	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
 )
 
-type MetarrCommand struct {
-	Commands map[string][]string
-}
-
-// NewMetarrCommandBuilder returns a new command builder to build and run Metarr commands
-func NewMetarrCommandBuilder() *MetarrCommand {
-	return &MetarrCommand{
-		Commands: make(map[string][]string),
-	}
-}
-
-// MakeMetarrCommands builds the command list for Metarr
-func (mc *MetarrCommand) MakeMetarrCommands(d []*models.DLs) ([]*exec.Cmd, error) {
-	if len(d) == 0 {
-		return nil, fmt.Errorf("no downloaded file models")
+// ExecuteMetaDownload initiates a yt-dlp meta download command
+func ExecuteMetaDownload(v *models.Video, cmd *exec.Cmd) error {
+	if cmd == nil {
+		return fmt.Errorf("no command built for URL %s", v.URL)
 	}
 
-	if _, err := exec.LookPath("metarr"); err != nil {
-		return nil, fmt.Errorf("metarr command not found in PATH: %w", err)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("yt-dlp error for %s: %v\nStderr: %s", v.URL, err, stderr.String())
 	}
 
-	if err := mc.ParsePresets(d); err != nil {
-		return nil, fmt.Errorf("failed to parse command presets")
+	// Find the line containing the JSON path
+	outputLines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	var jsonPath string
+
+	fileLine := outputLines[len(outputLines)-1]
+	logging.D(1, "File line captured as: %v", fileLine)
+
+	_, jsonPath, found := strings.Cut(fileLine, ": ")
+	if !found || jsonPath == "" {
+		logging.D(1, "Full stdout: %s", stdout.String())
+		logging.D(1, "Full stderr: %s", stderr.String())
+		return fmt.Errorf("could not find JSON file path in output for %s", v.URL)
 	}
 
-	commands := make([]*exec.Cmd, 0, len(mc.Commands))
-	for _, args := range mc.Commands {
-		command := exec.Command("metarr", args...)
-		commands = append(commands, command)
+	v.JPath = jsonPath
+
+	// Verify the file exists
+	if _, err := os.Stat(v.JPath); err != nil {
+		return fmt.Errorf("JSON file not found at %s: %v", v.JPath, err)
 	}
 
-	return commands, nil
-}
-
-// ParseMetarrPreset parses the Metarr from a preset file
-func (mc *MetarrCommand) ParsePresets(d []*models.DLs) error {
-
-	logging.I("Sending to Metarr for metadata insertion")
-
-	mPresetFilepath := cfg.GetString(keys.MetarrPreset)
-	if mPresetFilepath != "" {
-		if _, err := os.Stat(mPresetFilepath); err != nil {
-			logging.E(0, "Preset file not accessible: (%v) Clearing key...", err)
-			cfg.Set(keys.MetarrPreset, "")
-		}
-	}
-
-	if mc.Commands == nil {
-		mc.Commands = make(map[string][]string)
-	}
-
-	for _, model := range d {
-		if model == nil {
-			continue
-		}
-
-		args := []string{}
-
-		var (
-			outputPath, outputExt string
-		)
-
-		if cfg.IsSet(keys.MoveOnComplete) {
-			outputPath = cfg.GetString(keys.MoveOnComplete)
-		}
-
-		if cfg.IsSet(keys.OutputFiletype) {
-			outputExt = cfg.GetString(keys.OutputFiletype)
-		}
-
-		args = append(args, "-V", model.VideoPath)
-		args = append(args, "-J", model.JSONPath)
-
-		if mPresetFilepath != "" { // Parse preset file
-			content, err := os.ReadFile(mPresetFilepath)
-			if err != nil {
-				return fmt.Errorf("error reading file '%s': %w", mPresetFilepath, err)
-			}
-			cStr := string(content)
-
-			args = append(args, mc.metaOps(cStr)...)
-			args = append(args, mc.dateTagFormat(cStr)...)
-			args = append(args, mc.renameStyle(cStr)...)
-
-			if outputPath == "" {
-				if rtn, err := mc.outputLocation(cStr); err == nil {
-					args = append(args, rtn...)
-				}
-			}
-			if outputExt == "" {
-				if rtn, err := mc.outputExtension(cStr); err == nil {
-					args = append(args, rtn...)
-				}
-			}
-		} else { // Fallback to auto-preset detection
-			args = preset.AutoPreset(model.URL)
-		}
-
-		if outputPath != "" {
-			args = append(args, "-o", outputPath)
-		}
-
-		if outputExt != "" {
-			args = append(args, "--ext", outputExt)
-		}
-
-		if cfg.IsSet(keys.DebugLevel) {
-			dLevel := cfg.GetInt(keys.DebugLevel)
-			args = append(args, "-d", strconv.Itoa(dLevel))
-		}
-
-		mc.Commands[model.VideoPath] = args
-	}
+	logging.I("Successfully saved JSON file to '%s'", v.JPath)
 	return nil
 }
-
-// dateTagFormat builds the date tag format to prefix filenames with
-func (mc *MetarrCommand) dateTagFormat(c string) []string {
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrFilenameDate, enums.L_SINGLE)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-
-		lines[0] = strings.TrimSpace(lines[0])
-
-		switch lines[0] {
-		case "Ymd", "ymd", "mdY", "mdy", "dmY", "dmy":
-			args = append(args, "--filename-date-tag", lines[0])
-		default:
-			logging.E(0, "Date tag format entry syntax is incorrect, should be in a format such as Ymd (for yyyy-mm-dd) or ymd (for yy-mm-dd) and so on...")
-		}
-	}
-	return args
-}
-
-// metaOps adds the commands for manipulating metadata
-func (mc *MetarrCommand) metaOps(c string) []string {
-
-	var shouldOW bool
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrMetaOps, enums.L_MULTI)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-
-			entry := strings.Split(line, ":")
-			if len(entry) < 3 {
-				logging.E(0, "Error in new metadata field entry, entry shorter than 3 (should be at least 'field:operation:value')")
-			} else {
-				args = append(args, "--meta-ops", line)
-				if entry[1] == "set" {
-					shouldOW = true
-				}
-			}
-		}
-	}
-
-	if shouldOW {
-		args = append(args, "--meta-overwrite")
-	}
-
-	return args
-}
-
-// renameStyle is the chosen style of renaming, e.g. spaces, underscores
-func (mc *MetarrCommand) renameStyle(c string) []string {
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrRenameStyle, enums.L_SINGLE)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-		lines[0] = strings.TrimSpace(lines[0])
-
-		switch lines[0] {
-		case "spaces", "underscores", "skip":
-			args = append(args, "-r", lines[0])
-		default:
-			logging.E(0, "Rename style entry syntax is incorrect, should be spaces, underscores, or skip.")
-			args = append(args, "-r", "skip")
-		}
-	}
-	return args
-}
-
-// outputLocation designates the output directory
-func (mc *MetarrCommand) outputLocation(c string) ([]string, error) {
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrOutputDir, enums.L_SINGLE)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-		if lines[0] != "" {
-			dir, err := os.Stat(lines[0])
-			if err != nil {
-				return args, fmt.Errorf("error with output directory: %w", err)
-			} else if os.IsNotExist(err) {
-				return args, fmt.Errorf("target output directory does not exist: %w", err)
-			}
-
-			if !dir.IsDir() {
-				return args, fmt.Errorf("output location is not a directory")
-			}
-
-			args = append(args, "-o", lines[0])
-		}
-	}
-	return args, nil
-}
-
-// outputExtension is the filetype extension to output files as
-func (mc *MetarrCommand) outputExtension(c string) ([]string, error) {
-
-	lines, exists := mc.getFieldContent(c, tags.MetarrOutputExt, enums.L_SINGLE)
-	var args = make([]string, 0, len(lines)*2)
-
-	if exists && len(lines) > 0 {
-		lines[0] = strings.TrimSpace(lines[0])
-		lines[0] = strings.TrimPrefix(lines[0], ".")
-
-		filled := false
-		for _, ext := range consts.AllVidExtensions {
-			if ext == lines[0] {
-				args = append(args, "--ext", ext)
-				filled = true
-			}
-		}
-		if !filled {
-			return args, fmt.Errorf("incorrect file extension '%s' entered for yt-dlp", lines[0])
-		}
-	}
-	return args, nil
-}
-
-// removeEmptyLines strips empty lines from the result
-func (mc *MetarrCommand) removeEmptyLines(input []string) []string {
-	var lines = make([]string, 0, len(input))
-	for _, line := range input {
-		if line == "" || line == "\r" { // \n delimiter already removed by strings.Split
-			continue
-		}
-		lines = append(lines, line)
-	}
-	return lines
-}
-
-// getFieldContent extracts the content inside the field
-func (mc *MetarrCommand) getFieldContent(c, tag string, selectType enums.LineSelectType) ([]string, bool) {
-	if tagLoc := strings.Index(c, tag); tagLoc != -1 {
-
-		content := c[tagLoc+len(tag)+1:]
-
-		endIdx := strings.Index(content, "[")
-		if endIdx != -1 {
-			content = content[:endIdx]
-		}
-
-		content = cleanNewLines(content)
-		gotLines := strings.Split(content, "\n")
-
-		lines := mc.removeEmptyLines(gotLines)
-
-		if len(lines) > 0 {
-			if selectType == enums.L_SINGLE {
-				return []string{lines[0]}, true
-			}
-			// Returns multi
-			return lines, true
-		}
-		logging.D(2, "Lines grabbed empty for tag '%s' and content '%s'", tag, c)
-		return nil, false
-	}
-	logging.D(2, "Tag '%s' not found in content '%s'", tag, c)
-	return nil, false
-}
-
-// cleanNewLines normalizes the newline patterns across different OS's
-func cleanNewLines(s string) string {
-	rep := strings.NewReplacer("\r\n", "\n", "\r", "\n")
-	rep.Replace(s)
-	return s
-}
-package command
-
-import (
-	"fmt"
-	"os/exec"
-	"strings"
-	"tubarr/internal/cfg"
-	keys "tubarr/internal/domain/keys"
-	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
-)
-
-type VideoDLRequest struct {
-	DL *models.DLs
-}
-
-func NewVideoDLRequest(d *models.DLs) *VideoDLRequest {
-	return &VideoDLRequest{
-		DL: d,
-	}
-}
-
-// BuildVideoFetchCommand builds the command for yt-dlp
-func (vf *VideoDLRequest) VideoFetchCommand() error {
-	if vf.DL == nil {
-		return fmt.Errorf("model passed in null, returning no command")
-	}
-
-	if _, err := exec.LookPath("yt-dlp"); err != nil {
-		return fmt.Errorf("yt-dlp command not found: %w", err)
-	}
-
-	if vf.DL.URL == "" {
-		return fmt.Errorf("url passed in blank")
-	}
-
-	var args []string
-	dl := vf.DL
-
-	switch {
-	case strings.Contains(dl.URL, "censored.tv"):
-		// Not implemented
-	default:
-		// Use default
-	}
-
-	if cfg.IsSet(keys.RestrictFilenames) {
-		args = append(args, "--restrict-filenames", "-o", cfg.GetString(keys.RestrictFilenames))
-	}
-
-	if cfg.IsSet(keys.DLRetries) {
-		args = append(args, "--retries", cfg.GetString(keys.DLRetries))
-	}
-
-	args = append(args, "--print", "after_move:%(filepath)s")
-
-	if cfg.IsSet(keys.CookieSource) {
-		args = append(args, "--cookies-from-browser", cfg.GetString(keys.CookieSource))
-	}
-	// else if cookieFile != "" {
-	// 	args = append(args, "--cookies", cookieFile)
-	// }
-
-	if cfg.IsSet(keys.ExternalDownloader) {
-		args = append(args, "--external-downloader", cfg.GetString(keys.ExternalDownloader))
-	}
-
-	if cfg.IsSet(keys.ExternalDownloaderArgs) {
-		args = append(args, "--external-downloader-args", cfg.GetString(keys.ExternalDownloaderArgs))
-	}
-
-	args = append(args, dl.URL)
-
-	logging.D(1, "Built argument list: %v", args)
-	dl.VideoCommand = exec.Command("yt-dlp", args...)
-
-	return nil
-}
-
-// writeJsonLocation writes the target directory for the JSON file
-// func writeJsonLocation(s string) []string {
-// 	if s != "" {
-// 		return []string{"--write-info-json", "-P", s}
-// 	}
-// 	return nil
-// }
 package command
 
 import (
@@ -978,158 +775,123 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
-	"tubarr/internal/cfg"
-	consts "tubarr/internal/domain/constants"
-	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
-	utils "tubarr/internal/utils/fs/write"
 	logging "tubarr/internal/utils/logging"
 )
 
-var (
-	muDl sync.Mutex
-)
-
-// DownloadVideos takes in a list of URLs and downloads them
-func DownloadVideos(requests []*models.DLs) ([]*models.DLs, error) {
-	if len(requests) == 0 {
-		return nil, nil
+// ExecuteVideoDownload takes in a URL and downloads it
+func ExecuteVideoDownload(v *models.Video, cmd *exec.Cmd) (bool, error) {
+	if v == nil {
+		return false, fmt.Errorf("request model received nil")
 	}
 
-	muDl.Lock()
-	defer muDl.Unlock()
+	if cmd == nil {
+		return false, fmt.Errorf("command is nil for model with URL '%s'", v.URL)
+	}
 
-	// Get configuration values
-	var (
-		dlFiles        []*models.DLs
-		successfulURLs []string
-	)
+	// Create pipes for stdout and stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		logging.E(0, "Failed to create stdout pipe: %v", err)
+		return false, err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		logging.E(0, "Failed to create stderr pipe: %v", err)
+		return false, err
+	}
 
-	vDir := cfg.GetString(keys.VideoDir)
+	// Channel to receive the output filename
+	filenameChan := make(chan string, 1)
+	doneChan := make(chan struct{})
+	errChan := make(chan error, 1)
 
-	for _, request := range requests {
-		if request == nil {
-			continue
-		}
+	// Start output scanner in goroutine
+	go func() {
+		defer close(doneChan)
+		scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Println(line)
 
-		cmd := request.VideoCommand
-		if cmd == nil {
-			continue
-		}
+			// Capture the actual output filename
+			if strings.HasPrefix(line, "/") {
+				lineExt := filepath.Ext(line)
 
-		// Create pipes for stdout and stderr
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			logging.E(0, "Failed to create stdout pipe: %v", err)
-			continue
-		}
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			logging.E(0, "Failed to create stderr pipe: %v", err)
-			continue
-		}
-
-		// Channel to receive the output filename
-		filenameChan := make(chan string, 1)
-		doneChan := make(chan struct{})
-
-		// Start output scanner in goroutine
-		go func() {
-			defer close(doneChan)
-			scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
-			for scanner.Scan() {
-				line := scanner.Text()
-				fmt.Println(line)
-
-				// Capture the actual output filename
-				if strings.HasPrefix(line, "/") {
-					lineExt := filepath.Ext(line)
-
-					var match bool
-					for _, ext := range consts.AllVidExtensions {
-						logging.D(2, "Comparing extension %s to %s", ext, lineExt)
-						if lineExt == ext {
-							match = true
-							select {
-							case filenameChan <- line:
-							default:
-								// Channel already has a filename
-							}
+				for _, ext := range consts.AllVidExtensions {
+					logging.D(2, "Comparing extension %s to %s", ext, lineExt)
+					if lineExt == ext {
+						select {
+						case filenameChan <- line:
+						default:
+							logging.D(1, "Channel already has a filename")
 						}
-						if !match {
-							logging.D(1, "Did not find yt-dlp supported video format in output %s", line)
-						}
+						break
 					}
 				}
-				if err := scanner.Err(); err != nil {
-					logging.E(0, "Scanner error: %v", err)
-				}
 			}
-		}()
-
-		// Start command
-		logging.I("Executing download command: %s", cmd.String())
-		if err := cmd.Start(); err != nil {
-			logging.E(0, "Failed to start download: %v", err)
-			close(filenameChan)
-			continue
 		}
-
-		// Wait for command to complete
-		if err := cmd.Wait(); err != nil {
-			logging.E(0, "Download failed: %v", err)
-			close(filenameChan)
-			continue
+		if err := scanner.Err(); err != nil {
+			errChan <- fmt.Errorf("scanner error: %v", err)
 		}
+	}()
 
-		// Wait for scanner to finish
-		<-doneChan
+	// Start command
+	logging.I("Executing download command: %s", cmd.String())
+	if err := cmd.Start(); err != nil {
 		close(filenameChan)
+		return false, fmt.Errorf("failed to start download: %v", err)
+	}
 
-		// Get output filename
-		outputFilename := ""
-		select {
-		case filename := <-filenameChan:
-			outputFilename = filename
-		default:
-			logging.E(0, "No output filename captured for URL: %s", request.URL)
-			continue
+	// Wait for command to complete
+	if err := cmd.Wait(); err != nil {
+		close(filenameChan)
+		return false, fmt.Errorf("download failed: %v", err)
+	}
+
+	// Wait for scanner to finish
+	<-doneChan
+
+	// Check for scanner errors
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return false, err
 		}
-
-		// Short wait time for filesystem sync
-		time.Sleep(1 * time.Second)
-
-		// Set filenames
-		request.VideoPath = outputFilename
-
-		// Verify the download
-		if err := verifyDownload(request.VideoPath, request.JSONPath); err != nil {
-			logging.E(0, "Download verification failed: %v", err)
-			continue
-		}
-
-		logging.S(0, "Successfully downloaded files:\nVideo: %s\nJSON: %s",
-			request.VideoPath, request.JSONPath)
-
-		dlFiles = append(dlFiles, request)
-		successfulURLs = append(successfulURLs, request.URL)
+	default:
 	}
 
-	if len(dlFiles) == 0 {
-		return nil, fmt.Errorf("no files successfully downloaded")
+	// Get output filename
+	var outputFilename string
+	select {
+	case filename := <-filenameChan:
+		outputFilename = filename
+		close(filenameChan)
+	default:
+		close(filenameChan)
+		return false, fmt.Errorf("no output filename captured for URL: %s", v.URL)
 	}
 
-	// Update grabbed URLs file
-	grabbedURLsPath := filepath.Join(vDir, "grabbed-urls.txt")
-	if err := utils.AppendURLsToFile(grabbedURLsPath, successfulURLs); err != nil {
-		logging.E(0, "Failed to update grabbed-urls.txt: %v", err)
-		// Don't return error because downloads were successful
+	// Short wait time for filesystem sync
+	time.Sleep(1 * time.Second)
+
+	// Set filenames
+	v.VPath = outputFilename
+
+	// Verify the download
+	if err := verifyDownload(v.VPath, v.JPath); err != nil {
+		return false, fmt.Errorf("download verification failed: %v", err)
 	}
-	return dlFiles, nil
+
+	logging.S(0, "Successfully downloaded files:\nVideo: %s\nJSON: %s",
+		v.VPath, v.JPath)
+
+	return true, nil
 }
 
 // verifyDownload checks if the specified files exist and are non-empty
@@ -1158,38 +920,130 @@ func verifyDownload(videoPath, jsonPath string) error {
 package command
 
 import (
-	"fmt"
-	"path/filepath"
+	"os/exec"
+	"strconv"
 	"strings"
+	"tubarr/internal/cfg"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
+	"tubarr/internal/utils/logging"
 )
 
-// ExecuteMetaDownload initiates a yt-dlp meta download command
-func ExecuteMetaDownload(dl *models.DLs) error {
+type MetarrCommand struct {
+	Video *models.Video
+}
 
-	cmd := dl.JSONCommand
+// NewMetarrCommandBuilder returns a new command builder to build and run Metarr commands
+func NewMetarrCommandBuilder(v *models.Video) *MetarrCommand {
+	return &MetarrCommand{
+		Video: v,
+	}
+}
 
-	rtn, err := cmd.Output()
-	if err != nil {
-		fmt.Errorf("failed to run download metadata command for URL '%s': %w", dl.URL, err)
+// MakeMetarrCommands builds the command list for Metarr
+func (mc *MetarrCommand) MakeMetarrCommands() (*exec.Cmd, error) {
+	// Get merged arguments from both sources
+	args := mc.mergeArguments()
+
+	cmd := exec.Command("metarr", args...)
+	return cmd, nil
+}
+
+// mergeArguments combines arguments from both Viper config and model settings
+func (mc *MetarrCommand) mergeArguments() []string {
+
+	baseArgs := []string{
+		"-V", mc.Video.VPath,
+		"-J", mc.Video.JPath,
 	}
 
-	if len(rtn) == 0 {
-		fmt.Errorf("failed to capture output from command for URL '%s'? Got: %v", dl.URL, rtn)
+	// Map to deduplicate meta
+	metaOpsMap := make(map[string]struct{})
+
+	// Helper to add meta operations with deduplication
+	addMetaOps := func(ops []string) {
+		for _, op := range ops {
+			metaOpsMap[op] = struct{}{}
+		}
 	}
 
-	logging.I("retrieved JSON filename %s", string(rtn))
-
-	jsonDir := dl.JSONDir
-	if !strings.HasSuffix(jsonDir, "/") {
-		jsonDir += "/"
+	// Add model-based meta operations
+	if mc.Video.MetarrArgs.MetaOps != nil {
+		logging.D(2, "Adding MetarrArgs meta-ops: %v", mc.Video.MetarrArgs.MetaOps)
+		addMetaOps(mc.Video.MetarrArgs.MetaOps)
 	}
 
-	dl.JSONPath = filepath.Join(jsonDir, string(rtn))
-	logging.I("Saved JSON file path '%s' for URL '%s'", dl.JSONPath, dl.URL)
+	// Add viper meta operations
+	if cfg.IsSet(keys.MetaOps) {
+		viperOps := cfg.GetStringSlice(keys.MetaOps)
+		logging.D(2, "Adding Viper meta-ops: %v", viperOps)
+		addMetaOps(viperOps)
+	}
 
-	return nil
+	// Use map for other unique arguments
+	argMap := make(map[string]string)
+
+	// Add other model-based arguments
+	if mc.Video.MetarrArgs.FileDatePfx != "" {
+		argMap["--filename-date-tag"] = mc.Video.MetarrArgs.FileDatePfx
+	}
+	if mc.Video.MetarrArgs.RenameStyle != "" {
+		argMap["-r"] = mc.Video.MetarrArgs.RenameStyle
+	}
+	if mc.Video.MetarrArgs.FilenameReplaceSfx != "" {
+		argMap["--filename-replace-suffix"] = mc.Video.MetarrArgs.FilenameReplaceSfx
+	}
+
+	// Add Viper config arguments
+	if cfg.IsSet(keys.InputFileDatePfx) {
+		argMap["--filename-date-tag"] = cfg.GetString(keys.InputFileDatePfx)
+	}
+
+	if cfg.IsSet(keys.RenameStyle) {
+		argMap["-r"] = cfg.GetString(keys.RenameStyle)
+	}
+
+	if cfg.IsSet(keys.InputFilenameReplaceSfx) {
+		replacements := cfg.GetStringSlice(keys.InputFilenameReplaceSfx)
+		if len(replacements) > 0 {
+			argMap["--filename-replace-suffix"] = replacements[len(replacements)-1]
+		}
+	}
+
+	if cfg.IsSet(keys.MoveOnComplete) {
+		argMap["-o"] = cfg.GetString(keys.MoveOnComplete)
+	}
+
+	if cfg.IsSet(keys.OutputFiletype) {
+		argMap["--ext"] = cfg.GetString(keys.OutputFiletype)
+	}
+
+	if cfg.IsSet(keys.DebugLevel) {
+		argMap["--debug"] = strconv.Itoa(cfg.GetInt(keys.DebugLevel))
+	}
+
+	// Build final argument list
+	args := baseArgs
+
+	// Add regular arguments from map
+	for flag, value := range argMap {
+		args = append(args, flag, value)
+	}
+
+	var uniqueMetaOps []string
+	for op := range metaOpsMap {
+		uniqueMetaOps = append(uniqueMetaOps, op)
+	}
+
+	// Add all unique meta operations
+	for _, op := range uniqueMetaOps {
+		args = append(args, "--meta-ops", op)
+	}
+
+	logging.D(1, "Final Metarr arguments: %s", strings.Join(args, " "))
+	logging.D(2, "Unique meta operations: %v", uniqueMetaOps)
+
+	return args
 }
 package command
 
@@ -1201,30 +1055,307 @@ import (
 )
 
 // RunMetarr runs a Metarr command with a built argument list
-func RunMetarr(commands []*exec.Cmd) error {
-	if len(commands) == 0 {
-		return fmt.Errorf("no commands passed in")
-	}
-
+func RunMetarr(cmd *exec.Cmd) error {
 	var err error = nil
-	for _, command := range commands {
-		if len(command.String()) == 0 {
-			logging.E(0, "Command string is empty? %s", command.String())
-			continue
-		}
-		logging.I("Running command: %s", command.String())
+	if len(cmd.String()) == 0 {
+		return fmt.Errorf("command string is empty? %s", cmd.String())
+	}
+	logging.I("Running command: %s", cmd.String())
 
-		command.Stderr = os.Stderr
-		command.Stdout = os.Stdout
-		command.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stdin = os.Stdin
 
-		if err = command.Run(); err != nil {
-			logging.E(0, "Encountered error running command '%s': %w", command.String(), err)
-		}
+	if err = cmd.Run(); err != nil {
+		logging.E(0, "Encountered error running command '%s': %w", cmd.String(), err)
 	}
 	return err // Returns nil by default unless an error is grabbed
 }
-package domain
+package command
+
+import (
+	"os/exec"
+	"strconv"
+	"tubarr/internal/models"
+	logging "tubarr/internal/utils/logging"
+)
+
+type MetaDLRequest struct {
+	Videos *models.Video
+}
+
+func NewMetaDLRequest(videos *models.Video) *MetaDLRequest {
+	return &MetaDLRequest{
+		Videos: videos,
+	}
+}
+
+// RequestMetaCommand builds and returns the argument for downloading metadata
+// files for the given URL
+func (mdl *MetaDLRequest) RequestMetaCommand() *exec.Cmd {
+
+	v := mdl.Videos
+	var buildArgs []string
+	buildArgs = append(buildArgs, "--skip-download", "--write-info-json", "-P", v.JDir)
+
+	if v.Settings.CookieSource != "" {
+		buildArgs = append(buildArgs, "--cookies-from-browser", v.Settings.CookieSource)
+	}
+
+	if v.Settings.Retries != 0 {
+		buildArgs = append(buildArgs, "--retries", strconv.Itoa(v.Settings.Retries))
+	}
+
+	if v.Settings.ExternalDownloader != "" {
+		buildArgs = append(buildArgs, "--external-downloader", v.Settings.ExternalDownloader)
+	}
+
+	if v.Settings.ExternalDownloaderArgs != "" {
+		buildArgs = append(buildArgs, "--external-downloader-args", v.Settings.ExternalDownloaderArgs)
+	}
+
+	//buildArgs = append(buildArgs, "--quiet")
+	buildArgs = append(buildArgs, "--restrict-filenames", "-o", "%(title)s.%(ext)s")
+
+	args := buildArgs
+	args = append(args, v.URL)
+
+	cmd := exec.Command("yt-dlp", args...)
+	logging.D(3, "Built command for URL '%s':\n%v", v.URL, cmd.String())
+
+	return cmd
+}
+package command
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"tubarr/internal/cfg"
+	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/models"
+	logging "tubarr/internal/utils/logging"
+)
+
+type VideoDLRequest struct {
+	Video *models.Video
+}
+
+func NewVideoDLRequest(v *models.Video) *VideoDLRequest {
+	return &VideoDLRequest{
+		Video: v,
+	}
+}
+
+// BuildVideoFetchCommand builds the command for yt-dlp
+func (vf *VideoDLRequest) VideoFetchCommand() (*exec.Cmd, error) {
+	if vf.Video == nil {
+		return nil, fmt.Errorf("model passed in null, returning no command")
+	}
+
+	if vf.Video.VDir == "" {
+		return nil, fmt.Errorf("output directory entered blank")
+	}
+
+	v := vf.Video
+
+	if _, err := exec.LookPath("yt-dlp"); err != nil {
+		logging.E(0, "yt-dlp command not found: %w", err)
+		os.Exit(1)
+	}
+
+	if v.URL == "" {
+		return nil, fmt.Errorf("url passed in blank")
+	}
+
+	var args []string
+	args = append(args, "--restrict-filenames", "-o", filepath.Join(v.VDir, "%(title)s.%(ext)s"))
+
+	if v.Settings.Retries > 0 {
+		args = append(args, "--retries", cfg.GetString(keys.DLRetries))
+	}
+
+	args = append(args, "--print", "after_move:%(filepath)s")
+
+	if v.Settings.CookieSource != "" {
+		args = append(args, "--cookies-from-browser", v.Settings.CookieSource)
+	}
+
+	if v.Settings.ExternalDownloader != "" {
+		args = append(args, "--external-downloader", v.Settings.ExternalDownloader)
+	}
+
+	if v.Settings.ExternalDownloaderArgs != "" {
+		args = append(args, "--external-downloader-args", v.Settings.ExternalDownloaderArgs)
+	}
+
+	args = append(args, v.URL)
+
+	logging.D(1, "Built argument list: %v", args)
+	cmd := exec.Command("yt-dlp", args...)
+
+	logging.D(1, "Created download command for URL '%s', for command %s", v.URL, cmd)
+
+	return cmd, nil
+}
+package database
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
+	_ "github.com/mattn/go-sqlite3"
+)
+
+var db *sql.DB
+
+func init() {
+	const (
+		tDir  = ".tubarr"
+		tFile = "tubarr.db"
+	)
+
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("failed to get home directory")
+	}
+
+	dir = filepath.Join(dir, tDir)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Fatalf("failed to make directories: %v", err)
+	}
+
+	path := filepath.Join(dir, tFile)
+
+	db, err = sql.Open("sqlite3", path)
+	if err != nil {
+		log.Fatalf("failed to open database at path '%s': %v", path, err)
+	}
+
+	if err := initTables(db); err != nil {
+		log.Fatalf("failed to initialize tables: %v", err)
+	}
+}
+
+// GrabDB returns the database
+func GrabDB() *sql.DB {
+	return db
+}
+
+// initTables initializes the SQL tables
+func initTables(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := initChannelsTable(tx); err != nil {
+		return err
+	}
+
+	if err := initVideosTable(tx); err != nil {
+		return err
+	}
+
+	if err := initDownloadsTable(tx); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+package database
+
+import (
+	"database/sql"
+	"fmt"
+)
+
+// initChannelsTable intializes channel tables
+func initChannelsTable(tx *sql.Tx) error {
+	query := `
+    CREATE TABLE IF NOT EXISTS channels (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL UNIQUE,
+        name TEXT UNIQUE,
+        video_directory TEXT,
+        json_directory TEXT,
+        settings JSON,
+        metarr JSON,
+        last_scan TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_channels_url ON channels(url);
+    CREATE INDEX IF NOT EXISTS idx_channels_video_directory ON channels(video_directory);
+    CREATE INDEX IF NOT EXISTS idx_channels_json_directory ON channels(json_directory);
+    CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
+    CREATE INDEX IF NOT EXISTS idx_channels_settings ON channels(settings);
+    CREATE INDEX IF NOT EXISTS idx_channels_last_scan ON channels(last_scan);
+    `
+	if _, err := tx.Exec(query); err != nil {
+		return fmt.Errorf("failed to create channels table: %w", err)
+	}
+	return nil
+}
+
+// initVideosTable initializes videos tables
+func initVideosTable(tx *sql.Tx) error {
+	query := `
+    CREATE TABLE IF NOT EXISTS videos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id INTEGER REFERENCES channels(id),
+        downloaded INTEGER DEFAULT 0,
+        url TEXT NOT NULL UNIQUE,
+        title TEXT,
+        description TEXT,
+        video_directory TEXT,
+        json_directory TEXT,
+        upload_date TIMESTAMP,
+        metadata JSON,
+        metarr JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_videos_channel ON videos(channel_id);
+    CREATE INDEX IF NOT EXISTS idx_videos_url ON videos(url);
+    CREATE INDEX IF NOT EXISTS idx_videos_upload_date ON videos(upload_date);
+    `
+	if _, err := tx.Exec(query); err != nil {
+		return fmt.Errorf("failed to create videos table: %w", err)
+	}
+	return nil
+}
+
+// initDownloadsTable initializes downloads table
+func initDownloadsTable(tx *sql.Tx) error {
+	query := `
+    CREATE TABLE IF NOT EXISTS downloads (
+        id INTEGER PRIMARY KEY,
+        video_id INTEGER REFERENCES videos(id),
+        status TEXT NOT NULL CHECK(status IN ('pending', 'downloading', 'completed', 'failed')),
+        file_path TEXT,
+        file_size INTEGER,
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP,
+        error_message TEXT,
+        settings_used JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
+    CREATE INDEX IF NOT EXISTS idx_downloads_video ON downloads(video_id);
+    `
+	if _, err := tx.Exec(query); err != nil {
+		return fmt.Errorf("failed to create downloads table: %w", err)
+	}
+	return nil
+}
+package consts
 
 // Colors
 const (
@@ -1244,12 +1375,13 @@ const (
 	YellowDebug  string = ColorYellow + "[DEBUG] " + ColorReset
 	BlueInfo     string = ColorCyan + "[Info] " + ColorReset
 )
-package domain
+package consts
 
 // File prefix and suffix
 const (
 	OldTag  = "_metarrbackup"
 	TempTag = "tmp_"
+	IDTag   = "id_"
 )
 
 // Webpage tags
@@ -1266,241 +1398,77 @@ var (
 		".mov", ".mp4", ".mpeg", ".mpg", ".ogm", ".ogv",
 		".ts", ".vob", ".webm", ".wmv"}
 )
-package domain
 
-var (
-	ContractionsSpaced = map[string]string{
-		"ain t":     "aint",
-		"can t":     "cant",
-		"don t":     "dont",
-		"didn t":    "didnt",
-		"hasn t":    "hasnt",
-		"haven t":   "havent",
-		"won t":     "wont",
-		"wouldn t":  "wouldnt",
-		"shouldn t": "shouldnt",
-		"couldn t":  "couldnt",
-		"wasn t":    "wasnt",
-		"weren t":   "werent",
-		"let s":     "lets",
-		"hadn t":    "hadnt",
-		"who s":     "whos",
-		"what s":    "whats",
-		"when s":    "whens",
-		"where s":   "wheres",
-		"why s":     "whys",
-		"how s":     "hows",
-		"there s":   "theres",
-		"that s":    "thats",
-		"it d":      "itd",
-		"she d":     "shed",
-		"she s":     "shes",
-		"he d":      "hed",
-		"he s":      "hes",
-		"it ll":     "itll",
-		"should ve": "shouldve",
-		"could ve":  "couldve",
-		"would ve":  "wouldve",
-	}
-
-	ContractionsUnderscored = map[string]string{
-		"ain_t":     "aint",
-		"can_t":     "cant",
-		"don_t":     "dont",
-		"didn_t":    "didnt",
-		"hasn_t":    "hasnt",
-		"haven_t":   "havent",
-		"won_t":     "wont",
-		"wouldn_t":  "wouldnt",
-		"shouldn_t": "shouldnt",
-		"couldn_t":  "couldnt",
-		"wasn_t":    "wasnt",
-		"weren_t":   "werent",
-		"let_s":     "lets",
-		"hadn_t":    "hadnt",
-		"who_s":     "whos",
-		"what_s":    "whats",
-		"when_s":    "whens",
-		"where_s":   "wheres",
-		"why_s":     "whys",
-		"how_s":     "hows",
-		"there_s":   "theres",
-		"that_s":    "thats",
-		"it_d":      "itd",
-		"she_d":     "shed",
-		"she_s":     "shes",
-		"he_d":      "hed",
-		"he_s":      "hes",
-		"it_ll":     "itll",
-		"should_ve": "shouldve",
-		"could_ve":  "couldve",
-		"would_ve":  "wouldve",
-	}
-)
-package domain
-
+// Op types
 const (
-	JActor     = "actor"
-	JAuthor    = "author"
-	JArtist    = "artist"
-	JComposer  = "composer"
-	JCreator   = "creator"
-	JDirector  = "director"
-	JPerformer = "performer"
-	JProducer  = "producer"
-	JPublisher = "publisher"
-	JStudio    = "studio"
-	JUploader  = "uploader"
-	JWriter    = "writer"
+	FilterContains = "contains"
+	FilterOmit     = "omit"
 )
+package consts
 
+// Tables
 const (
-	JComment          = "comment"
-	JDescription      = "description"
-	JFallbackTitle    = "title"
-	JLongDescription  = "longdescription"
-	JLong_Description = "long_description"
-	JSubtitle         = "subtitle"
-	JSummary          = "summary"
-	JSynopsis         = "synopsis"
-	JTitle            = "fulltitle"
+	DBChannels  = "channels"
+	DBVideos    = "videos"
+	DBDownloads = "downloads"
 )
 
+// Channel
 const (
-	JCreationTime        = "creation_time"
-	JDate                = "date"
-	JFormattedDate       = "formatted_date"
-	JOriginallyAvailable = "originally_available_at"
-	JReleaseDate         = "release_date"
-	JUploadDate          = "upload_date"
-	JYear                = "year"
-	JReleaseYear         = "release_year"
+	QChanID        = "id"
+	QChanURL       = "url"
+	QChanName      = "name"
+	QChanVDir      = "video_directory"
+	QChanJDir      = "json_directory"
+	QChanSettings  = "settings"
+	QChanMetarr    = "metarr"
+	QChanLastScan  = "last_scan"
+	QChanCreatedAt = "created_at"
+	QChanUpdatedAt = "updated_at"
 )
 
+// Videos
 const (
-	JDomain        = "domain"
-	JReferer       = "referer"
-	JURL           = "url"
-	JWebpageDomain = "webpage_url_domain"
-	JWebpageURL    = "webpage_url"
+	QVidChanID      = "channel_id"
+	QVidDownloaded  = "downloaded"
+	QVidURL         = "url"
+	QVidTitle       = "title"
+	QVidDescription = "description"
+	QVidVDir        = "video_directory"
+	QVidJDir        = "json_directory"
+	QVidSettings    = "settings"
+	QVidMetarr      = "metarr"
+	QVidUploadDate  = "upload_date"
+	QVidMetadata    = "metadata"
+	QVidCreatedAt   = "created_at"
+	QVidUpdatedAt   = "updated_at"
 )
-package domain
 
-// Log file keys
+// DL status
 const (
-	LogFinished = "FINISHED: "
-	LogError    = "ERROR: "
-	LogFailure  = "FAILED: "
-	LogSuccess  = "Success: "
-	LogInfo     = "Info: "
-	LogWarning  = "Warning: "
-	LogBasic    = ""
+	DLStatusPending     = "pending"
+	DLStatusDownloading = "downloading"
+	DLStatusCompleted   = "finished"
+	DLStatusFailed      = "failed"
 )
-package domain
-
-const (
-	// Core Descriptive Metadata
-	NTitle         = "title"
-	NOriginalTitle = "originaltitle"
-	NSortTitle     = "sorttitle"
-	NTagline       = "tagline"
-	NDescription   = "description"
-	NPlot          = "plot"
-	NOutline       = "outline"
-	NShowTitle     = "showtitle"
-	NSubtitle      = "subtitle"
-
-	// Cast and Crew Metadata
-	NActors   = "actor"
-	NDirector = "director"
-	NWriter   = "writer"
-	NComposer = "composer"
-	NProducer = "producer"
-
-	// Genre, Category, and Rating Metadata
-	NGenre      = "genre"
-	NMood       = "mood"
-	NMPAA       = "mpaa"
-	NVotes      = "votes"
-	NRatingsURL = "ratingurl"
-
-	// Date and Release Metadata
-	NAired        = "aired"
-	NPremiereDate = "premiered"
-	NYear         = "year"
-
-	// Episodic Metadata
-	NSeason       = "season"
-	NEpisode      = "episode"
-	NEpisodeTitle = "episodetitle"
-
-	// Technical Information
-	NCountry   = "country"
-	NLanguage  = "language"
-	NRated     = "rated"
-	NEncodedBy = "encodedby"
-	NRuntime   = "runtime"
-	NRating    = "rating"
-
-	// Production Metadata
-	NProductionCompany = "productioncompany"
-	NStudio            = "studio"
-	NCoverArtist       = "coverartist"
-	NPublisher         = "publisher"
-	NCompilation       = "compilation"
-
-	// Artwork, Media Assets, and Related Links
-	NThumb    = "thumb"
-	NFanart   = "fanart"
-	NTrailer  = "trailer"
-	NCoverArt = "cover_art"
-
-	// Sorting and Alternate Display Titles
-	NShowSortTitle = "showsorttitle"
-
-	// Miscellaneous
-	NComment = "comment"
-	NTop250  = "top250"
-	NTrack   = "track"
-	NAlbum   = "album"
-	NLicence = "license"
-	NRights  = "rights"
-	NURL     = "url"
-)
-package domain
+package enums
 
 type LineSelectType int
 
 const (
 	L_SINGLE LineSelectType = iota
-	L_MULTI  LineSelectType = iota
+	L_MULTI
 )
-package domain
 
-// Terminal keys
+type DLFilterType int
+
 const (
-	VideoDir string = "video-dir"
-	MetaDir  string = "metadata-dir"
-	JsonDir  string = "json-dir"
-
-	InputExts    string = "input-exts"
-	InputPreset  string = "preset"
-	MetarrPreset string = "metarr-preset"
-	ChannelFile  string = "check-channels"
-	CookieSource string = "cookie-source"
-	CookiePath   string = "cookie-file"
-
-	ExternalDownloader     string = "external-downloader"
-	ExternalDownloaderArgs string = "external-downloader-args"
-	MoveOnComplete         string = "move-on-complete"
-
-	OutputFiletype string = "ext"
-
-	FilterOpsInput    string = "filter-ops"
-	TomlPath          string = "config-file"
-	RestrictFilenames string = "restrict_filenames"
-	DLRetries         string = "dl-retries"
+	DLFILTER_OMIT DLFilterType = iota
+	DLFILTER_CONTAINS
+	DLFILTER_OMIT_FIELD
+	DLFILTER_CONTAINS_FIELD
 )
+package keys
 
 // Primary program
 const (
@@ -1514,18 +1482,15 @@ const (
 	ChannelCheckNew string = "CheckChannelsForNew"
 )
 
+// Download operations
 const (
-	FilterOps string = "filterOps"
-)
-
-// Filename edits
-const (
-	FileNaming string = "ytdlp-naming-style"
+	FilterOps   string = "filterOps"
+	Concurrency string = "concurrency"
 )
 
 // Logging
 const (
-	DebugLevel string = "debug-level"
+	DebugLevel string = "debug"
 )
 
 // Web related
@@ -1533,7 +1498,100 @@ const (
 	Configuration string = "configuration"
 	ValidURLs     string = "validUrls"
 )
-package domain
+package keys
+
+// Terminal keys:
+// Files and directories
+const (
+	VideoDir       string = "video-dir"
+	JSONDir        string = "json-dir"
+	MetarrPreset   string = "metarr-preset"
+	OutputFiletype string = "ext"
+)
+
+// Web inputs
+const (
+	CookieSource           string = "cookie-source"
+	DLRetries              string = "dl-retries"
+	ExternalDownloader     string = "external-downloader"
+	ExternalDownloaderArgs string = "external-downloader-args"
+)
+
+// Program inputs
+const (
+	ConcurrencyLimitInput string = "concurrency-limit"
+	MoveOnComplete        string = "move-on-complete"
+)
+
+// Settings
+const (
+	FilterOpsInput string = "filter-ops"
+	CrawlFreq      string = "crawl-freq"
+)
+
+// Database operations
+const (
+	DBOpsInput   string = "db-ops"
+	ChanOpsInput string = "channel-ops"
+)
+
+// Metarr operations
+const (
+	InputFileDatePfx        string = "filename-date-tag"
+	InputFilenameReplaceSfx string = "filename-replace-suffix"
+	MDescDatePfx            string = "desc-date-prefix"
+	MDescDateSfx            string = "desc-date-suffix"
+	MetaOps                 string = "meta-ops"
+	MetaPurge               string = "purge-metafile"
+	MFilenamePfx            string = "metadata-filename-prefix"
+	OutputFiletypeInput     string = "ext"
+	RenameStyle             string = "rename-style"
+)
+package regex
+
+import (
+	"regexp"
+)
+
+var (
+	AnsiEscape   *regexp.Regexp
+	ExtraSpaces  *regexp.Regexp
+	InvalidChars *regexp.Regexp
+	SpecialChars *regexp.Regexp
+)
+
+// AnsiEscapeCompile compiles regex for ANSI escape codes
+func AnsiEscapeCompile() *regexp.Regexp {
+	if AnsiEscape == nil {
+		AnsiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	}
+	return AnsiEscape
+}
+
+// ExtraSpacesCompile compiles regex for extra spaces
+func ExtraSpacesCompile() *regexp.Regexp {
+	if ExtraSpaces == nil {
+		ExtraSpaces = regexp.MustCompile(`\s+`)
+	}
+	return ExtraSpaces
+}
+
+// InvalidCharsCompile compiles regex for invalid characters
+func InvalidCharsCompile() *regexp.Regexp {
+	if InvalidChars == nil {
+		InvalidChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
+	}
+	return InvalidChars
+}
+
+// SpecialCharsCompile compiles regex for special characters
+func SpecialCharsCompile() *regexp.Regexp {
+	if SpecialChars == nil {
+		SpecialChars = regexp.MustCompile(`[^\w\s-]`)
+	}
+	return SpecialChars
+}
+package tags
 
 // Preset tag in file
 const (
@@ -1544,124 +1602,294 @@ const (
 	MetarrOutputDir          = "[output-directory]"
 	MetarrOutputExt          = "[output-extension]"
 )
-package models
+package interfaces
 
-import "os/exec"
+import (
+	"database/sql"
+	"tubarr/internal/models"
+)
 
-// DLRequest represents a download request
-type DLRequest struct {
-	URL             string
-	DownloadArchive string
-	Command         *exec.Cmd
+type Store interface {
+	GetChannelStore() ChannelStore
+	GetVideoStore() VideoStore
 }
 
-type DLs struct {
-	VideoCommand *exec.Cmd
-	VideoPath    string
-	VideoDir     string
-
-	JSONCommand *exec.Cmd
-	JSONPath    string
-	JSONDir     string
-
-	Metamap map[string]interface{}
-
-	URL string
+type ChannelStore interface {
+	AddChannel(c *models.Channel) (int64, error)
+	CrawlChannel(key, val string, s Store) error
+	DeleteChannel(key, val string) error
+	ListChannels() (channels []models.Channel, err error, hasRows bool)
+	LoadGrabbedURLs(c *models.Channel) (urls []string, err error)
+	GetDB() *sql.DB
 }
 
-type DLFilter struct {
-	Field string
-	Omit  string
-}
-
-type Metadata struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
+type VideoStore interface {
+	AddVideo(v *models.Video) (int64, error)
+	DeleteVideo(key, val string) error
+	GetDB() *sql.DB
 }
 package models
 
-// Config represents the top-level configuration structure
-type Config struct {
-	Sites    map[string]*Site    `toml:"sites"`
-	Channels map[string]*Channel `toml:"channels"`
-	RawURLs  *RawURLs            `toml:"raw-urls"`
-}
-
-// Site represents a video site configuration
-type Site struct {
-	Channels []string     `toml:"channels"`
-	Settings SiteSettings `toml:"settings"`
-}
-
-// SiteSettings contains site-specific settings
-type SiteSettings struct {
-	SkipTitles        []string `toml:"skip:title"`
-	Retries           int      `toml:"retries"`
-	RestrictFilenames string   `toml:"restrict_filenames"`
-}
-
-// Channel represents a channel configuration
-type Channel struct {
-	URL        string   `toml:"url"`
-	Directory  string   `toml:"directory"`
-	SkipTitles []string `toml:"skip:title"`
-	Settings   ChannelSettings
-}
-
-// SiteSettings contains channel-specific settings
 type ChannelSettings struct {
-	SkipTitles        []string `toml:"skip:title"`
-	Retries           int      `toml:"retries"`
-	RestrictFilenames string   `toml:"restrict_filenames"`
+	CookieSource           string      `json:"cookie_source"`
+	CrawlFreq              int         `json:"crawl_freq"`
+	Filters                []DLFilters `json:"filters"`
+	Retries                int         `json:"download_retries"`
+	ExternalDownloader     string      `json:"external_downloader"`
+	ExternalDownloaderArgs string      `json:"external_downloader_args"`
+	Concurrency            int         `json:"max_concurrency"`
 }
 
-// RawURLs contains direct video/channel URLs
-type RawURLs struct {
-	URLs []string `toml:"url"`
+type DLFilters struct {
+	Field string `json:"filter_field"`
+	Type  string `json:"filter_type"`
+	Value string `json:"filter_value"`
+}
+
+type MetarrArgs struct {
+	FilenameReplaceSfx string   `json:"filename_replace_suffix"`
+	RenameStyle        string   `json:"rename_style"`
+	FileDatePfx        string   `json:"filename_date_prefix"`
+	MetaOps            []string `json:"meta_ops"`
+}
+package models
+
+import (
+	"encoding/json"
+	"os/exec"
+	"time"
+)
+
+// Matches the order of the DB table, do not alter
+type Channel struct {
+	ID   int64  `db:"id"`
+	URL  string `db:"url"`
+	Name string `db:"name"`
+	VDir string `db:"video_directory"`
+	JDir string `db:"json_directory"`
+
+	Settings   ChannelSettings `json:"settings" db:"settings"`
+	MetarrArgs MetarrArgs      `json:"metarr" db:"metarr"`
+
+	LastScan  time.Time `db:"last_scan"`
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+}
+
+type Video struct {
+	ID          int64
+	ChannelID   int64                  `db:"channel_id"`
+	Downloaded  bool                   `db:"downloaded"`
+	VDir        string                 `db:"video_directory"`
+	VPath       string                 `db:"video_path"`
+	JDir        string                 `db:"json_directory"`
+	JPath       string                 `db:"json_path"`
+	URL         string                 `db:"url"`
+	Title       string                 `db:"title"`
+	UploadDate  time.Time              `db:"upload_date"`
+	MetadataMap map[string]interface{} `db:"-"`
+
+	Channel    *Channel        `db:"-"`
+	Settings   ChannelSettings `json:"settings" db:"settings"`
+	MetarrArgs MetarrArgs      `json:"metarr" db:"metarr"`
+
+	CreatedAt time.Time `db:"created_at"`
+	UpdatedAt time.Time `db:"updated_at"`
+
+	//Other
+	DLMetaCommand  *exec.Cmd
+	DLVideoCommand *exec.Cmd
+}
+
+type Download struct {
+	ID           int64           `db:"id"`
+	VideoID      int64           `db:"video_id"`
+	Status       string          `db:"status"` // pending, downloading, completed, failed
+	FilePath     string          `db:"file_path"`
+	FileSize     int64           `db:"file_size"`
+	StartedAt    time.Time       `db:"started_at"`
+	CompletedAt  time.Time       `db:"completed_at"`
+	ErrorMessage string          `db:"error_message"`
+	SettingsUsed json.RawMessage `db:"settings_used"`
+	CreatedAt    time.Time       `db:"created_at"`
+	UpdatedAt    time.Time       `db:"updated_at"`
+
+	VDir  string `db:"video_directory"`
+	JDir  string `db:"json_directory"`
+	JPath string `db:"json_path"`
+	URL   string
 }
 package process
 
 import (
+	"fmt"
+	"os/exec"
 	"sync"
-	builder "tubarr/internal/command/builder"
-	execute "tubarr/internal/command/execute"
+	"time"
+	"tubarr/internal/cfg"
+	"tubarr/internal/domain/keys"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
+	"tubarr/internal/utils/browser"
+	"tubarr/internal/utils/logging"
 )
 
-// ProcessMetaDownloads is the entry point for processing metadata downloads
-func ProcessMetaDownloads(dls []*models.DLs) []*models.DLs {
+// CheckChannels checks channels and whether they are due for a crawl
+func CheckChannels(s interfaces.Store) error {
+	cs := s.GetChannelStore()
+	channels, err, hasRows := cs.ListChannels()
+	if !hasRows {
+		logging.I("No channels in database")
+	} else if err != nil {
+		return err
+	}
 
-	mdl := builder.NewMetaDLRequest(dls)
-	mdl.RequestMetaCommand()
+	var (
+		wg sync.WaitGroup
+	)
 
-	wg := sync.WaitGroup{}
-	validDls := make([]*models.DLs, 0, len(dls))
-	mu := sync.Mutex{}
+	conc := cfg.GetInt(keys.Concurrency)
+	if conc < 1 {
+		conc = 1
+	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for _, dl := range dls {
-			if err := execute.ExecuteMetaDownload(dl); err != nil {
-				logging.E(0, "Got error downloading meta for '%s': %v", dl.URL, err.Error())
-			}
-			if valid, err := validateJson(dl); err != nil {
-				logging.E(0, "JSON validation failed for '%s': %v", dl.URL, err.Error())
-				continue
-			} else if !valid {
-				logging.D(2, "Filtered out download for URL '%s'", dl.URL)
-				continue
-			}
+	sem := make(chan struct{}, conc)
+	errChan := make(chan error, len(channels))
 
-			mu.Lock()
-			validDls = append(validDls, dl)
-			mu.Unlock()
+	for _, channel := range channels {
+
+		timeSinceLastScan := time.Since(channel.LastScan)
+		crawlFreqDuration := time.Duration(channel.Settings.CrawlFreq) * time.Minute
+
+		logging.I("Time since last check: %v\nCrawl frequency: %d minutes", timeSinceLastScan, crawlFreqDuration)
+
+		if timeSinceLastScan < crawlFreqDuration {
+			logging.I("%v minutes since last check. Set to wait for %v...", crawlFreqDuration-timeSinceLastScan, crawlFreqDuration)
+			continue
 		}
-	}()
-	wg.Wait()
 
-	return validDls
+		wg.Add(1)
+		go func(c models.Channel) {
+			defer wg.Done()
+
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+			}()
+
+			if err := ChannelCrawl(s, c); err != nil {
+				errChan <- err
+			}
+		}(channel)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	var errors []error
+	for err := range errChan {
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("encountered %d errors during processing: %v", len(errors), errors)
+	}
+
+	return nil
+}
+
+// ChannelCrawl crawls a channel for new URLs
+func ChannelCrawl(s interfaces.Store, c models.Channel) error {
+	logging.I("Initiating crawl for URL %s...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s", c.URL, c.VDir, c.JDir, c.Settings.Filters, c.Settings.CookieSource)
+
+	switch {
+	case c.URL == "":
+		return fmt.Errorf("channel URL is blank")
+	case c.VDir == "", c.JDir == "":
+		return fmt.Errorf("output directories are blank")
+	}
+
+	cs := s.GetChannelStore()
+
+	videos, err := browser.GetNewReleases(cs, &c)
+	if err != nil {
+		return err
+	}
+
+	if len(videos) == 0 {
+		logging.I("No new releases for channel '%s'", c.URL)
+		return nil
+	}
+
+	if err := InitProcess(s.GetVideoStore(), c, videos); err != nil {
+		return err
+	}
+	return nil
+}
+
+// InitProcess begins the process for processing metadata/videos and respective downloads
+func InitProcess(vs interfaces.VideoStore, c models.Channel, videos []*models.Video) error {
+	var (
+		wg      sync.WaitGroup
+		errChan = make(chan error, len(videos))
+	)
+
+	logging.I("Starting meta/video processing for %d videos", len(videos))
+
+	conc := c.Settings.Concurrency
+	if conc < 1 {
+		conc = 1
+	}
+	sem := make(chan struct{}, conc)
+
+	for _, video := range videos {
+		wg.Add(1)
+
+		go func(v *models.Video) {
+			defer wg.Done()
+
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			if err := processJSON(v, vs); err != nil {
+				errChan <- fmt.Errorf("JSON processing error for %s: %w", v.URL, err)
+				return
+			}
+
+			if logging.Level > 1 {
+				fmt.Println()
+				logging.I("Got requests for '%s'", v.URL)
+				logging.P("Channel ID=%d", v.ChannelID)
+				logging.P("Uploaded=%s", v.UploadDate)
+			}
+
+			if err := processVideo(v, vs); err != nil {
+				errChan <- fmt.Errorf("video processing error for %s: %w", v.URL, err)
+				return
+			}
+
+			// Check if Metarr exists on system (proceed if yes)
+			if _, err := exec.LookPath("metarr"); err != nil {
+				logging.I("Skipping Metarr process... 'metarr' not available: %v", err)
+				return
+			}
+			InitMetarr(v)
+		}(video)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	var errors []error
+	for err := range errChan {
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("encountered %d errors during processing: %v", len(errors), errors)
+	}
+
+	return nil
 }
 package process
 
@@ -1670,19 +1898,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"tubarr/internal/cfg"
-	keys "tubarr/internal/domain/keys"
+	"strings"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
 )
 
-// validateJson checks if the JSON is valid and if it passes filter checks
-func validateJson(dl *models.DLs) (valid bool, err error) {
-
-	if dl.JSONDir == "" {
-		return false, fmt.Errorf("json directory cannot be empty")
+// validateAndStoreJSON checks if the JSON is valid and if it passes filter checks
+func validateAndStoreJSON(v *models.Video) (valid bool, err error) {
+	if v == nil {
+		return false, fmt.Errorf("dl model is null")
 	}
 
-	jInfo, err := os.Stat(dl.JSONPath)
+	if v.JPath == "" {
+		return false, fmt.Errorf("json path cannot be empty")
+	}
+
+	jInfo, err := os.Stat(v.JPath)
 	if err != nil {
 		return false, err
 	}
@@ -1696,90 +1928,763 @@ func validateJson(dl *models.DLs) (valid bool, err error) {
 		return false, fmt.Errorf("json not a regular file")
 	}
 
-	f, err := os.Open(dl.JSONPath)
+	f, err := os.Open(v.JPath)
 	if err != nil {
 		return false, err
 	}
 	defer f.Close()
 
+	logging.D(1, "About to decode JSON to metamap")
+
+	m := make(map[string]interface{})
 	decoder := json.NewDecoder(f)
-	if err := decoder.Decode(dl.Metamap); err != nil {
+	if err := decoder.Decode(&m); err != nil {
 		return false, fmt.Errorf("failed to decode JSON: %w", err)
 	}
 
-	if valid, err = filterRequests(dl); err != nil {
+	if len(m) > 0 {
+		v.MetadataMap = m
+	} else {
+		return false, nil
+	}
+
+	if valid, err = filterRequests(v); err != nil {
 		return false, err
+	}
+	if !valid {
+		return false, nil
 	}
 
 	return valid, nil
 }
 
 // filterRequests uses user input filters to check if the video should be downloaded
-func filterRequests(dl *models.DLs) (valid bool, err error) {
+func filterRequests(v *models.Video) (valid bool, err error) {
+	// Check if filters are set and validate if so
+	if len(v.Settings.Filters) == 0 {
+		logging.D(2, "No filters to check for '%s'", v.URL)
+		return true, nil
+	}
 
-	if cfg.IsSet(keys.FilterOps) {
-		filters, ok := cfg.Get(keys.FilterOps).([]*models.DLFilter)
-		if !ok {
-			return false, fmt.Errorf("wrong type sent in, got %T", filters)
-		}
+	// Apply filters if any match metadata content
+	for _, filter := range v.Settings.Filters {
+		val, exists := v.MetadataMap[filter.Field]
 
-		if len(filters) > 0 {
-			for _, filter := range filters {
-				if val, exists := dl.Metamap[filter.Field]; exists {
-					if val == filter.Omit {
-						return false, err
+		if filter.Value == "" {
+			if !exists {
+				switch filter.Type {
+				case consts.FilterContains:
+
+					logging.I("Filtering: Field '%s' not found in metadata for URL '%s' and filter is set to require it, filtering out", filter.Field, v.URL)
+					if err := removeUnwantedJSON(v.JPath); err != nil {
+						logging.E(0, err.Error())
 					}
+					return false, nil
+
+				case consts.FilterOmit:
+					logging.D(2, "Passed check: Field '%s' does not exist", filter.Field)
+					continue
+				}
+			}
+			if exists {
+				switch filter.Type {
+				case consts.FilterOmit:
+
+					logging.I("Filtering: Field '%s' found in metadata for URL '%s' and filter is set to omit it, filtering out", filter.Field, v.URL)
+					if err := removeUnwantedJSON(v.JPath); err != nil {
+						logging.E(0, err.Error())
+					}
+					return false, nil
+
+				case consts.FilterContains:
+					logging.D(2, "Passed check: Field '%s' exists", filter.Field)
+					continue
 				}
 			}
 		}
+
+		// Performing field contents checks
+		if filter.Value != "" {
+
+			strVal, ok := val.(string)
+			if !ok {
+				logging.E(0, "Unexpected type for field %s: expected string, got %T", filter.Field, val)
+				continue
+			}
+
+			lowerStrVal := strings.ToLower(strVal)
+			lowerFilterVal := strings.ToLower(filter.Value)
+
+			// Apply the filter logic
+			switch filter.Type {
+			case consts.FilterOmit:
+				if strings.Contains(lowerStrVal, lowerFilterVal) {
+
+					logging.D(1, "Filtering out video '%s' which contains '%s' in field '%s'", v.URL, filter.Value, filter.Field)
+					if err := removeUnwantedJSON(v.JPath); err != nil {
+						logging.E(0, err.Error())
+					}
+					return false, nil
+				}
+
+			case consts.FilterContains:
+				if !strings.Contains(lowerStrVal, lowerFilterVal) {
+
+					logging.D(1, "Filtering out video '%s' which does not contain '%s' in field '%s'", v.URL, filter.Value, filter.Field)
+					if err := removeUnwantedJSON(v.JPath); err != nil {
+						logging.E(0, err.Error())
+					}
+					return false, nil
+				}
+
+			default:
+				logging.D(1, "Unrecognized filter type, skipping...")
+				continue
+			}
+		}
 	}
+	logging.D(1, "Video '%s' passed filter checks", v.URL)
 	return true, nil
+}
+
+// removeUnwantedJSON removes filtered out JSON files
+func removeUnwantedJSON(path string) error {
+	if path == "" {
+		return fmt.Errorf("path sent in empty, not removing")
+	}
+
+	check, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("not deleting unwanted JSON file, got error: %w", err)
+	}
+
+	switch {
+	case check.IsDir():
+		return fmt.Errorf("JSON path sent in as a directory '%s', not deleting", path)
+	case !check.Mode().IsRegular():
+		return fmt.Errorf("JSON file '%s' is not a regular file, not deleting", path)
+	}
+
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("failed to remove unwanted JSON file '%s' due to error %w", path, err)
+	} else {
+		logging.S(0, "Removed unwanted JSON file '%s'", path)
+	}
+
+	return nil
 }
 package process
 
 import (
-	build "tubarr/internal/command/builder"
-	execute "tubarr/internal/command/execute"
+	"fmt"
+	"tubarr/internal/command"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
+	"tubarr/internal/utils/logging"
 )
 
-func ProcessVideoDownloads(dls []*models.DLs) {
+// processJSON downloads and processes JSON for a video
+func processJSON(v *models.Video, vs interfaces.VideoStore) error {
+	if v == nil {
+		logging.I("Nil video")
+		return nil
+	}
 
-	valid := make([]*models.DLs, len(dls))
+	// Create metadata download command
+	mdl := command.NewMetaDLRequest(v)
+	cmd := mdl.RequestMetaCommand()
+	if cmd == nil {
+		return fmt.Errorf("failed to create meta DL command for '%s'", v.URL)
+	}
 
-	for _, dl := range dls {
-		vcb := build.NewVideoDLRequest(dl)
-		if err := vcb.VideoFetchCommand(); err != nil {
-			logging.E(0, err.Error())
-			continue
+	// Execute metadata download
+	if err := command.ExecuteMetaDownload(v, cmd); err != nil {
+		logging.E(0, "Failed downloading metadata for '%s': %v", v.URL, err)
+		// Add to database even if metadata download fails
+		if _, err := vs.AddVideo(v); err != nil {
+			return fmt.Errorf("failed to add video to database: %v", err)
 		}
-		valid = append(valid, dl)
+		return nil
 	}
 
-	if len(valid) == 0 {
-		logging.E(0, "No valid downloads to process")
-		return
+	// Validate JSON
+	valid, err := validateAndStoreJSON(v)
+	if err != nil {
+		logging.E(0, "JSON validation failed for '%s': %v", v.URL, err)
 	}
 
-	execute.DownloadVideos(valid)
+	// Add to database regardless of validation
+	if _, err := vs.AddVideo(v); err != nil {
+		return fmt.Errorf("failed to add video to database: %v", err)
+	}
+
+	if !valid {
+		logging.D(1, "JSON validation failed but video added to database: %s", v.URL)
+		return nil
+	}
+
+	logging.S(0, "Successfully processed metadata for: %s", v.URL)
+	return nil
 }
-package utils
+package process
+
+import (
+	"tubarr/internal/command"
+	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
+)
+
+// InitMetarr begins processing with Metarr
+func InitMetarr(v *models.Video) error {
+	mc := command.NewMetarrCommandBuilder(v)
+	cmd, err := mc.MakeMetarrCommands()
+	if err != nil {
+		return err
+	}
+
+	if err := command.RunMetarr(cmd); err != nil {
+		return err
+	}
+	logging.S(1, "Finished Metarr command for '%s'", v.VPath)
+	return nil
+}
+package process
+
+import (
+	"fmt"
+	"tubarr/internal/command"
+	"tubarr/internal/interfaces"
+	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
+)
+
+// processVideo processes video downloads
+func processVideo(v *models.Video, vs interfaces.VideoStore) error {
+	if v == nil {
+		logging.I("No videos to download")
+		return nil
+	}
+
+	logging.D(2, "Processing download for URL: %s", v.URL)
+
+	vcb := command.NewVideoDLRequest(v)
+	cmd, err := vcb.VideoFetchCommand()
+	if err != nil {
+		return err
+	}
+
+	success, err := command.ExecuteVideoDownload(v, cmd)
+	if err != nil {
+		return err
+	}
+
+	if success {
+		v.Downloaded = true
+		vs.AddVideo(v)
+		logging.D(1, "Successfully processed: %s", v.URL)
+		return nil
+	}
+	return fmt.Errorf("video download was unsuccessful")
+}
+package repo
+
+import (
+	"database/sql"
+	"tubarr/internal/interfaces"
+)
+
+type Store struct {
+	db           *sql.DB
+	videoStore   *VideoStore
+	channelStore *ChannelStore
+}
+
+func InitStores(db *sql.DB) *Store {
+	return &Store{
+		db:           db,
+		videoStore:   GetVideoStore(db),
+		channelStore: GetChannelStore(db),
+	}
+}
+
+// GetChannelStore with pointer receiver
+func (s *Store) GetChannelStore() interfaces.ChannelStore {
+	return s.channelStore
+}
+
+// GetVideoStore with pointer receiver
+func (s *Store) GetVideoStore() interfaces.VideoStore {
+	return s.videoStore
+}
+package repo
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"time"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/interfaces"
+	"tubarr/internal/models"
+	"tubarr/internal/process"
+	"tubarr/internal/utils/logging"
+
+	"github.com/Masterminds/squirrel"
+)
+
+type ChannelStore struct {
+	DB *sql.DB
+}
+
+func GetChannelStore(db *sql.DB) *ChannelStore {
+	return &ChannelStore{
+		DB: db,
+	}
+}
+
+// GetDB returns the database
+func (cs *ChannelStore) GetDB() *sql.DB {
+	return cs.DB
+}
+
+// AddChannel adds a new channel to the database
+func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
+	switch {
+	case c.URL == "":
+		return 0, fmt.Errorf("must enter a url for channel")
+	case c.VDir == "":
+		return 0, fmt.Errorf("must enter a video directory where downloads will be stored")
+	}
+
+	if cs.channelExists(consts.QChanURL, c.URL) {
+		return 0, fmt.Errorf("channel with URL '%s' already exists", c.URL)
+	}
+
+	// JSON dir
+	if c.JDir == "" {
+		c.JDir = c.VDir
+	}
+	now := time.Now()
+
+	// Convert settings to JSON
+	settingsJSON, err := json.Marshal(c.Settings)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	// Convert metarr settings to JSON
+	metarrJSON, err := json.Marshal(c.MetarrArgs)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal metarr settings: %w", err)
+	}
+
+	query := squirrel.
+		Insert(consts.DBChannels).
+		Columns(
+			consts.QChanURL,
+			consts.QChanName,
+			consts.QChanVDir,
+			consts.QChanJDir,
+			consts.QChanSettings,
+			consts.QChanMetarr, // Add this column
+			consts.QChanLastScan,
+			consts.QChanCreatedAt,
+			consts.QChanUpdatedAt,
+		).
+		Values(
+			c.URL,
+			c.Name,
+			c.VDir,
+			c.JDir,
+			settingsJSON,
+			metarrJSON, // Add this value
+			now,
+			now,
+			now,
+		).
+		RunWith(cs.DB)
+
+	result, err := query.Exec()
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert channel: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	logging.S(0, "Successfully added channel with metarr operations: %+v", c.MetarrArgs)
+	return id, nil
+}
+
+// DeleteChannel deletes a channel from the database with a given key/value
+func (cs *ChannelStore) DeleteChannel(key, val string) error {
+	if !cs.channelExists(key, val) {
+		return fmt.Errorf("channel with key '%s' and value '%s' does not exist", key, val)
+	}
+
+	query := squirrel.
+		Delete(consts.DBChannels).
+		Where(squirrel.Eq{key: val}).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded
+func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store) error {
+	var (
+		c                    models.Channel
+		settings, metarrJSON json.RawMessage
+	)
+
+	query := squirrel.
+		Select(
+			consts.QChanID,
+			consts.QChanURL,
+			consts.QChanName,
+			consts.QChanVDir,
+			consts.QChanJDir,
+			consts.QChanSettings,
+			consts.QChanMetarr,
+			consts.QChanLastScan,
+			consts.QChanCreatedAt,
+			consts.QChanUpdatedAt,
+		).
+		From(consts.DBChannels).
+		Where(squirrel.Eq{key: val})
+
+	if err := query.
+		RunWith(cs.DB).
+		QueryRow().
+		Scan(
+			&c.ID,
+			&c.URL,
+			&c.Name,
+			&c.VDir,
+			&c.JDir,
+			&settings,
+			&metarrJSON,
+			&c.LastScan,
+			&c.CreatedAt,
+			&c.UpdatedAt,
+		); err != nil {
+		return fmt.Errorf("failed to scan channel: %w", err)
+	}
+
+	// Unmarshal settings
+	if err := json.Unmarshal(settings, &c.Settings); err != nil {
+		return fmt.Errorf("parsing channel settings: %w", err)
+	}
+
+	// Unmarshal metarr settings
+	if len(metarrJSON) > 0 {
+		if err := json.Unmarshal(metarrJSON, &c.MetarrArgs); err != nil {
+			return fmt.Errorf("parsing metarr settings: %w", err)
+		}
+	}
+
+	logging.D(1, "Retrieved channel with Metarr args: %+v", c.MetarrArgs)
+	return process.ChannelCrawl(s, c)
+}
+
+// ListChannels lists all channels in the database
+func (cs *ChannelStore) ListChannels() (channels []models.Channel, err error, hasRows bool) {
+	query := squirrel.
+		Select(
+			consts.QChanID,
+			consts.QChanURL,
+			consts.QChanName,
+			consts.QChanVDir,
+			consts.QChanJDir,
+			consts.QChanSettings,
+			consts.QChanMetarr,
+			consts.QChanLastScan,
+			consts.QChanCreatedAt,
+			consts.QChanUpdatedAt,
+		).
+		From(consts.DBChannels).
+		OrderBy(consts.QChanName).
+		RunWith(cs.DB)
+
+	rows, err := query.Query()
+	if err == sql.ErrNoRows {
+		return nil, nil, false
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to query channels: %w", err), true
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var c models.Channel
+		var settingsJSON, metarrJSON []byte
+		err := rows.Scan(
+			&c.ID,
+			&c.URL,
+			&c.Name,
+			&c.VDir,
+			&c.JDir,
+			&settingsJSON,
+			&metarrJSON, // Scan Metarr JSON
+			&c.LastScan,
+			&c.CreatedAt,
+			&c.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan channel: %w", err), true
+		}
+
+		// Unmarshal settings JSON
+		if len(settingsJSON) > 0 {
+			if err := json.Unmarshal(settingsJSON, &c.Settings); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal settings: %w", err), true
+			}
+		}
+
+		// Unmarshal Metarr JSON
+		if len(metarrJSON) > 0 {
+			if err := json.Unmarshal(metarrJSON, &c.MetarrArgs); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal metarr settings: %w", err), true
+			}
+		}
+
+		channels = append(channels, c)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err), true
+	}
+
+	return channels, nil, true
+}
+
+// LoadGrabbedURLs adds a new channel to the database
+func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err error) {
+	if c.ID == 0 {
+		return nil, fmt.Errorf("model entered has no ID")
+	}
+
+	// Select only URLs where channel_id matches and downloaded is true
+	query := squirrel.
+		Select(consts.QVidURL).
+		From(consts.DBVideos).
+		Where(squirrel.And{
+			squirrel.Eq{consts.QVidChanID: c.ID},
+			squirrel.Eq{consts.QVidDownloaded: 1}, // SQLite uses 1 for true
+		}).
+		RunWith(cs.DB)
+
+	logging.D(2, "Executing query: %v for channel ID %d", query, c.ID)
+
+	rows, err := query.Query()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var url string
+		if err := rows.Scan(&url); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		urls = append(urls, url)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %w", err)
+	}
+
+	logging.D(2, "Found %d downloaded URLs for channel ID %d", len(urls), c.ID)
+
+	return urls, nil
+}
+
+// Private /////////////////////////////////////////////////////////////////////
+
+// channelExists returns true if the channel exists in the database
+func (cs ChannelStore) channelExists(key, val string) bool {
+	var exists bool
+	query := squirrel.
+		Select("1").
+		From(consts.DBChannels).
+		Where(squirrel.Eq{key: val}).
+		RunWith(cs.DB)
+
+	if err := query.QueryRow().Scan(&exists); err == sql.ErrNoRows {
+		return false
+	} else if err != nil {
+		log.Fatalf("error querying row, aborting program")
+	}
+	return exists
+}
+package repo
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"time"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
+
+	"github.com/Masterminds/squirrel"
+)
+
+type VideoStore struct {
+	DB *sql.DB
+}
+
+func GetVideoStore(db *sql.DB) *VideoStore {
+	return &VideoStore{
+		DB: db,
+	}
+}
+
+// GetDB returns the database
+func (vs *VideoStore) GetDB() *sql.DB {
+	return vs.DB
+}
+
+// AddVideo adds a new video to the database
+func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
+	switch {
+	case v.URL == "":
+		return 0, fmt.Errorf("must enter a url for video")
+	case v.VDir == "":
+		return 0, fmt.Errorf("must enter a video directory where downloads will be stored")
+	}
+
+	if vs.videoExists(consts.QVidURL, v.URL) {
+		logging.D(2, "Video with URL '%s' already exists, skipping", v.URL)
+		return 0, nil // Return gracefully instead of error
+	}
+
+	// JSON dir
+	if v.JDir == "" {
+		v.JDir = v.VDir
+	}
+	now := time.Now()
+
+	// Convert metadata map to JSON string
+	metadataJSON, err := json.Marshal(v.MetadataMap)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal metadata to JSON: %w", err)
+	}
+
+	// Convert settings to JSON
+	settingsJSON, err := json.Marshal(v.Settings)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal settings to JSON: %w", err)
+	}
+
+	// Convert metarr settings to JSON
+	metarrJSON, err := json.Marshal(v.MetarrArgs)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal metarr settings to JSON: %w", err)
+	}
+
+	query := squirrel.
+		Insert(consts.DBVideos).
+		Columns(
+			consts.QVidChanID,
+			consts.QVidDownloaded,
+			consts.QVidURL,
+			consts.QVidTitle,
+			consts.QVidVDir,
+			consts.QVidJDir,
+			consts.QVidUploadDate,
+			consts.QVidMetadata,
+			consts.QVidSettings,
+			consts.QVidMetarr,
+			consts.QVidCreatedAt,
+			consts.QVidUpdatedAt,
+		).
+		Values(
+			v.ChannelID,
+			v.Downloaded,
+			v.URL,
+			v.Title,
+			v.VDir,
+			v.JDir,
+			v.UploadDate,
+			metadataJSON,
+			settingsJSON,
+			metarrJSON,
+			now,
+			now,
+		).
+		RunWith(vs.DB)
+
+	result, err := query.Exec()
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert video: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+	return id, nil
+}
+
+// DeleteVideo deletes an existent downloaded video from the database
+func (vs VideoStore) DeleteVideo(key, val string) error {
+	if key == "" || val == "" {
+		return fmt.Errorf("please pass in a key and value to delete a video entry")
+	}
+
+	query := squirrel.
+		Delete(consts.DBVideos).
+		Where(squirrel.Eq{key: val}).
+		RunWith(vs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		if err == sql.ErrNoRows {
+			fmt.Printf("No video exists with key '%s' and value '%s'", key, val)
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Private /////////////////////////////////////////////////////////////////////
+
+// channelExists returns true if the channel exists in the database
+func (vs VideoStore) videoExists(key, val string) bool {
+	var exists bool
+	query := squirrel.
+		Select("1").
+		From(consts.DBVideos).
+		Where(squirrel.Eq{key: val}).
+		RunWith(vs.DB)
+
+	if err := query.QueryRow().Scan(&exists); err == sql.ErrNoRows {
+		return false
+	} else if err != nil {
+		log.Fatalf("error querying row, aborting program")
+	}
+	return exists
+}
+package browser
 
 import (
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
-	config "tubarr/internal/cfg"
-	keys "tubarr/internal/domain/keys"
-	logging "tubarr/internal/utils/logging"
+	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
 	_ "github.com/browserutils/kooky/browser/all"
-	"github.com/browserutils/kooky/browser/chrome"
-	"github.com/browserutils/kooky/browser/firefox"
-	"github.com/browserutils/kooky/browser/safari"
 )
 
 // GetBrowserCookies sets cookies input by the user. Useful for getting URLs
@@ -1801,20 +2706,6 @@ func getBrowserCookies(url string) ([]*http.Cookie, error) {
 	baseURL, err := extractBaseDomain(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract base domain: %v", err)
-	}
-
-	if config.IsSet(keys.CookiePath) {
-		cookieFilePath := config.GetString(keys.CookiePath)
-
-		// If a cookie file path is provided, use it
-		if cookieFilePath != "" {
-			logging.D(2, "Reading cookies from specified file: %s", cookieFilePath)
-			kookyCookies, err := readCookieFile(cookieFilePath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read cookies from file: %v", err)
-			}
-			return convertToHTTPCookies(kookyCookies), nil
-		}
 	}
 
 	// Otherwise, proceed to use browser cookie stores
@@ -1892,45 +2783,13 @@ func keysFromMap(m map[string]bool) []string {
 	}
 	return keys
 }
-
-// readCookieFile reads cookies from the specified cookie file
-func readCookieFile(cookieFilePath string) ([]*kooky.Cookie, error) {
-	var store kooky.CookieStore
-	var err error
-
-	// Attempt to identify and read cookies based on known browser stores
-	if strings.Contains(cookieFilePath, "firefox") || strings.Contains(cookieFilePath, "cookies.sqlite") {
-		store, err = firefox.CookieStore(cookieFilePath)
-	} else if strings.Contains(cookieFilePath, "safari") || strings.Contains(cookieFilePath, "Cookies.binarycookies") {
-		store, err = safari.CookieStore(cookieFilePath)
-	} else if strings.Contains(cookieFilePath, "chrome") || strings.Contains(cookieFilePath, "Cookies") {
-		store, err = chrome.CookieStore(cookieFilePath)
-	} else {
-		return nil, fmt.Errorf("unsupported cookie file format")
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cookie store: %w", err)
-	}
-
-	// Read cookies from the store
-	cookies, err := store.ReadCookies()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cookies: %w", err)
-	}
-
-	return cookies, nil
-}
-package utils
+package browser
 
 import (
-	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
-	"tubarr/internal/cfg"
-	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
 
@@ -1938,56 +2797,72 @@ import (
 )
 
 // GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded
-func GetNewReleases(vDir, jDir string) []*models.DLs {
+func GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) ([]*models.Video, error) {
 
 	uniqueURLs := make(map[string]struct{})
-	urlsToCheck := cfg.GetStringSlice(keys.ChannelCheckNew)
 
-	for _, url := range urlsToCheck {
-		if url == "" {
-			continue
+	existingURLs, err := cs.LoadGrabbedURLs(c)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(existingURLs) > 0 {
+		fmt.Println()
+		logging.I("Found existing downloaded video URLs:")
+		count := 1
+		for _, u := range existingURLs {
+			logging.P("Entry %d: %v", count, u)
+			count++
 		}
+		fmt.Println()
+	}
 
-		cookies, err := getBrowserCookies(url)
-		if err != nil {
-			logging.E(0, "Could not get cookies for %s: %v", url, err)
-			continue
-		}
+	if c.URL == "" {
+		return nil, fmt.Errorf("channel url is blank")
+	}
 
-		urls, err := newEpisodeURLs(url, cookies)
-		if err != nil {
-			logging.E(0, "Could not grab episodes from %s: %v", url, err)
-			continue
-		}
+	cookies, err := getBrowserCookies(c.URL)
+	if err != nil {
+		return nil, err
+	}
 
-		// Add unique URLs to map
-		for _, newURL := range urls {
-			if newURL != "" {
-				uniqueURLs[newURL] = struct{}{}
-			}
+	newURLs, err := newEpisodeURLs(c.URL, existingURLs, cookies)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add unique URLs to map
+	for _, newURL := range newURLs {
+		if newURL != "" {
+			uniqueURLs[newURL] = struct{}{}
 		}
 	}
-	// Convert map to slice
-	var newRequests = make([]*models.DLs, 0, len(uniqueURLs))
-	for url := range uniqueURLs {
-		newRequests = append(newRequests, &models.DLs{
-			URL: url,
 
-			VideoDir: vDir,
-			JSONDir:  jDir,
+	// Convert map to slice
+	var newRequests = make([]*models.Video, 0, len(uniqueURLs))
+
+	for url := range uniqueURLs {
+		newRequests = append(newRequests, &models.Video{
+			ChannelID:  c.ID,
+			URL:        url,
+			VDir:       c.VDir,
+			JDir:       c.JDir,
+			Channel:    c,
+			Settings:   c.Settings,
+			MetarrArgs: c.MetarrArgs,
 		})
 	}
 
-	// Log results
+	// Display results
 	if len(newRequests) > 0 {
 		logging.I("Grabbed %d new download requests: %v", len(newRequests), uniqueURLs)
 	}
 
-	return newRequests
+	return newRequests, nil
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) {
+func newEpisodeURLs(targetURL string, existingURLs []string, cookies []*http.Cookie) ([]string, error) {
 
 	c := colly.NewCollector()
 	uniqueEpisodeURLs := make(map[string]struct{})
@@ -2061,19 +2936,13 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 		episodeURLs = append(episodeURLs, url)
 	}
 
-	// Load existing URLs from grabbed-urls.txt
-	existingURLs, err := loadGrabbedURLsFromFile("grabbed-urls.txt")
-	if err != nil {
-		return nil, fmt.Errorf("error reading grabbed URLs file: %v", err)
-	}
-
 	// Filter out URLs that are already in grabbed-urls.txt
 	var newURLs = make([]string, 0, len(episodeURLs))
 	for _, url := range episodeURLs {
 		normalizedURL := normalizeURL(url)
 		exists := false
 
-		for existingURL := range existingURLs {
+		for _, existingURL := range existingURLs {
 			if normalizeURL(existingURL) == normalizedURL {
 				exists = true
 				break
@@ -2090,42 +2959,6 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 	return newURLs, nil
 }
 
-// loadGrabbedURLsFromFile reads URLs from a file and returns them as a map for quick lookup
-func loadGrabbedURLsFromFile(filename string) (map[string]struct{}, error) {
-
-	var (
-		filepath string
-	)
-
-	videoDir := cfg.GetString(keys.VideoDir)
-
-	switch strings.HasSuffix(videoDir, "/") {
-	case false:
-		filepath = videoDir + "/" + filename
-	default:
-		filepath = videoDir + filename
-	}
-
-	file, err := os.Open(filepath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	urlMap := make(map[string]struct{})
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		url := scanner.Text()
-		urlMap[url] = struct{}{}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return urlMap, nil
-}
-
 // normalizeURL standardizes URLs for comparison by removing protocol and any trailing slashes
 func normalizeURL(inputURL string) string {
 	// Remove http:// or https://
@@ -2137,165 +2970,34 @@ func normalizeURL(inputURL string) string {
 
 	return cleanURL
 }
-package utils
-
-import (
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"strings"
-	consts "tubarr/internal/domain/constants"
-	logging "tubarr/internal/utils/logging"
-)
-
-// BackupFile creates a backup copy of the original file before modifying it.
-// helps save important data if the program fails in some way
-func BackupFile(file *os.File) error {
-
-	// Get the original filename
-	originalFilePath := file.Name()
-
-	backupFilePath := generateBackupFilename(originalFilePath)
-	logging.D(3, "Creating backup of file '%s' as '%s'", originalFilePath, backupFilePath)
-
-	// Open the backup file for writing
-	backupFile, err := os.Create(backupFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to create backup file: %w", err)
-	}
-	defer backupFile.Close()
-
-	// Seek to the beginning of the original file
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		return fmt.Errorf("failed to seek to beginning of original file: %w", err)
-	}
-
-	// Copy the content of the original file to the backup file
-	_, err = io.Copy(backupFile, file)
-	if err != nil {
-		return fmt.Errorf("failed to copy content to backup file: %w", err)
-	}
-
-	logging.D(3, "Backup successfully created at '%s'", backupFilePath)
-	return nil
-}
-
-// generateBackupFilename creates a backup filename by appending "_backup" to the original filename
-func generateBackupFilename(originalFilePath string) string {
-	ext := filepath.Ext(originalFilePath)
-	base := strings.TrimSuffix(originalFilePath, ext)
-	return fmt.Sprintf(base + consts.OldTag + ext)
-}
-
-// RenameToBackup renames the passed in file
-func RenameToBackup(filename string) error {
-
-	if filename == "" {
-		logging.E(0, "filename was passed in to backup empty")
-	}
-
-	backupName := generateBackupFilename(filename)
-
-	if err := os.Rename(filename, backupName); err != nil {
-		return fmt.Errorf("failed to backup filename '%s' to '%s'", filename, backupName)
-	}
-	return nil
-}
-package utils
-
-import (
-	"bufio"
-	"fmt"
-	"os"
-	"path/filepath"
-	logging "tubarr/internal/utils/logging"
-)
-
-// appendURLsToFile appends new URLs to the specified file
-func AppendURLsToFile(filename string, urls []string) error {
-	if len(urls) == 0 {
-		return nil
-	}
-
-	logging.D(2, "Appending URLs to file %s: %v", filename, urls)
-
-	// Ensure the directory exists
-	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory for %s: %w", filename, err)
-	}
-
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %w", filename, err)
-	}
-	defer file.Close()
-
-	written := make(map[string]bool)
-
-	// Load existing URLs from the file into the map
-	existingFile, err := os.Open(filename)
-	if err == nil {
-		defer existingFile.Close()
-		scanner := bufio.NewScanner(existingFile)
-		for scanner.Scan() {
-			written[scanner.Text()] = true
-		}
-		if err := scanner.Err(); err != nil {
-			return fmt.Errorf("error reading existing URLs: %w", err)
-		}
-	}
-
-	// Append only new URLs to the file
-	writer := bufio.NewWriter(file)
-	for _, url := range urls {
-		if url != "" && !written[url] {
-			if _, err := writer.WriteString(url + "\n"); err != nil {
-				return fmt.Errorf("error writing URL to file: %w", err)
-			}
-			written[url] = true
-		}
-	}
-
-	if err := writer.Flush(); err != nil {
-		return fmt.Errorf("error flushing writer: %w", err)
-	}
-
-	return nil
-}
-package utils
+package logging
 
 import (
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"sync"
-	consts "tubarr/internal/domain/constants"
-	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 
 	"github.com/spf13/viper"
 )
 
 var (
 	Level int = -1 // Pre initialization
-	muD   sync.Mutex
-	muE   sync.Mutex
-	muI   sync.Mutex
-	muP   sync.Mutex
-	muS   sync.Mutex
+	mu    sync.Mutex
 )
 
 func E(l int, format string, args ...interface{}) string {
 
-	muE.Lock()
-	defer muE.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
-	_, file, line, _ := runtime.Caller(1)
+	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
-	tag := fmt.Sprintf("[File: %s : Line: %d] ", file, line)
+	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
+	tag := fmt.Sprintf("["+consts.ColorBlue+"Function:"+consts.ColorReset+" %s - "+consts.ColorBlue+"File:"+consts.ColorReset+" %s : "+consts.ColorBlue+"Line:"+consts.ColorReset+" %d] ", funcName, file, line)
 
 	if Level < 0 {
 		Level = viper.GetInt(keys.DebugLevel)
@@ -2303,13 +3005,12 @@ func E(l int, format string, args ...interface{}) string {
 	if l <= viper.GetInt(keys.DebugLevel) {
 
 		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.RedError+format+tag+"\n", args...)
+			msg = fmt.Sprintf(consts.RedError+format+" "+tag+"\n", args...)
 		} else {
-			msg = fmt.Sprintf(consts.RedError + format + tag + "\n")
+			msg = fmt.Sprintf(consts.RedError + format + " " + tag + "\n")
 		}
 		fmt.Print(msg)
-
-		Write(consts.LogError, msg, nil)
+		writeLog(msg, l)
 	}
 
 	return msg
@@ -2317,13 +3018,9 @@ func E(l int, format string, args ...interface{}) string {
 
 func S(l int, format string, args ...interface{}) string {
 
-	muS.Lock()
-	defer muS.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
-
-	_, file, line, _ := runtime.Caller(1)
-	file = filepath.Base(file)
-	tag := fmt.Sprintf("[File: %s : Line: %d] ", file, line)
 
 	if Level < 0 {
 		Level = viper.GetInt(keys.DebugLevel)
@@ -2331,27 +3028,26 @@ func S(l int, format string, args ...interface{}) string {
 	if l <= viper.GetInt(keys.DebugLevel) {
 
 		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.GreenSuccess+format+tag+"\n", args...)
+			msg = fmt.Sprintf(consts.GreenSuccess+format+" \n", args...)
 		} else {
-			msg = fmt.Sprintf(consts.GreenSuccess + format + tag + "\n")
+			msg = fmt.Sprintf(consts.GreenSuccess + format + " \n")
 		}
 		fmt.Print(msg)
-
-		Write(consts.LogSuccess, msg, nil)
+		writeLog(msg, l)
 	}
-
 	return msg
 }
 
 func D(l int, format string, args ...interface{}) string {
 
-	muD.Lock()
-	defer muD.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
-	_, file, line, _ := runtime.Caller(1)
+	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
-	tag := fmt.Sprintf("[File: %s : Line: %d] ", file, line)
+	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
+	tag := fmt.Sprintf("["+consts.ColorBlue+"Function:"+consts.ColorReset+" %s - "+consts.ColorBlue+"File:"+consts.ColorReset+" %s : "+consts.ColorBlue+"Line:"+consts.ColorReset+" %d] ", funcName, file, line)
 
 	if Level < 0 {
 		Level = viper.GetInt(keys.DebugLevel)
@@ -2359,22 +3055,20 @@ func D(l int, format string, args ...interface{}) string {
 	if l <= viper.GetInt(keys.DebugLevel) && l != 0 { // Debug messages don't appear by default
 
 		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.YellowDebug+format+tag+"\n", args...)
+			msg = fmt.Sprintf(consts.YellowDebug+format+" "+tag+"\n", args...)
 		} else {
-			msg = fmt.Sprintf(consts.YellowDebug + format + tag + "\n")
+			msg = fmt.Sprintf(consts.YellowDebug + format + " " + tag + "\n")
 		}
 		fmt.Print(msg)
-
-		Write(consts.LogSuccess, msg, nil)
+		writeLog(msg, l)
 	}
-
 	return msg
 }
 
 func I(format string, args ...interface{}) string {
 
-	muI.Lock()
-	defer muI.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
 	if len(args) != 0 && args != nil {
@@ -2383,15 +3077,15 @@ func I(format string, args ...interface{}) string {
 		msg = fmt.Sprintf(consts.BlueInfo + format + "\n")
 	}
 	fmt.Print(msg)
-	Write(consts.LogInfo, msg, nil)
+	writeLog(msg, 0)
 
 	return msg
 }
 
 func P(format string, args ...interface{}) string {
 
-	muP.Lock()
-	defer muP.Unlock()
+	mu.Lock()
+	defer mu.Unlock()
 	var msg string
 
 	if len(args) != 0 && args != nil {
@@ -2400,39 +3094,36 @@ func P(format string, args ...interface{}) string {
 		msg = fmt.Sprintf(format + "\n")
 	}
 	fmt.Print(msg)
-	Write(consts.LogBasic, msg, nil)
+	writeLog(msg, 0)
 
 	return msg
 }
-package utils
+package logging
 
 import (
-	"fmt"
 	"log"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"sync"
 	"time"
+	"tubarr/internal/domain/regex"
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
+	ErrorArray []error
 	Loggable   bool = false
 	Logger     *log.Logger
-	ErrorArray []error
-	mu         sync.Mutex
 
-	// Regular expression to match ANSI escape codes
-	ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	// Matches ANSI escape codes
+	ansiEscape = regex.AnsiEscapeCompile()
 )
 
 // SetupLogging creates and/or opens the log file
 func SetupLogging(targetDir string) error {
 
 	logFile := &lumberjack.Logger{
-		Filename:   filepath.Join(targetDir, "/tubarr.log"), // Log file path
+		Filename:   filepath.Join(targetDir, "/metarr.log"), // Log file path
 		MaxSize:    1,                                       // Max size in MB before rotation
 		MaxBackups: 3,                                       // Number of backups to retain
 		Compress:   true,                                    // Gzip compression
@@ -2447,164 +3138,18 @@ func SetupLogging(targetDir string) error {
 }
 
 // Write writes error information to the log file
-func Write(tag, infoMsg string, err error, args ...interface{}) {
-
-	if Loggable {
-		mu.Lock()
-		defer mu.Unlock()
-
-		var (
-			errMsg,
-			info string
-		)
-
-		if err != nil {
-			if tag == "" {
-				errMsg = fmt.Sprintf(err.Error()+"\n", args...)
-			} else {
-				errMsg = fmt.Sprintf(tag+err.Error()+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(errMsg))
-
-		} else if infoMsg != "" {
-			if tag == "" {
-				info = fmt.Sprintf(infoMsg+"\n", args...)
-			} else {
-				info = fmt.Sprintf(tag+infoMsg+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(info))
-		}
-	}
-}
-
-// WriteArray writes an array of error information to the log file
-func WriteArray(tag string, infoMsg []string, err []error, args ...interface{}) {
-	if Loggable {
-		mu.Lock()
-		defer mu.Unlock()
-
-		var (
-			errMsg,
-			info string
-		)
-
-		var b strings.Builder
-
-		if len(err) != 0 && err != nil {
-			b.Grow(len(err) * 50)
-			defer b.Reset()
-
-			var errOut string
-			for i, errValue := range err {
-
-				b.WriteString(errValue.Error())
-				if i != len(err)-2 {
-					b.WriteString("; ")
-				}
-			}
-			errOut = b.String()
-
-			if tag == "" {
-				errMsg = fmt.Sprintf(errOut+"\n", args...)
-			} else {
-				errMsg = fmt.Sprintf(tag+errOut+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(errMsg))
-
-			return
+func writeLog(msg string, level int) {
+	// Do not add mutex
+	if Loggable && level < 2 {
+		if !strings.HasPrefix(msg, "\n") {
+			msg += "\n"
 		}
 
-		if len(infoMsg) != 0 && infoMsg != nil {
-			b.Grow(len(infoMsg) * 50)
-			defer b.Reset()
-
-			var infoOut string
-			for i, infoValue := range infoMsg {
-
-				b.WriteString(infoValue)
-				if i != len(infoMsg)-2 {
-					b.WriteString("; ")
-				}
-			}
-			infoOut = b.String()
-
-			if tag == "" {
-				info = fmt.Sprintf(infoOut+"\n", args...)
-			} else {
-				info = fmt.Sprintf(tag+infoOut+"\n", args...)
-			}
-			Logger.Print(stripAnsiCodes(info))
+		if ansiEscape == nil {
+			ansiEscape = regex.AnsiEscapeCompile()
 		}
-	}
-}
 
-// stripAnsiCodes removes ANSI escape codes from a string
-func stripAnsiCodes(input string) string {
-	return ansiEscape.ReplaceAllString(input, "")
-}
-package utils
-
-import (
-	"bufio"
-	"context"
-	"fmt"
-	"os"
-	"strings"
-	logging "tubarr/internal/utils/logging"
-)
-
-var (
-	userInputChan = make(chan string) // Channel for user input
-	decisionMade  bool
-)
-
-// Initialize user input reader in a goroutine
-func InitUserInputReader() {
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			input, _ := reader.ReadString('\n')
-			userInputChan <- strings.TrimSpace(input)
-		}
-	}()
-}
-
-// PromptMetaReplace displays a prompt message and waits for valid user input.
-// The option can be used to tell the program to overwrite all in the queue,
-// preserve all in the queue, or move through value by value
-func PromptMetaReplace(promptMsg, fileName string, overwriteAll, preserveAll *bool) (string, error) {
-
-	logging.D(3, "Entering PromptUser dialogue...")
-	ctx := context.Background()
-
-	if decisionMade {
-		// If overwriteAll, return "Y" without waiting
-		if *overwriteAll {
-
-			logging.D(3, "Overwrite all is set...")
-			return "Y", nil
-		} else if *preserveAll {
-
-			logging.D(3, "Preserve all is set...")
-			return "N", nil
-		}
-	}
-
-	fmt.Println()
-	logging.I(promptMsg)
-
-	// Wait for user input
-	select {
-	case response := <-userInputChan:
-		if response == "Y" {
-			*overwriteAll = true
-		}
-		decisionMade = true
-		return response, nil
-
-	case <-ctx.Done():
-		logging.I("Operation canceled during input.")
-		return "", fmt.Errorf("operation canceled")
+		Logger.Print(ansiEscape.ReplaceAllString(msg, ""))
 	}
 }
 package main
@@ -2612,17 +3157,12 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 	"tubarr/internal/cfg"
-	build "tubarr/internal/command/builder"
-	execute "tubarr/internal/command/execute"
-	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/database"
 	"tubarr/internal/process"
-	browser "tubarr/internal/utils/browser"
-	logging "tubarr/internal/utils/logging"
-
-	"github.com/spf13/viper"
+	"tubarr/internal/repo"
+	"tubarr/internal/utils/logging"
 )
 
 var startTime time.Time
@@ -2634,111 +3174,29 @@ func init() {
 
 // main is the program entrypoint (duh!)
 func main() {
+
+	// Initialize database and channel store
+	db := database.GrabDB()
+	store := repo.InitStores(db)
+
+	// Initialize commands with dependencies
+	cfg.InitCommands(store)
+
+	// Execute root command
 	if err := cfg.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Println()
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if !viper.GetBool("execute") {
-		fmt.Println()
-		return // Exit early if not meant to execute
-	}
-
-	var (
-		vDir, jDir string
-	)
-
-	// Video directory setup
-	if cfg.IsSet(keys.VideoDir) {
-		vDir = cfg.GetString(keys.VideoDir)
-		if !strings.HasSuffix(vDir, "/") {
-			vDir += "/"
-		}
-		// Create directory if it doesn't exist
-		if err := os.MkdirAll(vDir, 0755); err != nil {
-			fmt.Println("Failed to create directory structure:", err)
-			fmt.Println()
+	if cfg.GetBool("check_channels") {
+		if err := process.CheckChannels(store); err != nil {
+			fmt.Fprintf(os.Stderr, "Error checking channels: %v\n", err)
 			os.Exit(1)
 		}
-	} else {
-		fmt.Println("No video directory sent in. Skipping logging")
-	}
-
-	// Json directory setup
-	if cfg.IsSet(keys.JsonDir) {
-		jDir = cfg.GetString(keys.JsonDir)
-		if !strings.HasSuffix(jDir, "/") {
-			jDir += "/"
-		}
-		// Create directory if it doesn't exist
-		if err := os.MkdirAll(jDir, 0755); err != nil {
-			fmt.Println("Failed to create directory structure:", err)
-			fmt.Println()
-			os.Exit(1)
-		}
-	} else {
-		fmt.Println("No video directory sent in. Skipping logging")
-	}
-
-	// Setup logging
-	if vDir != "" {
-		if err := logging.SetupLogging(vDir); err != nil {
-			fmt.Printf("\n\nNotice: Log file was not created\nReason: %s\n\n", err)
-		}
-	} else if jDir != "" {
-		if err := logging.SetupLogging(jDir); err != nil {
-			fmt.Printf("\n\nNotice: Log file was not created\nReason: %s\n\n", err)
-		}
-	} else {
-		fmt.Println("Directory and file strings were entered empty. Exiting...")
-		fmt.Println()
-		os.Exit(1)
-	}
-
-	// Begin processing
-	if err := initProcess(vDir, jDir); err != nil {
-		logging.E(0, err.Error())
-		os.Exit(1)
 	}
 
 	endTime := time.Now()
-	logging.I("tubarr finished at: %v", endTime.Format("2006-01-02 15:04:05.00 MST"))
+	logging.I("metarr finished at: %v", endTime.Format("2006-01-02 15:04:05.00 MST"))
 	logging.I("Time elapsed: %.2f seconds", endTime.Sub(startTime).Seconds())
-}
-
-// process begins the main tubarr program
-func initProcess(vDir, jDir string) error {
-	if !cfg.IsSet(keys.ChannelCheckNew) {
-		return fmt.Errorf("no channels configured to check")
-	}
-
-	requests := browser.GetNewReleases(vDir, jDir)
-
-	if len(requests) == 0 {
-		logging.I("No new requests received from crawl")
-		return nil
-	}
-
-	// Returns DLs that pass checks, should be furnished with JSON directories and paths
-	dls := process.ProcessMetaDownloads(requests)
-
-	dlFiles, err := execute.DownloadVideos(dls)
-	if err != nil {
-		return fmt.Errorf("error downloading new videos: %w", err)
-	}
-
-	if cfg.IsSet(keys.MetarrPreset) && len(dlFiles) > 0 {
-		mcb := build.NewMetarrCommandBuilder()
-		commands, err := mcb.MakeMetarrCommands(dlFiles)
-		if err != nil {
-			return fmt.Errorf("failed to build metarr commands: %w", err)
-		}
-
-		if err := execute.RunMetarr(commands); err != nil {
-			return fmt.Errorf("failed to run metarr commands: %w", err)
-		}
-	}
-
-	return nil
+	fmt.Println()
 }

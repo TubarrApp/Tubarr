@@ -1,13 +1,10 @@
-package utils
+package browser
 
 import (
-	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
-	"tubarr/internal/cfg"
-	keys "tubarr/internal/domain/keys"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
 
@@ -15,56 +12,72 @@ import (
 )
 
 // GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded
-func GetNewReleases(vDir, jDir string) []*models.DLs {
+func GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) ([]*models.Video, error) {
 
 	uniqueURLs := make(map[string]struct{})
-	urlsToCheck := cfg.GetStringSlice(keys.ChannelCheckNew)
 
-	for _, url := range urlsToCheck {
-		if url == "" {
-			continue
+	existingURLs, err := cs.LoadGrabbedURLs(c)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(existingURLs) > 0 {
+		fmt.Println()
+		logging.I("Found existing downloaded video URLs:")
+		count := 1
+		for _, u := range existingURLs {
+			logging.P("Entry %d: %v", count, u)
+			count++
 		}
+		fmt.Println()
+	}
 
-		cookies, err := getBrowserCookies(url)
-		if err != nil {
-			logging.E(0, "Could not get cookies for %s: %v", url, err)
-			continue
-		}
+	if c.URL == "" {
+		return nil, fmt.Errorf("channel url is blank")
+	}
 
-		urls, err := newEpisodeURLs(url, cookies)
-		if err != nil {
-			logging.E(0, "Could not grab episodes from %s: %v", url, err)
-			continue
-		}
+	cookies, err := getBrowserCookies(c.URL)
+	if err != nil {
+		return nil, err
+	}
 
-		// Add unique URLs to map
-		for _, newURL := range urls {
-			if newURL != "" {
-				uniqueURLs[newURL] = struct{}{}
-			}
+	newURLs, err := newEpisodeURLs(c.URL, existingURLs, cookies)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add unique URLs to map
+	for _, newURL := range newURLs {
+		if newURL != "" {
+			uniqueURLs[newURL] = struct{}{}
 		}
 	}
-	// Convert map to slice
-	var newRequests = make([]*models.DLs, 0, len(uniqueURLs))
-	for url := range uniqueURLs {
-		newRequests = append(newRequests, &models.DLs{
-			URL: url,
 
-			VideoDir: vDir,
-			JSONDir:  jDir,
+	// Convert map to slice
+	var newRequests = make([]*models.Video, 0, len(uniqueURLs))
+
+	for url := range uniqueURLs {
+		newRequests = append(newRequests, &models.Video{
+			ChannelID:  c.ID,
+			URL:        url,
+			VDir:       c.VDir,
+			JDir:       c.JDir,
+			Channel:    c,
+			Settings:   c.Settings,
+			MetarrArgs: c.MetarrArgs,
 		})
 	}
 
-	// Log results
+	// Display results
 	if len(newRequests) > 0 {
 		logging.I("Grabbed %d new download requests: %v", len(newRequests), uniqueURLs)
 	}
 
-	return newRequests
+	return newRequests, nil
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) {
+func newEpisodeURLs(targetURL string, existingURLs []string, cookies []*http.Cookie) ([]string, error) {
 
 	c := colly.NewCollector()
 	uniqueEpisodeURLs := make(map[string]struct{})
@@ -138,19 +151,13 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 		episodeURLs = append(episodeURLs, url)
 	}
 
-	// Load existing URLs from grabbed-urls.txt
-	existingURLs, err := loadGrabbedURLsFromFile("grabbed-urls.txt")
-	if err != nil {
-		return nil, fmt.Errorf("error reading grabbed URLs file: %v", err)
-	}
-
 	// Filter out URLs that are already in grabbed-urls.txt
 	var newURLs = make([]string, 0, len(episodeURLs))
 	for _, url := range episodeURLs {
 		normalizedURL := normalizeURL(url)
 		exists := false
 
-		for existingURL := range existingURLs {
+		for _, existingURL := range existingURLs {
 			if normalizeURL(existingURL) == normalizedURL {
 				exists = true
 				break
@@ -165,42 +172,6 @@ func newEpisodeURLs(targetURL string, cookies []*http.Cookie) ([]string, error) 
 		return nil, nil
 	}
 	return newURLs, nil
-}
-
-// loadGrabbedURLsFromFile reads URLs from a file and returns them as a map for quick lookup
-func loadGrabbedURLsFromFile(filename string) (map[string]struct{}, error) {
-
-	var (
-		filepath string
-	)
-
-	videoDir := cfg.GetString(keys.VideoDir)
-
-	switch strings.HasSuffix(videoDir, "/") {
-	case false:
-		filepath = videoDir + "/" + filename
-	default:
-		filepath = videoDir + filename
-	}
-
-	file, err := os.Open(filepath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	urlMap := make(map[string]struct{})
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		url := scanner.Text()
-		urlMap[url] = struct{}{}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return urlMap, nil
 }
 
 // normalizeURL standardizes URLs for comparison by removing protocol and any trailing slashes

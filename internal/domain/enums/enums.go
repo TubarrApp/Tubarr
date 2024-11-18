@@ -1,4 +1,4 @@
-package domain
+package enums
 
 type LineSelectType int
 
