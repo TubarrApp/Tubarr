@@ -33,6 +33,7 @@ func initChannelCmds(s interfaces.Store) *cobra.Command {
 	channelCmd.AddCommand(deleteChannelCmd(cs))
 	channelCmd.AddCommand(listChannelCmd(cs))
 	channelCmd.AddCommand(updateChannelRow(cs))
+	channelCmd.AddCommand(updateChannelSettingsCmd(cs))
 
 	return channelCmd
 }
@@ -283,6 +284,64 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Comm
 	crawlCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
 
 	return crawlCmd
+}
+
+// updateChannelSettingsCmd updates channel settings
+func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		id                        int
+		crawlFreq                 int
+		url, name, key, val       string
+		downloadCmd, downloadArgs string
+	)
+
+	updateSettingsCmd := &cobra.Command{
+		Use:   "update-settings",
+		Short: "Update channel settings",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			switch {
+			case url != "":
+				key = consts.QChanURL
+				val = url
+			case name != "":
+				key = consts.QChanName
+				val = name
+			case id != 0:
+				key = consts.QChanID
+				val = strconv.Itoa(id)
+			default:
+				return fmt.Errorf("please enter either a URL or name")
+			}
+
+			if crawlFreq != 0 {
+				if err := cs.UpdateCrawlFrequency(key, val, crawlFreq); err != nil {
+					return fmt.Errorf("failed to update crawl frequency: %w", err)
+				}
+				logging.S(0, "Updated crawl frequency to %d minutes", crawlFreq)
+			}
+
+			if downloadCmd != "" {
+				if err := cs.UpdateExternalDownloader(key, val, downloadCmd, downloadArgs); err != nil {
+					return fmt.Errorf("failed to update external downloader settings: %w", err)
+				}
+				logging.S(0, "Updated external downloader settings")
+			}
+
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	updateSettingsCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	updateSettingsCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	updateSettingsCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+
+	updateSettingsCmd.Flags().IntVar(&crawlFreq, "crawl-freq", 0, "New crawl frequency in minutes")
+	updateSettingsCmd.Flags().StringVar(&downloadCmd, "downloader", "", "External downloader command")
+	updateSettingsCmd.Flags().StringVar(&downloadArgs, "downloader-args", "", "External downloader arguments")
+
+	return updateSettingsCmd
 }
 
 // updateChannelRow provides a command allowing the alteration of a channel row

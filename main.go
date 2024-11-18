@@ -15,7 +15,7 @@ var startTime time.Time
 
 func init() {
 	startTime = time.Now()
-	logging.I("tubarr started at: %v", startTime.Format("2006-01-02 15:04:05.00 MST"))
+	logging.I("Tubarr started at: %v", startTime.Format("2006-01-02 15:04:05.00 MST"))
 }
 
 // main is the program entrypoint (duh!)

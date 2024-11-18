@@ -245,6 +245,82 @@ func (cs *ChannelStore) ListChannels() (channels []models.Channel, err error, ha
 	return channels, nil, true
 }
 
+// UpdateChannelSettings updates specific settings in the channel's settings JSON
+func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*models.ChannelSettings) error) error {
+	var settingsJSON json.RawMessage
+	query := squirrel.
+		Select(consts.QChanSettings).
+		From(consts.DBChannels).
+		Where(squirrel.Eq{key: val}).
+		RunWith(cs.DB)
+
+	err := query.QueryRow().Scan(&settingsJSON)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no channel found with key '%s' and value '%v'", key, val)
+	} else if err != nil {
+		return fmt.Errorf("failed to get channel settings: %w", err)
+	}
+
+	// Unmarshal current settings
+	var settings models.ChannelSettings
+	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
+		return fmt.Errorf("failed to unmarshal settings: %w", err)
+	}
+
+	// Apply the update
+	if err := updateFn(&settings); err != nil {
+		return fmt.Errorf("failed to update settings: %w", err)
+	}
+
+	// Marshal updated settings
+	updatedJSON, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated settings: %w", err)
+	}
+
+	// Update in database
+	updateQuery := squirrel.
+		Update(consts.DBChannels).
+		Set(consts.QChanSettings, updatedJSON).
+		Set(consts.QChanUpdatedAt, time.Now()).
+		Where(squirrel.Eq{key: val}).
+		RunWith(cs.DB)
+
+	result, err := updateQuery.Exec()
+	if err != nil {
+		return fmt.Errorf("failed to update channel settings: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("no channel found with key '%s' and value '%v'", key, val)
+	}
+
+	logging.S(1, "Updated settings for channel with key '%s' and value '%v'", key, val)
+	return nil
+}
+
+// UpdateCrawlFrequency updates the crawl frequency for a channel
+func (cs ChannelStore) UpdateCrawlFrequency(key, val string, newFreq int) error {
+	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
+		s.CrawlFreq = newFreq
+		return nil
+	})
+}
+
+// UpdateExternalDownloader updates the external downloader settings
+func (cs ChannelStore) UpdateExternalDownloader(key, val string, downloader, args string) error {
+	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
+		s.ExternalDownloader = downloader
+		s.ExternalDownloaderArgs = args
+		return nil
+	})
+}
+
 // UpdateChannelRow updates a single element in the database
 func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
 	if key == "" {

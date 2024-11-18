@@ -18,6 +18,9 @@ type ChannelStore interface {
 	LoadGrabbedURLs(c *models.Channel) (urls []string, err error)
 	UpdateChannelRow(key, val, col, newVal string) error
 	UpdateLastScan(channelID int64) error
+	UpdateChannelSettings(key, val string, updateFn func(*models.ChannelSettings) error) error
+	UpdateCrawlFrequency(key, val string, newFreq int) error
+	UpdateExternalDownloader(key, val string, downloader, args string) error
 	GetDB() *sql.DB
 }
 
