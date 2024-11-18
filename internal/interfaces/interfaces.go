@@ -16,6 +16,7 @@ type ChannelStore interface {
 	DeleteChannel(key, val string) error
 	ListChannels() (channels []models.Channel, err error, hasRows bool)
 	LoadGrabbedURLs(c *models.Channel) (urls []string, err error)
+	UpdateChannelRow(key, val, col, newVal string) error
 	UpdateLastScan(channelID int64) error
 	GetDB() *sql.DB
 }

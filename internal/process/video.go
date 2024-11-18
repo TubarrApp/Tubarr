@@ -2,6 +2,7 @@ package process
 
 import (
 	"fmt"
+	"os/exec"
 	"time"
 	"tubarr/internal/command"
 	"tubarr/internal/interfaces"
@@ -18,13 +19,16 @@ func processVideo(v *models.Video, vs interfaces.VideoStore) error {
 
 	logging.D(2, "Processing download for URL: %s", v.URL)
 
-	vcb := command.NewVideoDLRequest(v)
-	cmd, err := vcb.VideoFetchCommand()
-	if err != nil {
-		return err
+	cmdTemplate := func() (*exec.Cmd, error) {
+		vcb := command.NewVideoDLRequest(v)
+		cmd, err := vcb.VideoFetchCommand()
+		if err != nil {
+			return nil, err
+		}
+		return cmd, nil
 	}
 
-	success, err := command.ExecuteVideoDownload(v, cmd)
+	success, err := command.ExecuteVideoDownload(v, cmdTemplate, 3)
 	if err != nil {
 		return err
 	}

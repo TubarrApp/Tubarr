@@ -32,6 +32,7 @@ func initChannelCmds(s interfaces.Store) *cobra.Command {
 	channelCmd.AddCommand(crawlChannelCmd(cs, s))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
 	channelCmd.AddCommand(listChannelCmd(cs))
+	channelCmd.AddCommand(updateChannelRow(cs))
 
 	return channelCmd
 }
@@ -284,7 +285,70 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Comm
 	return crawlCmd
 }
 
+// updateChannelRow provides a command allowing the alteration of a channel row
+func updateChannelRow(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		col, newVal, url, name string
+		id                     int
+
+		key, val string
+	)
+
+	updateRowCmd := &cobra.Command{
+		Use:   "update",
+		Short: "Update a channel column",
+		Long:  "Enter a column to update and a value to update that column to",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			switch {
+			case url != "":
+				key = consts.QChanURL
+				val = url
+			case name != "":
+				key = consts.QChanName
+				val = name
+			case id != 0:
+				key = consts.QChanID
+				val = strconv.Itoa(id)
+			default:
+				return fmt.Errorf("please enter either a URL or name")
+			}
+
+			if err := verifyChanRowUpdateValid(col, newVal); err != nil {
+				return err
+			}
+			if err := cs.UpdateChannelRow(key, val, col, newVal); err != nil {
+				return err
+			}
+			logging.S(0, "Updated channel column '%s' to value '%s'", col, newVal)
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	updateRowCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	updateRowCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	updateRowCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+
+	updateRowCmd.Flags().StringVarP(&col, "column-name", "c", "", "The name of the column in the table (e.g. video_directory)")
+	updateRowCmd.Flags().StringVarP(&newVal, "value", "v", "", "The value to set in the column (e.g. /my-directory)")
+	return updateRowCmd
+}
+
 // Private //////////////////////////////////////////////////////////////////////////////////////////
+
+// verifyChanRowUpdateValid verifies that your update operation is valid
+func verifyChanRowUpdateValid(col, val string) error {
+	switch col {
+	case "url", "name", "video_directory", "json_directory":
+		if val == "" {
+			return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
+		}
+	default:
+		return fmt.Errorf("cannot set a custom value for internal DB elements")
+	}
+	return nil
+}
 
 // verifyChannelOps verifies that the user inputted filters are valid
 func verifyChannelOps(ops []string) ([]models.DLFilters, error) {

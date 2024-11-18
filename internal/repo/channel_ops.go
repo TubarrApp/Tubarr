@@ -245,6 +245,28 @@ func (cs *ChannelStore) ListChannels() (channels []models.Channel, err error, ha
 	return channels, nil, true
 }
 
+// UpdateChannelRow updates a single element in the database
+func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
+	if key == "" {
+		return fmt.Errorf("please do not enter the key and value blank")
+	}
+
+	if !cs.channelExists(key, val) {
+		return fmt.Errorf("channel with key '%s' and value '%s' does not exist", key, val)
+	}
+
+	query := squirrel.
+		Update(consts.DBChannels).
+		Where(squirrel.Eq{key: val}).
+		Set(col, newVal).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // UpdateLastScan updates the DB entry for when the channel was last scanned
 func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	query := squirrel.
