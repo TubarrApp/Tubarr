@@ -35,7 +35,7 @@ func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	switch key {
 	case "url", "name", "id":
 		if val == "" {
-			return 0, fmt.Errorf("please enter a value for key '%s'", key)
+			return 0, fmt.Errorf("please enter a value for key %q", key)
 		}
 	default:
 		return 0, fmt.Errorf("please input a unique constrained value, such as URL or name")
@@ -69,7 +69,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
-	logging.S(0, "Added URL '%s' to ignore list for channel with ID '%d'", ignoreURL, channelID)
+	logging.S(0, "Added URL %q to ignore list for channel with ID '%d'", ignoreURL, channelID)
 	return nil
 }
 
@@ -140,7 +140,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	if cs.channelExists(consts.QChanURL, c.URL) {
-		return 0, fmt.Errorf("channel with URL '%s' already exists", c.URL)
+		return 0, fmt.Errorf("channel with URL %q already exists", c.URL)
 	}
 
 	// JSON dir
@@ -204,7 +204,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 // DeleteChannel deletes a channel from the database with a given key/value
 func (cs *ChannelStore) DeleteChannel(key, val string) error {
 	if !cs.channelExists(key, val) {
-		return fmt.Errorf("channel with key '%s' and value '%s' does not exist", key, val)
+		return fmt.Errorf("channel with key %q and value %q does not exist", key, val)
 	}
 
 	query := squirrel.
@@ -282,7 +282,6 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store) 
 // CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded
 func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store) error {
 	var (
-		c                    models.Channel
 		settings, metarrJSON json.RawMessage
 	)
 
@@ -302,6 +301,7 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store) error 
 		From(consts.DBChannels).
 		Where(squirrel.Eq{key: val})
 
+	var c models.Channel
 	if err := query.
 		RunWith(cs.DB).
 		QueryRow().
@@ -333,11 +333,11 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store) error 
 	}
 
 	logging.D(1, "Retrieved channel with Metarr args: %+v", c.MetarrArgs)
-	return process.ChannelCrawl(s, c)
+	return process.ChannelCrawl(s, &c)
 }
 
 // ListChannels lists all channels in the database
-func (cs *ChannelStore) ListChannels() (channels []models.Channel, err error, hasRows bool) {
+func (cs *ChannelStore) ListChannels() (channels []*models.Channel, err error, hasRows bool) {
 	query := squirrel.
 		Select(
 			consts.QChanID,
@@ -395,8 +395,7 @@ func (cs *ChannelStore) ListChannels() (channels []models.Channel, err error, ha
 				return nil, fmt.Errorf("failed to unmarshal metarr settings: %w", err), true
 			}
 		}
-
-		channels = append(channels, c)
+		channels = append(channels, &c)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -417,7 +416,7 @@ func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*mod
 
 	err := query.QueryRow().Scan(&settingsJSON)
 	if err == sql.ErrNoRows {
-		return fmt.Errorf("no channel found with key '%s' and value '%v'", key, val)
+		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
 		return fmt.Errorf("failed to get channel settings: %w", err)
 	}
@@ -458,10 +457,10 @@ func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*mod
 	}
 
 	if rows == 0 {
-		return fmt.Errorf("no channel found with key '%s' and value '%v'", key, val)
+		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	}
 
-	logging.S(1, "Updated settings for channel with key '%s' and value '%v'", key, val)
+	logging.S(1, "Updated settings for channel with key %q and value '%v'", key, val)
 	return nil
 }
 
@@ -474,7 +473,7 @@ func (cs ChannelStore) UpdateCrawlFrequency(key, val string, newFreq int) error 
 }
 
 // UpdateExternalDownloader updates the external downloader settings
-func (cs ChannelStore) UpdateExternalDownloader(key, val string, downloader, args string) error {
+func (cs ChannelStore) UpdateExternalDownloader(key, val, downloader, args string) error {
 	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
 		s.ExternalDownloader = downloader
 		s.ExternalDownloaderArgs = args
@@ -489,7 +488,7 @@ func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
 	}
 
 	if !cs.channelExists(key, val) {
-		return fmt.Errorf("channel with key '%s' and value '%s' does not exist", key, val)
+		return fmt.Errorf("channel with key %q and value %q does not exist", key, val)
 	}
 
 	query := squirrel.

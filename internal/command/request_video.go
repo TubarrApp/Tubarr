@@ -43,10 +43,9 @@ func (vf *VideoDLRequest) VideoFetchCommand() (*exec.Cmd, error) {
 	}
 
 	var args []string
-	args = append(args, "--restrict-filenames", "-o", filepath.Join(v.VDir, "%(title)s.%(ext)s"))
 
-	// Add retries and timeouts
-	args = append(args,
+	args = append(args, "--restrict-filenames",
+		"-o", filepath.Join(v.VDir, "%(title)s.%(ext)s"),
 		"--retries", "5",
 		"--fragment-retries", "10",
 		"--socket-timeout", "30",
@@ -75,13 +74,13 @@ func (vf *VideoDLRequest) VideoFetchCommand() (*exec.Cmd, error) {
 		}
 	}
 
-	args = append(args, "--sleep-requests", "1") // Add delay between requests
-	args = append(args, v.URL)
+	args = append(args, "--sleep-requests", "1",
+		v.URL) // Add delay between requests
 
 	logging.D(1, "Built argument list: %v", args)
 	cmd := exec.Command("yt-dlp", args...)
 
-	logging.D(1, "Created download command for URL '%s', command: %s", v.URL, cmd)
+	logging.D(1, "Created download command for URL %q, command: %s", v.URL, cmd)
 
 	return cmd, nil
 }

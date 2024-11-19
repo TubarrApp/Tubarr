@@ -23,10 +23,10 @@ var (
 func SetupLogging(targetDir string) error {
 
 	logFile := &lumberjack.Logger{
-		Filename:   filepath.Join(targetDir, "/metarr.log"), // Log file path
-		MaxSize:    1,                                       // Max size in MB before rotation
-		MaxBackups: 3,                                       // Number of backups to retain
-		Compress:   true,                                    // Gzip compression
+		Filename:   filepath.Join(targetDir, "tubarr.log"), // Log file path
+		MaxSize:    1,                                      // Max size in MB before rotation
+		MaxBackups: 3,                                      // Number of backups to retain
+		Compress:   true,                                   // Gzip compression
 	}
 
 	// Assign lumberjack logger to standard log output

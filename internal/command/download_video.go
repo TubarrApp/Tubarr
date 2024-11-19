@@ -22,7 +22,7 @@ func ExecuteVideoDownload(v *models.Video, cmdTemplate func() (*exec.Cmd, error)
 	}
 
 	if cmdTemplate == nil {
-		return false, fmt.Errorf("command template function is nil for model with URL '%s'", v.URL)
+		return false, fmt.Errorf("command template function is nil for model with URL %q", v.URL)
 	}
 
 	var lastError error

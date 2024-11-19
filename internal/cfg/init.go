@@ -53,14 +53,14 @@ func verify() error {
 	if viper.IsSet(keys.OutputFiletype) {
 		ext := viper.GetString(keys.OutputFiletype)
 		if !verifyOutputFiletype(ext) {
-			return fmt.Errorf("invalid output filetype '%s'", ext)
+			return fmt.Errorf("invalid output filetype %q", ext)
 		}
 	}
 
 	if viper.IsSet(keys.MetaPurge) {
 		purge := viper.GetString(keys.MetaPurge)
 		if !verifyPurgeMetafiles(purge) {
-			return fmt.Errorf("invalid meta purge type '%s'", purge)
+			return fmt.Errorf("invalid meta purge type %q", purge)
 		}
 	}
 

@@ -26,8 +26,8 @@ func initializeCookies() {
 }
 
 // GetBrowserCookies retrieves cookies for a given URL, using a specified cookie file if provided.
-func getBrowserCookies(url string) ([]*http.Cookie, error) {
-	baseURL, err := extractBaseDomain(url)
+func getBrowserCookies(u string) ([]*http.Cookie, error) {
+	baseURL, err := extractBaseDomain(u)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract base domain: %v", err)
 	}
@@ -62,9 +62,9 @@ func getBrowserCookies(url string) ([]*http.Cookie, error) {
 	logging.I("Attempted to read cookies from the following browsers: %v", keysFromMap(attemptedBrowsers))
 
 	if len(allCookies) == 0 {
-		logging.I("No cookies found for '%s', proceeding without cookies", url)
+		logging.I("No cookies found for %q, proceeding without cookies", u)
 	} else {
-		logging.I("Found a total of %d cookies for '%s'", len(allCookies), url)
+		logging.I("Found a total of %d cookies for %q", len(allCookies), u)
 	}
 
 	return allCookies, nil

@@ -23,10 +23,11 @@ func NewMetaDLRequest(videos *models.Video) *MetaDLRequest {
 func (mdl *MetaDLRequest) RequestMetaCommand() *exec.Cmd {
 	v := mdl.Videos
 	var buildArgs []string
-	buildArgs = append(buildArgs, "--skip-download", "--write-info-json", "-P", v.JDir)
 
-	// Add retries and timeouts
 	buildArgs = append(buildArgs,
+		"--skip-download",
+		"--write-info-json",
+		"-P", v.JDir,
 		"--retries", "5", // Number of retries for the entire download
 		"--fragment-retries", "10", // Number of retries for each fragment
 		"--socket-timeout", "30", // Socket timeout in seconds
@@ -53,11 +54,11 @@ func (mdl *MetaDLRequest) RequestMetaCommand() *exec.Cmd {
 		buildArgs = append(buildArgs, "--external-downloader-args", dlArgs)
 	}
 
-	buildArgs = append(buildArgs, "--restrict-filenames", "-o", "%(title)s.%(ext)s")
-	buildArgs = append(buildArgs, v.URL)
+	buildArgs = append(buildArgs, "--restrict-filenames", "-o", "%(title)s.%(ext)s",
+		v.URL)
 
 	cmd := exec.Command("yt-dlp", buildArgs...)
-	logging.D(3, "Built metadata command for URL '%s':\n%v", v.URL, cmd.String())
+	logging.D(3, "Built metadata command for URL %q:\n%v", v.URL, cmd.String())
 
 	return cmd
 }

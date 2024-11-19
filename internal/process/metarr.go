@@ -17,6 +17,6 @@ func InitMetarr(v *models.Video) error {
 	if err := command.RunMetarr(cmd); err != nil {
 		return err
 	}
-	logging.S(1, "Finished Metarr command for '%s'", v.VPath)
+	logging.S(1, "Finished Metarr command for %q", v.VPath)
 	return nil
 }

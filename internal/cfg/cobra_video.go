@@ -44,7 +44,7 @@ func deleteVideoCmd(vs interfaces.VideoStore) *cobra.Command {
 			if err := vs.DeleteVideo(consts.QVidURL, url); err != nil {
 				return err
 			}
-			logging.S(0, "Successfully deleted video with URL '%s'", url)
+			logging.S(0, "Successfully deleted video with URL %q", url)
 			return nil
 		},
 	}

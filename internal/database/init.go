@@ -24,7 +24,7 @@ func init() {
 	}
 
 	dir = filepath.Join(dir, tDir)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		log.Fatalf("failed to make directories: %v", err)
 	}
 
@@ -32,7 +32,7 @@ func init() {
 
 	db, err = sql.Open("sqlite3", path)
 	if err != nil {
-		log.Fatalf("failed to open database at path '%s': %v", path, err)
+		log.Fatalf("failed to open database at path %q: %v", path, err)
 	}
 
 	if err := initTables(db); err != nil {

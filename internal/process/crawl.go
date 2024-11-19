@@ -59,7 +59,7 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel) error {
 				logging.E(0, err.Error())
 			}
 
-			logging.S(0, "Added URL '%s' to ignore list.", v.URL)
+			logging.S(0, "Added URL %q to ignore list.", v.URL)
 			count++
 		}
 	}
@@ -69,7 +69,7 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel) error {
 // CheckChannels checks channels and whether they are due for a crawl
 func CheckChannels(s interfaces.Store) error {
 	cs := s.GetChannelStore()
-	channels, err, hasRows := cs.ListChannels()
+	chans, err, hasRows := cs.ListChannels()
 	if !hasRows {
 		logging.I("No channels in database")
 	} else if err != nil {
@@ -86,17 +86,17 @@ func CheckChannels(s interfaces.Store) error {
 	}
 
 	sem := make(chan struct{}, conc)
-	errChan := make(chan error, len(channels))
+	errChan := make(chan error, len(chans))
 
-	for _, channel := range channels {
+	for i := range chans {
 
-		timeSinceLastScan := time.Since(channel.LastScan)
-		crawlFreqDuration := time.Duration(channel.Settings.CrawlFreq) * time.Minute
+		timeSinceLastScan := time.Since(chans[i].LastScan)
+		crawlFreqDuration := time.Duration(chans[i].Settings.CrawlFreq) * time.Minute
 
-		logging.I("Time since last check for channel '%s': %s\nCrawl frequency: %d minutes",
-			channel.Name,
+		logging.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
+			chans[i].Name,
 			timeSinceLastScan.Round(time.Second),
-			channel.Settings.CrawlFreq)
+			chans[i].Settings.CrawlFreq)
 
 		if timeSinceLastScan < crawlFreqDuration {
 			remainingTime := crawlFreqDuration - timeSinceLastScan
@@ -105,7 +105,7 @@ func CheckChannels(s interfaces.Store) error {
 		}
 
 		wg.Add(1)
-		go func(c models.Channel) {
+		go func(c *models.Channel) {
 			defer wg.Done()
 
 			sem <- struct{}{}
@@ -116,7 +116,7 @@ func CheckChannels(s interfaces.Store) error {
 			if err := ChannelCrawl(s, c); err != nil {
 				errChan <- err
 			}
-		}(channel)
+		}(chans[i])
 	}
 
 	wg.Wait()
@@ -135,7 +135,7 @@ func CheckChannels(s interfaces.Store) error {
 }
 
 // ChannelCrawl crawls a channel for new URLs
-func ChannelCrawl(s interfaces.Store, c models.Channel) error {
+func ChannelCrawl(s interfaces.Store, c *models.Channel) error {
 	logging.I("Initiating crawl for URL %s...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
 		c.URL, c.VDir, c.JDir, c.Settings.Filters, c.Settings.CookieSource)
 
@@ -148,13 +148,13 @@ func ChannelCrawl(s interfaces.Store, c models.Channel) error {
 
 	cs := s.GetChannelStore()
 
-	videos, err := browser.GetNewReleases(cs, &c)
+	videos, err := browser.GetNewReleases(cs, c)
 	if err != nil {
 		return err
 	}
 
 	if len(videos) == 0 {
-		logging.I("No new releases for channel '%s'", c.URL)
+		logging.I("No new releases for channel %q", c.URL)
 	} else {
 		if err := InitProcess(s.GetVideoStore(), c, videos); err != nil {
 			return err
@@ -171,11 +171,11 @@ func ChannelCrawl(s interfaces.Store, c models.Channel) error {
 		if err != sql.ErrNoRows {
 			return err
 		}
-		logging.D(1, "No notification URL for channel with name '%s' and ID: %d", c.Name, c.ID)
+		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
 	}
 
 	if len(notifyURLs) > 0 {
-		if errs := notify(&c, notifyURLs); len(errs) != 0 {
+		if errs := notify(c, notifyURLs); len(errs) != 0 {
 			var b strings.Builder
 			totalLength := 0
 			for _, err := range errs {
@@ -197,7 +197,7 @@ func ChannelCrawl(s interfaces.Store, c models.Channel) error {
 }
 
 // InitProcess begins the process for processing metadata/videos and respective downloads
-func InitProcess(vs interfaces.VideoStore, c models.Channel, videos []*models.Video) error {
+func InitProcess(vs interfaces.VideoStore, c *models.Channel, videos []*models.Video) error {
 	var (
 		wg      sync.WaitGroup
 		errChan = make(chan error, len(videos))
@@ -227,7 +227,7 @@ func InitProcess(vs interfaces.VideoStore, c models.Channel, videos []*models.Vi
 
 			if logging.Level > 1 {
 				fmt.Println()
-				logging.I("Got requests for '%s'", v.URL)
+				logging.I("Got requests for %q", v.URL)
 				logging.P("Channel ID=%d", v.ChannelID)
 				logging.P("Uploaded=%s", v.UploadDate)
 			}
@@ -271,13 +271,13 @@ func notify(c *models.Channel, notifyURLs []string) (errs []error) {
 	notifyFunc := func(client *http.Client, notifyURL string) error {
 		resp, err := client.Post(notifyURL, "application/json", nil)
 		if err != nil {
-			return fmt.Errorf("failed to send notification to URL '%s' for channel '%s' (ID: %d): %w",
+			return fmt.Errorf("failed to send notification to URL %q for channel %q (ID: %d): %w",
 				notifyURL, c.Name, c.ID, err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode >= 400 {
-			return fmt.Errorf("notification failed with status %d for channel '%s' (ID: %d)", resp.StatusCode, c.Name, c.ID)
+			return fmt.Errorf("notification failed with status %d for channel %q (ID: %d)", resp.StatusCode, c.Name, c.ID)
 		}
 		return nil
 	}
@@ -286,7 +286,7 @@ func notify(c *models.Channel, notifyURLs []string) (errs []error) {
 	for _, notifyURL := range notifyURLs {
 		parsed, err := url.Parse(notifyURL)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("invalid notification URL '%s': %v", notifyURL, err))
+			errs = append(errs, fmt.Errorf("invalid notification URL %q: %v", notifyURL, err))
 			continue
 		}
 
@@ -296,10 +296,10 @@ func notify(c *models.Channel, notifyURLs []string) (errs []error) {
 		}
 
 		if err := notifyFunc(client, notifyURL); err != nil {
-			errs = append(errs, fmt.Errorf("failed to notify URL '%s': %v", notifyURL, err))
+			errs = append(errs, fmt.Errorf("failed to notify URL %q: %v", notifyURL, err))
 			continue
 		}
-		logging.S(1, "Successfully notified URL '%s' for channel '%s'", notifyURL, c.Name)
+		logging.S(1, "Successfully notified URL %q for channel %q", notifyURL, c.Name)
 	}
 	return errs
 }

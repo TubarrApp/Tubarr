@@ -28,28 +28,29 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 			case "append", "copy-to", "paste-from", "prefix", "trim-prefix", "trim-suffix", "replace", "set":
 				valid = append(valid, m)
 			default:
-				return nil, fmt.Errorf("invalid meta operation '%s'", split[1])
+				return nil, fmt.Errorf("invalid meta operation %q", split[1])
 			}
 		case 4:
-			switch split[1] {
-			case "date-tag":
-				if split[2] == "prefix" || split[2] == "suffix" {
+			if split[1] == "date-tag" {
+				switch split[2] {
+				case "prefix", "suffix":
 					if dateFormat(split[3]) {
 						valid = append(valid, m)
 					}
-				} else {
-					return nil, fmt.Errorf("invalid date tag location '%s', use prefix or suffix", split[2])
+				default:
+					return nil, fmt.Errorf("invalid date tag location %q, use prefix or suffix", split[2])
 				}
 			}
 		default:
-			return nil, fmt.Errorf("invalid meta op '%s'", m)
+			return nil, fmt.Errorf("invalid meta op %q", m)
 		}
 	}
+
 	if len(valid) != 0 {
 		return valid, nil
-	} else {
-		return nil, fmt.Errorf("no valid meta operations")
 	}
+
+	return nil, fmt.Errorf("no valid meta operations")
 }
 
 // validateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid
@@ -89,6 +90,6 @@ func dateFormat(dateFmt string) bool {
 			return true
 		}
 	}
-	logging.E(0, "Invalid date format entered as '%s', please enter up to three characters (where 'Y' is yyyy and 'y' is yy)")
+	logging.E(0, "Invalid date format entered as %q, please enter up to three characters (where 'Y' is yyyy and 'y' is yy)")
 	return false
 }

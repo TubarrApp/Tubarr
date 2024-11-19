@@ -12,7 +12,7 @@ func waitForFile(filePath string, timeout time.Duration) error {
 	for time.Now().Before(deadline) {
 
 		_, err := os.Stat(filePath)
-		if err == nil {
+		if err == nil { // If error IS nil
 			return nil
 		} else if !os.IsNotExist(err) {
 			return fmt.Errorf("unexpected error while checking file: %v", err)

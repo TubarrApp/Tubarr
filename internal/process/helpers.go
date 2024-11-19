@@ -63,11 +63,11 @@ func validateAndStoreJSON(v *models.Video) (valid bool, err error) {
 
 		// Extract upload date if available
 		if uploadDate, ok := m["upload_date"].(string); ok {
-			if t, err := time.Parse("20060102", uploadDate); err == nil {
+			if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
 				v.UploadDate = t
 				logging.D(2, "Extracted upload date: %s", t.Format("2006-01-02"))
 			} else {
-				logging.D(2, "Failed to parse upload date '%s': %v", uploadDate, err)
+				logging.D(2, "Failed to parse upload date %q: %v", uploadDate, err)
 			}
 		}
 
@@ -96,7 +96,7 @@ func validateAndStoreJSON(v *models.Video) (valid bool, err error) {
 func filterRequests(v *models.Video) (valid bool, err error) {
 	// Check if filters are set and validate if so
 	if len(v.Settings.Filters) == 0 {
-		logging.D(2, "No filters to check for '%s'", v.URL)
+		logging.D(2, "No filters to check for %q", v.URL)
 		return true, nil
 	}
 
@@ -109,14 +109,14 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				switch filter.Type {
 				case consts.FilterContains:
 
-					logging.I("Filtering: Field '%s' not found in metadata for URL '%s' and filter is set to require it, filtering out", filter.Field, v.URL)
+					logging.I("Filtering: Field %q not found in metadata for URL %q and filter is set to require it, filtering out", filter.Field, v.URL)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
 						logging.E(0, err.Error())
 					}
 					return false, nil
 
 				case consts.FilterOmit:
-					logging.D(2, "Passed check: Field '%s' does not exist", filter.Field)
+					logging.D(2, "Passed check: Field %q does not exist", filter.Field)
 					continue
 				}
 			}
@@ -124,14 +124,14 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				switch filter.Type {
 				case consts.FilterOmit:
 
-					logging.I("Filtering: Field '%s' found in metadata for URL '%s' and filter is set to omit it, filtering out", filter.Field, v.URL)
+					logging.I("Filtering: Field %q found in metadata for URL %q and filter is set to omit it, filtering out", filter.Field, v.URL)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
 						logging.E(0, err.Error())
 					}
 					return false, nil
 
 				case consts.FilterContains:
-					logging.D(2, "Passed check: Field '%s' exists", filter.Field)
+					logging.D(2, "Passed check: Field %q exists", filter.Field)
 					continue
 				}
 			}
@@ -154,7 +154,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 			case consts.FilterOmit:
 				if strings.Contains(lowerStrVal, lowerFilterVal) {
 
-					logging.D(1, "Filtering out video '%s' which contains '%s' in field '%s'", v.URL, filter.Value, filter.Field)
+					logging.D(1, "Filtering out video %q which contains %q in field %q", v.URL, filter.Value, filter.Field)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
 						logging.E(0, err.Error())
 					}
@@ -164,7 +164,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 			case consts.FilterContains:
 				if !strings.Contains(lowerStrVal, lowerFilterVal) {
 
-					logging.D(1, "Filtering out video '%s' which does not contain '%s' in field '%s'", v.URL, filter.Value, filter.Field)
+					logging.D(1, "Filtering out video %q which does not contain %q in field %q", v.URL, filter.Value, filter.Field)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
 						logging.E(0, err.Error())
 					}
@@ -177,7 +177,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 			}
 		}
 	}
-	logging.D(1, "Video '%s' passed filter checks", v.URL)
+	logging.D(1, "Video %q passed filter checks", v.URL)
 	return true, nil
 }
 
@@ -194,15 +194,15 @@ func removeUnwantedJSON(path string) error {
 
 	switch {
 	case check.IsDir():
-		return fmt.Errorf("JSON path sent in as a directory '%s', not deleting", path)
+		return fmt.Errorf("JSON path sent in as a directory %q, not deleting", path)
 	case !check.Mode().IsRegular():
-		return fmt.Errorf("JSON file '%s' is not a regular file, not deleting", path)
+		return fmt.Errorf("JSON file %q is not a regular file, not deleting", path)
 	}
 
 	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("failed to remove unwanted JSON file '%s' due to error %w", path, err)
+		return fmt.Errorf("failed to remove unwanted JSON file %q due to error %w", path, err)
 	} else {
-		logging.S(0, "Removed unwanted JSON file '%s'", path)
+		logging.S(0, "Removed unwanted JSON file %q", path)
 	}
 
 	return nil

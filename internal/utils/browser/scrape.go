@@ -54,7 +54,7 @@ func GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) ([]*models.Vi
 	}
 
 	// Convert map to slice
-	var newRequests = make([]*models.Video, 0, len(uniqueURLs))
+	newRequests := make([]*models.Video, 0, len(uniqueURLs))
 
 	for url := range uniqueURLs {
 		newRequests = append(newRequests, &models.Video{

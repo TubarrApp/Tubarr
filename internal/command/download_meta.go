@@ -46,6 +46,6 @@ func ExecuteMetaDownload(v *models.Video, cmd *exec.Cmd) error {
 		return fmt.Errorf("JSON file not found at %s: %v", v.JPath, err)
 	}
 
-	logging.I("Successfully saved JSON file to '%s'", v.JPath)
+	logging.I("Successfully saved JSON file to %q", v.JPath)
 	return nil
 }

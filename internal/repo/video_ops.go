@@ -38,7 +38,7 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	}
 
 	if vs.videoExists(consts.QVidURL, v.URL) {
-		logging.D(2, "Video with URL '%s' already exists, skipping", v.URL)
+		logging.D(2, "Video with URL %q already exists, skipping", v.URL)
 		return 0, nil // Return gracefully instead of error
 	}
 
@@ -176,7 +176,7 @@ func (vs VideoStore) DeleteVideo(key, val string) error {
 
 	if _, err := query.Exec(); err != nil {
 		if err == sql.ErrNoRows {
-			fmt.Printf("No video exists with key '%s' and value '%s'", key, val)
+			fmt.Printf("No video exists with key %q and value %q", key, val)
 		} else {
 			return err
 		}

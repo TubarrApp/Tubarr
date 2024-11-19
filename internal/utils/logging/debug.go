@@ -4,11 +4,29 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 
 	"github.com/spf13/viper"
+)
+
+const (
+	tagBaseLen = 1 + // "["
+		len(consts.ColorBlue) +
+		9 + // "Function: "
+		len(consts.ColorReset) +
+		3 + // " - "
+		len(consts.ColorBlue) +
+		5 + // "File: "
+		len(consts.ColorReset) +
+		3 + // " : "
+		len(consts.ColorBlue) +
+		5 + // "Line: "
+		len(consts.ColorReset) +
+		2 // "]\n"
 )
 
 var (
@@ -17,79 +35,138 @@ var (
 )
 
 func E(l int, format string, args ...interface{}) string {
+	if Level < 0 {
+		Level = viper.GetInt(keys.DebugLevel)
+	}
+
+	if l < Level {
+		return ""
+	}
 
 	mu.Lock()
 	defer mu.Unlock()
-	var msg string
 
 	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
-	tag := fmt.Sprintf("["+consts.ColorBlue+"Function:"+consts.ColorReset+" %s - "+consts.ColorBlue+"File:"+consts.ColorReset+" %s : "+consts.ColorBlue+"Line:"+consts.ColorReset+" %d] ", funcName, file, line)
 
-	if Level < 0 {
-		Level = viper.GetInt(keys.DebugLevel)
-	}
-	if l <= viper.GetInt(keys.DebugLevel) {
+	var b strings.Builder
+	b.Grow(len(consts.RedError) + tagBaseLen + len(format) + (len(args) * 32))
 
-		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.RedError+format+" "+tag+"\n", args...)
-		} else {
-			msg = fmt.Sprintf(consts.RedError + format + " " + tag + "\n")
-		}
-		fmt.Print(msg)
-		writeLog(msg, l)
+	b.WriteString(consts.RedError)
+
+	// Write formatted message
+	if len(args) != 0 && args != nil {
+		fmt.Fprintf(&b, format, args...)
+	} else {
+		b.WriteString(format)
 	}
+
+	b.WriteRune('[')
+	b.WriteString(consts.ColorBlue)
+	b.WriteString("Function: ")
+	b.WriteString(consts.ColorReset)
+	b.WriteString(funcName)
+	b.WriteString(" - ")
+	b.WriteString(consts.ColorBlue)
+	b.WriteString("File: ")
+	b.WriteString(consts.ColorReset)
+	b.WriteString(file)
+	b.WriteString(" : ")
+	b.WriteString(consts.ColorBlue)
+	b.WriteString("Line: ")
+	b.WriteString(consts.ColorReset)
+	b.WriteString(strconv.Itoa(line))
+	b.WriteString("]\n")
+
+	msg := b.String()
+
+	fmt.Print(msg)
+	writeLog(msg, l)
 
 	return msg
 }
 
 func S(l int, format string, args ...interface{}) string {
-
-	mu.Lock()
-	defer mu.Unlock()
-	var msg string
-
 	if Level < 0 {
 		Level = viper.GetInt(keys.DebugLevel)
 	}
-	if l <= viper.GetInt(keys.DebugLevel) {
 
-		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.GreenSuccess+format+" \n", args...)
-		} else {
-			msg = fmt.Sprintf(consts.GreenSuccess + format + " \n")
-		}
-		fmt.Print(msg)
-		writeLog(msg, l)
+	if l < Level {
+		return ""
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	var b strings.Builder
+	b.Grow(len(consts.GreenSuccess) + len(format) + len(consts.ColorReset) + len(" \n") + (len(args) * 32))
+	b.WriteString(consts.GreenSuccess)
+
+	// Write formatted message
+	if len(args) != 0 && args != nil {
+		fmt.Fprintf(&b, format, args...)
+	} else {
+		b.WriteString(format)
+	}
+
+	b.WriteString("\n")
+	msg := b.String()
+	fmt.Print(msg)
+	writeLog(msg, l)
+
 	return msg
 }
 
 func D(l int, format string, args ...interface{}) string {
+	if Level < 0 {
+		Level = viper.GetInt(keys.DebugLevel)
+	}
+
+	if l < Level {
+		return ""
+	}
 
 	mu.Lock()
 	defer mu.Unlock()
-	var msg string
 
 	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
-	tag := fmt.Sprintf("["+consts.ColorBlue+"Function:"+consts.ColorReset+" %s - "+consts.ColorBlue+"File:"+consts.ColorReset+" %s : "+consts.ColorBlue+"Line:"+consts.ColorReset+" %d] ", funcName, file, line)
 
-	if Level < 0 {
-		Level = viper.GetInt(keys.DebugLevel)
-	}
-	if l <= viper.GetInt(keys.DebugLevel) && l != 0 { // Debug messages don't appear by default
+	var b strings.Builder
+	b.Grow(len(consts.YellowDebug) + tagBaseLen + len(format) + (len(args) * 32))
+	b.WriteString(consts.YellowDebug)
 
-		if len(args) != 0 && args != nil {
-			msg = fmt.Sprintf(consts.YellowDebug+format+" "+tag+"\n", args...)
-		} else {
-			msg = fmt.Sprintf(consts.YellowDebug + format + " " + tag + "\n")
-		}
-		fmt.Print(msg)
-		writeLog(msg, l)
+	// Write formatted message
+	if len(args) != 0 && args != nil {
+		fmt.Fprintf(&b, format, args...)
+	} else {
+		b.WriteString(format)
 	}
+
+	b.WriteRune('[')
+	b.WriteString(consts.ColorBlue)
+	b.WriteString("Function: ")
+	b.WriteString(consts.ColorReset)
+	b.WriteString(funcName)
+	b.WriteString(" - ")
+	b.WriteString(consts.ColorBlue)
+	b.WriteString("File: ")
+	b.WriteString(consts.ColorReset)
+	b.WriteString(file)
+	b.WriteString(" : ")
+	b.WriteString(consts.ColorBlue)
+	b.WriteString("Line: ")
+	b.WriteString(consts.ColorReset)
+	b.WriteString(strconv.Itoa(line))
+	b.WriteString("]\n")
+
+	msg := b.String()
+
+	fmt.Print(msg)
+	writeLog(msg, l)
+
 	return msg
 }
 
@@ -97,13 +174,20 @@ func I(format string, args ...interface{}) string {
 
 	mu.Lock()
 	defer mu.Unlock()
-	var msg string
 
+	var b strings.Builder
+	b.Grow(len(consts.BlueInfo) + len(format) + len(consts.ColorReset) + len(" \n") + (len(args) * 32))
+	b.WriteString(consts.BlueInfo)
+
+	// Write formatted message
 	if len(args) != 0 && args != nil {
-		msg = fmt.Sprintf(consts.BlueInfo+format+"\n", args...)
+		fmt.Fprintf(&b, format, args...)
 	} else {
-		msg = fmt.Sprintf(consts.BlueInfo + format + "\n")
+		b.WriteString(format)
 	}
+
+	b.WriteString("\n")
+	msg := b.String()
 	fmt.Print(msg)
 	writeLog(msg, 0)
 
@@ -114,13 +198,19 @@ func P(format string, args ...interface{}) string {
 
 	mu.Lock()
 	defer mu.Unlock()
-	var msg string
 
+	var b strings.Builder
+	b.Grow(len(format) + len(" \n") + (len(args) * 32))
+
+	// Write formatted message
 	if len(args) != 0 && args != nil {
-		msg = fmt.Sprintf(format+"\n", args...)
+		fmt.Fprintf(&b, format, args...)
 	} else {
-		msg = fmt.Sprintf(format + "\n")
+		b.WriteString(format)
 	}
+
+	b.WriteString("\n")
+	msg := b.String()
 	fmt.Print(msg)
 	writeLog(msg, 0)
 

@@ -27,13 +27,13 @@ func processJSON(v *models.Video, vs interfaces.VideoStore) error {
 		mdl := command.NewMetaDLRequest(v)
 		cmd := mdl.RequestMetaCommand()
 		if cmd == nil {
-			return fmt.Errorf("failed to create meta DL command for '%s'", v.URL)
+			return fmt.Errorf("failed to create meta DL command for %q", v.URL)
 		}
 
 		// Execute metadata download
 		if err := command.ExecuteMetaDownload(v, cmd); err != nil {
 			lastErr = err
-			logging.E(0, "Attempt %d/%d failed downloading metadata for '%s': %v",
+			logging.E(0, "Attempt %d/%d failed downloading metadata for %q: %v",
 				attempt, maxRetries, v.URL, err)
 
 			if attempt < maxRetries {
@@ -49,7 +49,7 @@ func processJSON(v *models.Video, vs interfaces.VideoStore) error {
 			}
 
 			// Log error is retries fail
-			logging.E(0, "All %d attempts failed for '%s'. Final error: %v",
+			logging.E(0, "All %d attempts failed for %q. Final error: %v",
 				maxRetries, v.URL, lastErr)
 
 			// Add to database even if metadata download fails after all retries
@@ -74,7 +74,7 @@ func processJSON(v *models.Video, vs interfaces.VideoStore) error {
 	// Validate JSON
 	valid, err := validateAndStoreJSON(v)
 	if err != nil {
-		logging.E(0, "JSON validation failed for '%s': %v", v.URL, err)
+		logging.E(0, "JSON validation failed for %q: %v", v.URL, err)
 	}
 
 	// Add to database regardless of validation

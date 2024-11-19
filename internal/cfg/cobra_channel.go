@@ -336,7 +336,7 @@ func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			if err := cs.DeleteChannel(key, val); err != nil {
 				return err
 			}
-			logging.S(0, "Successfully deleted channel with key '%s' and value '%s'", key, val)
+			logging.S(0, "Successfully deleted channel with key %q and value %q", key, val)
 			return nil
 		},
 	}
@@ -355,7 +355,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "List all channels",
 		Long:  "Lists all channels currently saved in the database",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			channels, err, hasRows := cs.ListChannels()
+			chans, err, hasRows := cs.ListChannels()
 			if !hasRows {
 				logging.I("No entries in the database")
 				return nil
@@ -364,25 +364,25 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			for _, c := range channels {
+			for i := range chans {
 				fmt.Printf("\nChannel ID: %d\n\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\nCrawl Frequency: %d minutes\nFilters: %v\n",
-					c.ID, c.Name, c.URL, c.VDir, c.JDir, c.Settings.CrawlFreq, c.Settings.Filters)
+					chans[i].ID, chans[i].Name, chans[i].URL, chans[i].VDir, chans[i].JDir, chans[i].Settings.CrawlFreq, chans[i].Settings.Filters)
 
 				// Display Metarr operations if they exist
-				if len(c.MetarrArgs.MetaOps) > 0 {
+				if len(chans[i].MetarrArgs.MetaOps) > 0 {
 					fmt.Printf("Metarr Operations:\n")
-					for _, op := range c.MetarrArgs.MetaOps {
+					for _, op := range chans[i].MetarrArgs.MetaOps {
 						fmt.Printf("  - %s\n", op)
 					}
 				}
-				if c.MetarrArgs.FileDatePfx != "" {
-					fmt.Printf("Filename Date Format: %s\n", c.MetarrArgs.FileDatePfx)
+				if chans[i].MetarrArgs.FileDatePfx != "" {
+					fmt.Printf("Filename Date Format: %s\n", chans[i].MetarrArgs.FileDatePfx)
 				}
-				if c.MetarrArgs.RenameStyle != "" {
-					fmt.Printf("Rename Style: %s\n", c.MetarrArgs.RenameStyle)
+				if chans[i].MetarrArgs.RenameStyle != "" {
+					fmt.Printf("Rename Style: %s\n", chans[i].MetarrArgs.RenameStyle)
 				}
-				if c.MetarrArgs.FilenameReplaceSfx != "" {
-					fmt.Printf("Filename Suffix Replace: %s\n", c.MetarrArgs.FilenameReplaceSfx)
+				if chans[i].MetarrArgs.FilenameReplaceSfx != "" {
+					fmt.Printf("Filename Suffix Replace: %s\n", chans[i].MetarrArgs.FilenameReplaceSfx)
 				}
 			}
 			return nil
@@ -528,7 +528,7 @@ func updateChannelRow(cs interfaces.ChannelStore) *cobra.Command {
 			if err := cs.UpdateChannelRow(key, val, col, newVal); err != nil {
 				return err
 			}
-			logging.S(0, "Updated channel column '%s' to value '%s'", col, newVal)
+			logging.S(0, "Updated channel column %q to value %q", col, newVal)
 			return nil
 		},
 	}
