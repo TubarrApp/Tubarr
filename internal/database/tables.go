@@ -11,7 +11,7 @@ func initChannelsTable(tx *sql.Tx) error {
     CREATE TABLE IF NOT EXISTS channels (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         url TEXT NOT NULL UNIQUE,
-        name TEXT UNIQUE,
+        name TEXT NOT NULL UNIQUE,
         video_directory TEXT,
         json_directory TEXT,
         settings JSON,
@@ -38,7 +38,7 @@ func initVideosTable(tx *sql.Tx) error {
 	query := `
     CREATE TABLE IF NOT EXISTS videos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channel_id INTEGER REFERENCES channels(id),
+        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
         downloaded INTEGER DEFAULT 0,
         url TEXT NOT NULL UNIQUE,
         title TEXT,
@@ -50,7 +50,8 @@ func initVideosTable(tx *sql.Tx) error {
         settings JSON,
         metarr JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(channel_id, url)
     );
     CREATE INDEX IF NOT EXISTS idx_videos_channel ON videos(channel_id);
     CREATE INDEX IF NOT EXISTS idx_videos_url ON videos(url);
@@ -62,24 +63,21 @@ func initVideosTable(tx *sql.Tx) error {
 	return nil
 }
 
-// initDownloadsTable initializes downloads table
-func initDownloadsTable(tx *sql.Tx) error {
+// initNotifyTable initializes notification service tables
+func initNotifyTable(tx *sql.Tx) error {
 	query := `
-    CREATE TABLE IF NOT EXISTS downloads (
+    CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY,
-        video_id INTEGER REFERENCES videos(id),
-        status TEXT NOT NULL CHECK(status IN ('pending', 'downloading', 'completed', 'failed')),
-        file_path TEXT,
-        file_size INTEGER,
-        started_at TIMESTAMP,
-        completed_at TIMESTAMP,
-        error_message TEXT,
-        settings_used JSON,
+        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        notify_url TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(channel_id, notify_url)
     );
-    CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
-    CREATE INDEX IF NOT EXISTS idx_downloads_video ON downloads(video_id);
+    CREATE INDEX IF NOT EXISTS idx_notification_channel ON notifications(channel_id);
+    CREATE INDEX IF NOT EXISTS idx_notification_name ON notifications(name);
+    CREATE INDEX IF NOT EXISTS idx_notification_url ON notifications(notify_url);
     `
 	if _, err := tx.Exec(query); err != nil {
 		return fmt.Errorf("failed to create downloads table: %w", err)

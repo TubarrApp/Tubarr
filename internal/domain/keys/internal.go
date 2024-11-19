@@ -10,6 +10,7 @@ const (
 // Check channels for new uploads
 const (
 	ChannelCheckNew string = "CheckChannelsForNew"
+	CheckChannels   string = "checkChannels"
 )
 
 // Download operations

@@ -6,6 +6,7 @@ import (
 	"time"
 	"tubarr/internal/cfg"
 	"tubarr/internal/database"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/process"
 	"tubarr/internal/repo"
 	"tubarr/internal/utils/logging"
@@ -34,9 +35,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cfg.GetBool("check_channels") {
+	if cfg.GetBool(keys.CheckChannels) {
 		if err := process.CheckChannels(store); err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking channels: %v\n", err)
+			logging.E(0, "Encountered errors while checking channels: %v\n", err)
 			os.Exit(1)
 		}
 	}

@@ -61,7 +61,7 @@ func initTables(db *sql.DB) error {
 		return err
 	}
 
-	if err := initDownloadsTable(tx); err != nil {
+	if err := initNotifyTable(tx); err != nil {
 		return err
 	}
 

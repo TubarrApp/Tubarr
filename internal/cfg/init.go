@@ -17,7 +17,7 @@ var rootCmd = &cobra.Command{
 			return nil // Stop further execution if help is invoked
 		}
 		if len(args) == 0 {
-			viper.Set("check_channels", true)
+			viper.Set(keys.CheckChannels, true)
 		}
 		viper.Set("execute", true)
 		return nil

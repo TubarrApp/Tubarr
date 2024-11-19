@@ -207,3 +207,12 @@ func removeUnwantedJSON(path string) error {
 
 	return nil
 }
+
+// isPrivateNetwork returns true if the URL is detected as a LAN network
+func isPrivateNetwork(host string) bool {
+	return strings.HasPrefix(host, "192.168") ||
+		strings.HasPrefix(host, "10.") ||
+		strings.HasPrefix(host, "172.16.") || // 172.16.0.0 - 172.31.255.255
+		strings.HasPrefix(host, "127.") || // localhost
+		host == "localhost"
+}

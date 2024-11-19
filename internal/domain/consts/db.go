@@ -2,9 +2,9 @@ package consts
 
 // Tables
 const (
-	DBChannels  = "channels"
-	DBVideos    = "videos"
-	DBDownloads = "downloads"
+	DBChannels      = "channels"
+	DBVideos        = "videos"
+	DBNotifications = "notifications"
 )
 
 // Channel
@@ -36,6 +36,14 @@ const (
 	QVidMetadata    = "metadata"
 	QVidCreatedAt   = "created_at"
 	QVidUpdatedAt   = "updated_at"
+)
+
+const (
+	QNotifyChanID    = "channel_id"
+	QNotifyName      = "name"
+	QNotifyURL       = "notify_url"
+	QNotifyCreatedAt = "created_at"
+	QNotifyUpdatedAt = "updated_at"
 )
 
 // DL status

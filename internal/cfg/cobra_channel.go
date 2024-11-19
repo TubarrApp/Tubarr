@@ -30,12 +30,161 @@ func initChannelCmds(s interfaces.Store) *cobra.Command {
 	// Add subcommands with dependencies
 	channelCmd.AddCommand(addChannelCmd(cs))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s))
+	channelCmd.AddCommand(addCrawlToIgnore(cs, s))
+	channelCmd.AddCommand(addURLToIgnore(cs))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
 	channelCmd.AddCommand(listChannelCmd(cs))
 	channelCmd.AddCommand(updateChannelRow(cs))
 	channelCmd.AddCommand(updateChannelSettingsCmd(cs))
+	channelCmd.AddCommand(addNotifyURL(cs))
 
 	return channelCmd
+}
+
+// addNotifyURL adds a notification URL (can use to send requests to update Plex libraries on new video addition)
+func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		channelName, channelURL string
+		notifyURL               string
+	)
+
+	addNotifyCmd := &cobra.Command{
+		Use:   "notify",
+		Short: "Adds notify function to a channel",
+		Long:  "Enter a fully qualified notification URL here to send update requests to platforms like Plex etc.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if notifyURL == "" {
+				return fmt.Errorf("notification URL cannot be blank")
+			}
+
+			var key, val, notifyName string
+
+			switch {
+			case channelURL != "":
+				key = consts.QChanURL
+				val = channelURL
+				if notifyName == "" {
+					notifyName = channelURL
+				}
+			case channelName != "":
+				key = consts.QChanName
+				val = channelName
+				if notifyName == "" {
+					notifyName = channelName
+				}
+			default:
+				return fmt.Errorf("must enter a channel name or channel URL")
+			}
+
+			id, err := cs.GetID(key, val)
+			if err != nil {
+				return err
+			}
+
+			if err := cs.AddNotifyURL(id, notifyName, notifyURL); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	addNotifyCmd.Flags().StringVarP(&channelURL, "channel-url", "u", "", "Channel URL")
+	addNotifyCmd.Flags().StringVarP(&channelName, "channel-name", "n", "", "Channel name")
+	addNotifyCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
+
+	return addNotifyCmd
+}
+
+// addURLToIgnore adds a user inputted URL to ignore from crawls
+func addURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		url, name, key, val string
+		ignoreURL           string
+	)
+
+	ignoreURLCmd := &cobra.Command{
+		Use:   "ignore",
+		Short: "Adds a channel video URL to ignore",
+		Long:  "URLs added to this list will not be grabbed from channel crawls",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if ignoreURL == "" {
+				return fmt.Errorf("cannot enter the target ignore URL blank")
+			}
+			switch {
+			case url != "":
+				key = consts.QChanURL
+				val = url
+			case name != "":
+				key = consts.QChanName
+				val = name
+			default:
+				return fmt.Errorf("please enter either a channel URL or name")
+			}
+
+			id, err := cs.GetID(key, val)
+			if err != nil {
+				return err
+			}
+
+			if err := cs.AddURLToIgnore(id, ignoreURL); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	ignoreURLCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	ignoreURLCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	ignoreURLCmd.Flags().StringVarP(&ignoreURL, "ignore-url", "i", "", "Video URL to ignore")
+
+	return ignoreURLCmd
+}
+
+// addCrawlToIgnore crawls the current state of the channel page and adds the URLs as though they are already grabbed
+func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
+	var (
+		url, name string
+		id        int
+		key, val  string
+	)
+
+	ignoreCrawlCmd := &cobra.Command{
+		Use:   "ignore-current",
+		Short: "Crawl a channel for URLs to ignore",
+		Long:  "Crawls the current state of a channel page and adds all video URLs to ignore",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			switch {
+			case url != "":
+				key = consts.QChanURL
+				val = url
+			case name != "":
+				key = consts.QChanName
+				val = name
+			case id != 0:
+				key = consts.QChanID
+				val = strconv.Itoa(id)
+			default:
+				return fmt.Errorf("please enter either a URL or name")
+			}
+
+			if err := cs.CrawlChannelIgnore(key, val, s); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	ignoreCrawlCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	ignoreCrawlCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	ignoreCrawlCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+
+	return ignoreCrawlCmd
 }
 
 // addChannelCmd adds a new channel into the database
