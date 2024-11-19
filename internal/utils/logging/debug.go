@@ -8,9 +8,6 @@ import (
 	"strings"
 	"sync"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
-
-	"github.com/spf13/viper"
 )
 
 const (
@@ -35,11 +32,7 @@ var (
 )
 
 func E(l int, format string, args ...interface{}) string {
-	if Level < 0 {
-		Level = viper.GetInt(keys.DebugLevel)
-	}
-
-	if l < Level {
+	if l >= Level {
 		return ""
 	}
 
@@ -88,11 +81,7 @@ func E(l int, format string, args ...interface{}) string {
 }
 
 func S(l int, format string, args ...interface{}) string {
-	if Level < 0 {
-		Level = viper.GetInt(keys.DebugLevel)
-	}
-
-	if l < Level {
+	if l >= Level {
 		return ""
 	}
 
@@ -119,11 +108,7 @@ func S(l int, format string, args ...interface{}) string {
 }
 
 func D(l int, format string, args ...interface{}) string {
-	if Level < 0 {
-		Level = viper.GetInt(keys.DebugLevel)
-	}
-
-	if l < Level {
+	if l >= Level {
 		return ""
 	}
 
