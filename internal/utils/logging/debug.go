@@ -32,7 +32,7 @@ var (
 )
 
 func E(l int, format string, args ...interface{}) string {
-	if l >= Level {
+	if Level < l {
 		return ""
 	}
 
@@ -81,7 +81,7 @@ func E(l int, format string, args ...interface{}) string {
 }
 
 func S(l int, format string, args ...interface{}) string {
-	if l >= Level {
+	if Level < l {
 		return ""
 	}
 
@@ -108,7 +108,7 @@ func S(l int, format string, args ...interface{}) string {
 }
 
 func D(l int, format string, args ...interface{}) string {
-	if l >= Level {
+	if Level < l {
 		return ""
 	}
 
