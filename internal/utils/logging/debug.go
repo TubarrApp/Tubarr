@@ -19,7 +19,7 @@ const (
 		3 + // " - "
 		len(consts.ColorBlue) +
 		5 + // "File: "
-		25 + // Filename.go
+		25 + // a_really_long_filename.go
 		len(consts.ColorReset) +
 		3 + // " : "
 		len(consts.ColorBlue) +

@@ -24,8 +24,12 @@ func init() {
 	}
 
 	dir = filepath.Join(dir, tDir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		log.Fatalf("failed to make directories: %v", err)
+
+	// Stat dir before more expensive make dir
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			log.Fatalf("failed to make directories: %v", err)
+		}
 	}
 
 	path := filepath.Join(dir, tFile)
