@@ -14,14 +14,17 @@ const (
 	tagBaseLen = 1 + // "["
 		len(consts.ColorBlue) +
 		9 + // "Function: "
+		25 + // thisFunctionIsAnExample()
 		len(consts.ColorReset) +
 		3 + // " - "
 		len(consts.ColorBlue) +
 		5 + // "File: "
+		25 + // Filename.go
 		len(consts.ColorReset) +
 		3 + // " : "
 		len(consts.ColorBlue) +
 		5 + // "Line: "
+		6 + // 999:99
 		len(consts.ColorReset) +
 		2 // "]\n"
 )
