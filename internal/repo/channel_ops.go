@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/interfaces"
@@ -585,7 +584,8 @@ func (cs ChannelStore) channelExists(key, val string) bool {
 	if err := query.QueryRow().Scan(&exists); err == sql.ErrNoRows {
 		return false
 	} else if err != nil {
-		log.Fatalf("error querying row, aborting program")
+		logging.E(0, err.Error())
+		return exists
 	}
 	return exists
 }
@@ -602,7 +602,8 @@ func (cs ChannelStore) channelExistsID(id int64) bool {
 	if err := query.QueryRow().Scan(&exists); err == sql.ErrNoRows {
 		return false
 	} else if err != nil {
-		log.Fatalf("error querying row, aborting program")
+		logging.E(0, err.Error())
+		return exists
 	}
 	return exists
 }

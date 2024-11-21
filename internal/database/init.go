@@ -3,45 +3,23 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
-	"os"
-	"path/filepath"
+	"tubarr/internal/domain/setup"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
 
-func init() {
-	const (
-		tDir  = ".tubarr"
-		tFile = "tubarr.db"
-	)
-
-	dir, err := os.UserHomeDir()
+func InitDB() (err error) {
+	db, err = sql.Open("sqlite3", setup.DBFilePath)
 	if err != nil {
-		log.Fatalf("failed to get home directory")
-	}
-
-	dir = filepath.Join(dir, tDir)
-
-	// Stat dir before more expensive make dir
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			log.Fatalf("failed to make directories: %v", err)
-		}
-	}
-
-	path := filepath.Join(dir, tFile)
-
-	db, err = sql.Open("sqlite3", path)
-	if err != nil {
-		log.Fatalf("failed to open database at path %q: %v", path, err)
+		return fmt.Errorf("failed to open database at path %q: %v", setup.DBFilePath, err)
 	}
 
 	if err := initTables(db); err != nil {
-		log.Fatalf("failed to initialize tables: %v", err)
+		return fmt.Errorf("failed to initialize tables: %v", err)
 	}
+	return nil
 }
 
 // GrabDB returns the database
@@ -56,6 +34,10 @@ func initTables(db *sql.DB) error {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
+
+	if err := initProgramTable(tx); err != nil {
+		return err
+	}
 
 	if err := initChannelsTable(tx); err != nil {
 		return err

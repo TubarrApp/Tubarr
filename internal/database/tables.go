@@ -5,6 +5,28 @@ import (
 	"fmt"
 )
 
+// initProgramTable initializes the primary program database table
+func initProgramTable(tx *sql.Tx) error {
+	query := `
+    CREATE TABLE IF NOT EXISTS program (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        program_id TEXT UNIQUE NOT NULL,
+        running INTEGER DEFAULT 0,
+        pid INTEGER,
+        started_at TIMESTAMP,
+        last_heartbeat TIMESTAMP,
+        host TEXT
+        CONSTRAINT single_row CHECK (id = 1)
+    );
+    INSERT OR IGNORE INTO program (id, program_id, running) VALUES (1, 'Tubarr', 0);
+    CREATE INDEX IF NOT EXISTS idx_program_last_heartbeat ON program(last_heartbeat)
+    `
+	if _, err := tx.Exec(query); err != nil {
+		return fmt.Errorf("failed to create program table: %w", err)
+	}
+	return nil
+}
+
 // initChannelsTable intializes channel tables
 func initChannelsTable(tx *sql.Tx) error {
 	query := `
@@ -24,7 +46,6 @@ func initChannelsTable(tx *sql.Tx) error {
     CREATE INDEX IF NOT EXISTS idx_channels_video_directory ON channels(video_directory);
     CREATE INDEX IF NOT EXISTS idx_channels_json_directory ON channels(json_directory);
     CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
-    CREATE INDEX IF NOT EXISTS idx_channels_settings ON channels(settings);
     CREATE INDEX IF NOT EXISTS idx_channels_last_scan ON channels(last_scan);
     `
 	if _, err := tx.Exec(query); err != nil {
@@ -55,7 +76,6 @@ func initVideosTable(tx *sql.Tx) error {
     );
     CREATE INDEX IF NOT EXISTS idx_videos_channel ON videos(channel_id);
     CREATE INDEX IF NOT EXISTS idx_videos_url ON videos(url);
-    CREATE INDEX IF NOT EXISTS idx_videos_upload_date ON videos(upload_date);
     `
 	if _, err := tx.Exec(query); err != nil {
 		return fmt.Errorf("failed to create videos table: %w", err)

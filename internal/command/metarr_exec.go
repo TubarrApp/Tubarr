@@ -20,7 +20,7 @@ func RunMetarr(cmd *exec.Cmd) error {
 	cmd.Stdin = os.Stdin
 
 	if err = cmd.Run(); err != nil {
-		logging.E(0, "Encountered error running command %q: %w", cmd.String(), err)
+		logging.E(0, "Encountered error running command %q: %v", cmd.String(), err)
 	}
 	return err // Returns nil by default unless an error is grabbed
 }

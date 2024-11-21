@@ -2,9 +2,21 @@ package consts
 
 // Tables
 const (
+	DBProgram       = "program"
 	DBChannels      = "channels"
 	DBVideos        = "videos"
 	DBNotifications = "notifications"
+)
+
+// Program
+const (
+	QProgHost      = "host"
+	QProgID        = "id"
+	QProgHeartbeat = "last_heartbeat"
+	QProgProgramID = "program_id"
+	QProgPID       = "pid"
+	QProgStartedAt = "started_at"
+	QProgRunning   = "running"
 )
 
 // Channel
@@ -23,6 +35,7 @@ const (
 
 // Videos
 const (
+	QVidID          = "id"
 	QVidChanID      = "channel_id"
 	QVidDownloaded  = "downloaded"
 	QVidURL         = "url"
@@ -38,6 +51,7 @@ const (
 	QVidUpdatedAt   = "updated_at"
 )
 
+// Notification
 const (
 	QNotifyChanID    = "channel_id"
 	QNotifyName      = "name"

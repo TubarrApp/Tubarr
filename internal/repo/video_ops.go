@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
@@ -37,9 +36,9 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		return 0, fmt.Errorf("must enter a video directory where downloads will be stored")
 	}
 
-	if vs.videoExists(consts.QVidURL, v.URL) {
-		logging.D(2, "Video with URL %q already exists, skipping", v.URL)
-		return 0, nil // Return gracefully instead of error
+	if id, exists := vs.videoExists(consts.QVidURL, v.URL); exists {
+		logging.D(2, "Video with URL %q already exists, returning ID", v.URL)
+		return id, nil // Return gracefully instead of error
 	}
 
 	// JSON dir
@@ -105,11 +104,7 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		return 0, fmt.Errorf("failed to insert video: %w", err)
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
-	}
-	return id, nil
+	return result.LastInsertId()
 }
 
 // UpdateVideo updates the status of the video in the database
@@ -188,7 +183,7 @@ func (vs VideoStore) DeleteVideo(key, val string) error {
 // Private /////////////////////////////////////////////////////////////////////
 
 // channelExists returns true if the channel exists in the database
-func (vs VideoStore) videoExists(key, val string) bool {
+func (vs VideoStore) videoExists(key, val string) (int64, bool) {
 	var exists bool
 	query := squirrel.
 		Select("1").
@@ -196,10 +191,26 @@ func (vs VideoStore) videoExists(key, val string) bool {
 		Where(squirrel.Eq{key: val}).
 		RunWith(vs.DB)
 
-	if err := query.QueryRow().Scan(&exists); err == sql.ErrNoRows {
-		return false
-	} else if err != nil {
-		log.Fatalf("error querying row, aborting program")
+	if err := query.QueryRow().Scan(&exists); err != nil {
+		logging.E(0, err.Error())
+		return 0, false
 	}
-	return exists
+
+	idQuery := squirrel.
+		Select(consts.QVidID).
+		Where(squirrel.Eq{key: val}).
+		RunWith(vs.DB)
+
+	rtn, err := idQuery.Exec()
+	if err != nil {
+		logging.E(0, "Failed to retrieve ID for video with key %q and value %q", key, val)
+		return 0, exists
+	}
+
+	id, err := rtn.LastInsertId()
+	if err != nil {
+		logging.E(0, "Error grabbing last insert ID for video with key %q and value %q", key, val)
+		return id, exists
+	}
+	return id, exists
 }

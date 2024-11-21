@@ -90,6 +90,6 @@ func dateFormat(dateFmt string) bool {
 			return true
 		}
 	}
-	logging.E(0, "Invalid date format entered as %q, please enter up to three characters (where 'Y' is yyyy and 'y' is yy)")
+	logging.E(0, "Invalid date format entered as %q, please enter up to three characters (where 'Y' is yyyy and 'y' is yy)", dateFmt)
 	return false
 }

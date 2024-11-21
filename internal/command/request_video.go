@@ -34,7 +34,7 @@ func (vf *VideoDLRequest) VideoFetchCommand() (*exec.Cmd, error) {
 	v := vf.Video
 
 	if _, err := exec.LookPath("yt-dlp"); err != nil {
-		logging.E(0, "yt-dlp command not found: %w", err)
+		logging.E(0, "yt-dlp command not found: %v", err)
 		os.Exit(1)
 	}
 
