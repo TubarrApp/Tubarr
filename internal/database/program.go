@@ -123,9 +123,7 @@ func resetStaleProcess() error {
 
 	if time.Since(lastHeartbeat) > 2*time.Minute {
 
-		if time.Since(lastHeartbeat) > 2*time.Minute {
-			logging.I("Detected stale process, resetting state...")
-		}
+		logging.I("Detected stale process, resetting state...")
 
 		resetQuery := squirrel.
 			Update(consts.DBProgram).
