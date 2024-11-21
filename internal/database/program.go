@@ -12,6 +12,11 @@ import (
 
 // StartTubarr sets Tubarr fields in the database
 func StartTubarr() (pid int, err error) {
+
+	if err := resetStaleProcess(); err != nil {
+		return pid, fmt.Errorf("failed to correct stale process")
+	}
+
 	id, running := checkProgRunning()
 	if running {
 		return pid, fmt.Errorf("process already running (PID: %d)", id)
@@ -81,7 +86,7 @@ func UpdateHeartbeat() error {
 
 // Private ////////////////////////////////////////////////////////////////////////////////////////////
 
-// checkProgRunning checks if the program is already running
+// checkProgRunning checks if the program is already running.
 func checkProgRunning() (int, bool) {
 	var (
 		running bool
@@ -100,4 +105,38 @@ func checkProgRunning() (int, bool) {
 	}
 
 	return pid, running
+}
+
+// resetStaleProcess is useful when there are powercuts, etc.
+func resetStaleProcess() error {
+	var lastHeartbeat time.Time
+
+	query := squirrel.
+		Select(consts.QProgHeartbeat).
+		From(consts.DBProgram).
+		Where(squirrel.Eq{consts.QProgID: 1}).
+		RunWith(db)
+
+	if err := query.QueryRow().Scan(&lastHeartbeat); err != nil {
+		return err
+	}
+
+	if time.Since(lastHeartbeat) > 2*time.Minute {
+
+		if time.Since(lastHeartbeat) > 2*time.Minute {
+			logging.I("Detected stale process, resetting state...")
+		}
+
+		resetQuery := squirrel.
+			Update(consts.DBProgram).
+			Set(consts.QProgRunning, false).
+			Set(consts.QProgPID, 0).
+			Where(squirrel.Eq{consts.QProgID: 1}).
+			RunWith(db)
+
+		if _, err := resetQuery.Exec(); err != nil {
+			return err
+		}
+	}
+	return nil // Return normal
 }
