@@ -111,7 +111,10 @@ func main() {
 	}
 
 	endTime := time.Now()
-	logging.I("metarr finished at: %v", endTime.Format("2006-01-02 15:04:05.00 MST"))
-	logging.I("Time elapsed: %.2f seconds", endTime.Sub(startTime).Seconds())
+
+	logging.I("Tubarr finished at: %v\n\nTime elapsed: %.2f seconds",
+		endTime.Format("2006-01-02 15:04:05.00 MST"),
+		endTime.Sub(startTime).Seconds())
+
 	fmt.Println()
 }

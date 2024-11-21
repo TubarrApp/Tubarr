@@ -13,16 +13,16 @@ import (
 // StartTubarr sets Tubarr fields in the database
 func StartTubarr() (pid int, err error) {
 
-	if err := resetStaleProcess(); err != nil {
-		return pid, fmt.Errorf("failed to correct stale process")
+	// Check running or stale state
+	if id, running := checkProgRunning(); running {
+		reset, err := resetStaleProcess()
+		if err != nil {
+			return pid, fmt.Errorf("failed to correct stale process, unexpected error: %v", err)
+		}
+		if !reset {
+			return pid, fmt.Errorf("process already running (PID: %d)", id)
+		}
 	}
-
-	id, running := checkProgRunning()
-	if running {
-		return pid, fmt.Errorf("process already running (PID: %d)", id)
-	}
-
-	logging.I("Tubarr running status: %v", running)
 
 	pid = os.Getpid()
 	host, _ := os.Hostname()
@@ -108,7 +108,7 @@ func checkProgRunning() (int, bool) {
 }
 
 // resetStaleProcess is useful when there are powercuts, etc.
-func resetStaleProcess() error {
+func resetStaleProcess() (reset bool, err error) {
 	var lastHeartbeat time.Time
 
 	query := squirrel.
@@ -118,7 +118,7 @@ func resetStaleProcess() error {
 		RunWith(db)
 
 	if err := query.QueryRow().Scan(&lastHeartbeat); err != nil {
-		return err
+		return false, err
 	}
 
 	if time.Since(lastHeartbeat) > 2*time.Minute {
@@ -133,8 +133,9 @@ func resetStaleProcess() error {
 			RunWith(db)
 
 		if _, err := resetQuery.Exec(); err != nil {
-			return err
+			return false, err
 		}
+		return true, nil // Reset, no error
 	}
-	return nil // Return normal
+	return false, nil // Not reset, no error
 }

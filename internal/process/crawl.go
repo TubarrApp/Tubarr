@@ -93,6 +93,7 @@ func CheckChannels(s interfaces.Store) error {
 		timeSinceLastScan := time.Since(chans[i].LastScan)
 		crawlFreqDuration := time.Duration(chans[i].Settings.CrawlFreq) * time.Minute
 
+		fmt.Println()
 		logging.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
 			chans[i].Name,
 			timeSinceLastScan.Round(time.Second),
@@ -100,7 +101,8 @@ func CheckChannels(s interfaces.Store) error {
 
 		if timeSinceLastScan < crawlFreqDuration {
 			remainingTime := crawlFreqDuration - timeSinceLastScan
-			logging.I("Next check in: %s", remainingTime.Round(time.Second))
+			logging.P("Next check in: %s", remainingTime.Round(time.Second))
+			fmt.Println()
 			continue
 		}
 
