@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -12,30 +11,8 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-// validateAndStoreJSON checks if the JSON is valid and if it passes filter checks
-func validateAndStoreJSON(v *models.Video) (valid bool, err error) {
-	if v == nil {
-		return false, fmt.Errorf("dl model is null")
-	}
-
-	if v.JPath == "" {
-		return false, fmt.Errorf("json path cannot be empty")
-	}
-
-	jInfo, err := os.Stat(v.JPath)
-	if err != nil {
-		return false, err
-	}
-
-	switch {
-	case jInfo.IsDir():
-		return false, fmt.Errorf("json path should be path to json file, not directory")
-	case filepath.Ext(jInfo.Name()) != ".json":
-		return false, fmt.Errorf("json file should end in .json")
-	case !jInfo.Mode().IsRegular():
-		return false, fmt.Errorf("json not a regular file")
-	}
-
+// parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
+func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	f, err := os.Open(v.JPath)
 	if err != nil {
 		return false, err
@@ -92,7 +69,7 @@ func validateAndStoreJSON(v *models.Video) (valid bool, err error) {
 	return true, nil
 }
 
-// filterRequests uses user input filters to check if the video should be downloaded
+// filterRequests uses user input filters to check if the video should be downloaded.
 func filterRequests(v *models.Video) (valid bool, err error) {
 	// Check if filters are set and validate if so
 	if len(v.Settings.Filters) == 0 {
@@ -181,7 +158,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 	return true, nil
 }
 
-// removeUnwantedJSON removes filtered out JSON files
+// removeUnwantedJSON removes filtered out JSON files.
 func removeUnwantedJSON(path string) error {
 	if path == "" {
 		return fmt.Errorf("path sent in empty, not removing")
@@ -208,7 +185,7 @@ func removeUnwantedJSON(path string) error {
 	return nil
 }
 
-// isPrivateNetwork returns true if the URL is detected as a LAN network
+// isPrivateNetwork returns true if the URL is detected as a LAN network.
 func isPrivateNetwork(host string) bool {
 	return strings.HasPrefix(host, "192.168") ||
 		strings.HasPrefix(host, "10.") ||

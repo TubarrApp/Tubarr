@@ -10,7 +10,7 @@ import (
 	"github.com/Masterminds/squirrel"
 )
 
-// StartTubarr sets Tubarr fields in the database
+// StartTubarr sets Tubarr fields in the database.
 func StartTubarr() (pid int, err error) {
 
 	// Check running or stale state
@@ -44,7 +44,7 @@ func StartTubarr() (pid int, err error) {
 	return pid, nil
 }
 
-// QuitTubarr sets the program exit fields, ready for next run
+// QuitTubarr sets the program exit fields, ready for next run.
 func QuitTubarr() error {
 	if id, running := checkProgRunning(); !running {
 		return fmt.Errorf("tubarr is not marked as running. Process %d still active?", id)
@@ -70,7 +70,10 @@ func QuitTubarr() error {
 	return nil
 }
 
-// UpdateHeartbeat updates the program heartbeat
+// UpdateHeartbeat updates the program heartbeat.
+//
+// This function is crucial for ensuring things like powercuts don't
+// permanently lock the user out of the database.
 func UpdateHeartbeat() error {
 	query := squirrel.
 		Update(consts.DBProgram).

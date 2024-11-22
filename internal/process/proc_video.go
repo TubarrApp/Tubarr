@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"time"
 	"tubarr/internal/downloads"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
-// processVideo processes video downloads
-func processVideo(v *models.Video, vs interfaces.VideoStore) error {
+// processVideo processes video downloads.
+func processVideo(v *models.Video, vs models.VideoStore) error {
 	if v == nil {
 		logging.I("Null video entered")
 		return nil

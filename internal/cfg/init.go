@@ -3,7 +3,7 @@ package cfg
 import (
 	"fmt"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/interfaces"
+	"tubarr/internal/models"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,8 +36,8 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-// InitCommands initializes all commands and their flags
-func InitCommands(s interfaces.Store) {
+// InitCommands initializes all commands and their flags.
+func InitCommands(s models.Store) {
 
 	// Add channel commands as a subcommand of root
 	rootCmd.AddCommand(initChannelCmds(s))
@@ -48,7 +48,7 @@ func InitCommands(s interfaces.Store) {
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 }
 
-// verify verifies that the user input flags are valid
+// verify verifies that the user input flags are valid.
 func verify() error {
 	if viper.IsSet(keys.OutputFiletype) {
 		ext := viper.GetString(keys.OutputFiletype)

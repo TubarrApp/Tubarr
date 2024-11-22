@@ -6,7 +6,6 @@ import (
 	"strings"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
@@ -14,8 +13,8 @@ import (
 	"github.com/gocolly/colly"
 )
 
-// GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded
-func GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) ([]*models.Video, error) {
+// GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded.
+func GetNewReleases(cs models.ChannelStore, c *models.Channel) ([]*models.Video, error) {
 
 	uniqueURLs := make(map[string]struct{})
 
@@ -46,7 +45,7 @@ func GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) ([]*models.Vi
 
 	var fileURLs []string
 	if cfg.IsSet(keys.URLFile) {
-		prs := parsing.NewURLParser(cfg.GetString(keys.URLFile))
+		prs := parsing.NewURLFileParser(cfg.GetString(keys.URLFile))
 		if fileURLs, err = prs.ParseURLs(); err != nil {
 			return nil, err
 		}
@@ -197,7 +196,9 @@ func newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies [
 	return newURLs, nil
 }
 
-// normalizeURL standardizes URLs for comparison by removing protocol and any trailing slashes
+// normalizeURL standardizes URLs for comparison by removing protocol and any trailing slashes.
+//
+// Do NOT add a "ToLower" function as some sites like YouTube have case-sensitive URLs.
 func normalizeURL(inputURL string) string {
 	// Remove http:// or https://
 	cleanURL := strings.TrimPrefix(inputURL, "https://")

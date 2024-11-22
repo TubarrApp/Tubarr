@@ -2,7 +2,7 @@ package repo
 
 import (
 	"database/sql"
-	"tubarr/internal/interfaces"
+	"tubarr/internal/models"
 )
 
 type Store struct {
@@ -11,6 +11,7 @@ type Store struct {
 	channelStore *ChannelStore
 }
 
+// InitStores injects databases into the store methods.
 func InitStores(db *sql.DB) *Store {
 	return &Store{
 		db:           db,
@@ -19,12 +20,12 @@ func InitStores(db *sql.DB) *Store {
 	}
 }
 
-// GetChannelStore with pointer receiver
-func (s *Store) GetChannelStore() interfaces.ChannelStore {
+// GetChannelStore with pointer receiver.
+func (s *Store) GetChannelStore() models.ChannelStore {
 	return s.channelStore
 }
 
-// GetVideoStore with pointer receiver
-func (s *Store) GetVideoStore() interfaces.VideoStore {
+// GetVideoStore with pointer receiver.
+func (s *Store) GetVideoStore() models.VideoStore {
 	return s.videoStore
 }

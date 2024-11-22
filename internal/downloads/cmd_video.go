@@ -8,7 +8,7 @@ import (
 	logging "tubarr/internal/utils/logging"
 )
 
-// buildVideoCommand builds the command for yt-dlp
+// buildVideoCommand builds the command to download a video using yt-dlp.
 func buildVideoCommand(v *models.Video) *exec.Cmd {
 	args := make([]string, 0, 64)
 

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// verifyConcurrencyLimit checks and ensures correct concurrency limit input
+// verifyConcurrencyLimit checks and ensures correct concurrency limit input.
 func verifyConcurrencyLimit() {
 	maxConcurrentProcesses := viper.GetInt(keys.Concurrency)
 
@@ -23,7 +23,7 @@ func verifyConcurrencyLimit() {
 	viper.Set(keys.Concurrency, maxConcurrentProcesses)
 }
 
-// Verify the output filetype is valid for FFmpeg
+// verifyOutputFiletype verifies the output filetype is valid for FFmpeg.
 func verifyOutputFiletype(o string) bool {
 	o = strings.TrimSpace(o)
 
@@ -49,7 +49,7 @@ func verifyOutputFiletype(o string) bool {
 	return false
 }
 
-// verifyPurgeMetafiles checks and sets the type of metafile purge to perform
+// verifyPurgeMetafiles checks and sets the type of metafile purge to perform.
 func verifyPurgeMetafiles(purgeType string) bool {
 
 	purgeType = strings.TrimSpace(purgeType)

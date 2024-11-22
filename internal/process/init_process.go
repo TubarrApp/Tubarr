@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"os/exec"
 	"sync"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
-// InitProcess begins the process for processing metadata/videos and respective downloads
-func InitProcess(vs interfaces.VideoStore, c *models.Channel, videos []*models.Video) error {
+// InitProcess begins processing metadata/videos and respective downloads.
+func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video) error {
 	var (
 		wg      sync.WaitGroup
 		errChan = make(chan error, len(videos))

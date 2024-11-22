@@ -16,18 +16,19 @@ type VideoStore struct {
 	DB *sql.DB
 }
 
+// GetVideoStore returns a video store instance with injected database.
 func GetVideoStore(db *sql.DB) *VideoStore {
 	return &VideoStore{
 		DB: db,
 	}
 }
 
-// GetDB returns the database
+// GetDB returns the database.
 func (vs *VideoStore) GetDB() *sql.DB {
 	return vs.DB
 }
 
-// AddVideo adds a new video to the database
+// AddVideo adds a new video to the database.
 func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	switch {
 	case v.URL == "":
@@ -118,7 +119,7 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	return result.LastInsertId()
 }
 
-// UpdateVideo updates the status of the video in the database
+// UpdateVideo updates the status of the video in the database.
 func (vs VideoStore) UpdateVideo(v *models.Video) error {
 	metadataJSON, err := json.Marshal(v.MetadataMap)
 	if err != nil {
@@ -170,7 +171,7 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 	return nil
 }
 
-// DeleteVideo deletes an existent downloaded video from the database
+// DeleteVideo deletes an existent downloaded video from the database.
 func (vs VideoStore) DeleteVideo(key, val string, chanID int64) error {
 	if key == "" || val == "" {
 		return fmt.Errorf("please pass in a key and value to delete a video entry")
@@ -194,7 +195,7 @@ func (vs VideoStore) DeleteVideo(key, val string, chanID int64) error {
 
 // Private /////////////////////////////////////////////////////////////////////
 
-// videoExists returns true if the video exists in the database
+// videoExists returns true if the video exists in the database.
 func (vs VideoStore) videoExists(key, val string) (int64, bool) {
 	var id int64
 	query := squirrel.

@@ -9,7 +9,7 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-// NewDownload creates a download operation with specified options
+// NewDownload creates a download operation with specified options.
 func NewDownload(dlType DownloadType, video *models.Video, opts *Options) (*Download, error) {
 	if video == nil {
 		return nil, fmt.Errorf("video cannot be nil")
@@ -29,7 +29,7 @@ func NewDownload(dlType DownloadType, video *models.Video, opts *Options) (*Down
 	return dl, nil
 }
 
-// Execute performs the download with retries
+// Execute performs the download with retries.
 func (d *Download) Execute() error {
 	if d.Video == nil {
 		return fmt.Errorf("video model is nil")
@@ -58,7 +58,7 @@ func (d *Download) Execute() error {
 		d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
-// executeAttempt performs a single download attempt
+// executeAttempt performs a single download attempt.
 func (d *Download) executeAttempt() error {
 	var cmd *exec.Cmd
 
@@ -77,7 +77,7 @@ func (d *Download) executeAttempt() error {
 	return executeVideoDownload(d.Video, cmd)
 }
 
-// waitForFile waits until the file is ready in the file system
+// waitForFile waits until the file is ready in the file system.
 func waitForFile(filePath string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {

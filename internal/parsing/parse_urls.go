@@ -9,20 +9,25 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-type URLParser struct {
+type URLFileParser struct {
 	Filepath string
 	mu       sync.RWMutex
 }
 
-func NewURLParser(fpath string) *URLParser {
-	return &URLParser{
+// NewURLFileParser returns an instance of a URLFileParser.
+//
+// This is used to parse URLs from a file.
+func NewURLFileParser(fpath string) *URLFileParser {
+	return &URLFileParser{
 		Filepath: fpath,
 	}
 }
 
 // ParseURLs returns an array of URLs from a file.
-// Users should put a single URL on each line in the file.
-func (up *URLParser) ParseURLs() ([]string, error) {
+//
+// Users should put a single URL on each line in the file for proper parsing.
+// Hashtags should work to exclude lines (i.e. '# Comment').
+func (up *URLFileParser) ParseURLs() ([]string, error) {
 
 	up.mu.RLock()
 	defer up.mu.RUnlock()
@@ -38,7 +43,7 @@ func (up *URLParser) ParseURLs() ([]string, error) {
 
 	for scanner.Scan() {
 		u := strings.TrimSpace(scanner.Text())
-		if u == "" {
+		if u == "" || strings.HasPrefix(u, "#") {
 			continue
 		}
 

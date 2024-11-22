@@ -5,7 +5,7 @@ import (
 	"tubarr/internal/models"
 )
 
-// DownloadType represents the type of download operation
+// DownloadType represents the type of download operation.
 type DownloadType string
 
 const (
@@ -13,19 +13,19 @@ const (
 	TypeVideo DownloadType = "video"
 )
 
-// Options holds configuration for download operations
+// Options holds configuration for download operations.
 type Options struct {
 	MaxRetries    int
 	RetryInterval time.Duration
 }
 
-// DefaultOptions provides sensible defaults
+// DefaultOptions provides sensible defaults.
 var DefaultOptions = Options{
 	MaxRetries:    3,
 	RetryInterval: 5 * time.Second,
 }
 
-// Download encapsulates a download operation
+// Download encapsulates a download operation.
 type Download struct {
 	Type    DownloadType
 	Video   *models.Video

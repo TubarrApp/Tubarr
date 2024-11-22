@@ -34,6 +34,9 @@ var (
 	mu    sync.Mutex
 )
 
+// Log Error:
+//
+// Print and log a message of the error type.
 func E(l int, format string, args ...interface{}) string {
 	if Level < l {
 		return ""
@@ -83,6 +86,9 @@ func E(l int, format string, args ...interface{}) string {
 	return msg
 }
 
+// Log Success:
+//
+// Print and log a message of the success type.
 func S(l int, format string, args ...interface{}) string {
 	if Level < l {
 		return ""
@@ -110,6 +116,9 @@ func S(l int, format string, args ...interface{}) string {
 	return msg
 }
 
+// Log Debug:
+//
+// Print and log a message of the debug type.
 func D(l int, format string, args ...interface{}) string {
 	if Level < l {
 		return ""
@@ -158,6 +167,9 @@ func D(l int, format string, args ...interface{}) string {
 	return msg
 }
 
+// Log Info:
+//
+// Print and log a message of the info type.
 func I(format string, args ...interface{}) string {
 
 	mu.Lock()
@@ -182,6 +194,9 @@ func I(format string, args ...interface{}) string {
 	return msg
 }
 
+// Log:
+//
+// Print and log a plain message.
 func P(format string, args ...interface{}) string {
 
 	mu.Lock()

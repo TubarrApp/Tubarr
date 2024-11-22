@@ -10,7 +10,7 @@ var (
 	filenameReplaceSuffixInput []string
 )
 
-// validateMetaOps parses the meta transformation operations
+// validateMetaOps parses the meta transformation operations.
 func validateMetaOps(metaOps []string) ([]string, error) {
 	if len(metaOps) == 0 {
 		logging.I("No meta operations passed in to verification")
@@ -53,7 +53,7 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 	return nil, fmt.Errorf("no valid meta operations")
 }
 
-// validateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid
+// validateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid.
 func validateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 	valid := make([]string, 0, len(fileSfxReplace))
 
@@ -67,7 +67,7 @@ func validateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 	return valid, nil
 }
 
-// setRenameFlag sets the rename style to apply
+// setRenameFlag sets the rename style to apply.
 func setRenameFlag(flag string) error {
 
 	// Trim whitespace for more robust validation
@@ -82,7 +82,7 @@ func setRenameFlag(flag string) error {
 	}
 }
 
-// dateEnum returns the date format enum type
+// dateEnum returns the date format enum type.
 func dateFormat(dateFmt string) bool {
 	if len(dateFmt) > 2 {
 		switch dateFmt {

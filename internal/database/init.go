@@ -10,6 +10,7 @@ import (
 
 var db *sql.DB
 
+// InitDB opens the database and creates/initializes tables.
 func InitDB() (err error) {
 	db, err = sql.Open("sqlite3", setup.DBFilePath)
 	if err != nil {
@@ -27,7 +28,7 @@ func GrabDB() *sql.DB {
 	return db
 }
 
-// initTables initializes the SQL tables
+// initTables initializes the SQL tables.
 func initTables(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {

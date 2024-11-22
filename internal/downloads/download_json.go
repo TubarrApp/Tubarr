@@ -3,14 +3,13 @@ package downloads
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
-// executeJSONDownload initiates a yt-dlp meta download command
+// executeJSONDownload executes a JSON download command.
 func executeJSONDownload(v *models.Video, cmd *exec.Cmd) error {
 	if cmd == nil {
 		return fmt.Errorf("no command built for URL %s", v.URL)
@@ -42,8 +41,8 @@ func executeJSONDownload(v *models.Video, cmd *exec.Cmd) error {
 	v.JPath = jsonPath
 
 	// Verify the file exists
-	if _, err := os.Stat(v.JPath); err != nil {
-		return fmt.Errorf("JSON file not found at %s: %v", v.JPath, err)
+	if err := verifyJSONDownload(v.JPath); err != nil {
+		return err
 	}
 
 	logging.I("Successfully saved JSON file to %q", v.JPath)

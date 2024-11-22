@@ -2,10 +2,8 @@ package downloads
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -15,7 +13,7 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-// ExecuteVideoDownload takes in a URL and downloads it
+// executeVideoDownload executes a video download command.
 func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 
 	stdout, err := cmd.StdoutPipe()
@@ -51,7 +49,7 @@ func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 		return err
 	}
 
-	if err := verifyDownload(v.VPath, v.JPath); err != nil {
+	if err := verifyVideoDownload(v.VPath); err != nil {
 		return err
 	}
 
@@ -59,7 +57,7 @@ func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 	return nil
 }
 
-// scanVCmdOutput scans the video command output for the video filename
+// scanVCmdOutput scans the video command output for the video filename.
 func scanVCmdOutput(r io.Reader, filenameChan chan<- string) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -77,28 +75,4 @@ func scanVCmdOutput(r io.Reader, filenameChan chan<- string) {
 		}
 	}
 	close(filenameChan)
-}
-
-// verifyDownload checks if the specified files exist and are non-empty
-func verifyDownload(videoPath, jsonPath string) error {
-	// Check video file
-	videoInfo, err := os.Stat(videoPath)
-	if err != nil {
-		return fmt.Errorf("video file verification failed: %w", err)
-	}
-	if videoInfo.Size() == 0 {
-		return fmt.Errorf("video file is empty: %s", videoPath)
-	}
-
-	// Check JSON file
-	jsonData, err := os.ReadFile(jsonPath)
-	if err != nil {
-		return fmt.Errorf("failed to read JSON file: %w", err)
-	}
-
-	if !json.Valid(jsonData) {
-		return fmt.Errorf("invalid JSON content in file: %s", jsonPath)
-	}
-
-	return nil
 }

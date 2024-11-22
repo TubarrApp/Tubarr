@@ -19,6 +19,7 @@ var (
 	LogFilePath string
 )
 
+// InitCfgFilesDirs initializes necessary program directories and filepaths.
 func InitCfgFilesDirs() error {
 
 	dir, err := os.UserHomeDir()

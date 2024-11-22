@@ -11,7 +11,6 @@ import (
 	"time"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/browser"
 	"tubarr/internal/utils/logging"
@@ -40,8 +39,10 @@ func initClients() {
 	})
 }
 
-// CrawlIgnoreNew gets the channel's currently shown videos and adds to ignore on subsequent crawls
-func CrawlIgnoreNew(s interfaces.Store, c *models.Channel) error {
+// CrawlIgnoreNew gets the channel's currently displayed videos and ignores them on subsequent crawls.
+//
+// Essentially the URLs it finds are marked as though they have already been downloaded.
+func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 	cs := s.GetChannelStore()
 	videos, err := browser.GetNewReleases(cs, c)
 	if err != nil {
@@ -65,8 +66,8 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel) error {
 	return nil
 }
 
-// CheckChannels checks channels and whether they are due for a crawl
-func CheckChannels(s interfaces.Store) error {
+// CheckChannels checks channels and whether they are due for a crawl.
+func CheckChannels(s models.Store) error {
 	cs := s.GetChannelStore()
 	chans, err, hasRows := cs.ListChannels()
 	if !hasRows {
@@ -135,8 +136,8 @@ func CheckChannels(s interfaces.Store) error {
 	return nil
 }
 
-// ChannelCrawl crawls a channel for new URLs
-func ChannelCrawl(s interfaces.Store, c *models.Channel) error {
+// ChannelCrawl crawls a channel for new URLs.
+func ChannelCrawl(s models.Store, c *models.Channel) error {
 	logging.I("Initiating crawl for URL %s...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
 		c.URL, c.VDir, c.JDir, c.Settings.Filters, c.Settings.CookieSource)
 
@@ -197,7 +198,7 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel) error {
 	return nil
 }
 
-// notify pings notification services as required
+// notify pings notification services as required.
 func notify(c *models.Channel, notifyURLs []string) (errs []error) {
 
 	// Setup clients

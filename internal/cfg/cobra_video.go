@@ -3,14 +3,14 @@ package cfg
 import (
 	"fmt"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/interfaces"
+	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
 )
 
-// InitChannelCmds is the entrypoint for initializing channel commands
-func initVideoCmds(s interfaces.Store) *cobra.Command {
+// InitChannelCmds is the entrypoint for initializing channel commands.
+func initVideoCmds(s models.Store) *cobra.Command {
 	vidCmd := &cobra.Command{
 		Use:   "video",
 		Short: "Video commands",
@@ -29,8 +29,8 @@ func initVideoCmds(s interfaces.Store) *cobra.Command {
 	return vidCmd
 }
 
-// deleteVideoCmd deletes a channel from the database
-func deleteVideoCmd(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra.Command {
+// deleteVideoCmd deletes a channel from the database.
+func deleteVideoCmd(vs models.VideoStore, cs models.ChannelStore) *cobra.Command {
 	var (
 		chanName, chanURL, url, chanKey, chanVal string
 	)

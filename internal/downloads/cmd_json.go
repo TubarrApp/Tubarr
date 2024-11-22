@@ -8,8 +8,7 @@ import (
 	logging "tubarr/internal/utils/logging"
 )
 
-// RequestMetaCommand builds and returns the argument for downloading metadata
-// files for the given URL
+// RequestMetaCommand builds and returns the argument for downloading metadata files for the given URL.
 func buildJSONCommand(v *models.Video) *exec.Cmd {
 
 	args := make([]string, 0, 64)

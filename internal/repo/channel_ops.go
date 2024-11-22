@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/process"
 	"tubarr/internal/utils/logging"
@@ -18,18 +17,19 @@ type ChannelStore struct {
 	DB *sql.DB
 }
 
+// GetChannelStore returns a channel store instance with injected database.
 func GetChannelStore(db *sql.DB) *ChannelStore {
 	return &ChannelStore{
 		DB: db,
 	}
 }
 
-// GetDB returns the database
+// GetDB returns the database.
 func (cs *ChannelStore) GetDB() *sql.DB {
 	return cs.DB
 }
 
-// GetID gets the channel ID from an input key and value
+// GetID gets the channel ID from an input key and value.
 func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	switch key {
 	case "url", "name", "id":
@@ -52,7 +52,7 @@ func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	return id, nil
 }
 
-// AddURLToIgnore adds a URL into the database to ignore in subsequent crawls
+// AddURLToIgnore adds a URL into the database to ignore in subsequent crawls.
 func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error {
 
 	if !cs.channelExistsID(channelID) {
@@ -72,7 +72,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 	return nil
 }
 
-// GetNotifyURLs returns all notification URLs for a given channel
+// GetNotifyURLs returns all notification URLs for a given channel.
 func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 	query := squirrel.
 		Select(consts.QNotifyURL).
@@ -105,7 +105,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 	return urls, nil
 }
 
-// AddNotifyURL sets a notification table entry for a channel with a given ID
+// AddNotifyURL sets a notification table entry for a channel with a given ID.
 func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) error {
 
 	if notifyURL == "" {
@@ -129,7 +129,7 @@ func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) err
 	return nil
 }
 
-// AddChannel adds a new channel to the database
+// AddChannel adds a new channel to the database.
 func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	switch {
 	case c.URL == "":
@@ -200,7 +200,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	return id, nil
 }
 
-// DeleteChannel deletes a channel from the database with a given key/value
+// DeleteChannel deletes a channel from the database with a given key/value.
 func (cs *ChannelStore) DeleteChannel(key, val string) error {
 	if !cs.channelExists(key, val) {
 		return fmt.Errorf("channel with key %q and value %q does not exist", key, val)
@@ -217,8 +217,8 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 	return nil
 }
 
-// CrawlChannelIgnore crawls a channel and adds the latest videos to the ignore list
-func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store) error {
+// CrawlChannelIgnore crawls a channel and adds the latest videos to the ignore list.
+func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s models.Store) error {
 	var (
 		c                    models.Channel
 		settings, metarrJSON json.RawMessage
@@ -278,8 +278,8 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store) 
 	return nil
 }
 
-// CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded
-func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store) error {
+// CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded.
+func (cs *ChannelStore) CrawlChannel(key, val string, s models.Store) error {
 	var (
 		settings, metarrJSON json.RawMessage
 	)
@@ -335,7 +335,7 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store) error 
 	return process.ChannelCrawl(s, &c)
 }
 
-// ListChannels lists all channels in the database
+// ListChannels lists all channels in the database.
 func (cs *ChannelStore) ListChannels() (channels []*models.Channel, err error, hasRows bool) {
 	query := squirrel.
 		Select(
@@ -404,7 +404,7 @@ func (cs *ChannelStore) ListChannels() (channels []*models.Channel, err error, h
 	return channels, nil, true
 }
 
-// UpdateChannelSettings updates specific settings in the channel's settings JSON
+// UpdateChannelSettings updates specific settings in the channel's settings JSON.
 func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*models.ChannelSettings) error) error {
 	var settingsJSON json.RawMessage
 	query := squirrel.
@@ -463,7 +463,7 @@ func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*mod
 	return nil
 }
 
-// UpdateCrawlFrequency updates the crawl frequency for a channel
+// UpdateCrawlFrequency updates the crawl frequency for a channel.
 func (cs ChannelStore) UpdateCrawlFrequency(key, val string, newFreq int) error {
 	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
 		s.CrawlFreq = newFreq
@@ -471,7 +471,7 @@ func (cs ChannelStore) UpdateCrawlFrequency(key, val string, newFreq int) error 
 	})
 }
 
-// UpdateExternalDownloader updates the external downloader settings
+// UpdateExternalDownloader updates the external downloader settings.
 func (cs ChannelStore) UpdateExternalDownloader(key, val, downloader, args string) error {
 	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
 		s.ExternalDownloader = downloader
@@ -480,7 +480,7 @@ func (cs ChannelStore) UpdateExternalDownloader(key, val, downloader, args strin
 	})
 }
 
-// UpdateChannelRow updates a single element in the database
+// UpdateChannelRow updates a single element in the database.
 func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
 	if key == "" {
 		return fmt.Errorf("please do not enter the key and value blank")
@@ -502,7 +502,7 @@ func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
 	return nil
 }
 
-// UpdateLastScan updates the DB entry for when the channel was last scanned
+// UpdateLastScan updates the DB entry for when the channel was last scanned.
 func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	query := squirrel.
 		Update(consts.DBChannels).
@@ -529,7 +529,7 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	return nil
 }
 
-// LoadGrabbedURLs loads already downloaded URLs from the database
+// LoadGrabbedURLs loads already downloaded URLs from the database.
 func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err error) {
 	if c.ID == 0 {
 		return nil, fmt.Errorf("model entered has no ID")
@@ -572,7 +572,7 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 
 // Private /////////////////////////////////////////////////////////////////////
 
-// channelExists returns true if the channel exists in the database
+// channelExists returns true if the channel exists in the database.
 func (cs ChannelStore) channelExists(key, val string) bool {
 	var exists bool
 	query := squirrel.
@@ -590,7 +590,7 @@ func (cs ChannelStore) channelExists(key, val string) bool {
 	return exists
 }
 
-// channelExistsID returns true if the channel ID exists in the database
+// channelExistsID returns true if the channel ID exists in the database.
 func (cs ChannelStore) channelExistsID(id int64) bool {
 	var exists bool
 	query := squirrel.

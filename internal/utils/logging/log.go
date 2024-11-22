@@ -19,7 +19,7 @@ var (
 	ansiEscape = regex.AnsiEscapeCompile()
 )
 
-// SetupLogging creates and/or opens the log file
+// SetupLogging creates and/or opens the log file.
 func SetupLogging() error {
 
 	logFile := &lumberjack.Logger{
@@ -37,7 +37,7 @@ func SetupLogging() error {
 	return nil
 }
 
-// Write writes error information to the log file
+// Write writes error information to the log file.
 func writeLog(msg string, level int) {
 	// Do not add mutex
 	if Loggable && level < 2 {

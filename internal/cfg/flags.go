@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// initAllFileTransformers initializes user flag settings for transformations applying to all files
+// initAllFileTransformers initializes user flag settings for transformations applying to all files.
 func initAllFileTransformers() {
 
 	// Prefix file with metafield
@@ -30,7 +30,7 @@ func initAllFileTransformers() {
 	viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete))
 }
 
-// initMetaTransformers initializes user flag settings for manipulation of metadata
+// initMetaTransformers initializes user flag settings for manipulation of metadata.
 func initMetaTransformers() {
 
 	// Metadata transformations
@@ -48,7 +48,7 @@ func initMetaTransformers() {
 	viper.BindPFlag(keys.MetaPurge, rootCmd.PersistentFlags().Lookup(keys.MetaPurge))
 }
 
-// initVideoTransformers initializes user flag settings for transformation of video files
+// initVideoTransformers initializes user flag settings for transformation of video files.
 func initVideoTransformers() {
 
 	// Output extension type

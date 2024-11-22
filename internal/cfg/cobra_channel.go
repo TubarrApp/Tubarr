@@ -7,7 +7,6 @@ import (
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
@@ -15,8 +14,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// InitChannelCmds is the entrypoint for initializing channel commands
-func initChannelCmds(s interfaces.Store) *cobra.Command {
+// InitChannelCmds is the entrypoint for initializing channel commands.
+func initChannelCmds(s models.Store) *cobra.Command {
 	channelCmd := &cobra.Command{
 		Use:   "channel",
 		Short: "Channel commands",
@@ -43,8 +42,8 @@ func initChannelCmds(s interfaces.Store) *cobra.Command {
 	return channelCmd
 }
 
-// dlURLs downloads a list of URLs inputted by the user
-func dlURLs(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
+// dlURLs downloads a list of URLs inputted by the user.
+func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 	var (
 		cFile, channelURL, channelName, key, val string
 		urls                                     []string
@@ -93,8 +92,8 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
 	return dlURLFileCmd
 }
 
-// addNotifyURL adds a notification URL (can use to send requests to update Plex libraries on new video addition)
-func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
+// addNotifyURL adds a notification URL (can use to send requests to update Plex libraries on new video addition).
+func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 	var (
 		channelName, channelURL string
 		notifyURL               string
@@ -150,8 +149,8 @@ func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
 	return addNotifyCmd
 }
 
-// addURLToIgnore adds a user inputted URL to ignore from crawls
-func addURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
+// addURLToIgnore adds a user inputted URL to ignore from crawls.
+func addURLToIgnore(cs models.ChannelStore) *cobra.Command {
 	var (
 		url, name, key, val string
 		ignoreURL           string
@@ -196,8 +195,8 @@ func addURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
 	return ignoreURLCmd
 }
 
-// addCrawlToIgnore crawls the current state of the channel page and adds the URLs as though they are already grabbed
-func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
+// addCrawlToIgnore crawls the current state of the channel page and adds the URLs as though they are already grabbed.
+func addCrawlToIgnore(cs models.ChannelStore, s models.Store) *cobra.Command {
 	var (
 		url, name string
 		id        int
@@ -239,8 +238,8 @@ func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Com
 	return ignoreCrawlCmd
 }
 
-// addChannelCmd adds a new channel into the database
-func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+// addChannelCmd adds a new channel into the database.
+func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 	var (
 		url, name, vDir, jDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, dateFmt, renameFlag string
@@ -361,8 +360,8 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	return addCmd
 }
 
-// deleteChannelCmd deletes a channel from the database
-func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+// deleteChannelCmd deletes a channel from the database.
+func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 	var (
 		url, name string
 	)
@@ -400,8 +399,8 @@ func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	return delCmd
 }
 
-// listChannelCmd returns a list of channels in the database
-func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+// listChannelCmd returns a list of channels in the database.
+func listChannelCmd(cs models.ChannelStore) *cobra.Command {
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all channels",
@@ -444,8 +443,8 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	return listCmd
 }
 
-// crawlChannelCmd initiates a crawl of a given channel
-func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
+// crawlChannelCmd initiates a crawl of a given channel.
+func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 	var (
 		url, name string
 		id        int
@@ -487,8 +486,8 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Comm
 	return crawlCmd
 }
 
-// updateChannelSettingsCmd updates channel settings
-func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
+// updateChannelSettingsCmd updates channel settings.
+func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	var (
 		id                        int
 		crawlFreq                 int
@@ -545,8 +544,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	return updateSettingsCmd
 }
 
-// updateChannelRow provides a command allowing the alteration of a channel row
-func updateChannelRow(cs interfaces.ChannelStore) *cobra.Command {
+// updateChannelRow provides a command allowing the alteration of a channel row.
+func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 	var (
 		col, newVal, url, name string
 		id                     int
