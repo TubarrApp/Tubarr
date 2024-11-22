@@ -43,6 +43,8 @@ const (
 	QVidDescription = "description"
 	QVidVDir        = "video_directory"
 	QVidJDir        = "json_directory"
+	QVidVPath       = "video_path"
+	QVidJPath       = "json_path"
 	QVidSettings    = "settings"
 	QVidMetarr      = "metarr"
 	QVidUploadDate  = "upload_date"
@@ -61,9 +63,12 @@ const (
 )
 
 // DL status
+type DLStatus string
+
 const (
-	DLStatusPending     = "pending"
-	DLStatusDownloading = "downloading"
-	DLStatusCompleted   = "finished"
-	DLStatusFailed      = "failed"
+	DLStatusEmpty       DLStatus = ""
+	DLStatusPending     DLStatus = "waiting"
+	DLStatusDownloading DLStatus = "downloading"
+	DLStatusCompleted   DLStatus = "finished"
+	DLStatusFailed      DLStatus = "failed"
 )

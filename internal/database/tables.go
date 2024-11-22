@@ -19,7 +19,6 @@ func initProgramTable(tx *sql.Tx) error {
         CONSTRAINT single_row CHECK (id = 1)
     );
     INSERT OR IGNORE INTO program (id, program_id, running) VALUES (1, 'Tubarr', 0);
-    CREATE INDEX IF NOT EXISTS idx_program_last_heartbeat ON program(last_heartbeat)
     `
 	if _, err := tx.Exec(query); err != nil {
 		return fmt.Errorf("failed to create program table: %w", err)
@@ -43,8 +42,6 @@ func initChannelsTable(tx *sql.Tx) error {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_channels_url ON channels(url);
-    CREATE INDEX IF NOT EXISTS idx_channels_video_directory ON channels(video_directory);
-    CREATE INDEX IF NOT EXISTS idx_channels_json_directory ON channels(json_directory);
     CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
     CREATE INDEX IF NOT EXISTS idx_channels_last_scan ON channels(last_scan);
     `
@@ -66,6 +63,9 @@ func initVideosTable(tx *sql.Tx) error {
         description TEXT,
         video_directory TEXT,
         json_directory TEXT,
+        video_path TEXT,
+        json_path TEXT,
+        status TEXT,
         upload_date TIMESTAMP,
         metadata JSON,
         settings JSON,
@@ -96,7 +96,6 @@ func initNotifyTable(tx *sql.Tx) error {
         UNIQUE(channel_id, notify_url)
     );
     CREATE INDEX IF NOT EXISTS idx_notification_channel ON notifications(channel_id);
-    CREATE INDEX IF NOT EXISTS idx_notification_name ON notifications(name);
     CREATE INDEX IF NOT EXISTS idx_notification_url ON notifications(notify_url);
     `
 	if _, err := tx.Exec(query); err != nil {

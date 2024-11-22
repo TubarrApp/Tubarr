@@ -37,8 +37,10 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	}
 
 	if id, exists := vs.videoExists(consts.QVidURL, v.URL); exists {
-		logging.D(2, "Video with URL %q already exists, returning ID", v.URL)
-		return id, nil // Return gracefully instead of error
+		if err := vs.UpdateVideo(v); err != nil { // Attempt an update if add is not appropriate
+			return id, err
+		}
+		return id, nil
 	}
 
 	// JSON dir
@@ -47,20 +49,29 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	}
 	now := time.Now()
 
+	var (
+		metadataJSON []byte
+		settingsJSON []byte
+		metarrJSON   []byte
+		err          error
+	)
+
 	// Convert metadata map to JSON string
-	metadataJSON, err := json.Marshal(v.MetadataMap)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal metadata to JSON: %w", err)
+	if v.MetadataMap != nil {
+		metadataJSON, err = json.Marshal(v.MetadataMap)
+		if err != nil {
+			return 0, fmt.Errorf("failed to marshal metadata to JSON: %w", err)
+		}
 	}
 
 	// Convert settings to JSON
-	settingsJSON, err := json.Marshal(v.Settings)
+	settingsJSON, err = json.Marshal(v.Settings)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal settings to JSON: %w", err)
 	}
 
 	// Convert metarr settings to JSON
-	metarrJSON, err := json.Marshal(v.MetarrArgs)
+	metarrJSON, err = json.Marshal(v.MetarrArgs)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal metarr settings to JSON: %w", err)
 	}
@@ -109,21 +120,19 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 
 // UpdateVideo updates the status of the video in the database
 func (vs VideoStore) UpdateVideo(v *models.Video) error {
-
-	// JSON conversions for storage in DB
 	metadataJSON, err := json.Marshal(v.MetadataMap)
 	if err != nil {
-		return fmt.Errorf("failed to marshal metadata to JSON: %w", err)
+		return fmt.Errorf("failed to marshal metadata: %w", err)
 	}
 
 	settingsJSON, err := json.Marshal(v.Settings)
 	if err != nil {
-		return fmt.Errorf("failed to marshal settings to JSON: %w", err)
+		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
 	metarrJSON, err := json.Marshal(v.MetarrArgs)
 	if err != nil {
-		return fmt.Errorf("failed to marshal metarr settings to JSON: %w", err)
+		return fmt.Errorf("failed to marshal metarr: %w", err)
 	}
 
 	query := squirrel.
@@ -132,10 +141,13 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 		Set(consts.QVidTitle, v.Title).
 		Set(consts.QVidDescription, v.Description).
 		Set(consts.QVidVDir, v.VDir).
+		Set(consts.QVidJDir, v.JDir).
+		Set(consts.QVidVPath, v.VPath).
+		Set(consts.QVidJPath, v.JPath).
+		Set(consts.QVidUploadDate, v.UploadDate).
 		Set(consts.QVidMetadata, metadataJSON).
 		Set(consts.QVidSettings, settingsJSON).
 		Set(consts.QVidMetarr, metarrJSON).
-		Set(consts.QVidUploadDate, v.UploadDate).
 		Set(consts.QVidUpdatedAt, time.Now()).
 		Where(squirrel.Eq{consts.QVidURL: v.URL}).
 		RunWith(vs.DB)
@@ -154,7 +166,7 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 		return fmt.Errorf("no video found with URL %s", v.URL)
 	}
 
-	logging.D(1, "Updated video in database: %s (Title: %s)", v.URL, v.Title)
+	logging.S(0, "Updated video: %s (Title: %s) Downloaded: %v", v.URL, v.Title, v.Downloaded)
 	return nil
 }
 
@@ -182,35 +194,21 @@ func (vs VideoStore) DeleteVideo(key, val string) error {
 
 // Private /////////////////////////////////////////////////////////////////////
 
-// channelExists returns true if the channel exists in the database
+// videoExists returns true if the video exists in the database
 func (vs VideoStore) videoExists(key, val string) (int64, bool) {
-	var exists bool
+	var id int64
 	query := squirrel.
-		Select("1").
+		Select(consts.QVidID).
 		From(consts.DBVideos).
 		Where(squirrel.Eq{key: val}).
 		RunWith(vs.DB)
 
-	if err := query.QueryRow().Scan(&exists); err != nil {
-		logging.E(0, err.Error())
+	err := query.QueryRow().Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, false
+	} else if err != nil {
+		logging.E(0, "Error checking if video exists: %v", err)
 		return 0, false
 	}
-
-	idQuery := squirrel.
-		Select(consts.QVidID).
-		Where(squirrel.Eq{key: val}).
-		RunWith(vs.DB)
-
-	rtn, err := idQuery.Exec()
-	if err != nil {
-		logging.E(0, "Failed to retrieve ID for video with key %q and value %q", key, val)
-		return 0, exists
-	}
-
-	id, err := rtn.LastInsertId()
-	if err != nil {
-		logging.E(0, "Error grabbing last insert ID for video with key %q and value %q", key, val)
-		return id, exists
-	}
-	return id, exists
+	return id, true
 }
