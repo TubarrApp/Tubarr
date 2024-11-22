@@ -21,27 +21,43 @@ func initVideoCmds(s interfaces.Store) *cobra.Command {
 	}
 
 	vs := s.GetVideoStore()
+	cs := s.GetChannelStore()
 
 	// Add subcommands with dependencies
-	vidCmd.AddCommand(deleteVideoCmd(vs))
+	vidCmd.AddCommand(deleteVideoCmd(vs, cs))
 
 	return vidCmd
 }
 
 // deleteVideoCmd deletes a channel from the database
-func deleteVideoCmd(vs interfaces.VideoStore) *cobra.Command {
-	var url string
+func deleteVideoCmd(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		chanName, chanURL, url, chanKey, chanVal string
+	)
 
 	delCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete video entry",
-		Long:  "Delete a video entry from the database by URL",
+		Long:  "Delete a video entry from a channel by URL",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if url == "" {
-				return fmt.Errorf("must enter a URL")
+
+			switch {
+			case chanURL != "" && url != "":
+				chanKey = consts.QChanURL
+				chanVal = chanURL
+			case chanName != "" && url != "":
+				chanKey = consts.QChanName
+				chanVal = chanName
+			default:
+				return fmt.Errorf("must enter a channel name/URL, and a video URL to delete")
 			}
 
-			if err := vs.DeleteVideo(consts.QVidURL, url); err != nil {
+			cid, err := cs.GetID(chanKey, chanVal)
+			if err != nil {
+				return err
+			}
+
+			if err := vs.DeleteVideo(consts.QVidURL, url, cid); err != nil {
 				return err
 			}
 			logging.S(0, "Successfully deleted video with URL %q", url)
@@ -50,7 +66,9 @@ func deleteVideoCmd(vs interfaces.VideoStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	delCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
+	delCmd.Flags().StringVarP(&chanName, "channel-name", "n", "", "Channel name")
+	delCmd.Flags().StringVarP(&chanURL, "channel-url", "u", "", "Channel URL")
+	delCmd.Flags().StringVar(&url, "delete-url", "", "Video URL")
 
 	return delCmd
 }

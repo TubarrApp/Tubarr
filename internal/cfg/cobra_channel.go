@@ -12,6 +12,7 @@ import (
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // InitChannelCmds is the entrypoint for initializing channel commands
@@ -29,6 +30,7 @@ func initChannelCmds(s interfaces.Store) *cobra.Command {
 
 	// Add subcommands with dependencies
 	channelCmd.AddCommand(addChannelCmd(cs))
+	channelCmd.AddCommand(dlURLs(cs, s))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s))
 	channelCmd.AddCommand(addCrawlToIgnore(cs, s))
 	channelCmd.AddCommand(addURLToIgnore(cs))
@@ -39,6 +41,56 @@ func initChannelCmds(s interfaces.Store) *cobra.Command {
 	channelCmd.AddCommand(addNotifyURL(cs))
 
 	return channelCmd
+}
+
+// dlURLs downloads a list of URLs inputted by the user
+func dlURLs(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
+	var (
+		cFile, channelURL, channelName, key, val string
+		urls                                     []string
+	)
+
+	dlURLFileCmd := &cobra.Command{
+		Use:   "get-urls",
+		Short: "Download input URLs (plaintext or file)",
+		Long:  "Enter a file containing URLs, one per line, to download them to the channel",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cFile == "" && len(urls) == 0 {
+				return fmt.Errorf("must enter a URL source")
+			}
+
+			switch {
+			case channelURL != "":
+				key = consts.QChanURL
+				val = channelURL
+			case channelName != "":
+				key = consts.QChanName
+				val = channelName
+			default:
+				return fmt.Errorf("must enter a channel name or channel URL")
+			}
+
+			if len(urls) > 0 {
+				viper.Set(keys.URLAdd, urls)
+			}
+
+			if cFile != "" {
+				viper.Set(keys.URLFile, cFile)
+			}
+
+			if err := cs.CrawlChannel(key, val, s); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	dlURLFileCmd.Flags().StringVarP(&channelURL, "channel-url", "u", "", "Channel URL")
+	dlURLFileCmd.Flags().StringVarP(&channelName, "channel-name", "n", "", "Channel name")
+	dlURLFileCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to this channel")
+	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLAdd, nil, "Enter a list of URLs to download")
+
+	return dlURLFileCmd
 }
 
 // addNotifyURL adds a notification URL (can use to send requests to update Plex libraries on new video addition)

@@ -31,7 +31,7 @@ type ChannelStore interface {
 
 type VideoStore interface {
 	AddVideo(v *models.Video) (int64, error)
-	DeleteVideo(key, val string) error
+	DeleteVideo(key, val string, chanID int64) error
 	UpdateVideo(v *models.Video) error
 	GetDB() *sql.DB
 }

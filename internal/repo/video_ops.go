@@ -171,7 +171,7 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 }
 
 // DeleteVideo deletes an existent downloaded video from the database
-func (vs VideoStore) DeleteVideo(key, val string) error {
+func (vs VideoStore) DeleteVideo(key, val string, chanID int64) error {
 	if key == "" || val == "" {
 		return fmt.Errorf("please pass in a key and value to delete a video entry")
 	}
