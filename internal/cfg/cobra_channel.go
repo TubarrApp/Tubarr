@@ -341,11 +341,11 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 	addCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
 	addCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
 	addCmd.Flags().StringVarP(&vDir, keys.VideoDir, "v", "", "Output directory (videos will be saved here)")
-	addCmd.Flags().StringVarP(&jDir, keys.JSONDir, "j", "", "Output directory (videos will be saved here)")
+	addCmd.Flags().StringVarP(&jDir, keys.JSONDir, "j", "", "Output directory (JSON metafiles will be saved here)")
 
 	// Channel settings
 	addCmd.Flags().IntVar(&crawlFreq, keys.CrawlFreq, 30, "How often to check for new videos (in minutes)")
-	addCmd.Flags().IntVarP(&concurrency, keys.Concurrency, "l", 3, "Output directory (videos will be saved here)")
+	addCmd.Flags().IntVarP(&concurrency, keys.Concurrency, "l", 3, "Maximum concurrent videos to download/process for this channel")
 	addCmd.Flags().StringSliceVar(&filterInput, keys.FilterOpsInput, []string{}, "Filter video downloads (e.g. 'title:contains:frogs' ignores downloads without 'frogs' in the title metafield)")
 	addCmd.Flags().StringVar(&cookieSource, keys.CookieSource, "", "Please enter the browser to grab cookies from for sites requiring authentication (e.g. 'firefox')")
 	addCmd.Flags().StringVar(&externalDownloader, keys.ExternalDownloader, "", "External downloader option (e.g. 'aria2c')")
@@ -489,10 +489,9 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 // updateChannelSettingsCmd updates channel settings.
 func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	var (
-		id                        int
-		crawlFreq                 int
-		url, name, key, val       string
-		downloadCmd, downloadArgs string
+		id, concurrency, crawlFreq int
+		url, name, key, val        string
+		downloadCmd, downloadArgs  string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -512,6 +511,10 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 				val = strconv.Itoa(id)
 			default:
 				return fmt.Errorf("please enter either a URL or name")
+			}
+
+			if concurrency != 0 {
+
 			}
 
 			if crawlFreq != 0 {
@@ -537,6 +540,7 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	updateSettingsCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
 	updateSettingsCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
 
+	updateSettingsCmd.Flags().IntVarP(&concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this channel")
 	updateSettingsCmd.Flags().IntVar(&crawlFreq, "crawl-freq", 0, "New crawl frequency in minutes")
 	updateSettingsCmd.Flags().StringVar(&downloadCmd, "downloader", "", "External downloader command")
 	updateSettingsCmd.Flags().StringVar(&downloadArgs, "downloader-args", "", "External downloader arguments")

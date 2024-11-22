@@ -1,7 +1,6 @@
 package cfg
 
 import (
-	"fmt"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 
@@ -46,24 +45,4 @@ func InitCommands(s models.Store) {
 	// Set up any root-level flags here if needed
 	rootCmd.PersistentFlags().Int("debug", 0, "Debug level (0-5)")
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
-}
-
-// verify verifies that the user input flags are valid.
-func verify() error {
-	if viper.IsSet(keys.OutputFiletype) {
-		ext := viper.GetString(keys.OutputFiletype)
-		if !verifyOutputFiletype(ext) {
-			return fmt.Errorf("invalid output filetype %q", ext)
-		}
-	}
-
-	if viper.IsSet(keys.MetaPurge) {
-		purge := viper.GetString(keys.MetaPurge)
-		if !verifyPurgeMetafiles(purge) {
-			return fmt.Errorf("invalid meta purge type %q", purge)
-		}
-	}
-
-	verifyConcurrencyLimit()
-	return nil
 }

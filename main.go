@@ -73,7 +73,7 @@ func main() {
 	go func() {
 		<-sigChan
 		if err := pc.QuitTubarr(); err != nil {
-			logging.E(0, "!!! FAILED TO MARK TUBARR AS EXITED, WILL NOT RUN AGAIN UNLESS DB DELETED")
+			logging.E(0, "!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes)")
 		}
 		os.Exit(1)
 	}()
@@ -81,7 +81,7 @@ func main() {
 	defer func() {
 		if r := recover(); r != nil {
 			if err := pc.QuitTubarr(); err != nil {
-				logging.E(0, "!!! FAILED TO MARK TUBARR AS EXITED, WILL NOT RUN AGAIN UNLESS DB DELETED")
+				logging.E(0, "!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes)")
 			}
 			panic(r)
 		}
@@ -89,7 +89,7 @@ func main() {
 
 	defer func() {
 		if err := pc.QuitTubarr(); err != nil {
-			logging.E(0, "!!! FAILED TO MARK TUBARR AS EXITED, WILL NOT RUN AGAIN UNLESS DB DELETED")
+			logging.E(0, "!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes)")
 		}
 	}()
 

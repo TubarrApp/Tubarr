@@ -471,6 +471,14 @@ func (cs ChannelStore) UpdateCrawlFrequency(key, val string, newFreq int) error 
 	})
 }
 
+// UpdateConcurrencyLimit updates the concurrency limit for a channel.
+func (cs ChannelStore) UpdateConcurrencyLimit(key, val string, newConc int) error {
+	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
+		s.Concurrency = newConc
+		return nil
+	})
+}
+
 // UpdateExternalDownloader updates the external downloader settings.
 func (cs ChannelStore) UpdateExternalDownloader(key, val, downloader, args string) error {
 	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
