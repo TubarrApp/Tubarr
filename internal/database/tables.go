@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// initProgramTable initializes the primary program database table
+// initProgramTable initializes the primary program database table.
 func initProgramTable(tx *sql.Tx) error {
 	query := `
     CREATE TABLE IF NOT EXISTS program (
@@ -26,7 +26,7 @@ func initProgramTable(tx *sql.Tx) error {
 	return nil
 }
 
-// initChannelsTable intializes channel tables
+// initChannelsTable intializes channel tables.
 func initChannelsTable(tx *sql.Tx) error {
 	query := `
     CREATE TABLE IF NOT EXISTS channels (
@@ -51,7 +51,7 @@ func initChannelsTable(tx *sql.Tx) error {
 	return nil
 }
 
-// initVideosTable initializes videos tables
+// initVideosTable initializes videos tables.
 func initVideosTable(tx *sql.Tx) error {
 	query := `
     CREATE TABLE IF NOT EXISTS videos (
@@ -83,7 +83,7 @@ func initVideosTable(tx *sql.Tx) error {
 	return nil
 }
 
-// initNotifyTable initializes notification service tables
+// initNotifyTable initializes notification service tables.
 func initNotifyTable(tx *sql.Tx) error {
 	query := `
     CREATE TABLE IF NOT EXISTS notifications (

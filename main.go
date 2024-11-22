@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	"tubarr/internal/cfg"
@@ -17,7 +18,10 @@ import (
 
 var (
 	store     *repo.Store
+	dbc       *database.DBControl
+	pc        *repo.ProgControl
 	startTime time.Time
+	err       error
 )
 
 func init() {
@@ -36,22 +40,27 @@ func init() {
 	}
 
 	// Database & stores
-	if err := database.InitDB(); err != nil {
+	dbc, err = database.InitDB()
+	if err != nil {
 		logging.I("Tubarr exiting: %v\n", err)
 		os.Exit(0)
 	}
-	db := database.GrabDB()
-	store = repo.InitStores(db)
+	store = repo.InitStores(dbc.DB)
 
 	// Start
-	pid, err := database.StartTubarr()
+	pc = repo.NewProgController(dbc.DB)
+	id, err := pc.StartTubarr()
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "failure:") {
+			logging.E(0, "DB %v\n", err)
+			os.Exit(1)
+		}
 		logging.I("Tubarr exiting: %v\n", err)
 		os.Exit(0)
 	}
 
 	startTime = time.Now()
-	logging.I("Tubarr (PID: %d) started at: %v", pid, startTime.Format("2006-01-02 15:04:05.00 MST"))
+	logging.I("Tubarr (PID: %d) started at: %v", id, startTime.Format("2006-01-02 15:04:05.00 MST"))
 }
 
 // main is the program entrypoint (duh!)
@@ -63,7 +72,7 @@ func main() {
 	// Cleanup functions
 	go func() {
 		<-sigChan
-		if err := database.QuitTubarr(); err != nil {
+		if err := pc.QuitTubarr(); err != nil {
 			logging.E(0, "!!! FAILED TO MARK TUBARR AS EXITED, WILL NOT RUN AGAIN UNLESS DB DELETED")
 		}
 		os.Exit(1)
@@ -71,7 +80,7 @@ func main() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			if err := database.QuitTubarr(); err != nil {
+			if err := pc.QuitTubarr(); err != nil {
 				logging.E(0, "!!! FAILED TO MARK TUBARR AS EXITED, WILL NOT RUN AGAIN UNLESS DB DELETED")
 			}
 			panic(r)
@@ -79,7 +88,7 @@ func main() {
 	}()
 
 	defer func() {
-		if err := database.QuitTubarr(); err != nil {
+		if err := pc.QuitTubarr(); err != nil {
 			logging.E(0, "!!! FAILED TO MARK TUBARR AS EXITED, WILL NOT RUN AGAIN UNLESS DB DELETED")
 		}
 	}()
@@ -90,7 +99,7 @@ func main() {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			if err := database.UpdateHeartbeat(); err != nil {
+			if err := pc.UpdateHeartbeat(); err != nil {
 				logging.E(0, "Failed to update heartbeat: %v", err)
 			}
 		}
