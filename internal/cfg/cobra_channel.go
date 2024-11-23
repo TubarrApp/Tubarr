@@ -491,6 +491,7 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	var (
 		id, concurrency, crawlFreq int
 		url, name, key, val        string
+		vDir, jDir, outDir         string
 		downloadCmd, downloadArgs  string
 	)
 
@@ -513,8 +514,25 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 				return fmt.Errorf("please enter either a URL or name")
 			}
 
-			if concurrency != 0 {
+			if vDir != "" {
+				if err := cs.UpdateChannelEntry(key, val, consts.QChanVDir, vDir); err != nil {
+					return fmt.Errorf("failed to update video directory: %w", err)
+				}
+				logging.S(0, "Updated video directory to %q", vDir)
+			}
 
+			if jDir != "" {
+				if err := cs.UpdateChannelEntry(key, val, consts.QChanJDir, jDir); err != nil {
+					return fmt.Errorf("failed to update JSON directory: %w", err)
+				}
+				logging.S(0, "Updated JSON directory to %q", jDir)
+			}
+
+			if concurrency != 0 {
+				if err := cs.UpdateConcurrencyLimit(key, val, concurrency); err != nil {
+					return fmt.Errorf("failed to update concurrency limit: %w", err)
+				}
+				logging.S(0, "Updated concurrency to %d minutes", concurrency)
 			}
 
 			if crawlFreq != 0 {
@@ -522,6 +540,13 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 					return fmt.Errorf("failed to update crawl frequency: %w", err)
 				}
 				logging.S(0, "Updated crawl frequency to %d minutes", crawlFreq)
+			}
+
+			if outDir != "" {
+				if err := cs.UpdateMetarrOutputDir(key, val, outDir); err != nil {
+					return fmt.Errorf("failed to update Metarr output directory: %w", err)
+				}
+				logging.S(0, "Updated Metarr output directory to %q", outDir)
 			}
 
 			if downloadCmd != "" {
@@ -540,6 +565,13 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	updateSettingsCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
 	updateSettingsCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
 
+	// Edits:
+	// Files/dirs
+	updateSettingsCmd.Flags().StringVar(&vDir, keys.VideoDir, "", "This is where videos for this channel will be saved (some {{}} templating commands available)")
+	updateSettingsCmd.Flags().StringVar(&jDir, keys.JSONDir, "", "This is where JSON files for this channel will be saved (some {{}} templating commands available)")
+	updateSettingsCmd.Flags().StringVar(&outDir, "metarr-output-dir", "", "Metarr will move files to this location on completion (some {{}} templating commands available)")
+
+	// Program related
 	updateSettingsCmd.Flags().IntVarP(&concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this channel")
 	updateSettingsCmd.Flags().IntVar(&crawlFreq, "crawl-freq", 0, "New crawl frequency in minutes")
 	updateSettingsCmd.Flags().StringVar(&downloadCmd, "downloader", "", "External downloader command")

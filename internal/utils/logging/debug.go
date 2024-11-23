@@ -34,7 +34,7 @@ var (
 // Log Error:
 //
 // Print and log a message of the error type.
-func E(l int, format string, args ...interface{}) string {
+func E(l int, format string, args ...any) string {
 	if Level < l {
 		return ""
 	}
@@ -85,7 +85,7 @@ func E(l int, format string, args ...interface{}) string {
 // Log Success:
 //
 // Print and log a message of the success type.
-func S(l int, format string, args ...interface{}) string {
+func S(l int, format string, args ...any) string {
 	if Level < l {
 		return ""
 	}
@@ -115,7 +115,7 @@ func S(l int, format string, args ...interface{}) string {
 // Log Debug:
 //
 // Print and log a message of the debug type.
-func D(l int, format string, args ...interface{}) string {
+func D(l int, format string, args ...any) string {
 	if Level < l {
 		return ""
 	}
@@ -166,7 +166,7 @@ func D(l int, format string, args ...interface{}) string {
 // Log Info:
 //
 // Print and log a message of the info type.
-func I(format string, args ...interface{}) string {
+func I(format string, args ...any) string {
 
 	var b strings.Builder
 	b.Grow(len(consts.BlueInfo) + len(format) + len(consts.ColorReset) + 1 + (len(args) * 32))
@@ -193,7 +193,7 @@ func I(format string, args ...interface{}) string {
 // Log:
 //
 // Print and log a plain message.
-func P(format string, args ...interface{}) string {
+func P(format string, args ...any) string {
 
 	var b strings.Builder
 	b.Grow(len(format) + 1 + (len(args) * 32))

@@ -24,4 +24,5 @@ type MetarrArgs struct {
 	RenameStyle        string   `json:"rename_style"`
 	FileDatePfx        string   `json:"filename_date_prefix"`
 	MetaOps            []string `json:"meta_ops"`
+	OutputDir          string   `json:"metarr_output_directory"`
 }

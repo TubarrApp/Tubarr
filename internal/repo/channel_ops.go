@@ -168,7 +168,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			consts.QChanVDir,
 			consts.QChanJDir,
 			consts.QChanSettings,
-			consts.QChanMetarr, // Add this column
+			consts.QChanMetarr,
 			consts.QChanLastScan,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
@@ -179,7 +179,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			c.VDir,
 			c.JDir,
 			settingsJSON,
-			metarrJSON, // Add this value
+			metarrJSON,
 			now,
 			now,
 			now,
@@ -372,7 +372,7 @@ func (cs *ChannelStore) ListChannels() (channels []*models.Channel, err error, h
 			&c.VDir,
 			&c.JDir,
 			&settingsJSON,
-			&metarrJSON, // Scan Metarr JSON
+			&metarrJSON,
 			&c.LastScan,
 			&c.CreatedAt,
 			&c.UpdatedAt,
@@ -402,6 +402,65 @@ func (cs *ChannelStore) ListChannels() (channels []*models.Channel, err error, h
 	}
 
 	return channels, nil, true
+}
+
+// UpdateChannelMetarrArgs updates args for Metarr output.
+func (cs ChannelStore) UpdateChannelMetarrArgs(key, val string, updateFn func(*models.MetarrArgs) error) error {
+	var metarrArgs json.RawMessage
+	query := squirrel.
+		Select(consts.QChanMetarr).
+		From(consts.DBChannels).
+		Where(squirrel.Eq{key: val}).
+		RunWith(cs.DB)
+
+	err := query.QueryRow().Scan(&metarrArgs)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
+	} else if err != nil {
+		return fmt.Errorf("failed to get channel settings: %w", err)
+	}
+
+	// Unmarshal current settings
+	var args models.MetarrArgs
+	if err := json.Unmarshal(metarrArgs, &args); err != nil {
+		return fmt.Errorf("failed to unmarshal settings: %w", err)
+	}
+
+	// Apply the update
+	if err := updateFn(&args); err != nil {
+		return fmt.Errorf("failed to update settings: %w", err)
+	}
+
+	// Marshal updated settings
+	updatedArgs, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated settings: %w", err)
+	}
+
+	// Update in database
+	updateQuery := squirrel.
+		Update(consts.DBChannels).
+		Set(consts.QChanMetarr, updatedArgs).
+		Set(consts.QChanUpdatedAt, time.Now()).
+		Where(squirrel.Eq{key: val}).
+		RunWith(cs.DB)
+
+	result, err := updateQuery.Exec()
+	if err != nil {
+		return fmt.Errorf("failed to update channel Metarr args: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
+	}
+
+	logging.S(1, "Updated Metarr args for channel with key %q and value '%v'", key, val)
+	return nil
 }
 
 // UpdateChannelSettings updates specific settings in the channel's settings JSON.
@@ -461,6 +520,28 @@ func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*mod
 
 	logging.S(1, "Updated settings for channel with key %q and value '%v'", key, val)
 	return nil
+}
+
+// UpdateChannelEntry updates a single field for a channel.
+func (cs ChannelStore) UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error {
+	query := squirrel.
+		Update(consts.DBChannels).
+		Set(updateKey, updateVal).
+		Where(squirrel.Eq{chanKey: chanVal}).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return fmt.Errorf("failed to set %q=%q in channel identified by key %q and val %q", updateKey, updateVal, chanKey, chanVal)
+	}
+	return nil
+}
+
+// UpdateMetarrOutputDir updates the crawl frequency for a channel.
+func (cs ChannelStore) UpdateMetarrOutputDir(key, val string, outDir string) error {
+	return cs.UpdateChannelMetarrArgs(key, val, func(m *models.MetarrArgs) error {
+		m.OutputDir = outDir
+		return nil
+	})
 }
 
 // UpdateCrawlFrequency updates the crawl frequency for a channel.

@@ -12,7 +12,7 @@ var rootCmd = &cobra.Command{
 	Use:   "tubarr",
 	Short: "Tubarr is a video and metatagging tool",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if err := verify(); err != nil {
+		if err := viperFlags(); err != nil {
 			return
 		}
 	},

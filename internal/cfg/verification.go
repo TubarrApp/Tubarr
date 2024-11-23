@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// verify verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
-func verify() error {
+// viperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
+func viperFlags() error {
 	if viper.IsSet(keys.OutputFiletype) {
 		ext := viper.GetString(keys.OutputFiletype)
 		if !verifyOutputFiletype(ext) {

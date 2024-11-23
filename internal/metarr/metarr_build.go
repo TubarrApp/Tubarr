@@ -1,20 +1,44 @@
 package metarr
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 )
 
 // mergeArguments combines arguments from both Viper config and model settings
-func makeMetarrCommand(v *models.Video) []string {
+func makeMetarrCommand(v *models.Video) ([]string, error) {
 
 	baseArgs := []string{
 		"-V", v.VPath,
 		"-J", v.JPath,
+	}
+
+	dirParser := parsing.NewDirectoryParser(v.Channel, v)
+
+	if cfg.IsSet(keys.MoveOnComplete) && v.MetarrArgs.OutputDir == "" {
+		logging.I("Move on complete flag set, checking output directory for template directives...")
+		if parsedDir, err := dirParser.ParseDirectory(cfg.GetString(keys.MoveOnComplete)); err != nil {
+			logging.E(0, err.Error())
+		} else {
+			logging.S(0, "Updated output directory to %q", parsedDir)
+			cfg.Set(keys.MoveOnComplete, parsedDir)
+		}
+	}
+
+	var parsedOutputDir string
+	if v.MetarrArgs.OutputDir != "" {
+		dirParser := parsing.NewDirectoryParser(v.Channel, v)
+		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse output directory template: %w", err)
+		}
+		parsedOutputDir = parsed
 	}
 
 	// Map to deduplicate meta
@@ -52,6 +76,9 @@ func makeMetarrCommand(v *models.Video) []string {
 	}
 	if v.MetarrArgs.FilenameReplaceSfx != "" {
 		argMap["--filename-replace-suffix"] = v.MetarrArgs.FilenameReplaceSfx
+	}
+	if parsedOutputDir != "" {
+		argMap["-o"] = parsedOutputDir
 	}
 
 	// Add Viper config arguments
@@ -103,5 +130,5 @@ func makeMetarrCommand(v *models.Video) []string {
 	logging.D(1, "Final Metarr arguments: %s", strings.Join(args, " "))
 	logging.D(2, "Unique meta operations: %v", uniqueMetaOps)
 
-	return args
+	return args, nil
 }

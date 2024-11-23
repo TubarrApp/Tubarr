@@ -10,7 +10,11 @@ import (
 
 // InitMetarr begins processing with Metarr
 func InitMetarr(v *models.Video) error {
-	args := makeMetarrCommand(v)
+	args, err := makeMetarrCommand(v)
+	if err != nil {
+		return err
+	}
+
 	cmd := exec.Command("metarr", args...)
 
 	if err := runMetarr(cmd); err != nil {

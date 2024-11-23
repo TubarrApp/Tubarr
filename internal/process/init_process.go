@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 )
 
@@ -22,7 +23,7 @@ func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video
 
 	// Start workers
 	for w := 1; w <= conc; w++ {
-		go videoJob(w, jobs, results, vs)
+		go videoJob(w, jobs, results, vs, c)
 	}
 
 	// Send jobs
@@ -51,13 +52,28 @@ func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video
 }
 
 // videoJob starts a worker's process for a video.
-func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs models.VideoStore) {
+func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs models.VideoStore, c *models.Channel) {
 	for v := range videos {
 		var err error
 
-		if v.ID, err = vs.AddVideo(v); err != nil {
-			results <- fmt.Errorf("error adding video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
-			continue
+		// Initialize directory parser
+		dirParser := parsing.NewDirectoryParser(c, v)
+
+		var parseDirs = []*string{
+			&v.JDir, &v.VDir,
+			&c.JDir, &c.VDir,
+		}
+
+		for _, ptr := range parseDirs {
+			if ptr == nil {
+				logging.E(0, "Null pointer")
+				continue
+			}
+
+			if *ptr, err = dirParser.ParseDirectory(*ptr); err != nil {
+				logging.E(0, err.Error())
+				continue
+			}
 		}
 
 		if err := processJSON(v, vs); err != nil {

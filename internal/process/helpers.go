@@ -21,7 +21,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 
 	logging.D(1, "About to decode JSON to metamap")
 
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	decoder := json.NewDecoder(f)
 	if err := decoder.Decode(&m); err != nil {
 		return false, fmt.Errorf("failed to decode JSON: %w", err)

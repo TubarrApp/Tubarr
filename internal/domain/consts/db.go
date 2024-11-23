@@ -21,16 +21,18 @@ const (
 
 // Channel
 const (
-	QChanID        = "id"
-	QChanURL       = "url"
-	QChanName      = "name"
-	QChanVDir      = "video_directory"
-	QChanJDir      = "json_directory"
-	QChanSettings  = "settings"
-	QChanMetarr    = "metarr"
-	QChanLastScan  = "last_scan"
-	QChanCreatedAt = "created_at"
-	QChanUpdatedAt = "updated_at"
+	QChanID              = "id"
+	QChanURL             = "url"
+	QChanName            = "name"
+	QChanConcurrency     = "concurrency"
+	QChanVDir            = "video_directory"
+	QChanJDir            = "json_directory"
+	QChanMetarrOutputDir = "metarr_output_directory"
+	QChanSettings        = "settings"
+	QChanMetarr          = "metarr"
+	QChanLastScan        = "last_scan"
+	QChanCreatedAt       = "created_at"
+	QChanUpdatedAt       = "updated_at"
 )
 
 // Videos
