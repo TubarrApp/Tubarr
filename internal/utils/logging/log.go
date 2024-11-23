@@ -3,6 +3,7 @@ package logging
 import (
 	"log"
 	"strings"
+	"sync"
 	"time"
 	"tubarr/internal/domain/regex"
 	"tubarr/internal/domain/setup"
@@ -14,6 +15,7 @@ var (
 	ErrorArray []error
 	Loggable   bool = false
 	Logger     *log.Logger
+	mu         sync.Mutex
 
 	// Matches ANSI escape codes
 	ansiEscape = regex.AnsiEscapeCompile()
@@ -39,7 +41,9 @@ func SetupLogging() error {
 
 // Write writes error information to the log file.
 func writeLog(msg string, level int) {
-	// Do not add mutex
+	mu.Lock()
+	defer mu.Unlock()
+
 	if Loggable && level < 2 {
 		if !strings.HasPrefix(msg, "\n") {
 			msg += "\n"

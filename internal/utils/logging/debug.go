@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"tubarr/internal/domain/consts"
 )
@@ -15,22 +14,21 @@ const (
 	tagBaseLen = 15 + // 01/02 15:04:05(space)
 		1 + // "["
 		len(consts.ColorBlue) +
-		9 + // "Function: "
+		10 + // "Function: "
 		len(consts.ColorReset) +
 		3 + // " - "
 		len(consts.ColorBlue) +
-		5 + // "File: "
+		6 + // "File: "
 		len(consts.ColorReset) +
 		3 + // " : "
 		len(consts.ColorBlue) +
-		5 + // "Line: "
+		6 + // "Line: "
 		len(consts.ColorReset) +
 		2 // "]\n"
 )
 
 var (
 	Level int = -1 // Pre initialization
-	mu    sync.Mutex
 )
 
 // Log Error:
@@ -40,9 +38,6 @@ func E(l int, format string, args ...interface{}) string {
 	if Level < l {
 		return ""
 	}
-
-	mu.Lock()
-	defer mu.Unlock()
 
 	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
@@ -95,9 +90,6 @@ func S(l int, format string, args ...interface{}) string {
 		return ""
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
-
 	var b strings.Builder
 	b.Grow(len(consts.GreenSuccess) + len(format) + len(consts.ColorReset) + 1 + (len(args) * 32))
 
@@ -127,9 +119,6 @@ func D(l int, format string, args ...interface{}) string {
 	if Level < l {
 		return ""
 	}
-
-	mu.Lock()
-	defer mu.Unlock()
 
 	pc, file, line, _ := runtime.Caller(1)
 	file = filepath.Base(file)
@@ -179,9 +168,6 @@ func D(l int, format string, args ...interface{}) string {
 // Print and log a message of the info type.
 func I(format string, args ...interface{}) string {
 
-	mu.Lock()
-	defer mu.Unlock()
-
 	var b strings.Builder
 	b.Grow(len(consts.BlueInfo) + len(format) + len(consts.ColorReset) + 1 + (len(args) * 32))
 
@@ -208,9 +194,6 @@ func I(format string, args ...interface{}) string {
 //
 // Print and log a plain message.
 func P(format string, args ...interface{}) string {
-
-	mu.Lock()
-	defer mu.Unlock()
 
 	var b strings.Builder
 	b.Grow(len(format) + 1 + (len(args) * 32))
