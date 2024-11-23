@@ -32,7 +32,7 @@ func SetupLogging() error {
 	}
 
 	// Assign lumberjack logger to standard log output
-	Logger = log.New(logFile, "", log.LstdFlags)
+	Logger = log.New(logFile, "", 0)
 	Loggable = true
 
 	Logger.Printf(":\n=========== %v ===========\n\n", time.Now().Format(time.RFC1123Z))
