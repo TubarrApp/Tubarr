@@ -26,6 +26,7 @@ func verify() error {
 		}
 	}
 
+	verifyLoggingLevel()
 	verifyConcurrencyLimit()
 	return nil
 }
@@ -37,9 +38,8 @@ func verifyConcurrencyLimit() {
 	switch {
 	case maxConcurrentProcesses < 1:
 		maxConcurrentProcesses = 1
-		logging.E(2, "Max concurrency set too low, set to minimum value: %d", maxConcurrentProcesses)
 	default:
-		logging.I("Max concurrency: %d", maxConcurrentProcesses)
+		fmt.Printf("Max concurrency: %d", maxConcurrentProcesses)
 	}
 	viper.Set(keys.Concurrency, maxConcurrentProcesses)
 }
@@ -52,6 +52,7 @@ func verifyOutputFiletype(o string) bool {
 		o = "." + o
 		viper.Set(keys.OutputFiletype, o)
 	}
+	fmt.Printf("Output filetype: %s\n", o)
 
 	valid := false
 	for _, ext := range consts.AllVidExtensions {
@@ -79,7 +80,23 @@ func verifyPurgeMetafiles(purgeType string) bool {
 
 	switch purgeType {
 	case "all", "json", "nfo":
+		fmt.Printf("Purge metafiles post-Metarr: %s\n", purgeType)
 		return true
 	}
 	return false
+}
+
+// verifyLoggingLevel checks and validates the debug level.
+func verifyLoggingLevel() {
+	l := viper.GetInt(keys.DebugLevel)
+	if l < 0 {
+		l = 0
+	}
+
+	if l > 5 {
+		l = 5
+	}
+
+	logging.Level = l
+	fmt.Printf("Logging level: %d\n", logging.Level)
 }

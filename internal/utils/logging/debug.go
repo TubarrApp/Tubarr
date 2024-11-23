@@ -7,24 +7,23 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"tubarr/internal/domain/consts"
 )
 
 const (
-	tagBaseLen = 1 + // "["
+	tagBaseLen = 15 + // 01/02 15:04:05(space)
+		1 + // "["
 		len(consts.ColorBlue) +
 		9 + // "Function: "
-		25 + // thisFunctionIsAnExample()
 		len(consts.ColorReset) +
 		3 + // " - "
 		len(consts.ColorBlue) +
 		5 + // "File: "
-		25 + // a_really_long_filename.go
 		len(consts.ColorReset) +
 		3 + // " : "
 		len(consts.ColorBlue) +
 		5 + // "Line: "
-		6 + // 999:99
 		len(consts.ColorReset) +
 		2 // "]\n"
 )
@@ -50,8 +49,10 @@ func E(l int, format string, args ...interface{}) string {
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
 	var b strings.Builder
-	b.Grow(len(consts.RedError) + tagBaseLen + len(format) + (len(args) * 32))
+	b.Grow(len(consts.RedError) + tagBaseLen + len(format) + (len(args) * 32) + len(funcName) + len(file) + line)
 
+	b.WriteString(time.Now().Format("01/02 15:04:05"))
+	b.WriteRune(' ')
 	b.WriteString(consts.RedError)
 
 	// Write formatted message
@@ -98,7 +99,10 @@ func S(l int, format string, args ...interface{}) string {
 	defer mu.Unlock()
 
 	var b strings.Builder
-	b.Grow(len(consts.GreenSuccess) + len(format) + len(consts.ColorReset) + len(" \n") + (len(args) * 32))
+	b.Grow(len(consts.GreenSuccess) + len(format) + len(consts.ColorReset) + 1 + (len(args) * 32))
+
+	b.WriteString(time.Now().Format("01/02 15:04:05"))
+	b.WriteRune(' ')
 	b.WriteString(consts.GreenSuccess)
 
 	// Write formatted message
@@ -108,7 +112,7 @@ func S(l int, format string, args ...interface{}) string {
 		b.WriteString(format)
 	}
 
-	b.WriteString("\n")
+	b.WriteRune('\n')
 	msg := b.String()
 	fmt.Print(msg)
 	writeLog(msg, l)
@@ -132,7 +136,10 @@ func D(l int, format string, args ...interface{}) string {
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
 	var b strings.Builder
-	b.Grow(len(consts.YellowDebug) + tagBaseLen + len(format) + (len(args) * 32))
+	b.Grow(len(consts.YellowDebug) + tagBaseLen + len(format) + (len(args) * 32) + len(funcName) + len(file) + line)
+
+	b.WriteString(time.Now().Format("01/02 15:04:05"))
+	b.WriteRune(' ')
 	b.WriteString(consts.YellowDebug)
 
 	// Write formatted message
@@ -176,7 +183,10 @@ func I(format string, args ...interface{}) string {
 	defer mu.Unlock()
 
 	var b strings.Builder
-	b.Grow(len(consts.BlueInfo) + len(format) + len(consts.ColorReset) + len(" \n") + (len(args) * 32))
+	b.Grow(len(consts.BlueInfo) + len(format) + len(consts.ColorReset) + 1 + (len(args) * 32))
+
+	b.WriteString(time.Now().Format("01/02 15:04:05"))
+	b.WriteRune(' ')
 	b.WriteString(consts.BlueInfo)
 
 	// Write formatted message
@@ -186,7 +196,7 @@ func I(format string, args ...interface{}) string {
 		b.WriteString(format)
 	}
 
-	b.WriteString("\n")
+	b.WriteRune('\n')
 	msg := b.String()
 	fmt.Print(msg)
 	writeLog(msg, 0)
@@ -203,7 +213,10 @@ func P(format string, args ...interface{}) string {
 	defer mu.Unlock()
 
 	var b strings.Builder
-	b.Grow(len(format) + len(" \n") + (len(args) * 32))
+	b.Grow(len(format) + 1 + (len(args) * 32))
+
+	b.WriteString(time.Now().Format("01/02 15:04:05"))
+	b.WriteRune(' ')
 
 	// Write formatted message
 	if len(args) != 0 && args != nil {
@@ -212,7 +225,7 @@ func P(format string, args ...interface{}) string {
 		b.WriteString(format)
 	}
 
-	b.WriteString("\n")
+	b.WriteRune('\n')
 	msg := b.String()
 	fmt.Print(msg)
 	writeLog(msg, 0)

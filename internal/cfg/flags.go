@@ -55,3 +55,11 @@ func initVideoTransformers() {
 	rootCmd.PersistentFlags().String(keys.OutputFiletypeInput, "", "File extension to output files as (mp4 works best for most media servers)")
 	viper.BindPFlag(keys.OutputFiletypeInput, rootCmd.PersistentFlags().Lookup(keys.OutputFiletypeInput))
 }
+
+// initProgramFlags initializes user flag settings related to the core program. E.g. logging level.
+func initProgramFlags() {
+
+	// Debug level
+	rootCmd.PersistentFlags().Int(keys.DebugLevel, 0, "Debugging level (0 - 5)")
+	viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel))
+}

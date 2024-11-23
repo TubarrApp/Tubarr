@@ -53,12 +53,17 @@ func initChannelsTable(tx *sql.Tx) error {
 
 // initVideosTable initializes videos tables.
 func initVideosTable(tx *sql.Tx) error {
+
+	if _, err := tx.Exec("DROP INDEX IF EXISTS videos_url_unique"); err != nil {
+		return fmt.Errorf("failed to drop unique URL index: %w", err)
+	}
+
 	query := `
     CREATE TABLE IF NOT EXISTS videos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
         downloaded INTEGER DEFAULT 0,
-        url TEXT NOT NULL UNIQUE,
+        url TEXT NOT NULL,
         title TEXT,
         description TEXT,
         video_directory TEXT,
