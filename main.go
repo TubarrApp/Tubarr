@@ -55,7 +55,7 @@ func init() {
 		os.Exit(0)
 	}
 
-	if err := logging.SetupLogging(); err != nil {
+	if err := logging.SetupLogging(setup.CfgDir); err != nil {
 		fmt.Printf("could not set up logging, proceeding without: %v", err)
 	}
 

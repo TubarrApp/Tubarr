@@ -10,7 +10,7 @@ import (
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video) error {
+func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video) (bool, error) {
 	conc := c.Settings.Concurrency
 	if conc < 1 {
 		conc = 1
@@ -37,18 +37,23 @@ func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video
 	close(jobs)
 
 	// Collect results
-	var errors []error
+	var (
+		errors  []error
+		success bool
+	)
+
 	for i := 0; i < len(videos); i++ {
 		if err := <-results; err != nil {
 			errors = append(errors, err)
+		} else {
+			success = true
 		}
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("encountered %d errors during processing: %v", len(errors), errors)
+		return success, fmt.Errorf("encountered %d errors during processing: %v", len(errors), errors)
 	}
-
-	return nil
+	return success, nil
 }
 
 // videoJob starts a worker's process for a video.
