@@ -16,22 +16,25 @@ import (
 var (
 	Level      int  = -1
 	Loggable   bool = false
-	logger     zerolog.Logger
+	fileLogger zerolog.Logger
 	ErrorArray []error
 	mu         sync.Mutex
 	ansiEscape = regex.AnsiEscapeCompile()
+	console    = os.Stdout
 )
 
 const (
-	metarrLogFile = "metarr.log"
+	timeFormat     = "01/02 15:04:05"
+	metarrLogFile  = "metarr.log"
+	funcFileLine   = "%s%s%s[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
+	spaceSeparator = " "
 )
 
 func init() {
 	zerolog.TimeFieldFormat = time.RFC3339
-	logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
 }
 
-// SetupLogging creates and/or opens the log file
+// SetupLogging sets up logging for the application.
 func SetupLogging(targetDir string) error {
 	logfile, err := os.OpenFile(
 		filepath.Join(targetDir, metarrLogFile),
@@ -42,54 +45,27 @@ func SetupLogging(targetDir string) error {
 		return err
 	}
 
-	// Console writer with colors
-	console := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: "01/02 15:04:05",
-		NoColor:    false,
-		PartsOrder: []string{
-			zerolog.TimestampFieldName,
-			zerolog.MessageFieldName,
-		},
-	}
-
-	// File writer without colors and level prefixes
-	fileWriter := zerolog.ConsoleWriter{
-		Out:        logfile,
-		NoColor:    true,
-		TimeFormat: "01/02 15:04:05",
-		PartsOrder: []string{
-			zerolog.TimestampFieldName,
-			zerolog.MessageFieldName,
-		},
-	}
-
-	// Remove the level prefixes
-	console.FormatLevel = func(i interface{}) string {
-		return ""
-	}
-	fileWriter.FormatLevel = func(i interface{}) string {
-		return ""
-	}
-
-	// Strip ANSI codes from file output
-	fileWriter.FormatMessage = func(i interface{}) string {
-		if ansiEscape != nil {
-			return ansiEscape.ReplaceAllString(fmt.Sprintf("%v", i), "")
-		}
-		return fmt.Sprintf("%v", i)
-	}
-
-	multi := zerolog.MultiLevelWriter(console, fileWriter)
-	logger = zerolog.New(multi).With().Timestamp().Logger()
+	// File logger using zerolog's efficient JSON logging
+	fileLogger = zerolog.New(logfile).With().Timestamp().Logger()
 
 	Loggable = true
-	logger.Info().Msgf("=========== %v ===========", time.Now().Format(time.RFC1123Z))
+
+	startMsg := fmt.Sprintf("=========== %v ===========\n", time.Now().Format(time.RFC1123Z))
+	writeToConsole(startMsg)
+	if ansiEscape != nil {
+		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(startMsg, ""))
+	}
 
 	return nil
 }
 
-// E logs error messages.
+// writeToConsole writes messages to console without using zerolog (zerolog parses JSON, inefficient)
+func writeToConsole(msg string) {
+	timestamp := time.Now().Format(timeFormat)
+	fmt.Fprintf(console, "%s%s%s%s%s", consts.ColorBrightBlack, timestamp, consts.ColorReset, spaceSeparator, msg)
+}
+
+// E logs error messages, and appends to the global error array.
 func E(l int, format string, args ...interface{}) {
 	if Level < l {
 		return
@@ -108,13 +84,32 @@ func E(l int, format string, args ...interface{}) {
 	}
 
 	msg := fmt.Sprintf(format, args...)
-	logger.Error().Msg(fmt.Sprintf("%s%s[Function: %s - File: %s : Line: %d]",
+	consoleMsg := fmt.Sprintf(funcFileLine,
 		consts.RedError,
 		msg,
+		spaceSeparator,
+		consts.ColorDimCyan,
+		consts.ColorReset,
 		funcName,
+		consts.ColorDimWhite,
+		consts.ColorReset,
 		file,
+		consts.ColorDimWhite,
+		consts.ColorReset,
 		line,
-	))
+	)
+
+	// Console output with colors
+	writeToConsole(consoleMsg)
+
+	// File output with JSON logging and no colors
+	if Loggable {
+		fileLogger.Error().
+			Str("function", funcName).
+			Str("file", file).
+			Int("line", line).
+			Msg(ansiEscape.ReplaceAllString(msg, ""))
+	}
 }
 
 // S logs success messages.
@@ -122,8 +117,14 @@ func S(l int, format string, args ...interface{}) {
 	if Level < l {
 		return
 	}
+
 	msg := fmt.Sprintf(format, args...)
-	logger.Info().Msg(fmt.Sprintf("%s%s", consts.GreenSuccess, msg))
+	consoleMsg := fmt.Sprintf("%s%s\n", consts.GreenSuccess, msg)
+
+	writeToConsole(consoleMsg)
+	if Loggable {
+		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(msg, ""))
+	}
 }
 
 // D logs debug messages.
@@ -137,23 +138,49 @@ func D(l int, format string, args ...interface{}) {
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
 	msg := fmt.Sprintf(format, args...)
-	logger.Debug().Msg(fmt.Sprintf("%s%s[Function: %s - File: %s : Line: %d]",
+	consoleMsg := fmt.Sprintf(funcFileLine,
 		consts.YellowDebug,
 		msg,
+		spaceSeparator,
+		consts.ColorDimCyan,
+		consts.ColorReset,
 		funcName,
+		consts.ColorDimCyan,
+		consts.ColorReset,
 		file,
+		consts.ColorDimCyan,
+		consts.ColorReset,
 		line,
-	))
+	)
+
+	writeToConsole(consoleMsg)
+	if Loggable {
+		fileLogger.Debug().
+			Str("function", funcName).
+			Str("file", file).
+			Int("line", line).
+			Msg(ansiEscape.ReplaceAllString(msg, ""))
+	}
 }
 
 // I logs info messages.
 func I(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	logger.Info().Msg(fmt.Sprintf("%s%s", consts.BlueInfo, msg))
+	consoleMsg := fmt.Sprintf("%s%s\n", consts.BlueInfo, msg)
+
+	writeToConsole(consoleMsg)
+	if Loggable {
+		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(msg, ""))
+	}
 }
 
 // P logs plain messages.
 func P(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	logger.Info().Msg(msg)
+	consoleMsg := fmt.Sprintf("%s\n", msg)
+
+	writeToConsole(consoleMsg)
+	if Loggable {
+		fileLogger.Info().Msg(msg)
+	}
 }
