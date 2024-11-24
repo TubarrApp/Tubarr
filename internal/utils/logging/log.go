@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -17,17 +18,20 @@ var (
 	Level      int  = -1
 	Loggable   bool = false
 	fileLogger zerolog.Logger
-	ErrorArray []error
 	mu         sync.Mutex
+	ErrorArray = make([]error, 0, 8)
 	ansiEscape = regex.AnsiEscapeCompile()
 	console    = os.Stdout
 )
 
 const (
-	timeFormat     = "01/02 15:04:05"
-	metarrLogFile  = "tubarr.log"
-	funcFileLine   = "%s%s%s[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
-	spaceSeparator = " "
+	timeFormat         = "01/02 15:04:05"
+	tubarrLogFile      = "tubarr.log"
+	funcFileLineSingle = "%s%s [%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
+	funcFileLineMulti  = "%s%s[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
+	JFunction          = "function"
+	JFile              = "file"
+	JLine              = "line"
 )
 
 func init() {
@@ -37,7 +41,7 @@ func init() {
 // SetupLogging sets up logging for the application.
 func SetupLogging(targetDir string) error {
 	logfile, err := os.OpenFile(
-		filepath.Join(targetDir, metarrLogFile),
+		filepath.Join(targetDir, tubarrLogFile),
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
 		0644,
 	)
@@ -59,10 +63,10 @@ func SetupLogging(targetDir string) error {
 	return nil
 }
 
-// writeToConsole writes messages to console without using zerolog (zerolog parses JSON, inefficient)
+// writeToConsole writes messages to console without using zerolog (zerolog parses JSON, inefficient).
 func writeToConsole(msg string) {
 	timestamp := time.Now().Format(timeFormat)
-	fmt.Fprintf(console, "%s%s%s%s%s", consts.ColorBrightBlack, timestamp, consts.ColorReset, spaceSeparator, msg)
+	fmt.Fprintf(console, "%s%s%s %s", consts.ColorBrightBlack, timestamp, consts.ColorReset, msg)
 }
 
 // E logs error messages, and appends to the global error array.
@@ -83,11 +87,17 @@ func E(l int, format string, args ...interface{}) {
 		}
 	}
 
+	var funcFileLine string
 	msg := fmt.Sprintf(format, args...)
+	if strings.HasSuffix(msg, "\n") {
+		funcFileLine = funcFileLineMulti
+	} else {
+		funcFileLine = funcFileLineSingle
+	}
+
 	consoleMsg := fmt.Sprintf(funcFileLine,
 		consts.RedError,
 		msg,
-		spaceSeparator,
 		consts.ColorDimCyan,
 		consts.ColorReset,
 		funcName,
@@ -105,9 +115,9 @@ func E(l int, format string, args ...interface{}) {
 	// File output with JSON logging and no colors
 	if Loggable {
 		fileLogger.Error().
-			Str("function", funcName).
-			Str("file", file).
-			Int("line", line).
+			Str(JFunction, funcName).
+			Str(JFile, file).
+			Int(JLine, line).
 			Msg(ansiEscape.ReplaceAllString(msg, ""))
 	}
 }
@@ -137,11 +147,18 @@ func D(l int, format string, args ...interface{}) {
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
+	var funcFileLine string
+
 	msg := fmt.Sprintf(format, args...)
+	if strings.HasSuffix(msg, "\n") {
+		funcFileLine = funcFileLineMulti
+	} else {
+		funcFileLine = funcFileLineSingle
+	}
+
 	consoleMsg := fmt.Sprintf(funcFileLine,
 		consts.YellowDebug,
 		msg,
-		spaceSeparator,
 		consts.ColorDimCyan,
 		consts.ColorReset,
 		funcName,
@@ -156,9 +173,9 @@ func D(l int, format string, args ...interface{}) {
 	writeToConsole(consoleMsg)
 	if Loggable {
 		fileLogger.Debug().
-			Str("function", funcName).
-			Str("file", file).
-			Int("line", line).
+			Str(JFunction, funcName).
+			Str(JFile, file).
+			Int(JLine, line).
 			Msg(ansiEscape.ReplaceAllString(msg, ""))
 	}
 }
