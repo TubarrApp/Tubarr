@@ -28,7 +28,7 @@ const (
 	timeFormat         = "01/02 15:04:05"
 	tubarrLogFile      = "tubarr.log"
 	funcFileLineSingle = "%s%s [%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
-	funcFileLineMulti  = "%s%s[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
+	funcFileLineMulti  = "%s%s[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n\n"
 	JFunction          = "function"
 	JFile              = "file"
 	JLine              = "line"
