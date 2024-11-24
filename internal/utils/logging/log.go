@@ -25,7 +25,7 @@ var (
 
 const (
 	timeFormat     = "01/02 15:04:05"
-	metarrLogFile  = "metarr.log"
+	metarrLogFile  = "tubarr.log"
 	funcFileLine   = "%s%s%s[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
 	spaceSeparator = " "
 )
