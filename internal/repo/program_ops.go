@@ -79,7 +79,6 @@ func (pc ProgControl) QuitTubarr() error {
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
-	fmt.Println()
 	logging.I("Quitting Tubarr...\n")
 	return nil
 }
