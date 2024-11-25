@@ -2,6 +2,7 @@ package downloads
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -40,7 +41,7 @@ func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 
 	filename := <-filenameChan
 	if filename == "" {
-		return fmt.Errorf("no output filename captured")
+		return errors.New("no output filename captured")
 	}
 
 	v.VPath = filename

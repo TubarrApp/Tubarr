@@ -1,6 +1,7 @@
 package cfg
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -21,7 +22,7 @@ func initChannelCmds(s models.Store) *cobra.Command {
 		Short: "Channel commands",
 		Long:  "Manage channels with various subcommands like add, delete, and list.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("please specify a subcommand. Use --help to see available subcommands")
+			return errors.New("please specify a subcommand. Use --help to see available subcommands")
 		},
 	}
 
@@ -55,7 +56,7 @@ func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 		Long:  "Enter a file containing URLs, one per line, to download them to the channel",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cFile == "" && len(urls) == 0 {
-				return fmt.Errorf("must enter a URL source")
+				return errors.New("must enter a URL source")
 			}
 
 			switch {
@@ -66,7 +67,7 @@ func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 				key = consts.QChanName
 				val = channelName
 			default:
-				return fmt.Errorf("must enter a channel name or channel URL")
+				return errors.New("must enter a channel name or channel URL")
 			}
 
 			if len(urls) > 0 {
@@ -106,7 +107,7 @@ func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			if notifyURL == "" {
-				return fmt.Errorf("notification URL cannot be blank")
+				return errors.New("notification URL cannot be blank")
 			}
 
 			var key, val, notifyName string
@@ -125,7 +126,7 @@ func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 					notifyName = channelName
 				}
 			default:
-				return fmt.Errorf("must enter a channel name or channel URL")
+				return errors.New("must enter a channel name or channel URL")
 			}
 
 			id, err := cs.GetID(key, val)
@@ -162,7 +163,7 @@ func addURLToIgnore(cs models.ChannelStore) *cobra.Command {
 		Long:  "URLs added to this list will not be grabbed from channel crawls",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ignoreURL == "" {
-				return fmt.Errorf("cannot enter the target ignore URL blank")
+				return errors.New("cannot enter the target ignore URL blank")
 			}
 			switch {
 			case url != "":
@@ -172,7 +173,7 @@ func addURLToIgnore(cs models.ChannelStore) *cobra.Command {
 				key = consts.QChanName
 				val = name
 			default:
-				return fmt.Errorf("please enter either a channel URL or name")
+				return errors.New("please enter either a channel URL or name")
 			}
 
 			id, err := cs.GetID(key, val)
@@ -220,7 +221,7 @@ func addCrawlToIgnore(cs models.ChannelStore, s models.Store) *cobra.Command {
 				key = consts.QChanID
 				val = strconv.Itoa(id)
 			default:
-				return fmt.Errorf("please enter either a URL or name")
+				return errors.New("please enter either a URL or name")
 			}
 
 			if err := cs.CrawlChannelIgnore(key, val, s); err != nil {
@@ -255,7 +256,7 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
 			case vDir == "", url == "":
-				return fmt.Errorf("must enter both a video directory and url")
+				return errors.New("must enter both a video directory and url")
 			}
 
 			// Infer empty fields
@@ -275,7 +276,7 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 
 			if dateFmt != "" {
 				if !dateFormat(dateFmt) {
-					return fmt.Errorf("invalid Metarr filename date tag format")
+					return errors.New("invalid Metarr filename date tag format")
 				}
 			}
 
@@ -372,7 +373,7 @@ func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 		Long:  "Delete a channel by name or URL",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if url == "" && name == "" {
-				return fmt.Errorf("must enter both a video directory and url")
+				return errors.New("must enter both a video directory and url")
 			}
 
 			var key, val string
@@ -468,7 +469,7 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 				key = consts.QChanID
 				val = strconv.Itoa(id)
 			default:
-				return fmt.Errorf("please enter either a URL or name")
+				return errors.New("please enter either a URL or name")
 			}
 
 			if err := cs.CrawlChannel(key, val, s); err != nil {
@@ -489,10 +490,10 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 // updateChannelSettingsCmd updates channel settings.
 func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	var (
-		id, concurrency, crawlFreq int
-		url, name, key, val        string
-		vDir, jDir, outDir         string
-		downloadCmd, downloadArgs  string
+		id, concurrency, crawlFreq      int
+		url, name, key, val             string
+		vDir, jDir, outDir, maxFilesize string
+		downloadCmd, downloadArgs       string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -511,9 +512,10 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 				key = consts.QChanID
 				val = strconv.Itoa(id)
 			default:
-				return fmt.Errorf("please enter either a URL or name")
+				return errors.New("please enter either a URL or name")
 			}
 
+			// Files/dirs:
 			if vDir != "" {
 				if err := cs.UpdateChannelEntry(key, val, consts.QChanVDir, vDir); err != nil {
 					return fmt.Errorf("failed to update video directory: %w", err)
@@ -528,6 +530,14 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 				logging.S(0, "Updated JSON directory to %q", jDir)
 			}
 
+			if outDir != "" {
+				if err := cs.UpdateMetarrOutputDir(key, val, outDir); err != nil {
+					return fmt.Errorf("failed to update Metarr output directory: %w", err)
+				}
+				logging.S(0, "Updated Metarr output directory to %q", outDir)
+			}
+
+			// Settings:
 			if concurrency != 0 {
 				if err := cs.UpdateConcurrencyLimit(key, val, concurrency); err != nil {
 					return fmt.Errorf("failed to update concurrency limit: %w", err)
@@ -542,18 +552,39 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 				logging.S(0, "Updated crawl frequency to %d minutes", crawlFreq)
 			}
 
-			if outDir != "" {
-				if err := cs.UpdateMetarrOutputDir(key, val, outDir); err != nil {
-					return fmt.Errorf("failed to update Metarr output directory: %w", err)
-				}
-				logging.S(0, "Updated Metarr output directory to %q", outDir)
-			}
-
 			if downloadCmd != "" {
 				if err := cs.UpdateExternalDownloader(key, val, downloadCmd, downloadArgs); err != nil {
 					return fmt.Errorf("failed to update external downloader settings: %w", err)
 				}
 				logging.S(0, "Updated external downloader settings")
+			}
+
+			if maxFilesize != "" {
+				maxFilesize = strings.ToUpper(maxFilesize)
+
+				switch {
+				case strings.HasSuffix(maxFilesize, "K"), strings.HasSuffix(maxFilesize, "M"), strings.HasSuffix(maxFilesize, "G"):
+					maxFilesize = strings.TrimSuffix(maxFilesize, "B")
+					if err := cs.UpdateMaxFilesize(key, val, maxFilesize); err != nil {
+						return err
+					}
+					logging.S(0, "Updated max filesize to %s", maxFilesize)
+				case strings.HasSuffix(maxFilesize, "B"):
+					maxFilesize = strings.TrimSuffix(maxFilesize, "B")
+					if err := cs.UpdateMaxFilesize(key, val, maxFilesize); err != nil {
+						return err
+					}
+					logging.S(0, "Updated max filesize to %sB", maxFilesize)
+				default:
+					if _, err := strconv.Atoi(maxFilesize); err == nil {
+						if err := cs.UpdateMaxFilesize(key, val, maxFilesize); err != nil {
+							return err
+						}
+						logging.S(0, "Updated max filesize to %s bytes", maxFilesize)
+					} else {
+						return errors.New("max filesize should end in the filesize denomination, e.g. K, M, G (KB, MB, GB) or be a numeric value for bytes")
+					}
+				}
 			}
 
 			return nil
@@ -606,7 +637,7 @@ func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 				key = consts.QChanID
 				val = strconv.Itoa(id)
 			default:
-				return fmt.Errorf("please enter either a URL or name")
+				return errors.New("please enter either a URL or name")
 			}
 
 			if err := verifyChanRowUpdateValid(col, newVal); err != nil {
@@ -615,7 +646,7 @@ func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 			if err := cs.UpdateChannelRow(key, val, col, newVal); err != nil {
 				return err
 			}
-			logging.S(0, "Updated channel column %q to value %q", col, newVal)
+			logging.S(0, "Updated channel column: %q → %q", col, newVal)
 			return nil
 		},
 	}
@@ -640,7 +671,7 @@ func verifyChanRowUpdateValid(col, val string) error {
 			return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
 		}
 	default:
-		return fmt.Errorf("cannot set a custom value for internal DB elements")
+		return errors.New("cannot set a custom value for internal DB elements")
 	}
 	return nil
 }
@@ -652,7 +683,7 @@ func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
 	for _, op := range ops {
 		split := strings.Split(op, ":")
 		if len(split) < 3 {
-			return nil, fmt.Errorf("please enter filters in the format 'field:filter_type:value' (e.g. 'title:omit:frogs' ignores videos with frogs in the metatitle)")
+			return nil, errors.New("please enter filters in the format 'field:filter_type:value' (e.g. 'title:omit:frogs' ignores videos with frogs in the metatitle)")
 		}
 		switch len(split) {
 		case 3:
@@ -664,7 +695,7 @@ func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
 					Value: split[2],
 				})
 			default:
-				return nil, fmt.Errorf("please enter a filter type of either 'contains' or 'omit'")
+				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
 			}
 		case 2:
 			switch split[1] {
@@ -674,10 +705,10 @@ func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
 					Type:  split[1],
 				})
 			default:
-				return nil, fmt.Errorf("please enter a filter type of either 'contains' or 'omit'")
+				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
 			}
 		default:
-			return nil, fmt.Errorf("invalid filter. Valid examples: 'title:contains:frogs','date:omit' (contains only metatitles with frogs, and omits downloads including a date metafield)")
+			return nil, errors.New("invalid filter. Valid examples: 'title:contains:frogs','date:omit' (contains only metatitles with frogs, and omits downloads including a date metafield)")
 
 		}
 	}

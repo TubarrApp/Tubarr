@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -32,9 +33,9 @@ func (vs *VideoStore) GetDB() *sql.DB {
 func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	switch {
 	case v.URL == "":
-		return 0, fmt.Errorf("must enter a url for video")
+		return 0, errors.New("must enter a url for video")
 	case v.VDir == "":
-		return 0, fmt.Errorf("must enter a video directory where downloads will be stored")
+		return 0, errors.New("must enter a video directory where downloads will be stored")
 	}
 
 	if id, exists := vs.videoExists(v); exists {
@@ -178,7 +179,7 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 // DeleteVideo deletes an existent downloaded video from the database.
 func (vs VideoStore) DeleteVideo(key, val string, chanID int64) error {
 	if key == "" || val == "" {
-		return fmt.Errorf("please pass in a key and value to delete a video entry")
+		return errors.New("please pass in a key and value to delete a video entry")
 	}
 
 	query := squirrel.

@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ func InitCfgFilesDirs() error {
 
 	dir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to get home directory")
+		return errors.New("failed to get home directory")
 	}
 	CfgDir = filepath.Join(dir, tDir)
 

@@ -10,7 +10,7 @@ import (
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video) (bool, error) {
+func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video) (bool, []error) {
 	conc := c.Settings.Concurrency
 	if conc < 1 {
 		conc = 1
@@ -51,7 +51,7 @@ func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video
 	}
 
 	if len(errors) > 0 {
-		return success, fmt.Errorf("encountered %d errors during processing: %v", len(errors), errors)
+		return success, errors
 	}
 	return success, nil
 }

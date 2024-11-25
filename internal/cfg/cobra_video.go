@@ -1,7 +1,7 @@
 package cfg
 
 import (
-	"fmt"
+	"errors"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -16,7 +16,7 @@ func initVideoCmds(s models.Store) *cobra.Command {
 		Short: "Video commands",
 		Long:  "Manage videos with various subcommands like delete and list.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("please specify a subcommand. Use --help to see available subcommands")
+			return errors.New("please specify a subcommand. Use --help to see available subcommands")
 		},
 	}
 
@@ -49,7 +49,7 @@ func deleteVideoCmd(vs models.VideoStore, cs models.ChannelStore) *cobra.Command
 				chanKey = consts.QChanName
 				chanVal = chanName
 			default:
-				return fmt.Errorf("must enter a channel name/URL, and a video URL to delete")
+				return errors.New("must enter a channel name/URL, and a video URL to delete")
 			}
 
 			cid, err := cs.GetID(chanKey, chanVal)

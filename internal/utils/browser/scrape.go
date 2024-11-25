@@ -35,7 +35,7 @@ func GetNewReleases(cs models.ChannelStore, c *models.Channel) ([]*models.Video,
 	}
 
 	if c.URL == "" {
-		return nil, fmt.Errorf("channel url is blank")
+		return nil, fmt.Errorf("channel url is blank (channel ID: %d)", c.ID)
 	}
 
 	cookies, err := getBrowserCookies(c.URL)

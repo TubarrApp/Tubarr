@@ -1,6 +1,7 @@
 package parsing
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -34,7 +35,7 @@ func NewDirectoryParser(c *models.Channel, v *models.Video) (parseDir *Directory
 // ParseDirPtr directly modifies an input directory string.
 func (dp *Directory) ParseDirPtr(input *string) error {
 	if input == nil {
-		return fmt.Errorf("input string is null")
+		return errors.New("input string is null")
 	}
 
 	var err error
@@ -49,7 +50,7 @@ func (dp *Directory) ParseDirPtr(input *string) error {
 // ParseDirectory returns the absolute directory path with template replacements.
 func (dp *Directory) ParseDirectory(dir string) (parsedDir string, err error) {
 	if dir == "" {
-		return "", fmt.Errorf("directory sent in empty")
+		return "", errors.New("directory sent in empty")
 	}
 
 	parsed := dir
@@ -89,12 +90,12 @@ func (dp *Directory) parseTemplate(dir string) (string, error) {
 	for i := 0; i < opens; i++ {
 		startIdx := strings.Index(remaining, open)
 		if startIdx == -1 {
-			return "", fmt.Errorf("missing opening delimiter")
+			return "", errors.New("missing opening delimiter")
 		}
 
 		endIdx := strings.Index(remaining, close)
 		if endIdx == -1 {
-			return "", fmt.Errorf("missing closing delimiter")
+			return "", errors.New("missing closing delimiter")
 		}
 
 		// String up to template open
@@ -134,43 +135,43 @@ func (dp *Directory) replace(tag string) (string, error) {
 			}
 			return u.Host, nil
 		}
-		return "", fmt.Errorf("templating: URL empty")
+		return "", errors.New("templating: URL empty")
 
 	case templates.ChannelID:
 		if c.ID != 0 {
 			return strconv.Itoa(int(c.ID)), nil
 		}
-		return "", fmt.Errorf("templating: channel ID is 0")
+		return "", errors.New("templating: channel ID is 0")
 
 	case templates.ChannelName:
 		if c.Name != "" {
 			return c.Name, nil
 		}
-		return "", fmt.Errorf("templating: channel name empty")
+		return "", errors.New("templating: channel name empty")
 
 	case templates.ChannelURL:
 		if c.URL != "" {
 			return c.URL, nil
 		}
-		return "", fmt.Errorf("templating: URL empty")
+		return "", errors.New("templating: URL empty")
 
 	case templates.VideoID:
 		if v.ID != 0 {
 			return strconv.Itoa(int(v.ID)), nil
 		}
-		return "", fmt.Errorf("templating: video ID is 0")
+		return "", errors.New("templating: video ID is 0")
 
 	case templates.VideoTitle:
 		if v.Title != "" {
 			return v.Title, nil
 		}
-		return "", fmt.Errorf("templating: video title is empty")
+		return "", errors.New("templating: video title is empty")
 
 	case templates.VideoURL:
 		if v.URL != "" {
 			return v.URL, nil
 		}
-		return "", fmt.Errorf("templating: video URL is empty")
+		return "", errors.New("templating: video URL is empty")
 
 		// Metarr cases:
 	case templates.MetAuthor, templates.MetDay, templates.MetDirector,

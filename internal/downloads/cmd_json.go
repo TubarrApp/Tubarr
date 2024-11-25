@@ -34,6 +34,10 @@ func buildJSONCommand(v *models.Video) *exec.Cmd {
 		args = append(args, "--external-downloader", v.Settings.ExternalDownloader)
 	}
 
+	if v.Settings.MaxFilesize != "" {
+		args = append(args, "--max-filesize", v.Settings.MaxFilesize)
+	}
+
 	if v.Settings.ExternalDownloader != "" {
 		args = append(args, "--external-downloader", v.Settings.ExternalDownloader)
 

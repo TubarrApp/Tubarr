@@ -25,6 +25,10 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 		args = append(args, "--cookies-from-browser", v.Settings.CookieSource)
 	}
 
+	if v.Settings.MaxFilesize != "" {
+		args = append(args, "--max-filesize", v.Settings.MaxFilesize)
+	}
+
 	if v.Settings.ExternalDownloaderArgs != "" {
 		args = append(args, "--external-downloader", v.Settings.ExternalDownloader)
 		dlArgs := v.Settings.ExternalDownloaderArgs

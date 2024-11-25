@@ -1,6 +1,7 @@
 package cfg
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"tubarr/internal/utils/logging"
@@ -50,7 +51,7 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 		return valid, nil
 	}
 
-	return nil, fmt.Errorf("no valid meta operations")
+	return nil, errors.New("no valid meta operations")
 }
 
 // validateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid.
@@ -60,7 +61,7 @@ func validateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 	for _, pair := range fileSfxReplace {
 		parts := strings.Split(pair, ":")
 		if len(parts) < 2 {
-			return nil, fmt.Errorf("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
+			return nil, errors.New("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
 		}
 		valid = append(valid, pair)
 	}
@@ -78,7 +79,7 @@ func setRenameFlag(flag string) error {
 	case "spaces", "space", "underscores", "underscore", "fixes", "fix", "fixes-only", "fixesonly":
 		return nil
 	default:
-		return fmt.Errorf("'spaces', 'underscores' or 'fixes-only' not selected for renaming style, skipping these modifications")
+		return errors.New("'spaces', 'underscores' or 'fixes-only' not selected for renaming style, skipping these modifications")
 	}
 }
 

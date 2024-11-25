@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -37,7 +38,7 @@ func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 			return 0, fmt.Errorf("please enter a value for key %q", key)
 		}
 	default:
-		return 0, fmt.Errorf("please input a unique constrained value, such as URL or name")
+		return 0, errors.New("please input a unique constrained value, such as URL or name")
 	}
 	var id int64
 	query := squirrel.
@@ -109,7 +110,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) error {
 
 	if notifyURL == "" {
-		return fmt.Errorf("please enter a notification URL")
+		return errors.New("please enter a notification URL")
 	}
 
 	if notifyName == "" {
@@ -133,9 +134,9 @@ func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) err
 func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	switch {
 	case c.URL == "":
-		return 0, fmt.Errorf("must enter a url for channel")
+		return 0, errors.New("must enter a url for channel")
 	case c.VDir == "":
-		return 0, fmt.Errorf("must enter a video directory where downloads will be stored")
+		return 0, errors.New("must enter a video directory where downloads will be stored")
 	}
 
 	if cs.channelExists(consts.QChanURL, c.URL) {
@@ -515,10 +516,10 @@ func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*mod
 	}
 
 	if rows == 0 {
-		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
+		return fmt.Errorf("no channel found with key/val %q=%q", key, val)
 	}
 
-	logging.S(1, "Updated settings for channel with key %q and value '%v'", key, val)
+	logging.S(1, "Updated settings for channel with key/val %q=%q", key, val)
 	return nil
 }
 
@@ -569,10 +570,20 @@ func (cs ChannelStore) UpdateExternalDownloader(key, val, downloader, args strin
 	})
 }
 
+// UpdateMaxFilesize updates the video filesize limit for a channel.
+//
+// Values end in K, M, or G to denote filesize denomination.
+func (cs ChannelStore) UpdateMaxFilesize(key, val, maxSize string) error {
+	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
+		s.MaxFilesize = maxSize
+		return nil
+	})
+}
+
 // UpdateChannelRow updates a single element in the database.
 func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
 	if key == "" {
-		return fmt.Errorf("please do not enter the key and value blank")
+		return errors.New("please do not enter the key and value blank")
 	}
 
 	if !cs.channelExists(key, val) {
@@ -621,7 +632,7 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 // LoadGrabbedURLs loads already downloaded URLs from the database.
 func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err error) {
 	if c.ID == 0 {
-		return nil, fmt.Errorf("model entered has no ID")
+		return nil, errors.New("model entered has no ID")
 	}
 
 	// Select URLs where channel_id matches and downloaded is true

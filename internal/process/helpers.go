@@ -2,6 +2,7 @@ package process
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -161,7 +162,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 // removeUnwantedJSON removes filtered out JSON files.
 func removeUnwantedJSON(path string) error {
 	if path == "" {
-		return fmt.Errorf("path sent in empty, not removing")
+		return errors.New("path sent in empty, not removing")
 	}
 
 	check, err := os.Stat(path)

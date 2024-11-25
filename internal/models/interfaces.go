@@ -27,6 +27,7 @@ type ChannelStore interface {
 	UpdateConcurrencyLimit(key, val string, newConc int) error
 	UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error
 	UpdateMetarrOutputDir(key, val string, outDir string) error
+	UpdateMaxFilesize(key, val, maxSize string) error
 	GetID(key, val string) (int64, error)
 	AddNotifyURL(id int64, notifyName, notifyURL string) error
 	GetNotifyURLs(id int64) ([]string, error)

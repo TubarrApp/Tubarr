@@ -1,6 +1,7 @@
 package downloads
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +13,7 @@ import (
 // NewDownload creates a download operation with specified options.
 func NewDownload(dlType DownloadType, video *models.Video, opts *Options) (*Download, error) {
 	if video == nil {
-		return nil, fmt.Errorf("video cannot be nil")
+		return nil, errors.New("video cannot be nil")
 	}
 
 	dl := &Download{
@@ -32,7 +33,7 @@ func NewDownload(dlType DownloadType, video *models.Video, opts *Options) (*Down
 // Execute performs the download with retries.
 func (d *Download) Execute() error {
 	if d.Video == nil {
-		return fmt.Errorf("video model is nil")
+		return errors.New("video model is nil")
 	}
 
 	var lastErr error

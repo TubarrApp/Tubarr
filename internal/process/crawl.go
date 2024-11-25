@@ -3,6 +3,7 @@ package process
 import (
 	"crypto/tls"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -41,7 +42,7 @@ func initClients() {
 
 // CrawlIgnoreNew gets the channel's currently displayed videos and ignores them on subsequent crawls.
 //
-// Essentially the URLs it finds are marked as though they have already been downloaded.
+// Essentially it marks the URLs it finds as though they have already been downloaded.
 func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 	cs := s.GetChannelStore()
 	videos, err := browser.GetNewReleases(cs, c)
@@ -143,9 +144,9 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 
 	switch {
 	case c.URL == "":
-		return fmt.Errorf("channel URL is blank")
+		return errors.New("channel URL is blank")
 	case c.VDir == "", c.JDir == "":
-		return fmt.Errorf("output directories are blank")
+		return errors.New("output directories are blank")
 	}
 
 	cs := s.GetChannelStore()
@@ -155,12 +156,19 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 		return err
 	}
 
-	var success bool
+	var (
+		success bool
+		errs    = make([]error, 0, len(videos))
+	)
+
 	if len(videos) == 0 {
 		logging.I("No new releases for channel %q", c.URL)
 	} else {
-		if success, err = InitProcess(s.GetVideoStore(), c, videos); err != nil {
-			return err
+		if success, errs = InitProcess(s.GetVideoStore(), c, videos); errs != nil {
+			if !success {
+				return fmt.Errorf("encountered %d errors during processing: %v", len(errs), errs)
+			}
+			logging.ErrorArray = append(logging.ErrorArray, err)
 		}
 	}
 

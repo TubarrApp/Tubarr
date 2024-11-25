@@ -1,7 +1,7 @@
 package metarr
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
 	"tubarr/internal/models"
@@ -28,7 +28,7 @@ func InitMetarr(v *models.Video) error {
 func runMetarr(cmd *exec.Cmd) error {
 	var err error = nil
 	if cmd.String() == "" {
-		return fmt.Errorf("command string is empty")
+		return errors.New("command string is empty")
 	}
 	logging.I("Running command: %s", cmd.String())
 
