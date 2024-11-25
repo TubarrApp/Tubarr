@@ -139,6 +139,10 @@ func CheckChannels(s models.Store) error {
 
 // ChannelCrawl crawls a channel for new URLs.
 func ChannelCrawl(s models.Store, c *models.Channel) error {
+	const (
+		errMsg = "encountered %d errors during processing: %v"
+	)
+
 	logging.I("Initiating crawl for URL %s...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
 		c.URL, c.VDir, c.JDir, c.Settings.Filters, c.Settings.CookieSource)
 
@@ -165,9 +169,6 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 		logging.I("No new releases for channel %q", c.URL)
 	} else {
 		if success, errs = InitProcess(s.GetVideoStore(), c, videos); errs != nil {
-			if !success {
-				return fmt.Errorf("encountered %d errors during processing: %v", len(errs), errs)
-			}
 			logging.ErrorArray = append(logging.ErrorArray, err)
 		}
 	}
@@ -175,6 +176,10 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 	// Update last scan time regardless of whether new videos were found
 	if err := cs.UpdateLastScan(c.ID); err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
+	}
+
+	if !success {
+		return fmt.Errorf(errMsg, len(errs), errs)
 	}
 
 	// Some successful downloads, notify URLs
@@ -207,6 +212,11 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 			}
 		}
 	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf(errMsg, len(errs), errs)
+	}
+
 	return nil
 }
 
