@@ -168,48 +168,46 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 	if len(videos) == 0 {
 		logging.I("No new releases for channel %q", c.URL)
 	} else {
-		if success, errs = InitProcess(s.GetVideoStore(), c, videos); errs != nil {
-			logging.ErrorArray = append(logging.ErrorArray, err)
+		success, errs = InitProcess(s.GetVideoStore(), c, videos)
+		if errs != nil {
+			logging.ErrorArray = append(logging.ErrorArray, errs...)
 		}
-	}
 
-	// Update last scan time regardless of whether new videos were found
-	if err := cs.UpdateLastScan(c.ID); err != nil {
-		return fmt.Errorf("failed to update last scan time: %w", err)
-	}
+		if err := cs.UpdateLastScan(c.ID); err != nil {
+			return fmt.Errorf("failed to update last scan time: %w", err)
+		}
 
-	if !success {
-		return fmt.Errorf(errMsg, len(errs), errs)
+		if !success {
+			return fmt.Errorf(errMsg, len(errs), errs)
+		}
 	}
 
 	// Some successful downloads, notify URLs
-	if success {
-		notifyURLs, err := cs.GetNotifyURLs(c.ID)
-		if err != nil {
-			if err != sql.ErrNoRows {
-				return err
-			}
-			logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
+	notifyURLs, err := cs.GetNotifyURLs(c.ID)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return err
 		}
+		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
+	}
 
-		if len(notifyURLs) > 0 {
-			if errs := notify(c, notifyURLs); len(errs) != 0 {
-				var b strings.Builder
-				totalLength := 0
-				for _, err := range errs {
-					totalLength += len(err.Error())
-				}
-				b.Grow(totalLength + (len(errs)-1)*2)
-
-				for i, err := range errs {
-					b.WriteString(err.Error())
-					if i != len(errs)-1 {
-						b.WriteString(", ")
-					}
-
-				}
-				return fmt.Errorf("errors sending notifications for channel with ID %d:\n%s", c.ID, b.String())
+	if len(notifyURLs) > 0 {
+		if errs := notify(c, notifyURLs); len(errs) != 0 {
+			var b strings.Builder
+			totalLength := 0
+			for _, err := range errs {
+				totalLength += len(err.Error())
 			}
+			b.Grow(totalLength + (len(errs)-1)*2)
+
+			for i, err := range errs {
+				b.WriteString(err.Error())
+				if i != len(errs)-1 {
+					b.WriteString(", ")
+				}
+
+			}
+			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%s", c.ID, b.String())
 		}
 	}
 
