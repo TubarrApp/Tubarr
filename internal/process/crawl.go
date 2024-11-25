@@ -161,16 +161,16 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 	}
 
 	var (
-		success bool
-		errs    = make([]error, 0, len(videos))
+		success  bool
+		errArray = make([]error, 0, len(videos))
 	)
 
 	if len(videos) == 0 {
 		logging.I("No new releases for channel %q", c.URL)
 	} else {
-		success, errs = InitProcess(s.GetVideoStore(), c, videos)
-		if errs != nil {
-			logging.ErrorArray = append(logging.ErrorArray, errs...)
+		success, errArray = InitProcess(s.GetVideoStore(), c, videos)
+		if errArray != nil {
+			logging.ErrorArray = append(logging.ErrorArray, errArray...)
 		}
 
 		if err := cs.UpdateLastScan(c.ID); err != nil {
@@ -178,7 +178,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 		}
 
 		if !success {
-			return fmt.Errorf(errMsg, len(errs), errs)
+			return fmt.Errorf(errMsg, len(errArray), errArray)
 		}
 	}
 
@@ -211,8 +211,8 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 		}
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf(errMsg, len(errs), errs)
+	if len(errArray) > 0 {
+		return fmt.Errorf(errMsg, len(errArray), errArray)
 	}
 
 	return nil
