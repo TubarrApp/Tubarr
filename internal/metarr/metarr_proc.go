@@ -10,9 +10,10 @@ import (
 
 // InitMetarr begins processing with Metarr
 func InitMetarr(v *models.Video) error {
-	args, err := makeMetarrCommand(v)
-	if err != nil {
-		return err
+	args := makeMetarrCommand(v)
+	if len(args) == 0 {
+		logging.I("No Metarr arguments built, returning...")
+		return nil
 	}
 
 	cmd := exec.Command("metarr", args...)

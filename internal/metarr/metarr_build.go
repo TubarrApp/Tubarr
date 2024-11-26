@@ -6,148 +6,135 @@ import (
 	"strings"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/metcmd"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 )
 
+type metCmdMapping struct {
+	metarrValue interface{}
+	viperKey    string
+	cmdKey      string
+}
+
 // mergeArguments combines arguments from both Viper config and model settings
-func makeMetarrCommand(v *models.Video) ([]string, error) {
-
-	baseArgs := []string{
-		"-V", v.VPath,
-		"-J", v.JPath,
+func makeMetarrCommand(v *models.Video) []string {
+	args := []string{
+		metcmd.VideoFile, v.VPath,
+		metcmd.JSONFile, v.JPath,
 	}
 
-	dirParser := parsing.NewDirectoryParser(v.Channel, v)
-
-	if cfg.IsSet(keys.MoveOnComplete) && v.MetarrArgs.OutputDir == "" {
-		logging.I("Move on complete flag set, checking output directory for template directives...")
-		if parsedDir, err := dirParser.ParseDirectory(cfg.GetString(keys.MoveOnComplete)); err != nil {
-			logging.E(0, err.Error())
-		} else {
-			logging.S(0, "Updated output directory to %q", parsedDir)
-			cfg.Set(keys.MoveOnComplete, parsedDir)
-		}
-	}
-
-	var parsedOutputDir string
-	if v.MetarrArgs.OutputDir != "" {
-		dirParser := parsing.NewDirectoryParser(v.Channel, v)
-		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse output directory template: %w", err)
-		}
-		parsedOutputDir = parsed
-	}
-
-	// Map to deduplicate meta
-	metaOpsMap := make(map[string]struct{})
-
-	// Helper to add meta operations with deduplication
-	addMetaOps := func(ops []string) {
-		for _, op := range ops {
-			metaOpsMap[op] = struct{}{}
-		}
-	}
-
-	// Add model-based meta operations
-	if v.MetarrArgs.MetaOps != nil {
-		logging.D(2, "Adding MetarrArgs meta-ops: %v", v.MetarrArgs.MetaOps)
-		addMetaOps(v.MetarrArgs.MetaOps)
-	}
-
-	// Add viper meta operations
-	if cfg.IsSet(keys.MetaOps) {
-		viperOps := cfg.GetStringSlice(keys.MetaOps)
-		logging.D(2, "Adding Viper meta-ops: %v", viperOps)
-		addMetaOps(viperOps)
-	}
+	// Output directory
+	parsedOutputDir := parseOutputDir(v)
 
 	// Use map for other unique arguments
 	argMap := make(map[string]string)
 
-	// Add other model-based arguments
-	if v.MetarrArgs.Concurrency != 0 {
-		argMap["--concurrency"] = strconv.Itoa(v.MetarrArgs.Concurrency)
+	fields := []metCmdMapping{
+		{v.MetarrArgs.Concurrency,
+			"",
+			metcmd.Concurrency},
+
+		{v.MetarrArgs.Ext,
+			keys.OutputFiletype,
+			metcmd.Ext},
+
+		{v.MetarrArgs.FileDatePfx,
+			keys.InputFileDatePfx,
+			metcmd.FilenameDateTag},
+
+		{v.MetarrArgs.FilenameReplaceSfx,
+			keys.InputFilenameReplaceSfx,
+			metcmd.FilenameReplaceSfx},
+
+		{v.MetarrArgs.MaxCPU,
+			"",
+			metcmd.MaxCPU},
+
+		{v.MetarrArgs.MinFreeMem,
+			keys.MinFreeMem,
+			metcmd.MinFreeMem},
+
+		{v.MetarrArgs.RenameStyle,
+			keys.RenameStyle,
+			metcmd.RenameStyle},
+
+		{parsedOutputDir,
+			keys.MoveOnComplete,
+			metcmd.OutputDir},
+
+		{"",
+			keys.DebugLevel,
+			metcmd.Debug},
 	}
 
-	if v.MetarrArgs.Ext != "" {
-		argMap["--ext"] = v.MetarrArgs.Ext
-	}
+	for _, f := range fields {
+		switch val := f.metarrValue.(type) {
 
-	if v.MetarrArgs.FileDatePfx != "" {
-		argMap["--filename-date-tag"] = v.MetarrArgs.FileDatePfx
-	}
+		case int:
+			if val != 0 {
+				argMap[f.cmdKey] = strconv.Itoa(val)
 
-	if v.MetarrArgs.FilenameReplaceSfx != "" {
-		argMap["--filename-replace-suffix"] = v.MetarrArgs.FilenameReplaceSfx
-	}
+			} else if cfg.IsSet(f.viperKey) {
+				argMap[f.cmdKey] = strconv.Itoa(cfg.GetInt(f.viperKey))
+			}
 
-	if v.MetarrArgs.MaxCPU != 0 {
-		argMap["--max-cpu"] = fmt.Sprintf("%.2f", v.MetarrArgs.MaxCPU)
-	}
+		case float64:
+			if val != 0 {
+				argMap[f.cmdKey] = fmt.Sprintf("%.2f", val)
 
-	if v.MetarrArgs.MinFreeMem != "" {
-		argMap["--min-free-mem"] = v.MetarrArgs.MinFreeMem
-	}
+			} else if cfg.IsSet(f.viperKey) {
+				argMap[f.cmdKey] = fmt.Sprintf("%.2f", cfg.GetFloat64(f.viperKey))
+			}
 
-	if v.MetarrArgs.RenameStyle != "" {
-		argMap["-r"] = v.MetarrArgs.RenameStyle
-	}
+		case string:
+			if val != "" {
+				argMap[f.cmdKey] = val
 
-	if parsedOutputDir != "" {
-		argMap["-o"] = parsedOutputDir
-	}
+			} else if cfg.IsSet(f.viperKey) {
+				viperVal := cfg.Get(f.viperKey)
 
-	// Add Viper config arguments
-	if cfg.IsSet(keys.InputFileDatePfx) {
-		argMap["--filename-date-tag"] = cfg.GetString(keys.InputFileDatePfx)
-	}
-
-	if cfg.IsSet(keys.RenameStyle) {
-		argMap["-r"] = cfg.GetString(keys.RenameStyle)
-	}
-
-	if cfg.IsSet(keys.InputFilenameReplaceSfx) {
-		replacements := cfg.GetStringSlice(keys.InputFilenameReplaceSfx)
-		if len(replacements) > 0 {
-			argMap["--filename-replace-suffix"] = replacements[len(replacements)-1]
+				switch strVal := viperVal.(type) {
+				case string:
+					argMap[f.cmdKey] = strVal
+				case []string:
+					argMap[f.cmdKey] = strings.Join(strVal, ",")
+				}
+			}
 		}
 	}
 
-	if cfg.IsSet(keys.MoveOnComplete) {
-		argMap["-o"] = cfg.GetString(keys.MoveOnComplete)
+	for key, value := range argMap {
+		args = append(args, key, value)
 	}
 
-	if cfg.IsSet(keys.OutputFiletype) {
-		argMap["--ext"] = cfg.GetString(keys.OutputFiletype)
+	logging.I("Built Metarr argument list: %v", args)
+	return args
+}
+
+// parseOutputDir returns a parsed output directory
+func parseOutputDir(v *models.Video) string {
+	dirParser := parsing.NewDirectoryParser(v.Channel, v)
+	switch {
+	case cfg.IsSet(keys.MoveOnComplete) && v.MetarrArgs.OutputDir == "":
+
+		parsedDir, err := dirParser.ParseDirectory(cfg.GetString(keys.MoveOnComplete))
+		if err != nil {
+			logging.E(0, err.Error())
+			break
+		}
+		cfg.Set(keys.MoveOnComplete, parsedDir)
+		return parsedDir
+
+	case v.MetarrArgs.OutputDir != "":
+
+		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDir)
+		if err != nil {
+			logging.E(0, err.Error())
+			break
+		}
+		return parsed
 	}
-
-	if cfg.IsSet(keys.DebugLevel) {
-		argMap["--debug"] = strconv.Itoa(cfg.GetInt(keys.DebugLevel))
-	}
-
-	// Build final argument list
-	args := baseArgs
-
-	// Add regular arguments from map
-	for flag, value := range argMap {
-		args = append(args, flag, value)
-	}
-
-	var uniqueMetaOps []string
-	for op := range metaOpsMap {
-		uniqueMetaOps = append(uniqueMetaOps, op)
-	}
-
-	// Add all unique meta operations
-	for _, op := range uniqueMetaOps {
-		args = append(args, "--meta-ops", op)
-	}
-
-	logging.D(1, "Final Metarr arguments: %s", strings.Join(args, " "))
-	logging.D(2, "Unique meta operations: %v", uniqueMetaOps)
-
-	return args, nil
+	return ""
 }
