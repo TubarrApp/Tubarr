@@ -20,7 +20,6 @@ type metCmdMapping struct {
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video) []string {
-
 	fields := []metCmdMapping{
 		{
 			metarrValue: v.MetarrArgs.Concurrency,

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -188,9 +190,71 @@ func removeUnwantedJSON(path string) error {
 
 // isPrivateNetwork returns true if the URL is detected as a LAN network.
 func isPrivateNetwork(host string) bool {
-	return strings.HasPrefix(host, "192.168") ||
-		strings.HasPrefix(host, "10.") ||
-		strings.HasPrefix(host, "172.16.") || // 172.16.0.0 - 172.31.255.255
-		strings.HasPrefix(host, "127.") || // localhost
-		host == "localhost"
+	if host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return isPrivateNetworkFallback(host)
+	}
+
+	// IPv4
+	if ip4 := ip.To4(); ip4 != nil {
+		// Class A: 10.0.0.0/8
+		if ip4[0] == 10 {
+			return true
+		}
+		// Class B: 172.16.0.0/12
+		if ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31 {
+			return true
+		}
+		// Class C: 192.168.0.0/16
+		if ip4[0] == 192 && ip4[1] == 168 {
+			return true
+		}
+		// Localhost: 127.0.0.0/8
+		if ip4[0] == 127 {
+			return true
+		}
+	}
+
+	// IPv6
+	// Unique Local Address (ULA): fc00::/7
+	if ip[0] >= 0xfc && ip[0] <= 0xfd {
+		return true
+	}
+	// Link-local: fe80::/10
+	if ip[0] == 0xfe && (ip[1]&0xc0) == 0x80 {
+		return true
+	}
+	// Localhost: ::1
+	if ip.Equal(net.IPv6loopback) {
+		return true
+	}
+	return false
+}
+
+// isPrivateNetworkFallback
+func isPrivateNetworkFallback(host string) bool {
+	parts := strings.Split(host, ".")
+	if len(host) == 4 {
+		octets := make([]int, 4)
+		for i, p := range parts {
+			n, err := strconv.Atoi(p)
+			if err != nil || n < 0 || n > 255 {
+				return false
+			}
+			octets[i] = n
+		}
+		switch octets[0] {
+		case 192:
+			return octets[1] == 168
+		case 172:
+			return octets[1] >= 16 && octets[1] <= 31
+		case 10, 127:
+			return true
+		}
+	}
+	return false
 }
