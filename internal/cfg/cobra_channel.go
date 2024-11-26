@@ -3,7 +3,6 @@ package cfg
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -46,8 +45,9 @@ func initChannelCmds(s models.Store) *cobra.Command {
 // dlURLs downloads a list of URLs inputted by the user.
 func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 	var (
-		cFile, channelURL, channelName, key, val string
-		urls                                     []string
+		cFile, channelURL, channelName string
+		channelID                      int
+		urls                           []string
 	)
 
 	dlURLFileCmd := &cobra.Command{
@@ -59,15 +59,9 @@ func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 				return errors.New("must enter a URL source")
 			}
 
-			switch {
-			case channelURL != "":
-				key = consts.QChanURL
-				val = channelURL
-			case channelName != "":
-				key = consts.QChanName
-				val = channelName
-			default:
-				return errors.New("must enter a channel name or channel URL")
+			key, val, err := getChanKeyVal(channelID, channelName, channelURL)
+			if err != nil {
+				return err
 			}
 
 			if len(urls) > 0 {
@@ -85,8 +79,7 @@ func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 		},
 	}
 
-	dlURLFileCmd.Flags().StringVarP(&channelURL, "channel-url", "u", "", "Channel URL")
-	dlURLFileCmd.Flags().StringVarP(&channelName, "channel-name", "n", "", "Channel name")
+	setPrimaryChannelFlags(dlURLFileCmd, &channelName, &channelURL, &channelID)
 	dlURLFileCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to this channel")
 	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLAdd, nil, "Enter a list of URLs to download")
 
@@ -97,7 +90,8 @@ func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 	var (
 		channelName, channelURL string
-		notifyURL               string
+		channelID               int
+		notifyName, notifyURL   string
 	)
 
 	addNotifyCmd := &cobra.Command{
@@ -110,23 +104,13 @@ func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 				return errors.New("notification URL cannot be blank")
 			}
 
-			var key, val, notifyName string
+			key, val, err := getChanKeyVal(channelID, channelName, channelURL)
+			if err != nil {
+				return err
+			}
 
-			switch {
-			case channelURL != "":
-				key = consts.QChanURL
-				val = channelURL
-				if notifyName == "" {
-					notifyName = channelURL
-				}
-			case channelName != "":
-				key = consts.QChanName
-				val = channelName
-				if notifyName == "" {
-					notifyName = channelName
-				}
-			default:
-				return errors.New("must enter a channel name or channel URL")
+			if notifyName == "" {
+				notifyName = channelName
 			}
 
 			id, err := cs.GetID(key, val)
@@ -143,9 +127,9 @@ func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	addNotifyCmd.Flags().StringVarP(&channelURL, "channel-url", "u", "", "Channel URL")
-	addNotifyCmd.Flags().StringVarP(&channelName, "channel-name", "n", "", "Channel name")
+	setPrimaryChannelFlags(addNotifyCmd, &channelName, &channelURL, &channelID)
 	addNotifyCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
+	addNotifyCmd.Flags().StringVar(&notifyName, "notify-name", "", "Provide a custom name for this notification")
 
 	return addNotifyCmd
 }
@@ -153,8 +137,9 @@ func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 // addURLToIgnore adds a user inputted URL to ignore from crawls.
 func addURLToIgnore(cs models.ChannelStore) *cobra.Command {
 	var (
-		url, name, key, val string
-		ignoreURL           string
+		url, name string
+		ignoreURL string
+		id        int
 	)
 
 	ignoreURLCmd := &cobra.Command{
@@ -165,15 +150,10 @@ func addURLToIgnore(cs models.ChannelStore) *cobra.Command {
 			if ignoreURL == "" {
 				return errors.New("cannot enter the target ignore URL blank")
 			}
-			switch {
-			case url != "":
-				key = consts.QChanURL
-				val = url
-			case name != "":
-				key = consts.QChanName
-				val = name
-			default:
-				return errors.New("please enter either a channel URL or name")
+
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
 			}
 
 			id, err := cs.GetID(key, val)
@@ -189,8 +169,7 @@ func addURLToIgnore(cs models.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	ignoreURLCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
-	ignoreURLCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	setPrimaryChannelFlags(ignoreURLCmd, &name, &url, nil)
 	ignoreURLCmd.Flags().StringVarP(&ignoreURL, "ignore-url", "i", "", "Video URL to ignore")
 
 	return ignoreURLCmd
@@ -201,7 +180,6 @@ func addCrawlToIgnore(cs models.ChannelStore, s models.Store) *cobra.Command {
 	var (
 		url, name string
 		id        int
-		key, val  string
 	)
 
 	ignoreCrawlCmd := &cobra.Command{
@@ -210,18 +188,9 @@ func addCrawlToIgnore(cs models.ChannelStore, s models.Store) *cobra.Command {
 		Long:  "Crawls the current state of a channel page and adds all video URLs to ignore",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			switch {
-			case url != "":
-				key = consts.QChanURL
-				val = url
-			case name != "":
-				key = consts.QChanName
-				val = name
-			case id != 0:
-				key = consts.QChanID
-				val = strconv.Itoa(id)
-			default:
-				return errors.New("please enter either a URL or name")
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
 			}
 
 			if err := cs.CrawlChannelIgnore(key, val, s); err != nil {
@@ -232,9 +201,7 @@ func addCrawlToIgnore(cs models.ChannelStore, s models.Store) *cobra.Command {
 	}
 
 	// Primary channel elements
-	ignoreCrawlCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
-	ignoreCrawlCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
-	ignoreCrawlCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+	setPrimaryChannelFlags(ignoreCrawlCmd, &name, &url, nil)
 
 	return ignoreCrawlCmd
 }
@@ -375,6 +342,7 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 	var (
 		url, name string
+		id        int
 	)
 
 	delCmd := &cobra.Command{
@@ -386,13 +354,9 @@ func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 				return errors.New("must enter both a video directory and url")
 			}
 
-			var key, val string
-			if url != "" {
-				key = consts.QChanURL
-				val = url
-			} else if name != "" {
-				key = consts.QChanName
-				val = name
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
 			}
 
 			if err := cs.DeleteChannel(key, val); err != nil {
@@ -404,8 +368,7 @@ func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	delCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
-	delCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
+	setPrimaryChannelFlags(delCmd, &name, &url, &id)
 
 	return delCmd
 }
@@ -444,7 +407,6 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 	var (
 		url, name string
 		id        int
-		key, val  string
 	)
 
 	crawlCmd := &cobra.Command{
@@ -453,18 +415,9 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 		Long:  "Initiate a crawl for new URLs of a channel that have not yet been downloaded",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			switch {
-			case url != "":
-				key = consts.QChanURL
-				val = url
-			case name != "":
-				key = consts.QChanName
-				val = name
-			case id != 0:
-				key = consts.QChanID
-				val = strconv.Itoa(id)
-			default:
-				return errors.New("please enter either a URL or name")
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
 			}
 
 			if err := cs.CrawlChannel(key, val, s); err != nil {
@@ -475,9 +428,7 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 	}
 
 	// Primary channel elements
-	crawlCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
-	crawlCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
-	crawlCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+	setPrimaryChannelFlags(crawlCmd, &name, &url, &id)
 
 	return crawlCmd
 }
@@ -488,8 +439,7 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 		id, concurrency, crawlFreq, metarrConcurrency, retries  int
 		maxCPU                                                  float64
 		vDir, jDir, outDir                                      string
-		url, cookieSource                                       string
-		name, key, val                                          string
+		name, url, cookieSource                                 string
 		minFreeMem, renameStyle, filenameDateTag, metarrExt     string
 		maxFilesize, externalDownloader, externalDownloaderArgs string
 		dlFilters, metaOps                                      []string
@@ -501,18 +451,9 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 		Short: "Update channel settings",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			switch {
-			case url != "":
-				key = consts.QChanURL
-				val = url
-			case name != "":
-				key = consts.QChanName
-				val = name
-			case id != 0:
-				key = consts.QChanID
-				val = strconv.Itoa(id)
-			default:
-				return errors.New("please enter either a URL or name")
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
 			}
 
 			// Files/dirs:
@@ -602,8 +543,6 @@ func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 	var (
 		col, newVal, url, name string
 		id                     int
-
-		key, val string
 	)
 
 	updateRowCmd := &cobra.Command{
@@ -612,18 +551,9 @@ func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 		Long:  "Enter a column to update and a value to update that column to",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			switch {
-			case url != "":
-				key = consts.QChanURL
-				val = url
-			case name != "":
-				key = consts.QChanName
-				val = name
-			case id != 0:
-				key = consts.QChanID
-				val = strconv.Itoa(id)
-			default:
-				return errors.New("please enter either a URL or name")
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
 			}
 
 			if err := verifyChanRowUpdateValid(col, newVal); err != nil {
@@ -638,9 +568,7 @@ func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	updateRowCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
-	updateRowCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
-	updateRowCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+	setPrimaryChannelFlags(updateRowCmd, &name, &url, &id)
 
 	updateRowCmd.Flags().StringVarP(&col, "column-name", "c", "", "The name of the column in the table (e.g. video_directory)")
 	updateRowCmd.Flags().StringVarP(&newVal, "value", "v", "", "The value to set in the column (e.g. /my-directory)")

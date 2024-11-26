@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 )
 
@@ -183,4 +184,22 @@ func validateMaxFilesize(m string) (string, error) {
 		}
 	}
 	return m, nil
+}
+
+// getKeyVal returns a key and value for channel lookup.
+func getChanKeyVal(id int, name, url string) (key, val string, err error) {
+	switch {
+	case id != 0:
+		key = consts.QChanID
+		val = strconv.Itoa(id)
+	case url != "":
+		key = consts.QChanURL
+		val = url
+	case name != "":
+		key = consts.QChanName
+		val = name
+	default:
+		return "", "", errors.New("please enter either a channel ID, name, or URL")
+	}
+	return key, val, nil
 }
