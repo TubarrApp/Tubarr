@@ -28,7 +28,7 @@ const (
 	ConcurrencyLimitInput string = "concurrency-limit"
 	MoveOnComplete        string = "move-on-complete"
 	URLFile               string = "url-file"
-	URLAdd                string = "url"
+	URLAdd                string = "add-url"
 )
 
 // Settings
