@@ -244,7 +244,7 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 	var (
 		url, name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
-		dlFilterInput, metaOps, fileSfxReplace             []string
+		dlFilters, metaOps, fileSfxReplace                 []string
 		crawlFreq, concurrency, metarrConcurrency, retries int
 		maxCPU                                             float64
 	)
@@ -270,7 +270,7 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 			}
 
 			// Verify filters
-			dlFilters, err := verifyChannelOps(dlFilterInput)
+			dlFilters, err := verifyChannelOps(dlFilters)
 			if err != nil {
 				return err
 			}
@@ -354,19 +354,19 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	setPrimaryChannelFlags(addCmd, &url, &name, nil)
+	setPrimaryChannelFlags(addCmd, &name, &url, nil)
 
 	// Files/dirs
-	setFileDirFlags(addCmd, &vDir, &jDir)
+	setFileDirFlags(addCmd, &jDir, &vDir)
 
 	// Program related
-	setProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloader, &externalDownloaderArgs)
+	setProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader)
 
 	// Download
-	setDownloadFlags(addCmd, &maxFilesize, &cookieSource, &retries, &dlFilterInput)
+	setDownloadFlags(addCmd, &retries, &cookieSource, &maxFilesize, &dlFilters)
 
 	// Metarr
-	setMetarrFlags(addCmd, &metarrExt, &maxCPU, &metarrConcurrency, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps, &filenameDateTag)
+	setMetarrFlags(addCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
 
 	return addCmd
 }
@@ -580,19 +580,19 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	setPrimaryChannelFlags(updateSettingsCmd, &url, &name, &id)
+	setPrimaryChannelFlags(updateSettingsCmd, &name, &url, &id)
 
 	// Files/dirs
-	setFileDirFlags(updateSettingsCmd, &vDir, &jDir)
+	setFileDirFlags(updateSettingsCmd, &jDir, &vDir)
 
 	// Program related
-	setProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloader, &externalDownloaderArgs)
+	setProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader)
 
 	// Download
-	setDownloadFlags(updateSettingsCmd, &maxFilesize, &cookieSource, &retries, &dlFilters)
+	setDownloadFlags(updateSettingsCmd, &retries, &cookieSource, &maxFilesize, &dlFilters)
 
 	// Metarr
-	setMetarrFlags(updateSettingsCmd, &metarrExt, &maxCPU, &metarrConcurrency, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps, &filenameDateTag)
+	setMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
 
 	return updateSettingsCmd
 }
