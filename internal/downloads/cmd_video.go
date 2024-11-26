@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"tubarr/internal/models"
-	logging "tubarr/internal/utils/logging"
+	"tubarr/internal/utils/logging"
 )
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
 func buildVideoCommand(v *models.Video) *exec.Cmd {
-	args := make([]string, 0, 64)
+	args := make([]string, 0, 32)
 
 	args = append(args,
 		"--restrict-filenames",
@@ -41,8 +41,8 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 
 	args = append(args, "--sleep-requests", "1", v.URL)
 
-	logging.D(1, "Built argument list: %v", args)
 	cmd := exec.CommandContext(context.Background(), "yt-dlp", args...)
+	logging.D(1, "Built video download command for URL %q:\n%v", v.URL, cmd.String())
 
 	return cmd
 }

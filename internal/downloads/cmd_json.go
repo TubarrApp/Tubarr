@@ -11,7 +11,7 @@ import (
 // RequestMetaCommand builds and returns the argument for downloading metadata files for the given URL.
 func buildJSONCommand(v *models.Video) *exec.Cmd {
 
-	args := make([]string, 0, 64)
+	args := make([]string, 0, 32)
 
 	args = append(args,
 		"--skip-download",
@@ -42,7 +42,7 @@ func buildJSONCommand(v *models.Video) *exec.Cmd {
 		v.URL)
 
 	cmd := exec.CommandContext(context.Background(), "yt-dlp", args...)
-	logging.D(3, "Built metadata command for URL %q:\n%v", v.URL, cmd.String())
+	logging.D(1, "Built metadata download command for URL %q:\n%v", v.URL, cmd.String())
 
 	return cmd
 }
