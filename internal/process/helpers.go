@@ -63,8 +63,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 
 	if valid, err = filterRequests(v); err != nil {
 		return false, err
-	}
-	if !valid {
+	} else if !valid {
 		return false, nil
 	}
 
