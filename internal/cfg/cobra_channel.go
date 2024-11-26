@@ -34,6 +34,7 @@ func initChannelCmds(s models.Store) *cobra.Command {
 	channelCmd.AddCommand(addURLToIgnore(cs))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
 	channelCmd.AddCommand(listChannelCmd(cs))
+	channelCmd.AddCommand(listAllChannelsCmd(cs))
 	channelCmd.AddCommand(updateChannelRow(cs))
 	channelCmd.AddCommand(updateChannelSettingsCmd(cs))
 	channelCmd.AddCommand(addNotifyURL(cs))
@@ -103,18 +104,23 @@ func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 				return errors.New("notification URL cannot be blank")
 			}
 
-			key, val, err := getChanKeyVal(channelID, channelName, channelURL)
-			if err != nil {
-				return err
+			var (
+				id = int64(channelID)
+			)
+			if id == 0 {
+				key, val, err := getChanKeyVal(channelID, channelName, channelURL)
+				if err != nil {
+					return err
+				}
+
+				id, err = cs.GetID(key, val)
+				if err != nil {
+					return err
+				}
 			}
 
 			if notifyName == "" {
 				notifyName = channelName
-			}
-
-			id, err := cs.GetID(key, val)
-			if err != nil {
-				return err
 			}
 
 			if err := cs.AddNotifyURL(id, notifyName, notifyURL); err != nil {
@@ -372,14 +378,62 @@ func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 	return delCmd
 }
 
-// listChannelCmd returns a list of channels in the database.
+// listAllChannel returns details about a single channel in the database.
 func listChannelCmd(cs models.ChannelStore) *cobra.Command {
+	var (
+		url, name, key, val string
+		err                 error
+		channelID           int
+	)
 	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List a channel's details.",
+		Long:  "Lists details of a channel in the database.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			id := int64(channelID)
+			if id == 0 {
+				key, val, err = getChanKeyVal(channelID, name, url)
+				if err != nil {
+					return err
+				}
+
+				if id, err = cs.GetID(key, val); err != nil {
+					return err
+				}
+			}
+
+			ch, err, hasRows := cs.ListChannel(id)
+			if !hasRows {
+				logging.I("Entry for channel with ID %d does not exist in the database", id)
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URL, ch.VDir, ch.JDir)
+			fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
+			fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
+			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir)
+			fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
+
+			return nil
+		},
+	}
+	// Primary channel elements
+	setPrimaryChannelFlags(listCmd, &name, &url, &channelID)
+	return listCmd
+}
+
+// listAllChannelsCmd returns a list of channels in the database.
+func listAllChannelsCmd(cs models.ChannelStore) *cobra.Command {
+	listAllCmd := &cobra.Command{
 		Use:   "list-all",
 		Short: "List all channels.",
 		Long:  "Lists all channels currently saved in the database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			chans, err, hasRows := cs.ListChannels()
+			chans, err, hasRows := cs.ListAllChannels()
 			if !hasRows {
 				logging.I("No entries in the database")
 				return nil
@@ -398,7 +452,7 @@ func listChannelCmd(cs models.ChannelStore) *cobra.Command {
 			return nil
 		},
 	}
-	return listCmd
+	return listAllCmd
 }
 
 // crawlChannelCmd initiates a crawl of a given channel.

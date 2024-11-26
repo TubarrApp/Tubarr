@@ -127,6 +127,8 @@ func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) err
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
+
+	logging.S(0, "Added notification URL %q to channel with ID: %d", notifyURL, id)
 	return nil
 }
 
@@ -336,8 +338,65 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s models.Store) error {
 	return process.ChannelCrawl(s, &c)
 }
 
+// ListChannel returns a single channel from the database.
+func (cs *ChannelStore) ListChannel(id int64) (channel *models.Channel, err error, hasRows bool) {
+	var (
+		settingsJSON, metarrJSON json.RawMessage
+	)
+	query := squirrel.
+		Select(
+			consts.QChanID,
+			consts.QChanURL,
+			consts.QChanName,
+			consts.QChanVDir,
+			consts.QChanJDir,
+			consts.QChanSettings,
+			consts.QChanMetarr,
+			consts.QChanLastScan,
+			consts.QChanCreatedAt,
+			consts.QChanUpdatedAt,
+		).
+		From(consts.DBChannels).
+		Where(squirrel.Eq{consts.QChanID: id}).
+		RunWith(cs.DB)
+
+	row := query.QueryRow()
+
+	c := new(models.Channel)
+	if err := row.Scan(&c.ID,
+		&c.URL,
+		&c.Name,
+		&c.VDir,
+		&c.JDir,
+		&settingsJSON,
+		&metarrJSON,
+		&c.LastScan,
+		&c.CreatedAt,
+		&c.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, false
+		}
+		return nil, fmt.Errorf("failed to scan channel: %w", err), false
+	}
+
+	// Unmarshal settings JSON
+	if len(settingsJSON) > 0 {
+		if err := json.Unmarshal(settingsJSON, &c.Settings); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal settings: %w", err), true
+		}
+	}
+
+	// Unmarshal Metarr JSON
+	if len(metarrJSON) > 0 {
+		if err := json.Unmarshal(metarrJSON, &c.MetarrArgs); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal metarr settings: %w", err), true
+		}
+	}
+	return c, nil, true
+}
+
 // ListChannels lists all channels in the database.
-func (cs *ChannelStore) ListChannels() (channels []*models.Channel, err error, hasRows bool) {
+func (cs *ChannelStore) ListAllChannels() (channels []*models.Channel, err error, hasRows bool) {
 	query := squirrel.
 		Select(
 			consts.QChanID,

@@ -17,7 +17,8 @@ type ChannelStore interface {
 	CrawlChannelIgnore(key, val string, s Store) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
 	DeleteChannel(key, val string) error
-	ListChannels() (channels []*Channel, err error, hasRows bool)
+	ListChannel(id int64) (c *Channel, err error, hasRows bool)
+	ListAllChannels() (channels []*Channel, err error, hasRows bool)
 	LoadGrabbedURLs(c *Channel) (urls []string, err error)
 	UpdateChannelRow(key, val, col, newVal string) error
 	UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error

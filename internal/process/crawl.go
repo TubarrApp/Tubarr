@@ -70,7 +70,7 @@ func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(s models.Store) error {
 	cs := s.GetChannelStore()
-	chans, err, hasRows := cs.ListChannels()
+	chans, err, hasRows := cs.ListAllChannels()
 	if !hasRows {
 		logging.I("No channels in database")
 	} else if err != nil {
