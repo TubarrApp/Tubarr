@@ -255,5 +255,6 @@ func isPrivateNetworkFallback(host string) bool {
 			return true
 		}
 	}
+	logging.E(0, "Malformed IP string %q", host)
 	return false
 }
