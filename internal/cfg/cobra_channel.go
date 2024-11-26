@@ -3,7 +3,6 @@ package cfg
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -18,7 +17,7 @@ import (
 func initChannelCmds(s models.Store) *cobra.Command {
 	channelCmd := &cobra.Command{
 		Use:   "channel",
-		Short: "Channel commands",
+		Short: "Channel commands.",
 		Long:  "Manage channels with various subcommands like add, delete, and list.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return errors.New("please specify a subcommand. Use --help to see available subcommands")
@@ -52,8 +51,8 @@ func dlURLs(cs models.ChannelStore, s models.Store) *cobra.Command {
 
 	dlURLFileCmd := &cobra.Command{
 		Use:   "get-urls",
-		Short: "Download input URLs (plaintext or file)",
-		Long:  "Enter a file containing URLs, one per line, to download them to the channel",
+		Short: "Download inputted URLs (plaintext or file).",
+		Long:  "If using a file, the file should contain one URL per line.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cFile == "" && len(urls) == 0 {
 				return errors.New("must enter a URL source")
@@ -96,7 +95,7 @@ func addNotifyURL(cs models.ChannelStore) *cobra.Command {
 
 	addNotifyCmd := &cobra.Command{
 		Use:   "notify",
-		Short: "Adds notify function to a channel",
+		Short: "Adds notify function to a channel.",
 		Long:  "Enter a fully qualified notification URL here to send update requests to platforms like Plex etc.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -143,9 +142,9 @@ func addURLToIgnore(cs models.ChannelStore) *cobra.Command {
 	)
 
 	ignoreURLCmd := &cobra.Command{
-		Use:   "ignore",
-		Short: "Adds a channel video URL to ignore",
-		Long:  "URLs added to this list will not be grabbed from channel crawls",
+		Use:   "ignore-url",
+		Short: "Adds a video URL to ignore.",
+		Long:  "URLs added to this list will not be grabbed from channel crawls.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ignoreURL == "" {
 				return errors.New("cannot enter the target ignore URL blank")
@@ -183,9 +182,9 @@ func addCrawlToIgnore(cs models.ChannelStore, s models.Store) *cobra.Command {
 	)
 
 	ignoreCrawlCmd := &cobra.Command{
-		Use:   "ignore-current",
-		Short: "Crawl a channel for URLs to ignore",
-		Long:  "Crawls the current state of a channel page and adds all video URLs to ignore",
+		Use:   "ignore-crawl",
+		Short: "Crawl a channel for URLs to ignore.",
+		Long:  "Crawls the current state of a channel page and adds all video URLs to ignore.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			key, val, err := getChanKeyVal(id, name, url)
@@ -219,8 +218,8 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 	now := time.Now()
 	addCmd := &cobra.Command{
 		Use:   "add",
-		Short: "Add a channel",
-		Long:  "Add channel adds a new channel to the database using inputted URLs, names, etc.",
+		Short: "Add a channel.",
+		Long:  "Add channel adds a new channel to the database using inputted URLs, names, settings, etc.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
 			case vDir == "", url == "":
@@ -347,8 +346,8 @@ func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 
 	delCmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete channels",
-		Long:  "Delete a channel by name or URL",
+		Short: "Delete channels.",
+		Long:  "Delete a channel by ID, name, or URL.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if url == "" && name == "" {
 				return errors.New("must enter both a video directory and url")
@@ -376,9 +375,9 @@ func deleteChannelCmd(cs models.ChannelStore) *cobra.Command {
 // listChannelCmd returns a list of channels in the database.
 func listChannelCmd(cs models.ChannelStore) *cobra.Command {
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all channels",
-		Long:  "Lists all channels currently saved in the database",
+		Use:   "list-all",
+		Short: "List all channels.",
+		Long:  "Lists all channels currently saved in the database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chans, err, hasRows := cs.ListChannels()
 			if !hasRows {
@@ -411,8 +410,8 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 
 	crawlCmd := &cobra.Command{
 		Use:   "crawl",
-		Short: "Crawl a channel for new URLs",
-		Long:  "Initiate a crawl for new URLs of a channel that have not yet been downloaded",
+		Short: "Crawl a channel for new URLs.",
+		Long:  "Initiate a crawl for new URLs of a channel that have not yet been downloaded.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			key, val, err := getChanKeyVal(id, name, url)
@@ -448,7 +447,8 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 
 	updateSettingsCmd := &cobra.Command{
 		Use:   "update-settings",
-		Short: "Update channel settings",
+		Short: "Update channel settings.",
+		Long:  "Update channel settings with various parameters, both for Tubarr itself and for external software like Metarr.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			key, val, err := getChanKeyVal(id, name, url)
@@ -547,8 +547,8 @@ func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 
 	updateRowCmd := &cobra.Command{
 		Use:   "update",
-		Short: "Update a channel column",
-		Long:  "Enter a column to update and a value to update that column to",
+		Short: "Update a channel column.",
+		Long:  "Enter a column to update and a value to update that column to.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			key, val, err := getChanKeyVal(id, name, url)
@@ -573,58 +573,4 @@ func updateChannelRow(cs models.ChannelStore) *cobra.Command {
 	updateRowCmd.Flags().StringVarP(&col, "column-name", "c", "", "The name of the column in the table (e.g. video_directory)")
 	updateRowCmd.Flags().StringVarP(&newVal, "value", "v", "", "The value to set in the column (e.g. /my-directory)")
 	return updateRowCmd
-}
-
-// Private //////////////////////////////////////////////////////////////////////////////////////////
-
-// verifyChanRowUpdateValid verifies that your update operation is valid
-func verifyChanRowUpdateValid(col, val string) error {
-	switch col {
-	case "url", "name", "video_directory", "json_directory":
-		if val == "" {
-			return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
-		}
-	default:
-		return errors.New("cannot set a custom value for internal DB elements")
-	}
-	return nil
-}
-
-// verifyChannelOps verifies that the user inputted filters are valid
-func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
-
-	var filters = make([]models.DLFilters, 0, len(ops))
-	for _, op := range ops {
-		split := strings.Split(op, ":")
-		if len(split) < 3 {
-			return nil, errors.New("please enter filters in the format 'field:filter_type:value' (e.g. 'title:omit:frogs' ignores videos with frogs in the metatitle)")
-		}
-		switch len(split) {
-		case 3:
-			switch split[1] {
-			case "contains", "omit":
-				filters = append(filters, models.DLFilters{
-					Field: split[0],
-					Type:  split[1],
-					Value: split[2],
-				})
-			default:
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
-			}
-		case 2:
-			switch split[1] {
-			case "contains", "omit":
-				filters = append(filters, models.DLFilters{
-					Field: split[0],
-					Type:  split[1],
-				})
-			default:
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
-			}
-		default:
-			return nil, errors.New("invalid filter. Valid examples: 'title:contains:frogs','date:omit' (contains only metatitles with frogs, and omits downloads including a date metafield)")
-
-		}
-	}
-	return filters, nil
 }

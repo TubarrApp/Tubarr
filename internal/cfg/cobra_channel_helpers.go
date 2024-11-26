@@ -2,6 +2,7 @@ package cfg
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/consts"
@@ -202,4 +203,56 @@ func getChanKeyVal(id int, name, url string) (key, val string, err error) {
 		return "", "", errors.New("please enter either a channel ID, name, or URL")
 	}
 	return key, val, nil
+}
+
+// verifyChanRowUpdateValid verifies that your update operation is valid
+func verifyChanRowUpdateValid(col, val string) error {
+	switch col {
+	case "url", "name", "video_directory", "json_directory":
+		if val == "" {
+			return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
+		}
+	default:
+		return errors.New("cannot set a custom value for internal DB elements")
+	}
+	return nil
+}
+
+// verifyChannelOps verifies that the user inputted filters are valid
+func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
+
+	var filters = make([]models.DLFilters, 0, len(ops))
+	for _, op := range ops {
+		split := strings.Split(op, ":")
+		if len(split) < 3 {
+			return nil, errors.New("please enter filters in the format 'field:filter_type:value' (e.g. 'title:omit:frogs' ignores videos with frogs in the metatitle)")
+		}
+		switch len(split) {
+		case 3:
+			switch split[1] {
+			case "contains", "omit":
+				filters = append(filters, models.DLFilters{
+					Field: split[0],
+					Type:  split[1],
+					Value: split[2],
+				})
+			default:
+				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
+			}
+		case 2:
+			switch split[1] {
+			case "contains", "omit":
+				filters = append(filters, models.DLFilters{
+					Field: split[0],
+					Type:  split[1],
+				})
+			default:
+				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
+			}
+		default:
+			return nil, errors.New("invalid filter. Valid examples: 'title:contains:frogs','date:omit' (contains only metatitles with frogs, and omits downloads including a date metafield)")
+
+		}
+	}
+	return filters, nil
 }
