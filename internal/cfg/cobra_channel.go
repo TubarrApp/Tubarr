@@ -242,10 +242,11 @@ func addCrawlToIgnore(cs models.ChannelStore, s models.Store) *cobra.Command {
 // addChannelCmd adds a new channel into the database.
 func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 	var (
-		url, name, vDir, jDir, cookieSource,
-		externalDownloader, externalDownloaderArgs, dateFmt, renameFlag string
-		filterInput, metaOps, fileSfxReplace []string
-		crawlFreq, concurrency               int
+		url, name, vDir, jDir, outDir, cookieSource,
+		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
+		dlFilterInput, metaOps, fileSfxReplace             []string
+		crawlFreq, concurrency, metarrConcurrency, retries int
+		maxCPU                                             float64
 	)
 
 	now := time.Now()
@@ -269,13 +270,13 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 			}
 
 			// Verify filters
-			filters, err := verifyChannelOps(filterInput)
+			dlFilters, err := verifyChannelOps(dlFilterInput)
 			if err != nil {
 				return err
 			}
 
-			if dateFmt != "" {
-				if !dateFormat(dateFmt) {
+			if filenameDateTag != "" {
+				if !dateFormat(filenameDateTag) {
 					return errors.New("invalid Metarr filename date tag format")
 				}
 			}
@@ -286,14 +287,21 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 				}
 			}
 
+			var fileSfxReplaceStr string
 			if len(fileSfxReplace) > 0 {
-				if fileSfxReplace, err = validateFilenameSuffixReplace(fileSfxReplace); err != nil {
+				if fileSfxReplaceStr, err = validateFilenameSuffixReplace(fileSfxReplace); err != nil {
 					return err
 				}
 			}
 
-			if renameFlag != "" {
-				if err := setRenameFlag(renameFlag); err != nil {
+			if renameStyle != "" {
+				if err := validateRenameFlag(renameStyle); err != nil {
+					return err
+				}
+			}
+
+			if minFreeMem != "" {
+				if err := verifyMinFreeMem(minFreeMem); err != nil {
 					return err
 				}
 			}
@@ -306,18 +314,25 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 
 				Settings: models.ChannelSettings{
 					CrawlFreq:              crawlFreq,
-					Filters:                filters,
+					Filters:                dlFilters,
+					Retries:                retries,
 					CookieSource:           cookieSource,
 					ExternalDownloader:     externalDownloader,
 					ExternalDownloaderArgs: externalDownloaderArgs,
 					Concurrency:            concurrency,
+					MaxFilesize:            maxFilesize,
 				},
 
 				MetarrArgs: models.MetarrArgs{
+					Ext:                metarrExt,
 					MetaOps:            metaOps,
-					FileDatePfx:        dateFmt,
-					RenameStyle:        renameFlag,
-					FilenameReplaceSfx: strings.Join(fileSfxReplace, ","),
+					FileDatePfx:        filenameDateTag,
+					RenameStyle:        renameStyle,
+					FilenameReplaceSfx: fileSfxReplaceStr,
+					MaxCPU:             maxCPU,
+					MinFreeMem:         minFreeMem,
+					OutputDir:          outDir,
+					Concurrency:        metarrConcurrency,
 				},
 
 				LastScan:  now,
@@ -339,24 +354,19 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	addCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
-	addCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
-	addCmd.Flags().StringVarP(&vDir, keys.VideoDir, "v", "", "Output directory (videos will be saved here)")
-	addCmd.Flags().StringVarP(&jDir, keys.JSONDir, "j", "", "Output directory (JSON metafiles will be saved here)")
+	setPrimaryChannelFlags(addCmd, &url, &name, nil)
 
-	// Channel settings
-	addCmd.Flags().IntVar(&crawlFreq, keys.CrawlFreq, 30, "How often to check for new videos (in minutes)")
-	addCmd.Flags().IntVarP(&concurrency, keys.Concurrency, "l", 3, "Maximum concurrent videos to download/process for this channel")
-	addCmd.Flags().StringSliceVar(&filterInput, keys.FilterOpsInput, []string{}, "Filter video downloads (e.g. 'title:contains:frogs' ignores downloads without 'frogs' in the title metafield)")
-	addCmd.Flags().StringVar(&cookieSource, keys.CookieSource, "", "Please enter the browser to grab cookies from for sites requiring authentication (e.g. 'firefox')")
-	addCmd.Flags().StringVar(&externalDownloader, keys.ExternalDownloader, "", "External downloader option (e.g. 'aria2c')")
-	addCmd.Flags().StringVar(&externalDownloaderArgs, keys.ExternalDownloaderArgs, "", "External downloader arguments (e.g. '\"-x 16 -s 16\"')")
+	// Files/dirs
+	setFileDirFlags(addCmd, &vDir, &jDir)
 
-	// Metarr operations
-	addCmd.Flags().StringSliceVar(&fileSfxReplace, keys.InputFilenameReplaceSfx, nil, "Replace a filename suffix element in Metarr")
-	addCmd.Flags().StringVar(&renameFlag, keys.RenameStyle, "", "Rename style for Metarr (e.g. 'spaces')")
-	addCmd.Flags().StringVar(&dateFmt, keys.InputFileDatePfx, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
-	addCmd.Flags().StringSliceVar(&metaOps, keys.MetaOps, nil, "Meta operations to perform in Metarr")
+	// Program related
+	setProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloader, &externalDownloaderArgs)
+
+	// Download
+	setDownloadFlags(addCmd, &maxFilesize, &cookieSource, &retries, &dlFilterInput)
+
+	// Metarr
+	setMetarrFlags(addCmd, &metarrExt, &maxCPU, &metarrConcurrency, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps, &filenameDateTag)
 
 	return addCmd
 }
@@ -416,31 +426,16 @@ func listChannelCmd(cs models.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			for i := range chans {
-				fmt.Printf("\nChannel ID: %d\n\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\nCrawl Frequency: %d minutes\nFilters: %v\n",
-					chans[i].ID, chans[i].Name, chans[i].URL, chans[i].VDir, chans[i].JDir, chans[i].Settings.CrawlFreq, chans[i].Settings.Filters)
-
-				// Display Metarr operations if they exist
-				if len(chans[i].MetarrArgs.MetaOps) > 0 {
-					fmt.Printf("Metarr Operations:\n")
-					for _, op := range chans[i].MetarrArgs.MetaOps {
-						fmt.Printf("  - %s\n", op)
-					}
-				}
-				if chans[i].MetarrArgs.FileDatePfx != "" {
-					fmt.Printf("Filename Date Format: %s\n", chans[i].MetarrArgs.FileDatePfx)
-				}
-				if chans[i].MetarrArgs.RenameStyle != "" {
-					fmt.Printf("Rename Style: %s\n", chans[i].MetarrArgs.RenameStyle)
-				}
-				if chans[i].MetarrArgs.FilenameReplaceSfx != "" {
-					fmt.Printf("Filename Suffix Replace: %s\n", chans[i].MetarrArgs.FilenameReplaceSfx)
-				}
+			for _, ch := range chans {
+				fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URL, ch.VDir, ch.JDir)
+				fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
+				fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
+				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir)
+				fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 			}
 			return nil
 		},
 	}
-
 	return listCmd
 }
 
@@ -490,10 +485,15 @@ func crawlChannelCmd(cs models.ChannelStore, s models.Store) *cobra.Command {
 // updateChannelSettingsCmd updates channel settings.
 func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 	var (
-		id, concurrency, crawlFreq      int
-		url, name, key, val             string
-		vDir, jDir, outDir, maxFilesize string
-		downloadCmd, downloadArgs       string
+		id, concurrency, crawlFreq, metarrConcurrency, retries  int
+		maxCPU                                                  float64
+		vDir, jDir, outDir                                      string
+		url, cookieSource                                       string
+		name, key, val                                          string
+		minFreeMem, renameStyle, filenameDateTag, metarrExt     string
+		maxFilesize, externalDownloader, externalDownloaderArgs string
+		dlFilters, metaOps                                      []string
+		fileSfxReplace                                          []string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -516,97 +516,83 @@ func updateChannelSettingsCmd(cs models.ChannelStore) *cobra.Command {
 			}
 
 			// Files/dirs:
-			if vDir != "" {
+			if vDir != "" { // Do not stat, due to templating
 				if err := cs.UpdateChannelEntry(key, val, consts.QChanVDir, vDir); err != nil {
 					return fmt.Errorf("failed to update video directory: %w", err)
 				}
 				logging.S(0, "Updated video directory to %q", vDir)
 			}
 
-			if jDir != "" {
+			if jDir != "" { // Do not stat, due to templating
 				if err := cs.UpdateChannelEntry(key, val, consts.QChanJDir, jDir); err != nil {
 					return fmt.Errorf("failed to update JSON directory: %w", err)
 				}
 				logging.S(0, "Updated JSON directory to %q", jDir)
 			}
 
-			if outDir != "" {
-				if err := cs.UpdateMetarrOutputDir(key, val, outDir); err != nil {
-					return fmt.Errorf("failed to update Metarr output directory: %w", err)
-				}
-				logging.S(0, "Updated Metarr output directory to %q", outDir)
+			// Settings
+			fnSettingsArgs, err := getSettingsArgFns(chanSettings{
+				cookieSource:           cookieSource,
+				crawlFreq:              crawlFreq,
+				retries:                retries,
+				filters:                dlFilters,
+				externalDownloader:     externalDownloader,
+				externalDownloaderArgs: externalDownloaderArgs,
+				concurrency:            concurrency,
+				maxFilesize:            maxFilesize,
+			})
+			if err != nil {
+				return err
 			}
 
-			// Settings:
-			if concurrency != 0 {
-				if err := cs.UpdateConcurrencyLimit(key, val, concurrency); err != nil {
-					return fmt.Errorf("failed to update concurrency limit: %w", err)
-				}
-				logging.S(0, "Updated concurrency to %d minutes", concurrency)
-			}
-
-			if crawlFreq != 0 {
-				if err := cs.UpdateCrawlFrequency(key, val, crawlFreq); err != nil {
-					return fmt.Errorf("failed to update crawl frequency: %w", err)
-				}
-				logging.S(0, "Updated crawl frequency to %d minutes", crawlFreq)
-			}
-
-			if downloadCmd != "" {
-				if err := cs.UpdateExternalDownloader(key, val, downloadCmd, downloadArgs); err != nil {
-					return fmt.Errorf("failed to update external downloader settings: %w", err)
-				}
-				logging.S(0, "Updated external downloader settings")
-			}
-
-			if maxFilesize != "" {
-				maxFilesize = strings.ToUpper(maxFilesize)
-
-				switch {
-				case strings.HasSuffix(maxFilesize, "K"), strings.HasSuffix(maxFilesize, "M"), strings.HasSuffix(maxFilesize, "G"):
-					maxFilesize = strings.TrimSuffix(maxFilesize, "B")
-					if err := cs.UpdateMaxFilesize(key, val, maxFilesize); err != nil {
+			if len(fnSettingsArgs) > 0 {
+				for _, fn := range fnSettingsArgs {
+					if _, err := cs.UpdateChannelSettingsJSON(key, val, fn); err != nil {
 						return err
 					}
-					logging.S(0, "Updated max filesize to %s", maxFilesize)
-				case strings.HasSuffix(maxFilesize, "B"):
-					maxFilesize = strings.TrimSuffix(maxFilesize, "B")
-					if err := cs.UpdateMaxFilesize(key, val, maxFilesize); err != nil {
-						return err
-					}
-					logging.S(0, "Updated max filesize to %sB", maxFilesize)
-				default:
-					if _, err := strconv.Atoi(maxFilesize); err == nil {
-						if err := cs.UpdateMaxFilesize(key, val, maxFilesize); err != nil {
-							return err
-						}
-						logging.S(0, "Updated max filesize to %s bytes", maxFilesize)
-					} else {
-						return errors.New("max filesize should end in the filesize denomination, e.g. K, M, G (KB, MB, GB) or be a numeric value for bytes")
-					}
 				}
 			}
 
+			fnMetarrArray, err := getMetarrArgFns(cobraMetarrArgs{
+				filenameReplaceSfx: fileSfxReplace,
+				renameStyle:        renameStyle,
+				fileDatePfx:        filenameDateTag,
+				metarrExt:          metarrExt,
+				metaOps:            metaOps,
+				outputDir:          outDir,
+				concurrency:        metarrConcurrency,
+				maxCPU:             maxCPU,
+				minFreeMem:         minFreeMem,
+			})
+			if err != nil {
+				return err
+			}
+
+			if len(fnMetarrArray) > 0 {
+				for _, fn := range fnMetarrArray {
+					if _, err := cs.UpdateChannelMetarrArgsJSON(key, val, fn); err != nil {
+						return err
+					}
+				}
+			}
 			return nil
 		},
 	}
 
 	// Primary channel elements
-	updateSettingsCmd.Flags().StringVarP(&url, "url", "u", "", "Channel URL")
-	updateSettingsCmd.Flags().StringVarP(&name, "name", "n", "", "Channel name")
-	updateSettingsCmd.Flags().IntVarP(&id, "id", "i", 0, "Channel ID in the DB")
+	setPrimaryChannelFlags(updateSettingsCmd, &url, &name, &id)
 
-	// Edits:
 	// Files/dirs
-	updateSettingsCmd.Flags().StringVar(&vDir, keys.VideoDir, "", "This is where videos for this channel will be saved (some {{}} templating commands available)")
-	updateSettingsCmd.Flags().StringVar(&jDir, keys.JSONDir, "", "This is where JSON files for this channel will be saved (some {{}} templating commands available)")
-	updateSettingsCmd.Flags().StringVar(&outDir, "metarr-output-dir", "", "Metarr will move files to this location on completion (some {{}} templating commands available)")
+	setFileDirFlags(updateSettingsCmd, &vDir, &jDir)
 
 	// Program related
-	updateSettingsCmd.Flags().IntVarP(&concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this channel")
-	updateSettingsCmd.Flags().IntVar(&crawlFreq, "crawl-freq", 0, "New crawl frequency in minutes")
-	updateSettingsCmd.Flags().StringVar(&downloadCmd, "downloader", "", "External downloader command")
-	updateSettingsCmd.Flags().StringVar(&downloadArgs, "downloader-args", "", "External downloader arguments")
+	setProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloader, &externalDownloaderArgs)
+
+	// Download
+	setDownloadFlags(updateSettingsCmd, &maxFilesize, &cookieSource, &retries, &dlFilters)
+
+	// Metarr
+	setMetarrFlags(updateSettingsCmd, &metarrExt, &maxCPU, &metarrConcurrency, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps, &filenameDateTag)
 
 	return updateSettingsCmd
 }

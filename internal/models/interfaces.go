@@ -20,14 +20,10 @@ type ChannelStore interface {
 	ListChannels() (channels []*Channel, err error, hasRows bool)
 	LoadGrabbedURLs(c *Channel) (urls []string, err error)
 	UpdateChannelRow(key, val, col, newVal string) error
-	UpdateLastScan(channelID int64) error
-	UpdateChannelSettings(key, val string, updateFn func(*ChannelSettings) error) error
-	UpdateCrawlFrequency(key, val string, newFreq int) error
-	UpdateExternalDownloader(key, val, downloader, args string) error
-	UpdateConcurrencyLimit(key, val string, newConc int) error
 	UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error
-	UpdateMetarrOutputDir(key, val string, outDir string) error
-	UpdateMaxFilesize(key, val, maxSize string) error
+	UpdateLastScan(channelID int64) error
+	UpdateChannelSettingsJSON(key, val string, updateFn func(*ChannelSettings) error) (int64, error)
+	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*MetarrArgs) error) (int64, error)
 	GetID(key, val string) (int64, error)
 	AddNotifyURL(id int64, notifyName, notifyURL string) error
 	GetNotifyURLs(id int64) ([]string, error)

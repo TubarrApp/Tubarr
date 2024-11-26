@@ -1,9 +1,9 @@
 package downloads
 
 import (
-	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"tubarr/internal/models"
 	logging "tubarr/internal/utils/logging"
 )
@@ -14,10 +14,7 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 
 	args = append(args,
 		"--restrict-filenames",
-		"-o", filepath.Join(v.VDir, "%(title)s.%(ext)s"),
-		"--retries", "infinite",
-		"--fragment-retries", "infinite",
-		"--extractor-retries", "infinite")
+		"-o", filepath.Join(v.VDir, "%(title)s.%(ext)s"))
 
 	args = append(args, "--print", "after_move:%(filepath)s")
 
@@ -29,16 +26,16 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 		args = append(args, "--max-filesize", v.Settings.MaxFilesize)
 	}
 
-	if v.Settings.ExternalDownloaderArgs != "" {
+	if v.Settings.ExternalDownloader != "" {
 		args = append(args, "--external-downloader", v.Settings.ExternalDownloader)
-		dlArgs := v.Settings.ExternalDownloaderArgs
 
-		// Add safety arguments if using aria2c
-		if v.Settings.ExternalDownloader == "aria2c" {
-			dlArgs = fmt.Sprintf("%s --retry-wait=10 --max-tries=5 --timeout=60 --connect-timeout=60 --min-tls-version=TLSv1.2", dlArgs)
+		if v.Settings.ExternalDownloaderArgs != "" {
+			args = append(args, "--external-downloader-args", v.Settings.ExternalDownloaderArgs)
 		}
+	}
 
-		args = append(args, "--external-downloader-args", dlArgs)
+	if v.Settings.Retries != 0 {
+		args = append(args, "--retries", strconv.Itoa(v.Settings.Retries))
 	}
 
 	args = append(args, "--sleep-requests", "1", v.URL)

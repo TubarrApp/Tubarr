@@ -68,15 +68,34 @@ func makeMetarrCommand(v *models.Video) ([]string, error) {
 	argMap := make(map[string]string)
 
 	// Add other model-based arguments
+	if v.MetarrArgs.Concurrency != 0 {
+		argMap["--concurrency"] = strconv.Itoa(v.MetarrArgs.Concurrency)
+	}
+
+	if v.MetarrArgs.Ext != "" {
+		argMap["--ext"] = v.MetarrArgs.Ext
+	}
+
 	if v.MetarrArgs.FileDatePfx != "" {
 		argMap["--filename-date-tag"] = v.MetarrArgs.FileDatePfx
 	}
-	if v.MetarrArgs.RenameStyle != "" {
-		argMap["-r"] = v.MetarrArgs.RenameStyle
-	}
+
 	if v.MetarrArgs.FilenameReplaceSfx != "" {
 		argMap["--filename-replace-suffix"] = v.MetarrArgs.FilenameReplaceSfx
 	}
+
+	if v.MetarrArgs.MaxCPU != 0 {
+		argMap["--max-cpu"] = fmt.Sprintf("%.2f", v.MetarrArgs.MaxCPU)
+	}
+
+	if v.MetarrArgs.MinFreeMem != "" {
+		argMap["--min-free-mem"] = v.MetarrArgs.MinFreeMem
+	}
+
+	if v.MetarrArgs.RenameStyle != "" {
+		argMap["-r"] = v.MetarrArgs.RenameStyle
+	}
+
 	if parsedOutputDir != "" {
 		argMap["-o"] = parsedOutputDir
 	}

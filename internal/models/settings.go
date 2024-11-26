@@ -21,9 +21,13 @@ type DLFilters struct {
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
 type MetarrArgs struct {
-	FilenameReplaceSfx string   `json:"filename_replace_suffix"`
-	RenameStyle        string   `json:"rename_style"`
-	FileDatePfx        string   `json:"filename_date_prefix"`
-	MetaOps            []string `json:"meta_ops"`
+	Ext                string   `json:"metarr_ext"`
+	FilenameReplaceSfx string   `json:"metarr_filename_replace_suffix"`
+	RenameStyle        string   `json:"metarr_rename_style"`
+	FileDatePfx        string   `json:"metarr_filename_date_prefix"`
+	MetaOps            []string `json:"metarr_meta_ops"`
 	OutputDir          string   `json:"metarr_output_directory"`
+	Concurrency        int      `json:"metarr_concurrency"`
+	MaxCPU             float64  `json:"metarr_max_cpu_usage"`
+	MinFreeMem         string   `json:"metarr_min_free_mem"`
 }

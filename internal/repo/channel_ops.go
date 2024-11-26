@@ -406,7 +406,7 @@ func (cs *ChannelStore) ListChannels() (channels []*models.Channel, err error, h
 }
 
 // UpdateChannelMetarrArgs updates args for Metarr output.
-func (cs ChannelStore) UpdateChannelMetarrArgs(key, val string, updateFn func(*models.MetarrArgs) error) error {
+func (cs ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error) {
 	var metarrArgs json.RawMessage
 	query := squirrel.
 		Select(consts.QChanMetarr).
@@ -416,56 +416,48 @@ func (cs ChannelStore) UpdateChannelMetarrArgs(key, val string, updateFn func(*m
 
 	err := query.QueryRow().Scan(&metarrArgs)
 	if err == sql.ErrNoRows {
-		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
+		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
-		return fmt.Errorf("failed to get channel settings: %w", err)
+		return 0, fmt.Errorf("failed to get channel settings: %w", err)
 	}
 
 	// Unmarshal current settings
 	var args models.MetarrArgs
 	if err := json.Unmarshal(metarrArgs, &args); err != nil {
-		return fmt.Errorf("failed to unmarshal settings: %w", err)
+		return 0, fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
 	// Apply the update
 	if err := updateFn(&args); err != nil {
-		return fmt.Errorf("failed to update settings: %w", err)
+		return 0, fmt.Errorf("failed to update settings: %w", err)
 	}
 
 	// Marshal updated settings
 	updatedArgs, err := json.Marshal(args)
 	if err != nil {
-		return fmt.Errorf("failed to marshal updated settings: %w", err)
+		return 0, fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
-	// Update in database
+	// Print the updated settings
+	logging.S(0, "Updated MetarrArgs: %s", string(updatedArgs))
+
+	// Update the database with the new settings
 	updateQuery := squirrel.
 		Update(consts.DBChannels).
 		Set(consts.QChanMetarr, updatedArgs).
-		Set(consts.QChanUpdatedAt, time.Now()).
 		Where(squirrel.Eq{key: val}).
 		RunWith(cs.DB)
 
-	result, err := updateQuery.Exec()
+	rtn, err := updateQuery.Exec()
 	if err != nil {
-		return fmt.Errorf("failed to update channel Metarr args: %w", err)
+		return 0, fmt.Errorf("failed to update channel settings in database: %w", err)
 	}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rows == 0 {
-		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
-	}
-
-	logging.S(1, "Updated Metarr args for channel with key %q and value '%v'", key, val)
-	return nil
+	return rtn.RowsAffected()
 }
 
 // UpdateChannelSettings updates specific settings in the channel's settings JSON.
-func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*models.ChannelSettings) error) error {
+func (cs ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error) {
 	var settingsJSON json.RawMessage
 	query := squirrel.
 		Select(consts.QChanSettings).
@@ -475,52 +467,44 @@ func (cs ChannelStore) UpdateChannelSettings(key, val string, updateFn func(*mod
 
 	err := query.QueryRow().Scan(&settingsJSON)
 	if err == sql.ErrNoRows {
-		return fmt.Errorf("no channel found with key %q and value '%v'", key, val)
+		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
-		return fmt.Errorf("failed to get channel settings: %w", err)
+		return 0, fmt.Errorf("failed to get channel settings: %w", err)
 	}
 
 	// Unmarshal current settings
 	var settings models.ChannelSettings
 	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
-		return fmt.Errorf("failed to unmarshal settings: %w", err)
+		return 0, fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
 	// Apply the update
 	if err := updateFn(&settings); err != nil {
-		return fmt.Errorf("failed to update settings: %w", err)
+		return 0, fmt.Errorf("failed to update settings: %w", err)
 	}
 
 	// Marshal updated settings
-	updatedJSON, err := json.Marshal(settings)
+	updatedSettings, err := json.Marshal(settings)
 	if err != nil {
-		return fmt.Errorf("failed to marshal updated settings: %w", err)
+		return 0, fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
-	// Update in database
+	// Print the updated settings
+	logging.S(0, "Updated ChannelSettings: %s", string(updatedSettings))
+
+	// Update the database with the new settings
 	updateQuery := squirrel.
 		Update(consts.DBChannels).
-		Set(consts.QChanSettings, updatedJSON).
-		Set(consts.QChanUpdatedAt, time.Now()).
+		Set(consts.QChanSettings, updatedSettings).
 		Where(squirrel.Eq{key: val}).
 		RunWith(cs.DB)
 
-	result, err := updateQuery.Exec()
+	rtn, err := updateQuery.Exec()
 	if err != nil {
-		return fmt.Errorf("failed to update channel settings: %w", err)
+		return 0, fmt.Errorf("failed to update channel settings in database: %w", err)
 	}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rows == 0 {
-		return fmt.Errorf("no channel found with key/val %q=%q", key, val)
-	}
-
-	logging.S(1, "Updated settings for channel with key/val %q=%q", key, val)
-	return nil
+	return rtn.RowsAffected()
 }
 
 // UpdateChannelEntry updates a single field for a channel.
@@ -535,49 +519,6 @@ func (cs ChannelStore) UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal
 		return fmt.Errorf("failed to set %q=%q in channel identified by key %q and val %q", updateKey, updateVal, chanKey, chanVal)
 	}
 	return nil
-}
-
-// UpdateMetarrOutputDir updates the crawl frequency for a channel.
-func (cs ChannelStore) UpdateMetarrOutputDir(key, val string, outDir string) error {
-	return cs.UpdateChannelMetarrArgs(key, val, func(m *models.MetarrArgs) error {
-		m.OutputDir = outDir
-		return nil
-	})
-}
-
-// UpdateCrawlFrequency updates the crawl frequency for a channel.
-func (cs ChannelStore) UpdateCrawlFrequency(key, val string, newFreq int) error {
-	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
-		s.CrawlFreq = newFreq
-		return nil
-	})
-}
-
-// UpdateConcurrencyLimit updates the concurrency limit for a channel.
-func (cs ChannelStore) UpdateConcurrencyLimit(key, val string, newConc int) error {
-	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
-		s.Concurrency = newConc
-		return nil
-	})
-}
-
-// UpdateExternalDownloader updates the external downloader settings.
-func (cs ChannelStore) UpdateExternalDownloader(key, val, downloader, args string) error {
-	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
-		s.ExternalDownloader = downloader
-		s.ExternalDownloaderArgs = args
-		return nil
-	})
-}
-
-// UpdateMaxFilesize updates the video filesize limit for a channel.
-//
-// Values end in K, M, or G to denote filesize denomination.
-func (cs ChannelStore) UpdateMaxFilesize(key, val, maxSize string) error {
-	return cs.UpdateChannelSettings(key, val, func(s *models.ChannelSettings) error {
-		s.MaxFilesize = maxSize
-		return nil
-	})
 }
 
 // UpdateChannelRow updates a single element in the database.

@@ -3,14 +3,20 @@ package keys
 // Terminal keys:
 // Files and directories
 const (
-	VideoDir       string = "video-dir"
-	JSONDir        string = "json-dir"
+	URL  string = "url"
+	Name string = "name"
+	ID   string = "id"
+)
+const (
+	VideoDir       string = "video-directory"
+	JSONDir        string = "json-directory"
 	MetarrPreset   string = "metarr-preset"
 	OutputFiletype string = "ext"
 )
 
 // Web inputs
 const (
+	MaxFilesize            string = "max-filesize"
 	CookieSource           string = "cookie-source"
 	DLRetries              string = "dl-retries"
 	ExternalDownloader     string = "external-downloader"
@@ -39,13 +45,18 @@ const (
 
 // Metarr operations
 const (
-	InputFileDatePfx        string = "filename-date-tag"
-	InputFilenameReplaceSfx string = "filename-replace-suffix"
-	MDescDatePfx            string = "desc-date-prefix"
-	MDescDateSfx            string = "desc-date-suffix"
-	MetaOps                 string = "meta-ops"
-	MetaPurge               string = "purge-metafile"
-	MFilenamePfx            string = "metadata-filename-prefix"
-	OutputFiletypeInput     string = "ext"
-	RenameStyle             string = "rename-style"
+	InputFileDatePfx        string = "metarr-filename-date-tag"
+	InputFilenameReplaceSfx string = "metarr-filename-replace-suffix"
+	MDescDatePfx            string = "metarr-desc-date-prefix"
+	MDescDateSfx            string = "metarr-desc-date-suffix"
+	MetaOps                 string = "metarr-meta-ops"
+	MetaPurge               string = "metarr-purge-metafile"
+	MFilenamePfx            string = "metarr-metadata-filename-prefix"
+	OutputFiletypeInput     string = "metarr-ext"
+	RenameStyle             string = "metarr-rename-style"
+	MaxCPU                  string = "metarr-max-cpu"
+	MinFreeMem              string = "metarr-min-free-mem"
+	NoFileOverwrite         string = "metarr-no-file-overwrite"
+	MetarrConcurrency       string = "metarr-concurrency"
+	MetarrOutputDir         string = "metarr-output-dir"
 )

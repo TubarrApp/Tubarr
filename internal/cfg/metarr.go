@@ -3,6 +3,7 @@ package cfg
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"tubarr/internal/utils/logging"
 )
@@ -55,21 +56,24 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 }
 
 // validateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid.
-func validateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
+func validateFilenameSuffixReplace(fileSfxReplace []string) (string, error) {
 	valid := make([]string, 0, len(fileSfxReplace))
 
+	lengthStrings := 0
 	for _, pair := range fileSfxReplace {
 		parts := strings.Split(pair, ":")
 		if len(parts) < 2 {
-			return nil, errors.New("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
+			return "", errors.New("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
 		}
+		lengthStrings += len(parts[0]+parts[1]) + 1
 		valid = append(valid, pair)
 	}
-	return valid, nil
+
+	return strings.Join(valid, ","), nil
 }
 
-// setRenameFlag sets the rename style to apply.
-func setRenameFlag(flag string) error {
+// validateRenameFlag validates the rename style to apply.
+func validateRenameFlag(flag string) error {
 
 	// Trim whitespace for more robust validation
 	flag = strings.TrimSpace(flag)
@@ -93,4 +97,17 @@ func dateFormat(dateFmt string) bool {
 	}
 	logging.E(0, "Invalid date format entered as %q, please enter up to three characters (where 'Y' is yyyy and 'y' is yy)", dateFmt)
 	return false
+}
+
+// verifyMinFreeMem flag verifies the format of the free memory flag.
+func verifyMinFreeMem(minFreeMem string) error {
+	minFreeMem = strings.ToUpper(minFreeMem)
+	switch {
+	case strings.HasSuffix(minFreeMem, "B"), strings.HasSuffix(minFreeMem, "G"), strings.HasSuffix(minFreeMem, "M"), strings.HasSuffix(minFreeMem, "K"):
+	default:
+		if _, err := strconv.Atoi(minFreeMem); err != nil {
+			return fmt.Errorf("invalid min free memory argument %q for Metarr, should ", minFreeMem)
+		}
+	}
+	return nil
 }
