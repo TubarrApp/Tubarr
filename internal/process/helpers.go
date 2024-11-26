@@ -189,13 +189,18 @@ func removeUnwantedJSON(path string) error {
 
 // isPrivateNetwork returns true if the URL is detected as a LAN network.
 func isPrivateNetwork(host string) bool {
-	if host == "localhost" {
+	h, _, err := net.SplitHostPort(host)
+	if err == nil {
+		host = h
+	}
+
+	if h == "localhost" {
 		return true
 	}
 
-	ip := net.ParseIP(host)
+	ip := net.ParseIP(h)
 	if ip == nil {
-		return isPrivateNetworkFallback(host)
+		return isPrivateNetworkFallback(h)
 	}
 
 	// IPv4
@@ -235,9 +240,10 @@ func isPrivateNetwork(host string) bool {
 }
 
 // isPrivateNetworkFallback
-func isPrivateNetworkFallback(host string) bool {
-	parts := strings.Split(host, ".")
-	if len(host) == 4 {
+func isPrivateNetworkFallback(h string) bool {
+
+	parts := strings.Split(h, ".")
+	if len(parts) == 4 {
 		octets := make([]int, 4)
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
@@ -255,6 +261,6 @@ func isPrivateNetworkFallback(host string) bool {
 			return true
 		}
 	}
-	logging.E(0, "Malformed IP string %q", host)
+	logging.E(0, "Malformed IP string %q", h)
 	return false
 }
