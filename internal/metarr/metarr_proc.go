@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -16,7 +17,7 @@ func InitMetarr(v *models.Video) error {
 		return nil
 	}
 
-	cmd := exec.Command("metarr", args...)
+	cmd := exec.CommandContext(context.Background(), "metarr", args...)
 
 	if err := runMetarr(cmd); err != nil {
 		return err

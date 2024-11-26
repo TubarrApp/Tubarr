@@ -1,6 +1,7 @@
 package downloads
 
 import (
+	"context"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -41,7 +42,7 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 	args = append(args, "--sleep-requests", "1", v.URL)
 
 	logging.D(1, "Built argument list: %v", args)
-	cmd := exec.Command("yt-dlp", args...)
+	cmd := exec.CommandContext(context.Background(), "yt-dlp", args...)
 
 	return cmd
 }

@@ -1,6 +1,7 @@
 package downloads
 
 import (
+	"context"
 	"os/exec"
 	"strconv"
 	"tubarr/internal/models"
@@ -40,7 +41,7 @@ func buildJSONCommand(v *models.Video) *exec.Cmd {
 	args = append(args, "--restrict-filenames", "-o", "%(title)s.%(ext)s",
 		v.URL)
 
-	cmd := exec.Command("yt-dlp", args...)
+	cmd := exec.CommandContext(context.Background(), "yt-dlp", args...)
 	logging.D(3, "Built metadata command for URL %q:\n%v", v.URL, cmd.String())
 
 	return cmd

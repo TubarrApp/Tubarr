@@ -13,89 +13,109 @@ import (
 )
 
 type metCmdMapping struct {
-	metarrValue interface{}
+	metarrValue any
 	viperKey    string
 	cmdKey      string
 }
 
-// mergeArguments combines arguments from both Viper config and model settings
+// makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video) []string {
-	args := []string{
-		metcmd.VideoFile, v.VPath,
-		metcmd.JSONFile, v.JPath,
-	}
-
-	// Output directory
-	parsedOutputDir := parseOutputDir(v)
-
-	// Use map for other unique arguments
-	argMap := make(map[string]string)
 
 	fields := []metCmdMapping{
-		{v.MetarrArgs.Concurrency,
-			"",
-			metcmd.Concurrency},
-
-		{v.MetarrArgs.Ext,
-			keys.OutputFiletype,
-			metcmd.Ext},
-
-		{v.MetarrArgs.FileDatePfx,
-			keys.InputFileDatePfx,
-			metcmd.FilenameDateTag},
-
-		{v.MetarrArgs.FilenameReplaceSfx,
-			keys.InputFilenameReplaceSfx,
-			metcmd.FilenameReplaceSfx},
-
-		{v.MetarrArgs.MaxCPU,
-			"",
-			metcmd.MaxCPU},
-
-		{v.MetarrArgs.MinFreeMem,
-			keys.MinFreeMem,
-			metcmd.MinFreeMem},
-
-		{v.MetarrArgs.RenameStyle,
-			keys.RenameStyle,
-			metcmd.RenameStyle},
-
-		{parsedOutputDir,
-			keys.MoveOnComplete,
-			metcmd.OutputDir},
-
-		{"",
-			keys.DebugLevel,
-			metcmd.Debug},
+		{
+			metarrValue: v.MetarrArgs.Concurrency,
+			viperKey:    "",
+			cmdKey:      metcmd.Concurrency,
+		},
+		{
+			metarrValue: v.MetarrArgs.Ext,
+			viperKey:    keys.OutputFiletype,
+			cmdKey:      metcmd.Ext,
+		},
+		{
+			metarrValue: v.MetarrArgs.FileDatePfx,
+			viperKey:    keys.InputFileDatePfx,
+			cmdKey:      metcmd.FilenameDateTag,
+		},
+		{
+			metarrValue: v.MetarrArgs.FilenameReplaceSfx,
+			viperKey:    keys.InputFilenameReplaceSfx,
+			cmdKey:      metcmd.FilenameReplaceSfx,
+		},
+		{
+			metarrValue: v.MetarrArgs.MaxCPU,
+			viperKey:    "",
+			cmdKey:      metcmd.MaxCPU,
+		},
+		{
+			metarrValue: v.MetarrArgs.MinFreeMem,
+			viperKey:    keys.MinFreeMem,
+			cmdKey:      metcmd.MinFreeMem,
+		},
+		{
+			metarrValue: v.MetarrArgs.RenameStyle,
+			viperKey:    keys.RenameStyle,
+			cmdKey:      metcmd.RenameStyle,
+		},
+		{
+			metarrValue: parseOutputDir(v),
+			viperKey:    keys.MoveOnComplete,
+			cmdKey:      metcmd.OutputDir,
+		},
+		{
+			metarrValue: "",
+			viperKey:    keys.DebugLevel,
+			cmdKey:      metcmd.Debug,
+		},
 	}
 
+	// Map use to ensure uniqueness
+	argMap := make(map[string]string, len(fields))
+
+	// Final args
+	args := make([]string, 0, len(fields))
+	args = append(args, metcmd.VideoFile, v.VPath)
+	args = append(args, metcmd.JSONFile, v.JPath)
+
 	for _, f := range fields {
-		switch val := f.metarrValue.(type) {
+		processField(f, argMap)
+	}
 
-		case int:
-			if val != 0 {
-				argMap[f.cmdKey] = strconv.Itoa(val)
+	for k, v := range argMap {
+		args = append(args, k, v)
+	}
 
-			} else if cfg.IsSet(f.viperKey) {
-				argMap[f.cmdKey] = strconv.Itoa(cfg.GetInt(f.viperKey))
-			}
+	logging.I("Built Metarr argument list: %v", args)
+	return args
+}
 
-		case float64:
-			if val != 0 {
-				argMap[f.cmdKey] = fmt.Sprintf("%.2f", val)
+// processField processes each field in the argument map.
+func processField(f metCmdMapping, argMap map[string]string) {
+	switch val := f.metarrValue.(type) {
 
-			} else if cfg.IsSet(f.viperKey) {
-				argMap[f.cmdKey] = fmt.Sprintf("%.2f", cfg.GetFloat64(f.viperKey))
-			}
+	case int:
+		if val != 0 {
+			argMap[f.cmdKey] = strconv.Itoa(val)
 
-		case string:
-			if val != "" {
-				argMap[f.cmdKey] = val
+		} else if cfg.IsSet(f.viperKey) {
+			argMap[f.cmdKey] = strconv.Itoa(cfg.GetInt(f.viperKey))
+		}
 
-			} else if cfg.IsSet(f.viperKey) {
-				viperVal := cfg.Get(f.viperKey)
+	case float64:
+		if val != 0 {
+			argMap[f.cmdKey] = fmt.Sprintf("%.2f", val)
 
-				switch strVal := viperVal.(type) {
+		} else if cfg.IsSet(f.viperKey) {
+			argMap[f.cmdKey] = fmt.Sprintf("%.2f", cfg.GetFloat64(f.viperKey))
+		}
+
+	case string:
+		if val != "" {
+			argMap[f.cmdKey] = val
+
+		} else if cfg.IsSet(f.viperKey) {
+			if v := cfg.Get(f.viperKey); v != nil {
+				switch strVal := v.(type) {
 				case string:
 					argMap[f.cmdKey] = strVal
 				case []string:
@@ -104,16 +124,9 @@ func makeMetarrCommand(v *models.Video) []string {
 			}
 		}
 	}
-
-	for key, value := range argMap {
-		args = append(args, key, value)
-	}
-
-	logging.I("Built Metarr argument list: %v", args)
-	return args
 }
 
-// parseOutputDir returns a parsed output directory
+// parseOutputDir parses and returns the output directory.
 func parseOutputDir(v *models.Video) string {
 	dirParser := parsing.NewDirectoryParser(v.Channel, v)
 	switch {
