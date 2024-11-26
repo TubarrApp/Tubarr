@@ -167,6 +167,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 
 	if len(videos) == 0 {
 		logging.I("No new releases for channel %q", c.URL)
+		return nil
 	} else {
 		success, errArray = InitProcess(s.GetVideoStore(), c, videos)
 		if errArray != nil {
