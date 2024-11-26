@@ -93,7 +93,7 @@ func processField(f metCmdMapping, argMap map[string]string) {
 	switch val := f.metarrValue.(type) {
 
 	case int:
-		if val != 0 {
+		if val > 0 {
 			argMap[f.cmdKey] = strconv.Itoa(val)
 
 		} else if cfg.IsSet(f.viperKey) {
@@ -101,7 +101,10 @@ func processField(f metCmdMapping, argMap map[string]string) {
 		}
 
 	case float64:
-		if val != 0 {
+		if val > 0 {
+			if val > 100 {
+				val = 100
+			}
 			argMap[f.cmdKey] = fmt.Sprintf("%.2f", val)
 
 		} else if cfg.IsSet(f.viperKey) {

@@ -219,7 +219,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 }
 
 // notify pings notification services as required.
-func notify(c *models.Channel, notifyURLs []string) (errs []error) {
+func notify(c *models.Channel, notifyURLs []string) []error {
 
 	// Setup clients
 	initClients()
@@ -240,6 +240,8 @@ func notify(c *models.Channel, notifyURLs []string) (errs []error) {
 	}
 
 	// Notify for each URL
+	errs := make([]error, 0, len(notifyURLs))
+
 	for _, notifyURL := range notifyURLs {
 		parsed, err := url.Parse(notifyURL)
 		if err != nil {

@@ -68,7 +68,6 @@ func validateFilenameSuffixReplace(fileSfxReplace []string) (string, error) {
 		lengthStrings += len(parts[0]+parts[1]) + 1
 		valid = append(valid, pair)
 	}
-
 	return strings.Join(valid, ","), nil
 }
 
@@ -76,8 +75,7 @@ func validateFilenameSuffixReplace(fileSfxReplace []string) (string, error) {
 func validateRenameFlag(flag string) error {
 
 	// Trim whitespace for more robust validation
-	flag = strings.TrimSpace(flag)
-	flag = strings.ToLower(flag)
+	flag = strings.TrimSpace(strings.ToLower(flag))
 
 	switch flag {
 	case "spaces", "space", "underscores", "underscore", "fixes", "fix", "fixes-only", "fixesonly":
@@ -101,9 +99,12 @@ func dateFormat(dateFmt string) bool {
 
 // verifyMinFreeMem flag verifies the format of the free memory flag.
 func verifyMinFreeMem(minFreeMem string) error {
-	minFreeMem = strings.ToUpper(minFreeMem)
+	minFreeMem = strings.TrimSuffix(strings.ToUpper(minFreeMem), "B")
 	switch {
-	case strings.HasSuffix(minFreeMem, "B"), strings.HasSuffix(minFreeMem, "G"), strings.HasSuffix(minFreeMem, "M"), strings.HasSuffix(minFreeMem, "K"):
+	case strings.HasSuffix(minFreeMem, "G"), strings.HasSuffix(minFreeMem, "M"), strings.HasSuffix(minFreeMem, "K"):
+		if len(minFreeMem) < 2 {
+			return fmt.Errorf("invalid format for min free mem: %q", minFreeMem)
+		}
 	default:
 		if _, err := strconv.Atoi(minFreeMem); err != nil {
 			return fmt.Errorf("invalid min free memory argument %q for Metarr, should ", minFreeMem)
