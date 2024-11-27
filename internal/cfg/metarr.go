@@ -8,6 +8,10 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+const (
+	dupMsg = "Duplicate meta operation %q, skipping"
+)
+
 var (
 	filenameReplaceSuffixInput []string
 )
@@ -19,8 +23,11 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 		return metaOps, nil
 	}
 
+	var b strings.Builder
+
 	logging.D(1, "Validating meta operations...")
 	valid := make([]string, 0, len(metaOps))
+	exists := make(map[string]bool, len(metaOps))
 
 	for _, m := range metaOps {
 		split := strings.Split(m, ":")
@@ -28,6 +35,21 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 		case 3:
 			switch split[1] {
 			case "append", "copy-to", "paste-from", "prefix", "trim-prefix", "trim-suffix", "replace", "set":
+
+				b.Grow(len(m))
+				b.WriteString(split[0])
+				b.WriteRune(':')
+				b.WriteString(split[1])
+				b.WriteRune(':')
+				b.WriteString(split[2])
+				key := b.String()
+				b.Reset()
+
+				if exists[key] {
+					logging.I(dupMsg, m)
+					continue
+				}
+				exists[key] = true
 				valid = append(valid, m)
 			default:
 				return nil, fmt.Errorf("invalid meta operation %q", split[1])
@@ -37,6 +59,21 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 				switch split[2] {
 				case "prefix", "suffix":
 					if dateFormat(split[3]) {
+
+						b.Grow(len(m))
+						b.WriteString(split[0])
+						b.WriteRune(':')
+						b.WriteString(split[1])
+						b.WriteRune(':')
+						b.WriteString(split[2]) // Leave out split[3], probably don't want multiple date tags with diff formats
+						key := b.String()
+						b.Reset()
+
+						if exists[key] {
+							logging.I(dupMsg, m)
+							continue
+						}
+						exists[key] = true
 						valid = append(valid, m)
 					}
 				default:

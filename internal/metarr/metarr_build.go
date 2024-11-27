@@ -21,6 +21,7 @@ type metCmdMapping struct {
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video) []string {
 	fields := []metCmdMapping{
+		// Metarr args:
 		{
 			metarrValue: v.MetarrArgs.Concurrency,
 			viperKey:    "",
@@ -47,20 +48,26 @@ func makeMetarrCommand(v *models.Video) []string {
 			cmdKey:      metcmd.MaxCPU,
 		},
 		{
+			metarrValue: v.MetarrArgs.MetaOps,
+			viperKey:    keys.MetaOps,
+			cmdKey:      metcmd.MetaOps,
+		},
+		{
 			metarrValue: v.MetarrArgs.MinFreeMem,
 			viperKey:    keys.MinFreeMem,
 			cmdKey:      metcmd.MinFreeMem,
-		},
-		{
-			metarrValue: v.MetarrArgs.RenameStyle,
-			viperKey:    keys.RenameStyle,
-			cmdKey:      metcmd.RenameStyle,
 		},
 		{
 			metarrValue: parseOutputDir(v),
 			viperKey:    keys.MoveOnComplete,
 			cmdKey:      metcmd.OutputDir,
 		},
+		{
+			metarrValue: v.MetarrArgs.RenameStyle,
+			viperKey:    keys.RenameStyle,
+			cmdKey:      metcmd.RenameStyle,
+		},
+		// Other
 		{
 			metarrValue: "",
 			viperKey:    keys.DebugLevel,
