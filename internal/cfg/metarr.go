@@ -93,19 +93,19 @@ func validateMetaOps(metaOps []string) ([]string, error) {
 }
 
 // validateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid.
-func validateFilenameSuffixReplace(fileSfxReplace []string) (string, error) {
+func validateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 	valid := make([]string, 0, len(fileSfxReplace))
 
 	lengthStrings := 0
 	for _, pair := range fileSfxReplace {
 		parts := strings.Split(pair, ":")
 		if len(parts) < 2 {
-			return "", errors.New("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
+			return nil, errors.New("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
 		}
 		lengthStrings += len(parts[0]+parts[1]) + 1
 		valid = append(valid, pair)
 	}
-	return strings.Join(valid, ","), nil
+	return valid, nil
 }
 
 // validateRenameFlag validates the rename style to apply.

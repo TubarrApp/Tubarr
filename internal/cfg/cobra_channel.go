@@ -259,9 +259,8 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 				}
 			}
 
-			var fileSfxReplaceStr string
 			if len(fileSfxReplace) > 0 {
-				if fileSfxReplaceStr, err = validateFilenameSuffixReplace(fileSfxReplace); err != nil {
+				if fileSfxReplace, err = validateFilenameSuffixReplace(fileSfxReplace); err != nil {
 					return err
 				}
 			}
@@ -300,7 +299,7 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 					MetaOps:            metaOps,
 					FileDatePfx:        filenameDateTag,
 					RenameStyle:        renameStyle,
-					FilenameReplaceSfx: fileSfxReplaceStr,
+					FilenameReplaceSfx: fileSfxReplace,
 					MaxCPU:             maxCPU,
 					MinFreeMem:         minFreeMem,
 					OutputDir:          outDir,

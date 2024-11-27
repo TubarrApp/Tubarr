@@ -58,8 +58,8 @@ func makeMetarrCommand(v *models.Video) []string {
 			cmdKey:      metcmd.MinFreeMem,
 		},
 		{
-			metarrValue: parseOutputDir(v),
-			viperKey:    keys.MoveOnComplete,
+			metarrValue: parseOutputDir(v), // Already parses from Viper key if set and model output dir empty.
+			viperKey:    "",
 			cmdKey:      metcmd.OutputDir,
 		},
 		{
@@ -105,41 +105,24 @@ func makeMetarrCommand(v *models.Video) []string {
 // processField processes each field in the argument map.
 func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string) {
 	switch val := f.metarrValue.(type) {
-
 	case int:
 		if val > 0 {
 			argMap[f.cmdKey] = strconv.Itoa(val)
-
 		} else if cfg.IsSet(f.viperKey) {
 			argMap[f.cmdKey] = strconv.Itoa(cfg.GetInt(f.viperKey))
 		}
-
 	case float64:
-		if val > 0 {
-			if val > 100 {
-				val = 100
-			}
+		if val > 0.0 {
 			argMap[f.cmdKey] = fmt.Sprintf("%.2f", val)
-
 		} else if cfg.IsSet(f.viperKey) {
 			argMap[f.cmdKey] = fmt.Sprintf("%.2f", cfg.GetFloat64(f.viperKey))
 		}
-
 	case string:
 		if val != "" {
 			argMap[f.cmdKey] = val
-
 		} else if cfg.IsSet(f.viperKey) {
-			if vipr := cfg.Get(f.viperKey); vipr != nil {
-				switch viprVal := vipr.(type) {
-				case string:
-					argMap[f.cmdKey] = viprVal
-				case []string:
-					argSlicesMap[f.cmdKey] = viprVal
-				}
-			}
+			argMap[f.cmdKey] = cfg.GetString(f.viperKey)
 		}
-
 	case []string:
 		if len(val) > 0 {
 			argSlicesMap[f.cmdKey] = val
@@ -154,7 +137,6 @@ func parseOutputDir(v *models.Video) string {
 	dirParser := parsing.NewDirectoryParser(v.Channel, v)
 	switch {
 	case cfg.IsSet(keys.MoveOnComplete) && v.MetarrArgs.OutputDir == "":
-
 		parsedDir, err := dirParser.ParseDirectory(cfg.GetString(keys.MoveOnComplete))
 		if err != nil {
 			logging.E(0, "Failed to parse directory for video with ID %d: %v", v.ID, err)
@@ -164,7 +146,6 @@ func parseOutputDir(v *models.Video) string {
 		return parsedDir
 
 	case v.MetarrArgs.OutputDir != "":
-
 		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDir)
 		if err != nil {
 			logging.E(0, "Failed to parse directory at %q: %v", v.MetarrArgs.OutputDir, err)
