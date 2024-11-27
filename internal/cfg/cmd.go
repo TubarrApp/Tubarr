@@ -1,3 +1,4 @@
+// Package cfg provides configuration and command-line interface setup for Tubarr.
 package cfg
 
 import (
@@ -29,19 +30,27 @@ var rootCmd = &cobra.Command{
 }
 
 // InitCommands initializes all commands and their flags.
-func InitCommands(s models.Store) {
+func InitCommands(s models.Store) error {
 
-	initProgramFlags()
-	initAllFileTransformers()
-	initMetaTransformers()
-	initVideoTransformers()
+	if err := initProgramFlags(); err != nil {
+		return err
+	}
+	if err := initAllFileTransformers(); err != nil {
+		return err
+	}
+	if err := initMetaTransformers(); err != nil {
+		return err
+	}
+	if err := initVideoTransformers(); err != nil {
+		return err
+	}
 
 	rootCmd.AddCommand(initChannelCmds(s))
 	rootCmd.AddCommand(initVideoCmds(s))
+	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately
 func Execute() error {
-
 	return rootCmd.Execute()
 }

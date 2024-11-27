@@ -1,3 +1,4 @@
+// Package keys holds various keys for software operations, such as terminal input keys and internal Viper keys.
 package keys
 
 // Terminal keys:

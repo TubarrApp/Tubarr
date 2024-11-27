@@ -1,3 +1,4 @@
+// Package metarr builds and runs Metarr commands.
 package metarr
 
 import (
@@ -156,7 +157,7 @@ func parseOutputDir(v *models.Video) string {
 
 		parsedDir, err := dirParser.ParseDirectory(cfg.GetString(keys.MoveOnComplete))
 		if err != nil {
-			logging.E(0, err.Error())
+			logging.E(0, "Failed to parse directory for video with ID %d: %v", v.ID, err)
 			break
 		}
 		cfg.Set(keys.MoveOnComplete, parsedDir)
@@ -166,7 +167,7 @@ func parseOutputDir(v *models.Video) string {
 
 		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDir)
 		if err != nil {
-			logging.E(0, err.Error())
+			logging.E(0, "Failed to parse directory at %q: %v", v.MetarrArgs.OutputDir, err)
 			break
 		}
 		return parsed

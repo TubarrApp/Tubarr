@@ -188,7 +188,7 @@ func (vs VideoStore) DeleteVideo(key, val string, chanID int64) error {
 		RunWith(vs.DB)
 
 	if _, err := query.Exec(); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			fmt.Printf("No video exists with key %q and value %q", key, val)
 		} else {
 			return err
@@ -213,7 +213,7 @@ func (vs VideoStore) videoExists(v *models.Video) (int64, bool) {
 		RunWith(vs.DB)
 
 	err := query.QueryRow().Scan(&id)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, false
 	} else if err != nil {
 		logging.E(0, "Error checking if video exists: %v", err)

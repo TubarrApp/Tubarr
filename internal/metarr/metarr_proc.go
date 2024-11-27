@@ -28,7 +28,7 @@ func InitMetarr(v *models.Video) error {
 
 // RunMetarr runs a Metarr command with a built argument list
 func runMetarr(cmd *exec.Cmd) error {
-	var err error = nil
+	var err error
 	if cmd.String() == "" {
 		return errors.New("command string is empty")
 	}

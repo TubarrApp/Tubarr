@@ -1,3 +1,4 @@
+// Package tags holds tags used in preset settings files.
 package tags
 
 // Preset tag in file

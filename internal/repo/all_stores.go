@@ -1,3 +1,4 @@
+// Package repo is used for performing database operations.
 package repo
 
 import (

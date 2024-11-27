@@ -20,7 +20,11 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logging.E(0, "Failed to close file at %q", v.JPath)
+		}
+	}()
 
 	logging.D(1, "About to decode JSON to metamap")
 
@@ -90,7 +94,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 
 					logging.I("Filtering: Field %q not found in metadata for URL %q and filter is set to require it, filtering out", filter.Field, v.URL)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, err.Error())
+						logging.E(0, "Failed to remove unwanted JSON at %s: %v", v.JPath, err.Error())
 					}
 					return false, nil
 
@@ -105,7 +109,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 
 					logging.I("Filtering: Field %q found in metadata for URL %q and filter is set to omit it, filtering out", filter.Field, v.URL)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, err.Error())
+						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JPath, err)
 					}
 					return false, nil
 
@@ -135,7 +139,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 
 					logging.D(1, "Filtering out video %q which contains %q in field %q", v.URL, filter.Value, filter.Field)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, err.Error())
+						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JPath, err)
 					}
 					return false, nil
 				}
@@ -145,7 +149,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 
 					logging.D(1, "Filtering out video %q which does not contain %q in field %q", v.URL, filter.Value, filter.Field)
 					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, err.Error())
+						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JPath, err)
 					}
 					return false, nil
 				}
@@ -190,8 +194,9 @@ func removeUnwantedJSON(path string) error {
 // isPrivateNetwork returns true if the URL is detected as a LAN network.
 func isPrivateNetwork(host string) bool {
 	h, _, err := net.SplitHostPort(host)
-	if err == nil {
-		host = h
+	if err != nil {
+		logging.E(0, "Failed to parse private network, reverting to input host: %v", err)
+		h = host
 	}
 
 	if h == "localhost" {

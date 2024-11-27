@@ -31,7 +31,7 @@ func (pc ProgControl) StartTubarr() (pid int, err error) {
 	if id, running := pc.checkProgRunning(); running {
 		reset, err := pc.resetStaleProcess()
 		if err != nil {
-			return 0, fmt.Errorf("failure: could not correct stale process, unexpected error: %v", err)
+			return 0, fmt.Errorf("failure: could not correct stale process, unexpected error: %w", err)
 		}
 		if !reset {
 			return 0, fmt.Errorf("another instance is already running (PID: %d)", id)
@@ -53,7 +53,7 @@ func (pc ProgControl) StartTubarr() (pid int, err error) {
 		RunWith(pc.db)
 
 	if _, err := query.Exec(); err != nil {
-		return pid, fmt.Errorf("failure: %v", err)
+		return pid, fmt.Errorf("failure: %w", err)
 	}
 	return pid, nil
 }

@@ -21,7 +21,7 @@ func executeJSONDownload(v *models.Video, cmd *exec.Cmd) error {
 
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("yt-dlp error for %s: %v\nStderr: %s", v.URL, err, stderr.String())
+		return fmt.Errorf("yt-dlp error for %s: %w\nStderr: %s", v.URL, err, stderr.String())
 	}
 
 	// Find the line containing the JSON path

@@ -1,3 +1,4 @@
+// Package downloads handles file downloading commands and operations.
 package downloads
 
 import (
@@ -87,7 +88,7 @@ func waitForFile(filePath string, timeout time.Duration) error {
 		if err == nil { // If error IS nil
 			return nil
 		} else if !os.IsNotExist(err) {
-			return fmt.Errorf("unexpected error while checking file: %v", err)
+			return fmt.Errorf("unexpected error while checking file: %w", err)
 		}
 
 		time.Sleep(100 * time.Millisecond)

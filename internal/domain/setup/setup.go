@@ -1,3 +1,4 @@
+// Package setup handles initialization of the software, such as creating filepaths and directories.
 package setup
 
 import (
@@ -31,7 +32,7 @@ func InitCfgFilesDirs() error {
 
 	if _, err := os.Stat(CfgDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(CfgDir, 0o755); err != nil {
-			return fmt.Errorf("failed to make directories: %v", err)
+			return fmt.Errorf("failed to make directories: %w", err)
 		}
 	}
 

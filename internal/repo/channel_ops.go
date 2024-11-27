@@ -86,7 +86,11 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query notification URLs: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logging.E(0, "Failed to close rows for notify URLs in channel with ID %d", id)
+		}
+	}()
 
 	// Collect all URLs
 	var urls []string
@@ -373,7 +377,7 @@ func (cs *ChannelStore) ListChannel(id int64) (channel *models.Channel, err erro
 		&c.LastScan,
 		&c.CreatedAt,
 		&c.UpdatedAt); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, false
 		}
 		return nil, fmt.Errorf("failed to scan channel: %w", err), false
@@ -395,7 +399,7 @@ func (cs *ChannelStore) ListChannel(id int64) (channel *models.Channel, err erro
 	return c, nil, true
 }
 
-// ListChannels lists all channels in the database.
+// ListAllChannels lists all channels in the database.
 func (cs *ChannelStore) ListAllChannels() (channels []*models.Channel, err error, hasRows bool) {
 	query := squirrel.
 		Select(
@@ -415,12 +419,16 @@ func (cs *ChannelStore) ListAllChannels() (channels []*models.Channel, err error
 		RunWith(cs.DB)
 
 	rows, err := query.Query()
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, false
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to query channels: %w", err), true
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logging.E(0, "Failed to close channel rows")
+		}
+	}()
 
 	for rows.Next() {
 		var c models.Channel
@@ -464,7 +472,7 @@ func (cs *ChannelStore) ListAllChannels() (channels []*models.Channel, err error
 	return channels, nil, true
 }
 
-// UpdateChannelMetarrArgs updates args for Metarr output.
+// UpdateChannelMetarrArgsJSON updates args for Metarr output.
 func (cs ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error) {
 	var metarrArgs json.RawMessage
 	query := squirrel.
@@ -474,7 +482,7 @@ func (cs ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fun
 		RunWith(cs.DB)
 
 	err := query.QueryRow().Scan(&metarrArgs)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
 		return 0, fmt.Errorf("failed to get channel settings: %w", err)
@@ -515,7 +523,7 @@ func (cs ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fun
 	return rtn.RowsAffected()
 }
 
-// UpdateChannelSettings updates specific settings in the channel's settings JSON.
+// UpdateChannelSettingsJSON updates specific settings in the channel's settings JSON.
 func (cs ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error) {
 	var settingsJSON json.RawMessage
 	query := squirrel.
@@ -525,7 +533,7 @@ func (cs ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(
 		RunWith(cs.DB)
 
 	err := query.QueryRow().Scan(&settingsJSON)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
 		return 0, fmt.Errorf("failed to get channel settings: %w", err)
@@ -651,7 +659,11 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logging.E(0, "Failed to close rows for channel %v: %v", c.Name, err)
+		}
+	}()
 
 	for rows.Next() {
 		var url string
@@ -681,10 +693,10 @@ func (cs ChannelStore) channelExists(key, val string) bool {
 		Where(squirrel.Eq{key: val}).
 		RunWith(cs.DB)
 
-	if err := query.QueryRow().Scan(&exists); err == sql.ErrNoRows {
+	if err := query.QueryRow().Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return false
 	} else if err != nil {
-		logging.E(0, err.Error())
+		logging.E(0, "Failed to scan for existent channel with key=%s val=%s: %v", key, val, err)
 		return exists
 	}
 	return exists
@@ -699,10 +711,10 @@ func (cs ChannelStore) channelExistsID(id int64) bool {
 		Where(squirrel.Eq{consts.QChanID: id}).
 		RunWith(cs.DB)
 
-	if err := query.QueryRow().Scan(&exists); err == sql.ErrNoRows {
+	if err := query.QueryRow().Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return false
 	} else if err != nil {
-		logging.E(0, err.Error())
+		logging.E(0, "Failed to check if channel with ID %d exists", id)
 		return exists
 	}
 	return exists

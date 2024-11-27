@@ -1,3 +1,4 @@
+// Package logging handles the printing and writing of debug and log messages.
 package logging
 
 import (
@@ -66,7 +67,9 @@ func SetupLogging(targetDir string) error {
 // writeToConsole writes messages to console without using zerolog (zerolog parses JSON, inefficient).
 func writeToConsole(msg string) {
 	timestamp := time.Now().Format(timeFormat)
-	fmt.Fprintf(console, "%s%s%s %s", consts.ColorBrightBlack, timestamp, consts.ColorReset, msg)
+	if _, err := fmt.Fprintf(console, "%s%s%s %s", consts.ColorBrightBlack, timestamp, consts.ColorReset, msg); err != nil {
+		E(0, "Encountered error writing to console: %v", err)
+	}
 }
 
 // E logs error messages, and appends to the global error array.

@@ -1,3 +1,4 @@
+// Package metcmd holds command flag constants for Metarr.
 package metcmd
 
 const (

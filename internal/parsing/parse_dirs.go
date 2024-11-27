@@ -1,3 +1,4 @@
+// Package parsing performs parsing operations such as parsing template directives, and URLs.
 package parsing
 
 import (

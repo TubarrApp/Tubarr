@@ -1,3 +1,4 @@
+// Package regex compiles and caches various regex expressions.
 package regex
 
 import (

@@ -26,7 +26,7 @@ func initializeCookies() {
 func getBrowserCookies(u string) ([]*http.Cookie, error) {
 	baseURL, err := extractBaseDomain(u)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract base domain: %v", err)
+		return nil, fmt.Errorf("failed to extract base domain: %w", err)
 	}
 
 	// Otherwise, proceed to use browser cookie stores

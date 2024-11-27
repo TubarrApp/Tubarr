@@ -64,7 +64,7 @@ const (
 	QNotifyUpdatedAt = "updated_at"
 )
 
-// DL status
+// DLStatus holds constant download status strings.
 type DLStatus string
 
 const (

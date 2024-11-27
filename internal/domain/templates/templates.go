@@ -1,3 +1,4 @@
+// Package templates holds constants for templating elements.
 package templates
 
 const (

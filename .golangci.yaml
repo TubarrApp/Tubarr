@@ -1,0 +1,87 @@
+linters-settings:
+  cyclop:
+    max-complexity: 15
+  gocognit:
+    min-complexity: 15
+  gocyclo:
+    min-complexity: 15
+  lll:
+    line-length: 120
+  funlen:
+    lines: 100
+
+linters:
+  enable:
+    - bodyclose
+    - contextcheck
+    - errcheck
+    - errorlint
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unused
+
+presets:
+  - bugs
+  - comment
+  - complexity
+  - error
+  - format
+  - import
+  - metalinter
+  - module
+  - performance
+  - sql
+  - style
+  - test
+  - unused
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+    - linters:
+        - dupl
+      text: "is duplicated"
+    - linters:
+        - gocyclo
+      text: "function is too complex"
+    - linters:
+        - gocognit
+      text: "function is too complex"
+    - linters:
+        - funlen
+      text: "function is too long"
+    - linters:
+        - lll
+      text: "line is too long"
+  exclude-files:
+    - generated.go
+  exclude-dirs:
+    - vendor
+
+output:
+  formats:
+    - format: colored-line-number
+  sort-results: true
+  print-issued-lines: true
+  uniq-by-line: true
+  color: auto
+  severity: false
+  issues-exit-code: 1
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+# Enable only fast linters from enabled linters set (first run won't be fast)
+fast: false

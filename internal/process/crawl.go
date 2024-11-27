@@ -56,8 +56,9 @@ func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 
 		for _, v := range videos {
 			v.Downloaded = true
-			if _, err := vs.AddVideo(v); err != nil {
-				logging.E(0, err.Error())
+			if id, err := vs.AddVideo(v); err != nil {
+				errMsg := err.Error()
+				logging.E(0, "Failed to add video with ID %d to channel with ID %d: %s", id, c.ID, errMsg)
 			}
 
 			logging.S(0, "Added URL %q to ignore list.", v.URL)
@@ -162,7 +163,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 
 	var (
 		success  bool
-		errArray = make([]error, 0, len(videos))
+		errArray []error
 	)
 
 	if len(videos) == 0 {
@@ -186,7 +187,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 	// Some successful downloads, notify URLs
 	notifyURLs, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
@@ -232,7 +233,11 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 			return fmt.Errorf("failed to send notification to URL %q for channel %q (ID: %d): %w",
 				notifyURL, c.Name, c.ID, err)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				logging.E(0, "Failed to close HTTP response body: %v", err)
+			}
+		}()
 
 		if resp.StatusCode >= 400 {
 			return fmt.Errorf("notification failed with status %d for channel %q (ID: %d)", resp.StatusCode, c.Name, c.ID)
@@ -246,7 +251,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 	for _, notifyURL := range notifyURLs {
 		parsed, err := url.Parse(notifyURL)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("invalid notification URL %q: %v", notifyURL, err))
+			errs = append(errs, fmt.Errorf("invalid notification URL %q: %w", notifyURL, err))
 			continue
 		}
 
@@ -256,7 +261,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 		}
 
 		if err := notifyFunc(client, notifyURL); err != nil {
-			errs = append(errs, fmt.Errorf("failed to notify URL %q: %v", notifyURL, err))
+			errs = append(errs, fmt.Errorf("failed to notify URL %q: %w", notifyURL, err))
 			continue
 		}
 		logging.S(1, "Successfully notified URL %q for channel %q", notifyURL, c.Name)

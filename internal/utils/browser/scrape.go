@@ -1,3 +1,4 @@
+// Package browser handles operations relating to web scraping, cookie gathering, etc.
 package browser
 
 import (
@@ -93,7 +94,9 @@ func newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies [
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	for _, cookie := range cookies {
-		c.SetCookies(targetURL, []*http.Cookie{cookie})
+		if err := c.SetCookies(targetURL, []*http.Cookie{cookie}); err != nil {
+			return nil, err
+		}
 	}
 
 	// If the URL file is set, just use the file directly, no need to even visit the site
@@ -153,7 +156,7 @@ func newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies [
 		// Visit the target URL
 		err := c.Visit(targetURL)
 		if err != nil {
-			return nil, fmt.Errorf("error visiting webpage (%s): %v", targetURL, err)
+			return nil, fmt.Errorf("error visiting webpage (%s): %w", targetURL, err)
 		}
 		c.Wait()
 	}

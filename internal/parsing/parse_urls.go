@@ -36,7 +36,12 @@ func (up *URLFileParser) ParseURLs() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			errMsg := err.Error()
+			logging.E(0, "Failed to close file %q: %s", up.Filepath, errMsg)
+		}
+	}()
 
 	urls := make(map[string]struct{})
 	scanner := bufio.NewScanner(f)

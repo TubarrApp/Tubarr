@@ -1,17 +1,18 @@
+// Package enums contains enumerated variables.
 package enums
 
 type LineSelectType int
 
 const (
-	L_SINGLE LineSelectType = iota
-	L_MULTI
+	LSingle LineSelectType = iota
+	LMulti
 )
 
 type DLFilterType int
 
 const (
-	DLFILTER_OMIT DLFilterType = iota
-	DLFILTER_CONTAINS
-	DLFILTER_OMIT_FIELD
-	DLFILTER_CONTAINS_FIELD
+	DLFilterOmit DLFilterType = iota
+	DLFilterContains
+	DLFilterOmitField
+	DLFilterContainsField
 )

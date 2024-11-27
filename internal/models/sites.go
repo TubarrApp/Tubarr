@@ -1,3 +1,4 @@
+// Package models holds structs for modelling data, e.g. Channel data, Video data, etc.
 package models
 
 import (

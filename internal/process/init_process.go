@@ -1,3 +1,4 @@
+// Package process begins processing the primary Tubarr program.
 package process
 
 import (
@@ -71,12 +72,12 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs mode
 
 		for _, ptr := range parseDirs {
 			if ptr == nil {
-				logging.E(0, "Null pointer")
+				logging.E(0, "Null pointer in job with ID %d", id)
 				continue
 			}
 
 			if *ptr, err = dirParser.ParseDirectory(*ptr); err != nil {
-				logging.E(0, err.Error())
+				logging.E(0, "Failed to parse directory %q", *ptr)
 				continue
 			}
 		}
@@ -102,7 +103,9 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs mode
 			logging.I("Skipping Metarr process... 'metarr' not available: %v", err)
 			continue
 		}
-		metarr.InitMetarr(v)
+		if err := metarr.InitMetarr(v); err != nil {
+			results <- fmt.Errorf("error initializing Metarr: %w", err)
+		}
 		results <- nil // Nil = success
 	}
 }

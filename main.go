@@ -108,7 +108,10 @@ func main() {
 	}()
 
 	// Cobra/Viper commands
-	cfg.InitCommands(store)
+	if err := cfg.InitCommands(store); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return
+	}
 
 	if err := cfg.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

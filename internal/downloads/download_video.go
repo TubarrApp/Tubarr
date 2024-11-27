@@ -19,12 +19,12 @@ func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("stdout pipe error: %v", err)
+		return fmt.Errorf("stdout pipe error: %w", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return fmt.Errorf("stderr pipe error: %v", err)
+		return fmt.Errorf("stderr pipe error: %w", err)
 	}
 
 	filenameChan := make(chan string, 1)
@@ -32,11 +32,11 @@ func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 	go scanVCmdOutput(io.MultiReader(stdout, stderr), filenameChan)
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("command start error: %v", err)
+		return fmt.Errorf("command start error: %w", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("command wait error: %v", err)
+		return fmt.Errorf("command wait error: %w", err)
 	}
 
 	filename := <-filenameChan
