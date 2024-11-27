@@ -3,7 +3,6 @@ package metarr
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/metcmd"
@@ -77,6 +76,7 @@ func makeMetarrCommand(v *models.Video) []string {
 
 	// Map use to ensure uniqueness
 	argMap := make(map[string]string, len(fields))
+	argSlicesMap := make(map[string][]string, len(fields))
 
 	// Final args
 	args := make([]string, 0, len(fields))
@@ -84,11 +84,17 @@ func makeMetarrCommand(v *models.Video) []string {
 	args = append(args, metcmd.JSONFile, v.JPath)
 
 	for _, f := range fields {
-		processField(f, argMap)
+		processField(f, argMap, argSlicesMap)
 	}
 
 	for k, v := range argMap {
 		args = append(args, k, v)
+	}
+
+	for k, v := range argSlicesMap {
+		for _, val := range v {
+			args = append(args, k, val)
+		}
 	}
 
 	logging.I("Built Metarr argument list: %v", args)
@@ -96,7 +102,7 @@ func makeMetarrCommand(v *models.Video) []string {
 }
 
 // processField processes each field in the argument map.
-func processField(f metCmdMapping, argMap map[string]string) {
+func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string) {
 	switch val := f.metarrValue.(type) {
 
 	case int:
@@ -123,21 +129,21 @@ func processField(f metCmdMapping, argMap map[string]string) {
 			argMap[f.cmdKey] = val
 
 		} else if cfg.IsSet(f.viperKey) {
-			if v := cfg.Get(f.viperKey); v != nil {
-				switch strVal := v.(type) {
+			if vipr := cfg.Get(f.viperKey); vipr != nil {
+				switch viprVal := vipr.(type) {
 				case string:
-					argMap[f.cmdKey] = strVal
+					argMap[f.cmdKey] = viprVal
 				case []string:
-					argMap[f.cmdKey] = strings.Join(strVal, ",")
+					argSlicesMap[f.cmdKey] = viprVal
 				}
 			}
 		}
 
 	case []string:
 		if len(val) > 0 {
-			argMap[f.cmdKey] = strings.Join(val, ",")
+			argSlicesMap[f.cmdKey] = val
 		} else if cfg.IsSet(f.viperKey) {
-			argMap[f.cmdKey] = strings.Join(cfg.GetStringSlice(f.viperKey), ",")
+			argSlicesMap[f.cmdKey] = cfg.GetStringSlice(f.viperKey)
 		}
 	}
 }
