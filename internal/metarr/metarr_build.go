@@ -132,6 +132,13 @@ func processField(f metCmdMapping, argMap map[string]string) {
 				}
 			}
 		}
+
+	case []string:
+		if len(val) > 0 {
+			argMap[f.cmdKey] = strings.Join(val, ",")
+		} else if cfg.IsSet(f.viperKey) {
+			argMap[f.cmdKey] = strings.Join(cfg.GetStringSlice(f.viperKey), ",")
+		}
 	}
 }
 
