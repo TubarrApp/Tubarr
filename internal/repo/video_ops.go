@@ -30,7 +30,7 @@ func (vs *VideoStore) GetDB() *sql.DB {
 }
 
 // AddVideos adds an array of videos to the database.
-func (vs VideoStore) AddVideos(videos []*models.Video, chanID int64) (ok bool, errArray []error) {
+func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) (ok bool, errArray []error) {
 
 	// Query start
 	query := squirrel.
@@ -58,17 +58,18 @@ func (vs VideoStore) AddVideos(videos []*models.Video, chanID int64) (ok bool, e
 	for i, v := range videos {
 		switch {
 		case v.URL == "":
-			errArray = append(errArray, fmt.Errorf("must enter a url for video #%d in channel with ID %d", i, chanID))
+			errArray = append(errArray, fmt.Errorf("must enter a url for video #%d in channel %q", i, c.Name))
 			continue
 		case v.VDir == "":
-			errArray = append(errArray, fmt.Errorf("must enter a video output directory for video #%d in channel with ID %d", i, chanID))
+			errArray = append(errArray, fmt.Errorf("must enter a video output directory for video #%d in channel %q", i, c.Name))
 			continue
 		case v.ChannelID == 0:
-			if chanID == 0 {
-				errArray = append(errArray, fmt.Errorf("video #%d has no channel ID", i))
+			if c.ID == 0 {
+				errArray = append(errArray, fmt.Errorf("video #%d has no channel ID and no ID found in channel model %q, skipping", i, c.Name))
 				continue
 			} else {
-				v.ChannelID = chanID
+				v.ChannelID = c.ID
+				logging.W("Video with URL %q had empty channel ID, filled with passed in channel ID %d", v.URL, c.ID)
 			}
 		}
 
@@ -121,7 +122,7 @@ func (vs VideoStore) AddVideos(videos []*models.Video, chanID int64) (ok bool, e
 		}
 
 		if _, err := query.Exec(); err != nil {
-			errArray = append(errArray, fmt.Errorf("batch insert failed for videos in channel with ID %d: %w", chanID, err))
+			errArray = append(errArray, fmt.Errorf("batch insert failed for videos in channel %q: %w", c.Name, err))
 		} else {
 			ok = len(validVideos) > len(errArray)
 		}

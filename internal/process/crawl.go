@@ -58,7 +58,7 @@ func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 			v.Downloaded = true
 		}
 
-		added, errArray := vs.AddVideos(videos, c.ID)
+		added, errArray := vs.AddVideos(videos, c)
 		if len(errArray) > 0 {
 			logging.P("%s Encountered the following errors adding videos to ignore list:", consts.RedError)
 			fmt.Println()
@@ -79,7 +79,7 @@ func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(s models.Store) error {
 	cs := s.GetChannelStore()
-	chans, err, hasRows := cs.ListAllChannels()
+	chans, err, hasRows := cs.FetchAllChannels()
 	if !hasRows {
 		logging.I("No channels in database")
 	} else if err != nil {

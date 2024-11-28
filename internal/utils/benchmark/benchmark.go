@@ -1,3 +1,6 @@
+// Package benchmark sets up and initiated benchmarking.
+//
+// Includes CPU profiling, memory profiling, and tracing.
 package benchmark
 
 import (
@@ -19,11 +22,17 @@ type BenchFiles struct {
 }
 
 const (
-	cpuProf  = "cpu_"
-	memProf  = "mem_"
-	traceOut = "trace_"
-	profExt  = ".prof"
-	outExt   = ".out"
+	cpuProf    = "cpu_"
+	memProf    = "mem_"
+	traceOut   = "trace_"
+	profExt    = ".prof"
+	outExt     = ".out"
+	timeFormat = "2006-01-02 15:04:05.00"
+	timeTag    = "2006-01-02_15:04:05"
+
+	cpuProfBaseLen  = len(cpuProf) + len(profExt)
+	memProfBaseLen  = len(memProf) + len(profExt)
+	traceOutBaseLen = len(traceOut) + len(outExt)
 )
 
 var (
@@ -33,6 +42,7 @@ var (
 	traceOutPath string
 )
 
+// InjectMainWorkDir injects the main.go path variable into this package.
 func InjectMainWorkDir(mainGoPath string) {
 	mainWd = filepath.Dir(mainGoPath)
 }
@@ -42,39 +52,38 @@ func SetupBenchmarking() (*BenchFiles, error) {
 	var err error
 	b := new(BenchFiles)
 
-	benchStartTime := time.Now().Format("2006-01-02_15:04:05")
-
-	makeFilepaths(benchStartTime, mainWd)
+	benchStartTime := time.Now().Format(timeFormat)
+	makeBenchFilepaths(mainWd)
 
 	logging.I("(Benchmarking this run. Start time: %s)", benchStartTime)
 
 	// CPU profile
 	b.cpuFile, err = os.Create(cpuProfPath)
 	if err != nil {
-		CloseBenchFiles(b, "", fmt.Errorf("could not create CPU profiling file: %v", err))
+		CloseBenchFiles(b, "", fmt.Errorf("could not create CPU profiling file: %w", err))
 		return nil, err
 	}
 
 	if err := pprof.StartCPUProfile(b.cpuFile); err != nil {
-		CloseBenchFiles(b, "", fmt.Errorf("could not start CPU profiling: %v", err))
+		CloseBenchFiles(b, "", fmt.Errorf("could not start CPU profiling: %w", err))
 		return nil, err
 	}
 
 	// Memory profile
 	b.memFile, err = os.Create(memProfPath)
 	if err != nil {
-		CloseBenchFiles(b, "", fmt.Errorf("could not create memory profiling file: %v", err))
+		CloseBenchFiles(b, "", fmt.Errorf("could not create memory profiling file: %w", err))
 		return nil, err
 	}
 
 	// Trace
 	b.traceFile, err = os.Create(traceOutPath)
 	if err != nil {
-		CloseBenchFiles(b, "", fmt.Errorf("could not create trace file: %v", err))
+		CloseBenchFiles(b, "", fmt.Errorf("could not create trace file: %w", err))
 		return nil, err
 	}
 	if err := trace.Start(b.traceFile); err != nil {
-		CloseBenchFiles(b, "", fmt.Errorf("could not start trace: %v", err))
+		CloseBenchFiles(b, "", fmt.Errorf("could not start trace: %w", err))
 		return nil, err
 	}
 
@@ -114,10 +123,12 @@ func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
 	logging.I("%s", noErrExit)
 }
 
-func makeFilepaths(time, cwd string) {
+// makeBenchFilepaths makes paths for benchmarking files.
+func makeBenchFilepaths(cwd string) {
+	time := time.Now().Format(timeTag)
 	var b strings.Builder
 
-	b.Grow(len(cpuProf) + len(time) + len(profExt))
+	b.Grow(cpuProfBaseLen + len(time))
 	b.WriteString(cpuProf)
 	b.WriteString(time)
 	b.WriteString(profExt)
@@ -127,7 +138,7 @@ func makeFilepaths(time, cwd string) {
 	logging.I("Made CPU profiling file: %q", cpuProfPath)
 	b.Reset()
 
-	b.Grow(len(memProf) + len(time) + len(profExt))
+	b.Grow(memProfBaseLen + len(time))
 	b.WriteString(memProf)
 	b.WriteString(time)
 	b.WriteString(profExt)
@@ -136,7 +147,7 @@ func makeFilepaths(time, cwd string) {
 	logging.I("Made mem profiling file: %q", memProfPath)
 	b.Reset()
 
-	b.Grow(len(traceOut) + len(time) + len(outExt))
+	b.Grow(traceOutBaseLen + len(time))
 	b.WriteString(traceOut)
 	b.WriteString(time)
 	b.WriteString(outExt)

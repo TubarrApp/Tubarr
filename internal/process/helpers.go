@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -195,8 +196,16 @@ func removeUnwantedJSON(path string) error {
 func isPrivateNetwork(host string) bool {
 	h, _, err := net.SplitHostPort(host)
 	if err != nil {
-		logging.E(0, "Failed to parse private network, reverting to input host: %v", err)
-		h = host
+		if u, err := url.Parse(host); err == nil { // Err IS nil
+			h = u.Hostname()
+		} else {
+			parts := strings.Split(host, ":")
+			if _, afterProto, found := strings.Cut(parts[0], "//"); found {
+				h = afterProto
+			} else {
+				h = parts[0]
+			}
+		}
 	}
 
 	if h == "localhost" {
@@ -246,7 +255,6 @@ func isPrivateNetwork(host string) bool {
 
 // isPrivateNetworkFallback
 func isPrivateNetworkFallback(h string) bool {
-
 	parts := strings.Split(h, ".")
 	if len(parts) == 4 {
 		octets := make([]int, 4)

@@ -17,8 +17,8 @@ type ChannelStore interface {
 	CrawlChannelIgnore(key, val string, s Store) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
 	DeleteChannel(key, val string) error
-	ListChannel(id int64) (c *Channel, err error, hasRows bool)
-	ListAllChannels() (channels []*Channel, err error, hasRows bool)
+	FetchChannel(id int64) (c *Channel, err error, hasRows bool)
+	FetchAllChannels() (channels []*Channel, err error, hasRows bool)
 	LoadGrabbedURLs(c *Channel) (urls []string, err error)
 	UpdateChannelRow(key, val, col, newVal string) error
 	UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error
@@ -34,7 +34,7 @@ type ChannelStore interface {
 // VideoStore allows access to video repo methods.
 type VideoStore interface {
 	AddVideo(v *Video) (int64, error)
-	AddVideos(videos []*Video, chanID int64) (ok bool, errArray []error)
+	AddVideos(videos []*Video, c *Channel) (ok bool, errArray []error)
 	DeleteVideo(key, val string, chanID int64) error
 	UpdateVideo(v *Video) error
 	GetDB() *sql.DB

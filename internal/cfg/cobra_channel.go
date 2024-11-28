@@ -396,7 +396,7 @@ func listChannelCmd(cs models.ChannelStore) *cobra.Command {
 				}
 			}
 
-			ch, err, hasRows := cs.ListChannel(id)
+			ch, err, hasRows := cs.FetchChannel(id)
 			if !hasRows {
 				logging.I("Entry for channel with ID %d does not exist in the database", id)
 				return nil
@@ -426,7 +426,7 @@ func listAllChannelsCmd(cs models.ChannelStore) *cobra.Command {
 		Short: "List all channels.",
 		Long:  "Lists all channels currently saved in the database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			chans, err, hasRows := cs.ListAllChannels()
+			chans, err, hasRows := cs.FetchAllChannels()
 			if !hasRows {
 				logging.I("No entries in the database")
 				return nil

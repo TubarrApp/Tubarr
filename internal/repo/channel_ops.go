@@ -343,8 +343,8 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s models.Store) error {
 	return process.ChannelCrawl(s, &c)
 }
 
-// ListChannel returns a single channel from the database.
-func (cs *ChannelStore) ListChannel(id int64) (channel *models.Channel, err error, hasRows bool) {
+// FetchChannel returns a single channel from the database.
+func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err error, hasRows bool) {
 	var (
 		settingsJSON, metarrJSON json.RawMessage
 	)
@@ -400,8 +400,8 @@ func (cs *ChannelStore) ListChannel(id int64) (channel *models.Channel, err erro
 	return c, nil, true
 }
 
-// ListAllChannels lists all channels in the database.
-func (cs *ChannelStore) ListAllChannels() (channels []*models.Channel, err error, hasRows bool) {
+// FetchAllChannels retrieves all channels in the database.
+func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err error, hasRows bool) {
 	query := squirrel.
 		Select(
 			consts.QChanID,
