@@ -311,15 +311,9 @@ func addChannelCmd(cs models.ChannelStore) *cobra.Command {
 				UpdatedAt: now,
 			}
 
-			id, err := cs.AddChannel(c)
-			if err != nil {
+			if _, err := cs.AddChannel(c); err != nil {
 				return err
 			}
-
-			fmt.Println()
-			logging.S(0, "Successfully added channel (ID: %d)\n\nName: %s\nURL: %s\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %v\nMetarr Operations: %v",
-				id, c.Name, c.URL, c.Settings.CrawlFreq, c.Settings.Filters, c.Settings, c.MetarrArgs)
-			fmt.Println()
 			return nil
 		},
 	}

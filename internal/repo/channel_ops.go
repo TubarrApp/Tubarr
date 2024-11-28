@@ -33,7 +33,7 @@ func (cs *ChannelStore) GetDB() *sql.DB {
 // GetID gets the channel ID from an input key and value.
 func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	switch key {
-	case "url", "name", "id":
+	case consts.QChanURL, consts.QChanName, consts.QChanID:
 		if val == "" {
 			return 0, fmt.Errorf("please enter a value for key %q", key)
 		}
@@ -203,7 +203,8 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
 
-	logging.S(0, "Successfully added channel with metarr operations: %+v", c.MetarrArgs)
+	logging.S(0, "Successfully added channel (ID: %d)\n\nName: %s\nURL: %s\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
+		id, c.Name, c.URL, c.Settings.CrawlFreq, c.Settings.Filters, c.Settings, c.MetarrArgs)
 	return id, nil
 }
 

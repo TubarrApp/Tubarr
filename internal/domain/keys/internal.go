@@ -29,3 +29,8 @@ const (
 	Configuration string = "configuration"
 	ValidURLs     string = "validUrls"
 )
+
+// Benchmarking
+const (
+	BenchFiles string = "benchFiles"
+)

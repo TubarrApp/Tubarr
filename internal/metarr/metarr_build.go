@@ -13,76 +13,108 @@ import (
 )
 
 type metCmdMapping struct {
-	metarrValue any
+	metarrValue metVals
+	valType     metValTypes
 	viperKey    string
 	cmdKey      string
 }
 
+type metVals struct {
+	str      string
+	strSlice []string
+	i        int
+	f64      float64
+}
+
+type metValTypes int
+
+const (
+	str = iota
+	strSlice
+	i
+	f64
+)
+
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video) []string {
+
 	fields := []metCmdMapping{
+
 		// Metarr args:
 		{
-			metarrValue: v.MetarrArgs.Concurrency,
-			viperKey:    "",
+			metarrValue: metVals{i: v.MetarrArgs.Concurrency},
+			valType:     i,
+			viperKey:    "", // Don't use Tubarr concurrency key, Metarr has more potential resource constraints
 			cmdKey:      metcmd.Concurrency,
 		},
 		{
-			metarrValue: v.MetarrArgs.Ext,
+			metarrValue: metVals{str: v.MetarrArgs.Ext},
+			valType:     str,
 			viperKey:    keys.OutputFiletype,
 			cmdKey:      metcmd.Ext,
 		},
 		{
-			metarrValue: v.MetarrArgs.FileDatePfx,
+			metarrValue: metVals{str: v.MetarrArgs.FileDatePfx},
+			valType:     str,
 			viperKey:    keys.InputFileDatePfx,
 			cmdKey:      metcmd.FilenameDateTag,
 		},
 		{
-			metarrValue: v.MetarrArgs.FilenameReplaceSfx,
+			metarrValue: metVals{strSlice: v.MetarrArgs.FilenameReplaceSfx},
+			valType:     strSlice,
 			viperKey:    keys.InputFilenameReplaceSfx,
 			cmdKey:      metcmd.FilenameReplaceSfx,
 		},
 		{
-			metarrValue: v.MetarrArgs.MaxCPU,
+			metarrValue: metVals{f64: v.MetarrArgs.MaxCPU},
+			valType:     f64,
 			viperKey:    "",
 			cmdKey:      metcmd.MaxCPU,
 		},
 		{
-			metarrValue: v.MetarrArgs.MetaOps,
+			metarrValue: metVals{strSlice: v.MetarrArgs.MetaOps},
+			valType:     strSlice,
 			viperKey:    keys.MetaOps,
 			cmdKey:      metcmd.MetaOps,
 		},
 		{
-			metarrValue: v.MetarrArgs.MinFreeMem,
+			metarrValue: metVals{str: v.MetarrArgs.MinFreeMem},
+			valType:     str,
 			viperKey:    keys.MinFreeMem,
 			cmdKey:      metcmd.MinFreeMem,
 		},
 		{
-			metarrValue: parseOutputDir(v), // Already parses from Viper key if set and model output dir empty.
-			viperKey:    "",
+			metarrValue: metVals{str: parseOutputDir(v)},
+			valType:     str,
+			viperKey:    "", // Fallback logic already exists in parseOutputDir.
 			cmdKey:      metcmd.OutputDir,
 		},
 		{
-			metarrValue: v.MetarrArgs.RenameStyle,
+			metarrValue: metVals{str: v.MetarrArgs.RenameStyle},
+			valType:     str,
 			viperKey:    keys.RenameStyle,
 			cmdKey:      metcmd.RenameStyle,
 		},
 		// Other
 		{
-			metarrValue: "",
+			metarrValue: metVals{str: ""},
+			valType:     str,
 			viperKey:    keys.DebugLevel,
 			cmdKey:      metcmd.Debug,
 		},
 	}
 
+	singlesLen, sliceLen := calcNumElements(fields)
+
 	// Map use to ensure uniqueness
-	argMap := make(map[string]string, len(fields))
-	argSlicesMap := make(map[string][]string, len(fields))
+	argMap := make(map[string]string, singlesLen)
+	argSlicesMap := make(map[string][]string, sliceLen)
+
+	argMap[metcmd.VideoFile] = v.VPath
+	argMap[metcmd.JSONFile] = v.JPath
 
 	// Final args
-	args := make([]string, 0, len(fields))
-	args = append(args, metcmd.VideoFile, v.VPath)
-	args = append(args, metcmd.JSONFile, v.JPath)
+	args := make([]string, 0, singlesLen+sliceLen)
 
 	for _, f := range fields {
 		processField(f, argMap, argSlicesMap)
@@ -104,29 +136,29 @@ func makeMetarrCommand(v *models.Video) []string {
 
 // processField processes each field in the argument map.
 func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string) {
-	switch val := f.metarrValue.(type) {
-	case int:
-		if val > 0 {
-			argMap[f.cmdKey] = strconv.Itoa(val)
-		} else if cfg.IsSet(f.viperKey) {
+	switch f.valType {
+	case i:
+		if f.metarrValue.i > 0 {
+			argMap[f.cmdKey] = strconv.Itoa(f.metarrValue.i)
+		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
 			argMap[f.cmdKey] = strconv.Itoa(cfg.GetInt(f.viperKey))
 		}
-	case float64:
-		if val > 0.0 {
-			argMap[f.cmdKey] = fmt.Sprintf("%.2f", val)
-		} else if cfg.IsSet(f.viperKey) {
+	case f64:
+		if f.metarrValue.f64 > 0.0 {
+			argMap[f.cmdKey] = fmt.Sprintf("%.2f", f.metarrValue.f64)
+		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
 			argMap[f.cmdKey] = fmt.Sprintf("%.2f", cfg.GetFloat64(f.viperKey))
 		}
-	case string:
-		if val != "" {
-			argMap[f.cmdKey] = val
-		} else if cfg.IsSet(f.viperKey) {
+	case str:
+		if f.metarrValue.str != "" {
+			argMap[f.cmdKey] = f.metarrValue.str
+		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
 			argMap[f.cmdKey] = cfg.GetString(f.viperKey)
 		}
-	case []string:
-		if len(val) > 0 {
-			argSlicesMap[f.cmdKey] = val
-		} else if cfg.IsSet(f.viperKey) {
+	case strSlice:
+		if len(f.metarrValue.strSlice) > 0 {
+			argSlicesMap[f.cmdKey] = f.metarrValue.strSlice
+		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
 			argSlicesMap[f.cmdKey] = cfg.GetStringSlice(f.viperKey)
 		}
 	}
@@ -154,4 +186,19 @@ func parseOutputDir(v *models.Video) string {
 		return parsed
 	}
 	return ""
+}
+
+// calcNumElements returns the required map sizes.
+func calcNumElements(fields []metCmdMapping) (singles, slices int) {
+	singleElements := 2 // Start at 2 for VideoFile and JSONFile
+	sliceElements := 0
+	for _, f := range fields {
+		switch f.valType {
+		case str, i, f64:
+			singleElements += 2 // One key and one value
+		case strSlice:
+			sliceElements += (len(f.metarrValue.strSlice) * 2) // One key and one value per entry
+		}
+	}
+	return singleElements, sliceElements
 }

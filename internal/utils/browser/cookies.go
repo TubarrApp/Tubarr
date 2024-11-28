@@ -16,13 +16,13 @@ var (
 	allCookies []*http.Cookie
 )
 
-// initializeCookies initializes all browser cookie stores.
+// initializeCookies initializes all browser cookie stores
 func initializeCookies() {
 	allStores = kooky.FindAllCookieStores()
 	allCookies = []*http.Cookie{}
 }
 
-// GetBrowserCookies retrieves cookies for a given URL.
+// GetBrowserCookies retrieves cookies for a given URL, using a specified cookie file if provided.
 func getBrowserCookies(u string) ([]*http.Cookie, error) {
 	baseURL, err := extractBaseDomain(u)
 	if err != nil {
@@ -67,7 +67,7 @@ func getBrowserCookies(u string) ([]*http.Cookie, error) {
 	return allCookies, nil
 }
 
-// convertToHTTPCookies converts kooky cookies to http.Cookie format.
+// convertToHTTPCookies converts kooky cookies to http.Cookie format
 func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 	httpCookies := make([]*http.Cookie, len(kookyCookies))
 	for i, c := range kookyCookies {
@@ -82,7 +82,7 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 	return httpCookies
 }
 
-// extractBaseDomain parses a URL and extracts its base domain.
+// extractBaseDomain parses a URL and extracts its base domain
 func extractBaseDomain(urlString string) (string, error) {
 	parsedURL, err := url.Parse(urlString)
 	if err != nil {
@@ -96,11 +96,11 @@ func extractBaseDomain(urlString string) (string, error) {
 	return parsedURL.Hostname(), nil
 }
 
-// keysForMap helper function to get keys from a map.
+// keysForMap helper function to get keys from a map
 func keysFromMap(m map[string]bool) []string {
-	keys := make([]string, 0, len(m))
+	mapKeys := make([]string, 0, len(m))
 	for k := range m {
-		keys = append(keys, k)
+		mapKeys = append(mapKeys, k)
 	}
-	return keys
+	return mapKeys
 }

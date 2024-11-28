@@ -183,6 +183,46 @@ func D(l int, format string, args ...interface{}) {
 	}
 }
 
+// W logs debug messages.
+func W(format string, args ...interface{}) {
+
+	pc, file, line, _ := runtime.Caller(1)
+	file = filepath.Base(file)
+	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
+
+	var funcFileLine string
+
+	msg := fmt.Sprintf(format, args...)
+	if strings.HasSuffix(msg, "\n") {
+		funcFileLine = funcFileLineMulti
+	} else {
+		funcFileLine = funcFileLineSingle
+	}
+
+	consoleMsg := fmt.Sprintf(funcFileLine,
+		consts.YellowWarning,
+		msg,
+		consts.ColorDimCyan,
+		consts.ColorReset,
+		funcName,
+		consts.ColorDimCyan,
+		consts.ColorReset,
+		file,
+		consts.ColorDimCyan,
+		consts.ColorReset,
+		line,
+	)
+
+	writeToConsole(consoleMsg)
+	if Loggable {
+		fileLogger.Warn().
+			Str(JFunction, funcName).
+			Str(JFile, file).
+			Int(JLine, line).
+			Msg(ansiEscape.ReplaceAllString(msg, ""))
+	}
+}
+
 // I logs info messages.
 func I(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)

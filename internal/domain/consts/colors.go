@@ -16,8 +16,9 @@ const (
 )
 
 const (
-	RedError     string = ColorRed + "[ERROR] " + ColorReset
-	GreenSuccess string = ColorGreen + "[Success] " + ColorReset
-	YellowDebug  string = ColorYellow + "[Debug] " + ColorReset
-	BlueInfo     string = ColorCyan + "[Info] " + ColorReset
+	RedError      string = ColorRed + "[ERROR] " + ColorReset
+	GreenSuccess  string = ColorGreen + "[Success] " + ColorReset
+	YellowDebug   string = ColorYellow + "[Debug] " + ColorReset
+	YellowWarning string = ColorYellow + "[Warning] " + ColorReset
+	BlueInfo      string = ColorCyan + "[Info] " + ColorReset
 )

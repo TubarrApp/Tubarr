@@ -83,6 +83,12 @@ func initVideoTransformers() error {
 // initProgramFlags initializes user flag settings related to the core program. E.g. logging level.
 func initProgramFlags() error {
 
+	// Output benchmarking files
+	rootCmd.PersistentFlags().Bool(keys.Benchmarking, false, "Benchmarks the program")
+	if err := viper.BindPFlag(keys.Benchmarking, rootCmd.PersistentFlags().Lookup(keys.Benchmarking)); err != nil {
+		return err
+	}
+
 	// Debug level
 	rootCmd.PersistentFlags().Int(keys.DebugLevel, 0, "Debugging level (0 - 5)")
 	if err := viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel)); err != nil {

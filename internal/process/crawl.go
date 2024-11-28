@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 	"tubarr/internal/cfg"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/browser"
@@ -51,19 +52,26 @@ func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 	}
 
 	if len(videos) > 0 {
-		count := 0
 		vs := s.GetVideoStore()
 
 		for _, v := range videos {
 			v.Downloaded = true
-			if id, err := vs.AddVideo(v); err != nil {
-				errMsg := err.Error()
-				logging.E(0, "Failed to add video with ID %d to channel with ID %d: %s", id, c.ID, errMsg)
-			}
-
-			logging.S(0, "Added URL %q to ignore list.", v.URL)
-			count++
 		}
+
+		added, errArray := vs.AddVideos(videos, c.ID)
+		if len(errArray) > 0 {
+			logging.P("%s Encountered the following errors adding videos to ignore list:", consts.RedError)
+			fmt.Println()
+			for _, err := range errArray {
+				logging.P("%v", err)
+			}
+		}
+
+		if !added {
+			return fmt.Errorf("no videos were successfully added to the ignore list for channel with ID %d", c.ID)
+		}
+
+		logging.S(0, "Added %d videos to the ignore list in channel %q", len(videos)-len(errArray), c.Name)
 	}
 	return nil
 }

@@ -16,13 +16,13 @@ const (
 )
 
 var (
-	CfgDir      string
-	DBFilePath  string
+	CfgDir,
+	DBFilePath,
 	LogFilePath string
 )
 
 // InitCfgFilesDirs initializes necessary program directories and filepaths.
-func InitCfgFilesDirs() error {
+func InitCfgFilesDirs(time string) error {
 
 	dir, err := os.UserHomeDir()
 	if err != nil {
@@ -36,6 +36,7 @@ func InitCfgFilesDirs() error {
 		}
 	}
 
+	// Main files
 	DBFilePath = filepath.Join(CfgDir, tFile)
 	LogFilePath = filepath.Join(CfgDir, logFile)
 

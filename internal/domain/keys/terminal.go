@@ -1,13 +1,14 @@
 // Package keys holds various keys for software operations, such as terminal input keys and internal Viper keys.
 package keys
 
-// Terminal keys:
-// Files and directories
+// Channel identifiers
 const (
 	URL  string = "url"
 	Name string = "name"
 	ID   string = "id"
 )
+
+// Files and directories
 const (
 	VideoDir       string = "video-directory"
 	JSONDir        string = "json-directory"
@@ -30,6 +31,7 @@ const (
 	MoveOnComplete        string = "move-on-complete"
 	URLFile               string = "url-file"
 	URLAdd                string = "add-url"
+	Benchmarking          string = "benchmark"
 )
 
 // Settings

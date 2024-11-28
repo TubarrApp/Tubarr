@@ -2,19 +2,37 @@
 package cfg
 
 import (
+	"fmt"
+	"os"
+	"time"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
+	"tubarr/internal/utils/benchmark"
+	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+var (
+	benchmarking bool
+	benchFiles   *benchmark.BenchFiles
+	err          error
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "tubarr",
-	Short: "Tubarr is a video and metatagging tool",
+	Short: "Tubarr is a video downloading and metatagging tool.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if err := viperFlags(); err != nil {
 			return
+		}
+		if viper.IsSet(keys.Benchmarking) {
+			if benchFiles, err = benchmark.SetupBenchmarking(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return
+			}
+			benchmarking = true
 		}
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -26,6 +44,15 @@ var rootCmd = &cobra.Command{
 		}
 		viper.Set("execute", true)
 		return nil
+	},
+	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		if benchmarking {
+			if benchFiles == nil {
+				logging.E(0, "Null benchFiles")
+				return
+			}
+			benchmark.CloseBenchFiles(benchFiles, fmt.Sprintf("Benchmark ended at %v", time.Now().Format(time.RFC1123Z)), nil)
+		}
 	},
 }
 

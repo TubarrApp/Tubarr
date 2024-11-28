@@ -34,6 +34,7 @@ type ChannelStore interface {
 // VideoStore allows access to video repo methods.
 type VideoStore interface {
 	AddVideo(v *Video) (int64, error)
+	AddVideos(videos []*Video, chanID int64) (ok bool, errArray []error)
 	DeleteVideo(key, val string, chanID int64) error
 	UpdateVideo(v *Video) error
 	GetDB() *sql.DB

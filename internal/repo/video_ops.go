@@ -29,6 +29,106 @@ func (vs *VideoStore) GetDB() *sql.DB {
 	return vs.DB
 }
 
+// AddVideos adds an array of videos to the database.
+func (vs VideoStore) AddVideos(videos []*models.Video, chanID int64) (ok bool, errArray []error) {
+
+	// Query start
+	query := squirrel.
+		Insert(consts.DBVideos).
+		Columns(
+			consts.QVidChanID,
+			consts.QVidDownloaded,
+			consts.QVidURL,
+			consts.QVidTitle,
+			consts.QVidDescription,
+			consts.QVidVDir,
+			consts.QVidJDir,
+			consts.QVidUploadDate,
+			consts.QVidMetadata,
+			consts.QVidSettings,
+			consts.QVidMetarr,
+			consts.QVidCreatedAt,
+			consts.QVidUpdatedAt,
+		).
+		RunWith(vs.DB)
+
+	errArray = make([]error, 0, len(videos))
+	validVideos := make([][]interface{}, 0, len(videos))
+
+	for i, v := range videos {
+		switch {
+		case v.URL == "":
+			errArray = append(errArray, fmt.Errorf("must enter a url for video #%d in channel with ID %d", i, chanID))
+			continue
+		case v.VDir == "":
+			errArray = append(errArray, fmt.Errorf("must enter a video output directory for video #%d in channel with ID %d", i, chanID))
+			continue
+		case v.ChannelID == 0:
+			if chanID == 0 {
+				errArray = append(errArray, fmt.Errorf("video #%d has no channel ID", i))
+				continue
+			} else {
+				v.ChannelID = chanID
+			}
+		}
+
+		if id, exists := vs.videoExists(v); exists {
+			logging.D(1, "video %q already exists in the database for channel ID %d, attempting update", v.URL, v.ChannelID)
+			if err := vs.UpdateVideo(v); err != nil {
+				errArray = append(errArray, fmt.Errorf("video (ID: %d) in channel (ID: %d) URL %q already exists in database, and update failed", id, v.ChannelID, v.URL))
+				continue
+			}
+		}
+
+		// JSON dir
+		if v.JDir == "" {
+			v.JDir = v.VDir
+		}
+		now := time.Now()
+
+		var (
+			metadataJSON []byte
+			settingsJSON []byte
+			metarrJSON   []byte
+			err          error
+		)
+
+		if metadataJSON, settingsJSON, metarrJSON, err = vs.marshalVideoJSON(v); err != nil {
+			errArray = append(errArray, fmt.Errorf("failed to marshal JSON elements for video with ID %d and URL %q: %w", v.ID, v.URL, err))
+			continue
+		}
+
+		validVideos = append(validVideos, []interface{}{
+			v.ChannelID,
+			v.Downloaded,
+			v.URL,
+			v.Title,
+			v.Description,
+			v.VDir,
+			v.JDir,
+			v.UploadDate,
+			metadataJSON,
+			settingsJSON,
+			metarrJSON,
+			now,
+			now,
+		})
+	}
+
+	if len(validVideos) > 0 {
+		for _, values := range validVideos {
+			query = query.Values(values...)
+		}
+
+		if _, err := query.Exec(); err != nil {
+			errArray = append(errArray, fmt.Errorf("batch insert failed for videos in channel with ID %d: %w", chanID, err))
+		} else {
+			ok = len(validVideos) > len(errArray)
+		}
+	}
+	return ok, errArray
+}
+
 // AddVideo adds a new video to the database.
 func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	switch {
@@ -221,4 +321,26 @@ func (vs VideoStore) videoExists(v *models.Video) (int64, bool) {
 	}
 	logging.D(1, "Video %q already exists", v.ID)
 	return id, true
+}
+
+// marshalVideoJSON marshals all JSON elements for a video model.
+func (vs VideoStore) marshalVideoJSON(v *models.Video) (metadata, settings, metarr []byte, err error) {
+	if v.MetadataMap != nil {
+		metadata, err = json.Marshal(v.MetadataMap)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("metadata marshal: %w", err)
+		}
+	}
+
+	settings, err = json.Marshal(v.Settings)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("settings marshal: %w", err)
+	}
+
+	metarr, err = json.Marshal(v.MetarrArgs)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("metarr marshal: %w", err)
+	}
+
+	return metadata, settings, metarr, nil
 }

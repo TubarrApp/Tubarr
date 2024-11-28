@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"tubarr/internal/domain/setup"
 	"tubarr/internal/process"
 	"tubarr/internal/repo"
+	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 )
 
@@ -25,9 +27,19 @@ var (
 )
 
 func init() {
+	// Get start time ASAP
+	startTime = time.Now()
+
+	// Get directory of main.go (helpful for benchmarking file save locations)
+	_, mainGoPath, _, ok := runtime.Caller(0)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Error getting current working directory. Got: %v\n", mainGoPath)
+		os.Exit(1)
+	}
+	benchmark.InjectMainWorkDir(mainGoPath)
 
 	// Setup files/dirs
-	if err := setup.InitCfgFilesDirs(); err != nil {
+	if err := setup.InitCfgFilesDirs(startTime.Format("2006-01-02 15:04:05.00 MST")); err != nil {
 		fmt.Printf("Tubarr exiting: %v\n", err)
 		os.Exit(0)
 	}
@@ -55,11 +67,12 @@ func init() {
 		os.Exit(0)
 	}
 
+	// Setup logging
 	if err := logging.SetupLogging(setup.CfgDir); err != nil {
 		fmt.Printf("could not set up logging, proceeding without: %v", err)
 	}
 
-	startTime = time.Now()
+	// Print start time after logging is setup
 	logging.I("Tubarr (PID: %d) started at: %v", id, startTime.Format("2006-01-02 15:04:05.00 MST"))
 }
 

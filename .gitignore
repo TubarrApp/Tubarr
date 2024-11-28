@@ -1,2 +1,5 @@
 all_code.txt
 .golangci.yaml
+cpu.prof
+mem.prof
+trace.out

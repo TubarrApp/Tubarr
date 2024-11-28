@@ -13,7 +13,6 @@ const (
 	QProgHost      = "host"
 	QProgID        = "id"
 	QProgHeartbeat = "last_heartbeat"
-	QProgProgramID = "program_id"
 	QProgPID       = "pid"
 	QProgStartedAt = "started_at"
 	QProgRunning   = "running"
