@@ -33,13 +33,19 @@ func InitDB() (dbc *DBControl, err error) {
 
 // initTables initializes the SQL tables.
 func (dc *DBControl) initTables() error {
+	var (
+		committed bool
+	)
+
 	tx, err := dc.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			logging.E(0, "transaction rollback failed: %v", err)
+		if !committed {
+			if err := tx.Rollback(); err != nil {
+				logging.E(0, "transaction rollback failed: %v", err)
+			}
 		}
 	}()
 
@@ -55,9 +61,16 @@ func (dc *DBControl) initTables() error {
 		return err
 	}
 
+	if err := initDownloadsTable(tx); err != nil {
+		return err
+	}
+
 	if err := initNotifyTable(tx); err != nil {
 		return err
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err == nil { // err IS nil
+		committed = false
+	}
+	return err // nil unless error
 }

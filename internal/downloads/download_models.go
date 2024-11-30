@@ -27,7 +27,9 @@ var DefaultOptions = Options{
 
 // Download encapsulates a download operation.
 type Download struct {
-	Type    DownloadType
-	Video   *models.Video
-	Options Options
+	Type      DownloadType
+	Video     *models.Video
+	DLStore   models.DownloadStore
+	DLTracker *DownloadTracker
+	Options   Options
 }

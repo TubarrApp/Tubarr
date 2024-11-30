@@ -24,7 +24,7 @@ func initChannelCmds(s models.Store) *cobra.Command {
 		},
 	}
 
-	cs := s.GetChannelStore()
+	cs := s.ChannelStore()
 
 	// Add subcommands with dependencies
 	channelCmd.AddCommand(addChannelCmd(cs))

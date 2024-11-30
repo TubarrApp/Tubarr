@@ -6,10 +6,12 @@ import (
 )
 
 var (
-	AnsiEscape   *regexp.Regexp
-	ExtraSpaces  *regexp.Regexp
-	InvalidChars *regexp.Regexp
-	SpecialChars *regexp.Regexp
+	AnsiEscape,
+	DLPercentage,
+	ExtraSpaces,
+	InvalidChars,
+	SpecialChars,
+	Aria2FragCountRegex *regexp.Regexp
 )
 
 // AnsiEscapeCompile compiles regex for ANSI escape codes
@@ -18,6 +20,20 @@ func AnsiEscapeCompile() *regexp.Regexp {
 		AnsiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	}
 	return AnsiEscape
+}
+
+func DLPctCompile() *regexp.Regexp {
+	if DLPercentage == nil {
+		DLPercentage = regexp.MustCompile(`\[download\]\s+(\d+\.?\d*)%`)
+	}
+	return DLPercentage
+}
+
+func Aria2FragCountCompile() *regexp.Regexp {
+	if Aria2FragCountRegex == nil {
+		Aria2FragCountRegex = regexp.MustCompile(`Downloading (\d+) item`)
+	}
+	return Aria2FragCountRegex
 }
 
 // ExtraSpacesCompile compiles regex for extra spaces

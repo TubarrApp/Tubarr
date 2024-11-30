@@ -4,27 +4,43 @@ package process
 import (
 	"fmt"
 	"os/exec"
+	"sync"
+	"tubarr/internal/downloads"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 )
 
+var (
+	muErr sync.Mutex
+)
+
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video) (bool, []error) {
+func InitProcess(vs models.VideoStore, ds models.DownloadStore, c *models.Channel, videos []*models.Video) (bool, []error) {
 	conc := c.Settings.Concurrency
 	if conc < 1 {
 		conc = 1
 	}
 
+	// Collect results
+	var (
+		errors  []error
+		success bool
+	)
+
 	logging.I("Starting meta/video processing for %d videos", len(videos))
+
+	dlTracker := downloads.NewDownloadTracker(ds, c.Settings.ExternalDownloader)
+	dlTracker.Start()
+	defer dlTracker.Stop()
 
 	jobs := make(chan *models.Video, len(videos))
 	results := make(chan error, len(videos))
 
 	// Start workers
 	for w := 1; w <= conc; w++ {
-		go videoJob(w, jobs, results, vs, c)
+		go videoJob(w, jobs, results, vs, c, dlTracker)
 	}
 
 	// Send jobs
@@ -37,15 +53,11 @@ func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video
 	}
 	close(jobs)
 
-	// Collect results
-	var (
-		errors  []error
-		success bool
-	)
-
 	for i := 0; i < len(videos); i++ {
 		if err := <-results; err != nil {
+			muErr.Lock()
 			errors = append(errors, err)
+			muErr.Unlock()
 		} else {
 			success = true
 		}
@@ -58,7 +70,7 @@ func InitProcess(vs models.VideoStore, c *models.Channel, videos []*models.Video
 }
 
 // videoJob starts a worker's process for a video.
-func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs models.VideoStore, c *models.Channel) {
+func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs models.VideoStore, c *models.Channel, dlTracker *downloads.DownloadTracker) {
 	for v := range videos {
 		var err error
 
@@ -82,7 +94,7 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs mode
 			}
 		}
 
-		if err := processJSON(v, vs); err != nil {
+		if err := processJSON(v, vs, dlTracker); err != nil {
 			results <- fmt.Errorf("JSON processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 			continue
 		}
@@ -94,7 +106,7 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs mode
 			logging.P("Uploaded=%s", v.UploadDate)
 		}
 
-		if err := processVideo(v, vs); err != nil {
+		if err := processVideo(v, vs, dlTracker); err != nil {
 			results <- fmt.Errorf("video processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 			continue
 		}
@@ -106,6 +118,6 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs mode
 		if err := metarr.InitMetarr(v); err != nil {
 			results <- fmt.Errorf("error initializing Metarr: %w", err)
 		}
-		results <- nil // Nil = success
+		results <- nil // nil = success
 	}
 }

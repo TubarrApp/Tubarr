@@ -121,11 +121,15 @@ func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) err
 		notifyName = notifyURL
 	}
 
+	const (
+		querySuffix = "ON CONFLICT (channel_id, notify_url) DO UPDATE SET notify_url = EXCLUDED.notify_url, updated_at = EXCLUDED.updated_at"
+	)
+
 	query := squirrel.
 		Insert(consts.DBNotifications).
 		Columns(consts.QNotifyChanID, consts.QNotifyName, consts.QNotifyURL, consts.QNotifyCreatedAt, consts.QNotifyUpdatedAt).
 		Values(id, notifyName, notifyURL, time.Now(), time.Now()).
-		Suffix("ON CONFLICT (channel_id, notify_url) DO UPDATE SET notify_url = EXCLUDED.notify_url, updated_at = EXCLUDED.updated_at").
+		Suffix(querySuffix).
 		RunWith(cs.DB)
 
 	if _, err := query.Exec(); err != nil {
@@ -644,13 +648,20 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 		return nil, errors.New("model entered has no ID")
 	}
 
-	// Select URLs where channel_id matches and downloaded is true
+	const (
+		join     = "downloads ON downloads.video_id = videos.id"
+		vidURL   = "videos.url"
+		vidCID   = "videos.channel_id"
+		dlStatus = "downloads.status"
+	)
+
 	query := squirrel.
-		Select(consts.QVidURL).
+		Select(vidURL).
 		From(consts.DBVideos).
+		Join(join).
 		Where(squirrel.And{
-			squirrel.Eq{consts.QVidChanID: c.ID},
-			squirrel.Eq{consts.QVidDownloaded: true},
+			squirrel.Eq{vidCID: c.ID},
+			squirrel.Eq{dlStatus: consts.DLStatusCompleted},
 		}).
 		RunWith(cs.DB)
 
@@ -679,7 +690,7 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 		return nil, fmt.Errorf("row iteration error: %w", err)
 	}
 
-	logging.D(1, "Found %d previously downloaded videos for channel ID %d", len(urls), c.ID)
+	logging.I("Found %d previously downloaded videos for channel ID %d", len(urls), c.ID)
 	return urls, nil
 }
 

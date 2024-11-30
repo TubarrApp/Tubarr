@@ -29,9 +29,8 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 
 	if v.Settings.ExternalDownloader != "" {
 		args = append(args, "--external-downloader", v.Settings.ExternalDownloader)
-
 		if v.Settings.ExternalDownloaderArgs != "" {
-			args = append(args, "--external-downloader-args", v.Settings.ExternalDownloaderArgs)
+			args = append(args, "--external-downloader-args", "aria2c:-x 16 -s 16 --console-log-level=info")
 		}
 	}
 

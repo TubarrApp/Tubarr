@@ -9,7 +9,7 @@ import (
 )
 
 // processJSON downloads and processes JSON for a video.
-func processJSON(v *models.Video, vs models.VideoStore) error {
+func processJSON(v *models.Video, vs models.VideoStore, dlTracker *downloads.DownloadTracker) error {
 	if v == nil {
 		logging.I("Null video entered")
 		return nil
@@ -17,7 +17,7 @@ func processJSON(v *models.Video, vs models.VideoStore) error {
 
 	logging.D(2, "Processing JSON download for URL: %s", v.URL)
 
-	dl, err := downloads.NewDownload(downloads.TypeJSON, v, &downloads.Options{
+	dl, err := downloads.NewDownload(downloads.TypeJSON, v, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
 	})

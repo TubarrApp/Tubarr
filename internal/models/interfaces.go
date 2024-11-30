@@ -1,13 +1,15 @@
 package models
 
 import (
+	"context"
 	"database/sql"
 )
 
 // Store allows access to the main store repo methods.
 type Store interface {
-	GetChannelStore() ChannelStore
-	GetVideoStore() VideoStore
+	ChannelStore() ChannelStore
+	VideoStore() VideoStore
+	DownloadStore() DownloadStore
 }
 
 // ChannelStore allows access to channel repo methods.
@@ -34,8 +36,14 @@ type ChannelStore interface {
 // VideoStore allows access to video repo methods.
 type VideoStore interface {
 	AddVideo(v *Video) (int64, error)
-	AddVideos(videos []*Video, c *Channel) (ok bool, errArray []error)
+	AddVideos(videos []*Video, c *Channel) ([]*Video, []error)
 	DeleteVideo(key, val string, chanID int64) error
 	UpdateVideo(v *Video) error
 	GetDB() *sql.DB
+}
+
+type DownloadStore interface {
+	GetDB() *sql.DB
+	UpdateDownloadStatuses(ctx context.Context, updates []StatusUpdate) error
+	SetDownloadStatus(v *Video) error
 }

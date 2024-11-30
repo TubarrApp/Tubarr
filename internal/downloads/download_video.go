@@ -10,12 +10,15 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
 // executeVideoDownload executes a video download command.
-func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
+func (d *Download) executeVideoDownload(cmd *exec.Cmd) error {
+
+	logging.D(0, "Executing command: %v with args: %v", cmd.Path, cmd.Args)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -29,7 +32,7 @@ func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 
 	filenameChan := make(chan string, 1)
 
-	go scanVCmdOutput(io.MultiReader(stdout, stderr), filenameChan)
+	go d.scanVideoCmdOutput(io.MultiReader(stdout, stderr), filenameChan)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("command start error: %w", err)
@@ -44,27 +47,59 @@ func executeVideoDownload(v *models.Video, cmd *exec.Cmd) error {
 		return errors.New("no output filename captured")
 	}
 
-	v.VPath = filename
+	d.Video.VPath = filename
 
-	if err := waitForFile(v.VPath, 5*time.Second); err != nil {
+	if err := d.waitForFile(d.Video.VPath, 5*time.Second); err != nil {
 		return err
 	}
 
-	if err := verifyVideoDownload(v.VPath); err != nil {
+	if err := verifyVideoDownload(d.Video.VPath); err != nil {
 		return err
 	}
 
-	logging.S(0, "Download successful: %s", v.VPath)
+	logging.S(0, "Download successful: %s", d.Video.VPath)
 	return nil
 }
 
-// scanVCmdOutput scans the video command output for the video filename.
-func scanVCmdOutput(r io.Reader, filenameChan chan<- string) {
+// scanVideoCmdOutput scans the yt-dlp video download output for relevant information.
+func (d *Download) scanVideoCmdOutput(r io.Reader, filenameChan chan<- string) {
 	scanner := bufio.NewScanner(r)
+
+	var (
+		totalFrags,
+		completedFrags int
+		pct        float64
+		err        error
+		lastUpdate models.StatusUpdate
+	)
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		fmt.Println(line)
 
+		// Handle aria2c progress updates if applicable
+		if d.DLTracker.downloader == consts.DLerAria {
+
+			totalFrags, completedFrags, pct, err = downloaders.Aria2COutputParser(line, d.Video.URL, totalFrags, completedFrags)
+			if err != nil {
+				logging.E(0, "Could not parse Aria2C output line %q: %v", line, err)
+			}
+		}
+
+		if pct > 0.0 {
+			newUpdate := models.StatusUpdate{
+				VideoID:  d.Video.ID,
+				VideoURL: d.Video.URL,
+				Status:   d.Video.DownloadStatus.Status,
+				Percent:  pct,
+			}
+
+			if newUpdate != lastUpdate {
+				d.DLTracker.updates <- newUpdate
+				lastUpdate = newUpdate
+			}
+		}
+
+		// Check for completed file path
 		if strings.HasPrefix(line, "/") {
 			ext := filepath.Ext(line)
 			for _, validExt := range consts.AllVidExtensions {
@@ -75,5 +110,10 @@ func scanVCmdOutput(r io.Reader, filenameChan chan<- string) {
 			}
 		}
 	}
+
+	if err := scanner.Err(); err != nil {
+		logging.E(0, "Scanner error: %v", err)
+	}
+
 	close(filenameChan)
 }

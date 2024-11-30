@@ -5,6 +5,7 @@ const (
 	DBProgram       = "program"
 	DBChannels      = "channels"
 	DBVideos        = "videos"
+	DBDownloads     = "downloads"
 	DBNotifications = "notifications"
 )
 
@@ -50,8 +51,18 @@ const (
 	QVidMetarr      = "metarr"
 	QVidUploadDate  = "upload_date"
 	QVidMetadata    = "metadata"
+	QVidDLStatus    = "download_status"
 	QVidCreatedAt   = "created_at"
 	QVidUpdatedAt   = "updated_at"
+)
+
+// Downloads
+const (
+	QDLVidID     = "video_id"
+	QDLStatus    = "status"
+	QDLPct       = "percentage"
+	QDLCreatedAt = "created_at"
+	QDLUpdatedAt = "updated_at"
 )
 
 // Notification
@@ -63,13 +74,12 @@ const (
 	QNotifyUpdatedAt = "updated_at"
 )
 
-// DLStatus holds constant download status strings.
-type DLStatus string
+// DownloadStatus holds constant download status strings.
+type DownloadStatus string
 
 const (
-	DLStatusEmpty       DLStatus = ""
-	DLStatusPending     DLStatus = "waiting"
-	DLStatusDownloading DLStatus = "downloading"
-	DLStatusCompleted   DLStatus = "finished"
-	DLStatusFailed      DLStatus = "failed"
+	DLStatusPending     DownloadStatus = "Pending"
+	DLStatusDownloading DownloadStatus = "Downloading"
+	DLStatusCompleted   DownloadStatus = "Finished"
+	DLStatusFailed      DownloadStatus = "Failed"
 )

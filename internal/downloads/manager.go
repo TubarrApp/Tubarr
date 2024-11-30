@@ -7,19 +7,21 @@ import (
 	"os"
 	"os/exec"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
 // NewDownload creates a download operation with specified options.
-func NewDownload(dlType DownloadType, video *models.Video, opts *Options) (*Download, error) {
+func NewDownload(dlType DownloadType, video *models.Video, tracker *DownloadTracker, opts *Options) (*Download, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
 
 	dl := &Download{
-		Type:  dlType,
-		Video: video,
+		Type:      dlType,
+		Video:     video,
+		DLTracker: tracker,
 	}
 
 	if opts != nil {
@@ -46,12 +48,19 @@ func (d *Download) Execute() error {
 			lastErr = err
 			logging.E(0, "Download attempt %d failed: %v", attempt, err)
 
+			d.Video.DownloadStatus.Status = consts.DLStatusFailed
+			d.DLTracker.UpdateStatus(d)
+
 			if attempt < d.Options.MaxRetries {
 				time.Sleep(d.Options.RetryInterval)
 				continue
 			}
 		} else {
 			logging.S(0, "Successfully completed %s download for URL: %s", d.Type, d.Video.URL)
+
+			d.Video.UpdatedAt = time.Now()
+			d.Video.DownloadStatus.Status = consts.DLStatusCompleted
+			d.DLTracker.UpdateStatus(d)
 			return nil
 		}
 	}
@@ -76,16 +85,20 @@ func (d *Download) executeAttempt() error {
 	if d.Type == TypeJSON {
 		return executeJSONDownload(d.Video, cmd)
 	}
-	return executeVideoDownload(d.Video, cmd)
+
+	d.Video.DownloadStatus.Status = consts.DLStatusDownloading
+	d.DLTracker.UpdateStatus(d)
+
+	return d.executeVideoDownload(cmd)
 }
 
 // waitForFile waits until the file is ready in the file system.
-func waitForFile(filePath string, timeout time.Duration) error {
+func (d *Download) waitForFile(filePath string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 
 		_, err := os.Stat(filePath)
-		if err == nil { // If error IS nil
+		if err == nil { // err IS nil
 			return nil
 		} else if !os.IsNotExist(err) {
 			return fmt.Errorf("unexpected error while checking file: %w", err)

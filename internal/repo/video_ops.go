@@ -2,12 +2,12 @@ package repo
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
+	"tubarr/internal/utils/jsonutils"
 	"tubarr/internal/utils/logging"
 
 	"github.com/Masterminds/squirrel"
@@ -29,105 +29,99 @@ func (vs *VideoStore) GetDB() *sql.DB {
 	return vs.DB
 }
 
-// AddVideos adds an array of videos to the database.
-func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) (ok bool, errArray []error) {
+// AddVideos adds an array of videos into the database.
+//
+// Returns with the same video array but filled with IDs.
+func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*models.Video, []error) {
+	var errArray []error
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return nil, append(errArray, fmt.Errorf("failed to begin transaction: %w", err))
+	}
 
-	// Query start
-	query := squirrel.
-		Insert(consts.DBVideos).
-		Columns(
-			consts.QVidChanID,
-			consts.QVidDownloaded,
-			consts.QVidURL,
-			consts.QVidTitle,
-			consts.QVidDescription,
-			consts.QVidVDir,
-			consts.QVidJDir,
-			consts.QVidUploadDate,
-			consts.QVidMetadata,
-			consts.QVidSettings,
-			consts.QVidMetarr,
-			consts.QVidCreatedAt,
-			consts.QVidUpdatedAt,
-		).
-		RunWith(vs.DB)
+	var committed bool
+	defer func() {
+		if !committed && tx != nil {
+			if err := tx.Rollback(); err != nil {
+				logging.E(0, "Error rolling back: %v", err)
+			}
+		}
+	}()
 
-	errArray = make([]error, 0, len(videos))
-	validVideos := make([][]interface{}, 0, len(videos))
+	validVideos := make([]*models.Video, 0, len(videos))
 
 	for i, v := range videos {
 		switch {
 		case v.URL == "":
-			errArray = append(errArray, fmt.Errorf("must enter a url for video #%d in channel %q", i, c.Name))
+			errArray = append(errArray, fmt.Errorf("must enter a url for video #%d", i))
 			continue
 		case v.VDir == "":
-			errArray = append(errArray, fmt.Errorf("must enter a video output directory for video #%d in channel %q", i, c.Name))
+			errArray = append(errArray, fmt.Errorf("must enter a video directory for video #%d", i))
 			continue
 		case v.ChannelID == 0:
 			if c.ID == 0 {
-				errArray = append(errArray, fmt.Errorf("video #%d has no channel ID and no ID found in channel model %q, skipping", i, c.Name))
-				continue
-			} else {
-				v.ChannelID = c.ID
-				logging.W("Video with URL %q had empty channel ID, filled with passed in channel ID %d", v.URL, c.ID)
-			}
-		}
-
-		if id, exists := vs.videoExists(v); exists {
-			logging.D(1, "video %q already exists in the database for channel ID %d, attempting update", v.URL, v.ChannelID)
-			if err := vs.UpdateVideo(v); err != nil {
-				errArray = append(errArray, fmt.Errorf("video (ID: %d) in channel (ID: %d) URL %q already exists in database, and update failed", id, v.ChannelID, v.URL))
+				errArray = append(errArray, fmt.Errorf("video #%d has no channel ID", i))
 				continue
 			}
+			v.ChannelID = c.ID
 		}
 
-		// JSON dir
 		if v.JDir == "" {
 			v.JDir = v.VDir
 		}
-		now := time.Now()
-
-		var (
-			metadataJSON []byte
-			settingsJSON []byte
-			metarrJSON   []byte
-			err          error
-		)
-
-		if metadataJSON, settingsJSON, metarrJSON, err = vs.marshalVideoJSON(v); err != nil {
-			errArray = append(errArray, fmt.Errorf("failed to marshal JSON elements for video with ID %d and URL %q: %w", v.ID, v.URL, err))
-			continue
-		}
-
-		validVideos = append(validVideos, []interface{}{
-			v.ChannelID,
-			v.Downloaded,
-			v.URL,
-			v.Title,
-			v.Description,
-			v.VDir,
-			v.JDir,
-			v.UploadDate,
-			metadataJSON,
-			settingsJSON,
-			metarrJSON,
-			now,
-			now,
-		})
+		validVideos = append(validVideos, v)
 	}
 
 	if len(validVideos) > 0 {
-		for _, values := range validVideos {
-			query = query.Values(values...)
+		for _, v := range validVideos {
+			query := squirrel.Insert(consts.DBVideos).
+				Columns(
+					consts.QVidChanID,
+					consts.QVidURL,
+					consts.QVidVDir,
+					consts.QVidJDir,
+				).
+				Values(
+					v.ChannelID,
+					v.URL,
+					v.VDir,
+					v.JDir,
+				).
+				RunWith(tx)
+
+			result, err := query.Exec()
+			if err != nil {
+				errArray = append(errArray, fmt.Errorf("failed to insert video %s: %w", v.URL, err))
+				continue
+			}
+
+			id, err := result.LastInsertId()
+			if err != nil {
+				errArray = append(errArray, fmt.Errorf("failed to get last insert ID: %w", err))
+				continue
+			}
+			v.ID = id
+
+			dlQuery := squirrel.Insert(consts.DBDownloads).
+				Columns(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
+				Values(id, v.DownloadStatus.Status, v.DownloadStatus.Pct).
+				RunWith(tx)
+
+			if _, err := dlQuery.Exec(); err != nil {
+				errArray = append(errArray, fmt.Errorf("failed to insert download status for video %d: %w", id, err))
+				continue
+			}
 		}
 
-		if _, err := query.Exec(); err != nil {
-			errArray = append(errArray, fmt.Errorf("batch insert failed for videos in channel %q: %w", c.Name, err))
-		} else {
-			ok = len(validVideos) > len(errArray)
+		if err := tx.Commit(); err != nil {
+			return nil, append(errArray, fmt.Errorf("failed to commit: %w", err))
 		}
+
+		committed = true
+		return validVideos, errArray
 	}
-	return ok, errArray
+
+	return nil, errArray
 }
 
 // AddVideo adds a new video to the database.
@@ -154,94 +148,92 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 	now := time.Now()
 
 	var (
-		metadataJSON []byte
-		settingsJSON []byte
-		metarrJSON   []byte
-		err          error
+		metadataJSON,
+		settingsJSON,
+		metarrJSON []byte
+		err error
 	)
 
 	// Convert metadata map to JSON string
-	if v.MetadataMap != nil {
-		metadataJSON, err = json.Marshal(v.MetadataMap)
-		if err != nil {
-			return 0, fmt.Errorf("failed to marshal metadata to JSON: %w", err)
+	if metadataJSON, settingsJSON, metarrJSON, err = jsonutils.MarshalVideoJSON(v); err != nil {
+		return 0, fmt.Errorf("failed to marshal JSON for video with URL %q: %w", v.URL, err)
+	}
+
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	var committed bool
+	defer func() {
+		if !committed && tx != nil {
+			if err := tx.Rollback(); err != nil {
+				logging.E(0, "Error rolling back: %v", err)
+			}
 		}
-	}
+	}()
 
-	// Convert settings to JSON
-	settingsJSON, err = json.Marshal(v.Settings)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal settings to JSON: %w", err)
-	}
-
-	// Convert metarr settings to JSON
-	metarrJSON, err = json.Marshal(v.MetarrArgs)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal metarr settings to JSON: %w", err)
-	}
-
-	query := squirrel.
-		Insert(consts.DBVideos).
+	vidQuery := squirrel.Insert(consts.DBVideos).
 		Columns(
-			consts.QVidChanID,
-			consts.QVidDownloaded,
-			consts.QVidURL,
-			consts.QVidTitle,
-			consts.QVidDescription,
-			consts.QVidVDir,
-			consts.QVidJDir,
-			consts.QVidUploadDate,
-			consts.QVidMetadata,
-			consts.QVidSettings,
-			consts.QVidMetarr,
-			consts.QVidCreatedAt,
-			consts.QVidUpdatedAt,
+			consts.QVidChanID, consts.QVidURL, consts.QVidTitle,
+			consts.QVidDescription, consts.QVidVDir, consts.QVidJDir,
+			consts.QVidUploadDate, consts.QVidMetadata, consts.QVidSettings,
+			consts.QVidMetarr, consts.QVidCreatedAt, consts.QVidUpdatedAt,
 		).
 		Values(
-			v.ChannelID,
-			v.Downloaded,
-			v.URL,
-			v.Title,
-			v.Description,
-			v.VDir,
-			v.JDir,
-			v.UploadDate,
-			metadataJSON,
-			settingsJSON,
-			metarrJSON,
-			now,
-			now,
+			v.ChannelID, v.URL, v.Title, v.Description, v.VDir, v.JDir,
+			v.UploadDate, metadataJSON, settingsJSON, metarrJSON, now, now,
 		).
-		RunWith(vs.DB)
+		RunWith(tx)
 
-	result, err := query.Exec()
+	result, err := vidQuery.Exec()
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert video: %w", err)
 	}
 
-	return result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get inserted video ID: %w", err)
+	}
+
+	dlQuery := squirrel.Insert(consts.DBDownloads).
+		Columns(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
+		Values(id, v.DownloadStatus.Status, v.DownloadStatus.Pct).
+		RunWith(tx)
+
+	if _, err := dlQuery.Exec(); err != nil {
+		return 0, fmt.Errorf("failed to insert download status: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	committed = true
+	return id, nil
 }
 
 // UpdateVideo updates the status of the video in the database.
-func (vs VideoStore) UpdateVideo(v *models.Video) error {
-	metadataJSON, err := json.Marshal(v.MetadataMap)
+func (vs VideoStore) UpdateVideo(v *models.Video) (err error) {
+	var committed bool
+	tx, err := vs.DB.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to marshal metadata: %w", err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if !committed {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				logging.E(0, "Error rolling back download status for video with URL %s: %v", v.URL, rollbackErr)
+			}
+		}
+	}()
+
+	metadataJSON, settingsJSON, metarrJSON, err := jsonutils.MarshalVideoJSON(v)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON for video with URL %q: %w", v.URL, err)
 	}
 
-	settingsJSON, err := json.Marshal(v.Settings)
-	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %w", err)
-	}
-
-	metarrJSON, err := json.Marshal(v.MetarrArgs)
-	if err != nil {
-		return fmt.Errorf("failed to marshal metarr: %w", err)
-	}
-
-	query := squirrel.
+	// Update videos table
+	videoQuery := squirrel.
 		Update(consts.DBVideos).
-		Set(consts.QVidDownloaded, v.Downloaded).
 		Set(consts.QVidTitle, v.Title).
 		Set(consts.QVidDescription, v.Description).
 		Set(consts.QVidVDir, v.VDir).
@@ -257,9 +249,9 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 			squirrel.Eq{consts.QVidURL: v.URL},
 			squirrel.Eq{consts.QVidChanID: v.ChannelID},
 		}).
-		RunWith(vs.DB)
+		RunWith(tx)
 
-	result, err := query.Exec()
+	result, err := videoQuery.Exec()
 	if err != nil {
 		return fmt.Errorf("failed to update video: %w", err)
 	}
@@ -268,12 +260,28 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-
 	if rows == 0 {
 		return fmt.Errorf("no video found with URL %s", v.URL)
 	}
 
-	logging.S(0, "Updated video: %s (Title: %s) Downloaded: %v", v.URL, v.Title, v.Downloaded)
+	// Update downloads table
+	dlQuery := squirrel.
+		Update(consts.DBDownloads).
+		Set(consts.QDLStatus, v.DownloadStatus.Status).
+		Set(consts.QDLPct, v.DownloadStatus.Pct).
+		Where(squirrel.Eq{consts.QDLVidID: v.ID}).
+		RunWith(tx)
+
+	if _, err := dlQuery.Exec(); err != nil {
+		return fmt.Errorf("failed to update download status: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	committed = true
+	logging.S(0, "Updated video with URL: %s", v.URL)
 	return nil
 }
 
@@ -322,26 +330,4 @@ func (vs VideoStore) videoExists(v *models.Video) (int64, bool) {
 	}
 	logging.D(1, "Video %q already exists", v.ID)
 	return id, true
-}
-
-// marshalVideoJSON marshals all JSON elements for a video model.
-func (vs VideoStore) marshalVideoJSON(v *models.Video) (metadata, settings, metarr []byte, err error) {
-	if v.MetadataMap != nil {
-		metadata, err = json.Marshal(v.MetadataMap)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("metadata marshal: %w", err)
-		}
-	}
-
-	settings, err = json.Marshal(v.Settings)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("settings marshal: %w", err)
-	}
-
-	metarr, err = json.Marshal(v.MetarrArgs)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("metarr marshal: %w", err)
-	}
-
-	return metadata, settings, metarr, nil
 }

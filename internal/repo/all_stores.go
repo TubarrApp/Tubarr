@@ -7,26 +7,33 @@ import (
 )
 
 type Store struct {
-	db           *sql.DB
-	videoStore   *VideoStore
-	channelStore *ChannelStore
+	db            *sql.DB
+	videoStore    *VideoStore
+	channelStore  *ChannelStore
+	downloadStore *DownloadStore
 }
 
 // InitStores injects databases into the store methods.
 func InitStores(db *sql.DB) *Store {
 	return &Store{
-		db:           db,
-		videoStore:   GetVideoStore(db),
-		channelStore: GetChannelStore(db),
+		db:            db,
+		videoStore:    GetVideoStore(db),
+		channelStore:  GetChannelStore(db),
+		downloadStore: GetDownloadStore(db),
 	}
 }
 
-// GetChannelStore with pointer receiver.
-func (s *Store) GetChannelStore() models.ChannelStore {
+// ChannelStore with pointer receiver.
+func (s *Store) ChannelStore() models.ChannelStore {
 	return s.channelStore
 }
 
-// GetVideoStore with pointer receiver.
-func (s *Store) GetVideoStore() models.VideoStore {
+// VideoStore with pointer receiver.
+func (s *Store) VideoStore() models.VideoStore {
 	return s.videoStore
+}
+
+// DownloadStore with pointer receiver.
+func (s *Store) DownloadStore() models.DownloadStore {
+	return s.downloadStore
 }

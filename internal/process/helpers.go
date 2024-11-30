@@ -196,7 +196,7 @@ func removeUnwantedJSON(path string) error {
 func isPrivateNetwork(host string) bool {
 	h, _, err := net.SplitHostPort(host)
 	if err != nil {
-		if u, err := url.Parse(host); err == nil { // Err IS nil
+		if u, err := url.Parse(host); err == nil { // err IS nil
 			h = u.Hostname()
 		} else {
 			parts := strings.Split(host, ":")

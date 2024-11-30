@@ -9,7 +9,7 @@ import (
 )
 
 // processVideo processes video downloads.
-func processVideo(v *models.Video, vs models.VideoStore) error {
+func processVideo(v *models.Video, vs models.VideoStore, dlTracker *downloads.DownloadTracker) error {
 	if v == nil {
 		logging.I("Null video entered")
 		return nil
@@ -17,7 +17,7 @@ func processVideo(v *models.Video, vs models.VideoStore) error {
 
 	logging.D(2, "Processing video download for URL: %s", v.URL)
 
-	dl, err := downloads.NewDownload(downloads.TypeVideo, v, &downloads.Options{
+	dl, err := downloads.NewDownload(downloads.TypeVideo, v, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
 	})
@@ -29,10 +29,6 @@ func processVideo(v *models.Video, vs models.VideoStore) error {
 		return err
 	}
 
-	v.Downloaded = true
-	v.UpdatedAt = time.Now()
-
-	// Update the video record
 	if err := vs.UpdateVideo(v); err != nil {
 		return fmt.Errorf("failed to update video DB entry: %w", err)
 	}

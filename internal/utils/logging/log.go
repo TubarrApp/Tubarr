@@ -234,6 +234,18 @@ func I(format string, args ...interface{}) {
 	}
 }
 
+// ICarriage logs info messages in carriage return format.
+func ICarriage(format string, args ...interface{}) {
+
+	msg := fmt.Sprintf(format, args...)
+	consoleMsg := fmt.Sprintf("\r%s%s\r", consts.BlueInfo, msg)
+
+	writeToConsole(consoleMsg)
+	if Loggable {
+		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(msg, ""))
+	}
+}
+
 // P logs plain messages.
 func P(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)

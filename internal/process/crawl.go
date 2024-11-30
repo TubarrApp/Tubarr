@@ -45,40 +45,37 @@ func initClients() {
 //
 // Essentially it marks the URLs it finds as though they have already been downloaded.
 func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
-	cs := s.GetChannelStore()
-	videos, err := browser.GetNewReleases(cs, c)
+	videos, err := browser.GetNewReleases(s.ChannelStore(), c)
 	if err != nil {
 		return err
 	}
 
 	if len(videos) > 0 {
-		vs := s.GetVideoStore()
-
 		for _, v := range videos {
-			v.Downloaded = true
+			v.DownloadStatus.Status = consts.DLStatusCompleted
+			v.DownloadStatus.Pct = 100.0
 		}
 
-		added, errArray := vs.AddVideos(videos, c)
+		validVideos, errArray := s.VideoStore().AddVideos(videos, c)
 		if len(errArray) > 0 {
-			logging.P("%s Encountered the following errors adding videos to ignore list:", consts.RedError)
+			logging.P("%s Encountered the following errors adding videos:", consts.RedError)
 			fmt.Println()
 			for _, err := range errArray {
 				logging.P("%v", err)
 			}
+			if len(validVideos) == 0 {
+				return fmt.Errorf("no videos were successfully added to the ignore list for channel with ID %d", c.ID)
+			}
 		}
 
-		if !added {
-			return fmt.Errorf("no videos were successfully added to the ignore list for channel with ID %d", c.ID)
-		}
-
-		logging.S(0, "Added %d videos to the ignore list in channel %q", len(videos)-len(errArray), c.Name)
+		logging.S(0, "Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
 	}
 	return nil
 }
 
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(s models.Store) error {
-	cs := s.GetChannelStore()
+	cs := s.ChannelStore()
 	chans, err, hasRows := cs.FetchAllChannels()
 	if !hasRows {
 		logging.I("No channels in database")
@@ -162,7 +159,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 		return errors.New("output directories are blank")
 	}
 
-	cs := s.GetChannelStore()
+	cs := s.ChannelStore()
 
 	videos, err := browser.GetNewReleases(cs, c)
 	if err != nil {
@@ -178,7 +175,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 		logging.I("No new releases for channel %q", c.URL)
 		return nil
 	} else {
-		success, errArray = InitProcess(s.GetVideoStore(), c, videos)
+		success, errArray = InitProcess(s.VideoStore(), s.DownloadStore(), c, videos)
 		if errArray != nil {
 			logging.ErrorArray = append(logging.ErrorArray, errArray...)
 		}

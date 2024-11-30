@@ -51,9 +51,29 @@ func initChannelsTable(tx *sql.Tx) error {
 	return nil
 }
 
+// initNotifyTable initializes notification service tables.
+func initNotifyTable(tx *sql.Tx) error {
+	query := `
+    CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY,
+        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        notify_url TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(channel_id, notify_url)
+    );
+    CREATE INDEX IF NOT EXISTS idx_notification_channel ON notifications(channel_id);
+    CREATE INDEX IF NOT EXISTS idx_notification_url ON notifications(notify_url);
+    `
+	if _, err := tx.Exec(query); err != nil {
+		return fmt.Errorf("failed to create downloads table: %w", err)
+	}
+	return nil
+}
+
 // initVideosTable initializes videos tables.
 func initVideosTable(tx *sql.Tx) error {
-
 	query := `
     CREATE TABLE IF NOT EXISTS videos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,7 +86,8 @@ func initVideosTable(tx *sql.Tx) error {
         json_directory TEXT,
         video_path TEXT,
         json_path TEXT,
-        status TEXT,
+        download_status TEXT DEFAULT "Pending",
+        download_pct INTEGER,
         upload_date TIMESTAMP,
         metadata JSON,
         settings JSON,
@@ -84,20 +105,19 @@ func initVideosTable(tx *sql.Tx) error {
 	return nil
 }
 
-// initNotifyTable initializes notification service tables.
-func initNotifyTable(tx *sql.Tx) error {
+// initDownloadsTable initializes the download status table for videos.
+func initDownloadsTable(tx *sql.Tx) error {
 	query := `
-    CREATE TABLE IF NOT EXISTS notifications (
-        id INTEGER PRIMARY KEY,
-        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-        notify_url TEXT NOT NULL,
+    CREATE TABLE IF NOT EXISTS downloads (
+        video_id INTEGER PRIMARY KEY,
+        status TEXT DEFAULT 'Pending' NOT NULL,
+        percentage REAL DEFAULT 0 NOT NULL CHECK (percentage >= 0 AND percentage <= 100),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(channel_id, notify_url)
+        FOREIGN KEY(video_id) REFERENCES videos(id) ON DELETE CASCADE
     );
-    CREATE INDEX IF NOT EXISTS idx_notification_channel ON notifications(channel_id);
-    CREATE INDEX IF NOT EXISTS idx_notification_url ON notifications(notify_url);
+
+    CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
     `
 	if _, err := tx.Exec(query); err != nil {
 		return fmt.Errorf("failed to create downloads table: %w", err)

@@ -10,6 +10,7 @@ type ChannelSettings struct {
 	ExternalDownloaderArgs string      `json:"external_downloader_args"`
 	Concurrency            int         `json:"max_concurrency"`
 	MaxFilesize            string      `json:"max_filesize"`
+	AutoDownload           bool        `json:"auto_download"`
 }
 
 // DLFilters are used to filter in or out videos from download by metafields.

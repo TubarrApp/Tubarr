@@ -20,8 +20,8 @@ func initVideoCmds(s models.Store) *cobra.Command {
 		},
 	}
 
-	vs := s.GetVideoStore()
-	cs := s.GetChannelStore()
+	vs := s.VideoStore()
+	cs := s.ChannelStore()
 
 	// Add subcommands with dependencies
 	vidCmd.AddCommand(deleteVideoCmd(vs, cs))
