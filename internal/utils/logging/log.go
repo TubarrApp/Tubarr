@@ -238,7 +238,7 @@ func I(format string, args ...interface{}) {
 func ICarriage(format string, args ...interface{}) {
 
 	msg := fmt.Sprintf(format, args...)
-	consoleMsg := fmt.Sprintf("\r%s%s\r", consts.BlueInfo, msg)
+	consoleMsg := fmt.Sprintf("\r%s%s", consts.BlueInfo, msg)
 
 	writeToConsole(consoleMsg)
 	if Loggable {

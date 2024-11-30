@@ -74,7 +74,7 @@ func (t *DownloadTracker) processUpdates() {
 			lastUpdate = update
 		case <-ticker.C:
 			if lastUpdate.VideoID != 0 {
-				logging.ICarriage("Status update for video with URL %q:\nStatus: %s\nPercentage: %.1f",
+				logging.I("Status update for video with URL %q: Status: %q Percentage: %.1f",
 					lastUpdate.VideoURL, lastUpdate.Status, lastUpdate.Percent)
 				t.flushUpdates([]models.StatusUpdate{lastUpdate})
 			}
