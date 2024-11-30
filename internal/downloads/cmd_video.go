@@ -11,6 +11,10 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+const (
+	ariaBase = len(": --console-log-level=info") + len(consts.DLerAria)
+)
+
 // buildVideoCommand builds the command to download a video using yt-dlp.
 func buildVideoCommand(v *models.Video) *exec.Cmd {
 	args := make([]string, 0, 32)
@@ -37,6 +41,7 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 			case consts.DLerAria:
 				var b strings.Builder
 
+				b.Grow(len(v.Settings.ExternalDownloaderArgs))
 				b.WriteString(consts.DLerAria)
 				b.WriteRune(':')
 				b.WriteString(v.Settings.ExternalDownloaderArgs) // "aria2c:-x 16 -s 16 --console-log-level=info"
