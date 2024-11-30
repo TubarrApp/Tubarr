@@ -41,7 +41,7 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 			case consts.DLerAria:
 				var b strings.Builder
 
-				b.Grow(len(v.Settings.ExternalDownloaderArgs))
+				b.Grow(ariaBase + len(v.Settings.ExternalDownloaderArgs))
 				b.WriteString(consts.DLerAria)
 				b.WriteRune(':')
 				b.WriteString(v.Settings.ExternalDownloaderArgs) // "aria2c:-x 16 -s 16 --console-log-level=info"
