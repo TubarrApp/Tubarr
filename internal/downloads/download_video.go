@@ -18,8 +18,6 @@ import (
 // executeVideoDownload executes a video download command.
 func (d *Download) executeVideoDownload(cmd *exec.Cmd) error {
 
-	logging.D(0, "Executing command: %v with args: %v", cmd.Path, cmd.Args)
-
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("stdout pipe error: %w", err)
