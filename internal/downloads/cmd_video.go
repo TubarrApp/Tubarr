@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	ariaBase = len(": --console-log-level=info") + len(consts.DLerAria)
+	ariaBase = len(consts.DLerAria) + len(": --console-log-level=info")
 )
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
