@@ -62,6 +62,7 @@ func (t *DownloadTracker) processUpdates() {
 	ticker := time.NewTicker(t.flushTimer)
 	defer ticker.Stop()
 	var lastUpdate models.StatusUpdate
+	var newUpdate models.StatusUpdate
 
 	for {
 		select {
@@ -71,11 +72,14 @@ func (t *DownloadTracker) processUpdates() {
 			}
 			return
 		case update := <-t.updates:
-			lastUpdate = update
+			newUpdate = update
 		case <-ticker.C:
-			if lastUpdate.VideoID != 0 {
-				logging.I("Status update for video with URL %q: Status: %q Percentage: %.1f",
+			if newUpdate != lastUpdate {
+				lastUpdate = newUpdate
+
+				logging.I("Status update for video with URL %q:\nStatus: %s\nPercentage: %.1f",
 					lastUpdate.VideoURL, lastUpdate.Status, lastUpdate.Percent)
+
 				t.flushUpdates([]models.StatusUpdate{lastUpdate})
 			}
 		}
