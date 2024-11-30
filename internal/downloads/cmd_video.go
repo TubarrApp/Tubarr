@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
@@ -30,7 +32,20 @@ func buildVideoCommand(v *models.Video) *exec.Cmd {
 	if v.Settings.ExternalDownloader != "" {
 		args = append(args, "--external-downloader", v.Settings.ExternalDownloader)
 		if v.Settings.ExternalDownloaderArgs != "" {
-			args = append(args, "--external-downloader-args", "aria2c:-x 16 -s 16 --console-log-level=info")
+
+			switch v.Settings.ExternalDownloader {
+			case consts.DLerAria:
+				var b strings.Builder
+
+				b.WriteString(consts.DLerAria)
+				b.WriteRune(':')
+				b.WriteString(v.Settings.ExternalDownloaderArgs) // "aria2c:-x 16 -s 16 --console-log-level=info"
+				b.WriteString(" --console-log-level=info")
+
+				args = append(args, "--external-downloader-args", b.String())
+			default:
+				args = append(args, "--external-downloader-args", v.Settings.ExternalDownloaderArgs)
+			}
 		}
 	}
 

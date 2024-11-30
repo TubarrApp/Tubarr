@@ -110,5 +110,5 @@ func (t *DownloadTracker) flushUpdates(updates []models.StatusUpdate) {
 		break
 	}
 
-	logging.D(1, "Successfully flushed %d status updates", len(updates))
+	logging.D(2, "Successfully flushed %d status updates", len(updates))
 }

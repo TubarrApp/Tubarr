@@ -74,12 +74,12 @@ func (d *Download) scanVideoCmdOutput(r io.Reader, filenameChan chan<- string) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Handle aria2c progress updates if applicable
+		// Handle aria2 progress updates if applicable
 		if d.DLTracker.downloader == consts.DLerAria {
 
-			totalFrags, completedFrags, pct, err = downloaders.Aria2COutputParser(line, d.Video.URL, totalFrags, completedFrags)
+			totalFrags, completedFrags, pct, err = downloaders.Aria2OutputParser(line, d.Video.URL, totalFrags, completedFrags)
 			if err != nil {
-				logging.E(0, "Could not parse Aria2C output line %q: %v", line, err)
+				logging.E(0, "Could not parse Aria2 output line %q: %v", line, err)
 			}
 		}
 

@@ -7,8 +7,8 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-// Aria2COutputParser parses the terminal output from Aria2C.
-func Aria2COutputParser(line string, url string, totalFrags, completedFrags int) (totFrags, completeFrags int, pct float64, err error) {
+// Aria2OutputParser parses the terminal output from Aria2C.
+func Aria2OutputParser(line string, url string, totalFrags, completedFrags int) (totFrags, completeFrags int, pct float64, err error) {
 
 	if strings.Contains(line, "Downloading") && strings.Contains(line, "item(s)") {
 
