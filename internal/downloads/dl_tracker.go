@@ -43,13 +43,13 @@ func (t *DownloadTracker) Stop() {
 }
 
 // sendUpdate constructs the update and sends it into the processing channel.
-func (t *DownloadTracker) sendUpdate(d *Download) {
+func (t *DownloadTracker) sendUpdate(v *models.Video) {
 	t.updates <- models.StatusUpdate{
-		VideoID:  d.Video.ID,
-		VideoURL: d.Video.URL,
-		Status:   d.Video.DownloadStatus.Status,
-		Percent:  d.Video.DownloadStatus.Pct,
-		Error:    d.Video.DownloadStatus.Error,
+		VideoID:  v.ID,
+		VideoURL: v.URL,
+		Status:   v.DownloadStatus.Status,
+		Percent:  v.DownloadStatus.Pct,
+		Error:    v.DownloadStatus.Error,
 	}
 }
 

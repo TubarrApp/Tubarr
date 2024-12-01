@@ -50,7 +50,7 @@ func (d *Download) Execute() error {
 
 			d.Video.DownloadStatus.Status = consts.DLStatusFailed
 			d.Video.DownloadStatus.Error = err
-			d.DLTracker.sendUpdate(d)
+			d.DLTracker.sendUpdate(d.Video)
 
 			if attempt < d.Options.MaxRetries {
 				time.Sleep(d.Options.RetryInterval)
@@ -63,7 +63,7 @@ func (d *Download) Execute() error {
 			d.Video.DownloadStatus.Status = consts.DLStatusCompleted
 			d.Video.DownloadStatus.Pct = 100.0
 
-			d.DLTracker.sendUpdate(d)
+			d.DLTracker.sendUpdate(d.Video)
 
 			return nil
 		}
@@ -91,7 +91,7 @@ func (d *Download) executeAttempt() error {
 
 	d.Video.DownloadStatus.Status = consts.DLStatusDownloading
 	d.Video.DownloadStatus.Pct = 0.0
-	d.DLTracker.sendUpdate(d)
+	d.DLTracker.sendUpdate(d.Video)
 
 	return d.executeVideoDownload(cmd)
 }

@@ -103,7 +103,7 @@ func (d *Download) scanVideoCmdOutput(r io.Reader, filenameChan chan<- string) {
 			if newUpdate != lastUpdate {
 				d.Video.DownloadStatus.Status = newUpdate.Status
 				d.Video.DownloadStatus.Pct = newUpdate.Percent
-				d.DLTracker.sendUpdate(d)
+				d.DLTracker.sendUpdate(d.Video)
 				lastUpdate = newUpdate
 			}
 		}

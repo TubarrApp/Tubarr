@@ -3,7 +3,6 @@ package regex
 
 import (
 	"regexp"
-	"sync/atomic"
 )
 
 var (
@@ -12,65 +11,53 @@ var (
 	ExtraSpaces,
 	InvalidChars,
 	SpecialChars,
-	Aria2FragCountRegex atomic.Pointer[regexp.Regexp]
+	Aria2FragCountRegex *regexp.Regexp
 )
 
-// AnsiEscapeCompile compiles regex for ANSI escape codes
+// AnsiEscapeCompile compiles regex for ANSI escape codes.
 func AnsiEscapeCompile() *regexp.Regexp {
-	if rx := AnsiEscape.Load(); rx != nil {
-		return rx
+	if AnsiEscape == nil {
+		AnsiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	}
-	rx := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	AnsiEscape.Store(rx)
-	return rx
+	return AnsiEscape
 }
 
-// DLPctCompile compiles regex for parsing current download progress percentage.
+// DLPctCompile compiles the regex for handling regular download progress bars.
 func DLPctCompile() *regexp.Regexp {
-	if rx := DLPercentage.Load(); rx != nil {
-		return rx
+	if DLPercentage == nil {
+		DLPercentage = regexp.MustCompile(`\[download\]\s+(\d+\.?\d*)%`)
 	}
-	rx := regexp.MustCompile(`\[download\]\s+(\d+\.?\d*)%`)
-	DLPercentage.Store(rx)
-	return rx
+	return DLPercentage
 }
 
-// Aria2FragCountCompile compiles regex for grabbing the number of fragments for an Aria2 download.
+// Aria2FragCountCompile compiles the Aria2C fragment count regex.
 func Aria2FragCountCompile() *regexp.Regexp {
-	if rx := Aria2FragCountRegex.Load(); rx != nil {
-		return rx
+	if Aria2FragCountRegex == nil {
+		Aria2FragCountRegex = regexp.MustCompile(`Downloading (\d+) item`)
 	}
-	rx := regexp.MustCompile(`Downloading (\d+) item`)
-	Aria2FragCountRegex.Store(rx)
-	return rx
+	return Aria2FragCountRegex
 }
 
-// ExtraSpacesCompile compiles regex for extra spaces
+// ExtraSpacesCompile compiles regex for extra spaces.
 func ExtraSpacesCompile() *regexp.Regexp {
-	if rx := ExtraSpaces.Load(); rx != nil {
-		return rx
+	if ExtraSpaces == nil {
+		ExtraSpaces = regexp.MustCompile(`\s+`)
 	}
-	rx := regexp.MustCompile(`\s+`)
-	ExtraSpaces.Store(rx)
-	return rx
+	return ExtraSpaces
 }
 
-// InvalidCharsCompile compiles regex for invalid characters
+// InvalidCharsCompile compiles regex for invalid characters.
 func InvalidCharsCompile() *regexp.Regexp {
-	if rx := InvalidChars.Load(); rx != nil {
-		return rx
+	if InvalidChars == nil {
+		InvalidChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
 	}
-	rx := regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)
-	InvalidChars.Store(rx)
-	return rx
+	return InvalidChars
 }
 
-// SpecialCharsCompile compiles regex for special characters
+// SpecialCharsCompile compiles regex for special characters.
 func SpecialCharsCompile() *regexp.Regexp {
-	if rx := AnsiEscape.Load(); rx != nil {
-		return rx
+	if SpecialChars == nil {
+		SpecialChars = regexp.MustCompile(`[^\w\s-]`)
 	}
-	rx := regexp.MustCompile(`[^\w\s-]`)
-	AnsiEscape.Store(rx)
-	return rx
+	return SpecialChars
 }
