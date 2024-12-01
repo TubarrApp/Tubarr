@@ -6,34 +6,16 @@ import "tubarr/internal/domain/consts"
 type DLStatus struct {
 	Status consts.DownloadStatus `json:"status"`
 	Pct    float64               `json:"percentage"`
+	Error  error                 `json:"error"`
 }
 
 var DLStatusDefault = DLStatus{
 	Status: consts.DLStatusPending,
 	Pct:    0.0,
+	Error:  nil,
 }
 
-type VideoMap struct {
-	IDs  []int64
-	Data map[int64]*Video
-}
-
-// NewVideoMap creates a VideoMap from a slice of videos.
-func NewVideoMap(videos []*Video) VideoMap {
-	ids := make([]int64, len(videos))
-	data := make(map[int64]*Video, len(videos))
-
-	for i, v := range videos {
-		ids[i] = v.ID
-		data[v.ID] = v
-	}
-
-	return VideoMap{
-		IDs:  ids,
-		Data: data,
-	}
-}
-
+// StatusUpdate models updates to the download status of a video.
 type StatusUpdate struct {
 	VideoID  int64
 	VideoURL string
