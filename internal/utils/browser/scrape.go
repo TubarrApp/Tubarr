@@ -73,14 +73,6 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) 
 
 	if len(existingMap) > 0 {
 		logging.I("Found %d existing downloaded video URLs:", len(existingMap))
-		i := 1
-		for url := range existingMap {
-			logging.P("%s#%d%s - %v", consts.ColorBlue, i, consts.ColorReset, url)
-			if i == 25 {
-				break
-			}
-			i++
-		}
 	}
 
 	cookies, err := b.cookies.GetCookies(c.URL)
@@ -119,9 +111,15 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) 
 	}
 
 	if len(newRequests) > 0 {
-		logging.I("Grabbed %d new download requests: %v", len(newRequests), newRequests)
+		logging.I("Grabbed %d new download requests:", len(newRequests))
+		for i, v := range newRequests {
+			i++
+			logging.P("%s#%d%s - %v", consts.ColorBlue, i, consts.ColorReset, v.URL)
+			if i > 25 {
+				break
+			}
+		}
 	}
-
 	return newRequests, nil
 }
 
@@ -168,7 +166,8 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 	episodeURLs = append(episodeURLs, fileURLs...)
 
 	if cfg.IsSet(keys.URLAdd) {
-		episodeURLs = append(episodeURLs, cfg.GetStringSlice(keys.URLAdd)...)
+		urls := cfg.GetStringSlice(keys.URLAdd)
+		episodeURLs = append(episodeURLs, urls...)
 	}
 
 	// Filter out existing URLs

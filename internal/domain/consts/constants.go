@@ -28,10 +28,3 @@ const (
 	FilterContains = "contains"
 	FilterOmit     = "omit"
 )
-
-type DLType string
-
-const (
-	DLTypeVideo DLType = "video"
-	DLTypeJSON  DLType = "JSON"
-)

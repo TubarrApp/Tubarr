@@ -21,7 +21,8 @@ var (
 	Loggable   bool = false
 	fileLogger zerolog.Logger
 	mu         sync.Mutex
-	ErrorArray = make([]error, 0, 8)
+	muErr      sync.Mutex
+	errorArray = make([]error, 0, 8)
 	ansiEscape = regex.AnsiEscapeCompile()
 	console    = os.Stdout
 )
@@ -85,9 +86,7 @@ func E(l int, format string, args ...interface{}) {
 
 	if len(args) > 0 {
 		if err, ok := args[len(args)-1].(error); ok {
-			mu.Lock()
-			ErrorArray = append(ErrorArray, err)
-			mu.Unlock()
+			AppendErrorArray(err)
 		}
 	}
 
@@ -256,4 +255,11 @@ func P(format string, args ...interface{}) {
 	if Loggable {
 		fileLogger.Info().Msg(msg)
 	}
+}
+
+// AppendErrorArray adds a new error to the error array.
+func AppendErrorArray(err error) {
+	muErr.Lock()
+	errorArray = append(errorArray, err)
+	muErr.Unlock()
 }

@@ -3,6 +3,7 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -21,16 +22,22 @@ var (
 
 // InitProcess begins processing metadata/videos and respective downloads.
 func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, ctx context.Context) (bool, []error) {
+	var (
+		errs    []error
+		success bool
+	)
+
+	select {
+	case <-ctx.Done():
+		errs = append(errs, errors.New("aborting process, context cancelled"))
+		return false, errs
+	default:
+		// Process
+	}
 	conc := c.Settings.Concurrency
 	if conc < 1 {
 		conc = 1
 	}
-
-	// Collect results
-	var (
-		errors  []error
-		success bool
-	)
 
 	logging.I("Starting meta/video processing for %d videos", len(videos))
 
@@ -59,15 +66,15 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 	for i := 0; i < len(videos); i++ {
 		if err := <-results; err != nil {
 			muErr.Lock()
-			errors = append(errors, err)
+			errs = append(errs, err)
 			muErr.Unlock()
 		} else {
 			success = true
 		}
 	}
 
-	if len(errors) > 0 {
-		return success, errors
+	if len(errs) > 0 {
+		return success, errs
 	}
 	return success, nil
 }

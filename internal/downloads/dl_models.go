@@ -12,7 +12,7 @@ import (
 type DownloadType string
 
 const (
-	TypeJSON  DownloadType = "json"
+	TypeJSON  DownloadType = "JSON"
 	TypeVideo DownloadType = "video"
 )
 
