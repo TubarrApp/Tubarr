@@ -1,15 +1,18 @@
 package process
 
 import (
+	"context"
 	"fmt"
 	"time"
+
 	"tubarr/internal/downloads"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
 // processJSON downloads and processes JSON for a video.
-func processJSON(v *models.Video, vs models.VideoStore, dlTracker *downloads.DownloadTracker) error {
+func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore, dlTracker *downloads.DownloadTracker) error {
 	if v == nil {
 		logging.I("Null video entered")
 		return nil
@@ -17,7 +20,7 @@ func processJSON(v *models.Video, vs models.VideoStore, dlTracker *downloads.Dow
 
 	logging.D(2, "Processing JSON download for URL: %s", v.URL)
 
-	dl, err := downloads.NewDownload(downloads.TypeJSON, v, dlTracker, &downloads.Options{
+	dl, err := downloads.NewDownload(downloads.TypeJSON, ctx, v, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
 	})

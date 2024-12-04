@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
@@ -15,26 +17,26 @@ type DownloadTracker struct {
 	batchSize  int
 	flushTimer time.Duration
 	done       chan struct{}
-	dlstore    models.DownloadStore
+	dlStore    interfaces.DownloadStore
 	downloader string
 }
 
 // NewDownloadTracker returns the model used for tracking downloads.
-func NewDownloadTracker(store models.DownloadStore, externalDler string) *DownloadTracker {
+func NewDownloadTracker(store interfaces.DownloadStore, externalDler string) *DownloadTracker {
 	return &DownloadTracker{
 		db:         store.GetDB(),
 		updates:    make(chan models.StatusUpdate, 100),
 		batchSize:  50,
 		flushTimer: 500 * time.Millisecond,
 		done:       make(chan struct{}),
-		dlstore:    store,
+		dlStore:    store,
 		downloader: externalDler,
 	}
 }
 
 // Start starts download tracking.
-func (t *DownloadTracker) Start() {
-	go t.processUpdates()
+func (t *DownloadTracker) Start(ctx context.Context) {
+	go t.processUpdates(ctx)
 }
 
 // Stop stops download tracking.
@@ -54,7 +56,7 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 }
 
 // processUpdates processes download status updates.
-func (t *DownloadTracker) processUpdates() {
+func (t *DownloadTracker) processUpdates(ctx context.Context) {
 	ticker := time.NewTicker(t.flushTimer)
 	defer ticker.Stop()
 	var lastUpdate models.StatusUpdate
@@ -64,7 +66,7 @@ func (t *DownloadTracker) processUpdates() {
 		select {
 		case <-t.done:
 			if lastUpdate.VideoID != 0 {
-				t.flushUpdates([]models.StatusUpdate{lastUpdate})
+				t.flushUpdates(ctx, []models.StatusUpdate{lastUpdate})
 			}
 			return
 		case update := <-t.updates:
@@ -76,20 +78,20 @@ func (t *DownloadTracker) processUpdates() {
 				logging.I("Status update for video with URL %q:\nStatus: %s\nPercentage: %.1f\nError: %v",
 					lastUpdate.VideoURL, lastUpdate.Status, lastUpdate.Percent, lastUpdate.Error)
 
-				t.flushUpdates([]models.StatusUpdate{lastUpdate})
+				t.flushUpdates(ctx, []models.StatusUpdate{lastUpdate})
 			}
 		}
 	}
 }
 
 // flushUpdates flushes pending download status updates to the database.
-func (t *DownloadTracker) flushUpdates(updates []models.StatusUpdate) {
+func (t *DownloadTracker) flushUpdates(ctx context.Context, updates []models.StatusUpdate) {
 	if len(updates) == 0 {
 		return
 	}
 
 	// Add context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// Retry logic for transient failures
@@ -97,7 +99,7 @@ func (t *DownloadTracker) flushUpdates(updates []models.StatusUpdate) {
 	maxRetries := 3
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		if err := t.dlstore.UpdateDownloadStatuses(ctx, updates); err != nil {
+		if err := t.dlStore.UpdateDownloadStatuses(ctx, updates); err != nil {
 			if attempt == maxRetries-1 {
 				logging.E(0, "Failed to update download statuses after %d attempts: %v", maxRetries, err)
 				return

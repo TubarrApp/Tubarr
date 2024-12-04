@@ -2,5 +2,5 @@ package consts
 
 // Downloaders
 const (
-	DLerAria = "aria2c"
+	DownloaderAria = "aria2c"
 )

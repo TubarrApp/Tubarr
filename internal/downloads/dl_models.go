@@ -1,7 +1,10 @@
 package downloads
 
 import (
+	"context"
 	"time"
+
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 )
 
@@ -29,7 +32,8 @@ var DefaultOptions = Options{
 type Download struct {
 	Type      DownloadType
 	Video     *models.Video
-	DLStore   models.DownloadStore
+	DLStore   interfaces.DownloadStore
 	DLTracker *DownloadTracker
 	Options   Options
+	Context   context.Context
 }

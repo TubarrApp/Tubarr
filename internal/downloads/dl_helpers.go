@@ -4,7 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
+
+// verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
+func verifyJSONDownload(jsonPath string) error {
+	jsonData, err := os.ReadFile(jsonPath)
+	if err != nil {
+		return fmt.Errorf("failed to read JSON file: %w", err)
+	}
+
+	if !json.Valid(jsonData) {
+		return fmt.Errorf("invalid JSON content in file: %s", jsonPath)
+	}
+	return nil
+}
 
 // verifyVideoDownload checks if the specified video file exists and is not empty.
 func verifyVideoDownload(videoPath string) error {
@@ -20,15 +34,18 @@ func verifyVideoDownload(videoPath string) error {
 	return nil
 }
 
-// verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
-func verifyJSONDownload(jsonPath string) error {
-	jsonData, err := os.ReadFile(jsonPath)
-	if err != nil {
-		return fmt.Errorf("failed to read JSON file: %w", err)
-	}
+// waitForFile waits until the file is ready in the file system.
+func (d *Download) waitForFile(filepath string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
 
-	if !json.Valid(jsonData) {
-		return fmt.Errorf("invalid JSON content in file: %s", jsonPath)
+		if _, err := os.Stat(filepath); err == nil { // err IS nil
+			return nil
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("unexpected error while checking file: %w", err)
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
-	return nil
+	return fmt.Errorf("file not ready or empty after %v: %s", timeout, filepath)
 }

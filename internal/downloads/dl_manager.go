@@ -2,18 +2,19 @@
 package downloads
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"time"
+
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
 // NewDownload creates a download operation with specified options.
-func NewDownload(dlType DownloadType, video *models.Video, tracker *DownloadTracker, opts *Options) (*Download, error) {
+func NewDownload(dlType DownloadType, ctx context.Context, video *models.Video, tracker *DownloadTracker, opts *Options) (*Download, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -22,6 +23,7 @@ func NewDownload(dlType DownloadType, video *models.Video, tracker *DownloadTrac
 		Type:      dlType,
 		Video:     video,
 		DLTracker: tracker,
+		Context:   ctx,
 	}
 
 	if opts != nil {
@@ -78,15 +80,15 @@ func (d *Download) executeAttempt() error {
 	var cmd *exec.Cmd
 	switch d.Type {
 	case TypeJSON:
-		cmd = buildJSONCommand(d.Video)
+		cmd = d.buildJSONCommand()
 	case TypeVideo:
-		cmd = buildVideoCommand(d.Video)
+		cmd = d.buildVideoCommand()
 	default:
 		return fmt.Errorf("unsupported download type: %s", d.Type)
 	}
 
 	if d.Type == TypeJSON {
-		return executeJSONDownload(d.Video, cmd)
+		return d.executeJSONDownload(cmd)
 	}
 
 	d.Video.DownloadStatus.Status = consts.DLStatusDownloading
@@ -94,20 +96,4 @@ func (d *Download) executeAttempt() error {
 	d.DLTracker.sendUpdate(d.Video)
 
 	return d.executeVideoDownload(cmd)
-}
-
-// waitForFile waits until the file is ready in the file system.
-func (d *Download) waitForFile(filePath string, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-
-		if _, err := os.Stat(filePath); err == nil { // err IS nil
-			return nil
-		} else if !os.IsNotExist(err) {
-			return fmt.Errorf("unexpected error while checking file: %w", err)
-		}
-
-		time.Sleep(100 * time.Millisecond)
-	}
-	return fmt.Errorf("file not ready or empty after %v: %s", timeout, filePath)
 }

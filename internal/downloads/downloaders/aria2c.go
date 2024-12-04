@@ -1,3 +1,4 @@
+// Package downloaders holds logic specific to external downloaders.
 package downloaders
 
 import (

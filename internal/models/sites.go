@@ -12,8 +12,8 @@ type Channel struct {
 	ID         int64           `db:"id"`
 	URL        string          `db:"url"`
 	Name       string          `db:"name"`
-	VDir       string          `db:"video_directory"`
-	JDir       string          `db:"json_directory"`
+	VideoDir   string          `db:"video_directory"`
+	JSONDir    string          `db:"json_directory"`
 	Settings   ChannelSettings `json:"settings" db:"settings"`
 	MetarrArgs MetarrArgs      `json:"metarr" db:"metarr"`
 	LastScan   time.Time       `db:"last_scan"`
@@ -28,10 +28,10 @@ type Video struct {
 	ID             int64
 	ChannelID      int64           `db:"channel_id"`
 	Downloaded     bool            `db:"downloaded"`
-	VDir           string          `db:"video_directory"`
-	VPath          string          `db:"video_path"`
-	JDir           string          `db:"json_directory"`
-	JPath          string          `db:"json_path"`
+	VideoDir       string          `db:"video_directory"`
+	VideoPath      string          `db:"video_path"`
+	JSONDir        string          `db:"json_directory"`
+	JSONPath       string          `db:"json_path"`
 	URL            string          `db:"url"`
 	Title          string          `db:"title"`
 	Description    string          `db:"description"`

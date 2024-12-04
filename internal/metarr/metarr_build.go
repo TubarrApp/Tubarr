@@ -4,6 +4,7 @@ package metarr
 import (
 	"fmt"
 	"strconv"
+
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/metcmd"
@@ -62,7 +63,7 @@ func makeMetarrCommand(v *models.Video) []string {
 		{
 			metarrValue: metVals{strSlice: v.MetarrArgs.FilenameReplaceSfx},
 			valType:     strSlice,
-			viperKey:    keys.InputFilenameReplaceSfx,
+			viperKey:    keys.FilenameReplaceSuffix,
 			cmdKey:      metcmd.FilenameReplaceSfx,
 		},
 		{
@@ -110,8 +111,8 @@ func makeMetarrCommand(v *models.Video) []string {
 	argMap := make(map[string]string, singlesLen)
 	argSlicesMap := make(map[string][]string, sliceLen)
 
-	argMap[metcmd.VideoFile] = v.VPath
-	argMap[metcmd.JSONFile] = v.JPath
+	argMap[metcmd.VideoFile] = v.VideoPath
+	argMap[metcmd.JSONFile] = v.JSONPath
 
 	// Final args
 	args := make([]string, 0, singlesLen+sliceLen)

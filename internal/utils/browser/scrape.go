@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
 	"tubarr/internal/cfg"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
@@ -14,32 +17,73 @@ import (
 	"github.com/gocolly/colly"
 )
 
-// GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded.
-func GetNewReleases(cs models.ChannelStore, c *models.Channel) ([]*models.Video, error) {
+type Browser struct {
+	cookies   *CookieManager
+	collector *colly.Collector
+}
 
-	uniqueURLs := make(map[string]struct{})
+type urlPattern struct {
+	name    string
+	pattern string
+}
+
+const (
+	bitchute        = "bitchute.com"
+	bitchutePattern = "/video/"
+	censored        = "censored.tv"
+	censoredPattern = "/episode/"
+	odysee          = "odysee.com"
+	odyseePattern   = "@"
+	rumble          = "rumble.com"
+	rumblePattern   = "/v"
+	defaultDom      = "default"
+	defaultPattern  = "/watch"
+)
+
+var patterns = map[string]urlPattern{
+	bitchute:   {name: bitchute, pattern: bitchutePattern},
+	censored:   {name: censored, pattern: censoredPattern},
+	odysee:     {name: odysee, pattern: odyseePattern},
+	rumble:     {name: rumble, pattern: rumblePattern},
+	defaultDom: {name: defaultDom, pattern: defaultPattern},
+}
+
+func NewBrowser() *Browser {
+	return &Browser{
+		cookies:   NewCookieManager(),
+		collector: colly.NewCollector(),
+	}
+}
+
+// GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded.
+func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) ([]*models.Video, error) {
+	if c.URL == "" {
+		return nil, fmt.Errorf("channel url is blank (channel ID: %d)", c.ID)
+	}
 
 	existingURLs, err := cs.LoadGrabbedURLs(c)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(existingURLs) > 0 {
-		fmt.Println()
-		logging.I("Found existing downloaded video URLs:")
-		count := 1
-		for _, u := range existingURLs {
-			logging.P("Entry %d: %v", count, u)
-			count++
+	existingMap := make(map[string]struct{}, len(existingURLs))
+	for _, url := range existingURLs {
+		existingMap[url] = struct{}{}
+	}
+
+	if len(existingMap) > 0 {
+		logging.I("Found %d existing downloaded video URLs:", len(existingMap))
+		i := 1
+		for url := range existingMap {
+			logging.P("%s#%d%s - %v", consts.ColorBlue, i, consts.ColorReset, url)
+			if i == 25 {
+				break
+			}
+			i++
 		}
-		fmt.Println()
 	}
 
-	if c.URL == "" {
-		return nil, fmt.Errorf("channel url is blank (channel ID: %d)", c.ID)
-	}
-
-	cookies, err := getBrowserCookies(c.URL)
+	cookies, err := b.cookies.GetCookies(c.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -52,136 +96,86 @@ func GetNewReleases(cs models.ChannelStore, c *models.Channel) ([]*models.Video,
 		}
 	}
 
-	newURLs, err := newEpisodeURLs(c.URL, existingURLs, fileURLs, cookies)
+	newURLs, err := b.newEpisodeURLs(c.URL, existingURLs, fileURLs, cookies)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add unique URLs to map
+	newRequests := make([]*models.Video, 0, len(newURLs))
 	for _, newURL := range newURLs {
 		if newURL != "" {
-			uniqueURLs[newURL] = struct{}{}
+			if _, exists := existingMap[newURL]; !exists {
+				newRequests = append(newRequests, &models.Video{
+					ChannelID:  c.ID,
+					URL:        newURL,
+					VideoDir:   c.VideoDir,
+					JSONDir:    c.JSONDir,
+					Channel:    c,
+					Settings:   c.Settings,
+					MetarrArgs: c.MetarrArgs,
+				})
+			}
 		}
 	}
 
-	// Convert map to slice
-	newRequests := make([]*models.Video, 0, len(uniqueURLs))
-
-	for url := range uniqueURLs {
-		newRequests = append(newRequests, &models.Video{
-			ChannelID:  c.ID,
-			URL:        url,
-			VDir:       c.VDir,
-			JDir:       c.JDir,
-			Channel:    c,
-			Settings:   c.Settings,
-			MetarrArgs: c.MetarrArgs,
-		})
-	}
-
-	// Display results
 	if len(newRequests) > 0 {
-		logging.I("Grabbed %d new download requests: %v", len(newRequests), uniqueURLs)
+		logging.I("Grabbed %d new download requests: %v", len(newRequests), newRequests)
 	}
 
 	return newRequests, nil
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie) ([]string, error) {
-
-	c := colly.NewCollector()
+func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie) ([]string, error) {
 	uniqueEpisodeURLs := make(map[string]struct{})
 
+	// Set cookies
 	for _, cookie := range cookies {
-		if err := c.SetCookies(targetURL, []*http.Cookie{cookie}); err != nil {
+		if err := b.collector.SetCookies(targetURL, []*http.Cookie{cookie}); err != nil {
 			return nil, err
 		}
 	}
 
-	// If the URL file is set, just use the file directly, no need to even visit the site
+	// Only scrape website if we're not using a URL file
 	if !cfg.IsSet(keys.URLFile) {
-		// Video URL link pattern
-		switch {
-		case strings.Contains(targetURL, "bitchute.com"):
-			logging.I("Detected bitchute.com link")
-			c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-				link := e.Request.AbsoluteURL(e.Attr("href"))
-				if strings.Contains(link, "/video/") {
-					uniqueEpisodeURLs[link] = struct{}{}
-				}
-			})
-
-		case strings.Contains(targetURL, "censored.tv"):
-			logging.I("Detected censored.tv link")
-			c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-				link := e.Request.AbsoluteURL(e.Attr("href"))
-				if strings.Contains(link, "/episode/") {
-					uniqueEpisodeURLs[link] = struct{}{}
-				}
-			})
-
-		case strings.Contains(targetURL, "odysee.com"):
-			logging.I("Detected Odysee link")
-			c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-				link := e.Request.AbsoluteURL(e.Attr("href"))
-				parts := strings.Split(link, "/")
-				if len(parts) > 1 {
-					lastPart := parts[len(parts)-1]
-					if strings.Contains(link, "@") && strings.Contains(link, lastPart+"/") {
-						uniqueEpisodeURLs[link] = struct{}{}
-					}
-				}
-			})
-
-		case strings.Contains(targetURL, "rumble.com"):
-			logging.I("Detected Rumble link")
-			c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-				link := e.Request.AbsoluteURL(e.Attr("href"))
-				if strings.Contains(link, "/v") {
-					uniqueEpisodeURLs[link] = struct{}{}
-				}
-			})
-
-		default:
-			logging.I("Using default link detection")
-			c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-				link := e.Request.AbsoluteURL(e.Attr("href"))
-				if strings.Contains(link, "/watch") {
-					uniqueEpisodeURLs[link] = struct{}{}
-				}
-			})
+		pattern := patterns["default"]
+		for domain, p := range patterns {
+			if strings.Contains(targetURL, domain) {
+				pattern = p
+				logging.I("Detected %s link", p.name)
+				break
+			}
 		}
 
-		// Visit the target URL
-		err := c.Visit(targetURL)
-		if err != nil {
+		b.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+			link := e.Request.AbsoluteURL(e.Attr("href"))
+			if strings.Contains(link, pattern.pattern) {
+				uniqueEpisodeURLs[link] = struct{}{}
+			}
+		})
+
+		if err := b.collector.Visit(targetURL); err != nil {
 			return nil, fmt.Errorf("error visiting webpage (%s): %w", targetURL, err)
 		}
-		c.Wait()
+		b.collector.Wait()
 	}
 
-	// Convert unique URLs and file URLs to slice
-	var episodeURLs = make([]string, 0, len(uniqueEpisodeURLs)+len(fileURLs))
-	if len(uniqueEpisodeURLs) > 0 {
-		for url := range uniqueEpisodeURLs {
-			episodeURLs = append(episodeURLs, url)
-		}
+	// Collect URLs from all sources (scraping + files)
+	episodeURLs := make([]string, 0, len(uniqueEpisodeURLs)+len(fileURLs))
+	for url := range uniqueEpisodeURLs {
+		episodeURLs = append(episodeURLs, url)
 	}
-
-	// Add the file URLs
 	episodeURLs = append(episodeURLs, fileURLs...)
 
 	if cfg.IsSet(keys.URLAdd) {
 		episodeURLs = append(episodeURLs, cfg.GetStringSlice(keys.URLAdd)...)
 	}
 
-	// Filter out URLs that are already marked downloaded
+	// Filter out existing URLs
 	var newURLs = make([]string, 0, len(episodeURLs))
 	for _, url := range episodeURLs {
 		normalizedURL := normalizeURL(url)
 		exists := false
-
 		for _, existingURL := range existingURLs {
 			if normalizeURL(existingURL) == normalizedURL {
 				exists = true
@@ -192,6 +186,7 @@ func newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies [
 			newURLs = append(newURLs, url)
 		}
 	}
+
 	if len(newURLs) == 0 {
 		logging.I("No new videos at %s", targetURL)
 		return nil, nil
@@ -203,12 +198,7 @@ func newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies [
 //
 // Do NOT add a "ToLower" function as some sites like YouTube have case-sensitive URLs.
 func normalizeURL(inputURL string) string {
-	// Remove http:// or https://
 	cleanURL := strings.TrimPrefix(inputURL, "https://")
 	cleanURL = strings.TrimPrefix(cleanURL, "http://")
-
-	// Remove any trailing slash
-	cleanURL = strings.TrimSuffix(cleanURL, "/")
-
-	return cleanURL
+	return strings.TrimSuffix(cleanURL, "/")
 }

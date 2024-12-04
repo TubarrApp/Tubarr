@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -17,13 +18,13 @@ import (
 
 // parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
 func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
-	f, err := os.Open(v.JPath)
+	f, err := os.Open(v.JSONPath)
 	if err != nil {
 		return false, err
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			logging.E(0, "Failed to close file at %q", v.JPath)
+			logging.E(0, "Failed to close file at %q", v.JSONPath)
 		}
 	}()
 
@@ -94,8 +95,8 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				case consts.FilterContains:
 
 					logging.I("Filtering: Field %q not found in metadata for URL %q and filter is set to require it, filtering out", filter.Field, v.URL)
-					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %s: %v", v.JPath, err.Error())
+					if err := removeUnwantedJSON(v.JSONPath); err != nil {
+						logging.E(0, "Failed to remove unwanted JSON at %s: %v", v.JSONPath, err.Error())
 					}
 					return false, nil
 
@@ -109,8 +110,8 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				case consts.FilterOmit:
 
 					logging.I("Filtering: Field %q found in metadata for URL %q and filter is set to omit it, filtering out", filter.Field, v.URL)
-					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JPath, err)
+					if err := removeUnwantedJSON(v.JSONPath); err != nil {
+						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 					}
 					return false, nil
 
@@ -139,8 +140,8 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				if strings.Contains(lowerStrVal, lowerFilterVal) {
 
 					logging.D(1, "Filtering out video %q which contains %q in field %q", v.URL, filter.Value, filter.Field)
-					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JPath, err)
+					if err := removeUnwantedJSON(v.JSONPath); err != nil {
+						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 					}
 					return false, nil
 				}
@@ -149,8 +150,8 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				if !strings.Contains(lowerStrVal, lowerFilterVal) {
 
 					logging.D(1, "Filtering out video %q which does not contain %q in field %q", v.URL, filter.Value, filter.Field)
-					if err := removeUnwantedJSON(v.JPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JPath, err)
+					if err := removeUnwantedJSON(v.JSONPath); err != nil {
+						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 					}
 					return false, nil
 				}

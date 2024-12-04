@@ -5,24 +5,25 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
 // InitMetarr begins processing with Metarr
-func InitMetarr(v *models.Video) error {
+func InitMetarr(v *models.Video, ctx context.Context) error {
 	args := makeMetarrCommand(v)
 	if len(args) == 0 {
 		logging.I("No Metarr arguments built, returning...")
 		return nil
 	}
 
-	cmd := exec.CommandContext(context.Background(), "metarr", args...)
+	cmd := exec.CommandContext(ctx, "metarr", args...)
 
 	if err := runMetarr(cmd); err != nil {
 		return err
 	}
-	logging.S(1, "Finished Metarr command for %q", v.VPath)
+	logging.S(1, "Finished Metarr command for %q", v.VideoPath)
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package process
 
 import (
+	"context"
 	"crypto/tls"
 	"database/sql"
 	"errors"
@@ -10,9 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/browser"
 	"tubarr/internal/utils/logging"
@@ -22,8 +25,18 @@ var (
 	regClient       *http.Client
 	lanClient       *http.Client
 	initClientsOnce sync.Once
+	browserInstance *browser.Browser
 )
 
+const (
+	applicationJSON = "application/json"
+)
+
+func init() {
+	browserInstance = browser.NewBrowser()
+}
+
+// initClients initializes HTTP clients for web activities.
 func initClients() {
 	initClientsOnce.Do(func() {
 		regClient = &http.Client{
@@ -44,8 +57,8 @@ func initClients() {
 // CrawlIgnoreNew gets the channel's currently displayed videos and ignores them on subsequent crawls.
 //
 // Essentially it marks the URLs it finds as though they have already been downloaded.
-func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
-	videos, err := browser.GetNewReleases(s.ChannelStore(), c)
+func CrawlIgnoreNew(s interfaces.Store, c *models.Channel) error {
+	videos, err := browserInstance.GetNewReleases(s.ChannelStore(), c)
 	if err != nil {
 		return err
 	}
@@ -74,7 +87,7 @@ func CrawlIgnoreNew(s models.Store, c *models.Channel) error {
 }
 
 // CheckChannels checks channels and whether they are due for a crawl.
-func CheckChannels(s models.Store) error {
+func CheckChannels(s interfaces.Store, ctx context.Context) error {
 	cs := s.ChannelStore()
 	chans, err, hasRows := cs.FetchAllChannels()
 	if !hasRows {
@@ -122,7 +135,7 @@ func CheckChannels(s models.Store) error {
 				<-sem
 			}()
 
-			if err := ChannelCrawl(s, c); err != nil {
+			if err := ChannelCrawl(s, c, ctx); err != nil {
 				errChan <- err
 			}
 		}(chans[i])
@@ -144,24 +157,24 @@ func CheckChannels(s models.Store) error {
 }
 
 // ChannelCrawl crawls a channel for new URLs.
-func ChannelCrawl(s models.Store, c *models.Channel) error {
+func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) error {
 	const (
 		errMsg = "encountered %d errors during processing: %v"
 	)
 
 	logging.I("Initiating crawl for URL %s...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
-		c.URL, c.VDir, c.JDir, c.Settings.Filters, c.Settings.CookieSource)
+		c.URL, c.VideoDir, c.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
 
 	switch {
 	case c.URL == "":
 		return errors.New("channel URL is blank")
-	case c.VDir == "", c.JDir == "":
+	case c.VideoDir == "", c.JSONDir == "":
 		return errors.New("output directories are blank")
 	}
 
 	cs := s.ChannelStore()
 
-	videos, err := browser.GetNewReleases(cs, c)
+	videos, err := browserInstance.GetNewReleases(cs, c)
 	if err != nil {
 		return err
 	}
@@ -175,7 +188,7 @@ func ChannelCrawl(s models.Store, c *models.Channel) error {
 		logging.I("No new releases for channel %q", c.URL)
 		return nil
 	} else {
-		success, errArray = InitProcess(s.VideoStore(), s.DownloadStore(), c, videos)
+		success, errArray = InitProcess(s, c, videos, ctx)
 		if errArray != nil {
 			logging.ErrorArray = append(logging.ErrorArray, errArray...)
 		}
@@ -233,7 +246,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 
 	// Inner function
 	notifyFunc := func(client *http.Client, notifyURL string) error {
-		resp, err := client.Post(notifyURL, "application/json", nil)
+		resp, err := client.Post(notifyURL, applicationJSON, nil)
 		if err != nil {
 			return fmt.Errorf("failed to send notification to URL %q for channel %q (ID: %d): %w",
 				notifyURL, c.Name, c.ID, err)

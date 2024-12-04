@@ -5,66 +5,90 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+
 	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
 	_ "github.com/browserutils/kooky/browser/all"
 )
 
-var (
-	allStores  []kooky.CookieStore
-	allCookies []*http.Cookie
-)
-
-// initializeCookies initializes all browser cookie stores
-func initializeCookies() {
-	allStores = kooky.FindAllCookieStores()
-	allCookies = []*http.Cookie{}
+// CookieManager holds cookies for a domain.
+type CookieManager struct {
+	mu      sync.RWMutex
+	stores  []kooky.CookieStore
+	cookies map[string][]*http.Cookie
+	init    sync.Once
 }
 
-// GetBrowserCookies retrieves cookies for a given URL, using a specified cookie file if provided.
-func getBrowserCookies(u string) ([]*http.Cookie, error) {
+// NewCookieManager initializes a new cookie manager instance.
+func NewCookieManager() *CookieManager {
+	return &CookieManager{
+		cookies: make(map[string][]*http.Cookie),
+	}
+}
+
+// GetCookies retrieves cookies for a given URL, using a specified cookie file if provided.
+func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 	baseURL, err := extractBaseDomain(u)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract base domain: %w", err)
+		return nil, fmt.Errorf("extracting base domain: %w", err)
 	}
 
-	// Otherwise, proceed to use browser cookie stores
-	if allStores == nil || allCookies == nil || len(allCookies) == 0 {
-		initializeCookies()
+	// Initialize once
+	cm.init.Do(func() {
+		cm.stores = kooky.FindAllCookieStores()
+	})
+
+	// Check if we already have cookies for this domain
+	cm.mu.RLock()
+	if cookies, ok := cm.cookies[baseURL]; ok {
+		cm.mu.RUnlock()
+		return cookies, nil
+	}
+	cm.mu.RUnlock()
+
+	// Load cookies for domain
+	cookies, err := cm.loadCookiesForDomain(baseURL)
+	if err != nil {
+		return nil, err
 	}
 
-	attemptedBrowsers := make(map[string]bool, len(allStores))
+	// Store cookies
+	cm.mu.Lock()
+	cm.cookies[baseURL] = cookies
+	cm.mu.Unlock()
 
-	for _, store := range allStores {
+	return cookies, nil
+}
+
+// loadCookiesForDomain loads the cookies associated with a particularly domain.
+func (cm *CookieManager) loadCookiesForDomain(domain string) ([]*http.Cookie, error) {
+	var cookies []*http.Cookie
+	var attempted []string
+
+	for _, store := range cm.stores {
 		browserName := store.Browser()
-		logging.D(2, "Attempting to read cookies from %s", browserName)
-		attemptedBrowsers[browserName] = true
+		attempted = append(attempted, browserName)
 
-		cookies, err := store.ReadCookies(kooky.Valid, kooky.Domain(baseURL))
+		kookieCookies, err := store.ReadCookies(kooky.Valid, kooky.Domain(domain))
 		if err != nil {
-			logging.D(2, "Failed to read cookies from %s: %v", browserName, err)
+			logging.D(2, "Failed reading cookies from %s: %v", browserName, err)
 			continue
 		}
 
-		if len(cookies) > 0 {
-			logging.I("Successfully read %d cookies from %s for domain %s", len(cookies), browserName, baseURL)
-			allCookies = append(allCookies, convertToHTTPCookies(cookies)...)
-		} else {
-			logging.D(2, "No cookies found for %s", browserName)
+		if len(kookieCookies) > 0 {
+			logging.I("Found %d cookies in %s for %s", len(kookieCookies), browserName, domain)
+			cookies = append(cookies, convertToHTTPCookies(kookieCookies)...)
 		}
 	}
 
-	// Log summary of attempted browsers
-	logging.I("Attempted to read cookies from the following browsers: %v", keysFromMap(attemptedBrowsers))
-
-	if len(allCookies) == 0 {
-		logging.I("No cookies found for %q, proceeding without cookies", u)
-	} else {
-		logging.I("Found a total of %d cookies for %q", len(allCookies), u)
+	logging.I("Checked browsers: %v", attempted)
+	if len(cookies) == 0 {
+		logging.I("No cookies found for %s", domain)
 	}
 
-	return allCookies, nil
+	return cookies, nil
 }
 
 // convertToHTTPCookies converts kooky cookies to http.Cookie format
@@ -94,13 +118,4 @@ func extractBaseDomain(urlString string) (string, error) {
 		return strings.Join(parts[len(parts)-2:], "."), nil
 	}
 	return parsedURL.Hostname(), nil
-}
-
-// keysForMap helper function to get keys from a map
-func keysFromMap(m map[string]bool) []string {
-	mapKeys := make([]string, 0, len(m))
-	for k := range m {
-		mapKeys = append(mapKeys, k)
-	}
-	return mapKeys
 }
