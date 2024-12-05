@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,18 +21,22 @@ var (
 	Level      int  = -1
 	Loggable   bool = false
 	fileLogger zerolog.Logger
-	mu         sync.Mutex
 	muErr      sync.Mutex
 	errorArray = make([]error, 0, 8)
-	ansiEscape = regex.AnsiEscapeCompile()
 	console    = os.Stdout
+
+	builderPool = sync.Pool{
+		New: func() interface{} {
+			return new(strings.Builder)
+		},
+	}
 )
 
 const (
 	timeFormat         = "01/02 15:04:05"
 	tubarrLogFile      = "tubarr.log"
 	funcFileLineSingle = "%s%s [%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
-	funcFileLineMulti  = "%s%s[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n\n"
+	funcFileLineMulti  = "%s%s\n[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
 	JFunction          = "function"
 	JFile              = "file"
 	JLine              = "line"
@@ -54,14 +59,11 @@ func SetupLogging(targetDir string) error {
 
 	// File logger using zerolog's efficient JSON logging
 	fileLogger = zerolog.New(logfile).With().Timestamp().Logger()
-
 	Loggable = true
 
 	startMsg := fmt.Sprintf("=========== %v ===========\n", time.Now().Format(time.RFC1123Z))
 	writeToConsole(startMsg)
-	if ansiEscape != nil {
-		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(startMsg, ""))
-	}
+	fileLogger.Info().Msg(regex.AnsiEscapeCompile().ReplaceAllString(startMsg, ""))
 
 	return nil
 }
@@ -86,7 +88,7 @@ func E(l int, format string, args ...interface{}) {
 
 	if len(args) > 0 {
 		if err, ok := args[len(args)-1].(error); ok {
-			AppendErrorArray(err)
+			AddToErrorArray(err)
 		}
 	}
 
@@ -98,30 +100,47 @@ func E(l int, format string, args ...interface{}) {
 		funcFileLine = funcFileLineSingle
 	}
 
-	consoleMsg := fmt.Sprintf(funcFileLine,
-		consts.RedError,
-		msg,
-		consts.ColorDimCyan,
-		consts.ColorReset,
-		funcName,
-		consts.ColorDimWhite,
-		consts.ColorReset,
-		file,
-		consts.ColorDimWhite,
-		consts.ColorReset,
-		line,
-	)
+	b := builderPool.Get().(*strings.Builder)
+	b.Reset()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+	lineStr := strconv.Itoa(line)
 
-	// Console output with colors
-	writeToConsole(consoleMsg)
+	b.Grow(len(funcFileLine) +
+		len(consts.RedError) +
+		len(msg) +
+		len(consts.ColorDimCyan) +
+		len(consts.ColorReset) +
+		len(funcName) +
+		len(consts.ColorDimWhite) +
+		len(consts.ColorReset) +
+		len(file) +
+		len(consts.ColorDimWhite) +
+		len(consts.ColorReset) +
+		len(lineStr))
 
-	// File output with JSON logging and no colors
+	b.WriteString(funcFileLine)
+	b.WriteString(consts.RedError)
+	b.WriteString(msg)
+	b.WriteString(consts.ColorDimCyan)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(funcName)
+	b.WriteString(consts.ColorDimWhite)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(file)
+	b.WriteString(consts.ColorDimWhite)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(lineStr)
+
+	writeToConsole(b.String())
 	if Loggable {
 		fileLogger.Error().
 			Str(JFunction, funcName).
 			Str(JFile, file).
 			Int(JLine, line).
-			Msg(ansiEscape.ReplaceAllString(msg, ""))
+			Msg(regex.AnsiEscapeCompile().ReplaceAllString(msg, ""))
 	}
 }
 
@@ -132,11 +151,24 @@ func S(l int, format string, args ...interface{}) {
 	}
 
 	msg := fmt.Sprintf(format, args...)
-	consoleMsg := fmt.Sprintf("%s%s\n", consts.GreenSuccess, msg)
 
-	writeToConsole(consoleMsg)
+	b := builderPool.Get().(*strings.Builder)
+	b.Reset()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+
+	b.Grow(len(consts.GreenSuccess) +
+		len(msg) + 1)
+
+	b.WriteString(consts.GreenSuccess)
+	b.WriteString(msg)
+	b.WriteRune('\n')
+
+	writeToConsole(b.String())
 	if Loggable {
-		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(msg, ""))
+		fileLogger.Info().Msg(regex.AnsiEscapeCompile().ReplaceAllString(msg, ""))
 	}
 }
 
@@ -159,27 +191,47 @@ func D(l int, format string, args ...interface{}) {
 		funcFileLine = funcFileLineSingle
 	}
 
-	consoleMsg := fmt.Sprintf(funcFileLine,
-		consts.YellowDebug,
-		msg,
-		consts.ColorDimCyan,
-		consts.ColorReset,
-		funcName,
-		consts.ColorDimCyan,
-		consts.ColorReset,
-		file,
-		consts.ColorDimCyan,
-		consts.ColorReset,
-		line,
-	)
+	b := builderPool.Get().(*strings.Builder)
+	b.Reset()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+	lineStr := strconv.Itoa(line)
 
-	writeToConsole(consoleMsg)
+	b.Grow(len(funcFileLine) +
+		len(consts.YellowDebug) +
+		len(msg) +
+		len(consts.ColorDimCyan) +
+		len(consts.ColorReset) +
+		len(funcName) +
+		len(consts.ColorDimWhite) +
+		len(consts.ColorReset) +
+		len(file) +
+		len(consts.ColorDimWhite) +
+		len(consts.ColorReset) +
+		len(lineStr))
+
+	b.WriteString(funcFileLine)
+	b.WriteString(consts.YellowDebug)
+	b.WriteString(msg)
+	b.WriteString(consts.ColorDimCyan)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(funcName)
+	b.WriteString(consts.ColorDimWhite)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(file)
+	b.WriteString(consts.ColorDimWhite)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(lineStr)
+
+	writeToConsole(b.String())
 	if Loggable {
 		fileLogger.Debug().
 			Str(JFunction, funcName).
 			Str(JFile, file).
 			Int(JLine, line).
-			Msg(ansiEscape.ReplaceAllString(msg, ""))
+			Msg(regex.AnsiEscapeCompile().ReplaceAllString(msg, ""))
 	}
 }
 
@@ -199,67 +251,106 @@ func W(format string, args ...interface{}) {
 		funcFileLine = funcFileLineSingle
 	}
 
-	consoleMsg := fmt.Sprintf(funcFileLine,
-		consts.YellowWarning,
-		msg,
-		consts.ColorDimCyan,
-		consts.ColorReset,
-		funcName,
-		consts.ColorDimCyan,
-		consts.ColorReset,
-		file,
-		consts.ColorDimCyan,
-		consts.ColorReset,
-		line,
-	)
+	b := builderPool.Get().(*strings.Builder)
+	b.Reset()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+	lineStr := strconv.Itoa(line)
 
-	writeToConsole(consoleMsg)
+	b.Grow(len(funcFileLine) +
+		len(consts.YellowWarning) +
+		len(msg) +
+		len(consts.ColorDimCyan) +
+		len(consts.ColorReset) +
+		len(funcName) +
+		len(consts.ColorDimWhite) +
+		len(consts.ColorReset) +
+		len(file) +
+		len(consts.ColorDimWhite) +
+		len(consts.ColorReset) +
+		len(lineStr))
+
+	b.WriteString(funcFileLine)
+	b.WriteString(consts.YellowWarning)
+	b.WriteString(msg)
+	b.WriteString(consts.ColorDimCyan)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(funcName)
+	b.WriteString(consts.ColorDimWhite)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(file)
+	b.WriteString(consts.ColorDimWhite)
+	b.WriteString(consts.ColorReset)
+	b.WriteString(lineStr)
+
+	writeToConsole(b.String())
 	if Loggable {
 		fileLogger.Warn().
 			Str(JFunction, funcName).
 			Str(JFile, file).
 			Int(JLine, line).
-			Msg(ansiEscape.ReplaceAllString(msg, ""))
+			Msg(regex.AnsiEscapeCompile().ReplaceAllString(msg, ""))
 	}
 }
 
 // I logs info messages.
 func I(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	consoleMsg := fmt.Sprintf("%s%s\n", consts.BlueInfo, msg)
 
-	writeToConsole(consoleMsg)
+	b := builderPool.Get().(*strings.Builder)
+	b.Reset()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+
+	b.Grow(len(consts.BlueInfo) +
+		len(msg) + 1)
+
+	b.WriteString(consts.BlueInfo)
+	b.WriteString(msg)
+	b.WriteRune('\n')
+
+	writeToConsole(b.String())
 	if Loggable {
-		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(msg, ""))
-	}
-}
-
-// ICarriage logs info messages in carriage return format.
-func ICarriage(format string, args ...interface{}) {
-
-	msg := fmt.Sprintf(format, args...)
-	consoleMsg := fmt.Sprintf("\r%s%s", consts.BlueInfo, msg)
-
-	writeToConsole(consoleMsg)
-	if Loggable {
-		fileLogger.Info().Msg(ansiEscape.ReplaceAllString(msg, ""))
+		fileLogger.Info().Msg(regex.AnsiEscapeCompile().ReplaceAllString(msg, ""))
 	}
 }
 
 // P logs plain messages.
 func P(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	consoleMsg := fmt.Sprintf("%s\n", msg)
 
-	writeToConsole(consoleMsg)
+	b := builderPool.Get().(*strings.Builder)
+	b.Reset()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+
+	b.Grow(len(msg) + 1)
+
+	b.WriteString(msg)
+	b.WriteRune('\n')
+
+	writeToConsole(b.String())
 	if Loggable {
 		fileLogger.Info().Msg(msg)
 	}
 }
 
-// AppendErrorArray adds a new error to the error array.
-func AppendErrorArray(err error) {
+// AddToErrorArray adds an error to the error array under lock.
+func AddToErrorArray(err error) {
 	muErr.Lock()
-	errorArray = append(errorArray, err)
+	if err != nil {
+		errorArray = append(errorArray, err)
+	}
 	muErr.Unlock()
+}
+
+// GetErrorArray returns the error array.
+func GetErrorArray() []error {
+	return errorArray
 }

@@ -48,12 +48,7 @@ func (d *Download) Execute() error {
 
 		select {
 		case <-d.Context.Done():
-			logging.E(0, "Download cancelled for URL %s: %v", d.Video.URL, d.Context.Err())
-			d.Video.DownloadStatus.Status = consts.DLStatusFailed
-			d.Video.DownloadStatus.Error = d.Context.Err()
-			d.DLTracker.sendUpdate(d.Video)
-			return fmt.Errorf("download cancelled for %s: %w", d.Video.URL, d.Context.Err())
-
+			return d.cancelDownload()
 		default:
 			if err := d.executeAttempt(); err != nil {
 				lastErr = err
@@ -66,11 +61,7 @@ func (d *Download) Execute() error {
 				if attempt < d.Options.MaxRetries {
 					select {
 					case <-d.Context.Done():
-						logging.E(0, "Download cancelled during retry wait for URL %s: %v", d.Video.URL, d.Context.Err())
-						d.Video.DownloadStatus.Status = consts.DLStatusFailed
-						d.Video.DownloadStatus.Error = d.Context.Err()
-						d.DLTracker.sendUpdate(d.Video)
-						return fmt.Errorf("download cancelled for %s: %w", d.Video.URL, d.Context.Err())
+						return d.cancelDownload()
 					case <-time.After(d.Options.RetryInterval):
 						continue
 					}
@@ -93,14 +84,6 @@ func (d *Download) Execute() error {
 
 // executeAttempt performs a single download attempt.
 func (d *Download) executeAttempt() error {
-	select {
-	case <-d.Context.Done():
-		logging.E(0, "Download cancelled before starting attempt for URL %s: %v", d.Video.URL, d.Context.Err())
-		return fmt.Errorf("download cancelled for %s: %w", d.Video.URL, d.Context.Err())
-	default:
-		// Proceed
-	}
-
 	var cmd *exec.Cmd
 	switch d.Type {
 	case TypeJSON:

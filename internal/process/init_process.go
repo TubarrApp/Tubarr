@@ -29,7 +29,7 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 
 	select {
 	case <-ctx.Done():
-		errs = append(errs, errors.New("aborting process, context cancelled"))
+		errs = append(errs, errors.New("aborting process, context canceled"))
 		return false, errs
 	default:
 		// Process

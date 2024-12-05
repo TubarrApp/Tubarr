@@ -190,7 +190,7 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 	} else {
 		success, errArray = InitProcess(s, c, videos, ctx)
 		if errArray != nil {
-			logging.AppendErrorArray(err)
+			logging.AddToErrorArray(err)
 		}
 
 		if err := cs.UpdateLastScan(c.ID); err != nil {
