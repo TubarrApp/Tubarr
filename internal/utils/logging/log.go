@@ -33,13 +33,17 @@ var (
 )
 
 const (
-	timeFormat         = "01/02 15:04:05"
-	tubarrLogFile      = "tubarr.log"
-	funcFileLineSingle = "%s%s [%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
-	funcFileLineMulti  = "%s%s\n[%sFunction:%s %s - %sFile:%s %s : %sLine:%s %d]\n"
-	JFunction          = "function"
-	JFile              = "file"
-	JLine              = "line"
+	timeFormat    = "01/02 15:04:05"
+	tubarrLogFile = "tubarr.log"
+
+	tagFunc = "[" + consts.ColorDimCyan + "Function:" + consts.ColorReset + " "
+	tagFile = " - " + consts.ColorDimCyan + "File:" + consts.ColorReset + " "
+	tagLine = " : " + consts.ColorDimCyan + "Line:" + consts.ColorReset + " "
+	tagEnd  = "]\n"
+
+	JFunction = "function"
+	JFile     = "file"
+	JLine     = "line"
 )
 
 func init() {
@@ -83,22 +87,11 @@ func E(l int, format string, args ...interface{}) {
 	}
 
 	pc, file, line, _ := runtime.Caller(1)
+	lineStr := strconv.Itoa(line)
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
-	if len(args) > 0 {
-		if err, ok := args[len(args)-1].(error); ok {
-			AddToErrorArray(err)
-		}
-	}
-
-	var funcFileLine string
 	msg := fmt.Sprintf(format, args...)
-	if strings.HasSuffix(msg, "\n") {
-		funcFileLine = funcFileLineMulti
-	} else {
-		funcFileLine = funcFileLineSingle
-	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -106,33 +99,32 @@ func E(l int, format string, args ...interface{}) {
 		b.Reset()
 		builderPool.Put(b)
 	}()
-	lineStr := strconv.Itoa(line)
 
-	b.Grow(len(funcFileLine) +
-		len(consts.RedError) +
+	b.Grow(len(consts.RedError) +
 		len(msg) +
-		len(consts.ColorDimCyan) +
-		len(consts.ColorReset) +
+		1 +
+		len(tagFunc) +
 		len(funcName) +
-		len(consts.ColorDimWhite) +
-		len(consts.ColorReset) +
+		len(tagFile) +
 		len(file) +
-		len(consts.ColorDimWhite) +
-		len(consts.ColorReset) +
-		len(lineStr))
+		len(tagLine) +
+		len(lineStr) +
+		len(tagEnd))
 
-	b.WriteString(funcFileLine)
 	b.WriteString(consts.RedError)
 	b.WriteString(msg)
-	b.WriteString(consts.ColorDimCyan)
-	b.WriteString(consts.ColorReset)
+
+	if !strings.HasSuffix(msg, "\n") {
+		b.WriteRune(' ')
+	}
+
+	b.WriteString(tagFunc)
 	b.WriteString(funcName)
-	b.WriteString(consts.ColorDimWhite)
-	b.WriteString(consts.ColorReset)
+	b.WriteString(tagFile)
 	b.WriteString(file)
-	b.WriteString(consts.ColorDimWhite)
-	b.WriteString(consts.ColorReset)
+	b.WriteString(tagLine)
 	b.WriteString(lineStr)
+	b.WriteString(tagEnd)
 
 	writeToConsole(b.String())
 	if Loggable {
@@ -179,17 +171,11 @@ func D(l int, format string, args ...interface{}) {
 	}
 
 	pc, file, line, _ := runtime.Caller(1)
+	lineStr := strconv.Itoa(line)
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
-	var funcFileLine string
-
 	msg := fmt.Sprintf(format, args...)
-	if strings.HasSuffix(msg, "\n") {
-		funcFileLine = funcFileLineMulti
-	} else {
-		funcFileLine = funcFileLineSingle
-	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -197,33 +183,32 @@ func D(l int, format string, args ...interface{}) {
 		b.Reset()
 		builderPool.Put(b)
 	}()
-	lineStr := strconv.Itoa(line)
 
-	b.Grow(len(funcFileLine) +
-		len(consts.YellowDebug) +
+	b.Grow(len(consts.YellowDebug) +
 		len(msg) +
-		len(consts.ColorDimCyan) +
-		len(consts.ColorReset) +
+		1 +
+		len(tagFunc) +
 		len(funcName) +
-		len(consts.ColorDimWhite) +
-		len(consts.ColorReset) +
+		len(tagFile) +
 		len(file) +
-		len(consts.ColorDimWhite) +
-		len(consts.ColorReset) +
-		len(lineStr))
+		len(tagLine) +
+		len(lineStr) +
+		len(tagEnd))
 
-	b.WriteString(funcFileLine)
 	b.WriteString(consts.YellowDebug)
 	b.WriteString(msg)
-	b.WriteString(consts.ColorDimCyan)
-	b.WriteString(consts.ColorReset)
+
+	if !strings.HasSuffix(msg, "\n") {
+		b.WriteRune(' ')
+	}
+
+	b.WriteString(tagFunc)
 	b.WriteString(funcName)
-	b.WriteString(consts.ColorDimWhite)
-	b.WriteString(consts.ColorReset)
+	b.WriteString(tagFile)
 	b.WriteString(file)
-	b.WriteString(consts.ColorDimWhite)
-	b.WriteString(consts.ColorReset)
+	b.WriteString(tagLine)
 	b.WriteString(lineStr)
+	b.WriteString(tagEnd)
 
 	writeToConsole(b.String())
 	if Loggable {
@@ -239,17 +224,11 @@ func D(l int, format string, args ...interface{}) {
 func W(format string, args ...interface{}) {
 
 	pc, file, line, _ := runtime.Caller(1)
+	lineStr := strconv.Itoa(line)
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
-	var funcFileLine string
-
 	msg := fmt.Sprintf(format, args...)
-	if strings.HasSuffix(msg, "\n") {
-		funcFileLine = funcFileLineMulti
-	} else {
-		funcFileLine = funcFileLineSingle
-	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -257,33 +236,32 @@ func W(format string, args ...interface{}) {
 		b.Reset()
 		builderPool.Put(b)
 	}()
-	lineStr := strconv.Itoa(line)
 
-	b.Grow(len(funcFileLine) +
-		len(consts.YellowWarning) +
+	b.Grow(len(consts.YellowWarning) +
 		len(msg) +
-		len(consts.ColorDimCyan) +
-		len(consts.ColorReset) +
+		1 +
+		len(tagFunc) +
 		len(funcName) +
-		len(consts.ColorDimWhite) +
-		len(consts.ColorReset) +
+		len(tagFile) +
 		len(file) +
-		len(consts.ColorDimWhite) +
-		len(consts.ColorReset) +
-		len(lineStr))
+		len(tagLine) +
+		len(lineStr) +
+		len(tagEnd))
 
-	b.WriteString(funcFileLine)
 	b.WriteString(consts.YellowWarning)
 	b.WriteString(msg)
-	b.WriteString(consts.ColorDimCyan)
-	b.WriteString(consts.ColorReset)
+
+	if !strings.HasSuffix(msg, "\n") {
+		b.WriteRune(' ')
+	}
+
+	b.WriteString(tagFunc)
 	b.WriteString(funcName)
-	b.WriteString(consts.ColorDimWhite)
-	b.WriteString(consts.ColorReset)
+	b.WriteString(tagFile)
 	b.WriteString(file)
-	b.WriteString(consts.ColorDimWhite)
-	b.WriteString(consts.ColorReset)
+	b.WriteString(tagLine)
 	b.WriteString(lineStr)
+	b.WriteString(tagEnd)
 
 	writeToConsole(b.String())
 	if Loggable {
