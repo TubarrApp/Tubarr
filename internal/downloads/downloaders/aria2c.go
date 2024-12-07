@@ -25,7 +25,7 @@ func Aria2OutputParser(line string, url string, totalFrags, completedFrags int) 
 
 	if strings.Contains(line, "Download complete:") {
 		completedFrags++
-		logging.D(2, "Completed fragment %d of %d for URL %q", completedFrags, totalFrags, url)
+		logging.D(3, "Completed fragment %d of %d for URL %q", completedFrags, totalFrags, url)
 	}
 
 	if totalFrags > 0 {

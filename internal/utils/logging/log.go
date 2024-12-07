@@ -65,7 +65,19 @@ func SetupLogging(targetDir string) error {
 	fileLogger = zerolog.New(logfile).With().Timestamp().Logger()
 	Loggable = true
 
-	startMsg := fmt.Sprintf("=========== %v ===========\n", time.Now().Format(time.RFC1123Z))
+	b := builderPool.Get().(*strings.Builder)
+	b.Reset()
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+
+	b.WriteString("=========== ")
+	b.WriteString(time.Now().Format(time.RFC1123Z))
+	b.WriteString(" ===========")
+	b.WriteRune('\n')
+
+	startMsg := b.String()
 	writeToConsole(startMsg)
 	fileLogger.Info().Msg(regex.AnsiEscapeCompile().ReplaceAllString(startMsg, ""))
 
@@ -81,7 +93,7 @@ func writeToConsole(msg string) {
 }
 
 // E logs error messages, and appends to the global error array.
-func E(l int, format string, args ...interface{}) {
+func E(l int, msg string, args ...interface{}) {
 	if Level < l {
 		return
 	}
@@ -91,7 +103,9 @@ func E(l int, format string, args ...interface{}) {
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
-	msg := fmt.Sprintf(format, args...)
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -137,12 +151,14 @@ func E(l int, format string, args ...interface{}) {
 }
 
 // S logs success messages.
-func S(l int, format string, args ...interface{}) {
+func S(l int, msg string, args ...interface{}) {
 	if Level < l {
 		return
 	}
 
-	msg := fmt.Sprintf(format, args...)
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -165,7 +181,7 @@ func S(l int, format string, args ...interface{}) {
 }
 
 // D logs debug messages.
-func D(l int, format string, args ...interface{}) {
+func D(l int, msg string, args ...interface{}) {
 	if Level < l {
 		return
 	}
@@ -175,7 +191,9 @@ func D(l int, format string, args ...interface{}) {
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
-	msg := fmt.Sprintf(format, args...)
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -221,14 +239,16 @@ func D(l int, format string, args ...interface{}) {
 }
 
 // W logs debug messages.
-func W(format string, args ...interface{}) {
+func W(msg string, args ...interface{}) {
 
 	pc, file, line, _ := runtime.Caller(1)
 	lineStr := strconv.Itoa(line)
 	file = filepath.Base(file)
 	funcName := filepath.Base(runtime.FuncForPC(pc).Name())
 
-	msg := fmt.Sprintf(format, args...)
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -274,8 +294,10 @@ func W(format string, args ...interface{}) {
 }
 
 // I logs info messages.
-func I(format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
+func I(msg string, args ...interface{}) {
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
@@ -298,8 +320,10 @@ func I(format string, args ...interface{}) {
 }
 
 // P logs plain messages.
-func P(format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
+func P(msg string, args ...interface{}) {
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
 
 	b := builderPool.Get().(*strings.Builder)
 	b.Reset()
