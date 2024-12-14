@@ -28,6 +28,7 @@ const (
 	QChanVideoDir        = "video_directory"
 	QChanJSONDir         = "json_directory"
 	QChanMetarrOutputDir = "metarr_output_directory"
+	QChanMetarrExt       = "metarr_ext"
 	QChanSettings        = "settings"
 	QChanMetarr          = "metarr"
 	QChanLastScan        = "last_scan"

@@ -413,7 +413,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URL, ch.VideoDir, ch.JSONDir)
 			fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
 			fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
-			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir)
+			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext)
 			fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 
 			return nil
@@ -444,7 +444,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URL, ch.VideoDir, ch.JSONDir)
 				fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
 				fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
-				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir)
+				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext)
 				fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 			}
 			return nil

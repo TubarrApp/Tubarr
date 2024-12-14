@@ -57,8 +57,8 @@ func SetFileDirFlags(cmd *cobra.Command, jsonDir, videoDir *string) {
 func InitVideoTransformers(rootCmd *cobra.Command) error {
 
 	// Output extension type
-	rootCmd.PersistentFlags().String(keys.OutputFiletypeInput, "", "File extension to output files as (mp4 works best for most media servers)")
-	if err := viper.BindPFlag(keys.OutputFiletypeInput, rootCmd.PersistentFlags().Lookup(keys.OutputFiletypeInput)); err != nil {
+	rootCmd.PersistentFlags().String(keys.OutputFiletype, "", "File extension to output files as (mp4 works best for most media servers)")
+	if err := viper.BindPFlag(keys.OutputFiletype, rootCmd.PersistentFlags().Lookup(keys.OutputFiletype)); err != nil {
 		return err
 	}
 	return nil

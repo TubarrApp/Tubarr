@@ -55,11 +55,11 @@ const (
 	MetaOps               string = "metarr-meta-ops"
 	MetaPurge             string = "metarr-purge-metafile"
 	MFilenamePfx          string = "metarr-metadata-filename-prefix"
-	OutputFiletypeInput   string = "metarr-ext"
 	RenameStyle           string = "metarr-rename-style"
 	MaxCPU                string = "metarr-max-cpu"
 	MinFreeMem            string = "metarr-min-free-mem"
 	NoFileOverwrite       string = "metarr-no-file-overwrite"
 	MetarrConcurrency     string = "metarr-concurrency"
 	MetarrOutputDir       string = "metarr-output-dir"
+	MetarrExt             string = "metarr-ext"
 )
