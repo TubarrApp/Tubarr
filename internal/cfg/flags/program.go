@@ -30,7 +30,7 @@ func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 		cmd.Flags().IntVarP(concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this channel")
 	}
 	if crawlFreq != nil {
-		cmd.Flags().IntVar(crawlFreq, "crawl-freq", 30, "New crawl frequency in minutes")
+		cmd.Flags().IntVar(crawlFreq, keys.CrawlFreq, 30, "New crawl frequency in minutes")
 	}
 	if downloadCmd != nil {
 		cmd.Flags().StringVar(downloadCmd, "downloader", "", "External downloader command")
