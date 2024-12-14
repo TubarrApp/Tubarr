@@ -127,6 +127,13 @@ func (ds *DownloadStore) UpdateDownloadStatuses(ctx context.Context, updates []m
 	// Build batch update query
 	query := squirrel.Update(consts.DBDownloads)
 	for _, update := range updates {
+
+		if update.Percent > 100.0 || update.Status == consts.DLStatusCompleted {
+			update.Percent = 100.0
+		} else if update.Percent < 0.0 {
+			update.Percent = 0.0
+		}
+
 		query = query.
 			Set(consts.QDLStatus, update.Status).
 			Set(consts.QDLPct, update.Percent).
