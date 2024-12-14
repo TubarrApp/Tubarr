@@ -28,8 +28,16 @@ func Aria2OutputParser(line string, url string, totalFrags, completedFrags int) 
 		logging.D(3, "Completed fragment %d of %d for URL %q", completedFrags, totalFrags, url)
 	}
 
+	dlPct := (float64(completedFrags) / float64(totalFrags)) * 100
+
+	if dlPct > 100.0 {
+		dlPct = 100.0
+	} else if dlPct < 0.0 {
+		dlPct = 0.0
+	}
+
 	if totalFrags > 0 {
-		return totalFrags, completedFrags, ((float64(completedFrags) / float64(totalFrags)) * 100), nil
+		return totalFrags, completedFrags, dlPct, nil
 	}
 	return 0, 0, 0.0, nil
 }
