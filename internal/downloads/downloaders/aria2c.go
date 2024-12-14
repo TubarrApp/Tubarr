@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
 	"tubarr/internal/utils/logging"
 )
 
@@ -12,7 +13,6 @@ import (
 func Aria2OutputParser(line string, url string, totalFrags, completedFrags int) (totFrags, completeFrags int, pct float64, err error) {
 
 	if strings.Contains(line, "Downloading") && strings.Contains(line, "item(s)") {
-
 		logging.D(2, "Parsing Aria fragment count line: %v", line)
 
 		if matches := regexp.MustCompile(`Downloading (\d+) item`).FindStringSubmatch(line); len(matches) > 1 {
@@ -29,7 +29,7 @@ func Aria2OutputParser(line string, url string, totalFrags, completedFrags int) 
 	}
 
 	if totalFrags > 0 {
-		return totalFrags, completedFrags, (float64(completedFrags) / float64(totalFrags)) * 100, nil
+		return totalFrags, completedFrags, ((float64(completedFrags) / float64(totalFrags)) * 100), nil
 	}
 	return 0, 0, 0.0, nil
 }

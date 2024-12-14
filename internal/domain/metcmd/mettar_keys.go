@@ -20,6 +20,8 @@ const (
 // Meta ops
 const (
 	MetaOps = "--meta-ops"
+	MetaOW  = "--meta-overwrite"
+	MetaPS  = "--meta-preserve"
 )
 
 const (

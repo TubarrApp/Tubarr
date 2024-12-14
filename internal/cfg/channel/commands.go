@@ -35,7 +35,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(addChannelCmd(cs))
 	channelCmd.AddCommand(dlURLs(cs, s, ctx))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s, ctx))
-	channelCmd.AddCommand(addCrawlToIgnore(cs, s))
+	channelCmd.AddCommand(addCrawlToIgnore(cs, s, ctx))
 	channelCmd.AddCommand(addURLToIgnore(cs))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
 	channelCmd.AddCommand(listChannelCmd(cs))
@@ -186,7 +186,7 @@ func addURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
 }
 
 // addCrawlToIgnore crawls the current state of the channel page and adds the URLs as though they are already grabbed.
-func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
+func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
 	var (
 		url, name string
 		id        int
@@ -203,7 +203,7 @@ func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store) *cobra.Com
 				return err
 			}
 
-			if err := cs.CrawlChannelIgnore(key, val, s); err != nil {
+			if err := cs.CrawlChannelIgnore(key, val, s, ctx); err != nil {
 				return err
 			}
 			return nil

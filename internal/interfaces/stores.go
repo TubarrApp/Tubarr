@@ -21,7 +21,7 @@ type ChannelStore interface {
 	AddNotifyURL(id int64, notifyName, notifyURL string) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
 	CrawlChannel(key, val string, s Store, ctx context.Context) error
-	CrawlChannelIgnore(key, val string, s Store) error
+	CrawlChannelIgnore(key, val string, s Store, ctx context.Context) error
 	DeleteChannel(key, val string) error
 	FetchAllChannels() (channels []*models.Channel, err error, hasRows bool)
 	FetchChannel(id int64) (c *models.Channel, err error, hasRows bool)

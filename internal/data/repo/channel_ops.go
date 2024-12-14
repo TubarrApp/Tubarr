@@ -232,7 +232,7 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 }
 
 // CrawlChannelIgnore crawls a channel and adds the latest videos to the ignore list.
-func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store) error {
+func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, ctx context.Context) error {
 	var (
 		c                    models.Channel
 		settings, metarrJSON json.RawMessage
@@ -286,7 +286,7 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store) 
 
 	logging.D(1, "Retrieved channel with Metarr args: %+v", c.MetarrArgs)
 
-	if err := process.CrawlIgnoreNew(s, &c); err != nil {
+	if err := process.CrawlIgnoreNew(s, &c, ctx); err != nil {
 		return err
 	}
 	return nil

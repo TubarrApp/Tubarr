@@ -81,6 +81,7 @@ func (dp *Directory) ParseDirectory(dir string) (parsedDir string, err error) {
 func (dp *Directory) parseTemplate(dir string) (string, error) {
 	opens := strings.Count(dir, open)
 	closes := strings.Count(dir, close)
+
 	if opens != closes {
 		return "", fmt.Errorf("mismatched template delimiters: %d opens, %d closes", opens, closes)
 	}
@@ -184,7 +185,6 @@ func (dp *Directory) replace(tag string) (string, error) {
 		}
 		return "{{" + tag + "}}", nil
 
-		// Unsupported...
 	default:
 		return "", fmt.Errorf("tag %q detected as invalid", tag)
 	}

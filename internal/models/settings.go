@@ -27,6 +27,8 @@ type MetarrArgs struct {
 	RenameStyle        string   `json:"metarr_rename_style"`
 	FileDatePfx        string   `json:"metarr_filename_date_prefix"`
 	MetaOps            []string `json:"metarr_meta_ops"`
+	MetaOverwrite      bool     `json:"metarr_meta_overwrite"`
+	MetaPreserve       bool     `json:"metarr_meta_preserve"`
 	OutputDir          string   `json:"metarr_output_directory"`
 	Concurrency        int      `json:"metarr_concurrency"`
 	MaxCPU             float64  `json:"metarr_max_cpu_usage"`

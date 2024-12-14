@@ -57,8 +57,8 @@ func initClients() {
 // CrawlIgnoreNew gets the channel's currently displayed videos and ignores them on subsequent crawls.
 //
 // Essentially it marks the URLs it finds as though they have already been downloaded.
-func CrawlIgnoreNew(s interfaces.Store, c *models.Channel) error {
-	videos, err := browserInstance.GetNewReleases(s.ChannelStore(), c)
+func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) error {
+	videos, err := browserInstance.GetNewReleases(s.ChannelStore(), c, ctx)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 
 	cs := s.ChannelStore()
 
-	videos, err := browserInstance.GetNewReleases(cs, c)
+	videos, err := browserInstance.GetNewReleases(cs, c, ctx)
 	if err != nil {
 		return err
 	}

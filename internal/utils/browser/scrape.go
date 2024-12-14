@@ -2,8 +2,11 @@
 package browser
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os/exec"
 	"strings"
 
 	"tubarr/internal/cfg"
@@ -56,7 +59,7 @@ func NewBrowser() *Browser {
 }
 
 // GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded.
-func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) ([]*models.Video, error) {
+func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) ([]*models.Video, error) {
 	if c.URL == "" {
 		return nil, fmt.Errorf("channel url is blank (channel ID: %d)", c.ID)
 	}
@@ -88,7 +91,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) 
 		}
 	}
 
-	newURLs, err := b.newEpisodeURLs(c.URL, existingURLs, fileURLs, cookies)
+	newURLs, err := b.newEpisodeURLs(c.URL, existingURLs, fileURLs, cookies, ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +127,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel) 
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie) ([]string, error) {
+func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, ctx context.Context) ([]string, error) {
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	// Set cookies
@@ -135,12 +138,14 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 	}
 
 	// Only scrape website if we're not using a URL file
+	var customDom bool
 	if !cfg.IsSet(keys.URLFile) {
 		pattern := patterns["default"]
 		for domain, p := range patterns {
 			if strings.Contains(targetURL, domain) {
 				pattern = p
 				logging.I("Detected %s link", p.name)
+				customDom = true
 				break
 			}
 		}
@@ -151,14 +156,21 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 				uniqueEpisodeURLs[link] = struct{}{}
 			}
 		})
+	}
 
+	if customDom {
 		if err := b.collector.Visit(targetURL); err != nil {
 			return nil, fmt.Errorf("error visiting webpage (%s): %w", targetURL, err)
 		}
 		b.collector.Wait()
+	} else {
+		var err error
+		if uniqueEpisodeURLs, err = ytDlpURLFetch(targetURL, uniqueEpisodeURLs, ctx); err != nil {
+			return nil, err
+		}
 	}
 
-	// Collect URLs from all sources (scraping + files)
+	// Collect URLs from all sources (scraped + file)
 	episodeURLs := make([]string, 0, len(uniqueEpisodeURLs)+len(fileURLs))
 	for url := range uniqueEpisodeURLs {
 		episodeURLs = append(episodeURLs, url)
@@ -171,8 +183,19 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 	}
 
 	// Filter out existing URLs
-	var newURLs = make([]string, 0, len(episodeURLs))
-	for _, url := range episodeURLs {
+	newURLs := ignoreDownloadedURLs(episodeURLs, existingURLs)
+
+	if len(newURLs) == 0 {
+		logging.I("No new videos at %s", targetURL)
+		return nil, nil
+	}
+	return newURLs, nil
+}
+
+// ignoreDownloadedURLs filters out already downloaded URLs.
+func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
+	var newURLs = make([]string, 0, len(inputURLs))
+	for _, url := range inputURLs {
 		normalizedURL := normalizeURL(url)
 		exists := false
 		for _, existingURL := range existingURLs {
@@ -185,12 +208,7 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 			newURLs = append(newURLs, url)
 		}
 	}
-
-	if len(newURLs) == 0 {
-		logging.I("No new videos at %s", targetURL)
-		return nil, nil
-	}
-	return newURLs, nil
+	return newURLs
 }
 
 // normalizeURL standardizes URLs for comparison by removing protocol and any trailing slashes.
@@ -200,4 +218,31 @@ func normalizeURL(inputURL string) string {
 	cleanURL := strings.TrimPrefix(inputURL, "https://")
 	cleanURL = strings.TrimPrefix(cleanURL, "http://")
 	return strings.TrimSuffix(cleanURL, "/")
+}
+
+// ytDlpURLFetch fetches URLs using yt-dlp.
+func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, ctx context.Context) (map[string]struct{}, error) {
+	cmd := exec.CommandContext(ctx, "yt-dlp", consts.YtDLPFlatPlaylist, consts.YtDLPOutputJSON, chanURL)
+
+	j, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var result ytDlpOutput
+	if err := json.Unmarshal(j, &result); err != nil {
+		return nil, err
+	}
+
+	for _, entry := range result.Entries {
+		uniqueEpisodeURLs[entry.URL] = struct{}{}
+	}
+
+	return uniqueEpisodeURLs, nil
+}
+
+type ytDlpOutput struct {
+	Entries []struct {
+		URL string `json:"url"`
+	} `json:"entries"`
 }

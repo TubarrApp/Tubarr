@@ -117,8 +117,11 @@ func makeMetarrCommand(v *models.Video) []string {
 	// Final args
 	args := make([]string, 0, singlesLen+sliceLen)
 
+	var metaOW bool
 	for _, f := range fields {
-		processField(f, argMap, argSlicesMap)
+		if processField(f, argMap, argSlicesMap) {
+			metaOW = true
+		}
 	}
 
 	for k, v := range argMap {
@@ -131,12 +134,16 @@ func makeMetarrCommand(v *models.Video) []string {
 		}
 	}
 
+	if metaOW {
+		args = append(args, metcmd.MetaOW)
+	}
+
 	logging.I("Built Metarr argument list: %v", args)
 	return args
 }
 
 // processField processes each field in the argument map.
-func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string) {
+func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string) (metaOW bool) {
 	switch f.valType {
 	case i:
 		if f.metarrValue.i > 0 {
@@ -162,7 +169,22 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
 			argSlicesMap[f.cmdKey] = cfg.GetStringSlice(f.viperKey)
 		}
+
+		// Set Meta Overwrite flag if meta-ops arguments exist
+		if f.cmdKey == metcmd.MetaOps {
+			elemCount := len(f.metarrValue.strSlice)
+
+			if cfg.IsSet(f.viperKey) {
+				elemCount += len(cfg.GetStringSlice(f.viperKey))
+			}
+
+			if elemCount > 0 {
+				logging.I("User set meta ops, will set meta overwrite key...")
+				return true
+			}
+		}
 	}
+	return false
 }
 
 // parseOutputDir parses and returns the output directory.
