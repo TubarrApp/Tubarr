@@ -128,11 +128,7 @@ func (ds *DownloadStore) UpdateDownloadStatuses(ctx context.Context, updates []m
 	query := squirrel.Update(consts.DBDownloads)
 	for _, update := range updates {
 
-		if update.Percent > 100.0 || update.Status == consts.DLStatusCompleted {
-			update.Percent = 100.0
-		} else if update.Percent < 0.0 {
-			update.Percent = 0.0
-		}
+		normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
 
 		query = query.
 			Set(consts.QDLStatus, update.Status).

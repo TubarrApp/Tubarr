@@ -27,7 +27,6 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPUPtr *float64, metarrConcurrencyPtr
 	// String
 	if extPtr != nil {
 		cmd.Flags().StringVar(extPtr, keys.OutputFiletype, "", "Output filetype for videos passed into Metarr")
-		ext = *extPtr
 	}
 	if filenameDateTagPtr != nil {
 		cmd.Flags().StringVar(filenameDateTagPtr, keys.InputFileDatePfx, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
