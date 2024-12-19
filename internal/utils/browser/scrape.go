@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	"tubarr/internal/cfg"
+	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/errconsts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
@@ -28,6 +30,12 @@ type Browser struct {
 type urlPattern struct {
 	name    string
 	pattern string
+}
+
+type ytDlpOutput struct {
+	Entries []struct {
+		URL string `json:"url"`
+	} `json:"entries"`
 }
 
 const (
@@ -222,16 +230,20 @@ func normalizeURL(inputURL string) string {
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
 func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, ctx context.Context) (map[string]struct{}, error) {
-	cmd := exec.CommandContext(ctx, "yt-dlp", consts.YtDLPFlatPlaylist, consts.YtDLPOutputJSON, chanURL)
+	if uniqueEpisodeURLs == nil {
+		uniqueEpisodeURLs = make(map[string]struct{})
+	}
+
+	cmd := exec.CommandContext(ctx, cmdvideo.YTDLP, consts.YtDLPFlatPlaylist, consts.YtDLPOutputJSON, chanURL)
 
 	j, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return uniqueEpisodeURLs, fmt.Errorf(errconsts.YTDLPFailure, err)
 	}
 
 	var result ytDlpOutput
 	if err := json.Unmarshal(j, &result); err != nil {
-		return nil, err
+		return uniqueEpisodeURLs, err
 	}
 
 	for _, entry := range result.Entries {
@@ -239,10 +251,4 @@ func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, ctx co
 	}
 
 	return uniqueEpisodeURLs, nil
-}
-
-type ytDlpOutput struct {
-	Entries []struct {
-		URL string `json:"url"`
-	} `json:"entries"`
 }

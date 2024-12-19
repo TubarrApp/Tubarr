@@ -25,9 +25,10 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 	return nil
 }
 
+// SetProgramRelatedFlags sets flags for the Tubarr instance.
 func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd *string) {
 	if concurrency != nil {
-		cmd.Flags().IntVarP(concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this channel")
+		cmd.Flags().IntVarP(concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this instance")
 	}
 	if crawlFreq != nil {
 		cmd.Flags().IntVar(crawlFreq, keys.CrawlFreq, 30, "New crawl frequency in minutes")

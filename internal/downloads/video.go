@@ -13,6 +13,7 @@ import (
 
 	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/errconsts"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -90,11 +91,11 @@ func (d *Download) executeVideoDownload(cmd *exec.Cmd) error {
 
 	go d.scanVideoCmdOutput(io.MultiReader(stdout, stderr), filenameChan)
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("command start error: %w", err)
+		return fmt.Errorf(errconsts.YTDLPFailure, err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("command wait error: %w", err)
+		return fmt.Errorf(errconsts.YTDLPFailure, err)
 	}
 
 	filename := <-filenameChan
