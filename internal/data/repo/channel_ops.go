@@ -55,6 +55,28 @@ func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	return id, nil
 }
 
+// DeleteVideoURL deletes a URL from the downloaded database list.
+func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
+
+	if !cs.channelExistsID(channelID) {
+		return fmt.Errorf("channel with ID %d does not exist", channelID)
+	}
+
+	query := squirrel.
+		Delete(consts.DBVideos).
+		Where(squirrel.Eq{
+			consts.QVidChanID: channelID,
+			consts.QVidURL:    urls,
+		}).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return err
+	}
+	logging.S(0, "Deleted URLs %q for channel with ID '%d'", urls, channelID)
+	return nil
+}
+
 // AddURLToIgnore adds a URL into the database to ignore in subsequent crawls.
 func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error {
 
@@ -110,6 +132,28 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 	}
 
 	return urls, nil
+}
+
+// DeleteNotifyURLs deletes notify URLs from the channel.
+func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls []string) error {
+
+	if !cs.channelExistsID(channelID) {
+		return fmt.Errorf("channel with ID %d does not exist", channelID)
+	}
+
+	query := squirrel.
+		Delete(consts.DBNotifications).
+		Where(squirrel.Eq{
+			consts.QVidChanID: channelID,
+			consts.QNotifyURL: urls,
+		}).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return err
+	}
+	logging.S(0, "Deleted notify URLs %q for channel with ID '%d'", urls, channelID)
+	return nil
 }
 
 // AddNotifyURL sets a notification table entry for a channel with a given ID.

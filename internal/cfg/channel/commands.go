@@ -38,6 +38,8 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(addCrawlToIgnore(cs, s, ctx))
 	channelCmd.AddCommand(addURLToIgnore(cs))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
+	channelCmd.AddCommand(deleteURLs(cs))
+	channelCmd.AddCommand(deleteNotifyURLs(cs))
 	channelCmd.AddCommand(listChannelCmd(cs))
 	channelCmd.AddCommand(listAllChannelsCmd(cs))
 	channelCmd.AddCommand(updateChannelRow(cs))
@@ -45,6 +47,47 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(addNotifyURL(cs))
 
 	return channelCmd
+}
+
+// deleteURLs deletes a list of URLs inputted by the user.
+func deleteURLs(cs interfaces.ChannelStore) *cobra.Command {
+
+	var (
+		cFile, channelURL, channelName string
+		channelID                      int
+		urls                           []string
+	)
+
+	deleteURLsCmd := &cobra.Command{
+		Use:   "delete-urls",
+		Short: "Remove URLs from the database.",
+		Long:  "If using a file, the file should contain one URL per line.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if cFile == "" && len(urls) == 0 {
+				return errors.New("must enter a URL source")
+			}
+
+			key, val, err := getChanKeyVal(channelID, channelName, channelURL)
+			if err != nil {
+				return err
+			}
+
+			chanID, err := cs.GetID(key, val)
+			if err != nil {
+				return err
+			}
+
+			if err := cs.DeleteVideoURLs(chanID, urls); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	SetPrimaryChannelFlags(deleteURLsCmd, &channelName, &channelURL, &channelID)
+	deleteURLsCmd.Flags().StringSliceVar(&urls, keys.URLAdd, nil, "Enter a list of URLs to delete from the database.")
+
+	return deleteURLsCmd
 }
 
 // dlURLs downloads a list of URLs inputted by the user.
@@ -91,6 +134,54 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 	return dlURLFileCmd
 }
 
+// deleteNotifyURLs deletes notification URLs from a channel.
+func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		channelName, channelURL string
+		channelID               int
+		notifyURLs              []string
+	)
+
+	deleteNotifyCmd := &cobra.Command{
+		Use:   "notify-delete",
+		Short: "Deletes a notify function from a channel.",
+		Long:  "Enter a fully qualified notification URL here to delete from the database.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			if len(notifyURLs) == 0 {
+				return errors.New("must enter at least one notify URL to delete")
+			}
+
+			var (
+				id = int64(channelID)
+			)
+			if id == 0 {
+				key, val, err := getChanKeyVal(channelID, channelName, channelURL)
+				if err != nil {
+					return err
+				}
+
+				id, err = cs.GetID(key, val)
+				if err != nil {
+					return err
+				}
+			}
+
+			if err := cs.DeleteNotifyURLs(id, notifyURLs); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	SetPrimaryChannelFlags(deleteNotifyCmd, &channelName, &channelURL, &channelID)
+	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, "notify-urls", nil, "Full notification URL including tokens")
+
+	return deleteNotifyCmd
+}
+
 // addNotifyURL adds a notification URL (can use to send requests to update Plex libraries on new video addition).
 func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
 	var (
@@ -125,7 +216,7 @@ func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if notifyName == "" {
-				notifyName = channelName
+				notifyName = notifyURL
 			}
 
 			if err := cs.AddNotifyURL(id, notifyName, notifyURL); err != nil {

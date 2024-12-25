@@ -23,6 +23,8 @@ type ChannelStore interface {
 	CrawlChannel(key, val string, s Store, ctx context.Context) error
 	CrawlChannelIgnore(key, val string, s Store, ctx context.Context) error
 	DeleteChannel(key, val string) error
+	DeleteVideoURLs(channelID int64, urls []string) error
+	DeleteNotifyURLs(channelID int64, urls []string) error
 	FetchAllChannels() (channels []*models.Channel, err error, hasRows bool)
 	FetchChannel(id int64) (c *models.Channel, err error, hasRows bool)
 	GetDB() *sql.DB
