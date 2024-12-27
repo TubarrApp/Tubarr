@@ -17,6 +17,9 @@ type Channel struct {
 	Settings   ChannelSettings `json:"settings" db:"settings"`
 	MetarrArgs MetarrArgs      `json:"metarr" db:"metarr"`
 	LastScan   time.Time       `db:"last_scan"`
+	Username   string          `db:"username"`
+	Password   string          `db:"password"`
+	LoginURL   string          `db:"login_url"`
 	CreatedAt  time.Time       `db:"created_at"`
 	UpdatedAt  time.Time       `db:"updated_at"`
 }

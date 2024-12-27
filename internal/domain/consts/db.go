@@ -32,6 +32,9 @@ const (
 	QChanSettings        = "settings"
 	QChanMetarr          = "metarr"
 	QChanLastScan        = "last_scan"
+	QChanUsername        = "username"
+	QChanPassword        = "password"
+	QChanLoginURL        = "login_url"
 	QChanCreatedAt       = "created_at"
 	QChanUpdatedAt       = "updated_at"
 )

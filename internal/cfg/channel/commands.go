@@ -32,6 +32,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	cs := s.ChannelStore()
 
 	// Add subcommands with dependencies
+	channelCmd.AddCommand(addAuth(cs))
 	channelCmd.AddCommand(addChannelCmd(cs))
 	channelCmd.AddCommand(dlURLs(cs, s, ctx))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s, ctx))
@@ -47,6 +48,49 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(addNotifyURL(cs))
 
 	return channelCmd
+}
+
+// addAuth adds authentication details to a channel.
+func addAuth(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		channelName, channelURL      string
+		channelID                    int
+		username, password, loginURL string
+	)
+
+	addAuthCmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Add authentication details to a channel.",
+		Long:  "Add authentication details to a channel for use in crawls.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if username == "" || password == "" || loginURL == "" {
+				return errors.New("must enter a username, password, and login URL")
+			}
+
+			chanID := int64(channelID)
+
+			if channelID == 0 {
+				key, val, err := getChanKeyVal(channelID, channelName, channelURL)
+				if err != nil {
+					return err
+				}
+
+				if chanID, err = cs.GetID(key, val); err != nil {
+					return err
+				}
+			}
+
+			if err := cs.AddAuth(chanID, username, password, loginURL); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	SetPrimaryChannelFlags(addAuthCmd, &channelName, &channelURL, &channelID)
+	addAuthCmd.Flags().StringVar(&username, "username", "", "Enter the username for the channel")
+	addAuthCmd.Flags().StringVar(&password, "password", "", "Enter the password for the channel")
+	addAuthCmd.Flags().StringVar(&loginURL, "login-url", "", "Enter the login URL for the channel")
+	return addAuthCmd
 }
 
 // deleteURLs deletes a list of URLs inputted by the user.

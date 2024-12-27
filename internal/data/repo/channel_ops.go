@@ -201,6 +201,27 @@ func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) err
 	return nil
 }
 
+// AddAuth adds authentication details to a channel.
+func (cs ChannelStore) AddAuth(channelID int64, username, password, loginURL string) error {
+	if !cs.channelExistsID(channelID) {
+		return fmt.Errorf("channel with ID %d does not exist", channelID)
+	}
+
+	query := squirrel.
+		Update(consts.DBChannels).
+		Set(consts.QChanUsername, username).
+		Set(consts.QChanPassword, password).
+		Set(consts.QChanLoginURL, loginURL).
+		Where(squirrel.Eq{consts.QChanID: channelID}).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return err
+	}
+	logging.S(0, "Added authentication details for channel with ID %d", channelID)
+	return nil
+}
+
 // AddChannel adds a new channel to the database.
 func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	switch {
@@ -242,6 +263,9 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
+			consts.QChanUsername,
+			consts.QChanPassword,
+			consts.QChanLoginURL,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -253,6 +277,9 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			settingsJSON,
 			metarrJSON,
 			now,
+			c.Username,
+			c.Password,
+			c.LoginURL,
 			now,
 			now,
 		).
