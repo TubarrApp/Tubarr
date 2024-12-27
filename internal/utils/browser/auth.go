@@ -51,6 +51,7 @@ func login(username, password, loginURL string) ([]*http.Cookie, error) {
 	// Prepare the login form data
 	data := url.Values{}
 	data.Set("username", username)
+	data.Set("email", username)
 	data.Set("password", password)
 	if token != "" {
 		data.Set("_token", token)
