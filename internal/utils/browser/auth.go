@@ -72,7 +72,7 @@ func login(username, password, loginURL string) ([]*http.Cookie, error) {
 	return resp.Cookies(), nil
 }
 
-// parseToken parses the HTML body to find the value of the hidden token field
+// parseToken parses the HTML body to find the value of the token field.
 func parseToken(body string) string {
 	doc, err := html.Parse(strings.NewReader(body))
 	if err != nil {
