@@ -55,6 +55,21 @@ func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	return id, nil
 }
 
+// GetAuth gets authentication details for a channel.
+func (cs *ChannelStore) GetAuth(channelID int64) (username, password, loginURL string, err error) {
+	query := squirrel.
+		Select("username", "password", "login_url").
+		From(consts.DBChannels).
+		Where(squirrel.Eq{consts.QChanID: channelID}).
+		RunWith(cs.DB)
+
+	if err = query.QueryRow().Scan(&username, &password, &loginURL); err != nil {
+		return "", "", "", err
+	}
+
+	return username, password, loginURL, nil
+}
+
 // DeleteVideoURL deletes a URL from the downloaded database list.
 func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
 

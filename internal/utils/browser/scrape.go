@@ -3,7 +3,9 @@ package browser
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -89,6 +91,17 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	cookies, err := b.cookies.GetCookies(c.URL)
 	if err != nil {
 		return nil, err
+	}
+
+	if cookies == nil {
+		if username, password, loginURL, err := cs.GetAuth(c.ID); err == nil {
+			cookies, err = channelAuth(username, password, c.URL, loginURL)
+			if err != nil {
+				return nil, err
+			}
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
 	}
 
 	var fileURLs []string

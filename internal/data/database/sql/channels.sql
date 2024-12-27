@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS channels (
     settings JSON,
     metarr JSON,
     last_scan TIMESTAMP,
+    username TEXT,
+    password TEXT,
+    login_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
