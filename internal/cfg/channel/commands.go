@@ -447,6 +447,9 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				},
 
 				LastScan:  now,
+				Username:  username,
+				Password:  password,
+				LoginURL:  loginURL,
 				CreatedAt: now,
 				UpdatedAt: now,
 			}

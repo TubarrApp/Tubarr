@@ -15,9 +15,9 @@ import (
 )
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func channelAuth(username, password, channelURL, loginURL, cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
+func channelAuth(channelURL, cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 	if customAuthCookies[channelURL] == nil { // If the user is not already authenticated
-		cookies, err := login(username, password, loginURL, cookiesFilePath, c)
+		cookies, err := login(cookiesFilePath, c)
 		if err != nil {
 			return nil, err
 		}
@@ -27,7 +27,7 @@ func channelAuth(username, password, channelURL, loginURL, cookiesFilePath strin
 }
 
 // login logs the user in and returns the authentication cookie.
-func login(username, password, loginURL, cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
+func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err
@@ -35,10 +35,10 @@ func login(username, password, loginURL, cookiesFilePath string, c *models.Chann
 
 	client := &http.Client{Jar: jar}
 
-	logging.I("Logging in to %q", loginURL)
+	logging.I("Logging in to %q", c.LoginURL)
 
 	// Fetch the login page to get a fresh token
-	req, err := http.NewRequest("GET", loginURL, nil)
+	req, err := http.NewRequest("GET", c.LoginURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -59,18 +59,18 @@ func login(username, password, loginURL, cookiesFilePath string, c *models.Chann
 
 	// Prepare the login form data
 	data := url.Values{}
-	data.Set("email", username)
-	data.Set("username", username)
-	data.Set("password", password)
+	data.Set("email", c.Username)
+	data.Set("username", c.Username)
+	data.Set("password", c.Password)
 	if token != "" {
 		data.Set("_token", token)
 	}
 
-	logging.I("Logging in with username/email %q...", username)
+	logging.I("Logging in with username/email %q...", c.Username)
 	logging.I("Sending token %q", data.Get("_token"))
 
 	// Post the login form
-	req, err = http.NewRequest("POST", loginURL, strings.NewReader(data.Encode()))
+	req, err = http.NewRequest("POST", c.LoginURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}

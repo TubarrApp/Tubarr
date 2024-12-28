@@ -58,15 +58,15 @@ func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 // GetAuth gets authentication details for a channel.
 func (cs *ChannelStore) GetAuth(channelID int64) (username, password, loginURL string, err error) {
 	query := squirrel.
-		Select("username", "password", "login_url").
+		Select(consts.QChanUsername, consts.QChanPassword, consts.QChanLoginURL).
 		From(consts.DBChannels).
 		Where(squirrel.Eq{consts.QChanID: channelID}).
 		RunWith(cs.DB)
 
 	if err = query.QueryRow().Scan(&username, &password, &loginURL); err != nil {
+		logging.I("No auth details in the database for channel with ID: %d", channelID)
 		return "", "", "", err
 	}
-
 	return username, password, loginURL, nil
 }
 
@@ -337,6 +337,9 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
+			consts.QChanUsername,
+			consts.QChanPassword,
+			consts.QChanLoginURL,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -355,6 +358,9 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 			&settings,
 			&metarrJSON,
 			&c.LastScan,
+			&c.Username,
+			&c.Password,
+			&c.LoginURL,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
@@ -397,6 +403,9 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
+			consts.QChanUsername,
+			consts.QChanPassword,
+			consts.QChanLoginURL,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -416,6 +425,9 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 			&settings,
 			&metarrJSON,
 			&c.LastScan,
+			&c.Username,
+			&c.Password,
+			&c.LoginURL,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
@@ -453,6 +465,9 @@ func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err err
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
+			consts.QChanUsername,
+			consts.QChanPassword,
+			consts.QChanLoginURL,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -471,6 +486,9 @@ func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err err
 		&settingsJSON,
 		&metarrJSON,
 		&c.LastScan,
+		&c.Username,
+		&c.Password,
+		&c.LoginURL,
 		&c.CreatedAt,
 		&c.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -507,6 +525,9 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
+			consts.QChanUsername,
+			consts.QChanPassword,
+			consts.QChanLoginURL,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -538,6 +559,9 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 			&settingsJSON,
 			&metarrJSON,
 			&c.LastScan,
+			&c.Username,
+			&c.Password,
+			&c.LoginURL,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		)

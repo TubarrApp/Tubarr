@@ -95,12 +95,14 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	var cookies []*http.Cookie
 
 	if c.BaseDomain == "" {
+		logging.D(1, "Parsing URL %q", c.URL)
 		parsed, err := url.Parse(c.URL)
 		if err != nil {
 			return nil, err
 		}
 		c.BaseDomain = parsed.Hostname()
 		c.BaseDomainWithProto = parsed.Scheme + "://" + c.BaseDomain
+		logging.D(1, "Saved channel domain %q\nChannel domain with protocol %q", c.BaseDomain, c.BaseDomainWithProto)
 	}
 
 	if customAuthCookies[c.BaseDomain] == nil {
@@ -126,15 +128,20 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		b.WriteString(noSpaceChanName)
 		b.WriteString(txtExt)
 
-		if username, password, loginURL, err := cs.GetAuth(c.ID); err == nil {
-			cookies, err = channelAuth(username, password, c.BaseDomain, loginURL, b.String(), c)
+		if (c.Username == "" && c.Password == "") || c.LoginURL == "" {
+			logging.I("Logging in to %q with username %q", c.LoginURL, c.Username)
+			if c.Username, c.Password, c.LoginURL, err = cs.GetAuth(c.ID); !errors.Is(err, sql.ErrNoRows) {
+				return nil, err
+			}
+		}
+
+		if (c.Username != "" || c.Password != "") && c.LoginURL != "" {
+			logging.I("Logging in to %q with username %q", c.LoginURL, c.Username)
+			cookies, err = channelAuth(c.BaseDomain, b.String(), c)
 			if err != nil {
 				return nil, err
 			}
-		} else if !errors.Is(err, sql.ErrNoRows) {
-			return nil, err
 		}
-
 		customAuthCookies[c.BaseDomain] = cookies
 		logging.I("Set %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
 	} else {
