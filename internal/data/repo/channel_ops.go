@@ -150,7 +150,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 }
 
 // DeleteNotifyURLs deletes notify URLs from the channel.
-func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls []string) error {
+func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) error {
 
 	if !cs.channelExistsID(channelID) {
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
@@ -160,7 +160,10 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls []string) error {
 		Delete(consts.DBNotifications).
 		Where(squirrel.Eq{
 			consts.QVidChanID: channelID,
-			consts.QNotifyURL: urls,
+		}).
+		Where(squirrel.Or{
+			squirrel.Eq{consts.QNotifyURL: urls},
+			squirrel.Eq{consts.QNotifyName: names},
 		}).
 		RunWith(cs.DB)
 

@@ -89,7 +89,7 @@ func addAuth(cs interfaces.ChannelStore) *cobra.Command {
 	SetPrimaryChannelFlags(addAuthCmd, &channelName, &channelURL, &channelID)
 	addAuthCmd.Flags().StringVar(&username, "username", "", "Enter the username for the channel")
 	addAuthCmd.Flags().StringVar(&password, "password", "", "Enter the password for the channel")
-	addAuthCmd.Flags().StringVar(&loginURL, "login-url", "", "Enter the login URL for the channel")
+	addAuthCmd.Flags().StringVar(&loginURL, "login-url", "", "Enter the login URL for the site")
 	return addAuthCmd
 }
 
@@ -129,7 +129,7 @@ func deleteURLs(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	SetPrimaryChannelFlags(deleteURLsCmd, &channelName, &channelURL, &channelID)
-	deleteURLsCmd.Flags().StringSliceVar(&urls, keys.URLAdd, nil, "Enter a list of URLs to delete from the database.")
+	deleteURLsCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to delete from the database.")
 
 	return deleteURLsCmd
 }
@@ -173,7 +173,7 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 
 	SetPrimaryChannelFlags(dlURLFileCmd, &channelName, &channelURL, &channelID)
 	dlURLFileCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to this channel")
-	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLAdd, nil, "Enter a list of URLs to download")
+	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download")
 
 	return dlURLFileCmd
 }
@@ -183,7 +183,7 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 	var (
 		channelName, channelURL string
 		channelID               int
-		notifyURLs              []string
+		notifyURLs, notifyNames []string
 	)
 
 	deleteNotifyCmd := &cobra.Command{
@@ -211,7 +211,7 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
-			if err := cs.DeleteNotifyURLs(id, notifyURLs); err != nil {
+			if err := cs.DeleteNotifyURLs(id, notifyURLs, notifyNames); err != nil {
 				return err
 			}
 
@@ -221,7 +221,8 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Primary channel elements
 	SetPrimaryChannelFlags(deleteNotifyCmd, &channelName, &channelURL, &channelID)
-	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, "notify-urls", nil, "Full notification URL including tokens")
+	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, keys.URLs, nil, "Full notification URL including tokens")
+	deleteNotifyCmd.Flags().StringSliceVar(&notifyNames, "names", nil, "Full notification names")
 
 	return deleteNotifyCmd
 }

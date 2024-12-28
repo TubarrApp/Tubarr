@@ -3,9 +3,9 @@ package keys
 
 // Channel identifiers
 const (
-	URL  string = "url"
-	Name string = "name"
-	ID   string = "id"
+	URL  string = "channel-url"
+	Name string = "channel-name"
+	ID   string = "channel-id"
 )
 
 // Files and directories
@@ -31,6 +31,7 @@ const (
 	MoveOnComplete        string = "move-on-complete"
 	URLFile               string = "url-file"
 	URLAdd                string = "add-url"
+	URLs                  string = "urls"
 	Benchmarking          string = "benchmark"
 )
 
