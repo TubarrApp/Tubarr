@@ -35,7 +35,7 @@ func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 
 	client := &http.Client{Jar: jar}
 
-	logging.I("Logging in to %q", c.LoginURL)
+	logging.I("Logging in to %q with username %q", c.LoginURL, c.Username)
 
 	// Fetch the login page to get a fresh token
 	req, err := http.NewRequest("GET", c.LoginURL, nil)
@@ -55,7 +55,6 @@ func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 
 	// Parse the login page to find any hidden token fields
 	token := parseToken(string(body))
-	logging.I("Using token: %q", token)
 
 	// Prepare the login form data
 	data := url.Values{}
@@ -67,7 +66,7 @@ func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 	}
 
 	logging.I("Logging in with username/email %q...", c.Username)
-	logging.I("Sending token %q", data.Get("_token"))
+	logging.D(1, "Sending token %q", data.Get("_token"))
 
 	// Post the login form
 	req, err = http.NewRequest("POST", c.LoginURL, strings.NewReader(data.Encode()))

@@ -141,7 +141,6 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		sb.WriteString(txtExt)
 
 		if (c.Username != "" || c.Password != "") && c.LoginURL != "" {
-			logging.I("Logging in to %q with username %q", c.LoginURL, c.Username)
 			cookies, err = channelAuth(c.BaseDomain, sb.String(), c)
 			if err != nil {
 				return nil, err
