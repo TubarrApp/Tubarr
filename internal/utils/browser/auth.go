@@ -64,8 +64,6 @@ func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 	if token != "" {
 		data.Set("_token", token)
 	}
-
-	logging.I("Logging in with username/email %q...", c.Username)
 	logging.D(1, "Sending token %q", data.Get("_token"))
 
 	// Post the login form

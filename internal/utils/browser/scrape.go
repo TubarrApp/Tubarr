@@ -146,7 +146,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 				return nil, err
 			}
 			customAuthCookies[c.BaseDomain] = cookies
-			logging.I("Set %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
+			logging.D(2, "Set %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
 		}
 	} else {
 		cookies = customAuthCookies[c.BaseDomain]

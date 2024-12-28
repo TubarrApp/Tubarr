@@ -137,7 +137,7 @@ func saveCookiesToFile(cookies []*http.Cookie, filePath string, c *models.Channe
 	}
 
 	// Log the cookies for debugging
-	logging.I("Saving %d cookies to file %s", len(cookies), filePath)
+	logging.D(1, "Saving %d cookies to file %s...", len(cookies), filePath)
 
 	for _, cookie := range cookies {
 		domain := cookie.Domain
@@ -172,8 +172,5 @@ func saveCookiesToFile(cookies []*http.Cookie, filePath string, c *models.Channe
 
 	// Save the cookie path to the Channel model
 	c.CookiePath = filePath
-
-	logging.I("Saved cookies at %q", filePath)
-
 	return nil
 }
