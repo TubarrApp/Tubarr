@@ -10,9 +10,9 @@ const (
 
 // Auth
 const (
-	Username string = "username"
-	Password string = "password"
-	LoginURL string = "login-url"
+	AuthUsername string = "auth-username"
+	AuthPassword string = "auth-password"
+	AuthURL      string = "auth-url"
 )
 
 // Files and directories
