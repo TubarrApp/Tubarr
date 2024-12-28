@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -91,17 +93,53 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	}
 
 	var cookies []*http.Cookie
-	if customAuthCookies[c.URL] == nil {
+
+	if c.BaseDomain == "" {
+		parsed, err := url.Parse(c.URL)
+		if err != nil {
+			return nil, err
+		}
+		c.BaseDomain = parsed.Hostname()
+		c.BaseDomainWithProto = parsed.Scheme + "://" + c.BaseDomain
+	}
+
+	if customAuthCookies[c.BaseDomain] == nil {
+		const (
+			tubarrDir = ".tubarr/"
+			txtExt    = ".txt"
+		)
+
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "/"
+		}
+
+		var b strings.Builder
+		b.Grow(len(homeDir) + 1 + len(tubarrDir) + len(c.Name) + len(txtExt))
+		b.WriteString(homeDir)
+		if !strings.HasSuffix(c.VideoDir, "/") {
+			b.WriteRune('/')
+		}
+		b.WriteString(tubarrDir)
+
+		noSpaceChanName := strings.ReplaceAll(c.Name, " ", "-")
+		b.WriteString(noSpaceChanName)
+		b.WriteString(txtExt)
+
 		if username, password, loginURL, err := cs.GetAuth(c.ID); err == nil {
-			cookies, err = channelAuth(username, password, c.URL, loginURL)
+			cookies, err = channelAuth(username, password, c.BaseDomain, loginURL, b.String(), c)
 			if err != nil {
 				return nil, err
 			}
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
+
+		customAuthCookies[c.BaseDomain] = cookies
+		logging.I("Set %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
 	} else {
-		cookies = customAuthCookies[c.URL]
+		cookies = customAuthCookies[c.BaseDomain]
+		logging.D(2, "Retrieved %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
 	}
 
 	if cookies == nil {
@@ -136,6 +174,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 					Channel:    c,
 					Settings:   c.Settings,
 					MetarrArgs: c.MetarrArgs,
+					CookiePath: c.CookiePath,
 				})
 			}
 		}

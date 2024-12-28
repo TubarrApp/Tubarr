@@ -21,8 +21,12 @@ func (d *Download) buildJSONCommand() *exec.Cmd {
 		cmdjson.WriteInfoJSON,
 		cmdjson.P, d.Video.JSONDir)
 
-	if d.Video.Settings.CookieSource != "" {
-		args = append(args, cmdjson.CookieSource, d.Video.Settings.CookieSource)
+	if d.Video.CookiePath == "" {
+		if d.Video.Settings.CookieSource != "" {
+			args = append(args, cmdjson.CookieSource, d.Video.Settings.CookieSource)
+		}
+	} else {
+		args = append(args, cmdjson.CookiePath, d.Video.CookiePath)
 	}
 
 	if d.Video.Settings.MaxFilesize != "" {

@@ -4,6 +4,7 @@ package cmdvideo
 const (
 	AfterMove         = "after_move:%(filepath)s"
 	CookieSource      = "--cookies-from-browser"
+	CookiePath        = "--cookies"
 	ExternalDLer      = "--external-downloader"
 	ExternalDLArgs    = "--external-downloader-args"
 	FilenameSyntax    = "%(title)s.%(ext)s"

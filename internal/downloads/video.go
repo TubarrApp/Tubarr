@@ -33,8 +33,12 @@ func (d *Download) buildVideoCommand() *exec.Cmd {
 
 	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
-	if d.Video.Settings.CookieSource != "" {
-		args = append(args, cmdvideo.CookieSource, d.Video.Settings.CookieSource)
+	if d.Video.CookiePath == "" {
+		if d.Video.Settings.CookieSource != "" {
+			args = append(args, cmdvideo.CookieSource, d.Video.Settings.CookieSource)
+		}
+	} else {
+		args = append(args, cmdvideo.CookiePath, d.Video.CookiePath)
 	}
 
 	if d.Video.Settings.MaxFilesize != "" {

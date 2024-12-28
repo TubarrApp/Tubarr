@@ -3,36 +3,37 @@ package browser
 import (
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"strings"
+	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
+
+	"golang.org/x/net/publicsuffix"
 
 	"golang.org/x/net/html"
 )
 
-var AuthenticatedCookies = make(map[string][]*http.Cookie)
-
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func channelAuth(username, password, channelURL, loginURL string) ([]*http.Cookie, error) {
-	parsed, err := url.Parse(channelURL)
-	if err != nil {
-		return nil, err
-	}
-	channelURL = parsed.Hostname()
-
-	if AuthenticatedCookies[channelURL] == nil { // If the user is not already authenticated
-		cookies, err := login(username, password, loginURL)
+func channelAuth(username, password, channelURL, loginURL, cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
+	if customAuthCookies[channelURL] == nil { // If the user is not already authenticated
+		cookies, err := login(username, password, loginURL, cookiesFilePath, c)
 		if err != nil {
 			return nil, err
 		}
-		AuthenticatedCookies[channelURL] = cookies
+		customAuthCookies[channelURL] = cookies
 	}
-	return AuthenticatedCookies[channelURL], nil
+	return customAuthCookies[channelURL], nil
 }
 
 // login logs the user in and returns the authentication cookie.
-func login(username, password, loginURL string) ([]*http.Cookie, error) {
-	client := &http.Client{}
+func login(username, password, loginURL, cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Jar: jar}
 
 	logging.I("Logging in to %q", loginURL)
 
@@ -59,10 +60,13 @@ func login(username, password, loginURL string) ([]*http.Cookie, error) {
 	// Prepare the login form data
 	data := url.Values{}
 	data.Set("email", username)
+	data.Set("username", username)
 	data.Set("password", password)
 	if token != "" {
 		data.Set("_token", token)
 	}
+
+	var visitedURLs []*url.URL
 
 	logging.I("Logging in with username/email %q...", username)
 	logging.I("Sending token %q", data.Get("_token"))
@@ -74,27 +78,24 @@ func login(username, password, loginURL string) ([]*http.Cookie, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	// Copy cookies from the GET response to the POST request
-	for _, cookie := range resp.Cookies() {
-		req.AddCookie(cookie)
-	}
-
 	resp, err = client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logging.E(0, "Failed to read response body: %q", err)
+	// Add URL to visited list
+	visitedURLs = append(visitedURLs, req.URL)
+
+	// Log the cookies for debugging
+	for _, cookie := range resp.Cookies() {
+		logging.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
 	}
 
-	if resp.StatusCode == http.StatusOK {
-		logging.I("Login successful for username/email %q", username)
-	} else {
-		logging.E(0, "Login failed for username/email %q with status code %d", username, resp.StatusCode)
-		logging.E(0, "Response body: %s", string(respBody))
+	// Save cookies to file
+	err = saveCookiesToFile(resp.Cookies(), cookiesFilePath, c)
+	if err != nil {
+		return nil, err
 	}
 
 	return resp.Cookies(), nil

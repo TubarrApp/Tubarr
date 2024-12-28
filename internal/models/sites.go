@@ -9,19 +9,22 @@ import (
 //
 // Matches the order of the DB table, do not alter.
 type Channel struct {
-	ID         int64           `db:"id"`
-	URL        string          `db:"url"`
-	Name       string          `db:"name"`
-	VideoDir   string          `db:"video_directory"`
-	JSONDir    string          `db:"json_directory"`
-	Settings   ChannelSettings `json:"settings" db:"settings"`
-	MetarrArgs MetarrArgs      `json:"metarr" db:"metarr"`
-	LastScan   time.Time       `db:"last_scan"`
-	Username   string          `db:"username"`
-	Password   string          `db:"password"`
-	LoginURL   string          `db:"login_url"`
-	CreatedAt  time.Time       `db:"created_at"`
-	UpdatedAt  time.Time       `db:"updated_at"`
+	ID                  int64           `db:"id"`
+	URL                 string          `db:"url"`
+	Name                string          `db:"name"`
+	VideoDir            string          `db:"video_directory"`
+	JSONDir             string          `db:"json_directory"`
+	Settings            ChannelSettings `json:"settings" db:"settings"`
+	MetarrArgs          MetarrArgs      `json:"metarr" db:"metarr"`
+	LastScan            time.Time       `db:"last_scan"`
+	Username            string          `db:"username"`
+	Password            string          `db:"password"`
+	LoginURL            string          `db:"login_url"`
+	CreatedAt           time.Time       `db:"created_at"`
+	UpdatedAt           time.Time       `db:"updated_at"`
+	CookiePath          string
+	BaseDomain          string
+	BaseDomainWithProto string
 }
 
 // Video contains fields relating to a video, and a pointer to the channel it belongs to..
@@ -46,4 +49,5 @@ type Video struct {
 	DownloadStatus DLStatus        `json:"download_status" db:"download_status"`
 	CreatedAt      time.Time       `db:"created_at"`
 	UpdatedAt      time.Time       `db:"updated_at"`
+	CookiePath     string
 }

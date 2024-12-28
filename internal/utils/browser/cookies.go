@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
+	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
@@ -91,7 +93,7 @@ func (cm *CookieManager) loadCookiesForDomain(domain string) ([]*http.Cookie, er
 	return cookies, nil
 }
 
-// convertToHTTPCookies converts kooky cookies to http.Cookie format
+// convertToHTTPCookies converts kooky cookies to http.Cookie format.
 func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 	httpCookies := make([]*http.Cookie, len(kookyCookies))
 	for i, c := range kookyCookies {
@@ -106,7 +108,7 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 	return httpCookies
 }
 
-// extractBaseDomain parses a URL and extracts its base domain
+// extractBaseDomain parses a URL and extracts its base domain.
 func extractBaseDomain(urlString string) (string, error) {
 	parsedURL, err := url.Parse(urlString)
 	if err != nil {
@@ -118,4 +120,60 @@ func extractBaseDomain(urlString string) (string, error) {
 		return strings.Join(parts[len(parts)-2:], "."), nil
 	}
 	return parsedURL.Hostname(), nil
+}
+
+// saveCookiesToFile saves the cookies to a file in Netscape format.
+func saveCookiesToFile(cookies []*http.Cookie, filePath string, c *models.Channel) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Write the header for the Netscape cookies file
+	_, err = file.WriteString("# Netscape HTTP Cookie File\n# https://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n")
+	if err != nil {
+		return err
+	}
+
+	// Log the cookies for debugging
+	logging.I("Saving %d cookies to file %s", len(cookies), filePath)
+
+	for _, cookie := range cookies {
+		domain := cookie.Domain
+		if domain == "" {
+			domain = c.BaseDomain
+		}
+
+		if !strings.HasPrefix(domain, ".") && strings.Count(domain, ".") > 1 {
+			domain = "." + domain
+		}
+
+		secure := "FALSE"
+		if cookie.Secure {
+			secure = "TRUE"
+		}
+
+		// Handle expiration time correctly
+		expires := int64(0)
+		if !cookie.Expires.IsZero() {
+			expires = cookie.Expires.Unix()
+		} else {
+			// Log if the expiration time is zero
+			logging.W("Cookie %s has no expiration time set", cookie.Name)
+		}
+
+		_, err := file.WriteString(fmt.Sprintf("%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+			domain, "FALSE", cookie.Path, secure, expires, cookie.Name, cookie.Value))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Save the cookie path to the Channel model
+	c.CookiePath = filePath
+
+	logging.I("Saved cookies at %q", filePath)
+
+	return nil
 }
