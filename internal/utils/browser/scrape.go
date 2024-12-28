@@ -3,9 +3,7 @@ package browser
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -92,7 +90,13 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		logging.I("Found %d existing downloaded video URLs:", len(existingMap))
 	}
 
-	var cookies []*http.Cookie
+	var (
+		cookies []*http.Cookie
+		sb      strings.Builder
+	)
+	const (
+		protoExt = "://"
+	)
 
 	if c.BaseDomain == "" {
 		logging.D(1, "Parsing URL %q", c.URL)
@@ -101,7 +105,14 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 			return nil, err
 		}
 		c.BaseDomain = parsed.Hostname()
-		c.BaseDomainWithProto = parsed.Scheme + "://" + c.BaseDomain
+		parsedScheme := parsed.Scheme
+
+		sb.Reset()
+		sb.Grow(len(parsedScheme) + len(protoExt) + len(c.BaseDomain))
+		sb.WriteString(parsedScheme)
+		sb.WriteString(protoExt)
+		sb.WriteString(c.BaseDomain)
+		c.BaseDomainWithProto = sb.String()
 		logging.D(1, "Saved channel domain %q\nChannel domain with protocol %q", c.BaseDomain, c.BaseDomainWithProto)
 	}
 
@@ -113,37 +124,31 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
+			logging.E(0, "Failed to get user home directory, reverting to '/': %v", err)
 			homeDir = "/"
 		}
 
-		var b strings.Builder
-		b.Grow(len(homeDir) + 1 + len(tubarrDir) + len(c.Name) + len(txtExt))
-		b.WriteString(homeDir)
+		sb.Reset()
+		sb.Grow(len(homeDir) + 1 + len(tubarrDir) + len(c.Name) + len(txtExt))
+		sb.WriteString(homeDir)
 		if !strings.HasSuffix(c.VideoDir, "/") {
-			b.WriteRune('/')
+			sb.WriteRune('/')
 		}
-		b.WriteString(tubarrDir)
+		sb.WriteString(tubarrDir)
 
 		noSpaceChanName := strings.ReplaceAll(c.Name, " ", "-")
-		b.WriteString(noSpaceChanName)
-		b.WriteString(txtExt)
-
-		if (c.Username == "" && c.Password == "") || c.LoginURL == "" {
-			logging.I("Logging in to %q with username %q", c.LoginURL, c.Username)
-			if c.Username, c.Password, c.LoginURL, err = cs.GetAuth(c.ID); !errors.Is(err, sql.ErrNoRows) {
-				return nil, err
-			}
-		}
+		sb.WriteString(noSpaceChanName)
+		sb.WriteString(txtExt)
 
 		if (c.Username != "" || c.Password != "") && c.LoginURL != "" {
 			logging.I("Logging in to %q with username %q", c.LoginURL, c.Username)
-			cookies, err = channelAuth(c.BaseDomain, b.String(), c)
+			cookies, err = channelAuth(c.BaseDomain, sb.String(), c)
 			if err != nil {
 				return nil, err
 			}
+			customAuthCookies[c.BaseDomain] = cookies
+			logging.I("Set %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
 		}
-		customAuthCookies[c.BaseDomain] = cookies
-		logging.I("Set %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
 	} else {
 		cookies = customAuthCookies[c.BaseDomain]
 		logging.D(2, "Retrieved %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
