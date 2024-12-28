@@ -61,6 +61,8 @@ var patterns = map[string]urlPattern{
 	defaultDom: {name: defaultDom, pattern: defaultPattern},
 }
 
+var customAuthCookies = make(map[string][]*http.Cookie)
+
 func NewBrowser() *Browser {
 	return &Browser{
 		cookies:   NewCookieManager(),
@@ -88,18 +90,23 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		logging.I("Found %d existing downloaded video URLs:", len(existingMap))
 	}
 
-	cookies, err := b.cookies.GetCookies(c.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	if cookies == nil {
+	var cookies []*http.Cookie
+	if customAuthCookies[c.URL] == nil {
 		if username, password, loginURL, err := cs.GetAuth(c.ID); err == nil {
 			cookies, err = channelAuth(username, password, c.URL, loginURL)
 			if err != nil {
 				return nil, err
 			}
 		} else if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	} else {
+		cookies = customAuthCookies[c.URL]
+	}
+
+	if cookies == nil {
+		cookies, err = b.cookies.GetCookies(c.URL)
+		if err != nil {
 			return nil, err
 		}
 	}
