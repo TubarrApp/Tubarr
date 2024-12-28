@@ -87,9 +87,7 @@ func addAuth(cs interfaces.ChannelStore) *cobra.Command {
 		},
 	}
 	SetPrimaryChannelFlags(addAuthCmd, &channelName, &channelURL, &channelID)
-	addAuthCmd.Flags().StringVar(&username, "username", "", "Enter the username for the channel")
-	addAuthCmd.Flags().StringVar(&password, "password", "", "Enter the password for the channel")
-	addAuthCmd.Flags().StringVar(&loginURL, "login-url", "", "Enter the login URL for the site")
+	cfgflags.SetAuthFlags(addAuthCmd, &username, &password, &loginURL)
 	return addAuthCmd
 }
 
@@ -356,7 +354,8 @@ func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store, ctx contex
 func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	var (
 		url, name, vDir, jDir, outDir, cookieSource,
-		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
+		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt,
+		username, password, loginURL string
 		dlFilters, metaOps, fileSfxReplace                 []string
 		crawlFreq, concurrency, metarrConcurrency, retries int
 		maxCPU                                             float64
@@ -473,6 +472,9 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Metarr
 	cfgflags.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
+
+	// Login credentials
+	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL)
 
 	return addCmd
 }
@@ -629,6 +631,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		name, url, cookieSource                                 string
 		minFreeMem, renameStyle, filenameDateTag, metarrExt     string
 		maxFilesize, externalDownloader, externalDownloaderArgs string
+		username, password, loginURL                            string
 		dlFilters, metaOps                                      []string
 		fileSfxReplace                                          []string
 	)
@@ -657,6 +660,27 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 					return fmt.Errorf("failed to update JSON directory: %w", err)
 				}
 				logging.S(0, "Updated JSON directory to %q", jDir)
+			}
+
+			if username != "" {
+				if err := cs.UpdateChannelEntry(key, val, consts.QChanUsername, username); err != nil {
+					return fmt.Errorf("failed to update username: %w", err)
+				}
+				logging.S(0, "Updated username to %q", username)
+			}
+
+			if password != "" {
+				if err := cs.UpdateChannelEntry(key, val, consts.QChanPassword, password); err != nil {
+					return fmt.Errorf("failed to update password: %w", err)
+				}
+				logging.S(0, "Updated password for channel with key:value %q:%q", key, val)
+			}
+
+			if loginURL != "" {
+				if err := cs.UpdateChannelEntry(key, val, consts.QChanLoginURL, loginURL); err != nil {
+					return fmt.Errorf("failed to update login URL: %w", err)
+				}
+				logging.S(0, "Updated login URL to %q", loginURL)
 			}
 
 			// Settings
@@ -722,6 +746,9 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Metarr
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
+
+	// Auth
+	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL)
 
 	return updateSettingsCmd
 }

@@ -8,6 +8,13 @@ const (
 	ID   string = "channel-id"
 )
 
+// Auth
+const (
+	Username string = "username"
+	Password string = "password"
+	LoginURL string = "login-url"
+)
+
 // Files and directories
 const (
 	VideoDir       string = "video-directory"
