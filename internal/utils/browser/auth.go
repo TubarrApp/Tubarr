@@ -66,8 +66,6 @@ func login(username, password, loginURL, cookiesFilePath string, c *models.Chann
 		data.Set("_token", token)
 	}
 
-	var visitedURLs []*url.URL
-
 	logging.I("Logging in with username/email %q...", username)
 	logging.I("Sending token %q", data.Get("_token"))
 
@@ -84,12 +82,11 @@ func login(username, password, loginURL, cookiesFilePath string, c *models.Chann
 	}
 	defer resp.Body.Close()
 
-	// Add URL to visited list
-	visitedURLs = append(visitedURLs, req.URL)
-
 	// Log the cookies for debugging
-	for _, cookie := range resp.Cookies() {
-		logging.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
+	if logging.Level > 1 {
+		for _, cookie := range resp.Cookies() {
+			logging.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
+		}
 	}
 
 	// Save cookies to file
