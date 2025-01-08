@@ -32,13 +32,15 @@ type Channel struct {
 // Matches the order of the DB table, do not alter.
 type Video struct {
 	ID             int64
-	ChannelID      int64           `db:"channel_id"`
-	Downloaded     bool            `db:"downloaded"`
-	VideoDir       string          `db:"video_directory"`
-	VideoPath      string          `db:"video_path"`
-	JSONDir        string          `db:"json_directory"`
-	JSONPath       string          `db:"json_path"`
-	URL            string          `db:"url"`
+	ChannelID      int64  `db:"channel_id"`
+	Downloaded     bool   `db:"downloaded"`
+	VideoDir       string `db:"video_directory"`
+	VideoPath      string `db:"video_path"`
+	JSONDir        string `db:"json_directory"`
+	JSONPath       string `db:"json_path"`
+	JSONCustomFile string
+	URL            string `db:"url"`
+	DirectVideoURL string
 	Title          string          `db:"title"`
 	Description    string          `db:"description"`
 	UploadDate     time.Time       `db:"upload_date"`

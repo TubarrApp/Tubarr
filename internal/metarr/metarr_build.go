@@ -112,7 +112,12 @@ func makeMetarrCommand(v *models.Video) []string {
 	argSlicesMap := make(map[string][]string, sliceLen)
 
 	argMap[metcmd.VideoFile] = v.VideoPath
-	argMap[metcmd.JSONFile] = v.JSONPath
+
+	if v.JSONCustomFile == "" {
+		argMap[metcmd.JSONFile] = v.JSONPath
+	} else {
+		argMap[metcmd.JSONFile] = v.JSONCustomFile
+	}
 
 	// Final args
 	args := make([]string, 0, singlesLen+sliceLen)

@@ -27,9 +27,17 @@ const (
 func (d *Download) buildVideoCommand() *exec.Cmd {
 	args := make([]string, 0, 32)
 
-	args = append(args,
-		cmdvideo.RestrictFilenames,
-		cmdvideo.Output, filepath.Join(d.Video.VideoDir, cmdvideo.FilenameSyntax))
+	args = append(args, cmdvideo.RestrictFilenames)
+
+	var outputSyntax string
+	if d.Video.JSONCustomFile != "" {
+		JSONFileName := filepath.Base(d.Video.JSONCustomFile)
+		outputSyntax = strings.TrimSuffix(JSONFileName, ".json") + ".%(ext)s"
+	} else {
+		outputSyntax = cmdvideo.FilenameSyntax
+	}
+
+	args = append(args, cmdvideo.Output, filepath.Join(d.Video.VideoDir, outputSyntax))
 
 	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
@@ -71,7 +79,13 @@ func (d *Download) buildVideoCommand() *exec.Cmd {
 		args = append(args, cmdvideo.Retries, strconv.Itoa(d.Video.Settings.Retries))
 	}
 
-	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum, d.Video.URL)
+	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
+
+	if d.Video.DirectVideoURL != "" {
+		args = append(args, d.Video.DirectVideoURL)
+	} else {
+		args = append(args, d.Video.URL)
+	}
 
 	cmd := exec.CommandContext(d.Context, cmdvideo.YTDLP, args...)
 	logging.D(1, "Built video download command for URL %q:\n%v", d.Video.URL, cmd.String())

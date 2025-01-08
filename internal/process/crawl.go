@@ -17,6 +17,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/utils/browser"
 	"tubarr/internal/utils/logging"
 )
@@ -65,6 +66,10 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) 
 
 	if len(videos) > 0 {
 		for _, v := range videos {
+			if v.URL == "" {
+				logging.D(5, "Skipping invalid video entry with no URL in channel %q", c.URL)
+				continue
+			}
 			v.DownloadStatus.Status = consts.DLStatusCompleted
 			v.DownloadStatus.Pct = 100.0
 		}
@@ -174,9 +179,38 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 
 	cs := s.ChannelStore()
 
+	// Parse output directories
+	dirParser := parsing.NewDirectoryParser(c, nil)
+	videoDir, err := dirParser.ParseDirectory(c.VideoDir)
+	if err != nil {
+		return fmt.Errorf("failed to parse video directory: %w", err)
+	}
+
+	jsonDir, err := dirParser.ParseDirectory(c.JSONDir)
+	if err != nil {
+		return fmt.Errorf("failed to parse JSON directory: %w", err)
+	}
+
+	c.VideoDir = videoDir
+	c.JSONDir = jsonDir
+
+	logging.S(1, "Parsed video directory: %s", c.VideoDir)
+	logging.S(1, "Parsed JSON directory: %s", c.JSONDir)
+
 	videos, err := browserInstance.GetNewReleases(cs, c, ctx)
 	if err != nil {
 		return err
+	}
+
+	for _, v := range videos {
+		// Detect censored.tv links
+		if strings.Contains(c.URL, "censored.tv") {
+			logging.I("Detected a censored.tv link. Using specialized scraper.")
+			err := browserInstance.ScrapeCensoredTVMetadata(v.URL, c.JSONDir, v)
+			if err != nil {
+				return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
+			}
+		}
 	}
 
 	var (

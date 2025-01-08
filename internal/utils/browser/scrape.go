@@ -3,9 +3,13 @@ package browser
 
 import (
 	"context"
+	"crypto/tls"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"os/exec"
@@ -22,6 +26,7 @@ import (
 	"tubarr/internal/utils/logging"
 
 	"github.com/gocolly/colly"
+	"golang.org/x/net/publicsuffix"
 )
 
 type Browser struct {
@@ -77,7 +82,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	}
 
 	existingURLs, err := cs.LoadGrabbedURLs(c)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
@@ -209,9 +214,11 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	// Set cookies
-	for _, cookie := range cookies {
-		if err := b.collector.SetCookies(targetURL, []*http.Cookie{cookie}); err != nil {
-			return nil, err
+	if len(cookies) > 0 {
+		for _, cookie := range cookies {
+			if err := b.collector.SetCookies(targetURL, []*http.Cookie{cookie}); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -305,11 +312,14 @@ func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, ctx co
 	}
 
 	cmd := exec.CommandContext(ctx, cmdvideo.YTDLP, consts.YtDLPFlatPlaylist, consts.YtDLPOutputJSON, chanURL)
+	logging.D(2, "Executing YTDLP command for channel %q:\n%s", chanURL, cmd.String())
 
 	j, err := cmd.Output()
 	if err != nil {
 		return uniqueEpisodeURLs, fmt.Errorf(errconsts.YTDLPFailure, err)
 	}
+
+	logging.D(5, "Retrieved command output from YTDLP for channel %q:\n\n%s", chanURL, string(j))
 
 	var result ytDlpOutput
 	if err := json.Unmarshal(j, &result); err != nil {
@@ -318,7 +328,143 @@ func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, ctx co
 
 	for _, entry := range result.Entries {
 		uniqueEpisodeURLs[entry.URL] = struct{}{}
+		logging.D(5, "Added entry for channel %q: %q", chanURL, entry)
 	}
 
 	return uniqueEpisodeURLs, nil
+}
+
+func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.Video) error {
+	// Create a custom cookie jar to hold cookies
+	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
+	if err != nil {
+		return fmt.Errorf("failed to create cookie jar: %w", err)
+	}
+
+	// Set cookies for the domain
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Load cookies from the authenticated session
+	if cookies, ok := customAuthCookies[parsedURL.Host]; ok {
+		jar.SetCookies(parsedURL, cookies)
+	} else {
+		return fmt.Errorf("no authentication cookies available for %s", parsedURL.Host)
+	}
+
+	// Create a Colly collector with the custom HTTP client
+	collector := colly.NewCollector(
+		colly.Async(true),
+	)
+
+	collector.WithTransport(&http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Adjust if necessary
+	})
+	collector.SetCookieJar(jar)
+
+	// Metadata to populate
+	metadata := make(map[string]interface{})
+
+	logging.I("Scraping %s for metadata...", urlStr)
+
+	// Scope scraping to the main container
+	collector.OnHTML(".main-episode-player-container", func(container *colly.HTMLElement) {
+		// Scrape the title
+		title := strings.TrimSpace(container.ChildText("h4"))
+		if title != "" {
+			logging.D(2, "Scraped title: %s", title)
+			metadata["title"] = title
+			v.Title = title
+		} else {
+			logging.D(1, "Title not found in the container")
+		}
+
+		// Scrape the description
+		description := strings.TrimSpace(container.ChildText("p#check-for-urls"))
+		if description != "" {
+			logging.D(2, "Scraped description: %s", description)
+			metadata["description"] = description
+			v.Description = description
+		} else {
+			logging.D(1, "Description not found in the container")
+		}
+
+		// Scrape the release date
+		date := strings.TrimSpace(container.ChildText("p.text-muted.text-right.text-date.mb-0"))
+		if date != "" {
+			parsedDate, err := parsing.ParseWordDate(date)
+			if err != nil {
+				logging.E(0, err.Error())
+			}
+			logging.D(2, "Scraped release date: %s", date)
+			metadata["release_date"] = parsedDate
+		} else {
+			logging.D(1, "Release date not found in the container")
+		}
+
+		// Scrape the video URL
+		videoURL := container.ChildAttr("a[href$='.mp4']", "href")
+		if videoURL != "" {
+			logging.D(2, "Scraped video URL: %s", videoURL)
+			metadata["direct_video_url"] = videoURL
+			v.DirectVideoURL = videoURL
+		} else {
+			logging.D(1, "Video URL not found in the container")
+		}
+	})
+
+	// Visit the webpage
+	if err := collector.Visit(urlStr); err != nil {
+		return fmt.Errorf("failed to visit URL: %w", err)
+	}
+
+	collector.Wait()
+
+	// Ensure required fields are populated
+	if metadata["title"] == nil || metadata["direct_video_url"] == nil {
+		logging.D(1, "Scraped metadata: %+v", metadata)
+		return fmt.Errorf("missing required metadata fields (title [got: %s] or video URL [got: %v])", v.Title, metadata["direct_video_url"])
+	}
+
+	// Generate filename from title
+	filename := fmt.Sprintf("%s.json", sanitizeFilename(metadata["title"].(string)))
+
+	// Write metadata to JSON
+	if err := writeMetadataJSON(metadata, outputDir, filename, v); err != nil {
+		return fmt.Errorf("failed to write metadata JSON: %w", err)
+	}
+
+	logging.S(0, "Successfully wrote metadata JSON to %s/%s", outputDir, filename)
+	return nil
+}
+
+// sanitizeFilename removes illegal characters.
+func sanitizeFilename(name string) string {
+	return strings.Map(func(r rune) rune {
+		if strings.ContainsRune(`/\:*?"<>|`, r) {
+			return '_'
+		}
+		return r
+	}, name)
+}
+
+// writeMetadataJSON writes the custom metadata file.
+func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename string, v *models.Video) error {
+	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(metadata); err != nil {
+		return fmt.Errorf("failed to write JSON: %w", err)
+	}
+
+	v.JSONCustomFile = filePath
+	return nil
 }

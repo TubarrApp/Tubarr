@@ -4,12 +4,14 @@ go 1.23.0
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
+	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/browserutils/kooky v0.2.2
 	github.com/gocolly/colly v1.2.0
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/rs/zerolog v1.33.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
+	golang.org/x/net v0.33.0
 )
 
 require (
@@ -54,8 +56,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect

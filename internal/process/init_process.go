@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"tubarr/internal/downloads"
@@ -85,28 +86,37 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 		var err error
 
 		// Initialize directory parser
-		dirParser := parsing.NewDirectoryParser(c, v)
+		if strings.Contains(v.JSONDir, "{") || strings.Contains(v.VideoDir, "{") {
+			dirParser := parsing.NewDirectoryParser(c, v)
 
-		var parseDirs = []*string{
-			&v.JSONDir, &v.VideoDir,
-			&c.JSONDir, &c.VideoDir,
-		}
-
-		for _, ptr := range parseDirs {
-			if ptr == nil {
-				logging.E(0, "Null pointer in job with ID %d", id)
-				continue
+			var parseDirs = []*string{
+				&v.JSONDir, &v.VideoDir,
+				&c.JSONDir, &c.VideoDir,
 			}
 
-			if *ptr, err = dirParser.ParseDirectory(*ptr); err != nil {
-				logging.E(0, "Failed to parse directory %q", *ptr)
-				continue
+			for _, ptr := range parseDirs {
+				if ptr == nil {
+					logging.E(0, "Null pointer in job with ID %d", id)
+					continue
+				}
+
+				if *ptr, err = dirParser.ParseDirectory(*ptr); err != nil {
+					logging.E(0, "Failed to parse directory %q", *ptr)
+					continue
+				}
 			}
 		}
 
-		if err := processJSON(ctx, v, vs, dlTracker); err != nil {
-			results <- fmt.Errorf("JSON processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
-			continue
+		if v.JSONCustomFile == "" {
+			if err := processJSON(ctx, v, vs, dlTracker); err != nil {
+				results <- fmt.Errorf("JSON processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
+				continue
+			}
+		} else {
+			_, err := vs.AddVideo(v)
+			if err != nil {
+				results <- fmt.Errorf("error adding video with URL %s to database: %v", v.URL, err)
+			}
 		}
 
 		if logging.Level > 1 {
