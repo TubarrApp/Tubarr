@@ -18,6 +18,7 @@ import (
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/progflags"
 	"tubarr/internal/utils/browser"
 	"tubarr/internal/utils/logging"
 )
@@ -202,13 +203,19 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 		return err
 	}
 
+	// Check for custom scraper needs
 	for _, v := range videos {
+
 		// Detect censored.tv links
 		if strings.Contains(c.URL, "censored.tv") {
-			logging.I("Detected a censored.tv link. Using specialized scraper.")
-			err := browserInstance.ScrapeCensoredTVMetadata(v.URL, c.JSONDir, v)
-			if err != nil {
-				return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
+			if !progflags.CensoredTVUseCustom {
+				logging.I("Using regular censored.tv scraper...")
+			} else {
+				logging.I("Detected a censored.tv link. Using specialized scraper.")
+				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, c.JSONDir, v)
+				if err != nil {
+					return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
+				}
 			}
 		}
 	}
