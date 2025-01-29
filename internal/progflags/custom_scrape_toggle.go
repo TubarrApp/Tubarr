@@ -1,5 +1,5 @@
 package progflags
 
 const (
-	CensoredTVUseCustom = false
+	CensoredTVUseCustom = true
 )

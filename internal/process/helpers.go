@@ -254,14 +254,28 @@ func isPrivateNetwork(host string) bool {
 	return false
 }
 
-// isPrivateNetworkFallback
+// isPrivateNetworkFallback resolves the hostname and checks if the IP is private.
 func isPrivateNetworkFallback(h string) bool {
+	// Attempt to resolve hostname to IP addresses
+	ips, err := net.LookupIP(h)
+	if err == nil {
+		// Iterate through resolved IPs and check if any are private
+		for _, ip := range ips {
+			if isPrivateIP(ip.String(), h) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// If resolution fails, check if the input is a direct IP address
 	parts := strings.Split(h, ".")
 	if len(parts) == 4 {
 		octets := make([]int, 4)
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil || n < 0 || n > 255 {
+				logging.E(0, "Malformed IP string %q", h)
 				return false
 			}
 			octets[i] = n
@@ -275,6 +289,45 @@ func isPrivateNetworkFallback(h string) bool {
 			return true
 		}
 	}
-	logging.E(0, "Malformed IP string %q", h)
+
+	logging.E(0, "Failed to resolve hostname %q", h)
+	return false
+}
+
+// isPrivateIP checks if a given IP is in the private range.
+func isPrivateIP(ip, h string) bool {
+	var isPrivate bool
+
+	parts := strings.Split(ip, ".")
+	if len(parts) == 4 {
+		octets := make([]int, 4)
+		for i, p := range parts {
+			n, err := strconv.Atoi(p)
+			if err != nil || n < 0 || n > 255 {
+				return false
+			}
+			octets[i] = n
+		}
+
+		switch octets[0] {
+		case 192:
+			if octets[1] == 168 {
+				isPrivate = true
+			}
+		case 172:
+			if octets[1] >= 16 && octets[1] <= 31 {
+				isPrivate = true
+			}
+		case 10, 127:
+			isPrivate = true
+		}
+	}
+
+	if isPrivate {
+		logging.I("Host %q resolved to private IP address %q.", h, ip)
+		return true
+	}
+
+	logging.I("Host %q resolved to public IP address %q.", h, ip)
 	return false
 }
