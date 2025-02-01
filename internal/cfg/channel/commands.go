@@ -356,6 +356,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		url, name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt,
 		username, password, loginURL string
+		notifyName, notifyURL                              string
 		dlFilters, metaOps, fileSfxReplace                 []string
 		crawlFreq, concurrency, metarrConcurrency, retries int
 		maxCPU                                             float64
@@ -454,8 +455,19 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				UpdatedAt: now,
 			}
 
-			if _, err := cs.AddChannel(c); err != nil {
+			channelID, err := cs.AddChannel(c)
+			if err != nil {
 				return err
+			}
+
+			if notifyURL != "" && channelID > 0 {
+				if notifyName == "" {
+					notifyName = notifyURL
+				}
+
+				if err := cs.AddNotifyURL(channelID, notifyName, notifyURL); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -478,6 +490,10 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Login credentials
 	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL)
+
+	// Notification URL
+	addCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
+	addCmd.Flags().StringVar(&notifyName, "notify-name", "", "Provide a custom name for this notification")
 
 	return addCmd
 }
