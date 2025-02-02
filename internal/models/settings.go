@@ -11,6 +11,8 @@ type ChannelSettings struct {
 	Concurrency            int         `json:"max_concurrency"`
 	MaxFilesize            string      `json:"max_filesize"`
 	AutoDownload           bool        `json:"auto_download"`
+	FromDate               string      `json:"from_date"`
+	ToDate                 string      `json:"to_date"`
 }
 
 // DLFilters are used to filter in or out videos from download by metafields.

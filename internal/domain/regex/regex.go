@@ -13,11 +13,12 @@ const (
 	extraSpacesStr   = `\s+`
 	invalidCharsStr  = `[<>:"/\\|?*\x00-\x1F]`
 	specialCharsStr  = `[^\w\s-]`
+	yearFragmentsStr = `(?:(\d{4})y)?(?:(\d{1,2})m)?(?:(\d{1,2})d)?`
 )
 
 var (
-	onceAnsiEscape, onceDLPercentage, onceExtraSpaces, onceInvalidChars, onceSpecialChars, onceAria2FragCount sync.Once
-	AnsiEscape, DLPercentage, ExtraSpaces, InvalidChars, SpecialChars, Aria2FragCountRegex                    *regexp.Regexp
+	onceAnsiEscape, onceDLPercentage, onceExtraSpaces, onceInvalidChars, onceSpecialChars, onceAria2FragCount, onceYearFragments sync.Once
+	AnsiEscape, DLPercentage, ExtraSpaces, InvalidChars, SpecialChars, Aria2FragCountRegex, YearFragments                        *regexp.Regexp
 )
 
 // AnsiEscapeCompile compiles regex for ANSI escape codes.
@@ -66,4 +67,12 @@ func SpecialCharsCompile() *regexp.Regexp {
 		SpecialChars = regexp.MustCompile(specialCharsStr)
 	})
 	return SpecialChars
+}
+
+// YearFragments compiles regex for parsing user inputted dates.
+func YearFragmentsCompile() *regexp.Regexp {
+	onceYearFragments.Do(func() {
+		YearFragments = regexp.MustCompile(yearFragmentsStr)
+	})
+	return YearFragments
 }

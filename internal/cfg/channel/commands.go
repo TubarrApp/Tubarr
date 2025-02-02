@@ -357,6 +357,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt,
 		username, password, loginURL string
 		notifyName, notifyURL                              string
+		fromDate, toDate                                   string
 		dlFilters, metaOps, fileSfxReplace                 []string
 		crawlFreq, concurrency, metarrConcurrency, retries int
 		maxCPU                                             float64
@@ -389,7 +390,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if filenameDateTag != "" {
-				if !cfgvalidate.DateFormat(filenameDateTag) {
+				if !cfgvalidate.ValidateDateFormat(filenameDateTag) {
 					return errors.New("invalid Metarr filename date tag format")
 				}
 			}
@@ -418,6 +419,18 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
+			if fromDate != "" {
+				if fromDate, err = validateFromToDate(fromDate); err != nil {
+					return err
+				}
+			}
+
+			if toDate != "" {
+				if toDate, err = validateFromToDate(toDate); err != nil {
+					return err
+				}
+			}
+
 			c := &models.Channel{
 				URL:      url,
 				Name:     name,
@@ -433,6 +446,8 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 					ExternalDownloaderArgs: externalDownloaderArgs,
 					Concurrency:            concurrency,
 					MaxFilesize:            maxFilesize,
+					FromDate:               fromDate,
+					ToDate:                 toDate,
 				},
 
 				MetarrArgs: models.MetarrArgs{
@@ -494,6 +509,9 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	// Notification URL
 	addCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
 	addCmd.Flags().StringVar(&notifyName, "notify-name", "", "Provide a custom name for this notification")
+
+	addCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
+	addCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
 
 	return addCmd
 }
@@ -572,6 +590,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
 			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext)
 			fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
+			fmt.Printf("From Date: %q\nTo Date:%q\n", ch.Settings.FromDate, ch.Settings.ToDate)
 
 			return nil
 		},
@@ -603,6 +622,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
 				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext)
 				fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
+				fmt.Printf("From Date: %q\nTo Date:%q\n", ch.Settings.FromDate, ch.Settings.ToDate)
 			}
 			return nil
 		},

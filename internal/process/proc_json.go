@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/downloads"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
@@ -32,9 +33,14 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		return err
 	}
 
-	_, err = parseAndStoreJSON(v)
+	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
 		logging.E(0, "JSON parsing/storage failed for %q: %v", v.URL, err)
+	}
+	if !jsonValid { // Exclude video from future crawls
+		v.DownloadStatus.Status = consts.DLStatusCompleted
+		v.DownloadStatus.Pct = 100.0
+		vs.UpdateVideo(v)
 	}
 
 	if v.ID, err = vs.AddVideo(v); err != nil {

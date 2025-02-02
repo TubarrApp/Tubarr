@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 	cfgvalidate "tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/regex"
 	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
 )
 
 type cobraMetarrArgs struct {
@@ -54,7 +57,7 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 	}
 
 	if c.fileDatePfx != "" {
-		if !cfgvalidate.DateFormat(c.fileDatePfx) {
+		if !cfgvalidate.ValidateDateFormat(c.fileDatePfx) {
 			return nil, errors.New("invalid Metarr filename date tag format")
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
@@ -256,4 +259,70 @@ func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
 		}
 	}
 	return filters, nil
+}
+
+// validateFromToDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
+func validateFromToDate(d string) (string, error) {
+	d = strings.ToLower(d)
+	d = strings.ReplaceAll(d, "-", "")
+	d = strings.ReplaceAll(d, " ", "")
+
+	// Handle "today" special case
+	if d == "today" {
+		return time.Now().Format("20060102"), nil
+	}
+
+	// Regex to extract explicitly marked years, months, and days
+	re := regex.YearFragmentsCompile()
+	matches := re.FindStringSubmatch(d)
+
+	// Default values
+	year := strconv.Itoa(time.Now().Year())
+	month := "01"
+	day := "01"
+
+	// Year
+	if matches[1] != "" {
+		year = matches[1]
+	} else if len(d) == 8 && !strings.ContainsAny(d, "ymd") { // No markers, assume raw format
+		year, month, day = d[:4], d[4:6], d[6:8]
+	}
+
+	// Month
+	if matches[2] != "" {
+		if len(matches[2]) == 1 {
+			month = "0" + matches[2] // Pad single-digit months
+		} else {
+			month = matches[2]
+		}
+	}
+
+	// Day
+	if matches[3] != "" {
+		if len(matches[3]) == 1 {
+			day = "0" + matches[3] // Pad single-digit days
+		} else {
+			day = matches[3]
+		}
+	}
+
+	// Validate ranges
+	yearInt, _ := strconv.Atoi(year)
+	monthInt, _ := strconv.Atoi(month)
+	dayInt, _ := strconv.Atoi(day)
+
+	if yearInt < 1000 || yearInt > 9999 {
+		return "", fmt.Errorf("invalid year in yyyy-mm-dd date %q: year must be 4 digits", d)
+	}
+	if monthInt < 1 || monthInt > 12 {
+		return "", fmt.Errorf("invalid month in yyyy-mm-dd date %q: month must be between 01-12", d)
+	}
+	if dayInt < 1 || dayInt > 31 {
+		return "", fmt.Errorf("invalid day in yyyy-mm-dd date %q: day must be between 01-31", d)
+	}
+
+	output := year + month + day
+	logging.D(1, "Made from/to date %q", output)
+
+	return output, nil
 }

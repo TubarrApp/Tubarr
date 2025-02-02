@@ -54,7 +54,7 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 			if split[1] == "date-tag" {
 				switch split[2] {
 				case "prefix", "suffix":
-					if DateFormat(split[3]) {
+					if ValidateDateFormat(split[3]) {
 
 						b.Grow(len(m))
 						b.WriteString(split[0])
@@ -118,8 +118,8 @@ func ValidateRenameFlag(flag string) error {
 	}
 }
 
-// DateFormat returns the date format enum type.
-func DateFormat(dateFmt string) bool {
+// ValidateDateFormat returns the date format enum type.
+func ValidateDateFormat(dateFmt string) bool {
 	if len(dateFmt) > 2 {
 		switch dateFmt {
 		case "Ymd", "ymd", "Ydm", "ydm", "dmY", "dmy", "mdY", "mdy", "md", "dm":

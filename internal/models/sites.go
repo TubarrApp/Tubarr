@@ -33,7 +33,6 @@ type Channel struct {
 type Video struct {
 	ID             int64
 	ChannelID      int64  `db:"channel_id"`
-	Downloaded     bool   `db:"downloaded"`
 	VideoDir       string `db:"video_directory"`
 	VideoPath      string `db:"video_path"`
 	JSONDir        string `db:"json_directory"`

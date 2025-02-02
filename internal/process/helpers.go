@@ -162,6 +162,40 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 			}
 		}
 	}
+
+	// Other filters
+	// Upload date filter
+	if !v.UploadDate.IsZero() {
+		uploadDateNum, err := strconv.Atoi(v.UploadDate.Format("20060102"))
+		if err != nil {
+			return false, fmt.Errorf("failed to convert upload date to integer: %w", err)
+		}
+
+		if v.Channel.Settings.FromDate != "" {
+			fromDate, err := strconv.Atoi(v.Channel.Settings.FromDate)
+			if err != nil {
+				return false, fmt.Errorf("invalid 'from date' format: %w", err)
+			}
+			if uploadDateNum < fromDate {
+				logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Channel.Settings.FromDate)
+				return false, nil
+			}
+		}
+
+		if v.Channel.Settings.ToDate != "" {
+			toDate, err := strconv.Atoi(v.Channel.Settings.ToDate)
+			if err != nil {
+				return false, fmt.Errorf("invalid 'to date' format: %w", err)
+			}
+			if uploadDateNum > toDate {
+				logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Channel.Settings.ToDate)
+				return false, nil
+			}
+		}
+	} else {
+		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
+	}
+
 	logging.D(1, "Video %q passed filter checks", v.URL)
 	return true, nil
 }
