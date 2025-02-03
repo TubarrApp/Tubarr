@@ -23,6 +23,13 @@ const (
 	OutputFiletype string = "ext"
 )
 
+// Transcoding
+const (
+	TranscodeGPU     string = "transcode-gpu"
+	TranscodeCodec   string = "transcode-codec"
+	TranscodeQuality string = "transcode-quality"
+)
+
 // Web inputs
 const (
 	MaxFilesize            string = "max-filesize"

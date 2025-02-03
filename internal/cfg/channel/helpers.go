@@ -23,6 +23,9 @@ type cobraMetarrArgs struct {
 	concurrency        int
 	maxCPU             float64
 	minFreeMem         string
+	useGPU             string
+	transcodeCodec     string
+	transcodeQuality   string
 }
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
@@ -91,6 +94,39 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.MetaOps = valid
+			return nil
+		})
+	}
+
+	if c.useGPU != "" {
+		validGPU, err := validateGPU(c.useGPU)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.UseGPU = validGPU
+			return nil
+		})
+	}
+
+	if c.transcodeCodec != "" {
+		validTranscodeCodec, err := validateTranscodeCodec(c.transcodeCodec)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.TranscodeCodec = validTranscodeCodec
+			return nil
+		})
+	}
+
+	if c.transcodeQuality != "" {
+		validTranscodeQuality, err := validateTranscodeQuality(c.transcodeQuality)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.TranscodeQuality = validTranscodeQuality
 			return nil
 		})
 	}
@@ -325,4 +361,62 @@ func validateFromToDate(d string) (string, error) {
 	logging.D(1, "Made from/to date %q", output)
 
 	return output, nil
+}
+
+// validateGPU validates the user input GPU selection.
+func validateGPU(g string) (gpu string, err error) {
+	g = strings.ToLower(g)
+	switch g {
+	case "qsv", "intel":
+		return "qsv", nil
+	case "amd", "radeon", "vaapi":
+		return "vaapi", nil
+	case "nvidia", "cuda":
+		return "cuda", nil
+	default:
+		return "", fmt.Errorf("entered gpu %q not supported. Tubarr supports Intel, AMD, or Nvidia", g)
+	}
+}
+
+// validateTranscodeCodec validates the user input codec selection.
+func validateTranscodeCodec(c string) (codec string, err error) {
+	c = strings.ToLower(c)
+	c = strings.ReplaceAll(c, ".", "")
+	switch c {
+	case "h264", "hevc":
+		return c, nil
+	case "h265":
+		return "hevc", nil
+	default:
+		return "", fmt.Errorf("entered codec %q not supported. Tubarr supports h264 and HEVC (h265)", c)
+	}
+}
+
+// validateTranscodeQuality validates the transcode quality preset.
+func validateTranscodeQuality(q string) (quality string, err error) {
+	q = strings.ToLower(q)
+	q = strings.ReplaceAll(q, " ", "")
+
+	switch q {
+	case "p1", "p2", "p3", "p4", "p5", "p6", "p7":
+		logging.I("Got transcode quality profile %q", q)
+		return q, nil
+	}
+
+	qNum, err := strconv.Atoi(q)
+	if err != nil {
+		return "", fmt.Errorf("input should be p1 to p7, validation of transcoder quality failed")
+	}
+
+	var qualProf string
+	switch {
+	case qNum < 0:
+		qualProf = "p1"
+	case qNum > 7:
+		qualProf = "p7"
+	default:
+		qualProf = "p" + strconv.Itoa(qNum)
+	}
+	logging.I("Got transcode quality profile %q", qualProf)
+	return qualProf, nil
 }

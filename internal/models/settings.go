@@ -35,4 +35,7 @@ type MetarrArgs struct {
 	Concurrency        int      `json:"metarr_concurrency"`
 	MaxCPU             float64  `json:"metarr_max_cpu_usage"`
 	MinFreeMem         string   `json:"metarr_min_free_mem"`
+	UseGPU             string   `json:"metarr_gpu"`
+	TranscodeCodec     string   `json:"metarr_transcode_codec"`
+	TranscodeQuality   string   `json:"metarr_transcode_quality"`
 }

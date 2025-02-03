@@ -61,3 +61,18 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPUPtr *float64, metarrConcurrencyPtr
 		MinFreeMem:         minFreeMem,
 	}
 }
+
+// SetTranscodeFlags sets flags related to video transcoding.
+func SetTranscodeFlags(cmd *cobra.Command, gpu, codec, quality *string) {
+	if gpu != nil {
+		cmd.Flags().StringVar(gpu, keys.TranscodeGPU, "", "GPU for transcoding.")
+	}
+
+	if codec != nil {
+		cmd.Flags().StringVar(codec, keys.TranscodeCodec, "", "Codec for transcoding (h264/hevc).")
+	}
+
+	if quality != nil {
+		cmd.Flags().StringVar(quality, keys.TranscodeQuality, "", "Transcode quality profile from p1 (worst) to p7 (best).")
+	}
+}

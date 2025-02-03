@@ -361,6 +361,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		dlFilters, metaOps, fileSfxReplace                 []string
 		crawlFreq, concurrency, metarrConcurrency, retries int
 		maxCPU                                             float64
+		useGPU, codec, transcodeQuality                    string
 	)
 
 	now := time.Now()
@@ -431,6 +432,24 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
+			if useGPU != "" {
+				if useGPU, err = validateGPU(useGPU); err != nil {
+					return err
+				}
+			}
+
+			if codec != "" {
+				if codec, err = validateTranscodeCodec(codec); err != nil {
+					return err
+				}
+			}
+
+			if transcodeQuality != "" {
+				if transcodeQuality, err = validateTranscodeQuality(transcodeQuality); err != nil {
+					return err
+				}
+			}
+
 			c := &models.Channel{
 				URL:      url,
 				Name:     name,
@@ -460,6 +479,9 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 					MinFreeMem:         minFreeMem,
 					OutputDir:          outDir,
 					Concurrency:        metarrConcurrency,
+					UseGPU:             useGPU,
+					TranscodeCodec:     codec,
+					TranscodeQuality:   transcodeQuality,
 				},
 
 				LastScan:  now,
@@ -505,6 +527,9 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Login credentials
 	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL)
+
+	// Transcoding
+	cfgflags.SetTranscodeFlags(addCmd, &useGPU, &codec, &transcodeQuality)
 
 	// Notification URL
 	addCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
@@ -588,7 +613,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URL, ch.VideoDir, ch.JSONDir)
 			fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
 			fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
-			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext)
+			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\nHW accel type: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU)
 			fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 			fmt.Printf("From Date: %q\nTo Date:%q\n", ch.Settings.FromDate, ch.Settings.ToDate)
 
@@ -620,7 +645,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %s\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URL, ch.VideoDir, ch.JSONDir)
 				fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
 				fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
-				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext)
+				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\nHW accel type: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU)
 				fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 				fmt.Printf("From Date: %q\nTo Date:%q\n", ch.Settings.FromDate, ch.Settings.ToDate)
 			}
@@ -673,6 +698,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		username, password, loginURL                            string
 		dlFilters, metaOps                                      []string
 		fileSfxReplace                                          []string
+		useGPU, codec, transcodeQuality                         string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -755,6 +781,9 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				concurrency:        metarrConcurrency,
 				maxCPU:             maxCPU,
 				minFreeMem:         minFreeMem,
+				useGPU:             useGPU,
+				transcodeCodec:     codec,
+				transcodeQuality:   transcodeQuality,
 			})
 			if err != nil {
 				return err
@@ -785,6 +814,9 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Metarr
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
+
+	// Transcoding
+	cfgflags.SetTranscodeFlags(updateSettingsCmd, &useGPU, &codec, &transcodeQuality)
 
 	// Auth
 	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL)

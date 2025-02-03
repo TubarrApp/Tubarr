@@ -30,3 +30,9 @@ const (
 	JSONFile       = "--json-file"
 	VideoFile      = "--video-file"
 )
+
+const (
+	HWAccel          = "--hwaccel"
+	TranscodeCodec   = "--transcode-codec"
+	TranscodeQuality = "--transcode-quality"
+)
