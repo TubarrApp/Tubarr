@@ -361,7 +361,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		dlFilters, metaOps, fileSfxReplace                 []string
 		crawlFreq, concurrency, metarrConcurrency, retries int
 		maxCPU                                             float64
-		useGPU, codec, transcodeQuality                    string
+		useGPU, codec, audioCodec, transcodeQuality        string
 	)
 
 	now := time.Now()
@@ -444,6 +444,12 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
+			if audioCodec != "" {
+				if audioCodec, err = validateTranscodeAudioCodec(audioCodec); err != nil {
+					return err
+				}
+			}
+
 			if transcodeQuality != "" {
 				if transcodeQuality, err = validateTranscodeQuality(transcodeQuality); err != nil {
 					return err
@@ -470,18 +476,19 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				},
 
 				MetarrArgs: models.MetarrArgs{
-					Ext:                metarrExt,
-					MetaOps:            metaOps,
-					FileDatePfx:        filenameDateTag,
-					RenameStyle:        renameStyle,
-					FilenameReplaceSfx: fileSfxReplace,
-					MaxCPU:             maxCPU,
-					MinFreeMem:         minFreeMem,
-					OutputDir:          outDir,
-					Concurrency:        metarrConcurrency,
-					UseGPU:             useGPU,
-					TranscodeCodec:     codec,
-					TranscodeQuality:   transcodeQuality,
+					Ext:                 metarrExt,
+					MetaOps:             metaOps,
+					FileDatePfx:         filenameDateTag,
+					RenameStyle:         renameStyle,
+					FilenameReplaceSfx:  fileSfxReplace,
+					MaxCPU:              maxCPU,
+					MinFreeMem:          minFreeMem,
+					OutputDir:           outDir,
+					Concurrency:         metarrConcurrency,
+					UseGPU:              useGPU,
+					TranscodeCodec:      codec,
+					TranscodeAudioCodec: audioCodec,
+					TranscodeQuality:    transcodeQuality,
 				},
 
 				LastScan:  now,
@@ -529,7 +536,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL)
 
 	// Transcoding
-	cfgflags.SetTranscodeFlags(addCmd, &useGPU, &codec, &transcodeQuality)
+	cfgflags.SetTranscodeFlags(addCmd, &useGPU, &codec, &audioCodec, &transcodeQuality)
 
 	// Notification URL
 	addCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
@@ -698,7 +705,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		username, password, loginURL                            string
 		dlFilters, metaOps                                      []string
 		fileSfxReplace                                          []string
-		useGPU, codec, transcodeQuality                         string
+		useGPU, codec, audioCodec, transcodeQuality             string
+		fromDate, toDate                                        string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -758,6 +766,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				externalDownloaderArgs: externalDownloaderArgs,
 				concurrency:            concurrency,
 				maxFilesize:            maxFilesize,
+				fromDate:               fromDate,
+				toDate:                 toDate,
 			})
 			if err != nil {
 				return err
@@ -771,19 +781,44 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
+			if useGPU != "" {
+				if useGPU, err = validateGPU(useGPU); err != nil {
+					return err
+				}
+			}
+
+			if codec != "" {
+				if codec, err = validateTranscodeCodec(codec); err != nil {
+					return err
+				}
+			}
+
+			if audioCodec != "" {
+				if audioCodec, err = validateTranscodeAudioCodec(audioCodec); err != nil {
+					return err
+				}
+			}
+
+			if transcodeQuality != "" {
+				if transcodeQuality, err = validateTranscodeQuality(transcodeQuality); err != nil {
+					return err
+				}
+			}
+
 			fnMetarrArray, err := getMetarrArgFns(cobraMetarrArgs{
-				filenameReplaceSfx: fileSfxReplace,
-				renameStyle:        renameStyle,
-				fileDatePfx:        filenameDateTag,
-				metarrExt:          metarrExt,
-				metaOps:            metaOps,
-				outputDir:          outDir,
-				concurrency:        metarrConcurrency,
-				maxCPU:             maxCPU,
-				minFreeMem:         minFreeMem,
-				useGPU:             useGPU,
-				transcodeCodec:     codec,
-				transcodeQuality:   transcodeQuality,
+				filenameReplaceSfx:  fileSfxReplace,
+				renameStyle:         renameStyle,
+				fileDatePfx:         filenameDateTag,
+				metarrExt:           metarrExt,
+				metaOps:             metaOps,
+				outputDir:           outDir,
+				concurrency:         metarrConcurrency,
+				maxCPU:              maxCPU,
+				minFreeMem:          minFreeMem,
+				useGPU:              useGPU,
+				transcodeCodec:      codec,
+				transcodeAudioCodec: audioCodec,
+				transcodeQuality:    transcodeQuality,
 			})
 			if err != nil {
 				return err
@@ -816,10 +851,13 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
 
 	// Transcoding
-	cfgflags.SetTranscodeFlags(updateSettingsCmd, &useGPU, &codec, &transcodeQuality)
+	cfgflags.SetTranscodeFlags(updateSettingsCmd, &useGPU, &codec, &audioCodec, &transcodeQuality)
 
 	// Auth
 	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL)
+
+	updateSettingsCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
+	updateSettingsCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
 
 	return updateSettingsCmd
 }

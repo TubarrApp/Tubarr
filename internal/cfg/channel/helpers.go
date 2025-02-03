@@ -14,18 +14,19 @@ import (
 )
 
 type cobraMetarrArgs struct {
-	filenameReplaceSfx []string
-	renameStyle        string
-	fileDatePfx        string
-	metarrExt          string
-	metaOps            []string
-	outputDir          string
-	concurrency        int
-	maxCPU             float64
-	minFreeMem         string
-	useGPU             string
-	transcodeCodec     string
-	transcodeQuality   string
+	filenameReplaceSfx  []string
+	renameStyle         string
+	fileDatePfx         string
+	metarrExt           string
+	metaOps             []string
+	outputDir           string
+	concurrency         int
+	maxCPU              float64
+	minFreeMem          string
+	useGPU              string
+	transcodeCodec      string
+	transcodeAudioCodec string
+	transcodeQuality    string
 }
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
@@ -120,6 +121,17 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 		})
 	}
 
+	if c.transcodeAudioCodec != "" {
+		validTranscodeAudioCodec, err := validateTranscodeCodec(c.transcodeAudioCodec)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.TranscodeAudioCodec = validTranscodeAudioCodec
+			return nil
+		})
+	}
+
 	if c.transcodeQuality != "" {
 		validTranscodeQuality, err := validateTranscodeQuality(c.transcodeQuality)
 		if err != nil {
@@ -143,6 +155,8 @@ type chanSettings struct {
 	externalDownloaderArgs string
 	concurrency            int
 	maxFilesize            string
+	fromDate               string
+	toDate                 string
 }
 
 func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) error, err error) {
@@ -207,6 +221,28 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.Filters = dlFilters
+			return nil
+		})
+	}
+
+	if c.fromDate != "" {
+		validFromDate, err := validateFromToDate(c.fromDate)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.FromDate = validFromDate
+			return nil
+		})
+	}
+
+	if c.toDate != "" {
+		validToDate, err := validateFromToDate(c.toDate)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.ToDate = validToDate
 			return nil
 		})
 	}
@@ -361,6 +397,17 @@ func validateFromToDate(d string) (string, error) {
 	logging.D(1, "Made from/to date %q", output)
 
 	return output, nil
+}
+
+// verifyTranscodeAudioCodec verifies the audio codec to use for transcode/encode operations.
+func validateTranscodeAudioCodec(a string) (audioCodec string, err error) {
+	a = strings.ToLower(a)
+	switch a {
+	case "aac", "copy":
+		return a, nil
+	default:
+		return "", fmt.Errorf("audio codec flag %q is not currently implemented in this program, aborting", a)
+	}
 }
 
 // validateGPU validates the user input GPU selection.
