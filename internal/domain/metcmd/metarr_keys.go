@@ -32,7 +32,8 @@ const (
 )
 
 const (
-	HWAccel          = "--hwaccel"
-	TranscodeCodec   = "--transcode-codec"
-	TranscodeQuality = "--transcode-quality"
+	HWAccel             = "--hwaccel"
+	TranscodeCodec      = "--transcode-codec"
+	TranscodeAudioCodec = "--transcode-audio-codec"
+	TranscodeQuality    = "--transcode-quality"
 )
