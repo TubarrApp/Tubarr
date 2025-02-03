@@ -79,12 +79,6 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 
 // filterRequests uses user input filters to check if the video should be downloaded.
 func filterRequests(v *models.Video) (valid bool, err error) {
-	// Check if filters are set and validate if so
-	if len(v.Settings.Filters) == 0 {
-		logging.D(2, "No filters to check for %q", v.URL)
-		return true, nil
-	}
-
 	// Apply filters if any match metadata content
 	for _, filter := range v.Settings.Filters {
 		val, exists := v.MetadataMap[filter.Field]
@@ -179,7 +173,11 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 			if uploadDateNum < fromDate {
 				logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Channel.Settings.FromDate)
 				return false, nil
+			} else {
+				logging.D(3, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
 			}
+		} else {
+			logging.D(3, "No 'from date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
 		}
 
 		if v.Channel.Settings.ToDate != "" {
@@ -190,7 +188,11 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 			if uploadDateNum > toDate {
 				logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Channel.Settings.ToDate)
 				return false, nil
+			} else {
+				logging.D(3, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
 			}
+		} else {
+			logging.D(3, "No 'to date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
 		}
 	} else {
 		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)

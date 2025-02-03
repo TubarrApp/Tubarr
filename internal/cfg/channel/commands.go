@@ -421,13 +421,13 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if fromDate != "" {
-				if fromDate, err = validateFromToDate(fromDate); err != nil {
+				if fromDate, err = validateToFromDate(fromDate); err != nil {
 					return err
 				}
 			}
 
 			if toDate != "" {
-				if toDate, err = validateFromToDate(toDate); err != nil {
+				if toDate, err = validateToFromDate(toDate); err != nil {
 					return err
 				}
 			}

@@ -226,7 +226,7 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 	}
 
 	if c.fromDate != "" {
-		validFromDate, err := validateFromToDate(c.fromDate)
+		validFromDate, err := validateToFromDate(c.fromDate)
 		if err != nil {
 			return nil, err
 		}
@@ -237,7 +237,7 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 	}
 
 	if c.toDate != "" {
-		validToDate, err := validateFromToDate(c.toDate)
+		validToDate, err := validateToFromDate(c.toDate)
 		if err != nil {
 			return nil, err
 		}
@@ -333,8 +333,8 @@ func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
 	return filters, nil
 }
 
-// validateFromToDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
-func validateFromToDate(d string) (string, error) {
+// validateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
+func validateToFromDate(d string) (string, error) {
 	d = strings.ToLower(d)
 	d = strings.ReplaceAll(d, "-", "")
 	d = strings.ReplaceAll(d, " ", "")

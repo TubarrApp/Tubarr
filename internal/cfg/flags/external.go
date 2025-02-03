@@ -68,6 +68,10 @@ func SetTranscodeFlags(cmd *cobra.Command, gpu, codec, audioCodec, quality *stri
 		cmd.Flags().StringVar(gpu, keys.TranscodeGPU, "", "GPU for transcoding.")
 	}
 
+	if audioCodec != nil {
+		cmd.Flags().StringVar(audioCodec, keys.TranscodeAudioCodec, "", "Codec for transcoding audio (e.g. 'aac' or 'copy').")
+	}
+
 	if codec != nil {
 		cmd.Flags().StringVar(codec, keys.TranscodeCodec, "", "Codec for transcoding (h264/hevc).")
 	}

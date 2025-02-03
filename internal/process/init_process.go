@@ -108,8 +108,15 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 		}
 
 		if v.JSONCustomFile == "" {
-			if err := processJSON(ctx, v, vs, dlTracker); err != nil {
+			proceed, err := processJSON(ctx, v, vs, dlTracker)
+			if err != nil {
 				results <- fmt.Errorf("JSON processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
+				continue
+			}
+
+			if !proceed { // If the JSON filter failed, stop processing this video
+				logging.I("Skipping further processing for ignored video: %s", v.URL)
+				results <- nil
 				continue
 			}
 		} else {
