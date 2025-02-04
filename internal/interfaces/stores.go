@@ -36,7 +36,7 @@ type ChannelStore interface {
 	UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error
 	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
 	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error)
-	UpdateChannelRow(key, val, col, newVal string) error
+	UpdateChannelRow(key, val, col string, newVal any) error
 	UpdateLastScan(channelID int64) error
 }
 

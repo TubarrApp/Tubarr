@@ -116,6 +116,11 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 
 	for i := range chans {
 
+		if chans[i].Paused {
+			logging.I("Channel with name %q is paused, skipping checks.", chans[i].Name)
+			continue
+		}
+
 		timeSinceLastScan := time.Since(chans[i].LastScan)
 		crawlFreqDuration := time.Duration(chans[i].Settings.CrawlFreq) * time.Minute
 

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS channels (
     username TEXT,
     password TEXT,
     login_url TEXT,
+    paused INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

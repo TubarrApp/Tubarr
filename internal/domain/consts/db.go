@@ -35,6 +35,7 @@ const (
 	QChanUsername        = "username"
 	QChanPassword        = "password"
 	QChanLoginURL        = "login_url"
+	QChanPaused          = "paused"
 	QChanCreatedAt       = "created_at"
 	QChanUpdatedAt       = "updated_at"
 )

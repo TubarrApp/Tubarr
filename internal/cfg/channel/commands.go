@@ -43,6 +43,8 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(deleteNotifyURLs(cs))
 	channelCmd.AddCommand(listChannelCmd(cs))
 	channelCmd.AddCommand(listAllChannelsCmd(cs))
+	channelCmd.AddCommand(pauseChannelCmd(cs))
+	channelCmd.AddCommand(unpauseChannelCmd(cs))
 	channelCmd.AddCommand(updateChannelRow(cs))
 	channelCmd.AddCommand(updateChannelSettingsCmd(cs))
 	channelCmd.AddCommand(addNotifyURL(cs))
@@ -350,6 +352,66 @@ func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store, ctx contex
 	return ignoreCrawlCmd
 }
 
+// pauseChannelCmd pauses a channel from downloads in upcoming crawls.
+func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		url, name string
+		id        int
+	)
+
+	pauseCmd := &cobra.Command{
+		Use:   "pause",
+		Short: "Pause a channel.",
+		Long:  "Paused channels won't download new videos when the main program runs a crawl.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
+			}
+
+			if err := cs.UpdateChannelRow(key, val, consts.QChanPaused, true); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	SetPrimaryChannelFlags(pauseCmd, &name, &url, &id)
+
+	return pauseCmd
+}
+
+// pauseChannelCmd pauses a channel from downloads in upcoming crawls.
+func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		url, name string
+		id        int
+	)
+
+	pauseCmd := &cobra.Command{
+		Use:   "unpause",
+		Short: "Unpause a channel.",
+		Long:  "Unpauses a channel, allowing it to download new videos when the main program runs a crawl.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			key, val, err := getChanKeyVal(id, name, url)
+			if err != nil {
+				return err
+			}
+
+			if err := cs.UpdateChannelRow(key, val, consts.QChanPaused, false); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	SetPrimaryChannelFlags(pauseCmd, &name, &url, &id)
+
+	return pauseCmd
+}
+
 // addChannelCmd adds a new channel into the database.
 func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	var (
@@ -495,6 +557,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				Username:  username,
 				Password:  password,
 				LoginURL:  loginURL,
+				Paused:    false,
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
@@ -560,10 +623,6 @@ func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "Delete channels.",
 		Long:  "Delete a channel by ID, name, or URL.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if url == "" && name == "" {
-				return errors.New("must enter both a video directory and url")
-			}
-
 			key, val, err := getChanKeyVal(id, name, url)
 			if err != nil {
 				return err
@@ -623,6 +682,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\nHW accel type: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU)
 			fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 			fmt.Printf("From Date: %q\nTo Date:%q\n", ch.Settings.FromDate, ch.Settings.ToDate)
+			fmt.Printf("Paused?: %v\n", ch.Paused)
 
 			return nil
 		},
@@ -655,6 +715,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\nHW accel type: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU)
 				fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 				fmt.Printf("From Date: %q\nTo Date:%q\n", ch.Settings.FromDate, ch.Settings.ToDate)
+				fmt.Printf("Paused?: %v\n", ch.Paused)
 			}
 			return nil
 		},
@@ -674,7 +735,6 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 		Short: "Crawl a channel for new URLs.",
 		Long:  "Initiate a crawl for new URLs of a channel that have not yet been downloaded.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			key, val, err := getChanKeyVal(id, name, url)
 			if err != nil {
 				return err

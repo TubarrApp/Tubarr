@@ -269,6 +269,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			consts.QChanUsername,
 			consts.QChanPassword,
 			consts.QChanLoginURL,
+			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -283,6 +284,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			c.Username,
 			c.Password,
 			c.LoginURL,
+			false,
 			now,
 			now,
 		).
@@ -340,6 +342,7 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 			consts.QChanUsername,
 			consts.QChanPassword,
 			consts.QChanLoginURL,
+			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -361,6 +364,7 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 			&c.Username,
 			&c.Password,
 			&c.LoginURL,
+			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
@@ -406,6 +410,7 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 			consts.QChanUsername,
 			consts.QChanPassword,
 			consts.QChanLoginURL,
+			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -428,6 +433,7 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 			&c.Username,
 			&c.Password,
 			&c.LoginURL,
+			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
@@ -468,6 +474,7 @@ func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err err
 			consts.QChanUsername,
 			consts.QChanPassword,
 			consts.QChanLoginURL,
+			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -489,6 +496,7 @@ func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err err
 		&c.Username,
 		&c.Password,
 		&c.LoginURL,
+		&c.Paused,
 		&c.CreatedAt,
 		&c.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -528,6 +536,7 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 			consts.QChanUsername,
 			consts.QChanPassword,
 			consts.QChanLoginURL,
+			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -562,6 +571,7 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 			&c.Username,
 			&c.Password,
 			&c.LoginURL,
+			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		)
@@ -709,7 +719,7 @@ func (cs ChannelStore) UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal
 }
 
 // UpdateChannelRow updates a single element in the database.
-func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
+func (cs ChannelStore) UpdateChannelRow(key, val, col string, newVal any) error {
 	if key == "" {
 		return errors.New("please do not enter the key and value blank")
 	}
@@ -724,9 +734,30 @@ func (cs ChannelStore) UpdateChannelRow(key, val, col, newVal string) error {
 		Set(col, newVal).
 		RunWith(cs.DB)
 
-	if _, err := query.Exec(); err != nil {
+	// Print SQL query
+	if logging.Level > 1 {
+		sqlStr, args, _ := query.ToSql()
+		fmt.Printf("Executing SQL: %s with args: %v\n", sqlStr, args)
+	}
+
+	// Execute query
+	res, err := query.Exec()
+	if err != nil {
 		return err
 	}
+
+	// Ensure a row was updated
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("update failed: no rows affected")
+	} else {
+		logging.S(0, "Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
+	}
+
 	return nil
 }
 

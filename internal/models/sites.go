@@ -20,6 +20,7 @@ type Channel struct {
 	Username            string          `db:"username"`
 	Password            string          `db:"password"`
 	LoginURL            string          `db:"login_url"`
+	Paused              bool            `db:"paused"`
 	CreatedAt           time.Time       `db:"created_at"`
 	UpdatedAt           time.Time       `db:"updated_at"`
 	CookiePath          string
