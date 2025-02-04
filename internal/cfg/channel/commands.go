@@ -45,7 +45,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(listAllChannelsCmd(cs))
 	channelCmd.AddCommand(pauseChannelCmd(cs))
 	channelCmd.AddCommand(unpauseChannelCmd(cs))
-	channelCmd.AddCommand(updateChannelRow(cs))
+	channelCmd.AddCommand(updateChannelValue(cs))
 	channelCmd.AddCommand(updateChannelSettingsCmd(cs))
 	channelCmd.AddCommand(addNotifyURL(cs))
 
@@ -937,8 +937,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	return updateSettingsCmd
 }
 
-// updateChannelRow provides a command allowing the alteration of a channel row.
-func updateChannelRow(cs interfaces.ChannelStore) *cobra.Command {
+// updateChannelValue provides a command allowing the alteration of a channel row.
+func updateChannelValue(cs interfaces.ChannelStore) *cobra.Command {
 	var (
 		col, newVal, url, name string
 		id                     int
