@@ -704,8 +704,8 @@ func (cs ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(
 	return rtn.RowsAffected()
 }
 
-// UpdateChannelEntry updates a single element in the database.
-func (cs ChannelStore) UpdateChannelEntry(key, val, col string, newVal any) error {
+// UpdateChannelValue updates a single element in the database.
+func (cs ChannelStore) UpdateChannelValue(key, val, col string, newVal any) error {
 	if key == "" {
 		return errors.New("please do not enter the key and value blank")
 	}

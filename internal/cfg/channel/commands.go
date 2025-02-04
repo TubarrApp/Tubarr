@@ -369,7 +369,7 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			if err := cs.UpdateChannelEntry(key, val, consts.QChanPaused, true); err != nil {
+			if err := cs.UpdateChannelValue(key, val, consts.QChanPaused, true); err != nil {
 				return err
 			}
 			return nil
@@ -399,7 +399,7 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			if err := cs.UpdateChannelEntry(key, val, consts.QChanPaused, false); err != nil {
+			if err := cs.UpdateChannelValue(key, val, consts.QChanPaused, false); err != nil {
 				return err
 			}
 			return nil
@@ -785,35 +785,35 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 			// Files/dirs:
 			if vDir != "" { // Do not stat, due to templating
-				if err := cs.UpdateChannelEntry(key, val, consts.QChanVideoDir, vDir); err != nil {
+				if err := cs.UpdateChannelValue(key, val, consts.QChanVideoDir, vDir); err != nil {
 					return fmt.Errorf("failed to update video directory: %w", err)
 				}
 				logging.S(0, "Updated video directory to %q", vDir)
 			}
 
 			if jDir != "" { // Do not stat, due to templating
-				if err := cs.UpdateChannelEntry(key, val, consts.QChanJSONDir, jDir); err != nil {
+				if err := cs.UpdateChannelValue(key, val, consts.QChanJSONDir, jDir); err != nil {
 					return fmt.Errorf("failed to update JSON directory: %w", err)
 				}
 				logging.S(0, "Updated JSON directory to %q", jDir)
 			}
 
 			if username != "" {
-				if err := cs.UpdateChannelEntry(key, val, consts.QChanUsername, username); err != nil {
+				if err := cs.UpdateChannelValue(key, val, consts.QChanUsername, username); err != nil {
 					return fmt.Errorf("failed to update username: %w", err)
 				}
 				logging.S(0, "Updated username to %q", username)
 			}
 
 			if password != "" {
-				if err := cs.UpdateChannelEntry(key, val, consts.QChanPassword, password); err != nil {
+				if err := cs.UpdateChannelValue(key, val, consts.QChanPassword, password); err != nil {
 					return fmt.Errorf("failed to update password: %w", err)
 				}
 				logging.S(0, "Updated password for channel with key:value %q:%q", key, val)
 			}
 
 			if loginURL != "" {
-				if err := cs.UpdateChannelEntry(key, val, consts.QChanLoginURL, loginURL); err != nil {
+				if err := cs.UpdateChannelValue(key, val, consts.QChanLoginURL, loginURL); err != nil {
 					return fmt.Errorf("failed to update login URL: %w", err)
 				}
 				logging.S(0, "Updated login URL to %q", loginURL)
@@ -958,7 +958,7 @@ func updateChannelValue(cs interfaces.ChannelStore) *cobra.Command {
 			if err := verifyChanRowUpdateValid(col, newVal); err != nil {
 				return err
 			}
-			if err := cs.UpdateChannelEntry(key, val, col, newVal); err != nil {
+			if err := cs.UpdateChannelValue(key, val, col, newVal); err != nil {
 				return err
 			}
 			logging.S(0, "Updated channel column: %q → %q", col, newVal)
