@@ -467,3 +467,24 @@ func validateTranscodeQuality(q string) (quality string, err error) {
 	logging.I("Got transcode quality profile %q", qualProf)
 	return qualProf, nil
 }
+
+// hyphenateYyyyMmDd simply hyphenates yyyy-mm-dd date values for display.
+func hyphenateYyyyMmDd(d string) string {
+	d = strings.ReplaceAll(d, " ", "")
+	d = strings.ReplaceAll(d, "-", "")
+
+	if len(d) < 8 {
+		return d
+	}
+
+	b := strings.Builder{}
+	b.Grow(10)
+
+	b.WriteString(d[0:4])
+	b.WriteRune('-')
+	b.WriteString(d[4:6])
+	b.WriteRune('-')
+	b.WriteString(d[6:8])
+
+	return b.String()
+}
