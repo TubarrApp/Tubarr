@@ -369,7 +369,7 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			if err := cs.UpdateChannelRow(key, val, consts.QChanPaused, true); err != nil {
+			if err := cs.UpdateChannelEntry(key, val, consts.QChanPaused, true); err != nil {
 				return err
 			}
 			return nil
@@ -399,7 +399,7 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			if err := cs.UpdateChannelRow(key, val, consts.QChanPaused, false); err != nil {
+			if err := cs.UpdateChannelEntry(key, val, consts.QChanPaused, false); err != nil {
 				return err
 			}
 			return nil
@@ -424,6 +424,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		crawlFreq, concurrency, metarrConcurrency, retries int
 		maxCPU                                             float64
 		useGPU, codec, audioCodec, transcodeQuality        string
+		pause                                              bool
 	)
 
 	now := time.Now()
@@ -557,7 +558,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				Username:  username,
 				Password:  password,
 				LoginURL:  loginURL,
-				Paused:    false,
+				Paused:    pause,
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
@@ -607,6 +608,8 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	addCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
 	addCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
+
+	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
 
 	return addCmd
 }
@@ -942,8 +945,8 @@ func updateChannelRow(cs interfaces.ChannelStore) *cobra.Command {
 	)
 
 	updateRowCmd := &cobra.Command{
-		Use:   "update",
-		Short: "Update a channel column.",
+		Use:   "update-value",
+		Short: "Update a channel column value.",
 		Long:  "Enter a column to update and a value to update that column to.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -955,7 +958,7 @@ func updateChannelRow(cs interfaces.ChannelStore) *cobra.Command {
 			if err := verifyChanRowUpdateValid(col, newVal); err != nil {
 				return err
 			}
-			if err := cs.UpdateChannelRow(key, val, col, newVal); err != nil {
+			if err := cs.UpdateChannelEntry(key, val, col, newVal); err != nil {
 				return err
 			}
 			logging.S(0, "Updated channel column: %q → %q", col, newVal)

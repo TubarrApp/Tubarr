@@ -705,21 +705,21 @@ func (cs ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(
 }
 
 // UpdateChannelEntry updates a single field for a channel.
-func (cs ChannelStore) UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error {
-	query := squirrel.
-		Update(consts.DBChannels).
-		Set(updateKey, updateVal).
-		Where(squirrel.Eq{chanKey: chanVal}).
-		RunWith(cs.DB)
+// func (cs ChannelStore) UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error {
+// 	query := squirrel.
+// 		Update(consts.DBChannels).
+// 		Set(updateKey, updateVal).
+// 		Where(squirrel.Eq{chanKey: chanVal}).
+// 		RunWith(cs.DB)
 
-	if _, err := query.Exec(); err != nil {
-		return fmt.Errorf("failed to set %q=%q in channel identified by key %q and val %q", updateKey, updateVal, chanKey, chanVal)
-	}
-	return nil
-}
+// 	if _, err := query.Exec(); err != nil {
+// 		return fmt.Errorf("failed to set %q=%q in channel identified by key %q and val %q", updateKey, updateVal, chanKey, chanVal)
+// 	}
+// 	return nil
+// }
 
-// UpdateChannelRow updates a single element in the database.
-func (cs ChannelStore) UpdateChannelRow(key, val, col string, newVal any) error {
+// UpdateChannelEntry updates a single element in the database.
+func (cs ChannelStore) UpdateChannelEntry(key, val, col string, newVal any) error {
 	if key == "" {
 		return errors.New("please do not enter the key and value blank")
 	}

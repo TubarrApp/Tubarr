@@ -33,10 +33,9 @@ type ChannelStore interface {
 	GetID(key, val string) (int64, error)
 	GetNotifyURLs(id int64) ([]string, error)
 	LoadGrabbedURLs(c *models.Channel) (urls []string, err error)
-	UpdateChannelEntry(chanKey, chanVal, updateKey, updateVal string) error
+	UpdateChannelEntry(key, val, col string, newVal any) error
 	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
 	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error)
-	UpdateChannelRow(key, val, col string, newVal any) error
 	UpdateLastScan(channelID int64) error
 }
 
