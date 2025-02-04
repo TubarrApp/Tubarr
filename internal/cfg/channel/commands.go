@@ -774,10 +774,16 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if len(fnSettingsArgs) > 0 {
-				for _, fn := range fnSettingsArgs {
-					if _, err := cs.UpdateChannelSettingsJSON(key, val, fn); err != nil {
-						return err
+				finalUpdateFn := func(s *models.ChannelSettings) error {
+					for _, fn := range fnSettingsArgs {
+						if err := fn(s); err != nil {
+							return err
+						}
 					}
+					return nil
+				}
+				if _, err := cs.UpdateChannelSettingsJSON(key, val, finalUpdateFn); err != nil {
+					return err
 				}
 			}
 
@@ -825,10 +831,16 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if len(fnMetarrArray) > 0 {
-				for _, fn := range fnMetarrArray {
-					if _, err := cs.UpdateChannelMetarrArgsJSON(key, val, fn); err != nil {
-						return err
+				finalUpdateFn := func(s *models.MetarrArgs) error {
+					for _, fn := range fnMetarrArray {
+						if err := fn(s); err != nil {
+							return err
+						}
 					}
+					return nil
+				}
+				if _, err := cs.UpdateChannelMetarrArgsJSON(key, val, finalUpdateFn); err != nil {
+					return err
 				}
 			}
 			return nil
