@@ -3,6 +3,7 @@ package cfgchannel
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ type cobraMetarrArgs struct {
 	maxCPU              float64
 	minFreeMem          string
 	useGPU              string
+	gpuDir              string
 	transcodeCodec      string
 	transcodeAudioCodec string
 	transcodeQuality    string
@@ -100,7 +102,7 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 	}
 
 	if c.useGPU != "" {
-		validGPU, err := validateGPU(c.useGPU)
+		validGPU, err := validateGPU(c.useGPU, c.gpuDir)
 		if err != nil {
 			return nil, err
 		}
@@ -411,12 +413,18 @@ func validateTranscodeAudioCodec(a string) (audioCodec string, err error) {
 }
 
 // validateGPU validates the user input GPU selection.
-func validateGPU(g string) (gpu string, err error) {
+func validateGPU(g, devDir string) (gpu string, err error) {
 	g = strings.ToLower(g)
 	switch g {
 	case "qsv", "intel":
 		return "qsv", nil
 	case "amd", "radeon", "vaapi":
+
+		_, err := os.Stat(devDir)
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("driver location %q does not appear to exist?", devDir)
+		}
+
 		return "vaapi", nil
 	case "nvidia", "cuda":
 		return "cuda", nil

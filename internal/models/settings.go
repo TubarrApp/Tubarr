@@ -36,6 +36,7 @@ type MetarrArgs struct {
 	MaxCPU              float64  `json:"metarr_max_cpu_usage"`
 	MinFreeMem          string   `json:"metarr_min_free_mem"`
 	UseGPU              string   `json:"metarr_gpu"`
+	GPUDir              string   `json:"metarr_gpu_directory"`
 	TranscodeCodec      string   `json:"metarr_transcode_codec"`
 	TranscodeAudioCodec string   `json:"metarr_transcode_audio_codec"`
 	TranscodeQuality    string   `json:"metarr_transcode_quality"`

@@ -63,9 +63,13 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPUPtr *float64, metarrConcurrencyPtr
 }
 
 // SetTranscodeFlags sets flags related to video transcoding.
-func SetTranscodeFlags(cmd *cobra.Command, gpu, codec, audioCodec, quality *string) {
+func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuDir, codec, audioCodec, quality *string) {
 	if gpu != nil {
 		cmd.Flags().StringVar(gpu, keys.TranscodeGPU, "", "GPU for transcoding.")
+	}
+
+	if gpuDir != nil {
+		cmd.Flags().StringVar(gpuDir, keys.TranscodeGPUDir, "", "Directory of the GPU for transcoding (e.g. '/dev/dri/renderD128')")
 	}
 
 	if audioCodec != nil {

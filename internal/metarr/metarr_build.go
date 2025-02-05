@@ -104,6 +104,12 @@ func makeMetarrCommand(v *models.Video) []string {
 			cmdKey:      metcmd.HWAccel,
 		},
 		{
+			metarrValue: metVals{str: v.MetarrArgs.GPUDir},
+			valType:     str,
+			viperKey:    "",
+			cmdKey:      metcmd.GPUDir,
+		},
+		{
 			metarrValue: metVals{str: v.MetarrArgs.TranscodeCodec},
 			valType:     str,
 			viperKey:    "",

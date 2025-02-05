@@ -418,13 +418,13 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		url, name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt,
 		username, password, loginURL string
-		notifyName, notifyURL                              string
-		fromDate, toDate                                   string
-		dlFilters, metaOps, fileSfxReplace                 []string
-		crawlFreq, concurrency, metarrConcurrency, retries int
-		maxCPU                                             float64
-		useGPU, codec, audioCodec, transcodeQuality        string
-		pause                                              bool
+		notifyName, notifyURL                               string
+		fromDate, toDate                                    string
+		dlFilters, metaOps, fileSfxReplace                  []string
+		crawlFreq, concurrency, metarrConcurrency, retries  int
+		maxCPU                                              float64
+		useGPU, gpuDir, codec, audioCodec, transcodeQuality string
+		pause                                               bool
 	)
 
 	now := time.Now()
@@ -496,7 +496,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if useGPU != "" {
-				if useGPU, err = validateGPU(useGPU); err != nil {
+				if useGPU, err = validateGPU(useGPU, gpuDir); err != nil {
 					return err
 				}
 			}
@@ -549,6 +549,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 					OutputDir:           outDir,
 					Concurrency:         metarrConcurrency,
 					UseGPU:              useGPU,
+					GPUDir:              gpuDir,
 					TranscodeCodec:      codec,
 					TranscodeAudioCodec: audioCodec,
 					TranscodeQuality:    transcodeQuality,
@@ -600,7 +601,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL)
 
 	// Transcoding
-	cfgflags.SetTranscodeFlags(addCmd, &useGPU, &codec, &audioCodec, &transcodeQuality)
+	cfgflags.SetTranscodeFlags(addCmd, &useGPU, &gpuDir, &codec, &audioCodec, &transcodeQuality)
 
 	// Notification URL
 	addCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
@@ -768,7 +769,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		username, password, loginURL                            string
 		dlFilters, metaOps                                      []string
 		fileSfxReplace                                          []string
-		useGPU, codec, audioCodec, transcodeQuality             string
+		useGPU, gpuDir, codec, audioCodec, transcodeQuality     string
 		fromDate, toDate                                        string
 	)
 
@@ -851,7 +852,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if useGPU != "" {
-				if useGPU, err = validateGPU(useGPU); err != nil {
+				if useGPU, err = validateGPU(useGPU, gpuDir); err != nil {
 					return err
 				}
 			}
@@ -885,6 +886,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				maxCPU:              maxCPU,
 				minFreeMem:          minFreeMem,
 				useGPU:              useGPU,
+				gpuDir:              gpuDir,
 				transcodeCodec:      codec,
 				transcodeAudioCodec: audioCodec,
 				transcodeQuality:    transcodeQuality,
@@ -926,7 +928,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
 
 	// Transcoding
-	cfgflags.SetTranscodeFlags(updateSettingsCmd, &useGPU, &codec, &audioCodec, &transcodeQuality)
+	cfgflags.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuDir, &codec, &audioCodec, &transcodeQuality)
 
 	// Auth
 	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL)
