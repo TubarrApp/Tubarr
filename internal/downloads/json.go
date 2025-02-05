@@ -9,6 +9,7 @@ import (
 
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/cmdjson"
+	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"
 )
@@ -46,6 +47,9 @@ func (d *Download) buildJSONCommand() *exec.Cmd {
 	if d.Video.Settings.Retries != 0 {
 		args = append(args, cmdjson.Retries, strconv.Itoa(d.Video.Settings.Retries))
 	}
+
+	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
+	args = append(args, cmdvideo.RandomizeRequests...)
 
 	args = append(args, cmdjson.RestrictFilenames, cmdjson.Output, cmdjson.FilenameSyntax,
 		d.Video.URL)

@@ -21,3 +21,7 @@ const (
 const (
 	AriaLog = "--console-log-level=info"
 )
+
+var (
+	RandomizeRequests = []string{"--sleep-interval", "2", "--max-sleep-interval", "10"}
+)

@@ -83,6 +83,8 @@ func (d *Download) buildVideoCommand() *exec.Cmd {
 
 	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
 
+	args = append(args, cmdvideo.RandomizeRequests...)
+
 	if d.Video.DirectVideoURL != "" {
 		args = append(args, d.Video.DirectVideoURL)
 	} else {
