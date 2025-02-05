@@ -17,6 +17,12 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 		return err
 	}
 
+	// Cookies
+	rootCmd.PersistentFlags().String(keys.TubarrCookieSource, "", "Cookie source for web operations (e.g. 'Firefox')")
+	if err := viper.BindPFlag(keys.TubarrCookieSource, rootCmd.PersistentFlags().Lookup(keys.TubarrCookieSource)); err != nil {
+		return err
+	}
+
 	// Debug level
 	rootCmd.PersistentFlags().Int(keys.DebugLevel, 0, "Debugging level (0 - 5)")
 	if err := viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel)); err != nil {

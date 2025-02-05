@@ -35,6 +35,7 @@ const (
 const (
 	MaxFilesize            string = "max-filesize"
 	CookieSource           string = "cookie-source"
+	TubarrCookieSource     string = "cookie-source"
 	DLRetries              string = "dl-retries"
 	ExternalDownloader     string = "external-downloader"
 	ExternalDownloaderArgs string = "external-downloader-args"

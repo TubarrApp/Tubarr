@@ -11,9 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"tubarr/internal/cfg"
 	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/errconsts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -85,6 +87,14 @@ func (d *Download) buildVideoCommand() *exec.Cmd {
 		args = append(args, d.Video.DirectVideoURL)
 	} else {
 		args = append(args, d.Video.URL)
+	}
+
+	if cfg.IsSet(keys.TubarrCookieSource) {
+		browser := cfg.GetString(keys.TubarrCookieSource)
+		logging.I("Using cookies from browser %q", browser)
+		args = append(args, "--cookies-from-browser", browser)
+	} else {
+		logging.D(1, "No browser cookies set for Tubarr, skipping")
 	}
 
 	cmd := exec.CommandContext(d.Context, cmdvideo.YTDLP, args...)

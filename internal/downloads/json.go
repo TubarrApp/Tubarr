@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"tubarr/internal/cfg"
 	"tubarr/internal/domain/cmdjson"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"
 )
 
@@ -47,6 +49,14 @@ func (d *Download) buildJSONCommand() *exec.Cmd {
 
 	args = append(args, cmdjson.RestrictFilenames, cmdjson.Output, cmdjson.FilenameSyntax,
 		d.Video.URL)
+
+	if cfg.IsSet(keys.TubarrCookieSource) {
+		browser := cfg.GetString(keys.TubarrCookieSource)
+		logging.I("Using cookies from browser %q", browser)
+		args = append(args, "--cookies-from-browser", browser)
+	} else {
+		logging.D(1, "No browser cookies set for Tubarr, skipping")
+	}
 
 	cmd := exec.CommandContext(d.Context, cmdjson.YTDLP, args...)
 	logging.D(1, "Built metadata download command for URL %q:\n%v", d.Video.URL, cmd.String())
