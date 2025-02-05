@@ -25,11 +25,12 @@ const (
 
 // Transcoding
 const (
-	TranscodeGPU        string = "transcode-gpu"
-	TranscodeGPUDir     string = "transcode-gpu-directory"
-	TranscodeCodec      string = "transcode-codec"
-	TranscodeAudioCodec string = "transcode-audio-codec"
-	TranscodeQuality    string = "transcode-quality"
+	TranscodeGPU         string = "transcode-gpu"
+	TranscodeGPUDir      string = "transcode-gpu-directory"
+	TranscodeCodec       string = "transcode-codec"
+	TranscodeAudioCodec  string = "transcode-audio-codec"
+	TranscodeQuality     string = "transcode-quality"
+	TranscodeVideoFilter string = "transcode-video-filter"
 )
 
 // Web inputs

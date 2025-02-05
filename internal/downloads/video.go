@@ -25,8 +25,18 @@ const (
 	ariaBase = len(consts.DownloaderAria) + len(": ") + len(cmdvideo.AriaLog)
 )
 
+type VideoDownloadState struct {
+	TotalFrags     int
+	CompletedFrags int
+	URL            string
+}
+
+var (
+	states = make(map[string]*VideoDownloadState)
+)
+
 // buildVideoCommand builds the command to download a video using yt-dlp.
-func (d *Download) buildVideoCommand() *exec.Cmd {
+func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args := make([]string, 0, 32)
 
 	args = append(args, cmdvideo.RestrictFilenames)
@@ -40,7 +50,6 @@ func (d *Download) buildVideoCommand() *exec.Cmd {
 	}
 
 	args = append(args, cmdvideo.Output, filepath.Join(d.Video.VideoDir, outputSyntax))
-
 	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
 	if d.Video.CookiePath == "" {
@@ -82,7 +91,6 @@ func (d *Download) buildVideoCommand() *exec.Cmd {
 	}
 
 	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
-
 	args = append(args, cmdvideo.RandomizeRequests...)
 
 	if d.Video.DirectVideoURL != "" {
@@ -106,7 +114,7 @@ func (d *Download) buildVideoCommand() *exec.Cmd {
 }
 
 // executeVideoDownload executes a video download command.
-func (d *Download) executeVideoDownload(cmd *exec.Cmd) error {
+func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -147,54 +155,66 @@ func (d *Download) executeVideoDownload(cmd *exec.Cmd) error {
 }
 
 // scanVideoCmdOutput scans the yt-dlp video download output for relevant information.
-func (d *Download) scanVideoCmdOutput(r io.Reader, filenameChan chan<- string) {
+func (d *VideoDownload) scanVideoCmdOutput(r io.Reader, filenameChan chan<- string) {
+	if d.Video.URL == "" {
+		logging.I("Video URL received blank")
+		return
+	}
 	scanner := bufio.NewScanner(r)
-	var (
-		totalFrags,
-		completedFrags int
-		pct        float64
-		err        error
-		lastUpdate = models.StatusUpdate{
-			VideoID:  d.Video.ID,
-			VideoURL: d.Video.URL,
-			Status:   consts.DLStatusPending,
-			Percent:  0.0,
-			Error:    nil,
-		}
-	)
+
+	lastUpdate := models.StatusUpdate{
+		VideoID:  d.Video.ID,
+		VideoURL: d.Video.URL,
+		Status:   consts.DLStatusPending,
+		Percent:  0.0,
+		Error:    nil,
+	}
 
 	// Initialize as pending
 	d.DLTracker.updates <- lastUpdate
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		switch d.DLTracker.downloader {
 
-		// Aria2c
+		// Get or create state for this video
+		state, exists := states[d.Video.URL]
+		if !exists {
+			state = &VideoDownloadState{URL: d.Video.URL}
+			states[d.Video.URL] = state
+		}
+
+		switch d.DLTracker.downloader {
 		case consts.DownloaderAria:
-			totalFrags, completedFrags, pct, err = downloaders.Aria2OutputParser(line, d.Video.URL, totalFrags, completedFrags)
+			newTotal, newCompleted, pct, err := downloaders.Aria2OutputParser(line, state.URL, state.TotalFrags, state.CompletedFrags)
 			if err != nil {
 				logging.E(0, "Could not parse Aria2 output line %q: %v", line, err)
 			}
-		}
+			// Update state
+			state.TotalFrags = newTotal
+			state.CompletedFrags = newCompleted
 
-		// Send updates
-		if pct > 0.0 {
-			newUpdate := models.StatusUpdate{
-				VideoID:  d.Video.ID,
-				VideoURL: d.Video.URL,
-				Status:   d.Video.DownloadStatus.Status,
-				Percent:  pct,
-				Error:    d.Video.DownloadStatus.Error,
-			}
-			if pct == 100.0 {
-				newUpdate.Status = consts.DLStatusCompleted
-			}
-			if newUpdate != lastUpdate {
-				d.Video.DownloadStatus.Status = newUpdate.Status
-				d.Video.DownloadStatus.Pct = newUpdate.Percent
-				d.DLTracker.sendUpdate(d.Video)
-				lastUpdate = newUpdate
+			// Rest of status update logic
+			if pct > 0.0 {
+				newUpdate := models.StatusUpdate{
+					VideoID:  d.Video.ID,
+					VideoURL: d.Video.URL,
+					Status:   consts.DLStatusDownloading,
+					Percent:  pct,
+					Error:    d.Video.DownloadStatus.Error,
+				}
+
+				if pct == 100.0 {
+					newUpdate.Status = consts.DLStatusCompleted
+					// Remove completed state
+					delete(states, d.Video.URL)
+				}
+
+				if newUpdate != lastUpdate {
+					d.Video.DownloadStatus.Status = newUpdate.Status
+					d.Video.DownloadStatus.Pct = newUpdate.Percent
+					d.DLTracker.sendUpdate(d.Video)
+					lastUpdate = newUpdate
+				}
 			}
 		}
 

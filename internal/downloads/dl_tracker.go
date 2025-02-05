@@ -46,6 +46,11 @@ func (t *DownloadTracker) Stop() {
 
 // sendUpdate constructs the update and sends it into the processing channel.
 func (t *DownloadTracker) sendUpdate(v *models.Video) {
+	if v == nil || v.URL == "" {
+		logging.E(0, "Invalid video struct before status update: %+v", v)
+		return
+	}
+
 	t.updates <- models.StatusUpdate{
 		VideoID:  v.ID,
 		VideoURL: v.URL,
@@ -59,8 +64,11 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 func (t *DownloadTracker) processUpdates(ctx context.Context) {
 	ticker := time.NewTicker(t.flushTimer)
 	defer ticker.Stop()
-	var lastUpdate models.StatusUpdate
-	var newUpdate models.StatusUpdate
+
+	var (
+		lastUpdate models.StatusUpdate
+		newUpdate  models.StatusUpdate
+	)
 
 	for {
 		select {
@@ -74,11 +82,9 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 		case <-ticker.C:
 			if newUpdate != lastUpdate {
 				lastUpdate = newUpdate
-
-				logging.I("Status update for video with URL %q:\nStatus: %s\nPercentage: %.1f\nError: %v",
-					lastUpdate.VideoURL, lastUpdate.Status, lastUpdate.Percent, lastUpdate.Error)
-
-				t.flushUpdates(ctx, []models.StatusUpdate{lastUpdate})
+				logging.I("Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n",
+					newUpdate.VideoURL, newUpdate.Status, newUpdate.Percent, newUpdate.Error)
+				t.flushUpdates(ctx, []models.StatusUpdate{newUpdate})
 			}
 		}
 	}

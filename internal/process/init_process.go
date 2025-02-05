@@ -60,6 +60,11 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 			logging.E(0, "Video in queue for channel %q is nil", c.Name)
 			continue
 		}
+
+		if video.Downloaded {
+			logging.D(1, "Video in channel %q with URL %q is already marked as downloaded", c.Name, video.URL)
+			continue
+		}
 		jobs <- video
 	}
 	close(jobs)
@@ -133,17 +138,32 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 			logging.P("Uploaded=%s", v.UploadDate)
 		}
 
-		if err := processVideo(ctx, v, vs, dlTracker); err != nil {
+		logging.I("About to process video with ID %d and URL %q", v.ID, v.URL)
+
+		if err := processVideo(ctx, v, dlTracker); err != nil {
 			results <- fmt.Errorf("video processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 			continue
 		}
 
 		if _, err := exec.LookPath("metarr"); err != nil {
 			logging.I("Skipping Metarr process... 'metarr' not available: %v", err)
+
+			v.Downloaded = true
+			if err := vs.UpdateVideo(v); err != nil {
+				results <- fmt.Errorf("failed to update video DB entry: %w", err)
+			}
+
 			continue
 		}
+
 		if err := metarr.InitMetarr(v, ctx); err != nil {
 			results <- fmt.Errorf("error initializing Metarr: %w", err)
+			continue
+		}
+
+		v.Downloaded = true
+		if err := vs.UpdateVideo(v); err != nil {
+			results <- fmt.Errorf("failed to update video DB entry: %w", err)
 		}
 		results <- nil // nil = success
 	}

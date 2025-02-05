@@ -32,9 +32,10 @@ const (
 )
 
 const (
-	HWAccel             = "--hwaccel"
-	GPUDir              = "--transcode-gpu-directory"
-	TranscodeCodec      = "--transcode-codec"
-	TranscodeAudioCodec = "--transcode-audio-codec"
-	TranscodeQuality    = "--transcode-quality"
+	HWAccel              = "--hwaccel"
+	GPUDir               = "--transcode-gpu-directory"
+	TranscodeCodec       = "--transcode-codec"
+	TranscodeAudioCodec  = "--transcode-audio-codec"
+	TranscodeQuality     = "--transcode-quality"
+	TranscodeVideoFilter = "--transcode-video-filter"
 )

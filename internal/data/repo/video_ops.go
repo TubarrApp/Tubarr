@@ -80,12 +80,14 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 					consts.QVidURL,
 					consts.QVidVideoDir,
 					consts.QVidJSONDir,
+					consts.QVidDownloaded,
 				).
 				Values(
 					v.ChannelID,
 					v.URL,
 					v.VideoDir,
 					v.JSONDir,
+					v.Downloaded,
 				).
 				RunWith(tx)
 
@@ -177,12 +179,13 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		Columns(
 			consts.QVidChanID, consts.QVidURL, consts.QVidTitle,
 			consts.QVidDescription, consts.QVidVideoDir, consts.QVidJSONDir,
-			consts.QVidUploadDate, consts.QVidMetadata, consts.QVidSettings,
-			consts.QVidMetarr, consts.QVidCreatedAt, consts.QVidUpdatedAt,
+			consts.QVidDownloaded, consts.QVidUploadDate, consts.QVidMetadata,
+			consts.QVidSettings, consts.QVidMetarr, consts.QVidCreatedAt,
+			consts.QVidUpdatedAt,
 		).
 		Values(
 			v.ChannelID, v.URL, v.Title, v.Description, v.VideoDir, v.JSONDir,
-			v.UploadDate, metadataJSON, settingsJSON, metarrJSON, now, now,
+			v.Downloaded, v.UploadDate, metadataJSON, settingsJSON, metarrJSON, now, now,
 		).
 		RunWith(tx)
 
@@ -243,6 +246,7 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 		Set(consts.QVidJSONDir, v.JSONDir).
 		Set(consts.QVidVideoPath, v.VideoPath).
 		Set(consts.QVidJSONPath, v.JSONPath).
+		Set(consts.QVidDownloaded, v.Downloaded).
 		Set(consts.QVidUploadDate, v.UploadDate).
 		Set(consts.QVidMetadata, metadataJSON).
 		Set(consts.QVidSettings, settingsJSON).
@@ -331,6 +335,7 @@ func (vs VideoStore) videoExists(v *models.Video) (int64, bool) {
 		logging.E(0, "Error checking if video exists: %v", err)
 		return 0, false
 	}
-	logging.D(1, "Video %q already exists", v.ID)
+
+	logging.D(1, "Video with URL %q already exists in the database with ID %d", v.URL, v.ID)
 	return id, true
 }

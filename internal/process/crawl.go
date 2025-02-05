@@ -73,6 +73,7 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) 
 			}
 			v.DownloadStatus.Status = consts.DLStatusCompleted
 			v.DownloadStatus.Pct = 100.0
+			v.Downloaded = true
 		}
 
 		validVideos, errArray := s.VideoStore().AddVideos(videos, c)
@@ -234,15 +235,20 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 		logging.I("No new releases for channel %q", c.URL)
 		return nil
 	} else {
+		// Main process
 		success, errArray = InitProcess(s, c, videos, ctx)
-		if errArray != nil {
-			logging.AddToErrorArray(err)
+		if len(errArray) != 0 {
+			for _, err := range errArray {
+				logging.AddToErrorArray(err)
+			}
 		}
 
+		// Last scan time update
 		if err := cs.UpdateLastScan(c.ID); err != nil {
 			return fmt.Errorf("failed to update last scan time: %w", err)
 		}
 
+		// Add errors to array on failure
 		if !success {
 			return fmt.Errorf(errMsg, len(errArray), errArray)
 		}

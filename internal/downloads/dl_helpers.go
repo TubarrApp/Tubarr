@@ -36,7 +36,7 @@ func verifyVideoDownload(videoPath string) error {
 }
 
 // waitForFile waits until the file is ready in the file system.
-func (d *Download) waitForFile(filepath string, timeout time.Duration) error {
+func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 
@@ -51,10 +51,15 @@ func (d *Download) waitForFile(filepath string, timeout time.Duration) error {
 	return fmt.Errorf("file not ready or empty after %v: %s", timeout, filepath)
 }
 
-// cancelDownload cancels the download, typically due to user input.
-func (d *Download) cancelDownload() error {
+// cancelVideoDownload cancels the download, typically due to user input.
+func (d *VideoDownload) cancelVideoDownload() error {
 	d.Video.DownloadStatus.Status = consts.DLStatusFailed
 	d.Video.DownloadStatus.Error = d.Context.Err()
 	d.DLTracker.sendUpdate(d.Video)
-	return fmt.Errorf("user canceled download for %s: %w", d.Video.URL, d.Context.Err())
+	return fmt.Errorf("user canceled video download for %s: %w", d.Video.URL, d.Context.Err())
+}
+
+// cancelJSONDownload cancels the download, typically due to user input.
+func (d *JSONDownload) cancelJSONDownload() error {
+	return fmt.Errorf("user canceled JSON download for %s: %w", d.Video.URL, d.Context.Err())
 }

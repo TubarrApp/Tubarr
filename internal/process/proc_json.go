@@ -18,10 +18,9 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		logging.I("Null video entered")
 		return false, nil
 	}
-
 	logging.D(2, "Processing JSON download for URL: %s", v.URL)
 
-	dl, err := downloads.NewDownload(downloads.TypeJSON, ctx, v, dlTracker, &downloads.Options{
+	dl, err := downloads.NewJSONDownload(ctx, v, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
 	})
@@ -38,10 +37,11 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		logging.E(0, "JSON parsing/storage failed for %q: %v", v.URL, err)
 	}
 
-	if !jsonValid { // Exclude video from future crawls
+	if !jsonValid { // JSON failed checks, exclude video
 
 		v.DownloadStatus.Status = consts.DLStatusCompleted
 		v.DownloadStatus.Pct = 100.0
+		v.Downloaded = true
 
 		if v.ID, err = vs.AddVideo(v); err != nil {
 			return false, fmt.Errorf("failed to update ignored video in DB: %w", err)

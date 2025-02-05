@@ -15,20 +15,21 @@ import (
 )
 
 type cobraMetarrArgs struct {
-	filenameReplaceSfx  []string
-	renameStyle         string
-	fileDatePfx         string
-	metarrExt           string
-	metaOps             []string
-	outputDir           string
-	concurrency         int
-	maxCPU              float64
-	minFreeMem          string
-	useGPU              string
-	gpuDir              string
-	transcodeCodec      string
-	transcodeAudioCodec string
-	transcodeQuality    string
+	filenameReplaceSfx   []string
+	renameStyle          string
+	fileDatePfx          string
+	metarrExt            string
+	metaOps              []string
+	outputDir            string
+	concurrency          int
+	maxCPU               float64
+	minFreeMem           string
+	useGPU               string
+	gpuDir               string
+	transcodeCodec       string
+	transcodeAudioCodec  string
+	transcodeQuality     string
+	transcodeVideoFilter string
 }
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
@@ -141,6 +142,17 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeQuality = validTranscodeQuality
+			return nil
+		})
+	}
+
+	if c.transcodeVideoFilter != "" {
+		validTranscodeVideoFilter, err := validateTranscodeVideoFilter(c.transcodeVideoFilter)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.TranscodeVideoFilter = validTranscodeVideoFilter
 			return nil
 		})
 	}
@@ -495,4 +507,9 @@ func hyphenateYyyyMmDd(d string) string {
 	b.WriteString(d[6:8])
 
 	return b.String()
+}
+
+// validateTranscodeVideoFilter validates the transcode video filter preset.
+func validateTranscodeVideoFilter(q string) (vf string, err error) {
+	return q, nil
 }

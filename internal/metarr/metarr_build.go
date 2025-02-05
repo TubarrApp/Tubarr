@@ -127,6 +127,12 @@ func makeMetarrCommand(v *models.Video) []string {
 			viperKey:    "",
 			cmdKey:      metcmd.TranscodeAudioCodec,
 		},
+		{
+			metarrValue: metVals{str: v.MetarrArgs.TranscodeVideoFilter},
+			valType:     str,
+			viperKey:    "",
+			cmdKey:      metcmd.TranscodeVideoFilter,
+		},
 		// Other
 		{
 			metarrValue: metVals{str: ""},

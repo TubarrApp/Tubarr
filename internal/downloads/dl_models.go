@@ -2,11 +2,14 @@ package downloads
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 )
+
+var ongoingDownloads sync.Map
 
 // DownloadType represents the type of download operation.
 type DownloadType string
@@ -28,11 +31,18 @@ var DefaultOptions = Options{
 	RetryInterval: 5 * time.Second,
 }
 
-// Download encapsulates a download operation.
-type Download struct {
-	Type      DownloadType
+// VideoDownload encapsulates a video download operation.
+type VideoDownload struct {
 	Video     *models.Video
 	DLStore   interfaces.DownloadStore
+	DLTracker *DownloadTracker
+	Options   Options
+	Context   context.Context
+}
+
+// JSONDownload encapsulates a JSON download operation.
+type JSONDownload struct {
+	Video     *models.Video
 	DLTracker *DownloadTracker
 	Options   Options
 	Context   context.Context

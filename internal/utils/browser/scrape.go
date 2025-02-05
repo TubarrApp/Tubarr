@@ -86,13 +86,15 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		return nil, err
 	}
 
+	logging.D(2, "Loaded into 'existingURLs' for channel %q: %v", c.Name, existingURLs)
+
 	existingMap := make(map[string]struct{}, len(existingURLs))
 	for _, url := range existingURLs {
 		existingMap[url] = struct{}{}
 	}
 
 	if len(existingMap) > 0 {
-		logging.I("Found %d existing downloaded video URLs:", len(existingMap))
+		logging.D(2, "Inserted %d existing downloaded video URLs for channel %q into map: %v", len(existingMap), c.Name, existingMap)
 	}
 
 	var (
@@ -178,10 +180,13 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		return nil, err
 	}
 
+	logging.D(2, "Grabbed 'new' URLs for channel %q before filtering: %v", c.Name, newURLs)
+
 	newRequests := make([]*models.Video, 0, len(newURLs))
 	for _, newURL := range newURLs {
 		if newURL != "" {
 			if _, exists := existingMap[newURL]; !exists {
+				logging.D(1, "%q does not exist in 'existingMap' for channel %q, adding download request", newURL, c.Name)
 				newRequests = append(newRequests, &models.Video{
 					ChannelID:  c.ID,
 					URL:        newURL,
@@ -195,6 +200,8 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 			}
 		}
 	}
+
+	logging.D(2, "List of 'new' requests for channel %q: %v", c.Name, newRequests)
 
 	if len(newRequests) > 0 {
 		logging.I("Grabbed %d new download requests:", len(newRequests))

@@ -15,7 +15,7 @@ import (
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
-func (d *Download) buildJSONCommand() *exec.Cmd {
+func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	args := make([]string, 0, 32)
 
@@ -69,7 +69,7 @@ func (d *Download) buildJSONCommand() *exec.Cmd {
 }
 
 // executeJSONDownload executes a JSON download command.
-func (d *Download) executeJSONDownload(cmd *exec.Cmd) error {
+func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	if cmd == nil {
 		return fmt.Errorf("no command built for URL %s", d.Video.URL)
 	}
