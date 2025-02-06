@@ -80,7 +80,7 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 					consts.QVidURL,
 					consts.QVidVideoDir,
 					consts.QVidJSONDir,
-					consts.QVidDownloaded,
+					consts.QVidFinished,
 				).
 				Values(
 					v.ChannelID,
@@ -179,7 +179,7 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		Columns(
 			consts.QVidChanID, consts.QVidURL, consts.QVidTitle,
 			consts.QVidDescription, consts.QVidVideoDir, consts.QVidJSONDir,
-			consts.QVidDownloaded, consts.QVidUploadDate, consts.QVidMetadata,
+			consts.QVidFinished, consts.QVidUploadDate, consts.QVidMetadata,
 			consts.QVidSettings, consts.QVidMetarr, consts.QVidCreatedAt,
 			consts.QVidUpdatedAt,
 		).
@@ -246,7 +246,7 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 		Set(consts.QVidJSONDir, v.JSONDir).
 		Set(consts.QVidVideoPath, v.VideoPath).
 		Set(consts.QVidJSONPath, v.JSONPath).
-		Set(consts.QVidDownloaded, v.Downloaded).
+		Set(consts.QVidFinished, v.Downloaded).
 		Set(consts.QVidUploadDate, v.UploadDate).
 		Set(consts.QVidMetadata, metadataJSON).
 		Set(consts.QVidSettings, settingsJSON).

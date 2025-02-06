@@ -168,37 +168,49 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 		if v.Channel.Settings.FromDate != "" {
 			fromDate, err := strconv.Atoi(v.Channel.Settings.FromDate)
 			if err != nil {
+				if err := removeUnwantedJSON(v.JSONPath); err != nil {
+					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+				}
 				return false, fmt.Errorf("invalid 'from date' format: %w", err)
 			}
 			if uploadDateNum < fromDate {
 				logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Channel.Settings.FromDate)
+				if err := removeUnwantedJSON(v.JSONPath); err != nil {
+					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+				}
 				return false, nil
 			} else {
-				logging.D(3, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
+				logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
 			}
 		} else {
-			logging.D(3, "No 'from date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
+			logging.D(1, "No 'from date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
 		}
 
 		if v.Channel.Settings.ToDate != "" {
 			toDate, err := strconv.Atoi(v.Channel.Settings.ToDate)
 			if err != nil {
+				if err := removeUnwantedJSON(v.JSONPath); err != nil {
+					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+				}
 				return false, fmt.Errorf("invalid 'to date' format: %w", err)
 			}
 			if uploadDateNum > toDate {
 				logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Channel.Settings.ToDate)
+				if err := removeUnwantedJSON(v.JSONPath); err != nil {
+					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+				}
 				return false, nil
 			} else {
-				logging.D(3, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
+				logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
 			}
 		} else {
-			logging.D(3, "No 'to date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
+			logging.D(1, "No 'to date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
 		}
 	} else {
 		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
 	}
 
-	logging.D(1, "Video %q passed filter checks", v.URL)
+	logging.I("Video %q for channel %q passed filter checks", v.URL, v.Channel.Name)
 	return true, nil
 }
 

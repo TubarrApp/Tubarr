@@ -146,13 +146,12 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 		}
 
 		if _, err := exec.LookPath("metarr"); err != nil {
-			logging.I("Skipping Metarr process... 'metarr' not available: %v", err)
+			logging.I("Skipping Metarr process... 'metarr' $PATH not available: %v", err)
 
 			v.Downloaded = true
 			if err := vs.UpdateVideo(v); err != nil {
 				results <- fmt.Errorf("failed to update video DB entry: %w", err)
 			}
-
 			continue
 		}
 

@@ -62,13 +62,12 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 
 // processUpdates processes download status updates.
 func (t *DownloadTracker) processUpdates(ctx context.Context) {
-	ticker := time.NewTicker(t.flushTimer)
-	defer ticker.Stop()
-
 	var (
 		lastUpdate models.StatusUpdate
 		newUpdate  models.StatusUpdate
+		ticker     = time.NewTicker(t.flushTimer)
 	)
+	defer ticker.Stop()
 
 	for {
 		select {

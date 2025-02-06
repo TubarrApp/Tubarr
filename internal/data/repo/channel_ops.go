@@ -101,7 +101,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 
 	query := squirrel.
 		Insert(consts.DBVideos).
-		Columns(consts.QVidChanID, consts.QVidURL, consts.QVidDownloaded).
+		Columns(consts.QVidChanID, consts.QVidURL, consts.QVidFinished).
 		Values(channelID, ignoreURL, true).
 		RunWith(cs.DB)
 
@@ -785,7 +785,7 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 		From(consts.DBVideos).
 		Where(squirrel.And{
 			squirrel.Eq{consts.QVidChanID: c.ID},
-			squirrel.Eq{consts.QVidDownloaded: 1},
+			squirrel.Eq{consts.QVidFinished: 1},
 		}).
 		RunWith(cs.DB)
 
