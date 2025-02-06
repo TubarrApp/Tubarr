@@ -79,7 +79,6 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) 
 		validVideos, errArray := s.VideoStore().AddVideos(videos, c)
 		if len(errArray) > 0 {
 			logging.P("%s Encountered the following errors adding videos:", consts.RedError)
-			fmt.Println()
 			for _, err := range errArray {
 				logging.P("%v", err)
 			}

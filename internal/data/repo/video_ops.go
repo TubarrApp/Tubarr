@@ -92,7 +92,12 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 				RunWith(tx)
 
 			result, err := query.Exec()
-			if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				if err := vs.UpdateVideo(v); err != nil {
+					errArray = append(errArray, fmt.Errorf("failed to insert video %s: %w", v.URL, err))
+					continue
+				}
+			} else if err != nil {
 				errArray = append(errArray, fmt.Errorf("failed to insert video %s: %w", v.URL, err))
 				continue
 			}
