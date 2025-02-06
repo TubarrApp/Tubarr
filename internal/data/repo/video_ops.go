@@ -74,32 +74,53 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 
 	if len(validVideos) > 0 {
 		for _, v := range validVideos {
-			query := squirrel.Insert(consts.DBVideos).
-				Columns(
-					consts.QVidChanID,
-					consts.QVidURL,
-					consts.QVidVideoDir,
-					consts.QVidJSONDir,
-					consts.QVidFinished,
-				).
-				Values(
-					v.ChannelID,
-					v.URL,
-					v.VideoDir,
-					v.JSONDir,
-					v.Finished,
-				).
-				RunWith(tx)
 
-			result, err := query.Exec()
-			if errors.Is(err, sql.ErrNoRows) {
-				if err := vs.UpdateVideo(v); err != nil {
+			var (
+				insertQuery squirrel.InsertBuilder
+				updateQuery squirrel.UpdateBuilder
+				result      sql.Result
+				isInsert    bool
+			)
+
+			_, exists := vs.videoExists(v)
+			if !exists {
+				insertQuery = squirrel.Insert(consts.DBVideos).
+					Columns(
+						consts.QVidChanID,
+						consts.QVidURL,
+						consts.QVidVideoDir,
+						consts.QVidJSONDir,
+						consts.QVidFinished,
+					).
+					Values(
+						v.ChannelID,
+						v.URL,
+						v.VideoDir,
+						v.JSONDir,
+						v.Finished,
+					).
+					RunWith(tx)
+			} else {
+				updateQuery = squirrel.Update(consts.DBVideos).
+					Set(consts.QVidVideoDir, v.VideoDir).
+					Set(consts.QVidJSONDir, v.JSONDir).
+					Set(consts.QVidFinished, v.Finished).
+					Where(squirrel.Eq{consts.QVidChanID: v.ChannelID, consts.QVidURL: v.URL}).
+					RunWith(tx)
+			}
+
+			if isInsert {
+				result, err = insertQuery.Exec()
+				if err != nil {
 					errArray = append(errArray, fmt.Errorf("failed to insert video %s: %w", v.URL, err))
 					continue
 				}
-			} else if err != nil {
-				errArray = append(errArray, fmt.Errorf("failed to insert video %s: %w", v.URL, err))
-				continue
+			} else {
+				result, err = updateQuery.Exec()
+				if err != nil {
+					errArray = append(errArray, fmt.Errorf("failed to insert video %s: %w", v.URL, err))
+					continue
+				}
 			}
 
 			id, err := result.LastInsertId()
