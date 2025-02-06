@@ -145,15 +145,25 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 			continue
 		}
 
+		// If Metarr is not available at all, mark as complete and return (user may not want to use it)
 		if _, err := exec.LookPath("metarr"); err != nil {
-			v.Finished = true
-			if err := vs.UpdateVideo(v); err != nil {
-				results <- fmt.Errorf("failed to update video DB entry: %w", err)
+
+			if errors.Is(err, exec.ErrNotFound) {
+				logging.I("No Metarr $PATH, skipping Metarr process and marking video as finished")
+				v.Finished = true
+				if err := vs.UpdateVideo(v); err != nil {
+					results <- fmt.Errorf("failed to update video DB entry: %w", err)
+					continue
+				}
+				results <- nil
+				continue
 			}
-			results <- fmt.Errorf("could not run Metarr. Check $PATH, permissions, and ensure the file is executable: %w", err)
+
+			results <- fmt.Errorf("could not run Metarr at $PATH, check permissions and check that the file is executable (chmod +x)")
 			continue
 		}
 
+		//
 		if err := metarr.InitMetarr(v, ctx); err != nil {
 			results <- fmt.Errorf("error initializing Metarr: %w", err)
 			continue
