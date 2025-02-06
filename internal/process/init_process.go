@@ -61,7 +61,7 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 			continue
 		}
 
-		if video.Downloaded {
+		if video.Finished {
 			logging.D(1, "Video in channel %q with URL %q is already marked as downloaded", c.Name, video.URL)
 			continue
 		}
@@ -146,12 +146,11 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 		}
 
 		if _, err := exec.LookPath("metarr"); err != nil {
-			logging.I("Skipping Metarr process... 'metarr' $PATH not available: %v", err)
-
-			v.Downloaded = true
+			v.Finished = true
 			if err := vs.UpdateVideo(v); err != nil {
 				results <- fmt.Errorf("failed to update video DB entry: %w", err)
 			}
+			results <- fmt.Errorf("could not run Metarr. Check $PATH, permissions, and ensure the file is executable: %w", err)
 			continue
 		}
 
@@ -160,7 +159,7 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 			continue
 		}
 
-		v.Downloaded = true
+		v.Finished = true
 		if err := vs.UpdateVideo(v); err != nil {
 			results <- fmt.Errorf("failed to update video DB entry: %w", err)
 		}

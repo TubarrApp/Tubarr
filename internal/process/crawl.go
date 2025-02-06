@@ -73,7 +73,7 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) 
 			}
 			v.DownloadStatus.Status = consts.DLStatusCompleted
 			v.DownloadStatus.Pct = 100.0
-			v.Downloaded = true
+			v.Finished = true
 		}
 
 		validVideos, errArray := s.VideoStore().AddVideos(videos, c)

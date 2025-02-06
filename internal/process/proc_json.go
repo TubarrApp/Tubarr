@@ -41,7 +41,7 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 
 		v.DownloadStatus.Status = consts.DLStatusCompleted
 		v.DownloadStatus.Pct = 100.0
-		v.Downloaded = true
+		v.Finished = true
 
 		if v.ID, err = vs.AddVideo(v); err != nil {
 			return false, fmt.Errorf("failed to update ignored video in DB: %w", err)

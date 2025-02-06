@@ -443,7 +443,7 @@ func validateGPU(g, devDir string) (gpu string, err error) {
 	case "auto", "automatic", "automated":
 		return "auto", nil
 	default:
-		return "", fmt.Errorf("entered gpu %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
+		return "", fmt.Errorf("entered GPU %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
 	}
 }
 

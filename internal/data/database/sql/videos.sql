@@ -1,7 +1,7 @@
  CREATE TABLE IF NOT EXISTS videos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-    downloaded INTEGER DEFAULT 0,
+    finished INTEGER DEFAULT 0,
     url_file TEXT,
     url TEXT NOT NULL,
     title TEXT,

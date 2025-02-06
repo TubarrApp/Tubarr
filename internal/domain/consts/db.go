@@ -44,7 +44,7 @@ const (
 const (
 	QVidID          = "id"
 	QVidChanID      = "channel_id"
-	QVidFinished    = "downloaded"
+	QVidFinished    = "finished"
 	QVidURL         = "url"
 	QVidTitle       = "title"
 	QVidDescription = "description"

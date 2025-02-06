@@ -38,7 +38,7 @@ type Video struct {
 	VideoPath      string `db:"video_path"`
 	JSONDir        string `db:"json_directory"`
 	JSONPath       string `db:"json_path"`
-	Downloaded     bool   `db:"downloaded"`
+	Finished       bool   `db:"finished"`
 	JSONCustomFile string
 	URL            string `db:"url"`
 	DirectVideoURL string

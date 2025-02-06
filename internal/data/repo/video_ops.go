@@ -87,7 +87,7 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 					v.URL,
 					v.VideoDir,
 					v.JSONDir,
-					v.Downloaded,
+					v.Finished,
 				).
 				RunWith(tx)
 
@@ -185,7 +185,7 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		).
 		Values(
 			v.ChannelID, v.URL, v.Title, v.Description, v.VideoDir, v.JSONDir,
-			v.Downloaded, v.UploadDate, metadataJSON, settingsJSON, metarrJSON, now, now,
+			v.Finished, v.UploadDate, metadataJSON, settingsJSON, metarrJSON, now, now,
 		).
 		RunWith(tx)
 
@@ -246,7 +246,7 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 		Set(consts.QVidJSONDir, v.JSONDir).
 		Set(consts.QVidVideoPath, v.VideoPath).
 		Set(consts.QVidJSONPath, v.JSONPath).
-		Set(consts.QVidFinished, v.Downloaded).
+		Set(consts.QVidFinished, v.Finished).
 		Set(consts.QVidUploadDate, v.UploadDate).
 		Set(consts.QVidMetadata, metadataJSON).
 		Set(consts.QVidSettings, settingsJSON).
