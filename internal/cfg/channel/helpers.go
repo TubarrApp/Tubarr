@@ -440,7 +440,7 @@ func validateGPU(g, devDir string) (gpu string, err error) {
 		return "vaapi", nil
 	case "nvidia", "cuda":
 		return "cuda", nil
-	case "auto", "automatic":
+	case "auto", "automatic", "automated":
 		return "auto", nil
 	default:
 		return "", fmt.Errorf("entered gpu %q not supported. Tubarr supports Intel, AMD, or Nvidia", g)
