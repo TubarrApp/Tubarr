@@ -3,6 +3,7 @@ package browser
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"tubarr/internal/cfg"
@@ -75,118 +77,84 @@ func NewBrowser() *Browser {
 	}
 }
 
-// GetNewReleases checks a channel URL for URLs which have not yet been recorded as downloaded.
+// GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
 func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) ([]*models.Video, error) {
-	if c.URL == "" {
-		return nil, fmt.Errorf("channel url is blank (channel ID: %d)", c.ID)
+	if len(c.URLs) == 0 {
+		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
 	}
 
+	// Load already downloaded URLs
 	existingURLs, err := cs.LoadGrabbedURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
-	logging.D(2, "Loaded into 'existingURLs' for channel %q: %v", c.Name, existingURLs)
-
+	// Convert existing URLs into a map for quick lookup
 	existingMap := make(map[string]struct{}, len(existingURLs))
 	for _, url := range existingURLs {
 		existingMap[url] = struct{}{}
 	}
 
-	if len(existingMap) > 0 {
-		logging.D(2, "Inserted %d existing downloaded video URLs for channel %q into map: %v", len(existingMap), c.Name, existingMap)
-	}
+	logging.D(2, "Loaded %d existing downloaded video URLs for channel %q", len(existingMap), c.Name)
 
+	// Prepare data structures
 	var (
-		cookies []*http.Cookie
-		sb      strings.Builder
-	)
-	const (
-		protoExt = "://"
+		newRequests []*models.Video
 	)
 
-	if c.BaseDomain == "" {
-		logging.D(1, "Parsing URL %q", c.URL)
-		parsed, err := url.Parse(c.URL)
+	// Process each URL separately
+	for _, videoURL := range c.URLs {
+		parsed, err := url.Parse(videoURL)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse URL %q: %w", videoURL, err)
 		}
-		c.BaseDomain = parsed.Hostname()
-		parsedScheme := parsed.Scheme
 
-		sb.Reset()
-		sb.Grow(len(parsedScheme) + len(protoExt) + len(c.BaseDomain))
-		sb.WriteString(parsedScheme)
-		sb.WriteString(protoExt)
-		sb.WriteString(c.BaseDomain)
-		c.BaseDomainWithProto = sb.String()
-		logging.D(1, "Saved channel domain %q\nChannel domain with protocol %q", c.BaseDomain, c.BaseDomainWithProto)
-	}
+		domain := parsed.Hostname()
+		protocol := parsed.Scheme
+		baseDomainWithProto := protocol + "://" + domain
 
-	if customAuthCookies[c.BaseDomain] == nil {
-		const (
-			tubarrDir = ".tubarr/"
-			txtExt    = ".txt"
-		)
+		logging.D(1, "Processing BaseDomain %q for URL %q", baseDomainWithProto, videoURL)
 
-		homeDir, err := os.UserHomeDir()
+		// Retrieve authentication details for this specific video URL
+		username, password, loginURL, err := cs.GetAuth(c.ID, videoURL)
 		if err != nil {
-			logging.E(0, "Failed to get user home directory, reverting to '/': %v", err)
-			homeDir = "/"
+			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, videoURL, err)
 		}
 
-		sb.Reset()
-		sb.Grow(len(homeDir) + 1 + len(tubarrDir) + len(c.Name) + len(txtExt))
-		sb.WriteString(homeDir)
-		if !strings.HasSuffix(c.VideoDir, "/") {
-			sb.WriteRune('/')
+		// Generate a unique cookie path per URL
+		cookiePath := getAuthFilePath(c.Name, videoURL)
+
+		authDetails := &models.ChanURLAuthDetails{
+			Username:   username,
+			Password:   password,
+			LoginURL:   loginURL,
+			CookiePath: cookiePath,
 		}
-		sb.WriteString(tubarrDir)
 
-		noSpaceChanName := strings.ReplaceAll(c.Name, " ", "-")
-		sb.WriteString(noSpaceChanName)
-		sb.WriteString(txtExt)
-
-		if (c.Username != "" || c.Password != "") && c.LoginURL != "" {
-			cookies, err = channelAuth(c.BaseDomain, sb.String(), c)
+		// Retrieve or generate authentication cookies for this specific video URL
+		var cookies []*http.Cookie
+		if (username != "" || password != "") && loginURL != "" {
+			cookies, err = channelAuth(domain, cookiePath, authDetails)
 			if err != nil {
-				return nil, err
+				logging.E(0, "Failed to get auth cookies for %q: %v", videoURL, err)
 			}
-			customAuthCookies[c.BaseDomain] = cookies
-			logging.D(2, "Set %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
+		} else {
+			// If no auth is required, retrieve cookies normally
+			cookies, err = b.cookies.GetCookies(videoURL)
+			if err != nil {
+				logging.E(0, "Failed to get cookies for %q: %v", videoURL, err)
+			}
 		}
-	} else {
-		cookies = customAuthCookies[c.BaseDomain]
-		logging.D(2, "Retrieved %d cookies for domain %q: %v", len(cookies), c.BaseDomain, cookies)
-	}
 
-	if cookies == nil {
-		cookies, err = b.cookies.GetCookies(c.URL)
+		// Fetch new episode URLs for this video URL
+		newEpisodeURLs, err := b.newEpisodeURLs(videoURL, existingURLs, nil, cookies, ctx)
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	var fileURLs []string
-	if cfg.IsSet(keys.URLFile) {
-		prs := parsing.NewURLFileParser(cfg.GetString(keys.URLFile))
-		if fileURLs, err = prs.ParseURLs(); err != nil {
-			return nil, err
-		}
-	}
-
-	newURLs, err := b.newEpisodeURLs(c.URL, existingURLs, fileURLs, cookies, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	logging.D(2, "Grabbed 'new' URLs for channel %q before filtering: %v", c.Name, newURLs)
-
-	newRequests := make([]*models.Video, 0, len(newURLs))
-	for _, newURL := range newURLs {
-		if newURL != "" {
+		// Filter out already downloaded URLs
+		for _, newURL := range newEpisodeURLs {
 			if _, exists := existingMap[newURL]; !exists {
-				logging.D(1, "%q does not exist in 'existingMap' for channel %q, adding download request", newURL, c.Name)
 				newRequests = append(newRequests, &models.Video{
 					ChannelID:  c.ID,
 					URL:        newURL,
@@ -195,20 +163,20 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 					Channel:    c,
 					Settings:   c.Settings,
 					MetarrArgs: c.MetarrArgs,
-					CookiePath: c.CookiePath,
+					CookiePath: cookiePath,
 				})
 			}
 		}
 	}
 
-	logging.D(2, "List of 'new' requests for channel %q: %v", c.Name, newRequests)
+	logging.D(2, "New download requests for channel %q: %v", c.Name, newRequests)
 
+	// Print summary if new videos were found
 	if len(newRequests) > 0 {
-		logging.I("Grabbed %d new download requests:", len(newRequests))
+		logging.I("Found %d new download requests for channel %q:", len(newRequests), c.Name)
 		for i, v := range newRequests {
-			i++
-			logging.P("%s#%d%s - %v", consts.ColorBlue, i, consts.ColorReset, v.URL)
-			if i > 25 {
+			logging.P("%s#%d%s - %v", consts.ColorBlue, i+1, consts.ColorReset, v.URL)
+			if i >= 25 {
 				break
 			}
 		}
@@ -474,4 +442,34 @@ func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename stri
 
 	v.JSONCustomFile = filePath
 	return nil
+}
+
+// Extracts the hostname from a URL.
+// func urlHostname(rawURL string) string {
+// 	parsed, err := url.Parse(rawURL)
+// 	if err != nil {
+// 		return ""
+// 	}
+// 	return parsed.Hostname()
+// }
+
+// getAuthFilePath generates a unique authentication file path per channel and URL.
+func getAuthFilePath(channelName, videoURL string) string {
+	const tubarrDir = ".tubarr/"
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = "/"
+	}
+
+	// If no specific URL is provided, return the default per-channel auth file.
+	if videoURL == "" {
+		return filepath.Join(homeDir, tubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
+	}
+
+	// Generate a short hash for the URL to ensure uniqueness
+	urlHash := sha256.Sum256([]byte(videoURL))
+	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use the first 8 hex characters
+
+	// Construct file path (e.g., ~/.tubarr/CensoredTV_Show_a1b2c3d4.txt)
+	return filepath.Join(homeDir, tubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
 }

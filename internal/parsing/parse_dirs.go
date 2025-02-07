@@ -4,7 +4,6 @@ package parsing
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -130,16 +129,6 @@ func (dp *Directory) replace(tag string) (string, error) {
 
 	switch strings.ToLower(tag) {
 
-	case templates.ChannelDomain:
-		if c.URL != "" {
-			u, err := url.Parse(c.URL)
-			if err != nil {
-				return "", fmt.Errorf("error parsing base domain from %q", c.URL)
-			}
-			return u.Host, nil
-		}
-		return "", errors.New("templating: URL empty")
-
 	case templates.ChannelID:
 		if c.ID != 0 {
 			return strconv.Itoa(int(c.ID)), nil
@@ -151,12 +140,6 @@ func (dp *Directory) replace(tag string) (string, error) {
 			return c.Name, nil
 		}
 		return "", errors.New("templating: channel name empty")
-
-	case templates.ChannelURL:
-		if c.URL != "" {
-			return c.URL, nil
-		}
-		return "", errors.New("templating: URL empty")
 
 	case templates.VideoID:
 		if v.ID != 0 {

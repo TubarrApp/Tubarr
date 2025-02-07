@@ -2,10 +2,9 @@
 package templates
 
 const (
-	ChannelDomain = "channel_domain"
-	ChannelName   = "channel_name"
-	ChannelURL    = "channel_url"
-	ChannelID     = "channel_id"
+	ChannelName = "channel_name"
+	ChannelURL  = "channel_url"
+	ChannelID   = "channel_id"
 )
 
 const (

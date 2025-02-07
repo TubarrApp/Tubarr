@@ -123,7 +123,7 @@ func extractBaseDomain(urlString string) (string, error) {
 }
 
 // saveCookiesToFile saves the cookies to a file in Netscape format.
-func saveCookiesToFile(cookies []*http.Cookie, filePath string, c *models.Channel) error {
+func saveCookiesToFile(cookies []*http.Cookie, filePath string, a *models.ChanURLAuthDetails) error {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -142,7 +142,7 @@ func saveCookiesToFile(cookies []*http.Cookie, filePath string, c *models.Channe
 	for _, cookie := range cookies {
 		domain := cookie.Domain
 		if domain == "" {
-			domain = c.BaseDomain
+			domain = a.BaseDomain
 		}
 
 		if !strings.HasPrefix(domain, ".") && strings.Count(domain, ".") > 1 {
@@ -170,7 +170,7 @@ func saveCookiesToFile(cookies []*http.Cookie, filePath string, c *models.Channe
 		}
 	}
 
-	// Save the cookie path to the Channel model
-	c.CookiePath = filePath
+	// Save the cookie path to the video model
+	a.CookiePath = filePath
 	return nil
 }

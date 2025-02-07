@@ -35,7 +35,7 @@ func (cs *ChannelStore) GetDB() *sql.DB {
 // GetID gets the channel ID from an input key and value.
 func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	switch key {
-	case consts.QChanURL, consts.QChanName, consts.QChanID:
+	case consts.QChanName, consts.QChanID:
 		if val == "" {
 			return 0, fmt.Errorf("please enter a value for key %q", key)
 		}
@@ -55,19 +55,25 @@ func (cs *ChannelStore) GetID(key, val string) (int64, error) {
 	return id, nil
 }
 
-// GetAuth gets authentication details for a channel.
-func (cs *ChannelStore) GetAuth(channelID int64) (username, password, loginURL string, err error) {
+// GetAuth retrieves authentication details for a specific URL in a channel.
+func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password, loginURL string, err error) {
+	var u, p, l sql.NullString // Use sql.NullString to handle NULL values
+
 	query := squirrel.
-		Select(consts.QChanUsername, consts.QChanPassword, consts.QChanLoginURL).
-		From(consts.DBChannels).
-		Where(squirrel.Eq{consts.QChanID: channelID}).
+		Select(consts.QChanURLsUsername, consts.QChanURLsPassword, consts.QChanURLsLoginURL).
+		From(consts.DBChannelURLs).
+		Where(squirrel.And{
+			squirrel.Eq{consts.QChanURLsChannelID: channelID},
+			squirrel.Eq{consts.QChanURLsURL: url},
+		}).
 		RunWith(cs.DB)
 
-	if err = query.QueryRow().Scan(&username, &password, &loginURL); err != nil {
-		logging.I("No auth details in the database for channel with ID: %d", channelID)
+	if err = query.QueryRow().Scan(&u, &p, &l); err != nil {
+		logging.I("No auth details found in database for channel ID: %d, URL: %s", channelID, url)
 		return "", "", "", err
 	}
-	return username, password, loginURL, nil
+
+	return u.String, p.String, l.String, nil
 }
 
 // DeleteVideoURL deletes a URL from the downloaded database list.
@@ -205,37 +211,48 @@ func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) err
 }
 
 // AddAuth adds authentication details to a channel.
-func (cs ChannelStore) AddAuth(channelID int64, username, password, loginURL string) error {
-	if !cs.channelExistsID(channelID) {
-		return fmt.Errorf("channel with ID %d does not exist", channelID)
+func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChanURLAuthDetails) error {
+	if !cs.channelExistsID(chanID) {
+		return fmt.Errorf("channel with ID %d does not exist", chanID)
 	}
 
-	query := squirrel.
-		Update(consts.DBChannels).
-		Set(consts.QChanUsername, username).
-		Set(consts.QChanPassword, password).
-		Set(consts.QChanLoginURL, loginURL).
-		Where(squirrel.Eq{consts.QChanID: channelID}).
-		RunWith(cs.DB)
-
-	if _, err := query.Exec(); err != nil {
-		return err
+	if authDetails == nil {
+		logging.I("No authorization details to add for channel with ID %d", chanID)
+		return nil
 	}
-	logging.S(0, "Added authentication details for channel with ID %d", channelID)
+
+	for chanURL, a := range authDetails {
+		if !cs.channelURLExists(consts.QChanURLsURL, chanURL) {
+			return fmt.Errorf("channel with URL %q does not exist", chanURL)
+		}
+
+		query := squirrel.
+			Update(consts.DBChannelURLs).
+			Set(consts.QChanURLsUsername, a.Username).
+			Set(consts.QChanURLsPassword, a.Password).
+			Set(consts.QChanURLsLoginURL, a.LoginURL).
+			Where(squirrel.Eq{consts.QChanURLsURL: chanURL}).
+			RunWith(cs.DB)
+
+		if _, err := query.Exec(); err != nil {
+			return err
+		}
+		logging.S(0, "Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
+	}
 	return nil
 }
 
 // AddChannel adds a new channel to the database.
 func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	switch {
-	case c.URL == "":
-		return 0, errors.New("must enter a url for channel")
+	case len(c.URLs) == 0:
+		return 0, errors.New("must enter at least one URL for the channel")
 	case c.VideoDir == "":
 		return 0, errors.New("must enter a video directory where downloads will be stored")
 	}
 
-	if cs.channelExists(consts.QChanURL, c.URL) {
-		return 0, fmt.Errorf("channel with URL %q already exists", c.URL)
+	if cs.channelExists(consts.QChanName, c.Name) {
+		return 0, fmt.Errorf("channel with name %q already exists", c.Name)
 	}
 
 	// JSON dir
@@ -256,34 +273,27 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("failed to marshal metarr settings: %w", err)
 	}
 
+	// Insert into the channels table
 	query := squirrel.
 		Insert(consts.DBChannels).
 		Columns(
-			consts.QChanURL,
 			consts.QChanName,
 			consts.QChanVideoDir,
 			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanUsername,
-			consts.QChanPassword,
-			consts.QChanLoginURL,
 			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
 		Values(
-			c.URL,
 			c.Name,
 			c.VideoDir,
 			c.JSONDir,
 			settingsJSON,
 			metarrJSON,
 			now,
-			c.Username,
-			c.Password,
-			c.LoginURL,
 			false,
 			now,
 			now,
@@ -295,13 +305,28 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("failed to insert channel: %w", err)
 	}
 
+	// Get the new channel ID
 	id, err := result.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
 
-	logging.S(0, "Successfully added channel (ID: %d)\n\nName: %s\nURL: %s\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
-		id, c.Name, c.URL, c.Settings.CrawlFreq, c.Settings.Filters, c.Settings, c.MetarrArgs)
+	// Insert URLs into the channel_urls table
+	for _, url := range c.URLs {
+		urlQuery := squirrel.
+			Insert(consts.DBChannelURLs).
+			Columns(consts.QChanURLsChannelID, consts.QChanURLsURL).
+			Values(id, url).
+			RunWith(cs.DB)
+
+		if _, err := urlQuery.Exec(); err != nil {
+			return 0, fmt.Errorf("failed to insert URL %q for channel ID %d: %w", url, id, err)
+		}
+	}
+
+	logging.S(0, "Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
+		id, c.Name, c.URLs, c.Settings.CrawlFreq, c.Settings.Filters, c.Settings, c.MetarrArgs)
+
 	return id, nil
 }
 
@@ -332,16 +357,12 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 	query := squirrel.
 		Select(
 			consts.QChanID,
-			consts.QChanURL,
 			consts.QChanName,
 			consts.QChanVideoDir,
 			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanUsername,
-			consts.QChanPassword,
-			consts.QChanLoginURL,
 			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
@@ -354,16 +375,12 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 		QueryRow().
 		Scan(
 			&c.ID,
-			&c.URL,
 			&c.Name,
 			&c.VideoDir,
 			&c.JSONDir,
 			&settings,
 			&metarrJSON,
 			&c.LastScan,
-			&c.Username,
-			&c.Password,
-			&c.LoginURL,
 			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
@@ -383,8 +400,33 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 		}
 	}
 
-	logging.D(1, "Retrieved channel with Metarr args: %+v", c.MetarrArgs)
+	// Initialize URL list
+	c.URLs = []string{}
 
+	// Fetch all URLs for the channel
+	urlQuery := squirrel.
+		Select("url").
+		From(consts.DBChannelURLs).
+		Where(squirrel.Eq{"channel_id": c.ID}).
+		RunWith(cs.DB)
+
+	urlRows, err := urlQuery.Query()
+	if err != nil {
+		return fmt.Errorf("failed to fetch URLs for channel: %w", err)
+	}
+	defer urlRows.Close()
+
+	for urlRows.Next() {
+		var url string
+		if err := urlRows.Scan(&url); err != nil {
+			return fmt.Errorf("failed to scan URL: %w", err)
+		}
+		c.URLs = append(c.URLs, url)
+	}
+
+	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
+
+	// Process crawling using the updated channel object
 	if err := process.CrawlIgnoreNew(s, &c, ctx); err != nil {
 		return err
 	}
@@ -400,16 +442,12 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 	query := squirrel.
 		Select(
 			consts.QChanID,
-			consts.QChanURL,
 			consts.QChanName,
 			consts.QChanVideoDir,
 			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanUsername,
-			consts.QChanPassword,
-			consts.QChanLoginURL,
 			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
@@ -423,16 +461,12 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 		QueryRow().
 		Scan(
 			&c.ID,
-			&c.URL,
 			&c.Name,
 			&c.VideoDir,
 			&c.JSONDir,
 			&settings,
 			&metarrJSON,
 			&c.LastScan,
-			&c.Username,
-			&c.Password,
-			&c.LoginURL,
 			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
@@ -452,28 +486,50 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 		}
 	}
 
-	logging.D(1, "Retrieved channel with Metarr args: %+v", c.MetarrArgs)
+	// Initialize URL list
+	c.URLs = []string{}
+
+	// Fetch all URLs for the channel
+	urlQuery := squirrel.
+		Select("url").
+		From(consts.DBChannelURLs).
+		Where(squirrel.Eq{"channel_id": c.ID}).
+		RunWith(cs.DB)
+
+	urlRows, err := urlQuery.Query()
+	if err != nil {
+		return fmt.Errorf("failed to fetch URLs for channel: %w", err)
+	}
+	defer urlRows.Close()
+
+	for urlRows.Next() {
+		var url string
+		if err := urlRows.Scan(&url); err != nil {
+			return fmt.Errorf("failed to scan URL: %w", err)
+		}
+		c.URLs = append(c.URLs, url)
+	}
+
+	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
+
+	// Process crawling using the updated channel object
 	return process.ChannelCrawl(s, &c, ctx)
 }
 
-// FetchChannel returns a single channel from the database.
-func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err error, hasRows bool) {
+// FetchChannel returns a single channel from the database along with its associated URLs.
+func (cs *ChannelStore) FetchChannel(id int64) (*models.Channel, error, bool) {
 	var (
 		settingsJSON, metarrJSON json.RawMessage
 	)
 	query := squirrel.
 		Select(
 			consts.QChanID,
-			consts.QChanURL,
 			consts.QChanName,
 			consts.QChanVideoDir,
 			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanUsername,
-			consts.QChanPassword,
-			consts.QChanLoginURL,
 			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
@@ -485,20 +541,18 @@ func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err err
 	row := query.QueryRow()
 
 	c := new(models.Channel)
-	if err := row.Scan(&c.ID,
-		&c.URL,
+	if err := row.Scan(
+		&c.ID,
 		&c.Name,
 		&c.VideoDir,
 		&c.JSONDir,
 		&settingsJSON,
 		&metarrJSON,
 		&c.LastScan,
-		&c.Username,
-		&c.Password,
-		&c.LoginURL,
 		&c.Paused,
 		&c.CreatedAt,
-		&c.UpdatedAt); err != nil {
+		&c.UpdatedAt,
+	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, false
 		}
@@ -518,6 +572,31 @@ func (cs *ChannelStore) FetchChannel(id int64) (channel *models.Channel, err err
 			return nil, fmt.Errorf("failed to unmarshal metarr settings: %w", err), true
 		}
 	}
+
+	// Initialize URL list
+	c.URLs = []string{}
+
+	// Fetch URLs associated with this channel
+	urlQuery := squirrel.
+		Select("url").
+		From(consts.DBChannelURLs).
+		Where(squirrel.Eq{"channel_id": c.ID}).
+		RunWith(cs.DB)
+
+	urlRows, err := urlQuery.Query()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch URLs for channel: %w", err), true
+	}
+	defer urlRows.Close()
+
+	for urlRows.Next() {
+		var url string
+		if err := urlRows.Scan(&url); err != nil {
+			return nil, fmt.Errorf("failed to scan URL: %w", err), true
+		}
+		c.URLs = append(c.URLs, url)
+	}
+
 	return c, nil, true
 }
 
@@ -526,16 +605,12 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 	query := squirrel.
 		Select(
 			consts.QChanID,
-			consts.QChanURL,
 			consts.QChanName,
 			consts.QChanVideoDir,
 			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanUsername,
-			consts.QChanPassword,
-			consts.QChanLoginURL,
 			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
@@ -556,21 +631,21 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 		}
 	}()
 
+	channelsMap := make(map[int64]*models.Channel)
+	channelList := []*models.Channel{}
+
 	for rows.Next() {
 		var c models.Channel
 		var settingsJSON, metarrJSON []byte
+
 		err := rows.Scan(
 			&c.ID,
-			&c.URL,
 			&c.Name,
 			&c.VideoDir,
 			&c.JSONDir,
 			&settingsJSON,
 			&metarrJSON,
 			&c.LastScan,
-			&c.Username,
-			&c.Password,
-			&c.LoginURL,
 			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
@@ -579,27 +654,48 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 			return nil, fmt.Errorf("failed to scan channel: %w", err), true
 		}
 
-		// Unmarshal settings JSON
+		// Unmarshal JSON fields
 		if len(settingsJSON) > 0 {
 			if err := json.Unmarshal(settingsJSON, &c.Settings); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal settings: %w", err), true
 			}
 		}
-
-		// Unmarshal Metarr JSON
 		if len(metarrJSON) > 0 {
 			if err := json.Unmarshal(metarrJSON, &c.MetarrArgs); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal metarr settings: %w", err), true
 			}
 		}
-		channels = append(channels, &c)
+
+		c.URLs = []string{}
+		channelsMap[c.ID] = &c
+		channelList = append(channelList, &c)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %w", err), true
+	urlQuery := squirrel.
+		Select(consts.QChanURLsChannelID, consts.QChanURLsURL).
+		From(consts.DBChannelURLs).
+		RunWith(cs.DB)
+
+	urlRows, err := urlQuery.Query()
+	if err != nil {
+		return nil, fmt.Errorf("failed to query URLs: %w", err), true
+	}
+	defer urlRows.Close()
+
+	for urlRows.Next() {
+		var channelID int64
+		var url string
+
+		if err := urlRows.Scan(&channelID, &url); err != nil {
+			return nil, fmt.Errorf("failed to scan URLs: %w", err), true
+		}
+
+		if channel, exists := channelsMap[channelID]; exists {
+			channel.URLs = append(channel.URLs, url)
+		}
 	}
 
-	return channels, nil, true
+	return channelList, nil, len(channelList) > 0
 }
 
 // UpdateChannelMetarrArgsJSON updates args for Metarr output.
@@ -849,6 +945,24 @@ func (cs ChannelStore) channelExists(key, val string) bool {
 		return false
 	} else if err != nil {
 		logging.E(0, "Failed to scan for existent channel with key=%s val=%s: %v", key, val, err)
+		return exists
+	}
+	return exists
+}
+
+// channelURLExists returns true if the channel exists in the database.
+func (cs ChannelStore) channelURLExists(key, val string) bool {
+	var exists bool
+	query := squirrel.
+		Select("1").
+		From(consts.DBChannelURLs).
+		Where(squirrel.Eq{key: val}).
+		RunWith(cs.DB)
+
+	if err := query.QueryRow().Scan(&exists); errors.Is(err, sql.ErrNoRows) {
+		return false
+	} else if err != nil {
+		logging.E(0, "Failed to scan for existent channel URL with key=%s val=%s: %v", key, val, err)
 		return exists
 	}
 	return exists

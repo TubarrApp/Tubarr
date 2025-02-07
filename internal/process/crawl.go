@@ -68,7 +68,7 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) 
 	if len(videos) > 0 {
 		for _, v := range videos {
 			if v.URL == "" {
-				logging.D(5, "Skipping invalid video entry with no URL in channel %q", c.URL)
+				logging.D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
 				continue
 			}
 			v.DownloadStatus.Status = consts.DLStatusCompleted
@@ -173,12 +173,12 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 		errMsg = "encountered %d errors during processing: %v"
 	)
 
-	logging.I("Initiating crawl for URL %s...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
-		c.URL, c.VideoDir, c.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
+	logging.I("Initiating crawl for channel %q...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
+		c.Name, c.VideoDir, c.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
 
 	switch {
-	case c.URL == "":
-		return errors.New("channel URL is blank")
+	case len(c.URLs) == 0:
+		return errors.New("no channel URLs")
 	case c.VideoDir == "", c.JSONDir == "":
 		return errors.New("output directories are blank")
 	}
@@ -212,7 +212,7 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 	for _, v := range videos {
 
 		// Detect censored.tv links
-		if strings.Contains(c.URL, "censored.tv") {
+		if strings.Contains(v.URL, "censored.tv") {
 			if !progflags.CensoredTVUseCustom {
 				logging.I("Using regular censored.tv scraper...")
 			} else {
@@ -231,7 +231,7 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 	)
 
 	if len(videos) == 0 {
-		logging.I("No new releases for channel %q", c.URL)
+		logging.I("No new releases for channel %q", c.Name)
 		return nil
 	} else {
 		// Main process

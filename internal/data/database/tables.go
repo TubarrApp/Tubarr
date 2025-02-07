@@ -11,6 +11,7 @@ var sqlFiles embed.FS
 
 const (
 	channelSQL      = "sql/channels.sql"
+	channelURLsSQL  = "sql/channel_urls.sql"
 	downloadSQL     = "sql/downloads.sql"
 	notificationSQL = "sql/notifications.sql"
 	programSQL      = "sql/program.sql"
@@ -25,6 +26,11 @@ func initProgramTable(tx *sql.Tx) error {
 // initChannelsTable intializes channel tables.
 func initChannelsTable(tx *sql.Tx) error {
 	return executeSQLFile(tx, channelSQL, "channels table")
+}
+
+// initChannelURLsTable intializes channel tables.
+func initChannelURLsTable(tx *sql.Tx) error {
+	return executeSQLFile(tx, channelURLsSQL, "channel urls table")
 }
 
 // initNotifyTable initializes notification service tables.

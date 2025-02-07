@@ -57,6 +57,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := initChannelURLsTable(tx); err != nil {
+		return err
+	}
+
 	if err := initVideosTable(tx); err != nil {
 		return err
 	}

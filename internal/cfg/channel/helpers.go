@@ -278,14 +278,11 @@ func validateMaxFilesize(m string) (string, error) {
 }
 
 // getKeyVal returns a key and value for channel lookup.
-func getChanKeyVal(id int, name, url string) (key, val string, err error) {
+func getChanKeyVal(id int, name string) (key, val string, err error) {
 	switch {
 	case id != 0:
 		key = consts.QChanID
 		val = strconv.Itoa(id)
-	case url != "":
-		key = consts.QChanURL
-		val = url
 	case name != "":
 		key = consts.QChanName
 		val = name
@@ -298,7 +295,7 @@ func getChanKeyVal(id int, name, url string) (key, val string, err error) {
 // verifyChanRowUpdateValid verifies that your update operation is valid
 func verifyChanRowUpdateValid(col, val string) error {
 	switch col {
-	case "url", "name", "video_directory", "json_directory":
+	case "name", "video_directory", "json_directory":
 		if val == "" {
 			return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
 		}
@@ -514,4 +511,99 @@ func hyphenateYyyyMmDd(d string) string {
 // validateTranscodeVideoFilter validates the transcode video filter preset.
 func validateTranscodeVideoFilter(q string) (vf string, err error) {
 	return q, nil
+}
+
+// parseAuthDetails parses authorization details for a particular channel URL.
+func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*models.ChanURLAuthDetails, error) {
+	logging.I("Parsing authorization details...")
+	if usernames == nil && passwords == nil && loginURLs == nil {
+		logging.I("No authorization details to parse...")
+		return nil, nil
+	}
+
+	// Initialize the map
+	authMap := make(map[string]*models.ChanURLAuthDetails)
+
+	// Process usernames
+	for _, u := range usernames {
+		if !strings.Contains(u, " ") {
+			return nil, fmt.Errorf("must input auth username as 'URL username' with a space between the two. %q is invalid", u)
+		}
+
+		uParts := strings.Split(u, " ")
+		if len(uParts) != 2 {
+			return nil, fmt.Errorf("too many space separated elements in the username %q", u)
+		}
+
+		// Initialize the struct if it doesn't exist
+		if authMap[uParts[0]] == nil {
+			authMap[uParts[0]] = &models.ChanURLAuthDetails{}
+		}
+		authMap[uParts[0]].Username = uParts[1]
+	}
+
+	// Process passwords
+	for _, p := range passwords {
+		if !strings.Contains(p, " ") {
+			return nil, fmt.Errorf("must input auth password as 'URL password' with a space between the two")
+		}
+
+		pParts := strings.Split(p, " ")
+		if len(pParts) != 2 {
+			return nil, fmt.Errorf("too many space separated elements in the URL password entry")
+		}
+
+		// Initialize the struct if it doesn't exist
+		if authMap[pParts[0]] == nil {
+			authMap[pParts[0]] = &models.ChanURLAuthDetails{}
+		}
+		authMap[pParts[0]].Password = pParts[1]
+	}
+
+	// Process login URLs
+	for _, l := range loginURLs {
+		if !strings.Contains(l, " ") {
+			return nil, fmt.Errorf("must input auth login URL as 'channelURL loginURL' with a space between the two. %q is invalid", l)
+		}
+
+		lParts := strings.Split(l, " ")
+		if len(lParts) != 2 {
+			return nil, fmt.Errorf("too many space separated elements in the channel URL's login URL entry: %q", l)
+		}
+
+		// Initialize the struct if it doesn't exist
+		if authMap[lParts[0]] == nil {
+			authMap[lParts[0]] = &models.ChanURLAuthDetails{}
+		}
+		authMap[lParts[0]].LoginURL = lParts[1]
+	}
+
+	// Validate that all required fields are present
+	for chanURL, details := range authMap {
+		if chanURL == "" {
+			continue
+		}
+
+		var count int
+		if details.LoginURL != "" {
+			count++
+		}
+		if details.Username != "" {
+			count++
+		}
+		if details.Password != "" {
+			count++
+		}
+
+		if count != 3 {
+			return nil, fmt.Errorf("every channel URL must have a username, password, and login URL")
+		}
+	}
+
+	if len(authMap) == 0 {
+		logging.I("No auth details added")
+		return nil, nil
+	}
+
+	return authMap, nil
 }

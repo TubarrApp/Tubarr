@@ -15,9 +15,9 @@ import (
 )
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func channelAuth(channelURL, cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
+func channelAuth(channelURL, cookiesFilePath string, a *models.ChanURLAuthDetails) ([]*http.Cookie, error) {
 	if customAuthCookies[channelURL] == nil { // If the user is not already authenticated
-		cookies, err := login(cookiesFilePath, c)
+		cookies, err := login(cookiesFilePath, a)
 		if err != nil {
 			return nil, err
 		}
@@ -27,7 +27,7 @@ func channelAuth(channelURL, cookiesFilePath string, c *models.Channel) ([]*http
 }
 
 // login logs the user in and returns the authentication cookie.
-func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
+func login(cookiesFilePath string, a *models.ChanURLAuthDetails) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err
@@ -35,10 +35,10 @@ func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 
 	client := &http.Client{Jar: jar}
 
-	logging.I("Logging in to %q with username %q", c.LoginURL, c.Username)
+	logging.I("Logging in to %q with username %q", a.LoginURL, a.Username)
 
 	// Fetch the login page to get a fresh token
-	req, err := http.NewRequest("GET", c.LoginURL, nil)
+	req, err := http.NewRequest("GET", a.LoginURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -58,16 +58,16 @@ func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 
 	// Prepare the login form data
 	data := url.Values{}
-	data.Set("email", c.Username)
-	data.Set("username", c.Username)
-	data.Set("password", c.Password)
+	data.Set("email", a.Username)
+	data.Set("username", a.Username)
+	data.Set("password", a.Password)
 	if token != "" {
 		data.Set("_token", token)
 	}
 	logging.D(1, "Sending token %q", data.Get("_token"))
 
 	// Post the login form
-	req, err = http.NewRequest("POST", c.LoginURL, strings.NewReader(data.Encode()))
+	req, err = http.NewRequest("POST", a.LoginURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func login(cookiesFilePath string, c *models.Channel) ([]*http.Cookie, error) {
 	}
 
 	// Save cookies to file
-	err = saveCookiesToFile(resp.Cookies(), cookiesFilePath, c)
+	err = saveCookiesToFile(resp.Cookies(), cookiesFilePath, a)
 	if err != nil {
 		return nil, err
 	}

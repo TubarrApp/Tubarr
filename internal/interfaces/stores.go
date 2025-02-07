@@ -17,7 +17,7 @@ type Store interface {
 
 // ChannelStore allows access to channel repo methods.
 type ChannelStore interface {
-	AddAuth(channelID int64, username, password, loginURL string) error
+	AddAuth(chanID int64, authDetails map[string]*models.ChanURLAuthDetails) error
 	AddChannel(c *models.Channel) (int64, error)
 	AddNotifyURL(id int64, notifyName, notifyURL string) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
@@ -28,7 +28,7 @@ type ChannelStore interface {
 	DeleteNotifyURLs(channelID int64, urls, names []string) error
 	FetchAllChannels() (channels []*models.Channel, err error, hasRows bool)
 	FetchChannel(id int64) (c *models.Channel, err error, hasRows bool)
-	GetAuth(channelID int64) (username, password, loginURL string, err error)
+	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetDB() *sql.DB
 	GetID(key, val string) (int64, error)
 	GetNotifyURLs(id int64) ([]string, error)

@@ -35,8 +35,8 @@ func InitVideoCmds(s interfaces.Store) *cobra.Command {
 // deletecmdvideo deletes a channel from the database.
 func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra.Command {
 	var (
-		chanName, chanURL, url, chanKey, chanVal string
-		chanID                                   int
+		chanName, chanKey, chanVal, url string
+		chanID                          int
 	)
 
 	delCmd := &cobra.Command{
@@ -46,10 +46,7 @@ func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			switch {
-			case chanURL != "" && url != "":
-				chanKey = consts.QChanURL
-				chanVal = chanURL
-			case chanName != "" && url != "":
+			case chanName != "":
 				chanKey = consts.QChanName
 				chanVal = chanName
 			case chanID != 0:
@@ -73,7 +70,7 @@ func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra
 	}
 
 	// Primary channel elements
-	cfgchannel.SetPrimaryChannelFlags(delCmd, &chanName, &chanURL, &chanID)
+	cfgchannel.SetPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
 	delCmd.Flags().StringVar(&url, "delete-url", "", "Video URL")
 
 	return delCmd

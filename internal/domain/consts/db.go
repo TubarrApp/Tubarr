@@ -4,6 +4,7 @@ package consts
 const (
 	DBProgram       = "program"
 	DBChannels      = "channels"
+	DBChannelURLs   = "channel_urls"
 	DBVideos        = "videos"
 	DBDownloads     = "downloads"
 	DBNotifications = "notifications"
@@ -22,7 +23,6 @@ const (
 // Channel
 const (
 	QChanID              = "id"
-	QChanURL             = "url"
 	QChanName            = "name"
 	QChanConcurrency     = "concurrency"
 	QChanVideoDir        = "video_directory"
@@ -32,12 +32,19 @@ const (
 	QChanSettings        = "settings"
 	QChanMetarr          = "metarr"
 	QChanLastScan        = "last_scan"
-	QChanUsername        = "username"
-	QChanPassword        = "password"
-	QChanLoginURL        = "login_url"
 	QChanPaused          = "paused"
 	QChanCreatedAt       = "created_at"
 	QChanUpdatedAt       = "updated_at"
+)
+
+// Channel URLs
+const (
+	QChanURLsID        = "id"
+	QChanURLsChannelID = "channel_id"
+	QChanURLsURL       = "url"
+	QChanURLsUsername  = "username"
+	QChanURLsPassword  = "password"
+	QChanURLsLoginURL  = "login_url"
 )
 
 // Videos

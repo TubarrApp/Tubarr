@@ -42,3 +42,11 @@ type MetarrArgs struct {
 	TranscodeAudioCodec  string   `json:"metarr_transcode_audio_codec"`
 	TranscodeQuality     string   `json:"metarr_transcode_quality"`
 }
+
+type ChanURLAuthDetails struct {
+	Username   string
+	Password   string
+	LoginURL   string
+	BaseDomain string
+	CookiePath string
+}
