@@ -3,7 +3,7 @@ package keys
 
 // Channel identifiers
 const (
-	URL  string = "channel-url"
+	URL  string = "channel-urls"
 	Name string = "channel-name"
 	ID   string = "channel-id"
 )

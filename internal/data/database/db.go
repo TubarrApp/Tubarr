@@ -28,6 +28,12 @@ func InitDB() (d *Database, err error) {
 		return nil, fmt.Errorf("failed to open database at path %q: %w", setup.DBFilePath, err)
 	}
 
+	// Enable foreign key enforcement
+	_, err = d.DB.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
+
 	if err := d.initTables(); err != nil {
 		return nil, fmt.Errorf("failed to initialize tables: %w", err)
 	}
