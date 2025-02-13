@@ -232,25 +232,31 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 
 	if len(videos) == 0 {
 		logging.I("No new releases for channel %q", c.Name)
-		return nil
-	} else {
-		// Main process
-		success, errArray = InitProcess(s, c, videos, ctx)
-		if len(errArray) != 0 {
-			for _, err := range errArray {
-				logging.AddToErrorArray(err)
-			}
-		}
 
-		// Last scan time update
 		if err := cs.UpdateLastScan(c.ID); err != nil {
 			return fmt.Errorf("failed to update last scan time: %w", err)
 		}
 
-		// Add errors to array on failure
-		if !success {
-			return fmt.Errorf(errMsg, len(errArray), errArray)
+		// Return early, no new releases...
+		return nil
+	}
+
+	// Main process
+	success, errArray = InitProcess(s, c, videos, ctx)
+	if len(errArray) != 0 {
+		for _, err := range errArray {
+			logging.AddToErrorArray(err)
 		}
+	}
+
+	// Last scan time update
+	if err := cs.UpdateLastScan(c.ID); err != nil {
+		return fmt.Errorf("failed to update last scan time: %w", err)
+	}
+
+	// Add errors to array on failure
+	if !success {
+		return fmt.Errorf(errMsg, len(errArray), errArray)
 	}
 
 	// Some successful downloads, notify URLs
