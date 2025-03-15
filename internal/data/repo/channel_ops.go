@@ -176,7 +176,17 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
-	logging.S(0, "Deleted notify URLs %q for channel with ID '%d'", urls, channelID)
+
+	switch {
+	case len(urls) > 0 && len(names) == 0:
+		logging.S(0, "Deleted notify URLs %v for channel with ID '%d'.", urls, channelID)
+	case len(urls) == 0 && len(names) > 0:
+		logging.S(0, "Deleted notify URLs with friendly names %v for channel with ID '%d'.", names, channelID)
+	case len(urls) > 0 && len(names) > 0:
+		logging.S(0, "Deleted notify URLs: %v and notify URLs with friendly names %v for channel with ID '%d'.", urls, names, channelID)
+	default:
+		logging.S(0, "No notify URLs to delete.")
+	}
 	return nil
 }
 

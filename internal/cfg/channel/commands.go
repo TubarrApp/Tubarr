@@ -197,8 +197,8 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 		Long:  "Enter a fully qualified notification URL here to delete from the database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if len(notifyURLs) == 0 {
-				return errors.New("must enter at least one notify URL to delete")
+			if len(notifyURLs) == 0 && len(notifyNames) == 0 {
+				return errors.New("must enter at least one notify URL or name to delete")
 			}
 
 			var (
@@ -226,8 +226,8 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Primary channel elements
 	SetPrimaryChannelFlags(deleteNotifyCmd, &channelName, nil, &channelID)
-	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, keys.URLs, nil, "Full notification URL including tokens")
-	deleteNotifyCmd.Flags().StringSliceVar(&notifyNames, "names", nil, "Full notification names")
+	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, "notify-urls", nil, "Full notification URLs (e.g. 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE')")
+	deleteNotifyCmd.Flags().StringSliceVar(&notifyNames, "notify-names", nil, "Full notification names")
 
 	return deleteNotifyCmd
 }
@@ -278,7 +278,7 @@ func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Primary channel elements
 	SetPrimaryChannelFlags(addNotifyCmd, &channelName, nil, &channelID)
-	addNotifyCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
+	addNotifyCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URLs (e.g. 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE')")
 	addNotifyCmd.Flags().StringVar(&notifyName, "notify-name", "", "Provide a custom name for this notification")
 
 	return addNotifyCmd
@@ -692,6 +692,11 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
+			notifyURLs, err := cs.GetNotifyURLs(ch.ID)
+			if err != nil {
+				logging.E(0, "Unable to fetch notification URLs for channel %q: %v", ch.Name, err)
+			}
+
 			fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURLs: %+v\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URLs, ch.VideoDir, ch.JSONDir)
 			fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
 			fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
@@ -699,6 +704,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 			fmt.Printf("From Date (yyyy-mm-dd): %q\nTo Date (yyyy-mm-dd): %q\n", hyphenateYyyyMmDd(ch.Settings.FromDate), hyphenateYyyyMmDd(ch.Settings.ToDate))
 			fmt.Printf("Paused?: %v\n", ch.Paused)
+			fmt.Printf("Notification URLs: %v\n", notifyURLs)
 
 			return nil
 		},
@@ -725,6 +731,12 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			for _, ch := range chans {
+
+				notifyURLs, err := cs.GetNotifyURLs(ch.ID)
+				if err != nil {
+					logging.E(0, "Unable to fetch notification URLs for channel %q: %v", ch.Name, err)
+				}
+
 				fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %+v\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URLs, ch.VideoDir, ch.JSONDir)
 				fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
 				fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
@@ -732,6 +744,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
 				fmt.Printf("From Date (yyyy-mm-dd): %q\nTo Date (yyyy-mm-dd): %q\n", hyphenateYyyyMmDd(ch.Settings.FromDate), hyphenateYyyyMmDd(ch.Settings.ToDate))
 				fmt.Printf("Paused?: %v\n", ch.Paused)
+				fmt.Printf("Notification URLs: %v\n", notifyURLs)
 			}
 			return nil
 		},
