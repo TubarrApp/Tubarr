@@ -3,7 +3,6 @@ package metarr
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -151,33 +150,68 @@ func makeMetarrCommand(v *models.Video) []string {
 	argMap := make(map[string]string, singlesLen)
 	argSlicesMap := make(map[string][]string, sliceLen)
 
+	// Viper parsing issue workaround (remove double quotes and wrap command in them)
 	if strings.ContainsRune(v.VideoPath, '"') {
-		newVideoPath := strings.ReplaceAll(v.VideoPath, `"`, ``)
+		newVideoPath := strings.ReplaceAll(v.VideoPath, `"`, `'`)
 		err := os.Rename(v.VideoPath, newVideoPath)
 		if err != nil {
-			log.Printf("Failed to rename file: %v", err)
+			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.VideoPath, err)
 		} else {
 			v.VideoPath = newVideoPath
 		}
 	}
 
 	if strings.ContainsRune(v.JSONPath, '"') {
-		newJSONPath := strings.ReplaceAll(v.JSONPath, `"`, ``)
+		newJSONPath := strings.ReplaceAll(v.JSONPath, `"`, `'`)
 		err := os.Rename(v.JSONPath, newJSONPath)
 		if err != nil {
-			log.Printf("Failed to rename file: %v", err)
+			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.JSONPath, err)
 		} else {
 			v.JSONPath = newJSONPath
 		}
 	}
 
-	argMap[metcmd.VideoFile] = `"` + v.VideoPath + `"`
+	if strings.ContainsRune(v.JSONCustomFile, '"') {
+		newJSONCustomFile := strings.ReplaceAll(v.JSONCustomFile, `"`, `'`)
+		err := os.Rename(v.JSONCustomFile, newJSONCustomFile)
+		if err != nil {
+			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.JSONCustomFile, err)
+		} else {
+			v.JSONCustomFile = newJSONCustomFile
+		}
+	}
 
+	b := strings.Builder{}
+
+	// Write video path
+	b.Grow(len(v.VideoPath) + 2)
+	b.WriteByte('"')
+	b.WriteString(v.VideoPath)
+	b.WriteByte('"')
+
+	argMap[metcmd.VideoFile] = b.String()
+	b.Reset()
+
+	// Write JSON path
 	if v.JSONCustomFile == "" {
-		argMap[metcmd.JSONFile] = `"` + v.JSONPath + `"`
+		b.Grow(len(v.JSONPath) + 2)
+		b.WriteByte('"')
+		b.WriteString(v.JSONPath)
+		b.WriteByte('"')
+
+		argMap[metcmd.JSONFile] = b.String()
+		b.Reset()
+
 		logging.I("Making Metarr argument for video %q and JSON file %q.", v.VideoPath, v.JSONPath)
 	} else {
-		argMap[metcmd.JSONFile] = `"` + v.JSONCustomFile + `"`
+		b.Grow(len(v.JSONCustomFile) + 2)
+		b.WriteByte('"')
+		b.WriteString(v.JSONCustomFile)
+		b.WriteByte('"')
+
+		argMap[metcmd.JSONFile] = b.String()
+		b.Reset()
+
 		logging.I("Making Metarr argument for video %q and JSON file %q.", v.VideoPath, v.JSONCustomFile)
 	}
 
