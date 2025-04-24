@@ -150,80 +150,16 @@ func makeMetarrCommand(v *models.Video) []string {
 	argMap := make(map[string]string, singlesLen)
 	argSlicesMap := make(map[string][]string, sliceLen)
 
-	var (
-		newVideoPath, newJSONPath, newJSONCustomFile string
-	)
+	// Viper slice comma parsing issue workaround, may need to do the same for all strSlice arguments
+	argMap[metcmd.VideoFile] = cleanAndWrapCommaPaths(v.VideoPath)
 
-	// Viper parsing issue workaround (remove double quotes and wrap command in them)
-	if strings.ContainsRune(v.VideoPath, '"') {
-		newVideoPath = strings.ReplaceAll(v.VideoPath, `"`, `\"`)
-		err := os.Rename(v.VideoPath, newVideoPath)
-		if err != nil {
-			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.VideoPath, err)
-		}
-	}
-
-	if strings.ContainsRune(v.JSONPath, '"') {
-		newJSONPath = strings.ReplaceAll(v.JSONPath, `"`, `\"`)
-		err := os.Rename(v.JSONPath, newJSONPath)
-		if err != nil {
-			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.JSONPath, err)
-		}
-	}
-
-	if strings.ContainsRune(v.JSONCustomFile, '"') {
-		newJSONCustomFile = strings.ReplaceAll(v.JSONCustomFile, `"`, `\"`)
-		err := os.Rename(v.JSONCustomFile, newJSONCustomFile)
-		if err != nil {
-			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.JSONCustomFile, err)
-		}
-	}
-
-	b := strings.Builder{}
-
-	// Write video path
-	b.Grow(len(v.VideoPath) + 2)
-	b.WriteByte('"')
-	if newVideoPath == "" {
-		b.WriteString(v.VideoPath)
-	} else {
-		b.WriteString(newVideoPath)
-	}
-	b.WriteByte('"')
-
-	argMap[metcmd.VideoFile] = b.String()
-	b.Reset()
-
-	// Write JSON path
 	if v.JSONCustomFile == "" {
-		b.Grow(len(v.JSONPath) + 2)
-		b.WriteByte('"')
-		if newJSONPath == "" {
-			b.WriteString(v.JSONPath)
-		} else {
-			b.WriteString(newJSONPath)
-		}
-		b.WriteByte('"')
-
-		argMap[metcmd.JSONFile] = b.String()
-		b.Reset()
-
-		logging.I("Making Metarr argument for video %q and JSON file %q.", v.VideoPath, v.JSONPath)
+		argMap[metcmd.JSONFile] = cleanAndWrapCommaPaths(v.JSONPath)
 	} else {
-		b.Grow(len(v.JSONCustomFile) + 2)
-		b.WriteByte('"')
-		if newJSONCustomFile == "" {
-			b.WriteString(v.JSONCustomFile)
-		} else {
-			b.WriteString(newJSONCustomFile)
-		}
-		b.WriteByte('"')
-
-		argMap[metcmd.JSONFile] = b.String()
-		b.Reset()
-
-		logging.I("Making Metarr argument for video %q and JSON file %q.", v.VideoPath, v.JSONCustomFile)
+		argMap[metcmd.JSONFile] = cleanAndWrapCommaPaths(v.JSONCustomFile)
 	}
+
+	logging.I("Making Metarr argument for video %q and JSON file %q.", argMap[metcmd.VideoFile], argMap[metcmd.JSONFile])
 
 	// Final args
 	args := make([]string, 0, singlesLen+sliceLen)
@@ -276,9 +212,9 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 		}
 	case strSlice:
 		if len(f.metarrValue.strSlice) > 0 {
-			argSlicesMap[f.cmdKey] = f.metarrValue.strSlice
+			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(f.metarrValue.strSlice)
 		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
-			argSlicesMap[f.cmdKey] = cfg.GetStringSlice(f.viperKey)
+			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(cfg.GetStringSlice(f.viperKey))
 		}
 
 		// Set Meta Overwrite flag if meta-ops arguments exist
@@ -335,4 +271,38 @@ func calcNumElements(fields []metCmdMapping) (singles, slices int) {
 		}
 	}
 	return singleElements, sliceElements
+}
+
+// cleanAndWrapCommaPaths performs escaping for strings containing commas (can be misinterpreted in slices)
+func cleanAndWrapCommaPaths(path string) string {
+	// Escape quotes if needed
+	if strings.ContainsRune(path, '"') {
+		escaped := strings.ReplaceAll(path, `"`, `\"`)
+		if err := os.Rename(path, escaped); err != nil {
+			logging.E(0, "Failed to escape quotes in filename %q: %v", path, err)
+		} else {
+			path = escaped
+		}
+	}
+
+	// Wrap in quotes if it contains a comma
+	if strings.ContainsRune(path, ',') {
+		b := strings.Builder{}
+		b.Grow(len(path) + 2)
+		b.WriteByte('"')
+		b.WriteString(path)
+		b.WriteByte('"')
+		return b.String()
+	}
+
+	return path
+}
+
+// cleanCommaSliceValues escapes and fixes slice entries containing commas
+func cleanCommaSliceValues(slice []string) []string {
+	result := make([]string, 0, len(slice))
+	for _, val := range slice {
+		result = append(result, cleanAndWrapCommaPaths(val))
+	}
+	return result
 }
