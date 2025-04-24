@@ -34,9 +34,9 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 
 				b.Grow(len(m))
 				b.WriteString(split[0])
-				b.WriteRune(':')
+				b.WriteByte(':')
 				b.WriteString(split[1])
-				b.WriteRune(':')
+				b.WriteByte(':')
 				b.WriteString(split[2])
 				key := b.String()
 				b.Reset()
@@ -58,9 +58,9 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 
 						b.Grow(len(m))
 						b.WriteString(split[0])
-						b.WriteRune(':')
+						b.WriteByte(':')
 						b.WriteString(split[1])
-						b.WriteRune(':')
+						b.WriteByte(':')
 						b.WriteString(split[2]) // Leave out split[3], probably don't want multiple date tags with diff formats
 						key := b.String()
 						b.Reset()

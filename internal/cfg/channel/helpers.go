@@ -500,9 +500,9 @@ func hyphenateYyyyMmDd(d string) string {
 	b.Grow(10)
 
 	b.WriteString(d[0:4])
-	b.WriteRune('-')
+	b.WriteByte('-')
 	b.WriteString(d[4:6])
-	b.WriteRune('-')
+	b.WriteByte('-')
 	b.WriteString(d[6:8])
 
 	return b.String()

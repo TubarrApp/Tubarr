@@ -150,34 +150,32 @@ func makeMetarrCommand(v *models.Video) []string {
 	argMap := make(map[string]string, singlesLen)
 	argSlicesMap := make(map[string][]string, sliceLen)
 
+	var (
+		newVideoPath, newJSONPath, newJSONCustomFile string
+	)
+
 	// Viper parsing issue workaround (remove double quotes and wrap command in them)
 	if strings.ContainsRune(v.VideoPath, '"') {
-		newVideoPath := strings.ReplaceAll(v.VideoPath, `"`, `'`)
+		newVideoPath = strings.ReplaceAll(v.VideoPath, `"`, `\"`)
 		err := os.Rename(v.VideoPath, newVideoPath)
 		if err != nil {
 			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.VideoPath, err)
-		} else {
-			v.VideoPath = newVideoPath
 		}
 	}
 
 	if strings.ContainsRune(v.JSONPath, '"') {
-		newJSONPath := strings.ReplaceAll(v.JSONPath, `"`, `'`)
+		newJSONPath = strings.ReplaceAll(v.JSONPath, `"`, `\"`)
 		err := os.Rename(v.JSONPath, newJSONPath)
 		if err != nil {
 			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.JSONPath, err)
-		} else {
-			v.JSONPath = newJSONPath
 		}
 	}
 
 	if strings.ContainsRune(v.JSONCustomFile, '"') {
-		newJSONCustomFile := strings.ReplaceAll(v.JSONCustomFile, `"`, `'`)
+		newJSONCustomFile = strings.ReplaceAll(v.JSONCustomFile, `"`, `\"`)
 		err := os.Rename(v.JSONCustomFile, newJSONCustomFile)
 		if err != nil {
 			logging.E(0, "Failed to remove double quotes from filename %q: %v", v.JSONCustomFile, err)
-		} else {
-			v.JSONCustomFile = newJSONCustomFile
 		}
 	}
 
@@ -186,7 +184,11 @@ func makeMetarrCommand(v *models.Video) []string {
 	// Write video path
 	b.Grow(len(v.VideoPath) + 2)
 	b.WriteByte('"')
-	b.WriteString(v.VideoPath)
+	if newVideoPath == "" {
+		b.WriteString(v.VideoPath)
+	} else {
+		b.WriteString(newVideoPath)
+	}
 	b.WriteByte('"')
 
 	argMap[metcmd.VideoFile] = b.String()
@@ -196,7 +198,11 @@ func makeMetarrCommand(v *models.Video) []string {
 	if v.JSONCustomFile == "" {
 		b.Grow(len(v.JSONPath) + 2)
 		b.WriteByte('"')
-		b.WriteString(v.JSONPath)
+		if newJSONPath == "" {
+			b.WriteString(v.JSONPath)
+		} else {
+			b.WriteString(newJSONPath)
+		}
 		b.WriteByte('"')
 
 		argMap[metcmd.JSONFile] = b.String()
@@ -206,7 +212,11 @@ func makeMetarrCommand(v *models.Video) []string {
 	} else {
 		b.Grow(len(v.JSONCustomFile) + 2)
 		b.WriteByte('"')
-		b.WriteString(v.JSONCustomFile)
+		if newJSONCustomFile == "" {
+			b.WriteString(v.JSONCustomFile)
+		} else {
+			b.WriteString(newJSONCustomFile)
+		}
 		b.WriteByte('"')
 
 		argMap[metcmd.JSONFile] = b.String()

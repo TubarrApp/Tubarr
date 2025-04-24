@@ -75,7 +75,7 @@ func SetupLogging(targetDir string) error {
 	b.WriteString("=========== ")
 	b.WriteString(time.Now().Format(time.RFC1123Z))
 	b.WriteString(" ===========")
-	b.WriteRune('\n')
+	b.WriteByte('\n')
 
 	startMsg := b.String()
 	writeToConsole(startMsg)
@@ -129,7 +129,7 @@ func E(l int, msg string, args ...interface{}) {
 	b.WriteString(msg)
 
 	if !strings.HasSuffix(msg, "\n") {
-		b.WriteRune(' ')
+		b.WriteByte(' ')
 	}
 
 	b.WriteString(tagFunc)
@@ -172,7 +172,7 @@ func S(l int, msg string, args ...interface{}) {
 
 	b.WriteString(consts.GreenSuccess)
 	b.WriteString(msg)
-	b.WriteRune('\n')
+	b.WriteByte('\n')
 
 	writeToConsole(b.String())
 	if Loggable {
@@ -217,7 +217,7 @@ func D(l int, msg string, args ...interface{}) {
 	b.WriteString(msg)
 
 	if !strings.HasSuffix(msg, "\n") {
-		b.WriteRune(' ')
+		b.WriteByte(' ')
 	}
 
 	b.WriteString(tagFunc)
@@ -272,7 +272,7 @@ func W(msg string, args ...interface{}) {
 	b.WriteString(msg)
 
 	if !strings.HasSuffix(msg, "\n") {
-		b.WriteRune(' ')
+		b.WriteByte(' ')
 	}
 
 	b.WriteString(tagFunc)
@@ -311,7 +311,7 @@ func I(msg string, args ...interface{}) {
 
 	b.WriteString(consts.BlueInfo)
 	b.WriteString(msg)
-	b.WriteRune('\n')
+	b.WriteByte('\n')
 
 	writeToConsole(b.String())
 	if Loggable {
@@ -335,7 +335,7 @@ func P(msg string, args ...interface{}) {
 	b.Grow(len(msg) + 1)
 
 	b.WriteString(msg)
-	b.WriteRune('\n')
+	b.WriteByte('\n')
 
 	writeToConsole(b.String())
 	if Loggable {

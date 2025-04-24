@@ -74,9 +74,9 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 				b.Grow(ariaBase + len(d.Video.Settings.ExternalDownloaderArgs))
 				b.WriteString(consts.DownloaderAria)
-				b.WriteRune(':')
+				b.WriteByte(':')
 				b.WriteString(d.Video.Settings.ExternalDownloaderArgs) // "aria2c:-x 16 -s 16 --console-log-level=info"
-				b.WriteRune(' ')
+				b.WriteByte(' ')
 				b.WriteString(cmdvideo.AriaLog)
 
 				args = append(args, cmdvideo.ExternalDLArgs, b.String())
