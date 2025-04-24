@@ -275,23 +275,25 @@ func calcNumElements(fields []metCmdMapping) (singles, slices int) {
 
 // cleanAndWrapCommaPaths performs escaping for strings containing commas (can be misinterpreted in slices)
 func cleanAndWrapCommaPaths(path string) string {
-	// Escape quotes if needed
-	if strings.ContainsRune(path, '"') {
-		escaped := strings.ReplaceAll(path, `"`, `\"`)
-		if err := os.Rename(path, escaped); err != nil {
-			logging.E(0, "Failed to escape quotes in filename %q: %v", path, err)
-		} else {
-			path = escaped
-		}
-	}
 
-	// Wrap in quotes if it contains a comma
 	if strings.ContainsRune(path, ',') {
+		// Escape quotes if needed
+		if strings.ContainsRune(path, '"') {
+			escaped := strings.ReplaceAll(path, `"`, `\"`)
+			if err := os.Rename(path, escaped); err != nil {
+				logging.E(0, "Failed to escape quotes in filename %q: %v", path, err)
+			} else {
+				path = escaped
+			}
+		}
+
+		// Prefix and suffix with double quotes
 		b := strings.Builder{}
 		b.Grow(len(path) + 2)
 		b.WriteByte('"')
 		b.WriteString(path)
 		b.WriteByte('"')
+
 		return b.String()
 	}
 
