@@ -3,7 +3,10 @@ package metarr
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strconv"
+	"strings"
 
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
@@ -148,12 +151,34 @@ func makeMetarrCommand(v *models.Video) []string {
 	argMap := make(map[string]string, singlesLen)
 	argSlicesMap := make(map[string][]string, sliceLen)
 
-	argMap[metcmd.VideoFile] = v.VideoPath
+	if strings.ContainsRune(v.VideoPath, '"') {
+		newVideoPath := strings.ReplaceAll(v.VideoPath, `"`, ``)
+		err := os.Rename(v.VideoPath, newVideoPath)
+		if err != nil {
+			log.Printf("Failed to rename file: %v", err)
+		} else {
+			v.VideoPath = newVideoPath
+		}
+	}
+
+	if strings.ContainsRune(v.JSONPath, '"') {
+		newJSONPath := strings.ReplaceAll(v.JSONPath, `"`, ``)
+		err := os.Rename(v.JSONPath, newJSONPath)
+		if err != nil {
+			log.Printf("Failed to rename file: %v", err)
+		} else {
+			v.JSONPath = newJSONPath
+		}
+	}
+
+	argMap[metcmd.VideoFile] = `"` + v.VideoPath + `"`
 
 	if v.JSONCustomFile == "" {
-		argMap[metcmd.JSONFile] = v.JSONPath
+		argMap[metcmd.JSONFile] = `"` + v.JSONPath + `"`
+		logging.I("Making Metarr argument for video %q and JSON file %q.", v.VideoPath, v.JSONPath)
 	} else {
-		argMap[metcmd.JSONFile] = v.JSONCustomFile
+		argMap[metcmd.JSONFile] = `"` + v.JSONCustomFile + `"`
+		logging.I("Making Metarr argument for video %q and JSON file %q.", v.VideoPath, v.JSONCustomFile)
 	}
 
 	// Final args
