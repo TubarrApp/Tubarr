@@ -51,7 +51,7 @@ const (
 	bitchute        = "bitchute.com"
 	bitchutePattern = "/video/"
 	censored        = "censored.tv"
-	censoredPattern = "/episode/"
+	censoredPattern = "/episodes/"
 	odysee          = "odysee.com"
 	odyseePattern   = "@"
 	rumble          = "rumble.com"
@@ -345,9 +345,9 @@ func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 	logging.I("Scraping %s for metadata...", urlStr)
 
 	// Scope scraping to the main container
-	collector.OnHTML(".main-episode-player-container", func(container *colly.HTMLElement) {
+	collector.OnHTML(".episode-container", func(container *colly.HTMLElement) {
 		// Scrape the title
-		title := strings.TrimSpace(container.ChildText("h4"))
+		title := strings.TrimSpace(container.ChildText(".episode-title"))
 		if title != "" {
 			logging.D(2, "Scraped title: %s", title)
 			metadata["title"] = title
@@ -357,7 +357,7 @@ func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 		}
 
 		// Scrape the description
-		description := strings.TrimSpace(container.ChildText("p#check-for-urls"))
+		description := strings.TrimSpace(container.ChildText("#about .raised-content"))
 		if description != "" {
 			logging.D(2, "Scraped description: %s", description)
 			metadata["description"] = description
@@ -367,7 +367,7 @@ func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 		}
 
 		// Scrape the release date
-		date := strings.TrimSpace(container.ChildText("p.text-muted.text-right.text-date.mb-0"))
+		date := strings.TrimSpace(container.ChildText("#about time"))
 		if date != "" {
 			parsedDate, err := parsing.ParseWordDate(date)
 			if err != nil {

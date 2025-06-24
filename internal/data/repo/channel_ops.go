@@ -895,22 +895,6 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 		}).
 		RunWith(cs.DB)
 
-	// const (
-	// 	join     = "downloads ON downloads.video_id = videos.id"
-	// 	vidURL   = "videos.url"
-	// 	vidCID   = "videos.channel_id"
-	// 	dlStatus = "downloads.status"
-	// )
-	// query := squirrel.
-	// 	Select(vidURL).
-	// 	From(consts.DBVideos).
-	// 	Join(join).
-	// 	Where(squirrel.And{
-	// 		squirrel.Eq{vidCID: c.ID},
-	// 		squirrel.Eq{dlStatus: consts.DLStatusCompleted},
-	// 	}).
-	// 	RunWith(cs.DB)
-
 	logging.D(2, "Executing query to find downloaded videos: %v for channel ID %d", query, c.ID)
 
 	rows, err := query.Query()
