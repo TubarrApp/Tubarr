@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -344,30 +345,53 @@ func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 
 	logging.I("Scraping %s for metadata...", urlStr)
 
-	// Scope scraping to the main container
-	collector.OnHTML(".episode-container", func(container *colly.HTMLElement) {
-		// Scrape the title
-		title := strings.TrimSpace(container.ChildText(".episode-title"))
+	collector.OnHTML("html", func(container *colly.HTMLElement) {
+		// Use .Find for all deep queries
+		doc := container.DOM
+
+		// Title
+		title := strings.TrimSpace(doc.Find("#episode-container .episode-title").Text())
 		if title != "" {
 			logging.D(2, "Scraped title: %s", title)
 			metadata["title"] = title
 			v.Title = title
 		} else {
-			logging.D(1, "Title not found in the container")
+			logging.D(1, "Title not found")
 		}
 
-		// Scrape the description
-		description := strings.TrimSpace(container.ChildText("#about .raised-content"))
+		// Description
+		description, err := doc.Find("#about .raised-content").Html()
+		if err != nil {
+			logging.E(0, "Failed to grab description: %v", err.Error())
+			return
+		}
+
+		// Clean newline tags
+		description = strings.ReplaceAll(description, "<br>", "\n")
+		description = strings.ReplaceAll(description, "<br/>", "\n")
+		description = strings.ReplaceAll(description, "<br />", "\n")
+		description = strings.ReplaceAll(description, "&nbsp", "\n")
+
+		// Fix newline quirks
+		description = strings.ReplaceAll(description, " \n", "\n")
+		description = strings.ReplaceAll(description, "\n ", "\n")
+
+		// Trim space
+		description = strings.TrimSpace(description)
+
+		// Unescape special characters
+		description = html.UnescapeString(description)
+
 		if description != "" {
 			logging.D(2, "Scraped description: %s", description)
 			metadata["description"] = description
 			v.Description = description
 		} else {
-			logging.D(1, "Description not found in the container")
+			logging.D(1, "Description not found")
 		}
 
-		// Scrape the release date
-		date := strings.TrimSpace(container.ChildText("#about time"))
+		// Release date
+		date := strings.TrimSpace(doc.Find("#about time").Text())
 		if date != "" {
 			parsedDate, err := parsing.ParseWordDate(date)
 			if err != nil {
@@ -376,17 +400,17 @@ func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 			logging.D(2, "Scraped release date: %s", date)
 			metadata["release_date"] = parsedDate
 		} else {
-			logging.D(1, "Release date not found in the container")
+			logging.D(1, "Release date not found")
 		}
 
-		// Scrape the video URL
-		videoURL := container.ChildAttr("a[href$='.mp4']", "href")
-		if videoURL != "" {
+		// Video URL
+		videoURL, ok := doc.Find("a.dropdown-item[href$='.mp4']").Attr("href")
+		if ok {
 			logging.D(2, "Scraped video URL: %s", videoURL)
 			metadata["direct_video_url"] = videoURL
 			v.DirectVideoURL = videoURL
 		} else {
-			logging.D(1, "Video URL not found in the container")
+			logging.D(1, "Video URL not found")
 		}
 	})
 
