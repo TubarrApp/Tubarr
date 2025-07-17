@@ -500,13 +500,13 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			if useGPU != "" {
-				if useGPU, err = validateGPU(useGPU, gpuDir); err != nil {
+				if useGPU, gpuDir, err = validateGPU(useGPU, gpuDir); err != nil {
 					return err
 				}
 			}
 
 			if codec != "" {
-				if codec, err = validateTranscodeCodec(codec); err != nil {
+				if codec, err = validateTranscodeCodec(codec, useGPU); err != nil {
 					return err
 				}
 			}
@@ -856,31 +856,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
-			if useGPU != "" {
-				if useGPU, err = validateGPU(useGPU, gpuDir); err != nil {
-					return err
-				}
-			}
-
-			if codec != "" {
-				if codec, err = validateTranscodeCodec(codec); err != nil {
-					return err
-				}
-			}
-
-			if audioCodec != "" {
-				if audioCodec, err = validateTranscodeAudioCodec(audioCodec); err != nil {
-					return err
-				}
-			}
-
-			if transcodeQuality != "" {
-				if transcodeQuality, err = validateTranscodeQuality(transcodeQuality); err != nil {
-					return err
-				}
-			}
-
-			fnMetarrArray, err := getMetarrArgFns(cobraMetarrArgs{
+			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
 				filenameReplaceSfx:   fileSfxReplace,
 				renameStyle:          renameStyle,
 				fileDatePfx:          filenameDateTag,

@@ -9,9 +9,12 @@ import (
 	"time"
 	cfgvalidate "tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/regex"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
+
+	"github.com/spf13/cobra"
 )
 
 type cobraMetarrArgs struct {
@@ -33,7 +36,7 @@ type cobraMetarrArgs struct {
 }
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
-func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
+func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
 	if c.minFreeMem != "" {
 		if err := cfgvalidate.ValidateMinFreeMem(c.minFreeMem); err != nil {
 			return nil, err
@@ -102,8 +105,8 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 		})
 	}
 
-	if c.useGPU != "" {
-		validGPU, err := validateGPU(c.useGPU, c.gpuDir)
+	if c.useGPU != "" || cmd.Flags().Changed(keys.TranscodeGPU) {
+		validGPU, _, err := validateGPU(c.useGPU, c.gpuDir)
 		if err != nil {
 			return nil, err
 		}
@@ -113,8 +116,8 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 		})
 	}
 
-	if c.transcodeCodec != "" {
-		validTranscodeCodec, err := validateTranscodeCodec(c.transcodeCodec)
+	if c.transcodeCodec != "" || cmd.Flags().Changed(keys.TranscodeCodec) {
+		validTranscodeCodec, err := validateTranscodeCodec(c.transcodeCodec, c.useGPU)
 		if err != nil {
 			return nil, err
 		}
@@ -124,8 +127,8 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 		})
 	}
 
-	if c.transcodeAudioCodec != "" {
-		validTranscodeAudioCodec, err := validateTranscodeCodec(c.transcodeAudioCodec)
+	if c.transcodeAudioCodec != "" || cmd.Flags().Changed(keys.TranscodeAudioCodec) {
+		validTranscodeAudioCodec, err := validateTranscodeAudioCodec(c.transcodeAudioCodec)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +138,7 @@ func getMetarrArgFns(c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, e
 		})
 	}
 
-	if c.transcodeQuality != "" {
+	if c.transcodeQuality != "" || cmd.Flags().Changed(keys.TranscodeQuality) {
 		validTranscodeQuality, err := validateTranscodeQuality(c.transcodeQuality)
 		if err != nil {
 			return nil, err
@@ -416,36 +419,40 @@ func validateTranscodeAudioCodec(a string) (audioCodec string, err error) {
 	switch a {
 	case "aac", "copy":
 		return a, nil
+	case "":
+		return "", nil
 	default:
 		return "", fmt.Errorf("audio codec flag %q is not currently implemented in this program, aborting", a)
 	}
 }
 
 // validateGPU validates the user input GPU selection.
-func validateGPU(g, devDir string) (gpu string, err error) {
+func validateGPU(g, devDir string) (gpu, gpuDir string, err error) {
 	g = strings.ToLower(g)
 	switch g {
 	case "qsv", "intel":
-		return "qsv", nil
+		return "qsv", devDir, nil
 	case "amd", "radeon", "vaapi":
 
 		_, err := os.Stat(devDir)
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("driver location %q does not appear to exist?", devDir)
+			return "", "", fmt.Errorf("driver location %q does not appear to exist?", devDir)
 		}
 
-		return "vaapi", nil
+		return "vaapi", devDir, nil
 	case "nvidia", "cuda":
-		return "cuda", nil
+		return "cuda", devDir, nil
 	case "auto", "automatic", "automated":
-		return "auto", nil
+		return "auto", devDir, nil
+	case "":
+		return "", "", nil
 	default:
-		return "", fmt.Errorf("entered GPU %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
+		return "", devDir, fmt.Errorf("entered GPU %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
 	}
 }
 
 // validateTranscodeCodec validates the user input codec selection.
-func validateTranscodeCodec(c string) (codec string, err error) {
+func validateTranscodeCodec(c string, accel string) (codec string, err error) {
 	c = strings.ToLower(c)
 	c = strings.ReplaceAll(c, ".", "")
 	switch c {
@@ -453,6 +460,12 @@ func validateTranscodeCodec(c string) (codec string, err error) {
 		return c, nil
 	case "h265":
 		return "hevc", nil
+	case "":
+		if accel == "" {
+			return "", nil
+		} else {
+			return "", fmt.Errorf("entered codec %q not supported with acceleration type %q. Tubarr supports h264 and HEVC (h265)", c, accel)
+		}
 	default:
 		return "", fmt.Errorf("entered codec %q not supported. Tubarr supports h264 and HEVC (h265)", c)
 	}
