@@ -14,7 +14,7 @@ import (
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {
 	if viper.IsSet(keys.OutputFiletype) {
-		ext := viper.GetString(keys.OutputFiletype)
+		ext := strings.ToLower(viper.GetString(keys.OutputFiletype))
 		if !ValidateOutputFiletype(ext) {
 			return fmt.Errorf("invalid output filetype %q", ext)
 		}
@@ -47,7 +47,7 @@ func ValidateConcurrencyLimit() {
 
 // ValidateOutputFiletype verifies the output filetype is valid for FFmpeg.
 func ValidateOutputFiletype(o string) bool {
-	o = strings.TrimSpace(o)
+	o = strings.ToLower(strings.TrimSpace(o))
 
 	if !strings.HasPrefix(o, ".") {
 		o = "." + o

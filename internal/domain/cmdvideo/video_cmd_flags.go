@@ -8,6 +8,7 @@ const (
 	ExternalDLer      = "--external-downloader"
 	ExternalDLArgs    = "--external-downloader-args"
 	FilenameSyntax    = "%(title)s.%(ext)s"
+	OutputExtension   = "--merge-output-format"
 	RestrictFilenames = "--restrict-filenames"
 	Retries           = "--retries"
 	SleepRequests     = "--sleep-requests"

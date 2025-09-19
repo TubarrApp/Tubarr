@@ -32,17 +32,36 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 }
 
 // SetProgramRelatedFlags sets flags for the Tubarr instance.
-func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd *string) {
+func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd *string, isUpdate bool) {
 	if concurrency != nil {
-		cmd.Flags().IntVarP(concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this instance")
+		def := 0
+		if !isUpdate {
+			def = 3
+		}
+		cmd.Flags().IntVarP(concurrency, keys.Concurrency, "l", def, "Maximum concurrent videos to download/process for this instance")
+
 	}
 	if crawlFreq != nil {
-		cmd.Flags().IntVar(crawlFreq, keys.CrawlFreq, 30, "New crawl frequency in minutes")
+		def := 0
+		if !isUpdate {
+			def = 30
+		}
+		cmd.Flags().IntVar(crawlFreq, keys.CrawlFreq, def, "New crawl frequency in minutes")
 	}
 	if downloadCmd != nil {
-		cmd.Flags().StringVar(downloadCmd, "downloader", "", "External downloader command")
+		def := ""
+		if !isUpdate {
+			def = ""
+		}
+		if isUpdate && *downloadCmd != "" {
+			cmd.Flags().StringVar(downloadCmd, "downloader", def, "External downloader command")
+		}
 	}
 	if downloadArgs != nil {
-		cmd.Flags().StringVar(downloadArgs, "downloader-args", "", "External downloader arguments")
+		def := ""
+		if !isUpdate {
+			def = ""
+		}
+		cmd.Flags().StringVar(downloadArgs, "downloader-args", def, "External downloader arguments")
 	}
 }

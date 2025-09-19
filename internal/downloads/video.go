@@ -93,18 +93,22 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
 	args = append(args, cmdvideo.RandomizeRequests...)
 
-	if d.Video.DirectVideoURL != "" {
-		args = append(args, d.Video.DirectVideoURL)
-	} else {
-		args = append(args, d.Video.URL)
-	}
-
 	if cfg.IsSet(keys.TubarrCookieSource) {
 		browser := cfg.GetString(keys.TubarrCookieSource)
 		logging.I("Using cookies from browser %q", browser)
 		args = append(args, "--cookies-from-browser", browser)
 	} else {
 		logging.D(1, "No browser cookies set for Tubarr, skipping")
+	}
+
+	if d.Video.Channel.Settings.OutputExt != "" {
+		args = append(args, cmdvideo.OutputExtension, d.Video.Channel.Settings.OutputExt)
+	}
+
+	if d.Video.DirectVideoURL != "" {
+		args = append(args, d.Video.DirectVideoURL)
+	} else {
+		args = append(args, d.Video.URL)
 	}
 
 	cmd := exec.CommandContext(d.Context, cmdvideo.YTDLP, args...)

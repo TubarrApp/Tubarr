@@ -49,6 +49,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	if c.metarrExt != "" {
 		if cfgvalidate.ValidateOutputFiletype(c.metarrExt) {
+			c.metarrExt = strings.ToLower(c.metarrExt)
 			fns = append(fns, func(m *models.MetarrArgs) error {
 				m.Ext = c.metarrExt
 				return nil
@@ -174,6 +175,7 @@ type chanSettings struct {
 	maxFilesize            string
 	fromDate               string
 	toDate                 string
+	outputExt              string
 }
 
 func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) error, err error) {
@@ -260,6 +262,18 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.ToDate = validToDate
+			return nil
+		})
+	}
+
+	if c.outputExt != "" {
+		c.outputExt = strings.ToLower(c.outputExt)
+		err := validateOutputExtension(c.outputExt)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.OutputExt = c.outputExt
 			return nil
 		})
 	}
@@ -448,6 +462,17 @@ func validateGPU(g, devDir string) (gpu, gpuDir string, err error) {
 		return "", "", nil
 	default:
 		return "", devDir, fmt.Errorf("entered GPU %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
+	}
+}
+
+// validateOutputExtension validates that the output extension is valid.
+func validateOutputExtension(e string) error {
+	e = strings.ToLower(e)
+	switch e {
+	case "avi", "flv", "mkv", "mov", "mp4", "webm":
+		return nil
+	default:
+		return fmt.Errorf("output extension %v is invalid or not supported", e)
 	}
 }
 

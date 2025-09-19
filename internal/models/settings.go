@@ -9,6 +9,7 @@ type ChannelSettings struct {
 	ExternalDownloader     string      `json:"external_downloader"`
 	ExternalDownloaderArgs string      `json:"external_downloader_args"`
 	Concurrency            int         `json:"max_concurrency"`
+	OutputExt              string      `json:"output_ext"`
 	MaxFilesize            string      `json:"max_filesize"`
 	AutoDownload           bool        `json:"auto_download"`
 	FromDate               string      `json:"from_date"`

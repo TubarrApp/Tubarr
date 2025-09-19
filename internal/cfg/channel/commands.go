@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	cfgflags "tubarr/internal/cfg/flags"
 	cfgvalidate "tubarr/internal/cfg/validation"
@@ -421,14 +422,14 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
-		usernames, passwords, loginURLs                                           []string
-		notifyName, notifyURL                                                     string
-		fromDate, toDate                                                          string
-		dlFilters, metaOps, fileSfxReplace                                        []string
-		crawlFreq, concurrency, metarrConcurrency, retries                        int
-		maxCPU                                                                    float64
-		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
-		pause                                                                     bool
+		usernames, passwords, loginURLs                                                      []string
+		notifyName, notifyURL                                                                string
+		fromDate, toDate                                                                     string
+		dlFilters, metaOps, fileSfxReplace                                                   []string
+		crawlFreq, concurrency, metarrConcurrency, retries                                   int
+		maxCPU                                                                               float64
+		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, outputExt string
+		pause                                                                                bool
 	)
 
 	now := time.Now()
@@ -523,6 +524,13 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
+			if outputExt != "" {
+				outputExt = strings.ToLower(outputExt)
+				if err = validateOutputExtension(outputExt); err != nil {
+					return err
+				}
+			}
+
 			c := &models.Channel{
 				URLs:     urls,
 				Name:     name,
@@ -540,6 +548,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 					MaxFilesize:            maxFilesize,
 					FromDate:               fromDate,
 					ToDate:                 toDate,
+					OutputExt:              outputExt,
 				},
 
 				MetarrArgs: models.MetarrArgs{
@@ -600,7 +609,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetFileDirFlags(addCmd, &jDir, &vDir)
 
 	// Program related
-	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader)
+	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, false)
 
 	// Download
 	cfgflags.SetDownloadFlags(addCmd, &retries, &cookieSource, &maxFilesize, &dlFilters)
@@ -620,6 +629,8 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	addCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
 	addCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
+
+	addCmd.Flags().StringVar(&outputExt, "output-ext", "", "The preferred downloaded output format for videos")
 
 	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
 
@@ -692,19 +703,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			notifyURLs, err := cs.GetNotifyURLs(ch.ID)
-			if err != nil {
-				logging.E(0, "Unable to fetch notification URLs for channel %q: %v", ch.Name, err)
-			}
-
-			fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURLs: %+v\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URLs, ch.VideoDir, ch.JSONDir)
-			fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
-			fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
-			fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\nHW accel type: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU)
-			fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
-			fmt.Printf("From Date (yyyy-mm-dd): %q\nTo Date (yyyy-mm-dd): %q\n", hyphenateYyyyMmDd(ch.Settings.FromDate), hyphenateYyyyMmDd(ch.Settings.ToDate))
-			fmt.Printf("Paused?: %v\n", ch.Paused)
-			fmt.Printf("Notification URLs: %v\n", notifyURLs)
+			displaySettings(cs, ch)
 
 			return nil
 		},
@@ -731,20 +730,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			for _, ch := range chans {
-
-				notifyURLs, err := cs.GetNotifyURLs(ch.ID)
-				if err != nil {
-					logging.E(0, "Unable to fetch notification URLs for channel %q: %v", ch.Name, err)
-				}
-
-				fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %+v\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URLs, ch.VideoDir, ch.JSONDir)
-				fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries)
-				fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
-				fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\nHW accel type: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU)
-				fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
-				fmt.Printf("From Date (yyyy-mm-dd): %q\nTo Date (yyyy-mm-dd): %q\n", hyphenateYyyyMmDd(ch.Settings.FromDate), hyphenateYyyyMmDd(ch.Settings.ToDate))
-				fmt.Printf("Paused?: %v\n", ch.Paused)
-				fmt.Printf("Notification URLs: %v\n", notifyURLs)
+				displaySettings(cs, ch)
 			}
 			return nil
 		},
@@ -797,6 +783,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		fileSfxReplace                                                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
+		outExt                                                                    string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -837,6 +824,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				maxFilesize:            maxFilesize,
 				fromDate:               fromDate,
 				toDate:                 toDate,
+				outputExt:              outExt,
 			})
 			if err != nil {
 				return err
@@ -901,7 +889,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetFileDirFlags(updateSettingsCmd, &jDir, &vDir)
 
 	// Program related
-	cfgflags.SetProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader)
+	cfgflags.SetProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, true)
 
 	// Download
 	cfgflags.SetDownloadFlags(updateSettingsCmd, &retries, &cookieSource, &maxFilesize, &dlFilters)
@@ -917,6 +905,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	updateSettingsCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
 	updateSettingsCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
+
+	updateSettingsCmd.Flags().StringVar(&outExt, "output-ext", "", "The preferred downloaded output format for videos")
 
 	return updateSettingsCmd
 }
@@ -956,4 +946,20 @@ func updateChannelValue(cs interfaces.ChannelStore) *cobra.Command {
 	updateRowCmd.Flags().StringVarP(&col, "column-name", "c", "", "The name of the column in the table (e.g. video_directory)")
 	updateRowCmd.Flags().StringVarP(&newVal, "value", "v", "", "The value to set in the column (e.g. /my-directory)")
 	return updateRowCmd
+}
+
+func displaySettings(cs interfaces.ChannelStore, ch *models.Channel) {
+	notifyURLs, err := cs.GetNotifyURLs(ch.ID)
+	if err != nil {
+		logging.E(0, "Unable to fetch notification URLs for channel %q: %v", ch.Name, err)
+	}
+
+	fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %+v\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URLs, ch.VideoDir, ch.JSONDir)
+	fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\nYt-dlp Output Extension: %s\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries, ch.Settings.OutputExt)
+	fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
+	fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Dir: %s\nOutput Filetype: %s\nHW accel type: %s\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU)
+	fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
+	fmt.Printf("From Date (yyyy-mm-dd): %q\nTo Date (yyyy-mm-dd): %q\n", hyphenateYyyyMmDd(ch.Settings.FromDate), hyphenateYyyyMmDd(ch.Settings.ToDate))
+	fmt.Printf("Paused?: %v\n", ch.Paused)
+	fmt.Printf("Notification URLs: %v\n", notifyURLs)
 }
