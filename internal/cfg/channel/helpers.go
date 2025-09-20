@@ -322,6 +322,10 @@ func verifyChanRowUpdateValid(col, val string) error {
 	return nil
 }
 
+const (
+	filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omit:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omit:must' omits videos only when the metafile contains a date field"
+)
+
 // verifyChannelOps verifies that the user inputted filters are valid
 func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
 
@@ -329,33 +333,62 @@ func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
 	for _, op := range ops {
 		split := strings.Split(op, ":")
 		if len(split) < 3 {
-			return nil, errors.New("please enter filters in the format 'field:filter_type:value' (e.g. 'title:omit:frogs' ignores videos with frogs in the metatitle)")
+			logging.E(0, filterFormatError)
+			return nil, errors.New("filter format error")
 		}
 		switch len(split) {
-		case 3:
+		case 4:
+
+			split[0] = strings.ToLower(split[0])
+			split[1] = strings.ToLower(split[1])
+			split[2] = strings.ToLower(split[2])
+			split[3] = strings.ToLower(split[3])
+
 			switch split[1] {
 			case "contains", "omit":
-				filters = append(filters, models.DLFilters{
-					Field: split[0],
-					Type:  split[1],
-					Value: split[2],
-				})
+
+				switch split[3] {
+				case "must", "any":
+					filters = append(filters, models.DLFilters{
+						Field:   split[0],
+						Type:    split[1],
+						Value:   split[2],
+						MustAny: split[3],
+					})
+				default:
+					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
+				}
+
 			default:
+				logging.E(0, filterFormatError)
 				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
 			}
-		case 2:
+		case 3:
+
+			split[0] = strings.ToLower(split[0])
+			split[1] = strings.ToLower(split[1])
+			split[2] = strings.ToLower(split[2])
+
 			switch split[1] {
 			case "contains", "omit":
-				filters = append(filters, models.DLFilters{
-					Field: split[0],
-					Type:  split[1],
-				})
+
+				switch split[2] {
+				case "must", "any":
+					filters = append(filters, models.DLFilters{
+						Field:   split[0],
+						Type:    split[1],
+						MustAny: split[2],
+					})
+				default:
+					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
+				}
+
 			default:
 				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
 			}
 		default:
-			return nil, errors.New("invalid filter. Valid examples: 'title:contains:frogs','date:omit' (contains only metatitles with frogs, and omits downloads including a date metafield)")
-
+			logging.E(0, filterFormatError)
+			return nil, errors.New("filter format error")
 		}
 	}
 	return filters, nil

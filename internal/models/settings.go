@@ -18,9 +18,10 @@ type ChannelSettings struct {
 
 // DLFilters are used to filter in or out videos from download by metafields.
 type DLFilters struct {
-	Field string `json:"filter_field"`
-	Type  string `json:"filter_type"`
-	Value string `json:"filter_value"`
+	Field   string `json:"filter_field"`
+	Type    string `json:"filter_type"`
+	Value   string `json:"filter_value"`
+	MustAny string `json:"filter_must_any"`
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.

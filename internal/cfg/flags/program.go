@@ -53,9 +53,7 @@ func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 		if !isUpdate {
 			def = ""
 		}
-		if isUpdate && *downloadCmd != "" {
-			cmd.Flags().StringVar(downloadCmd, "downloader", def, "External downloader command")
-		}
+		cmd.Flags().StringVar(downloadCmd, "downloader", def, "External downloader command")
 	}
 	if downloadArgs != nil {
 		def := ""

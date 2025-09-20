@@ -630,7 +630,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	addCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
 	addCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
 
-	addCmd.Flags().StringVar(&outputExt, "output-ext", "", "The preferred downloaded output format for videos")
+	addCmd.Flags().StringVar(&outputExt, "output-extension", "", "The preferred downloaded output format for videos")
 
 	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
 
@@ -906,7 +906,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	updateSettingsCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
 	updateSettingsCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
 
-	updateSettingsCmd.Flags().StringVar(&outExt, "output-ext", "", "The preferred downloaded output format for videos")
+	updateSettingsCmd.Flags().StringVar(&outExt, "output-extension", "", "The preferred downloaded output format for videos")
 
 	return updateSettingsCmd
 }

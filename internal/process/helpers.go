@@ -80,9 +80,24 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 // filterRequests uses user input filters to check if the video should be downloaded.
 func filterRequests(v *models.Video) (valid bool, err error) {
 	// Apply filters if any match metadata content
+
+	mustTotal := 0
+	mustPassed := 0
+	anyTotal := 0
+	anyPassed := 0
+
 	for _, filter := range v.Settings.Filters {
+
+		switch filter.MustAny {
+		case "must":
+			mustTotal++
+		case "any":
+			anyTotal++
+		}
+
 		val, exists := v.MetadataMap[filter.Field]
 
+		// Empty field logic
 		if filter.Value == "" {
 			if !exists {
 				switch filter.Type {
@@ -92,32 +107,61 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 					if err := removeUnwantedJSON(v.JSONPath); err != nil {
 						logging.E(0, "Failed to remove unwanted JSON at %s: %v", v.JSONPath, err.Error())
 					}
-					return false, nil
+					return false, nil // Empty field cannot contain any contain filter, return here.
 
 				case consts.FilterOmit:
 					logging.D(2, "Passed check: Field %q does not exist", filter.Field)
+
+					switch filter.MustAny {
+					case "must":
+						mustPassed++
+						logging.D(3, "'Must' filter %v passed for field %v", filter.Value, val)
+					case "any":
+						anyPassed++
+						logging.D(3, "'Any' filter %v passed for field %v", filter.Value, val)
+					}
+
 					continue
 				}
 			}
+
 			if exists {
 				switch filter.Type {
 				case consts.FilterOmit:
 
-					logging.I("Filtering: Field %q found in metadata for URL %q and filter is set to omit it, filtering out", filter.Field, v.URL)
-					if err := removeUnwantedJSON(v.JSONPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+					switch filter.MustAny {
+
+					case "must":
+						logging.I("Filtering: Field %q found in metadata for URL %q and filter is set to omit it, filtering out", filter.Field, v.URL)
+						if err := removeUnwantedJSON(v.JSONPath); err != nil {
+							logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+						}
+						return false, nil // Must omit but contains the field
+					case "any":
+						continue
 					}
-					return false, nil
 
 				case consts.FilterContains:
 					logging.D(2, "Passed check: Field %q exists", filter.Field)
+
+					switch filter.MustAny {
+					case "must":
+						mustPassed++
+						logging.D(3, "'Must' filter %v passed for field %v", filter.Value, val)
+					case "any":
+						anyPassed++
+						logging.D(3, "'Any' filter %v passed for field %v", filter.Value, val)
+					}
+
 					continue
 				}
 			}
 		}
 
-		// Performing field contents checks
+		// Non-empty field logic
 		if filter.Value != "" {
+
+			passed := false
 
 			strVal, ok := val.(string)
 			if !ok {
@@ -131,8 +175,11 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 			// Apply the filter logic
 			switch filter.Type {
 			case consts.FilterOmit:
-				if strings.Contains(lowerStrVal, lowerFilterVal) {
 
+				if !strings.Contains(lowerStrVal, lowerFilterVal) {
+					passed = true
+				} else if filter.MustAny == "must" {
+					// Fail hard for must
 					logging.D(1, "Filtering out video %q which contains %q in field %q", v.URL, filter.Value, filter.Field)
 					if err := removeUnwantedJSON(v.JSONPath); err != nil {
 						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
@@ -141,8 +188,10 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				}
 
 			case consts.FilterContains:
-				if !strings.Contains(lowerStrVal, lowerFilterVal) {
 
+				if strings.Contains(lowerStrVal, lowerFilterVal) {
+					passed = true
+				} else if filter.MustAny == "must" {
 					logging.D(1, "Filtering out video %q which does not contain %q in field %q", v.URL, filter.Value, filter.Field)
 					if err := removeUnwantedJSON(v.JSONPath); err != nil {
 						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
@@ -154,8 +203,37 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 				logging.D(1, "Unrecognized filter type, skipping...")
 				continue
 			}
+
+			if passed {
+				switch filter.MustAny {
+				case "must":
+					mustPassed++
+					logging.D(3, "'Must' filter %v passed for field %v", filter.Value, val)
+				case "any":
+					anyPassed++
+					logging.D(3, "'Any' filter %v passed for field %v", filter.Value, val)
+				}
+			}
 		}
 	}
+
+	// Some "must" filters failed
+	if mustPassed != mustTotal {
+		logging.D(1, "Filtering out video %q which does not meet 'must contain' threshold (number of 'musts': %d 'musts' found: %d)", v.URL, mustTotal, mustPassed)
+		return false, nil
+	}
+
+	// No "any" filters passed and no "must" filters passed
+	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
+		logging.D(1, "Filtering out video %q which does not meet any filter threshold.\n\nNumber of 'anys': %d\n'Anys' found: %d\n\nNumber of 'musts': %d\n'Musts' found: %d\n\n", v.URL, anyTotal, anyPassed, mustTotal, mustPassed)
+		return false, nil
+	}
+
+	if len(v.Settings.Filters) > 0 {
+		logging.I("Video passed download filter checks: %v", v.Settings.Filters)
+	}
+
+	logging.D(3, "Filter tally:\n\nNumber of 'anys': %d\n'Anys' found: %d\n\nNumber of 'musts': %d\n'Musts' found: %d\n\n", anyTotal, anyPassed, mustTotal, mustPassed)
 
 	// Other filters
 	// Upload date filter
