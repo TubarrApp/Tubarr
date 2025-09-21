@@ -106,7 +106,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.useGPU != "" || cmd.Flags().Changed(keys.TranscodeGPU) {
+	if c.useGPU != "" {
 		validGPU, _, err := validateGPU(c.useGPU, c.gpuDir)
 		if err != nil {
 			return nil, err
@@ -115,15 +115,32 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 			m.UseGPU = validGPU
 			return nil
 		})
+	} else if cmd.Flags().Changed(keys.TranscodeGPU) && c.useGPU == "" {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.UseGPU = c.useGPU
+			return nil
+		})
 	}
 
-	if c.transcodeCodec != "" || cmd.Flags().Changed(keys.TranscodeCodec) {
+	if cmd.Flags().Changed(keys.TranscodeGPUDir) && c.gpuDir == "" {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.GPUDir = c.gpuDir
+			return nil
+		})
+	}
+
+	if c.transcodeCodec != "" {
 		validTranscodeCodec, err := validateTranscodeCodec(c.transcodeCodec, c.useGPU)
 		if err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeCodec = validTranscodeCodec
+			return nil
+		})
+	} else if cmd.Flags().Changed(keys.TranscodeCodec) && c.transcodeCodec == "" {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.TranscodeCodec = c.transcodeCodec
 			return nil
 		})
 	}

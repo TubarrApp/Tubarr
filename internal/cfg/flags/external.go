@@ -73,7 +73,7 @@ func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuDir, videoFilter, codec, audi
 	}
 
 	if videoFilter != nil {
-		cmd.Flags().StringVar(videoFilter, keys.TranscodeVideoFilter, "", "Directory of the GPU for transcoding (e.g. '/dev/dri/renderD128')")
+		cmd.Flags().StringVar(videoFilter, keys.TranscodeVideoFilter, "", "Video filter")
 	}
 
 	if audioCodec != nil {
