@@ -274,7 +274,7 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 			return nil, err
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.OutputExt = c.outputExt
+			s.YtdlpOutputExt = c.outputExt
 			return nil
 		})
 	}

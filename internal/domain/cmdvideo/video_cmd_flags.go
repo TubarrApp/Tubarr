@@ -2,21 +2,21 @@
 package cmdvideo
 
 const (
-	AfterMove         = "after_move:%(filepath)s"
-	CookieSource      = "--cookies-from-browser"
-	CookiePath        = "--cookies"
-	ExternalDLer      = "--external-downloader"
-	ExternalDLArgs    = "--external-downloader-args"
-	FilenameSyntax    = "%(title)s.%(ext)s"
-	OutputExtension   = "--merge-output-format"
-	RestrictFilenames = "--restrict-filenames"
-	Retries           = "--retries"
-	SleepRequests     = "--sleep-requests"
-	SleepRequestsNum  = "1"
-	MaxFilesize       = "--max-filesize"
-	Output            = "-o"
-	Print             = "--print"
-	YTDLP             = "yt-dlp"
+	AfterMove            = "after_move:%(filepath)s"
+	CookieSource         = "--cookies-from-browser"
+	CookiePath           = "--cookies"
+	ExternalDLer         = "--external-downloader"
+	ExternalDLArgs       = "--external-downloader-args"
+	FilenameSyntax       = "%(title)s.%(ext)s"
+	YtdlpOutputExtension = "--merge-output-format"
+	RestrictFilenames    = "--restrict-filenames"
+	Retries              = "--retries"
+	SleepRequests        = "--sleep-requests"
+	SleepRequestsNum     = "1"
+	MaxFilesize          = "--max-filesize"
+	Output               = "-o"
+	Print                = "--print"
+	YTDLP                = "yt-dlp"
 )
 
 const (
