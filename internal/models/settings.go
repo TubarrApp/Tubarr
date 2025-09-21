@@ -5,6 +5,7 @@ type ChannelSettings struct {
 	CookieSource           string      `json:"cookie_source"`
 	CrawlFreq              int         `json:"crawl_freq"`
 	Filters                []DLFilters `json:"filters"`
+	FilterFile             string      `json:"filter_file"`
 	Retries                int         `json:"download_retries"`
 	ExternalDownloader     string      `json:"external_downloader"`
 	ExternalDownloaderArgs string      `json:"external_downloader_args"`

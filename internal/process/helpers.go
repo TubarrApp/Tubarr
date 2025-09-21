@@ -1,6 +1,7 @@
 package process
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	cfgchannel "tubarr/internal/cfg/channel"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -80,6 +82,27 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 // filterRequests uses user input filters to check if the video should be downloaded.
 func filterRequests(v *models.Video) (valid bool, err error) {
 	// Apply filters if any match metadata content
+
+	if v.Channel.Settings.FilterFile != "" {
+		logging.I("Adding filters from file %v...", v.Channel.Settings.FilterFile)
+		filters, err := loadFiltersFromFile(v.Channel.Settings.FilterFile)
+		if err != nil {
+			logging.E(0, "Error loading filters from file %v: %v", v.Channel.Settings.FilterFile, err)
+		}
+
+		if len(filters) > 0 {
+			validFilters, err := cfgchannel.VerifyChannelOps(filters)
+			if err != nil {
+				logging.E(0, "Error loading filters from file %v: %v", v.Channel.Settings.FilterFile, err)
+			}
+			if len(validFilters) > 0 {
+				logging.D(1, "Found following filters in file:\n\n%v", validFilters)
+				v.Settings.Filters = append(v.Settings.Filters, validFilters...)
+			}
+		} else {
+			logging.I("No valid filters found in file. Format is one per line 'field:contains:dogs:must' (Only download videos with 'dogs' in the title)")
+		}
+	}
 
 	mustTotal := 0
 	mustPassed := 0
@@ -290,6 +313,32 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 
 	logging.I("Video %q for channel %q passed filter checks", v.URL, v.Channel.Name)
 	return true, nil
+}
+
+// loadFiltersFromFile loads filters from a file (one per line).
+func loadFiltersFromFile(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	filters := []string{}
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // skip blank lines and comments
+		}
+		filters = append(filters, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return filters, nil
 }
 
 // removeUnwantedJSON removes filtered out JSON files.

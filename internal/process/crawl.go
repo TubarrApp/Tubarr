@@ -197,6 +197,12 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 		return fmt.Errorf("failed to parse JSON directory: %w", err)
 	}
 
+	if c.Settings.FilterFile != "" {
+		if c.Settings.FilterFile, err = dirParser.ParseDirectory(c.Settings.FilterFile); err != nil {
+			return fmt.Errorf("failed to parse filter file directory: %w", err)
+		}
+	}
+
 	c.VideoDir = videoDir
 	c.JSONDir = jsonDir
 

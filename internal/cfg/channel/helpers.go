@@ -168,6 +168,7 @@ type chanSettings struct {
 	cookieSource           string
 	crawlFreq              int
 	filters                []string
+	filterFile             string
 	retries                int
 	externalDownloader     string
 	externalDownloaderArgs string
@@ -234,7 +235,7 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 	}
 
 	if len(c.filters) > 0 {
-		dlFilters, err := verifyChannelOps(c.filters)
+		dlFilters, err := VerifyChannelOps(c.filters)
 		if err != nil {
 			return nil, err
 		}
@@ -326,8 +327,8 @@ const (
 	filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omit:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omit:must' omits videos only when the metafile contains a date field"
 )
 
-// verifyChannelOps verifies that the user inputted filters are valid
-func verifyChannelOps(ops []string) ([]models.DLFilters, error) {
+// VerifyChannelOps verifies that the user inputted filters are valid
+func VerifyChannelOps(ops []string) ([]models.DLFilters, error) {
 
 	var filters = make([]models.DLFilters, 0, len(ops))
 	for _, op := range ops {
@@ -516,6 +517,8 @@ func validateTranscodeCodec(c string, accel string) (codec string, err error) {
 	switch c {
 	case "h264", "hevc":
 		return c, nil
+	case "x264":
+		return "h264", nil
 	case "h265":
 		return "hevc", nil
 	case "":

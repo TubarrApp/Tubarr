@@ -7,7 +7,7 @@ import (
 )
 
 // SetDownloadFlags sets flags related to download tasks.
-func SetDownloadFlags(cmd *cobra.Command, retries *int, cookieSource, maxFilesize *string, dlFilters *[]string) {
+func SetDownloadFlags(cmd *cobra.Command, retries *int, cookieSource, maxFilesize *string, dlFilters *[]string, dlFilterFile *string) {
 	if retries != nil {
 		cmd.Flags().IntVar(retries, keys.DLRetries, 0, "Number of retries to attempt a download before failure")
 	}
@@ -21,5 +21,9 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, cookieSource, maxFilesiz
 
 	if dlFilters != nil {
 		cmd.Flags().StringSliceVar(dlFilters, keys.FilterOpsInput, nil, "Filter in or out videos with certain metafields")
+	}
+
+	if dlFilterFile != nil {
+		cmd.Flags().StringVar(dlFilterFile, keys.FilterOpsFile, "", "Path to a filter operations file (one operation per line)")
 	}
 }
