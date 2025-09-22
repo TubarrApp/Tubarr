@@ -795,6 +795,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Long:  "Update channel settings with various parameters, both for Tubarr itself and for external software like Metarr.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			logging.I("Updating channel with name %v", name)
+
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
