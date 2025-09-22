@@ -128,7 +128,11 @@ func saveCookiesToFile(cookies []*http.Cookie, filePath string, a *models.ChanUR
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logging.E(0, "failed to close file %v due to error: %v", filePath, err)
+		}
+	}()
 
 	// Write the header for the Netscape cookies file
 	_, err = file.WriteString("# Netscape HTTP Cookie File\n# https://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n")

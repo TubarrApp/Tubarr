@@ -76,7 +76,7 @@ func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password
 	return u.String, p.String, l.String, nil
 }
 
-// DeleteVideoURL deletes a URL from the downloaded database list.
+// DeleteVideoURLs deletes a URL from the downloaded database list.
 func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
 
 	if !cs.channelExistsID(channelID) {
@@ -424,7 +424,11 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 	if err != nil {
 		return fmt.Errorf("failed to fetch URLs for channel: %w", err)
 	}
-	defer urlRows.Close()
+	defer func() {
+		if err := urlRows.Close(); err != nil {
+			logging.E(0, "failed to close database URL rows in query for channel %v: %v", c.Name, err)
+		}
+	}()
 
 	for urlRows.Next() {
 		var url string
@@ -510,7 +514,11 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 	if err != nil {
 		return fmt.Errorf("failed to fetch URLs for channel: %w", err)
 	}
-	defer urlRows.Close()
+	defer func() {
+		if err := urlRows.Close(); err != nil {
+			logging.E(0, "failed to close database URL rows in query for channel %v: %v", c.Name, err)
+		}
+	}()
 
 	for urlRows.Next() {
 		var url string
@@ -597,7 +605,11 @@ func (cs *ChannelStore) FetchChannel(id int64) (*models.Channel, error, bool) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URLs for channel: %w", err), true
 	}
-	defer urlRows.Close()
+	defer func() {
+		if err := urlRows.Close(); err != nil {
+			logging.E(0, "failed to close database URL rows in query for channel %v: %v", c.Name, err)
+		}
+	}()
 
 	for urlRows.Next() {
 		var url string
@@ -690,7 +702,11 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to query URLs: %w", err), true
 	}
-	defer urlRows.Close()
+	defer func() {
+		if err := urlRows.Close(); err != nil {
+			logging.E(0, "failed to close database URL rows while fetching all channels: %v", err)
+		}
+	}()
 
 	for urlRows.Next() {
 		var channelID int64

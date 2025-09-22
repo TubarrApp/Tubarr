@@ -321,7 +321,11 @@ func loadFiltersFromFile(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logging.E(0, "failed to close file %v due to error: %v", path, err)
+		}
+	}()
 
 	filters := []string{}
 	scanner := bufio.NewScanner(file)

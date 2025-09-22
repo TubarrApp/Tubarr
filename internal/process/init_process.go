@@ -127,7 +127,7 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 		} else {
 			_, err := vs.AddVideo(v)
 			if err != nil {
-				results <- fmt.Errorf("error adding video with URL %s to database: %v", v.URL, err)
+				results <- fmt.Errorf("error adding video with URL %s to database: %w", v.URL, err)
 			}
 		}
 

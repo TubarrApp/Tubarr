@@ -46,7 +46,11 @@ func login(cookiesFilePath string, a *models.ChanURLAuthDetails) ([]*http.Cookie
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.E(0, "failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -77,7 +81,11 @@ func login(cookiesFilePath string, a *models.ChanURLAuthDetails) ([]*http.Cookie
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logging.E(0, "failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
+		}
+	}()
 
 	// Log the cookies for debugging
 	if logging.Level > 1 {

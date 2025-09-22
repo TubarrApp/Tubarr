@@ -456,7 +456,11 @@ func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename stri
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			logging.E(0, "failed to close file %v due to error: %v", filePath, err)
+		}
+	}()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")

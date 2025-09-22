@@ -69,7 +69,7 @@ func SpecialCharsCompile() *regexp.Regexp {
 	return SpecialChars
 }
 
-// YearFragments compiles regex for parsing user inputted dates.
+// YearFragmentsCompile compiles regex for parsing user inputted dates.
 func YearFragmentsCompile() *regexp.Regexp {
 	onceYearFragments.Do(func() {
 		YearFragments = regexp.MustCompile(yearFragmentsStr)
