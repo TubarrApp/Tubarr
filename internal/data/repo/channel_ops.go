@@ -911,7 +911,7 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 		}).
 		RunWith(cs.DB)
 
-	logging.D(2, "Executing query to find downloaded videos: %v for channel ID %d", query, c.ID)
+	logging.D(2, "Executing query to find downloaded videos: %v for channel %q", query, c.Name)
 
 	rows, err := query.Query()
 	if err != nil {
@@ -936,7 +936,7 @@ func (cs ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err er
 		return nil, fmt.Errorf("row iteration error: %w", err)
 	}
 
-	logging.I("Found %d previously downloaded videos for channel ID %d", len(urls), c.ID)
+	logging.I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
 	return urls, nil
 }
 
