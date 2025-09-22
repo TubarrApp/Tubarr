@@ -126,15 +126,13 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		fns = append(fns, func(m *models.MetarrArgs) error {
 
 			if c.gpuDir != "" {
-				if info, err := os.Stat(c.gpuDir); err != nil {
+				if _, err := os.Stat(c.gpuDir); err != nil {
 					switch {
 					case os.IsNotExist(err):
 						return fmt.Errorf("gpu directory was entered as %v, but path does not exist", c.gpuDir)
 					default:
 						return fmt.Errorf("error checking GPU directory %v: %w", c.gpuDir, err)
 					}
-				} else if !info.IsDir() {
-					return fmt.Errorf("gpu directory was entered as %v, but path is a file", c.gpuDir)
 				}
 			}
 			m.GPUDir = c.gpuDir
