@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 	cfgflags "tubarr/internal/cfg/flags"
-	cfgvalidate "tubarr/internal/cfg/validation"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
@@ -269,7 +269,7 @@ func addNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
-			validPairs, err := cfgvalidate.ValidateNotificationPairs(notification)
+			validPairs, err := validation.ValidateNotificationPairs(notification)
 			if err != nil {
 				return err
 			}
@@ -443,18 +443,13 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		Short: "Add a channel.",
 		Long:  "Add channel adds a new channel to the database using inputted URLs, names, settings, etc.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			switch {
-			case vDir == "", len(urls) == 0:
-				return errors.New("must enter both a video directory and at least one channel URL source")
+			if vDir == "" || len(urls) == 0 || name == "" {
+				return errors.New("new channels require a video directory, name, and at least one channel URL")
 			}
 
 			// Infer empty fields
-			if jDir == "" {
+			if jDir == "" { // Do not stat, due to templating
 				jDir = vDir
-			}
-
-			if name == "" {
-				return fmt.Errorf("must input a name for this channel")
 			}
 
 			// Verify filters
@@ -464,31 +459,31 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 			}
 
 			if filenameDateTag != "" {
-				if !cfgvalidate.ValidateDateFormat(filenameDateTag) {
+				if !validation.ValidateDateFormat(filenameDateTag) {
 					return errors.New("invalid Metarr filename date tag format")
 				}
 			}
 
 			if len(metaOps) > 0 {
-				if metaOps, err = cfgvalidate.ValidateMetaOps(metaOps); err != nil {
+				if metaOps, err = validation.ValidateMetaOps(metaOps); err != nil {
 					return err
 				}
 			}
 
 			if len(fileSfxReplace) > 0 {
-				if fileSfxReplace, err = cfgvalidate.ValidateFilenameSuffixReplace(fileSfxReplace); err != nil {
+				if fileSfxReplace, err = validation.ValidateFilenameSuffixReplace(fileSfxReplace); err != nil {
 					return err
 				}
 			}
 
 			if renameStyle != "" {
-				if err := cfgvalidate.ValidateRenameFlag(renameStyle); err != nil {
+				if err := validation.ValidateRenameFlag(renameStyle); err != nil {
 					return err
 				}
 			}
 
 			if minFreeMem != "" {
-				if err := cfgvalidate.ValidateMinFreeMem(minFreeMem); err != nil {
+				if err := validation.ValidateMinFreeMem(minFreeMem); err != nil {
 					return err
 				}
 			}
@@ -599,7 +594,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 			}
 
 			if len(notification) != 0 {
-				validPairs, err := cfgvalidate.ValidateNotificationPairs(notification)
+				validPairs, err := validation.ValidateNotificationPairs(notification)
 				if err != nil {
 					return err
 				}

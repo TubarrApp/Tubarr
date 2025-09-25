@@ -17,7 +17,7 @@ type Store interface {
 
 // ChannelStore allows access to channel repo methods.
 type ChannelStore interface {
-	AddAuth(chanID int64, authDetails map[string]*models.ChanURLAuthDetails) error
+	AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error
 	AddChannel(c *models.Channel) (int64, error)
 	AddNotifyURLs(id int64, notifications []string) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error

@@ -4,6 +4,7 @@ package consts
 const (
 	YtDLPFlatPlaylist = "--flat-playlist"
 	YtDLPOutputJSON   = "-J"
+	Cookies           = "--cookies"
 )
 
 // Downloaders

@@ -15,7 +15,7 @@ import (
 )
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func channelAuth(channelURL, cookiesFilePath string, a *models.ChanURLAuthDetails) ([]*http.Cookie, error) {
+func channelAuth(channelURL, cookiesFilePath string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 	if customAuthCookies[channelURL] == nil { // If the user is not already authenticated
 		cookies, err := login(cookiesFilePath, a)
 		if err != nil {
@@ -27,7 +27,7 @@ func channelAuth(channelURL, cookiesFilePath string, a *models.ChanURLAuthDetail
 }
 
 // login logs the user in and returns the authentication cookie.
-func login(cookiesFilePath string, a *models.ChanURLAuthDetails) ([]*http.Cookie, error) {
+func login(cookiesFilePath string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err
@@ -92,12 +92,6 @@ func login(cookiesFilePath string, a *models.ChanURLAuthDetails) ([]*http.Cookie
 		for _, cookie := range resp.Cookies() {
 			logging.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
 		}
-	}
-
-	// Save cookies to file
-	err = saveCookiesToFile(resp.Cookies(), cookiesFilePath, a)
-	if err != nil {
-		return nil, err
 	}
 
 	return resp.Cookies(), nil

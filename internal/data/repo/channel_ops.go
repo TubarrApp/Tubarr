@@ -236,7 +236,7 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, notifyName, notifyURL
 }
 
 // AddAuth adds authentication details to a channel.
-func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChanURLAuthDetails) error {
+func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error {
 	if !cs.channelExistsID(chanID) {
 		return fmt.Errorf("channel with ID %d does not exist", chanID)
 	}

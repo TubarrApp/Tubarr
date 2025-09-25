@@ -1,8 +1,9 @@
-// Package cfgvalidate handles validation of user flag input.
-package cfgvalidate
+// Package validation handles validation of user flag input.
+package validation
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -10,6 +11,28 @@ import (
 
 	"github.com/spf13/viper"
 )
+
+// ValidateDirectory validates that the directory exists, else creates it.
+func ValidateDirectory(d string) error {
+
+	logging.D(3, "Statting directory %q...", d)
+	dirInfo, err := os.Stat(d)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logging.D(3, "Directory %q does not exist, creating it...", d)
+			if err := os.MkdirAll(d, 0o755); err != nil {
+				return fmt.Errorf("directory %q did not exist and Tubarr failed to create it: %w", d, err)
+			}
+		} else {
+			return fmt.Errorf("failed to stat directory: %w", err)
+		}
+	}
+	if !dirInfo.IsDir() {
+		return fmt.Errorf("directory entered %q is a file", d)
+	}
+
+	return nil
+}
 
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {

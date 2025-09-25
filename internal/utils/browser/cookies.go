@@ -123,14 +123,21 @@ func extractBaseDomain(urlString string) (string, error) {
 }
 
 // saveCookiesToFile saves the cookies to a file in Netscape format.
-func saveCookiesToFile(cookies []*http.Cookie, filePath string, a *models.ChanURLAuthDetails) error {
-	file, err := os.Create(filePath)
+func saveCookiesToFile(cookies []*http.Cookie, access *models.ChannelAccessDetails) error {
+	// Return early if no cookies exist
+	if len(cookies) == 0 {
+		access.CookiePath = ""
+		logging.D(1, "%d cookies to write to file %q, cleared 'access.CookiePath' (value is now %q)", len(cookies), access.CookiePath, access.CookiePath)
+		return nil
+	}
+
+	file, err := os.Create(access.CookiePath)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E(0, "failed to close file %v due to error: %v", filePath, err)
+			logging.E(0, "failed to close file %q due to error: %v", access.CookiePath, err)
 		}
 	}()
 
@@ -141,12 +148,12 @@ func saveCookiesToFile(cookies []*http.Cookie, filePath string, a *models.ChanUR
 	}
 
 	// Log the cookies for debugging
-	logging.D(1, "Saving %d cookies to file %s...", len(cookies), filePath)
+	logging.D(1, "Saving %d cookies to file %s...", len(cookies), access.CookiePath)
 
 	for _, cookie := range cookies {
 		domain := cookie.Domain
 		if domain == "" {
-			domain = a.BaseDomain
+			domain = access.BaseDomain
 		}
 
 		if !strings.HasPrefix(domain, ".") && strings.Count(domain, ".") > 1 {
@@ -173,8 +180,28 @@ func saveCookiesToFile(cookies []*http.Cookie, filePath string, a *models.ChanUR
 			return err
 		}
 	}
-
-	// Save the cookie path to the video model
-	a.CookiePath = filePath
 	return nil
+}
+
+// mergeCookies merges cookies so that directly input authorization cookies take precedent (last in file).
+func mergeCookies(primary, secondary []*http.Cookie) []*http.Cookie {
+	cookieMap := make(map[string]*http.Cookie)
+
+	// secondary first (e.g. Firefox)
+	for _, c := range secondary {
+		key := c.Domain + "|" + c.Path + "|" + c.Name
+		cookieMap[key] = c
+	}
+
+	// primary overrides (e.g. manual/auth cookies)
+	for _, c := range primary {
+		key := c.Domain + "|" + c.Path + "|" + c.Name
+		cookieMap[key] = c
+	}
+
+	merged := make([]*http.Cookie, 0, len(cookieMap))
+	for _, c := range cookieMap {
+		merged = append(merged, c)
+	}
+	return merged
 }

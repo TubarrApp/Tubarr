@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"tubarr/internal/cfg"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/errconsts"
@@ -124,29 +125,40 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 
 		var (
 			authCookies, regCookies, cookies []*http.Cookie
-			cookiePath                       string
+			generatedCookiePath              string
+			doLogin, doGlobalCookies         bool
+			chanAccessDetails                *models.ChannelAccessDetails
 		)
 
-		// If authorization details exist, perform login and store cookies.
 		if (username != "" || password != "") && loginURL != "" {
-			cookiePath = getAuthFilePath(c.Name, videoURL)
+			doLogin = true
+		}
 
-			authDetails := &models.ChanURLAuthDetails{
+		if c.Settings.UseGlobalCookies {
+			doGlobalCookies = true
+		}
+
+		if doLogin || doGlobalCookies {
+			generatedCookiePath = generateCookieFilePath(c.Name, videoURL)
+
+			chanAccessDetails = &models.ChannelAccessDetails{
 				Username:   username,
 				Password:   password,
 				LoginURL:   loginURL,
-				CookiePath: cookiePath,
+				CookiePath: generatedCookiePath,
 			}
+		}
 
-			// Generate a unique cookie path per URL
-			authCookies, err = channelAuth(domain, cookiePath, authDetails)
+		// If authorization details exist, perform login and store cookies.
+		if doLogin {
+			authCookies, err = channelAuth(domain, chanAccessDetails.CookiePath, chanAccessDetails)
 			if err != nil {
 				logging.E(0, "Failed to get auth cookies for %q: %v", videoURL, err)
 			}
 		}
 
 		// Get cookies globally
-		if c.Settings.UseGlobalCookies {
+		if c.Settings.UseGlobalCookies { // TODO: add to a cookie file and implant into yt-dlp command if file isn't empty
 			regCookies, err = b.cookies.GetCookies(videoURL)
 			if err != nil {
 				logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", videoURL, c.Settings.CookieSource, err)
@@ -154,10 +166,16 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		}
 
 		// Combine cookies
-		cookies = append(authCookies, regCookies...)
+		cookies = mergeCookies(authCookies, regCookies)
+
+		// Save cookies to file
+		err = saveCookiesToFile(cookies, chanAccessDetails)
+		if err != nil {
+			return nil, err
+		}
 
 		// Fetch new episode URLs for this video URL
-		newEpisodeURLs, err := b.newEpisodeURLs(videoURL, existingURLs, nil, cookies, ctx)
+		newEpisodeURLs, err := b.newEpisodeURLs(videoURL, existingURLs, nil, cookies, chanAccessDetails.CookiePath, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +191,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 					Channel:    c,
 					Settings:   c.Settings,
 					MetarrArgs: c.MetarrArgs,
-					CookiePath: cookiePath,
+					CookiePath: chanAccessDetails.CookiePath,
 				})
 			}
 		}
@@ -185,8 +203,11 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	if len(newRequests) > 0 {
 		logging.I("Found %d new download requests for channel %q:", len(newRequests), c.Name)
 		for i, v := range newRequests {
-			logging.P("%s#%d%s - %v", consts.ColorBlue, i+1, consts.ColorReset, v.URL)
-			if i >= 25 {
+			if v == nil {
+				continue
+			}
+			logging.P("%s#%d%s - %q", consts.ColorBlue, i+1, consts.ColorReset, v.URL)
+			if i >= 24 { // 25 (i starts at 0)
 				break
 			}
 		}
@@ -195,7 +216,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, ctx context.Context) ([]string, error) {
+func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, cookiePath string, ctx context.Context) ([]string, error) {
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	// Set cookies
@@ -235,7 +256,7 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 		b.collector.Wait()
 	} else {
 		var err error
-		if uniqueEpisodeURLs, err = ytDlpURLFetch(targetURL, uniqueEpisodeURLs, ctx); err != nil {
+		if uniqueEpisodeURLs, err = ytDlpURLFetch(targetURL, uniqueEpisodeURLs, cookiePath, ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -291,12 +312,16 @@ func normalizeURL(inputURL string) string {
 }
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, ctx context.Context) (map[string]struct{}, error) {
+func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string, ctx context.Context) (map[string]struct{}, error) {
 	if uniqueEpisodeURLs == nil {
 		uniqueEpisodeURLs = make(map[string]struct{})
 	}
 
 	cmd := exec.CommandContext(ctx, cmdvideo.YTDLP, consts.YtDLPFlatPlaylist, consts.YtDLPOutputJSON, chanURL)
+
+	if cookiePath != "" {
+		cmd.Args = append(cmd.Args, consts.Cookies, cookiePath)
+	}
 	logging.D(2, "Executing YTDLP command for channel %q:\n%s", chanURL, cmd.String())
 
 	j, err := cmd.Output()
@@ -332,8 +357,6 @@ func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)
 	}
-
-	// Load cookies from the authenticated session
 	if cookies, ok := customAuthCookies[parsedURL.Host]; ok {
 		jar.SetCookies(parsedURL, cookies)
 	} else {
@@ -462,6 +485,12 @@ func sanitizeFilename(name string) string {
 // writeMetadataJSON writes the custom metadata file.
 func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename string, v *models.Video) error {
 	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
+
+	// Ensure the directory exists
+	if err := validation.ValidateDirectory(outputDir); err != nil {
+		return err
+	}
+
 	file, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -482,17 +511,8 @@ func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename stri
 	return nil
 }
 
-// Extracts the hostname from a URL.
-// func urlHostname(rawURL string) string {
-// 	parsed, err := url.Parse(rawURL)
-// 	if err != nil {
-// 		return ""
-// 	}
-// 	return parsed.Hostname()
-// }
-
-// getAuthFilePath generates a unique authentication file path per channel and URL.
-func getAuthFilePath(channelName, videoURL string) string {
+// generateCookieFilePath generates a unique authentication file path per channel and URL.
+func generateCookieFilePath(channelName, videoURL string) string {
 	const tubarrDir = ".tubarr/"
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

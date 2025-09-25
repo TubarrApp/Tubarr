@@ -18,8 +18,8 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 	}
 
 	// Cookies
-	rootCmd.PersistentFlags().String(keys.TubarrCookieSource, "", "Cookie source for web operations (e.g. 'Firefox')")
-	if err := viper.BindPFlag(keys.TubarrCookieSource, rootCmd.PersistentFlags().Lookup(keys.TubarrCookieSource)); err != nil {
+	rootCmd.PersistentFlags().String(keys.CookieSource, "", "Cookie source for web operations (e.g. 'Firefox')")
+	if err := viper.BindPFlag(keys.CookieSource, rootCmd.PersistentFlags().Lookup(keys.CookieSource)); err != nil {
 		return err
 	}
 

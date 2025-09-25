@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	cfgvalidate "tubarr/internal/cfg/validation"
+	validation "tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/regex"
@@ -38,7 +38,7 @@ type cobraMetarrArgs struct {
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
 func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
 	if c.minFreeMem != "" {
-		if err := cfgvalidate.ValidateMinFreeMem(c.minFreeMem); err != nil {
+		if err := validation.ValidateMinFreeMem(c.minFreeMem); err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
@@ -48,7 +48,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.metarrExt != "" {
-		if cfgvalidate.ValidateOutputFiletype(c.metarrExt) {
+		if validation.ValidateOutputFiletype(c.metarrExt) {
 			c.metarrExt = strings.ToLower(c.metarrExt)
 			fns = append(fns, func(m *models.MetarrArgs) error {
 				m.Ext = c.metarrExt
@@ -58,7 +58,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.renameStyle != "" {
-		if err := cfgvalidate.ValidateRenameFlag(c.renameStyle); err != nil {
+		if err := validation.ValidateRenameFlag(c.renameStyle); err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
@@ -68,7 +68,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.fileDatePfx != "" {
-		if !cfgvalidate.ValidateDateFormat(c.fileDatePfx) {
+		if !validation.ValidateDateFormat(c.fileDatePfx) {
 			return nil, errors.New("invalid Metarr filename date tag format")
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
@@ -78,7 +78,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if len(c.filenameReplaceSfx) != 0 {
-		valid, err := cfgvalidate.ValidateFilenameSuffixReplace(c.filenameReplaceSfx)
+		valid, err := validation.ValidateFilenameSuffixReplace(c.filenameReplaceSfx)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +96,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if len(c.metaOps) > 0 {
-		valid, err := cfgvalidate.ValidateMetaOps(c.metaOps)
+		valid, err := validation.ValidateMetaOps(c.metaOps)
 		if err != nil {
 			return nil, err
 		}
@@ -616,7 +616,7 @@ func validateTranscodeVideoFilter(q string) (vf string, err error) {
 }
 
 // parseAuthDetails parses authorization details for a particular channel URL.
-func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*models.ChanURLAuthDetails, error) {
+func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*models.ChannelAccessDetails, error) {
 	logging.D(3, "Parsing authorization details...")
 	if usernames == nil && passwords == nil && loginURLs == nil {
 		logging.D(3, "No authorization details to parse...")
@@ -624,7 +624,7 @@ func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*mod
 	}
 
 	// Initialize the map
-	authMap := make(map[string]*models.ChanURLAuthDetails)
+	authMap := make(map[string]*models.ChannelAccessDetails)
 
 	// Process usernames
 	for _, u := range usernames {
@@ -639,7 +639,7 @@ func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*mod
 
 		// Initialize the struct if it doesn't exist
 		if authMap[uParts[0]] == nil {
-			authMap[uParts[0]] = &models.ChanURLAuthDetails{}
+			authMap[uParts[0]] = &models.ChannelAccessDetails{}
 		}
 		authMap[uParts[0]].Username = uParts[1]
 	}
@@ -657,7 +657,7 @@ func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*mod
 
 		// Initialize the struct if it doesn't exist
 		if authMap[pParts[0]] == nil {
-			authMap[pParts[0]] = &models.ChanURLAuthDetails{}
+			authMap[pParts[0]] = &models.ChannelAccessDetails{}
 		}
 		authMap[pParts[0]].Password = pParts[1]
 	}
@@ -675,7 +675,7 @@ func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*mod
 
 		// Initialize the struct if it doesn't exist
 		if authMap[lParts[0]] == nil {
-			authMap[lParts[0]] = &models.ChanURLAuthDetails{}
+			authMap[lParts[0]] = &models.ChannelAccessDetails{}
 		}
 		authMap[lParts[0]].LoginURL = lParts[1]
 	}

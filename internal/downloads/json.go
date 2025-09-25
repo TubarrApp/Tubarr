@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"tubarr/internal/cfg"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/cmdjson"
 	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/keys"
@@ -16,7 +17,6 @@ import (
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
 func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
-
 	args := make([]string, 0, 32)
 
 	args = append(args,
@@ -26,7 +26,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	if d.Video.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
-			args = append(args, cmdjson.CookieSource, d.Video.Settings.CookieSource)
+			args = append(args, cmdjson.CookiesFromBrowser, d.Video.Settings.CookieSource)
 		}
 	} else {
 		args = append(args, cmdjson.CookiePath, d.Video.CookiePath)
@@ -54,10 +54,10 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args = append(args, cmdjson.RestrictFilenames, cmdjson.Output, cmdjson.FilenameSyntax,
 		d.Video.URL)
 
-	if cfg.IsSet(keys.TubarrCookieSource) {
-		browserCookieSource := cfg.GetString(keys.TubarrCookieSource)
+	if cfg.IsSet(keys.CookieSource) {
+		browserCookieSource := cfg.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
-		args = append(args, "--cookies-from-browser", browserCookieSource)
+		args = append(args, cmdjson.CookiesFromBrowser, browserCookieSource)
 	} else {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Video.Channel.Name, d.Video.URL)
 	}
@@ -73,6 +73,14 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	if cmd == nil {
 		return fmt.Errorf("no command built for URL %s", d.Video.URL)
 	}
+
+	// Ensure the directory exists
+	if err := validation.ValidateDirectory(d.Video.VideoDir); err != nil {
+		return err
+	}
+
+	// Execute JSON download
+	logging.D(3, "Executing JSON download command...")
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

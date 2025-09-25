@@ -47,7 +47,7 @@ type MetarrArgs struct {
 	TranscodeQuality     string   `json:"metarr_transcode_quality"`
 }
 
-type ChanURLAuthDetails struct {
+type ChannelAccessDetails struct {
 	Username   string
 	Password   string
 	LoginURL   string

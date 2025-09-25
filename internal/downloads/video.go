@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"tubarr/internal/cfg"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/errconsts"
@@ -54,7 +55,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	if d.Video.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
-			args = append(args, cmdvideo.CookieSource, d.Video.Settings.CookieSource)
+			args = append(args, cmdvideo.CookiesFromBrowser, d.Video.Settings.CookieSource)
 		}
 	} else {
 		args = append(args, cmdvideo.CookiePath, d.Video.CookiePath)
@@ -93,10 +94,10 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
 	args = append(args, cmdvideo.RandomizeRequests...)
 
-	if cfg.IsSet(keys.TubarrCookieSource) {
-		browserCookieSource := cfg.GetString(keys.TubarrCookieSource)
+	if cfg.IsSet(keys.CookieSource) {
+		browserCookieSource := cfg.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
-		args = append(args, "--cookies-from-browser", browserCookieSource)
+		args = append(args, cmdvideo.CookiesFromBrowser, browserCookieSource)
 	} else {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Video.Channel.Name, d.Video.URL)
 	}
@@ -119,6 +120,17 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 // executeVideoDownload executes a video download command.
 func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
+	if cmd == nil {
+		return fmt.Errorf("no command built for URL %s", d.Video.URL)
+	}
+
+	// Ensure the directory exists
+	if err := validation.ValidateDirectory(d.Video.JSONDir); err != nil {
+		return err
+	}
+
+	// Execute video download
+	logging.D(3, "Executing video download command...")
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

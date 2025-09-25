@@ -9,7 +9,7 @@ import (
 
 	cfgchannel "tubarr/internal/cfg/channel"
 	cfgflags "tubarr/internal/cfg/flags"
-	cfgvalidate "tubarr/internal/cfg/validation"
+	validation "tubarr/internal/cfg/validation"
 	cfgvideo "tubarr/internal/cfg/video"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
@@ -30,7 +30,7 @@ var rootCmd = &cobra.Command{
 	Use:   "tubarr",
 	Short: "Tubarr is a video downloading and metatagging tool.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if err := cfgvalidate.ValidateViperFlags(); err != nil {
+		if err := validation.ValidateViperFlags(); err != nil {
 			return
 		}
 		if viper.IsSet(keys.Benchmarking) {

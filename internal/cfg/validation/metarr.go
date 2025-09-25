@@ -1,4 +1,4 @@
-package cfgvalidate
+package validation
 
 import (
 	"errors"
