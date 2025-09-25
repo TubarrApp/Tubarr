@@ -15,19 +15,19 @@ import (
 )
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func channelAuth(channelURL, cookiesFilePath string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
-	if customAuthCookies[channelURL] == nil { // If the user is not already authenticated
-		cookies, err := login(cookiesFilePath, a)
+func channelAuth(channelHostname string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
+	if customAuthCookies[channelHostname] == nil { // If the user is not already authenticated
+		cookies, err := login(a)
 		if err != nil {
 			return nil, err
 		}
-		customAuthCookies[channelURL] = cookies
+		customAuthCookies[channelHostname] = cookies
 	}
-	return customAuthCookies[channelURL], nil
+	return customAuthCookies[channelHostname], nil
 }
 
 // login logs the user in and returns the authentication cookie.
-func login(cookiesFilePath string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
+func login(a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err

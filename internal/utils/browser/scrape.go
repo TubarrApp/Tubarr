@@ -105,77 +105,73 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	)
 
 	// Process each URL separately
-	for _, videoURL := range c.URLs {
-		parsed, err := url.Parse(videoURL)
+	for _, channelURL := range c.URLs {
+		parsed, err := url.Parse(channelURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse URL %q: %w", videoURL, err)
+			return nil, fmt.Errorf("failed to parse URL %q: %w", channelURL, err)
 		}
 
-		domain := parsed.Hostname()
-		protocol := parsed.Scheme
-		baseDomainWithProto := protocol + "://" + domain
-
-		logging.D(1, "Processing BaseDomain %q for URL %q", baseDomainWithProto, videoURL)
+		hostname := parsed.Hostname()
+		logging.D(1, "Processing channel URL %q", channelURL)
 
 		// Retrieve authentication details for this specific video URL
-		username, password, loginURL, err := cs.GetAuth(c.ID, videoURL)
+		username, password, loginURL, err := cs.GetAuth(c.ID, channelURL)
 		if err != nil {
-			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, videoURL, err)
+			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, channelURL, err)
 		}
 
 		var (
 			authCookies, regCookies, cookies []*http.Cookie
 			generatedCookiePath              string
-			doLogin, doGlobalCookies         bool
-			chanAccessDetails                *models.ChannelAccessDetails
+			chanAccessDetails                models.ChannelAccessDetails
 		)
 
-		if (username != "" || password != "") && loginURL != "" {
-			doLogin = true
-		}
+		doLogin := ((username != "" || password != "") && loginURL != "")
 
-		if c.Settings.UseGlobalCookies {
-			doGlobalCookies = true
-		}
+		if doLogin || c.Settings.UseGlobalCookies {
+			generatedCookiePath = generateCookieFilePath(c.Name, channelURL)
 
-		if doLogin || doGlobalCookies {
-			generatedCookiePath = generateCookieFilePath(c.Name, videoURL)
+			baseDomain, err := BaseDomain(channelURL)
+			if err != nil {
+				logging.E(0, "Failed to grab base domain for video URL %q: %v", channelURL, err)
+			}
 
-			chanAccessDetails = &models.ChannelAccessDetails{
+			chanAccessDetails = models.ChannelAccessDetails{
 				Username:   username,
 				Password:   password,
 				LoginURL:   loginURL,
+				BaseDomain: baseDomain,
 				CookiePath: generatedCookiePath,
 			}
-		}
 
-		// If authorization details exist, perform login and store cookies.
-		if doLogin {
-			authCookies, err = channelAuth(domain, chanAccessDetails.CookiePath, chanAccessDetails)
-			if err != nil {
-				logging.E(0, "Failed to get auth cookies for %q: %v", videoURL, err)
+			// If authorization details exist, perform login and store cookies.
+			if doLogin {
+				authCookies, err = channelAuth(hostname, &chanAccessDetails)
+				if err != nil {
+					logging.E(0, "Failed to get auth cookies for %q: %v", channelURL, err)
+				}
 			}
-		}
 
-		// Get cookies globally
-		if c.Settings.UseGlobalCookies { // TODO: add to a cookie file and implant into yt-dlp command if file isn't empty
-			regCookies, err = b.cookies.GetCookies(videoURL)
-			if err != nil {
-				logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", videoURL, c.Settings.CookieSource, err)
+			// Get cookies globally
+			if c.Settings.UseGlobalCookies {
+				regCookies, err = b.cookies.GetCookies(channelURL)
+				if err != nil {
+					logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", channelURL, c.Settings.CookieSource, err)
+				}
 			}
-		}
 
-		// Combine cookies
-		cookies = mergeCookies(authCookies, regCookies)
+			// Combine cookies
+			cookies = mergeCookies(authCookies, regCookies)
 
-		// Save cookies to file
-		err = saveCookiesToFile(cookies, chanAccessDetails)
-		if err != nil {
-			return nil, err
+			// Save cookies to file
+			err = saveCookiesToFile(cookies, &chanAccessDetails)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		// Fetch new episode URLs for this video URL
-		newEpisodeURLs, err := b.newEpisodeURLs(videoURL, existingURLs, nil, cookies, chanAccessDetails.CookiePath, ctx)
+		newEpisodeURLs, err := b.newEpisodeURLs(channelURL, existingURLs, nil, cookies, chanAccessDetails.CookiePath, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +193,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		}
 	}
 
-	logging.D(2, "New download requests for channel %q: %v", c.Name, newRequests)
+	logging.D(1, "New download requests for channel %q: %v", c.Name, newRequests)
 
 	// Print summary if new videos were found
 	if len(newRequests) > 0 {

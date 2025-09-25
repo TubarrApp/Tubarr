@@ -3,7 +3,6 @@ package browser
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -32,7 +31,7 @@ func NewCookieManager() *CookieManager {
 
 // GetCookies retrieves cookies for a given URL.
 func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
-	baseURL, err := extractBaseDomain(u)
+	baseURL, err := BaseDomain(u)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
@@ -108,20 +107,6 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 	return httpCookies
 }
 
-// extractBaseDomain parses a URL and extracts its base domain.
-func extractBaseDomain(urlString string) (string, error) {
-	parsedURL, err := url.Parse(urlString)
-	if err != nil {
-		return "", err
-	}
-
-	parts := strings.Split(parsedURL.Hostname(), ".")
-	if len(parts) > 2 {
-		return strings.Join(parts[len(parts)-2:], "."), nil
-	}
-	return parsedURL.Hostname(), nil
-}
-
 // saveCookiesToFile saves the cookies to a file in Netscape format.
 func saveCookiesToFile(cookies []*http.Cookie, access *models.ChannelAccessDetails) error {
 	// Return early if no cookies exist
@@ -153,7 +138,7 @@ func saveCookiesToFile(cookies []*http.Cookie, access *models.ChannelAccessDetai
 	for _, cookie := range cookies {
 		domain := cookie.Domain
 		if domain == "" {
-			domain = access.BaseDomain
+			domain = access.LoginURL
 		}
 
 		if !strings.HasPrefix(domain, ".") && strings.Count(domain, ".") > 1 {
