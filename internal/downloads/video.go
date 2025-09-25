@@ -98,7 +98,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		logging.I("Using cookies from browser %q", browser)
 		args = append(args, "--cookies-from-browser", browser)
 	} else {
-		logging.D(1, "No browser cookies set for Tubarr, skipping")
+		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Video.Channel.Name, d.Video.URL)
 	}
 
 	if d.Video.Channel.Settings.YtdlpOutputExt != "" {
