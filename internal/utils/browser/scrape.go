@@ -147,11 +147,9 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		}
 
 		// Get cookies globally
-		if c.Settings.CookieSource != "" {
-			regCookies, err = b.cookies.GetCookies(videoURL)
-			if err != nil {
-				logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", videoURL, c.Settings.CookieSource, err)
-			}
+		regCookies, err = b.cookies.GetCookies(videoURL)
+		if err != nil {
+			logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", videoURL, c.Settings.CookieSource, err)
 		}
 
 		// Combine cookies
