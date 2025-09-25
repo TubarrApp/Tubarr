@@ -122,19 +122,23 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, videoURL, err)
 		}
 
-		// Generate a unique cookie path per URL
-		cookiePath := getAuthFilePath(c.Name, videoURL)
-
-		authDetails := &models.ChanURLAuthDetails{
-			Username:   username,
-			Password:   password,
-			LoginURL:   loginURL,
-			CookiePath: cookiePath,
-		}
-
 		// Retrieve or generate authentication cookies for this specific video URL
-		var cookies []*http.Cookie
+		var (
+			cookies    []*http.Cookie
+			cookiePath string
+		)
+
 		if (username != "" || password != "") && loginURL != "" {
+			cookiePath = getAuthFilePath(c.Name, videoURL)
+
+			authDetails := &models.ChanURLAuthDetails{
+				Username:   username,
+				Password:   password,
+				LoginURL:   loginURL,
+				CookiePath: cookiePath,
+			}
+
+			// Generate a unique cookie path per URL
 			cookies, err = channelAuth(domain, cookiePath, authDetails)
 			if err != nil {
 				logging.E(0, "Failed to get auth cookies for %q: %v", videoURL, err)
@@ -310,6 +314,7 @@ func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, ctx co
 	return uniqueEpisodeURLs, nil
 }
 
+// ScrapeCensoredTVMetadata scrapes Censored.TV links for metadata.
 func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.Video) error {
 	// Create a custom cookie jar to hold cookies
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
