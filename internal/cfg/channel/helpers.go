@@ -374,7 +374,7 @@ func VerifyChannelOps(ops []string) ([]models.DLFilters, error) {
 			split[3] = strings.ToLower(split[3])
 
 			switch split[1] {
-			case "contains", "omit":
+			case "contains", "omits":
 
 				switch split[3] {
 				case "must", "any":
@@ -399,7 +399,7 @@ func VerifyChannelOps(ops []string) ([]models.DLFilters, error) {
 			split[2] = strings.ToLower(split[2])
 
 			switch split[1] {
-			case "contains", "omit":
+			case "contains", "omits":
 
 				switch split[2] {
 				case "must", "any":
