@@ -38,6 +38,6 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, ytdlpOutputExt, fromDate
 	}
 
 	if dlFilterFile != nil {
-		cmd.Flags().StringVar(dlFilterFile, keys.FilterOpsFile, "", "Path to a filter operations file (one operation per line)")
+		cmd.Flags().StringVar(dlFilterFile, keys.FilterOpsFile, "", "Path to a filter operations file (one operation per line [Format is: 'field:contains/omit:VALUE:must/any'])")
 	}
 }
