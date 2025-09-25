@@ -124,10 +124,11 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 
 		// Retrieve or generate authentication cookies for this specific video URL
 		var (
-			cookies    []*http.Cookie
-			cookiePath string
+			authCookies, regCookies, cookies []*http.Cookie
+			cookiePath                       string
 		)
 
+		// If authorization details exist, perform login and store cookies.
 		if (username != "" || password != "") && loginURL != "" {
 			cookiePath = getAuthFilePath(c.Name, videoURL)
 
@@ -139,17 +140,21 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 			}
 
 			// Generate a unique cookie path per URL
-			cookies, err = channelAuth(domain, cookiePath, authDetails)
+			authCookies, err = channelAuth(domain, cookiePath, authDetails)
 			if err != nil {
 				logging.E(0, "Failed to get auth cookies for %q: %v", videoURL, err)
 			}
-		} else {
-			// If no auth is required, retrieve cookies normally
-			cookies, err = b.cookies.GetCookies(videoURL)
+		}
+
+		// Get cookies from cookie source
+		if c.Settings.CookieSource != "" {
+			regCookies, err = b.cookies.GetCookies(videoURL)
 			if err != nil {
-				logging.E(0, "Failed to get cookies for %q: %v", videoURL, err)
+				logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", videoURL, c.Settings.CookieSource, err)
 			}
 		}
+
+		cookies = append(authCookies, regCookies...)
 
 		// Fetch new episode URLs for this video URL
 		newEpisodeURLs, err := b.newEpisodeURLs(videoURL, existingURLs, nil, cookies, ctx)
