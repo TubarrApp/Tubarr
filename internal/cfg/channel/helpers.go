@@ -390,7 +390,7 @@ func VerifyChannelOps(ops []string) ([]models.DLFilters, error) {
 
 			default:
 				logging.E(0, filterFormatError)
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
+				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
 			}
 		case 3:
 
@@ -413,7 +413,7 @@ func VerifyChannelOps(ops []string) ([]models.DLFilters, error) {
 				}
 
 			default:
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omit'")
+				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
 			}
 		default:
 			logging.E(0, filterFormatError)

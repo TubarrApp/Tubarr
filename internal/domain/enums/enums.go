@@ -8,11 +8,11 @@ const (
 	LMulti
 )
 
-type DLFilterType int
+// type DLFilterType int
 
-const (
-	DLFilterOmit DLFilterType = iota
-	DLFilterContains
-	DLFilterOmitField
-	DLFilterContainsField
-)
+// const (
+// 	DLFilterOmits DLFilterType = iota
+// 	DLFilterContains
+// 	DLFilterOmitsField
+// 	DLFilterContainsField
+// )
