@@ -10,11 +10,11 @@ import (
 func SetDownloadFlags(cmd *cobra.Command, retries *int, ytdlpOutputExt, fromDate, toDate, cookieSource, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
 
 	if fromDate != nil {
-		cmd.Flags().StringVar(fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
+		cmd.Flags().StringVar(fromDate, keys.FromDate, "", "Only grab videos uploaded on or after this date")
 	}
 
 	if toDate != nil {
-		cmd.Flags().StringVar(toDate, "to-date", "", "Only grab videos uploaded up to this date")
+		cmd.Flags().StringVar(toDate, keys.ToDate, "", "Only grab videos uploaded up to this date")
 	}
 
 	if ytdlpOutputExt != nil {

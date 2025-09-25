@@ -45,6 +45,8 @@ const (
 	CookieSource           string = "cookie-source"
 	TubarrCookieSource     string = "cookie-source"
 	DLRetries              string = "dl-retries"
+	FromDate               string = "from-date"
+	ToDate                 string = "to-date"
 	ExternalDownloader     string = "external-downloader"
 	ExternalDownloaderArgs string = "external-downloader-args"
 )
