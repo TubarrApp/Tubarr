@@ -40,6 +40,7 @@ const (
 
 // Web inputs
 const (
+	YtdlpOutputExt         string = "ytdlp-output-extension"
 	MaxFilesize            string = "max-filesize"
 	CookieSource           string = "cookie-source"
 	TubarrCookieSource     string = "cookie-source"

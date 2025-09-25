@@ -7,7 +7,20 @@ import (
 )
 
 // SetDownloadFlags sets flags related to download tasks.
-func SetDownloadFlags(cmd *cobra.Command, retries *int, cookieSource, maxFilesize *string, dlFilters *[]string, dlFilterFile *string) {
+func SetDownloadFlags(cmd *cobra.Command, retries *int, ytdlpOutputExt, fromDate, toDate, cookieSource, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
+
+	if fromDate != nil {
+		cmd.Flags().StringVar(fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
+	}
+
+	if toDate != nil {
+		cmd.Flags().StringVar(toDate, "to-date", "", "Only grab videos uploaded up to this date")
+	}
+
+	if ytdlpOutputExt != nil {
+		cmd.Flags().StringVar(ytdlpOutputExt, keys.YtdlpOutputExt, "", "The preferred downloaded output format for videos")
+	}
+
 	if retries != nil {
 		cmd.Flags().IntVar(retries, keys.DLRetries, 0, "Number of retries to attempt a download before failure")
 	}
@@ -15,6 +28,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, cookieSource, maxFilesiz
 	if cookieSource != nil {
 		cmd.Flags().StringVar(cookieSource, keys.CookieSource, "", "Cookie source to use for downloading videos (e.g. firefox)")
 	}
+
 	if maxFilesize != nil {
 		cmd.Flags().StringVar(maxFilesize, keys.MaxFilesize, "", "Enter your desired yt-dlp max filesize parameter")
 	}

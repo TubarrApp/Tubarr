@@ -426,15 +426,15 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
-		usernames, passwords, loginURLs                                                      []string
-		notification                                                                         []string
-		fromDate, toDate                                                                     string
-		dlFilters, metaOps, fileSfxReplace                                                   []string
-		dlFilterFile                                                                         string
-		crawlFreq, concurrency, metarrConcurrency, retries                                   int
-		maxCPU                                                                               float64
-		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, outputExt string
-		pause, ignoreRun                                                                     bool
+		usernames, passwords, loginURLs                                                           []string
+		notification                                                                              []string
+		fromDate, toDate                                                                          string
+		dlFilters, metaOps, fileSfxReplace                                                        []string
+		dlFilterFile                                                                              string
+		crawlFreq, concurrency, metarrConcurrency, retries                                        int
+		maxCPU                                                                                    float64
+		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
+		pause, ignoreRun                                                                          bool
 	)
 
 	now := time.Now()
@@ -529,9 +529,9 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				}
 			}
 
-			if outputExt != "" {
-				outputExt = strings.ToLower(outputExt)
-				if err = validateOutputExtension(outputExt); err != nil {
+			if ytdlpOutputExt != "" {
+				ytdlpOutputExt = strings.ToLower(ytdlpOutputExt)
+				if err = validateOutputExtension(ytdlpOutputExt); err != nil {
 					return err
 				}
 			}
@@ -554,7 +554,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 					MaxFilesize:            maxFilesize,
 					FromDate:               fromDate,
 					ToDate:                 toDate,
-					YtdlpOutputExt:         outputExt,
+					YtdlpOutputExt:         ytdlpOutputExt,
 				},
 
 				MetarrArgs: models.MetarrArgs{
@@ -631,7 +631,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, false)
 
 	// Download
-	cfgflags.SetDownloadFlags(addCmd, &retries, &cookieSource, &maxFilesize, &dlFilters, &dlFilterFile)
+	cfgflags.SetDownloadFlags(addCmd, &retries, &ytdlpOutputExt, &fromDate, &toDate, &cookieSource, &maxFilesize, &dlFilterFile, &dlFilters)
 
 	// Metarr
 	cfgflags.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
@@ -644,11 +644,6 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 
 	// Notification URL
 	cfgflags.SetNotifyFlags(addCmd, &notification)
-
-	addCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
-	addCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
-
-	addCmd.Flags().StringVar(&outputExt, "ytdlp-output-extension", "", "The preferred downloaded output format for videos")
 
 	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
 	addCmd.Flags().BoolVar(&ignoreRun, "ignore-run", false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
@@ -803,7 +798,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		fileSfxReplace                                                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
-		outExt                                                                    string
+		ytdlpOutExt                                                               string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -847,7 +842,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				maxFilesize:            maxFilesize,
 				fromDate:               fromDate,
 				toDate:                 toDate,
-				outputExt:              outExt,
+				ytdlpOutputExt:         ytdlpOutExt,
 			})
 			if err != nil {
 				return err
@@ -915,7 +910,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, true)
 
 	// Download
-	cfgflags.SetDownloadFlags(updateSettingsCmd, &retries, &cookieSource, &maxFilesize, &dlFilters, &dlFilterFile)
+	cfgflags.SetDownloadFlags(updateSettingsCmd, &retries, &ytdlpOutExt, &fromDate, &toDate, &cookieSource, &maxFilesize, &dlFilterFile, &dlFilters)
 
 	// Metarr
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
@@ -925,11 +920,6 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Auth
 	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL)
-
-	updateSettingsCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
-	updateSettingsCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
-
-	updateSettingsCmd.Flags().StringVar(&outExt, "ytdlp-output-extension", "", "The preferred downloaded output format for videos")
 
 	return updateSettingsCmd
 }

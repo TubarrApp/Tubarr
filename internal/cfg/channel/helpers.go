@@ -204,7 +204,7 @@ type chanSettings struct {
 	maxFilesize            string
 	fromDate               string
 	toDate                 string
-	outputExt              string
+	ytdlpOutputExt         string
 }
 
 func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) error, err error) {
@@ -295,14 +295,14 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	if c.outputExt != "" {
-		c.outputExt = strings.ToLower(c.outputExt)
-		err := validateOutputExtension(c.outputExt)
+	if c.ytdlpOutputExt != "" {
+		c.ytdlpOutputExt = strings.ToLower(c.ytdlpOutputExt)
+		err := validateOutputExtension(c.ytdlpOutputExt)
 		if err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.YtdlpOutputExt = c.outputExt
+			s.YtdlpOutputExt = c.ytdlpOutputExt
 			return nil
 		})
 	}
