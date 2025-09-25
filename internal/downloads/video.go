@@ -94,9 +94,9 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, cmdvideo.RandomizeRequests...)
 
 	if cfg.IsSet(keys.TubarrCookieSource) {
-		browser := cfg.GetString(keys.TubarrCookieSource)
-		logging.I("Using cookies from browser %q", browser)
-		args = append(args, "--cookies-from-browser", browser)
+		browserCookieSource := cfg.GetString(keys.TubarrCookieSource)
+		logging.I("Using cookies from browser %q", browserCookieSource)
+		args = append(args, "--cookies-from-browser", browserCookieSource)
 	} else {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Video.Channel.Name, d.Video.URL)
 	}

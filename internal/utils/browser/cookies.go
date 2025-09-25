@@ -30,11 +30,11 @@ func NewCookieManager() *CookieManager {
 	}
 }
 
-// GetCookies retrieves cookies for a given URL, using a specified cookie file if provided.
+// GetCookies retrieves cookies for a given URL.
 func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 	baseURL, err := extractBaseDomain(u)
 	if err != nil {
-		return nil, fmt.Errorf("extracting base domain: %w", err)
+		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
 
 	// Initialize once

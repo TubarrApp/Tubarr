@@ -146,7 +146,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 			}
 		}
 
-		// Get cookies from cookie source
+		// Get cookies globally
 		if c.Settings.CookieSource != "" {
 			regCookies, err = b.cookies.GetCookies(videoURL)
 			if err != nil {
@@ -154,6 +154,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 			}
 		}
 
+		// Combine cookies
 		cookies = append(authCookies, regCookies...)
 
 		// Fetch new episode URLs for this video URL
