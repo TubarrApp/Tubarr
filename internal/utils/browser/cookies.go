@@ -127,7 +127,7 @@ func saveCookiesToFile(cookies []*http.Cookie, access *models.ChannelAccessDetai
 	// Return early if no cookies exist
 	if len(cookies) == 0 {
 		access.CookiePath = ""
-		logging.D(1, "%d cookies to write to file %q, cleared 'access.CookiePath' (value is now %q)", len(cookies), access.CookiePath, access.CookiePath)
+		logging.I("%d cookies to write to file %q, won't use '--cookies' in commands", len(cookies), access.CookiePath, access.CookiePath)
 		return nil
 	}
 
