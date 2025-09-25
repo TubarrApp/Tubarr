@@ -193,11 +193,9 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		}
 	}
 
-	logging.D(1, "New download requests for channel %q: %v", c.Name, newRequests)
-
 	// Print summary if new videos were found
 	if len(newRequests) > 0 {
-		logging.I("Found %d new download requests for channel %q:", len(newRequests), c.Name)
+		logging.I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
 		for i, v := range newRequests {
 			if v == nil {
 				continue
