@@ -2,19 +2,20 @@ package models
 
 // ChannelSettings are the primary settings for a channel, affecting videos belonging to it.
 type ChannelSettings struct {
+	AutoDownload           bool        `json:"auto_download"`
+	Concurrency            int         `json:"max_concurrency"`
 	CookieSource           string      `json:"cookie_source"`
 	CrawlFreq              int         `json:"crawl_freq"`
-	Filters                []DLFilters `json:"filters"`
-	FilterFile             string      `json:"filter_file"`
-	Retries                int         `json:"download_retries"`
 	ExternalDownloader     string      `json:"external_downloader"`
 	ExternalDownloaderArgs string      `json:"external_downloader_args"`
-	Concurrency            int         `json:"max_concurrency"`
-	YtdlpOutputExt         string      `json:"ytdlp_output_ext"`
-	MaxFilesize            string      `json:"max_filesize"`
-	AutoDownload           bool        `json:"auto_download"`
+	Filters                []DLFilters `json:"filters"`
+	FilterFile             string      `json:"filter_file"`
 	FromDate               string      `json:"from_date"`
+	MaxFilesize            string      `json:"max_filesize"`
+	Retries                int         `json:"download_retries"`
 	ToDate                 string      `json:"to_date"`
+	UseGlobalCookies       bool        `json:"use_global_cookies"`
+	YtdlpOutputExt         string      `json:"ytdlp_output_ext"`
 }
 
 // DLFilters are used to filter in or out videos from download by metafields.

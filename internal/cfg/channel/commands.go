@@ -434,7 +434,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		crawlFreq, concurrency, metarrConcurrency, retries                                        int
 		maxCPU                                                                                    float64
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
-		pause, ignoreRun                                                                          bool
+		pause, ignoreRun, useGlobalCookies                                                        bool
 	)
 
 	now := time.Now()
@@ -554,6 +554,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 					MaxFilesize:            maxFilesize,
 					FromDate:               fromDate,
 					ToDate:                 toDate,
+					UseGlobalCookies:       useGlobalCookies,
 					YtdlpOutputExt:         ytdlpOutputExt,
 				},
 
@@ -631,7 +632,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, false)
 
 	// Download
-	cfgflags.SetDownloadFlags(addCmd, &retries, &ytdlpOutputExt, &fromDate, &toDate, &cookieSource, &maxFilesize, &dlFilterFile, &dlFilters)
+	cfgflags.SetDownloadFlags(addCmd, &retries, &useGlobalCookies, &ytdlpOutputExt, &fromDate, &toDate, &cookieSource, &maxFilesize, &dlFilterFile, &dlFilters)
 
 	// Metarr
 	cfgflags.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
@@ -799,6 +800,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
+		useGlobalCookies                                                          bool
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -910,7 +912,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, true)
 
 	// Download
-	cfgflags.SetDownloadFlags(updateSettingsCmd, &retries, &ytdlpOutExt, &fromDate, &toDate, &cookieSource, &maxFilesize, &dlFilterFile, &dlFilters)
+	cfgflags.SetDownloadFlags(updateSettingsCmd, &retries, &useGlobalCookies, &ytdlpOutExt, &fromDate, &toDate, &cookieSource, &maxFilesize, &dlFilterFile, &dlFilters)
 
 	// Metarr
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)

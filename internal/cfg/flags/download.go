@@ -7,7 +7,7 @@ import (
 )
 
 // SetDownloadFlags sets flags related to download tasks.
-func SetDownloadFlags(cmd *cobra.Command, retries *int, ytdlpOutputExt, fromDate, toDate, cookieSource, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
+func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookieSource, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
 
 	if fromDate != nil {
 		cmd.Flags().StringVar(fromDate, keys.FromDate, "", "Only grab videos uploaded on or after this date")
@@ -15,6 +15,10 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, ytdlpOutputExt, fromDate
 
 	if toDate != nil {
 		cmd.Flags().StringVar(toDate, keys.ToDate, "", "Only grab videos uploaded up to this date")
+	}
+
+	if useGlobalCookies != nil {
+		cmd.Flags().BoolVar(useGlobalCookies, keys.UseGlobalCookies, false, "Attempt to grab cookies globally (Kooky searches common browser locations)")
 	}
 
 	if ytdlpOutputExt != nil {

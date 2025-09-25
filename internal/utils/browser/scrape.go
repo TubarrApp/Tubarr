@@ -122,7 +122,6 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, videoURL, err)
 		}
 
-		// Retrieve or generate authentication cookies for this specific video URL
 		var (
 			authCookies, regCookies, cookies []*http.Cookie
 			cookiePath                       string
@@ -147,7 +146,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		}
 
 		// Get cookies globally
-		if c.Settings.CookieSource != "" { // NEED TO IMPLEMENT REAL LOGIC FOR THIS...
+		if c.Settings.UseGlobalCookies {
 			regCookies, err = b.cookies.GetCookies(videoURL)
 			if err != nil {
 				logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", videoURL, c.Settings.CookieSource, err)

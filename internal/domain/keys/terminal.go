@@ -38,7 +38,7 @@ const (
 	TranscodeVideoFilter string = "transcode-video-filter"
 )
 
-// Web inputs
+// Downloading
 const (
 	YtdlpOutputExt         string = "ytdlp-output-extension"
 	MaxFilesize            string = "max-filesize"
@@ -47,6 +47,7 @@ const (
 	DLRetries              string = "dl-retries"
 	FromDate               string = "from-date"
 	ToDate                 string = "to-date"
+	UseGlobalCookies       string = "use-global-cookies"
 	ExternalDownloader     string = "external-downloader"
 	ExternalDownloaderArgs string = "external-downloader-args"
 )
