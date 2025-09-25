@@ -26,5 +26,5 @@ var (
 // Op types
 const (
 	FilterContains = "contains"
-	FilterOmit     = "omit"
+	FilterOmits    = "omit"
 )

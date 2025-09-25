@@ -132,7 +132,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 					}
 					return false, nil // Empty field cannot contain any contain filter, return here.
 
-				case consts.FilterOmit:
+				case consts.FilterOmits:
 					logging.D(2, "Passed check: Field %q does not exist", filter.Field)
 
 					switch filter.MustAny {
@@ -150,7 +150,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 
 			if exists {
 				switch filter.Type {
-				case consts.FilterOmit:
+				case consts.FilterOmits:
 
 					switch filter.MustAny {
 
@@ -197,7 +197,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 
 			// Apply the filter logic
 			switch filter.Type {
-			case consts.FilterOmit:
+			case consts.FilterOmits:
 
 				if !strings.Contains(lowerStrVal, lowerFilterVal) {
 					passed = true

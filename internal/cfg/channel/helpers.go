@@ -352,7 +352,7 @@ func verifyChanRowUpdateValid(col, val string) error {
 }
 
 const (
-	filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omit:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omit:must' omits videos only when the metafile contains a date field"
+	filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omits:must' omits videos only when the metafile contains a date field"
 )
 
 // VerifyChannelOps verifies that the user inputted filters are valid.
