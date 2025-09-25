@@ -15,6 +15,11 @@ const (
 	AuthURL      string = "auth-url"
 )
 
+// Notification
+const (
+	NotifyPair string = "notify"
+)
+
 // Files and directories
 const (
 	VideoDir       string = "video-directory"

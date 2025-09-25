@@ -45,6 +45,44 @@ func ValidateConcurrencyLimit() {
 	viper.Set(keys.Concurrency, maxConcurrentProcesses)
 }
 
+// ValidateNotificationPairs verifies that the notification pairs entered are valid.
+func ValidateNotificationPairs(pairs []string) ([]string, error) {
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+
+	for i, p := range pairs {
+
+		if !strings.ContainsRune(p, '|') {
+			return nil, fmt.Errorf("notification entry %q does not contain a '|' separator (should be in 'URL|friendly name' format", p)
+		}
+
+		entry := strings.Split(p, "|")
+
+		switch {
+		case len(entry) > 2:
+			return nil, fmt.Errorf("too many entries for %q, should be in 'URL|friendly name' format", p)
+		case entry[0] == "":
+			return nil, fmt.Errorf("missing URL from notification entry %q, should be in 'URL|friendly name' format", p)
+		}
+
+		if entry[1] == "" {
+			entry[1] = entry[0] // Use URL as name if name field is missing
+		}
+
+		entry[0] = strings.ReplaceAll(entry[0], `'`, ``)
+		entry[0] = strings.ReplaceAll(entry[0], `"`, ``)
+		entry[1] = strings.ReplaceAll(entry[1], `'`, ``)
+		entry[1] = strings.ReplaceAll(entry[1], `"`, ``)
+
+		pairs[i] = (entry[0] + "|" + entry[1])
+
+		logging.D(2, "Made notification pair: %v", pairs[i])
+	}
+
+	return pairs, nil
+}
+
 // ValidateOutputFiletype verifies the output filetype is valid for FFmpeg.
 func ValidateOutputFiletype(o string) bool {
 	o = strings.ToLower(strings.TrimSpace(o))

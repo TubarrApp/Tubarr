@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	cfgflags "tubarr/internal/cfg/flags"
@@ -34,7 +35,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 
 	// Add subcommands with dependencies
 	channelCmd.AddCommand(addAuth(cs))
-	channelCmd.AddCommand(addChannelCmd(cs))
+	channelCmd.AddCommand(addChannelCmd(cs, s, ctx))
 	channelCmd.AddCommand(dlURLs(cs, s, ctx))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s, ctx))
 	channelCmd.AddCommand(addCrawlToIgnore(cs, s, ctx))
@@ -48,7 +49,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(unpauseChannelCmd(cs))
 	channelCmd.AddCommand(updateChannelValue(cs))
 	channelCmd.AddCommand(updateChannelSettingsCmd(cs))
-	channelCmd.AddCommand(addNotifyURL(cs))
+	channelCmd.AddCommand(addNotifyURLs(cs))
 
 	return channelCmd
 }
@@ -88,8 +89,10 @@ func addAuth(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			if err := cs.AddAuth(chanID, authDetails); err != nil {
-				return err
+			if len(authDetails) > 0 {
+				if err := cs.AddAuth(chanID, authDetails); err != nil {
+					return err
+				}
 			}
 			return nil
 		},
@@ -233,21 +236,22 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 	return deleteNotifyCmd
 }
 
-// addNotifyURL adds a notification URL (can use to send requests to update Plex libraries on new video addition).
-func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
+// addNotifyURLs adds a notification URL (can use to send requests to update Plex libraries on new video addition).
+func addNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 	var (
-		channelName, notifyName, notifyURL string
-		channelID                          int
+		channelName  string
+		channelID    int
+		notification []string
 	)
 
 	addNotifyCmd := &cobra.Command{
 		Use:   "notify",
 		Short: "Adds notify function to a channel.",
-		Long:  "Enter a fully qualified notification URL here to send update requests to platforms like Plex etc.",
+		Long:  "Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. (notification pair format is 'URL|Friendly Name')",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			if notifyURL == "" {
-				return errors.New("notification URL cannot be blank")
+			if len(notification) == 0 {
+				return errors.New("no notification URL|Name pairs entered")
 			}
 
 			var (
@@ -265,11 +269,12 @@ func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
-			if notifyName == "" {
-				notifyName = notifyURL
+			validPairs, err := cfgvalidate.ValidateNotificationPairs(notification)
+			if err != nil {
+				return err
 			}
 
-			if err := cs.AddNotifyURL(id, notifyName, notifyURL); err != nil {
+			if err := cs.AddNotifyURLs(id, validPairs); err != nil {
 				return err
 			}
 
@@ -279,8 +284,7 @@ func addNotifyURL(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Primary channel elements
 	SetPrimaryChannelFlags(addNotifyCmd, &channelName, nil, &channelID)
-	addNotifyCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URLs (e.g. 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE')")
-	addNotifyCmd.Flags().StringVar(&notifyName, "notify-name", "", "Provide a custom name for this notification")
+	cfgflags.SetNotifyFlags(addNotifyCmd, &notification)
 
 	return addNotifyCmd
 }
@@ -417,20 +421,20 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 }
 
 // addChannelCmd adds a new channel into the database.
-func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
 	var (
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
 		usernames, passwords, loginURLs                                                      []string
-		notifyName, notifyURL                                                                string
+		notification                                                                         []string
 		fromDate, toDate                                                                     string
 		dlFilters, metaOps, fileSfxReplace                                                   []string
 		dlFilterFile                                                                         string
 		crawlFreq, concurrency, metarrConcurrency, retries                                   int
 		maxCPU                                                                               float64
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, outputExt string
-		pause                                                                                bool
+		pause, ignoreRun                                                                     bool
 	)
 
 	now := time.Now()
@@ -587,19 +591,32 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			if err := cs.AddAuth(channelID, authDetails); err != nil {
-				return err
-			}
-
-			if notifyURL != "" && channelID > 0 {
-				if notifyName == "" {
-					notifyName = notifyURL
-				}
-
-				if err := cs.AddNotifyURL(channelID, notifyName, notifyURL); err != nil {
+			if len(authDetails) > 0 {
+				if err := cs.AddAuth(channelID, authDetails); err != nil {
 					return err
 				}
 			}
+
+			if len(notification) != 0 {
+				validPairs, err := cfgvalidate.ValidateNotificationPairs(notification)
+				if err != nil {
+					return err
+				}
+
+				if err := cs.AddNotifyURLs(channelID, validPairs); err != nil {
+					return err
+				}
+			}
+
+			// Should perform an ignore run?
+			if ignoreRun {
+				logging.I("Running an 'ignore crawl'...")
+				cID := strconv.FormatInt(channelID, 10)
+				if err := cs.CrawlChannelIgnore("id", cID, s, ctx); err != nil {
+					logging.E(0, "Failed to complete ignore crawl run: %v", err)
+				}
+			}
+
 			return nil
 		},
 	}
@@ -626,8 +643,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetTranscodeFlags(addCmd, &useGPU, &gpuDir, &transcodeVideoFilter, &codec, &audioCodec, &transcodeQuality)
 
 	// Notification URL
-	addCmd.Flags().StringVar(&notifyURL, "notify-url", "", "Full notification URL including tokens")
-	addCmd.Flags().StringVar(&notifyName, "notify-name", "", "Provide a custom name for this notification")
+	cfgflags.SetNotifyFlags(addCmd, &notification)
 
 	addCmd.Flags().StringVar(&fromDate, "from-date", "", "Only grab videos uploaded on or after this date")
 	addCmd.Flags().StringVar(&toDate, "to-date", "", "Only grab videos uploaded up to this date")
@@ -635,6 +651,7 @@ func addChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	addCmd.Flags().StringVar(&outputExt, "ytdlp-output-extension", "", "The preferred downloaded output format for videos")
 
 	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
+	addCmd.Flags().BoolVar(&ignoreRun, "ignore-run", false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
 
 	return addCmd
 }

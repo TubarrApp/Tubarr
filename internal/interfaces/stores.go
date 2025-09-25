@@ -19,7 +19,7 @@ type Store interface {
 type ChannelStore interface {
 	AddAuth(chanID int64, authDetails map[string]*models.ChanURLAuthDetails) error
 	AddChannel(c *models.Channel) (int64, error)
-	AddNotifyURL(id int64, notifyName, notifyURL string) error
+	AddNotifyURLs(id int64, notifications []string) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
 	CrawlChannel(key, val string, s Store, ctx context.Context) error
 	CrawlChannelIgnore(key, val string, s Store, ctx context.Context) error

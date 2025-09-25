@@ -355,7 +355,7 @@ const (
 	filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omit:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omit:must' omits videos only when the metafile contains a date field"
 )
 
-// VerifyChannelOps verifies that the user inputted filters are valid
+// VerifyChannelOps verifies that the user inputted filters are valid.
 func VerifyChannelOps(ops []string) ([]models.DLFilters, error) {
 
 	var filters = make([]models.DLFilters, 0, len(ops))
@@ -617,9 +617,9 @@ func validateTranscodeVideoFilter(q string) (vf string, err error) {
 
 // parseAuthDetails parses authorization details for a particular channel URL.
 func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*models.ChanURLAuthDetails, error) {
-	logging.I("Parsing authorization details...")
+	logging.D(3, "Parsing authorization details...")
 	if usernames == nil && passwords == nil && loginURLs == nil {
-		logging.I("No authorization details to parse...")
+		logging.D(3, "No authorization details to parse...")
 		return nil, nil
 	}
 

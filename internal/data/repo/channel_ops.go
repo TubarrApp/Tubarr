@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/interfaces"
@@ -190,27 +191,41 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 	return nil
 }
 
-// AddNotifyURL sets a notification table entry for a channel with a given ID.
-func (cs *ChannelStore) AddNotifyURL(id int64, notifyName, notifyURL string) error {
+// AddNotifyURLs sets notification pairs in the database.
+func (cs *ChannelStore) AddNotifyURLs(id int64, notifications []string) error {
+	tx, err := cs.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
+	for _, n := range notifications {
+		nPair := strings.Split(n, "|")
+		if err := cs.addNotifyURL(tx, id, nPair[1], nPair[0]); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// addNotifyURL sets a notification table entry for a channel with a given ID.
+func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, notifyName, notifyURL string) error {
 	if notifyURL == "" {
 		return errors.New("please enter a notification URL")
 	}
-
 	if notifyName == "" {
 		notifyName = notifyURL
 	}
 
-	const (
-		querySuffix = "ON CONFLICT (channel_id, notify_url) DO UPDATE SET notify_url = EXCLUDED.notify_url, updated_at = EXCLUDED.updated_at"
-	)
+	const querySuffix = "ON CONFLICT (channel_id, notify_url) DO UPDATE SET notify_url = EXCLUDED.notify_url, updated_at = EXCLUDED.updated_at"
 
 	query := squirrel.
 		Insert(consts.DBNotifications).
 		Columns(consts.QNotifyChanID, consts.QNotifyName, consts.QNotifyURL, consts.QNotifyCreatedAt, consts.QNotifyUpdatedAt).
 		Values(id, notifyName, notifyURL, time.Now(), time.Now()).
 		Suffix(querySuffix).
-		RunWith(cs.DB)
+		RunWith(tx) // use the transaction here
 
 	if _, err := query.Exec(); err != nil {
 		return err
@@ -227,7 +242,7 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 	}
 
 	if authDetails == nil {
-		logging.I("No authorization details to add for channel with ID %d", chanID)
+		logging.D(1, "No authorization details to add for channel with ID %d", chanID)
 		return nil
 	}
 
