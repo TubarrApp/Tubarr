@@ -9,6 +9,7 @@ import (
 	"time"
 
 	cfgchannel "tubarr/internal/cfg/channel"
+	cfgfiles "tubarr/internal/cfg/files"
 	cfgflags "tubarr/internal/cfg/flags"
 	validation "tubarr/internal/cfg/validation"
 	cfgvideo "tubarr/internal/cfg/video"
@@ -59,7 +60,7 @@ var rootCmd = &cobra.Command{
 
 			if configFile != "" {
 				// load and normalize keys from any Viper-supported config file
-				if err := loadConfigFile(configFile); err != nil {
+				if err := cfgfiles.LoadConfigFile(configFile); err != nil {
 					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
 					os.Exit(1)
 				}
@@ -115,16 +116,4 @@ func InitCommands(s interfaces.Store, ctx context.Context) error {
 // Execute adds all child commands to the root command and sets flags appropriately
 func Execute() error {
 	return rootCmd.Execute()
-}
-
-// loadConfigFile loads in the preset configuration file.
-func loadConfigFile(file string) error {
-	logging.I("Using configuration file %q", file)
-	viper.SetConfigFile(file)
-	if err := viper.ReadInConfig(); err != nil {
-		return err
-	}
-
-	validation.WarnMalformedKeys()
-	return nil
 }

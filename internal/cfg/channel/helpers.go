@@ -90,6 +90,9 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.outputDir != "" {
+		if _, err = validation.ValidateDirectory(c.outputDir, false); err != nil {
+			return nil, err
+		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.OutputDir = c.outputDir
 			return nil
@@ -195,21 +198,26 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 type chanSettings struct {
 	channelConfigFile      string
+	concurrency            int
 	cookieSource           string
 	crawlFreq              int
-	filters                []string
-	filterFile             string
-	retries                int
 	externalDownloader     string
 	externalDownloaderArgs string
-	concurrency            int
-	maxFilesize            string
+	filters                []string
+	filterFile             string
 	fromDate               string
+	jsonDir                string
+	maxFilesize            string
+	paused                 bool
+	retries                int
 	toDate                 string
+	videoDir               string
 	ytdlpOutputExt         string
 }
 
 func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) error, err error) {
+
+	logging.I("CHECKING JSON DIR %q", c.jsonDir)
 
 	if c.concurrency > 0 {
 		fns = append(fns, func(s *models.ChannelSettings) error {
@@ -275,8 +283,18 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
+	if c.jsonDir != "" {
+		if _, err = validation.ValidateDirectory(c.jsonDir, false); err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.JSONDir = c.jsonDir
+			return nil
+		})
+	}
+
 	if c.maxFilesize != "" {
-		c.maxFilesize, err = validateMaxFilesize(c.maxFilesize)
+		c.maxFilesize, err = validation.ValidateMaxFilesize(c.maxFilesize)
 		if err != nil {
 			return nil, err
 		}
@@ -285,6 +303,11 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 			return nil
 		})
 	}
+
+	fns = append(fns, func(s *models.ChannelSettings) error {
+		s.Paused = c.paused
+		return nil
+	})
 
 	if c.retries > 0 {
 		fns = append(fns, func(s *models.ChannelSettings) error {
@@ -304,6 +327,16 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
+	if c.videoDir != "" {
+		if _, err = validation.ValidateDirectory(c.videoDir, false); err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.VideoDir = c.videoDir
+			return nil
+		})
+	}
+
 	if c.ytdlpOutputExt != "" {
 		c.ytdlpOutputExt = strings.ToLower(c.ytdlpOutputExt)
 		if err := validation.ValidateYtdlpOutputExtension(c.ytdlpOutputExt); err != nil {
@@ -316,19 +349,6 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 	}
 
 	return fns, nil
-}
-
-func validateMaxFilesize(m string) (string, error) {
-	m = strings.ToUpper(m)
-	switch {
-	case strings.HasSuffix(m, "B"), strings.HasSuffix(m, "K"), strings.HasSuffix(m, "M"), strings.HasSuffix(m, "G"):
-		return strings.TrimSuffix(m, "B"), nil
-	default:
-		if _, err := strconv.Atoi(m); err != nil {
-			return "", err
-		}
-	}
-	return m, nil
 }
 
 // getKeyVal returns a key and value for channel lookup.
@@ -473,22 +493,6 @@ func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*mod
 	}
 
 	return authMap, nil
-}
-
-// loadConfigFile loads in the preset configuration file.
-func loadConfigFile(file string) error {
-
-	if _, err := validation.ValidateFile(file, false); err != nil {
-		return err
-	}
-
-	logging.I("Using configuration file %q", file)
-	viper.SetConfigFile(file)
-	if err := viper.ReadInConfig(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // getConfigValue normalizes and retrieves values from the config file.

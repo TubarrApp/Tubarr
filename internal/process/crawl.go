@@ -118,7 +118,9 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 
 	for _, c := range chans {
 
-		if c.Settings.ChannelConfigFile != "" && c.UpdatedFromConfig {
+		settings := c.Settings
+
+		if settings.ChannelConfigFile != "" && c.UpdatedFromConfig {
 			if err := cfgchannel.UpdateChannelFromConfig(cs, c); err != nil {
 				return err
 			}
@@ -126,19 +128,19 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 			c.UpdatedFromConfig = true
 		}
 
-		if c.Paused {
+		if settings.Paused {
 			logging.I("Channel with name %q is paused, skipping checks.", c.Name)
 			continue
 		}
 
 		timeSinceLastScan := time.Since(c.LastScan)
-		crawlFreqDuration := time.Duration(c.Settings.CrawlFreq) * time.Minute
+		crawlFreqDuration := time.Duration(settings.CrawlFreq) * time.Minute
 
 		fmt.Println()
 		logging.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
 			c.Name,
 			timeSinceLastScan.Round(time.Second),
-			c.Settings.CrawlFreq)
+			settings.CrawlFreq)
 
 		if timeSinceLastScan < crawlFreqDuration {
 			remainingTime := crawlFreqDuration - timeSinceLastScan
@@ -183,30 +185,31 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 		errMsg = "encountered %d errors during processing: %v"
 	)
 
-	logging.I("Initiating crawl for channel %q...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
-		c.Name, c.VideoDir, c.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
+	settings := c.Settings
 
+	logging.I("Initiating crawl for channel %q...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
+		c.Name, settings.VideoDir, settings.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
+
+	cs := s.ChannelStore()
 	if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
-		cfgchannel.UpdateChannelFromConfig(s.ChannelStore(), c)
+		cfgchannel.UpdateChannelFromConfig(cs, c)
 	}
 
 	switch {
 	case len(c.URLs) == 0:
 		return errors.New("no channel URLs")
-	case c.VideoDir == "", c.JSONDir == "":
+	case settings.VideoDir == "", settings.JSONDir == "":
 		return errors.New("output directories are blank")
 	}
 
-	cs := s.ChannelStore()
-
 	// Parse output directories
 	dirParser := parsing.NewDirectoryParser(c, nil)
-	videoDir, err := dirParser.ParseDirectory(c.VideoDir)
+	videoDir, err := dirParser.ParseDirectory(settings.VideoDir)
 	if err != nil {
 		return fmt.Errorf("failed to parse video directory: %w", err)
 	}
 
-	jsonDir, err := dirParser.ParseDirectory(c.JSONDir)
+	jsonDir, err := dirParser.ParseDirectory(settings.JSONDir)
 	if err != nil {
 		return fmt.Errorf("failed to parse JSON directory: %w", err)
 	}
@@ -217,11 +220,11 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 		}
 	}
 
-	c.VideoDir = videoDir
-	c.JSONDir = jsonDir
+	settings.VideoDir = videoDir
+	settings.JSONDir = jsonDir
 
-	logging.S(1, "Parsed video directory: %s", c.VideoDir)
-	logging.S(1, "Parsed JSON directory: %s", c.JSONDir)
+	logging.S(1, "Parsed video directory: %s", settings.VideoDir)
+	logging.S(1, "Parsed JSON directory: %s", settings.JSONDir)
 
 	videos, err := browserInstance.GetNewReleases(cs, c, ctx)
 	if err != nil {
@@ -237,7 +240,7 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 				logging.I("Using regular censored.tv scraper...")
 			} else {
 				logging.I("Detected a censored.tv link. Using specialized scraper.")
-				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, c.JSONDir, v)
+				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, settings.JSONDir, v)
 				if err != nil {
 					return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
 				}

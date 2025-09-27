@@ -10,6 +10,7 @@ import (
 	"time"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/regex"
+	"tubarr/internal/domain/templates"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
@@ -19,15 +20,30 @@ import (
 // ValidateDirectory validates that the directory exists, else creates it if desired.
 func ValidateDirectory(d string, createIfNotFound bool) (os.FileInfo, error) {
 
-	logging.D(3, "Statting directory %q...", d)
+	possibleTemplate := (strings.Contains(d, "{{") && strings.Contains(d, "}}"))
+
+	logging.D(3, "Statting directory %q. Suspected templating: %v...", d, possibleTemplate)
+
 	dirInfo, err := os.Stat(d)
+	if possibleTemplate {
+		if checkTags(d) {
+			return dirInfo, nil
+		}
+	}
 	if err != nil {
+
+		if possibleTemplate {
+			logging.W("directory appears to contain a templating element not included in the supported list.\nSupported template tags are: %q", templates.TemplateMap)
+		}
+
 		if os.IsNotExist(err) {
 			switch {
 			case createIfNotFound:
 				logging.D(3, "Directory %q does not exist, creating it...", d)
 				if err := os.MkdirAll(d, 0o755); err != nil {
 					return dirInfo, fmt.Errorf("directory %q does not exist and Tubarr failed to create it: %w", d, err)
+				} else {
+					break // Directory successfully created
 				}
 			default:
 				return dirInfo, fmt.Errorf("directory %q does not exist: %w", d, err)
@@ -191,6 +207,20 @@ func WarnMalformedKeys() {
 	}
 }
 
+// ValidateMaxFilesize checks the max filesize setting.
+func ValidateMaxFilesize(m string) (string, error) {
+	m = strings.ToUpper(m)
+	switch {
+	case strings.HasSuffix(m, "B"), strings.HasSuffix(m, "K"), strings.HasSuffix(m, "M"), strings.HasSuffix(m, "G"):
+		return strings.TrimSuffix(m, "B"), nil
+	default:
+		if _, err := strconv.Atoi(m); err != nil {
+			return "", err
+		}
+	}
+	return m, nil
+}
+
 // ValidateChannelOps verifies that the user inputted filters are valid.
 func ValidateChannelOps(ops []string) ([]models.DLFilters, error) {
 
@@ -327,4 +357,24 @@ func ValidateToFromDate(d string) (string, error) {
 	logging.D(1, "Made from/to date %q", output)
 
 	return output, nil
+}
+
+// checkTags checks if templating tags are present.
+func checkTags(d string) (hasTemplating bool) {
+	s := strings.Index(d, "{{")
+	e := strings.Index(d, "}}")
+
+	if s > -1 && e > s+2 {
+		if exists := templates.TemplateMap[d[(s+2):e]]; exists { // "+ 2" to skip the "{{" opening tag and leave just the tag
+			logging.D(3, "Directory %q appears to contain templating elements. Will not stat.")
+			return true
+		}
+	}
+
+	if e+2 < len(d) {
+		if s := strings.Index(d[e+2:], "{{"); s >= 0 {
+			return checkTags(d[e+2:])
+		}
+	}
+	return false
 }

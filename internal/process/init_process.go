@@ -96,7 +96,7 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 
 			var parseDirs = []*string{
 				&v.JSONDir, &v.VideoDir,
-				&c.JSONDir, &c.VideoDir,
+				&c.Settings.JSONDir, &c.Settings.VideoDir,
 			}
 
 			for _, ptr := range parseDirs {

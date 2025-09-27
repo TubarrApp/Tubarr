@@ -2,7 +2,6 @@ package models
 
 // ChannelSettings are the primary settings for a channel, affecting videos belonging to it.
 type ChannelSettings struct {
-	AutoDownload           bool        `json:"auto_download" mapstructure:"auto-download"`
 	ChannelConfigFile      string      `json:"channel_config_file" mapstructure:"channel-config-file"`
 	Concurrency            int         `json:"max_concurrency" mapstructure:"max-concurrency"`
 	CookieSource           string      `json:"cookie_source" mapstructure:"cookie-source"`
@@ -12,9 +11,12 @@ type ChannelSettings struct {
 	Filters                []DLFilters `json:"filters" mapstructure:"filters"`
 	FilterFile             string      `json:"filter_file" mapstructure:"filter-file"`
 	FromDate               string      `json:"from_date" mapstructure:"from-date"`
+	JSONDir                string      `json:"json_directory" mapstructure:"json-directory"`
 	MaxFilesize            string      `json:"max_filesize" mapstructure:"max-filesize"`
+	Paused                 bool        `json:"paused" mapstructure:"pause"`
 	Retries                int         `json:"download_retries" mapstructure:"download-retries"`
 	ToDate                 string      `json:"to_date" mapstructure:"to-date"`
+	VideoDir               string      `json:"video_directory" mapstructure:"video-directory"`
 	UseGlobalCookies       bool        `json:"use_global_cookies" mapstructure:"use-global-cookies"`
 	YtdlpOutputExt         string      `json:"ytdlp_output_ext" mapstructure:"ytdlp-output-ext"`
 }

@@ -41,12 +41,12 @@ const (
 
 // Downloading
 const (
-	AutoDownload           string = "auto-download"
 	YtdlpOutputExt         string = "ytdlp-output-extension"
 	MaxFilesize            string = "max-filesize"
 	CookieSource           string = "cookie-source"
 	DLRetries              string = "dl-retries"
 	FromDate               string = "from-date"
+	Pause                  string = "pause-toggle"
 	ToDate                 string = "to-date"
 	UseGlobalCookies       string = "use-global-cookies"
 	ExternalDownloader     string = "external-downloader"

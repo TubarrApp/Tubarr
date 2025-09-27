@@ -2,21 +2,21 @@
 package templates
 
 const (
+	ChannelID   = "channel_id"
 	ChannelName = "channel_name"
 	ChannelURL  = "channel_url"
-	ChannelID   = "channel_id"
 )
 
 const (
 	VideoID    = "video_id"
-	VideoURL   = "video_url"
 	VideoTitle = "video_title"
+	VideoURL   = "video_url"
 )
 
 const (
-	MetYear  = "year"
-	MetMonth = "month"
 	MetDay   = "day"
+	MetMonth = "month"
+	MetYear  = "year"
 )
 
 const (
@@ -27,3 +27,11 @@ const (
 const (
 	MetDomain = "domain"
 )
+
+var TemplateMap = map[string]bool{
+	ChannelID: true, ChannelName: true, ChannelURL: true,
+	VideoID: true, VideoTitle: true, VideoURL: true,
+	MetDay: true, MetMonth: true, MetYear: true,
+	MetAuthor: true, MetDirector: true,
+	MetDomain: true,
+}

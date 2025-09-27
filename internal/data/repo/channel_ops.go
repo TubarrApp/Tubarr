@@ -272,7 +272,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	switch {
 	case len(c.URLs) == 0:
 		return 0, errors.New("must enter at least one URL for the channel")
-	case c.VideoDir == "":
+	case c.Settings.VideoDir == "":
 		return 0, errors.New("must enter a video directory where downloads will be stored")
 	}
 
@@ -281,8 +281,8 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	// JSON dir
-	if c.JSONDir == "" {
-		c.JSONDir = c.VideoDir
+	if c.Settings.JSONDir == "" {
+		c.Settings.JSONDir = c.Settings.VideoDir
 	}
 	now := time.Now()
 
@@ -303,23 +303,17 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		Insert(consts.DBChannels).
 		Columns(
 			consts.QChanName,
-			consts.QChanVideoDir,
-			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
 		Values(
 			c.Name,
-			c.VideoDir,
-			c.JSONDir,
 			settingsJSON,
 			metarrJSON,
 			now,
-			false,
 			now,
 			now,
 		).
@@ -383,12 +377,9 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 		Select(
 			consts.QChanID,
 			consts.QChanName,
-			consts.QChanVideoDir,
-			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -401,12 +392,9 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 		Scan(
 			&c.ID,
 			&c.Name,
-			&c.VideoDir,
-			&c.JSONDir,
 			&settings,
 			&metarrJSON,
 			&c.LastScan,
-			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
@@ -486,12 +474,9 @@ func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, err
 		Select(
 			consts.QChanID,
 			consts.QChanName,
-			consts.QChanVideoDir,
-			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -505,12 +490,9 @@ func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, err
 		Scan(
 			&c.ID,
 			&c.Name,
-			&c.VideoDir,
-			&c.JSONDir,
 			&settings,
 			&metarrJSON,
 			&c.LastScan,
-			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
@@ -569,12 +551,9 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 		Select(
 			consts.QChanID,
 			consts.QChanName,
-			consts.QChanVideoDir,
-			consts.QChanJSONDir,
 			consts.QChanSettings,
 			consts.QChanMetarr,
 			consts.QChanLastScan,
-			consts.QChanPaused,
 			consts.QChanCreatedAt,
 			consts.QChanUpdatedAt,
 		).
@@ -604,12 +583,9 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 		err := rows.Scan(
 			&c.ID,
 			&c.Name,
-			&c.VideoDir,
-			&c.JSONDir,
 			&settingsJSON,
 			&metarrJSON,
 			&c.LastScan,
-			&c.Paused,
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		)
