@@ -97,7 +97,7 @@ func addAuth(cs interfaces.ChannelStore) *cobra.Command {
 			return nil
 		},
 	}
-	SetPrimaryChannelFlags(addAuthCmd, &channelName, nil, &channelID)
+	cfgflags.SetPrimaryChannelFlags(addAuthCmd, &channelName, nil, &channelID)
 	cfgflags.SetAuthFlags(addAuthCmd, &usernames, &passwords, &loginURLs)
 	return addAuthCmd
 }
@@ -137,7 +137,7 @@ func deleteVideoURLs(cs interfaces.ChannelStore) *cobra.Command {
 		},
 	}
 
-	SetPrimaryChannelFlags(deleteURLsCmd, &channelName, nil, &channelID)
+	cfgflags.SetPrimaryChannelFlags(deleteURLsCmd, &channelName, nil, &channelID)
 	deleteURLsCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to delete from the database.")
 
 	return deleteURLsCmd
@@ -156,8 +156,16 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 		Short: "Download inputted URLs (plaintext or file).",
 		Long:  "If using a file, the file should contain one URL per line.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cFileInfo, err := validation.ValidateFile(cFile, false)
+			if err != nil {
+				return fmt.Errorf("file entered (%q) is not valid: %v", cFile, err)
+			}
+			if cFile != "" && cFileInfo.Size() == 0 {
+				return fmt.Errorf("url file %q is blank", cFile)
+			}
+
 			if cFile == "" && len(urls) == 0 {
-				return errors.New("must enter a URL source")
+				return errors.New("must enter URLs into the source file, or set at least one URL directly")
 			}
 
 			key, val, err := getChanKeyVal(channelID, channelName)
@@ -180,7 +188,7 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 		},
 	}
 
-	SetPrimaryChannelFlags(dlURLFileCmd, &channelName, nil, &channelID)
+	cfgflags.SetPrimaryChannelFlags(dlURLFileCmd, &channelName, nil, &channelID)
 	dlURLFileCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to this channel")
 	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download")
 
@@ -229,7 +237,7 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(deleteNotifyCmd, &channelName, nil, &channelID)
+	cfgflags.SetPrimaryChannelFlags(deleteNotifyCmd, &channelName, nil, &channelID)
 	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, "notify-urls", nil, "Full notification URLs (e.g. 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE')")
 	deleteNotifyCmd.Flags().StringSliceVar(&notifyNames, "notify-names", nil, "Full notification names")
 
@@ -283,7 +291,7 @@ func addNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(addNotifyCmd, &channelName, nil, &channelID)
+	cfgflags.SetPrimaryChannelFlags(addNotifyCmd, &channelName, nil, &channelID)
 	cfgflags.SetNotifyFlags(addNotifyCmd, &notification)
 
 	return addNotifyCmd
@@ -323,7 +331,7 @@ func addVideoURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(ignoreURLCmd, &name, nil, nil)
+	cfgflags.SetPrimaryChannelFlags(ignoreURLCmd, &name, nil, nil)
 	ignoreURLCmd.Flags().StringVarP(&ignoreURL, "ignore-video-url", "i", "", "Video URL to ignore")
 
 	return ignoreURLCmd
@@ -355,7 +363,7 @@ func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store, ctx contex
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(ignoreCrawlCmd, &name, nil, nil)
+	cfgflags.SetPrimaryChannelFlags(ignoreCrawlCmd, &name, nil, nil)
 
 	return ignoreCrawlCmd
 }
@@ -385,7 +393,7 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(pauseCmd, &name, nil, &id)
+	cfgflags.SetPrimaryChannelFlags(pauseCmd, &name, nil, &id)
 
 	return pauseCmd
 }
@@ -415,7 +423,7 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(pauseCmd, &name, nil, &id)
+	cfgflags.SetPrimaryChannelFlags(pauseCmd, &name, nil, &id)
 
 	return pauseCmd
 }
@@ -430,7 +438,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		notification                                                                              []string
 		fromDate, toDate                                                                          string
 		dlFilters, metaOps, fileSfxReplace                                                        []string
-		dlFilterFile                                                                              string
+		configFile, dlFilterFile                                                                  string
 		crawlFreq, concurrency, metarrConcurrency, retries                                        int
 		maxCPU                                                                                    float64
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
@@ -443,17 +451,24 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		Short: "Add a channel.",
 		Long:  "Add channel adds a new channel to the database using inputted URLs, names, settings, etc.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Files and directories
 			if vDir == "" || len(urls) == 0 || name == "" {
 				return errors.New("new channels require a video directory, name, and at least one channel URL")
 			}
 
-			// Infer empty fields
 			if jDir == "" { // Do not stat, due to templating
 				jDir = vDir
 			}
 
+			if configFile != "" {
+				if err := loadConfigFile(configFile); err != nil {
+					return err
+				}
+			}
+
 			// Verify filters
-			dlFilters, err := VerifyChannelOps(dlFilters)
+			dlFilters, err := validation.ValidateChannelOps(dlFilters)
 			if err != nil {
 				return err
 			}
@@ -489,44 +504,44 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 			}
 
 			if fromDate != "" {
-				if fromDate, err = validateToFromDate(fromDate); err != nil {
+				if fromDate, err = validation.ValidateToFromDate(fromDate); err != nil {
 					return err
 				}
 			}
 
 			if toDate != "" {
-				if toDate, err = validateToFromDate(toDate); err != nil {
+				if toDate, err = validation.ValidateToFromDate(toDate); err != nil {
 					return err
 				}
 			}
 
 			if useGPU != "" {
-				if useGPU, gpuDir, err = validateGPU(useGPU, gpuDir); err != nil {
+				if useGPU, gpuDir, err = validation.ValidateGPU(useGPU, gpuDir); err != nil {
 					return err
 				}
 			}
 
 			if codec != "" {
-				if codec, err = validateTranscodeCodec(codec, useGPU); err != nil {
+				if codec, err = validation.ValidateTranscodeCodec(codec, useGPU); err != nil {
 					return err
 				}
 			}
 
 			if audioCodec != "" {
-				if audioCodec, err = validateTranscodeAudioCodec(audioCodec); err != nil {
+				if audioCodec, err = validation.ValidateTranscodeAudioCodec(audioCodec); err != nil {
 					return err
 				}
 			}
 
 			if transcodeQuality != "" {
-				if transcodeQuality, err = validateTranscodeQuality(transcodeQuality); err != nil {
+				if transcodeQuality, err = validation.ValidateTranscodeQuality(transcodeQuality); err != nil {
 					return err
 				}
 			}
 
 			if ytdlpOutputExt != "" {
 				ytdlpOutputExt = strings.ToLower(ytdlpOutputExt)
-				if err = validateOutputExtension(ytdlpOutputExt); err != nil {
+				if err = validation.ValidateYtdlpOutputExtension(ytdlpOutputExt); err != nil {
 					return err
 				}
 			}
@@ -538,16 +553,17 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				JSONDir:  jDir,
 
 				Settings: models.ChannelSettings{
-					CrawlFreq:              crawlFreq,
-					Filters:                dlFilters,
-					FilterFile:             dlFilterFile,
-					Retries:                retries,
+					ChannelConfigFile:      configFile,
+					Concurrency:            concurrency,
 					CookieSource:           cookieSource,
+					CrawlFreq:              crawlFreq,
 					ExternalDownloader:     externalDownloader,
 					ExternalDownloaderArgs: externalDownloaderArgs,
-					Concurrency:            concurrency,
-					MaxFilesize:            maxFilesize,
+					Filters:                dlFilters,
+					FilterFile:             dlFilterFile,
 					FromDate:               fromDate,
+					MaxFilesize:            maxFilesize,
+					Retries:                retries,
 					ToDate:                 toDate,
 					UseGlobalCookies:       useGlobalCookies,
 					YtdlpOutputExt:         ytdlpOutputExt,
@@ -618,10 +634,10 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(addCmd, &name, &urls, nil)
+	cfgflags.SetPrimaryChannelFlags(addCmd, &name, &urls, nil)
 
 	// Files/dirs
-	cfgflags.SetFileDirFlags(addCmd, &jDir, &vDir)
+	cfgflags.SetFileDirFlags(addCmd, &configFile, &jDir, &vDir)
 
 	// Program related
 	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, false)
@@ -674,7 +690,7 @@ func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(delCmd, &name, &urls, &id)
+	cfgflags.SetPrimaryChannelFlags(delCmd, &name, &urls, &id)
 
 	return delCmd
 }
@@ -704,7 +720,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
-			ch, err, hasRows := cs.FetchChannel(id)
+			ch, err, hasRows := cs.FetchChannelModel("id", strconv.FormatInt(id, 10))
 			if !hasRows {
 				logging.I("Entry for channel with ID %d does not exist in the database", id)
 				return nil
@@ -719,7 +735,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		},
 	}
 	// Primary channel elements
-	SetPrimaryChannelFlags(listCmd, &name, nil, &channelID)
+	cfgflags.SetPrimaryChannelFlags(listCmd, &name, nil, &channelID)
 	return listCmd
 }
 
@@ -773,7 +789,7 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(crawlCmd, &name, nil, &id)
+	cfgflags.SetPrimaryChannelFlags(crawlCmd, &name, nil, &id)
 
 	return crawlCmd
 }
@@ -790,7 +806,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		maxFilesize, externalDownloader, externalDownloaderArgs                   string
 		username, password, loginURL                                              []string
 		dlFilters, metaOps                                                        []string
-		dlFilterFile                                                              string
+		configFile, dlFilterFile                                                  string
 		fileSfxReplace                                                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
@@ -826,8 +842,28 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				logging.S(0, "Updated JSON directory to %q", jDir)
 			}
 
+			// Update from config file
+			if configFile != "" {
+				if err := loadConfigFile(configFile); err != nil {
+					return err
+				}
+			} else {
+				c, err, _ := cs.FetchChannelModel(key, val)
+				if err != nil {
+					return err
+				}
+
+				if c.Settings.ChannelConfigFile != "" {
+
+					if err := loadConfigFile(configFile); err != nil {
+						return err
+					}
+				}
+			}
+
 			// Settings
 			fnSettingsArgs, err := getSettingsArgFns(chanSettings{
+				channelConfigFile:      configFile,
 				cookieSource:           cookieSource,
 				crawlFreq:              crawlFreq,
 				retries:                retries,
@@ -898,10 +934,10 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(updateSettingsCmd, &name, &urls, &id)
+	cfgflags.SetPrimaryChannelFlags(updateSettingsCmd, &name, &urls, &id)
 
 	// Files/dirs
-	cfgflags.SetFileDirFlags(updateSettingsCmd, &jDir, &vDir)
+	cfgflags.SetFileDirFlags(updateSettingsCmd, &configFile, &jDir, &vDir)
 
 	// Program related
 	cfgflags.SetProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, true)
@@ -951,25 +987,266 @@ func updateChannelValue(cs interfaces.ChannelStore) *cobra.Command {
 	}
 
 	// Primary channel elements
-	SetPrimaryChannelFlags(updateRowCmd, &name, nil, &id)
+	cfgflags.SetPrimaryChannelFlags(updateRowCmd, &name, nil, &id)
 
 	updateRowCmd.Flags().StringVarP(&col, "column-name", "c", "", "The name of the column in the table (e.g. video_directory)")
 	updateRowCmd.Flags().StringVarP(&newVal, "value", "v", "", "The value to set in the column (e.g. /my-directory)")
 	return updateRowCmd
 }
 
+// displaySettings displays fields relevant to a channel.
+// displaySettings displays fields relevant to a channel.
 func displaySettings(cs interfaces.ChannelStore, ch *models.Channel) {
 	notifyURLs, err := cs.GetNotifyURLs(ch.ID)
 	if err != nil {
 		logging.E(0, "Unable to fetch notification URLs for channel %q: %v", ch.Name, err)
 	}
 
-	fmt.Printf("\n%sChannel ID: %d%s\nName: %s\nURL: %+v\nVideo Directory: %s\nJSON Directory: %s\n", consts.ColorGreen, ch.ID, consts.ColorReset, ch.Name, ch.URLs, ch.VideoDir, ch.JSONDir)
-	fmt.Printf("Crawl Frequency: %d minutes\nFilters: %v\nFilter File: %v\nConcurrency: %d\nCookie Source: %s\nRetries: %d\nYt-dlp Output Extension: %s\n", ch.Settings.CrawlFreq, ch.Settings.Filters, ch.Settings.FilterFile, ch.Settings.Concurrency, ch.Settings.CookieSource, ch.Settings.Retries, ch.Settings.YtdlpOutputExt)
-	fmt.Printf("External Downloader: %s\nExternal Downloader Args: %s\nMax Filesize: %s\n", ch.Settings.ExternalDownloader, ch.Settings.ExternalDownloaderArgs, ch.Settings.MaxFilesize)
-	fmt.Printf("Max CPU: %.2f\nMetarr Concurrency: %d\nMin Free Mem: %s\nOutput Directory: %s\nOutput Filetype: %s\nHW acceleration type: %s\nHW acceleration directory: %s\nVideo codec: %s\nAudio codec: %v\n", ch.MetarrArgs.MaxCPU, ch.MetarrArgs.Concurrency, ch.MetarrArgs.MinFreeMem, ch.MetarrArgs.OutputDir, ch.MetarrArgs.Ext, ch.MetarrArgs.UseGPU, ch.MetarrArgs.GPUDir, ch.MetarrArgs.TranscodeCodec, ch.MetarrArgs.TranscodeAudioCodec)
-	fmt.Printf("Rename Style: %s\nFilename Suffix Replace: %v\nMeta Ops: %v\nFilename Date Format: %s\n", ch.MetarrArgs.RenameStyle, ch.MetarrArgs.FilenameReplaceSfx, ch.MetarrArgs.MetaOps, ch.MetarrArgs.FileDatePfx)
-	fmt.Printf("From Date (yyyy-mm-dd): %q\nTo Date (yyyy-mm-dd): %q\n", hyphenateYyyyMmDd(ch.Settings.FromDate), hyphenateYyyyMmDd(ch.Settings.ToDate))
-	fmt.Printf("Paused?: %v\n", ch.Paused)
+	fmt.Printf("\n%sChannel%s %q\n", consts.ColorGreen, consts.ColorReset, ch.Name)
+
+	// Channel basic info
+	fmt.Printf("\n%sBasic Info:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("ID: %d\n", ch.ID)
+	fmt.Printf("Name: %s\n", ch.Name)
+	fmt.Printf("URL: %+v\n", ch.URLs)
+	fmt.Printf("Video Directory: %s\n", ch.VideoDir)
+	fmt.Printf("JSON Directory: %s\n", ch.JSONDir)
+	fmt.Printf("Paused: %v\n", ch.Paused)
+
+	// Channel settings
+	fmt.Printf("\n%sChannel Settings:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("Config File: %s\n", ch.Settings.ChannelConfigFile)
+	fmt.Printf("Auto Download: %v\n", ch.Settings.AutoDownload)
+	fmt.Printf("Crawl Frequency: %d minutes\n", ch.Settings.CrawlFreq)
+	fmt.Printf("Concurrency: %d\n", ch.Settings.Concurrency)
+	fmt.Printf("Cookie Source: %s\n", ch.Settings.CookieSource)
+	fmt.Printf("Retries: %d\n", ch.Settings.Retries)
+	fmt.Printf("External Downloader: %s\n", ch.Settings.ExternalDownloader)
+	fmt.Printf("External Downloader Args: %s\n", ch.Settings.ExternalDownloaderArgs)
+	fmt.Printf("Filter File: %s\n", ch.Settings.FilterFile)
+	fmt.Printf("From Date: %q\n", hyphenateYyyyMmDd(ch.Settings.FromDate))
+	fmt.Printf("To Date: %q\n", hyphenateYyyyMmDd(ch.Settings.ToDate))
+	fmt.Printf("Max Filesize: %s\n", ch.Settings.MaxFilesize)
+	fmt.Printf("Use Global Cookies: %v\n", ch.Settings.UseGlobalCookies)
+	fmt.Printf("Yt-dlp Output Extension: %s\n", ch.Settings.YtdlpOutputExt)
+
+	// Metarr settings
+	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("Output Directory: %s\n", ch.MetarrArgs.OutputDir)
+	fmt.Printf("Output Filetype: %s\n", ch.MetarrArgs.Ext)
+	fmt.Printf("Metarr Concurrency: %d\n", ch.MetarrArgs.Concurrency)
+	fmt.Printf("Max CPU: %.2f\n", ch.MetarrArgs.MaxCPU)
+	fmt.Printf("Min Free Memory: %s\n", ch.MetarrArgs.MinFreeMem)
+	fmt.Printf("HW Acceleration: %s\n", ch.MetarrArgs.UseGPU)
+	fmt.Printf("HW Acceleration Directory: %s\n", ch.MetarrArgs.GPUDir)
+	fmt.Printf("Video Codec: %s\n", ch.MetarrArgs.TranscodeCodec)
+	fmt.Printf("Audio Codec: %s\n", ch.MetarrArgs.TranscodeAudioCodec)
+	fmt.Printf("Transcode Quality: %s\n", ch.MetarrArgs.TranscodeQuality)
+	fmt.Printf("Rename Style: %s\n", ch.MetarrArgs.RenameStyle)
+	fmt.Printf("Filename Suffix Replace: %v\n", ch.MetarrArgs.FilenameReplaceSfx)
+	fmt.Printf("Meta Operations: %v\n", ch.MetarrArgs.MetaOps)
+	fmt.Printf("Filename Date Format: %s\n", ch.MetarrArgs.FileDatePfx)
+
+	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Notification URLs: %v\n", notifyURLs)
+}
+
+// UpdateChannelFromConfig updates the channel settings from a config file if it exists.
+func UpdateChannelFromConfig(cs interfaces.ChannelStore, c *models.Channel) error {
+	cfgFile := c.Settings.ChannelConfigFile
+	if cfgFile == "" {
+		logging.D(2, "No config file path, nothing to apply")
+		return nil
+	}
+
+	logging.I("Updating channel from config file %q...", cfgFile)
+	if _, err := validation.ValidateFile(cfgFile, false); err != nil {
+		return err
+	}
+
+	if err := loadConfigFile(cfgFile); err != nil {
+		return err
+	}
+
+	if err := applyConfigChannelSettings(c); err != nil {
+		return err
+	}
+
+	if err := applyConfigMetarrSettings(c); err != nil {
+		return err
+	}
+
+	key, val, err := getChanKeyVal(int(c.ID), c.Name)
+	if err != nil {
+		return err
+	}
+
+	_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
+		*s = c.Settings
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = cs.UpdateChannelMetarrArgsJSON(key, val, func(m *models.MetarrArgs) error {
+		*m = c.MetarrArgs
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	logging.S(0, "Updated channel %q from config file", c.Name)
+	return nil
+}
+
+// applyConfigChannelSettings applies the channel settings to the model and saves to database.
+func applyConfigChannelSettings(c *models.Channel) (err error) {
+	if v, ok := getConfigValue[bool](keys.AutoDownload); ok {
+		c.Settings.AutoDownload = v
+	}
+	if v, ok := getConfigValue[string](keys.ChannelConfigFile); ok {
+		if _, err = validation.ValidateFile(v, false); err != nil {
+			return err
+		}
+		c.Settings.ChannelConfigFile = v
+	}
+	if v, ok := getConfigValue[int](keys.ConcurrencyLimitInput); ok {
+		c.Settings.Concurrency = validation.ValidateConcurrencyLimit(v)
+	}
+	if v, ok := getConfigValue[string](keys.CookieSource); ok {
+		c.Settings.CookieSource = v // No check for this currently! (cookies-from-browser)
+	}
+	if v, ok := getConfigValue[int](keys.CrawlFreq); ok {
+		c.Settings.CrawlFreq = v
+	}
+	if v, ok := getConfigValue[string](keys.ExternalDownloader); ok {
+		c.Settings.ExternalDownloader = v // No checks for this yet.
+	}
+	if v, ok := getConfigValue[string](keys.ExternalDownloaderArgs); ok {
+		c.Settings.ExternalDownloaderArgs = v // No checks for this yet.
+	}
+	if v, ok := getConfigValue[string](keys.FilterOpsFile); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return err
+		}
+		c.Settings.FilterFile = v
+	}
+	if v, ok := getConfigValue[string](keys.FromDate); ok {
+		if c.Settings.FromDate, err = validation.ValidateToFromDate(v); err != nil {
+			return err
+		}
+	}
+	if v, ok := getConfigValue[string](keys.MaxFilesize); ok {
+		c.Settings.MaxFilesize = v
+	}
+	if v, ok := getConfigValue[int](keys.DLRetries); ok {
+		c.Settings.Retries = v
+	}
+	if v, ok := getConfigValue[string](keys.ToDate); ok {
+		if c.Settings.ToDate, err = validation.ValidateToFromDate(v); err != nil {
+			return err
+		}
+	}
+	if v, ok := getConfigValue[bool](keys.UseGlobalCookies); ok {
+		c.Settings.UseGlobalCookies = v
+	}
+	if v, ok := getConfigValue[string](keys.YtdlpOutputExt); ok {
+		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
+			return err
+		}
+		c.Settings.YtdlpOutputExt = v
+	}
+	return nil
+}
+
+// applyConfigMetarrSettings applies the Metarr settings to the model and saves to database.
+func applyConfigMetarrSettings(c *models.Channel) (err error) {
+
+	var (
+		gpuDirGot, gpuGot string
+		videoCodecGot     string
+	)
+
+	if v, ok := getConfigValue[string](keys.MExt); ok {
+		if _, err := validation.ValidateOutputFiletype(c.Settings.ChannelConfigFile); err != nil {
+			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.Settings.ChannelConfigFile)
+		}
+		c.MetarrArgs.Ext = v
+	}
+	if v, ok := getConfigValue[[]string](keys.MFilenameReplaceSuffix); ok {
+		c.MetarrArgs.FilenameReplaceSfx, err = validation.ValidateFilenameSuffixReplace(v)
+		if err != nil {
+			return err
+		}
+	}
+	if v, ok := getConfigValue[string](keys.MRenameStyle); ok {
+		if err := validation.ValidateRenameFlag(v); err != nil {
+			return err
+		}
+		c.MetarrArgs.RenameStyle = v
+	}
+	if v, ok := getConfigValue[string](keys.MInputFileDatePfx); ok {
+		if ok := validation.ValidateDateFormat(v); !ok {
+			return fmt.Errorf("date format %q in config file %q is invalid", v, c.Settings.ChannelConfigFile)
+		}
+		c.MetarrArgs.FileDatePfx = v
+	}
+	if v, ok := getConfigValue[[]string](keys.MMetaOps); ok {
+		c.MetarrArgs.MetaOps, err = validation.ValidateMetaOps(v)
+		if err != nil {
+			return err
+		}
+	}
+	if v, ok := getConfigValue[string](keys.MOutputDir); ok {
+		c.MetarrArgs.OutputDir = v // No check due to templating.
+	}
+	if v, ok := getConfigValue[int](keys.MConcurrency); ok {
+		c.MetarrArgs.Concurrency = validation.ValidateConcurrencyLimit(v)
+	}
+	if v, ok := getConfigValue[float64](keys.MMaxCPU); ok {
+		c.MetarrArgs.MaxCPU = v // Handled in Metarr
+	}
+	if v, ok := getConfigValue[string](keys.MMinFreeMem); ok {
+		c.MetarrArgs.MinFreeMem = v // Handled in Metarr
+	}
+	if v, ok := getConfigValue[string](keys.TranscodeGPU); ok {
+		gpuGot = v
+	}
+	if v, ok := getConfigValue[string](keys.TranscodeGPUDir); ok {
+		gpuDirGot = v
+	}
+	if v, ok := getConfigValue[string](keys.TranscodeVideoFilter); ok {
+		c.MetarrArgs.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(v)
+		if err != nil {
+			return err
+		}
+	}
+	if v, ok := getConfigValue[string](keys.TranscodeCodec); ok {
+		videoCodecGot = v
+	}
+	if v, ok := getConfigValue[string](keys.TranscodeAudioCodec); ok {
+		if c.MetarrArgs.TranscodeAudioCodec, err = validation.ValidateTranscodeAudioCodec(v); err != nil {
+			return err
+		}
+	}
+	if v, ok := getConfigValue[string](keys.MTranscodeQuality); ok {
+		if c.MetarrArgs.TranscodeQuality, err = validation.ValidateTranscodeQuality(v); err != nil {
+			return err
+		}
+	}
+
+	if gpuGot != "" || gpuDirGot != "" {
+		c.MetarrArgs.UseGPU, c.MetarrArgs.GPUDir, err = validation.ValidateGPU(gpuGot, gpuDirGot)
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.MetarrArgs.TranscodeCodec, err = validation.ValidateTranscodeCodec(videoCodecGot, c.MetarrArgs.UseGPU); err != nil {
+		return err
+	}
+
+	return nil
 }

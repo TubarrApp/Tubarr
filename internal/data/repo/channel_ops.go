@@ -464,6 +464,20 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 
 // CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded.
 func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx context.Context) error {
+
+	c, err, _ := cs.FetchChannelModel(key, val)
+	if err != nil {
+		return err
+	}
+
+	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
+
+	// Process crawling using the updated channel object
+	return process.ChannelCrawl(s, c, ctx)
+}
+
+// FetchChannelModel fills the channel model from the database.
+func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, error, bool) {
 	var (
 		settings, metarrJSON json.RawMessage
 	)
@@ -500,18 +514,21 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
-		return fmt.Errorf("failed to scan channel: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, false
+		}
+		return nil, fmt.Errorf("failed to scan channel: %w", err), false
 	}
 
 	// Unmarshal settings
 	if err := json.Unmarshal(settings, &c.Settings); err != nil {
-		return fmt.Errorf("parsing channel settings: %w", err)
+		return nil, fmt.Errorf("parsing channel settings: %w", err), true
 	}
 
 	// Unmarshal metarr settings
 	if len(metarrJSON) > 0 {
 		if err := json.Unmarshal(metarrJSON, &c.MetarrArgs); err != nil {
-			return fmt.Errorf("parsing metarr settings: %w", err)
+			return nil, fmt.Errorf("parsing metarr settings: %w", err), true
 		}
 	}
 
@@ -519,97 +536,6 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 	c.URLs = []string{}
 
 	// Fetch all URLs for the channel
-	urlQuery := squirrel.
-		Select("url").
-		From(consts.DBChannelURLs).
-		Where(squirrel.Eq{"channel_id": c.ID}).
-		RunWith(cs.DB)
-
-	urlRows, err := urlQuery.Query()
-	if err != nil {
-		return fmt.Errorf("failed to fetch URLs for channel: %w", err)
-	}
-	defer func() {
-		if err := urlRows.Close(); err != nil {
-			logging.E(0, "failed to close database URL rows in query for channel %v: %v", c.Name, err)
-		}
-	}()
-
-	for urlRows.Next() {
-		var url string
-		if err := urlRows.Scan(&url); err != nil {
-			return fmt.Errorf("failed to scan URL: %w", err)
-		}
-		c.URLs = append(c.URLs, url)
-	}
-
-	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
-
-	// Process crawling using the updated channel object
-	return process.ChannelCrawl(s, &c, ctx)
-}
-
-// FetchChannel returns a single channel from the database along with its associated URLs.
-func (cs *ChannelStore) FetchChannel(id int64) (*models.Channel, error, bool) {
-	var (
-		settingsJSON, metarrJSON json.RawMessage
-	)
-	query := squirrel.
-		Select(
-			consts.QChanID,
-			consts.QChanName,
-			consts.QChanVideoDir,
-			consts.QChanJSONDir,
-			consts.QChanSettings,
-			consts.QChanMetarr,
-			consts.QChanLastScan,
-			consts.QChanPaused,
-			consts.QChanCreatedAt,
-			consts.QChanUpdatedAt,
-		).
-		From(consts.DBChannels).
-		Where(squirrel.Eq{consts.QChanID: id}).
-		RunWith(cs.DB)
-
-	row := query.QueryRow()
-
-	c := new(models.Channel)
-	if err := row.Scan(
-		&c.ID,
-		&c.Name,
-		&c.VideoDir,
-		&c.JSONDir,
-		&settingsJSON,
-		&metarrJSON,
-		&c.LastScan,
-		&c.Paused,
-		&c.CreatedAt,
-		&c.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil, false
-		}
-		return nil, fmt.Errorf("failed to scan channel: %w", err), false
-	}
-
-	// Unmarshal settings JSON
-	if len(settingsJSON) > 0 {
-		if err := json.Unmarshal(settingsJSON, &c.Settings); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal settings: %w", err), true
-		}
-	}
-
-	// Unmarshal Metarr JSON
-	if len(metarrJSON) > 0 {
-		if err := json.Unmarshal(metarrJSON, &c.MetarrArgs); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal metarr settings: %w", err), true
-		}
-	}
-
-	// Initialize URL list
-	c.URLs = []string{}
-
-	// Fetch URLs associated with this channel
 	urlQuery := squirrel.
 		Select("url").
 		From(consts.DBChannelURLs).
@@ -634,7 +560,7 @@ func (cs *ChannelStore) FetchChannel(id int64) (*models.Channel, error, bool) {
 		c.URLs = append(c.URLs, url)
 	}
 
-	return c, nil, true
+	return &c, nil, true
 }
 
 // FetchAllChannels retrieves all channels in the database.

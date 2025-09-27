@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	cfgchannel "tubarr/internal/cfg/channel"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -91,7 +91,7 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 		}
 
 		if len(filters) > 0 {
-			validFilters, err := cfgchannel.VerifyChannelOps(filters)
+			validFilters, err := validation.ValidateChannelOps(filters)
 			if err != nil {
 				logging.E(0, "Error loading filters from file %v: %v", v.Channel.Settings.FilterFile, err)
 			}

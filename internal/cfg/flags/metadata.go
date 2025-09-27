@@ -11,8 +11,8 @@ import (
 func InitMetaTransformers(rootCmd *cobra.Command) error {
 
 	// Metadata transformations
-	rootCmd.PersistentFlags().StringSlice(keys.MetaOps, nil, "Metadata operations (field:operation:value) - e.g. title:set:New Title, description:prefix:Draft-, tags:append:newtag")
-	if err := viper.BindPFlag(keys.MetaOps, rootCmd.PersistentFlags().Lookup(keys.MetaOps)); err != nil {
+	rootCmd.PersistentFlags().StringSlice(keys.MMetaOps, nil, "Metadata operations (field:operation:value) - e.g. title:set:New Title, description:prefix:Draft-, tags:append:newtag")
+	if err := viper.BindPFlag(keys.MMetaOps, rootCmd.PersistentFlags().Lookup(keys.MMetaOps)); err != nil {
 		return err
 	}
 
@@ -27,8 +27,8 @@ func InitMetaTransformers(rootCmd *cobra.Command) error {
 		return err
 	}
 
-	rootCmd.PersistentFlags().String(keys.MetaPurge, "", "Delete metadata files (e.g. .json, .nfo) after the video is successfully processed")
-	if err := viper.BindPFlag(keys.MetaPurge, rootCmd.PersistentFlags().Lookup(keys.MetaPurge)); err != nil {
+	rootCmd.PersistentFlags().String(keys.MMetaPurge, "", "Delete metadata files (e.g. .json, .nfo) after the video is successfully processed")
+	if err := viper.BindPFlag(keys.MMetaPurge, rootCmd.PersistentFlags().Lookup(keys.MMetaPurge)); err != nil {
 		return err
 	}
 	return nil

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	cfgchannel "tubarr/internal/cfg/channel"
@@ -40,6 +41,30 @@ var rootCmd = &cobra.Command{
 			}
 			benchmarking = true
 		}
+
+		// Setup channel flags from config file
+		if viper.IsSet(keys.ChannelConfigFile) {
+			configFile := viper.GetString(keys.ChannelConfigFile)
+
+			cInfo, err := os.Stat(configFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed check for config file path: %v", err)
+				fmt.Println()
+				os.Exit(1)
+			} else if cInfo.IsDir() {
+				fmt.Fprintf(os.Stderr, "config file entered is a directory, should be a file")
+				fmt.Println()
+				os.Exit(1)
+			}
+
+			if configFile != "" {
+				// load and normalize keys from any Viper-supported config file
+				if err := loadConfigFile(configFile); err != nil {
+					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
+					os.Exit(1)
+				}
+			}
+		}
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Lookup("help").Changed {
@@ -65,6 +90,9 @@ var rootCmd = &cobra.Command{
 // InitCommands initializes all commands and their flags.
 func InitCommands(s interfaces.Store, ctx context.Context) error {
 
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert "video_directory" to "video-directory"
+
 	if err := cfgflags.InitProgramFlags(rootCmd); err != nil {
 		return err
 	}
@@ -80,10 +108,23 @@ func InitCommands(s interfaces.Store, ctx context.Context) error {
 
 	rootCmd.AddCommand(cfgchannel.InitChannelCmds(s, ctx))
 	rootCmd.AddCommand(cfgvideo.InitVideoCmds(s))
+
 	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately
 func Execute() error {
 	return rootCmd.Execute()
+}
+
+// loadConfigFile loads in the preset configuration file.
+func loadConfigFile(file string) error {
+	logging.I("Using configuration file %q", file)
+	viper.SetConfigFile(file)
+	if err := viper.ReadInConfig(); err != nil {
+		return err
+	}
+
+	validation.WarnMalformedKeys()
+	return nil
 }

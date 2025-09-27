@@ -6,15 +6,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 	validation "tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/domain/regex"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 type cobraMetarrArgs struct {
@@ -48,13 +47,15 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.metarrExt != "" {
-		if validation.ValidateOutputFiletype(c.metarrExt) {
-			c.metarrExt = strings.ToLower(c.metarrExt)
-			fns = append(fns, func(m *models.MetarrArgs) error {
-				m.Ext = c.metarrExt
-				return nil
-			})
+		_, err := validation.ValidateOutputFiletype(c.metarrExt)
+		if err != nil {
+			return nil, err
 		}
+		c.metarrExt = strings.ToLower(c.metarrExt)
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.Ext = c.metarrExt
+			return nil
+		})
 	}
 
 	if c.renameStyle != "" {
@@ -107,7 +108,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.useGPU != "" {
-		validGPU, _, err := validateGPU(c.useGPU, c.gpuDir)
+		validGPU, _, err := validation.ValidateGPU(c.useGPU, c.gpuDir)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +142,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.transcodeCodec != "" {
-		validTranscodeCodec, err := validateTranscodeCodec(c.transcodeCodec, c.useGPU)
+		validTranscodeCodec, err := validation.ValidateTranscodeCodec(c.transcodeCodec, c.useGPU)
 		if err != nil {
 			return nil, err
 		}
@@ -157,7 +158,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.transcodeAudioCodec != "" || cmd.Flags().Changed(keys.TranscodeAudioCodec) {
-		validTranscodeAudioCodec, err := validateTranscodeAudioCodec(c.transcodeAudioCodec)
+		validTranscodeAudioCodec, err := validation.ValidateTranscodeAudioCodec(c.transcodeAudioCodec)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +169,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.transcodeQuality != "" || cmd.Flags().Changed(keys.TranscodeQuality) {
-		validTranscodeQuality, err := validateTranscodeQuality(c.transcodeQuality)
+		validTranscodeQuality, err := validation.ValidateTranscodeQuality(c.transcodeQuality)
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +180,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	if c.transcodeVideoFilter != "" {
-		validTranscodeVideoFilter, err := validateTranscodeVideoFilter(c.transcodeVideoFilter)
+		validTranscodeVideoFilter, err := validation.ValidateTranscodeVideoFilter(c.transcodeVideoFilter)
 		if err != nil {
 			return nil, err
 		}
@@ -193,6 +194,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 }
 
 type chanSettings struct {
+	channelConfigFile      string
 	cookieSource           string
 	crawlFreq              int
 	filters                []string
@@ -212,6 +214,13 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 	if c.concurrency > 0 {
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.Concurrency = c.concurrency
+			return nil
+		})
+	}
+
+	if c.channelConfigFile != "" {
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.ChannelConfigFile = c.channelConfigFile
 			return nil
 		})
 	}
@@ -244,9 +253,24 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	if c.retries > 0 {
+	if len(c.filters) > 0 {
+		dlFilters, err := validation.ValidateChannelOps(c.filters)
+		if err != nil {
+			return nil, err
+		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.Retries = c.retries
+			s.Filters = dlFilters
+			return nil
+		})
+	}
+
+	if c.fromDate != "" {
+		validFromDate, err := validation.ValidateToFromDate(c.fromDate)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.FromDate = validFromDate
 			return nil
 		})
 	}
@@ -262,30 +286,15 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	if len(c.filters) > 0 {
-		dlFilters, err := VerifyChannelOps(c.filters)
-		if err != nil {
-			return nil, err
-		}
+	if c.retries > 0 {
 		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.Filters = dlFilters
-			return nil
-		})
-	}
-
-	if c.fromDate != "" {
-		validFromDate, err := validateToFromDate(c.fromDate)
-		if err != nil {
-			return nil, err
-		}
-		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.FromDate = validFromDate
+			s.Retries = c.retries
 			return nil
 		})
 	}
 
 	if c.toDate != "" {
-		validToDate, err := validateToFromDate(c.toDate)
+		validToDate, err := validation.ValidateToFromDate(c.toDate)
 		if err != nil {
 			return nil, err
 		}
@@ -297,8 +306,7 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 
 	if c.ytdlpOutputExt != "" {
 		c.ytdlpOutputExt = strings.ToLower(c.ytdlpOutputExt)
-		err := validateOutputExtension(c.ytdlpOutputExt)
-		if err != nil {
+		if err := validation.ValidateYtdlpOutputExtension(c.ytdlpOutputExt); err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
@@ -351,244 +359,6 @@ func verifyChanRowUpdateValid(col, val string) error {
 	return nil
 }
 
-const (
-	filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omits:must' omits videos only when the metafile contains a date field"
-)
-
-// VerifyChannelOps verifies that the user inputted filters are valid.
-func VerifyChannelOps(ops []string) ([]models.DLFilters, error) {
-
-	var filters = make([]models.DLFilters, 0, len(ops))
-	for _, op := range ops {
-		split := strings.Split(op, ":")
-		if len(split) < 3 {
-			logging.E(0, filterFormatError)
-			return nil, errors.New("filter format error")
-		}
-		switch len(split) {
-		case 4:
-
-			split[0] = strings.ToLower(split[0])
-			split[1] = strings.ToLower(split[1])
-			split[2] = strings.ToLower(split[2])
-			split[3] = strings.ToLower(split[3])
-
-			switch split[1] {
-			case "contains", "omits":
-
-				switch split[3] {
-				case "must", "any":
-					filters = append(filters, models.DLFilters{
-						Field:   split[0],
-						Type:    split[1],
-						Value:   split[2],
-						MustAny: split[3],
-					})
-				default:
-					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
-				}
-
-			default:
-				logging.E(0, filterFormatError)
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
-			}
-		case 3:
-
-			split[0] = strings.ToLower(split[0])
-			split[1] = strings.ToLower(split[1])
-			split[2] = strings.ToLower(split[2])
-
-			switch split[1] {
-			case "contains", "omits":
-
-				switch split[2] {
-				case "must", "any":
-					filters = append(filters, models.DLFilters{
-						Field:   split[0],
-						Type:    split[1],
-						MustAny: split[2],
-					})
-				default:
-					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
-				}
-
-			default:
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
-			}
-		default:
-			logging.E(0, filterFormatError)
-			return nil, errors.New("filter format error")
-		}
-	}
-	return filters, nil
-}
-
-// validateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
-func validateToFromDate(d string) (string, error) {
-	d = strings.ToLower(d)
-	d = strings.ReplaceAll(d, "-", "")
-	d = strings.ReplaceAll(d, " ", "")
-
-	// Handle "today" special case
-	if d == "today" {
-		return time.Now().Format("20060102"), nil
-	}
-
-	// Regex to extract explicitly marked years, months, and days
-	re := regex.YearFragmentsCompile()
-	matches := re.FindStringSubmatch(d)
-
-	// Default values
-	year := strconv.Itoa(time.Now().Year())
-	month := "01"
-	day := "01"
-
-	// Year
-	if matches[1] != "" {
-		year = matches[1]
-	} else if len(d) == 8 && !strings.ContainsAny(d, "ymd") { // No markers, assume raw format
-		year, month, day = d[:4], d[4:6], d[6:8]
-	}
-
-	// Month
-	if matches[2] != "" {
-		if len(matches[2]) == 1 {
-			month = "0" + matches[2] // Pad single-digit months
-		} else {
-			month = matches[2]
-		}
-	}
-
-	// Day
-	if matches[3] != "" {
-		if len(matches[3]) == 1 {
-			day = "0" + matches[3] // Pad single-digit days
-		} else {
-			day = matches[3]
-		}
-	}
-
-	// Validate ranges
-	yearInt, _ := strconv.Atoi(year)
-	monthInt, _ := strconv.Atoi(month)
-	dayInt, _ := strconv.Atoi(day)
-
-	if yearInt < 1000 || yearInt > 9999 {
-		return "", fmt.Errorf("invalid year in yyyy-mm-dd date %q: year must be 4 digits", d)
-	}
-	if monthInt < 1 || monthInt > 12 {
-		return "", fmt.Errorf("invalid month in yyyy-mm-dd date %q: month must be between 01-12", d)
-	}
-	if dayInt < 1 || dayInt > 31 {
-		return "", fmt.Errorf("invalid day in yyyy-mm-dd date %q: day must be between 01-31", d)
-	}
-
-	output := year + month + day
-	logging.D(1, "Made from/to date %q", output)
-
-	return output, nil
-}
-
-// verifyTranscodeAudioCodec verifies the audio codec to use for transcode/encode operations.
-func validateTranscodeAudioCodec(a string) (audioCodec string, err error) {
-	a = strings.ToLower(a)
-	switch a {
-	case "aac", "copy":
-		return a, nil
-	case "":
-		return "", nil
-	default:
-		return "", fmt.Errorf("audio codec flag %q is not currently implemented in this program, aborting", a)
-	}
-}
-
-// validateGPU validates the user input GPU selection.
-func validateGPU(g, devDir string) (gpu, gpuDir string, err error) {
-	g = strings.ToLower(g)
-	switch g {
-	case "qsv", "intel":
-		return "qsv", devDir, nil
-	case "amd", "radeon", "vaapi":
-
-		_, err := os.Stat(devDir)
-		if os.IsNotExist(err) {
-			return "", "", fmt.Errorf("driver location %q does not appear to exist?", devDir)
-		}
-
-		return "vaapi", devDir, nil
-	case "nvidia", "cuda":
-		return "cuda", devDir, nil
-	case "auto", "automatic", "automated":
-		return "auto", devDir, nil
-	case "":
-		return "", "", nil
-	default:
-		return "", devDir, fmt.Errorf("entered GPU %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
-	}
-}
-
-// validateOutputExtension validates that the output extension is valid.
-func validateOutputExtension(e string) error {
-	e = strings.ToLower(e)
-	switch e {
-	case "avi", "flv", "mkv", "mov", "mp4", "webm":
-		return nil
-	default:
-		return fmt.Errorf("output extension %v is invalid or not supported", e)
-	}
-}
-
-// validateTranscodeCodec validates the user input codec selection.
-func validateTranscodeCodec(c string, accel string) (codec string, err error) {
-	c = strings.ToLower(c)
-	c = strings.ReplaceAll(c, ".", "")
-	switch c {
-	case "h264", "hevc":
-		return c, nil
-	case "x264":
-		return "h264", nil
-	case "h265":
-		return "hevc", nil
-	case "":
-		if accel == "" {
-			return "", nil
-		} else {
-			return "", fmt.Errorf("entered codec %q not supported with acceleration type %q. Tubarr supports h264 and HEVC (h265)", c, accel)
-		}
-	default:
-		return "", fmt.Errorf("entered codec %q not supported. Tubarr supports h264 and HEVC (h265)", c)
-	}
-}
-
-// validateTranscodeQuality validates the transcode quality preset.
-func validateTranscodeQuality(q string) (quality string, err error) {
-	q = strings.ToLower(q)
-	q = strings.ReplaceAll(q, " ", "")
-
-	switch q {
-	case "p1", "p2", "p3", "p4", "p5", "p6", "p7":
-		logging.I("Got transcode quality profile %q", q)
-		return q, nil
-	}
-
-	qNum, err := strconv.Atoi(q)
-	if err != nil {
-		return "", fmt.Errorf("input should be p1 to p7, validation of transcoder quality failed")
-	}
-
-	var qualProf string
-	switch {
-	case qNum < 0:
-		qualProf = "p1"
-	case qNum > 7:
-		qualProf = "p7"
-	default:
-		qualProf = "p" + strconv.Itoa(qNum)
-	}
-	logging.I("Got transcode quality profile %q", qualProf)
-	return qualProf, nil
-}
-
 // hyphenateYyyyMmDd simply hyphenates yyyy-mm-dd date values for display.
 func hyphenateYyyyMmDd(d string) string {
 	d = strings.ReplaceAll(d, " ", "")
@@ -608,11 +378,6 @@ func hyphenateYyyyMmDd(d string) string {
 	b.WriteString(d[6:8])
 
 	return b.String()
-}
-
-// validateTranscodeVideoFilter validates the transcode video filter preset.
-func validateTranscodeVideoFilter(q string) (vf string, err error) {
-	return q, nil
 }
 
 // parseAuthDetails parses authorization details for a particular channel URL.
@@ -708,4 +473,108 @@ func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*mod
 	}
 
 	return authMap, nil
+}
+
+// loadConfigFile loads in the preset configuration file.
+func loadConfigFile(file string) error {
+
+	if _, err := validation.ValidateFile(file, false); err != nil {
+		return err
+	}
+
+	logging.I("Using configuration file %q", file)
+	viper.SetConfigFile(file)
+	if err := viper.ReadInConfig(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getConfigValue normalizes and retrieves values from the config file.
+// Supports both kebab-case and snake_case keys.
+func getConfigValue[T any](key string) (T, bool) {
+	var zero T
+
+	// Try original key first
+	if viper.IsSet(key) {
+		if val, ok := convertConfigValue[T](viper.Get(key)); ok {
+			return val, true
+		}
+	}
+
+	// Try snake_case version
+	snakeKey := strings.ReplaceAll(key, "-", "_")
+	if snakeKey != key && viper.IsSet(snakeKey) {
+		if val, ok := convertConfigValue[T](viper.Get(snakeKey)); ok {
+			return val, true
+		}
+	}
+
+	// Try kebab-case version
+	kebabKey := strings.ReplaceAll(key, "_", "-")
+	if kebabKey != key && viper.IsSet(kebabKey) {
+		if val, ok := convertConfigValue[T](viper.Get(kebabKey)); ok {
+			return val, true
+		}
+	}
+
+	return zero, false
+}
+
+// convertConfigValue handles config entry conversions safely.
+func convertConfigValue[T any](v any) (T, bool) {
+	var zero T
+
+	// Direct type match
+	if val, ok := v.(T); ok {
+		return val, true
+	}
+
+	// Let Viper handle the conversion - it's already good at this
+	switch any(zero).(type) {
+	case string:
+		if s, ok := v.(string); ok {
+			return any(s).(T), true
+		}
+		return any(fmt.Sprintf("%v", v)).(T), true
+
+	case int:
+		if i, ok := v.(int); ok {
+			return any(i).(T), true
+		}
+		if i64, ok := v.(int64); ok {
+			return any(int(i64)).(T), true
+		}
+		if f, ok := v.(float64); ok {
+			return any(int(f)).(T), true
+		}
+
+	case float64:
+		if f, ok := v.(float64); ok {
+			return any(f).(T), true
+		}
+		if i, ok := v.(int); ok {
+			return any(float64(i)).(T), true
+		}
+
+	case bool:
+		if b, ok := v.(bool); ok {
+			return any(b).(T), true
+		}
+
+	case []string:
+		if slice, ok := v.([]string); ok {
+			return any(slice).(T), true
+		}
+		if slice, ok := v.([]any); ok {
+			strSlice := make([]string, len(slice))
+			for i, item := range slice {
+				strSlice[i] = fmt.Sprintf("%v", item)
+			}
+			return any(strSlice).(T), true
+		}
+	}
+
+	return zero, false
 }

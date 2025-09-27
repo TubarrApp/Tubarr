@@ -59,13 +59,13 @@ func makeMetarrCommand(v *models.Video) []string {
 		{
 			metarrValue: metVals{str: v.MetarrArgs.FileDatePfx},
 			valType:     str,
-			viperKey:    keys.InputFileDatePfx,
+			viperKey:    keys.MInputFileDatePfx,
 			cmdKey:      metcmd.FilenameDateTag,
 		},
 		{
 			metarrValue: metVals{strSlice: v.MetarrArgs.FilenameReplaceSfx},
 			valType:     strSlice,
-			viperKey:    keys.FilenameReplaceSuffix,
+			viperKey:    keys.MFilenameReplaceSuffix,
 			cmdKey:      metcmd.FilenameReplaceSfx,
 		},
 		{
@@ -77,13 +77,13 @@ func makeMetarrCommand(v *models.Video) []string {
 		{
 			metarrValue: metVals{strSlice: v.MetarrArgs.MetaOps},
 			valType:     strSlice,
-			viperKey:    keys.MetaOps,
+			viperKey:    keys.MMetaOps,
 			cmdKey:      metcmd.MetaOps,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.MinFreeMem},
 			valType:     str,
-			viperKey:    keys.MinFreeMem,
+			viperKey:    keys.MMinFreeMem,
 			cmdKey:      metcmd.MinFreeMem,
 		},
 		{
@@ -95,7 +95,7 @@ func makeMetarrCommand(v *models.Video) []string {
 		{
 			metarrValue: metVals{str: v.MetarrArgs.RenameStyle},
 			valType:     str,
-			viperKey:    keys.RenameStyle,
+			viperKey:    keys.MRenameStyle,
 			cmdKey:      metcmd.RenameStyle,
 		},
 		// Transcoding

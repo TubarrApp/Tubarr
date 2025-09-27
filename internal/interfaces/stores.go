@@ -27,7 +27,7 @@ type ChannelStore interface {
 	DeleteVideoURLs(channelID int64, urls []string) error
 	DeleteNotifyURLs(channelID int64, urls, names []string) error
 	FetchAllChannels() (channels []*models.Channel, err error, hasRows bool)
-	FetchChannel(id int64) (c *models.Channel, err error, hasRows bool)
+	FetchChannelModel(key, val string) (c *models.Channel, err error, hasRows bool)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetDB() *sql.DB
 	GetID(key, val string) (int64, error)

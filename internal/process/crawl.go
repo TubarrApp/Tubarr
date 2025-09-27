@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"tubarr/internal/cfg"
+	cfgchannel "tubarr/internal/cfg/channel"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
@@ -60,6 +61,10 @@ func initClients() {
 //
 // Essentially it marks the URLs it finds as though they have already been downloaded.
 func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) error {
+	if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
+		cfgchannel.UpdateChannelFromConfig(s.ChannelStore(), c)
+	}
+
 	videos, err := browserInstance.GetNewReleases(s.ChannelStore(), c, ctx)
 	if err != nil {
 		return err
@@ -106,29 +111,34 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 		wg sync.WaitGroup
 	)
 
-	conc := cfg.GetInt(keys.Concurrency)
-	if conc < 1 {
-		conc = 1
-	}
+	conc := max(cfg.GetInt(keys.Concurrency), 1)
 
 	sem := make(chan struct{}, conc)
 	errChan := make(chan error, len(chans))
 
-	for i := range chans {
+	for _, c := range chans {
 
-		if chans[i].Paused {
-			logging.I("Channel with name %q is paused, skipping checks.", chans[i].Name)
+		if c.Settings.ChannelConfigFile != "" && c.UpdatedFromConfig {
+			if err := cfgchannel.UpdateChannelFromConfig(cs, c); err != nil {
+				return err
+			}
+
+			c.UpdatedFromConfig = true
+		}
+
+		if c.Paused {
+			logging.I("Channel with name %q is paused, skipping checks.", c.Name)
 			continue
 		}
 
-		timeSinceLastScan := time.Since(chans[i].LastScan)
-		crawlFreqDuration := time.Duration(chans[i].Settings.CrawlFreq) * time.Minute
+		timeSinceLastScan := time.Since(c.LastScan)
+		crawlFreqDuration := time.Duration(c.Settings.CrawlFreq) * time.Minute
 
 		fmt.Println()
 		logging.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
-			chans[i].Name,
+			c.Name,
 			timeSinceLastScan.Round(time.Second),
-			chans[i].Settings.CrawlFreq)
+			c.Settings.CrawlFreq)
 
 		if timeSinceLastScan < crawlFreqDuration {
 			remainingTime := crawlFreqDuration - timeSinceLastScan
@@ -149,7 +159,7 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 			if err := ChannelCrawl(s, c, ctx); err != nil {
 				errChan <- err
 			}
-		}(chans[i])
+		}(c)
 	}
 
 	wg.Wait()
@@ -175,6 +185,10 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 
 	logging.I("Initiating crawl for channel %q...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
 		c.Name, c.VideoDir, c.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
+
+	if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
+		cfgchannel.UpdateChannelFromConfig(s.ChannelStore(), c)
+	}
 
 	switch {
 	case len(c.URLs) == 0:

@@ -1,4 +1,4 @@
-package cfgchannel
+package cfgflags
 
 import (
 	"tubarr/internal/domain/keys"

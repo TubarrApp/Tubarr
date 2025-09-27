@@ -3,13 +3,11 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/utils/logging"
-)
-
-const (
-	dupMsg = "Duplicate meta operation %q, skipping"
 )
 
 // ValidateMetaOps parses the meta transformation operations.
@@ -19,6 +17,9 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 		return metaOps, nil
 	}
 
+	const (
+		dupMsg = "Duplicate meta operation %q, skipping"
+	)
 	var b strings.Builder
 
 	logging.D(1, "Validating meta operations...")
@@ -144,4 +145,152 @@ func ValidateMinFreeMem(minFreeMem string) error {
 		}
 	}
 	return nil
+}
+
+// ValidateOutputFiletype verifies the output filetype is valid for FFmpeg.
+func ValidateOutputFiletype(o string) (dottedExt string, err error) {
+	o = strings.ToLower(strings.TrimSpace(o))
+
+	fmt.Printf("Output filetype: %s\n", o)
+
+	valid := false
+	for _, ext := range consts.AllVidExtensions {
+		if o != ext {
+			continue
+		} else {
+			valid = true
+			break
+		}
+	}
+
+	if valid {
+		logging.I("Outputting files as %s", o)
+		if !strings.HasPrefix(o, ".") {
+			o = "." + o
+		}
+		return o, nil
+	}
+	return "", fmt.Errorf("output filetype %q is not supported", o)
+}
+
+// ValidatePurgeMetafiles checks and sets the type of metafile purge to perform.
+func ValidatePurgeMetafiles(purgeType string) bool {
+
+	purgeType = strings.TrimSpace(purgeType)
+	purgeType = strings.ToLower(purgeType)
+	purgeType = strings.ReplaceAll(purgeType, ".", "")
+
+	switch purgeType {
+	case "all", "json", "nfo":
+		fmt.Printf("Purge metafiles post-Metarr: %s\n", purgeType)
+		return true
+	}
+	return false
+}
+
+// ValidateTranscodeAudioCodec verifies the audio codec to use for transcode/encode operations.
+func ValidateTranscodeAudioCodec(a string) (audioCodec string, err error) {
+	a = strings.ToLower(a)
+	switch a {
+	case "aac", "ac3", "alac", "copy", "eac3", "libmp3lame", "libopus", "libvorbis":
+		return a, nil
+	case "mp3":
+		return "libmp3lame", nil
+	case "opus":
+		return "libopus", nil
+	case "vorbis":
+		return "libvorbis", nil
+	case "":
+		return "", nil
+	default:
+		return "", fmt.Errorf("audio codec flag %q is not currently implemented in this program, aborting", a)
+	}
+}
+
+// ValidateGPU validates the user input GPU selection.
+func ValidateGPU(g, devDir string) (gpu, gpuDir string, err error) {
+	g = strings.ToLower(g)
+
+	switch g {
+	case "qsv", "intel":
+		gpu = "qsv"
+	case "amd", "radeon", "vaapi":
+		gpu = "vaapi"
+	case "nvidia", "cuda":
+		gpu = "cuda"
+	case "auto", "automatic", "automated":
+		return "auto", devDir, nil // Return early, no directory needed for auto
+	case "":
+		return "", "", nil // Return early, no HW acceleration required
+	default:
+		return "", devDir, fmt.Errorf("entered GPU %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
+	}
+
+	_, err = os.Stat(devDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", "", fmt.Errorf("driver location %q does not appear to exist?", devDir)
+		}
+	}
+
+	return gpu, devDir, nil
+}
+
+// validateTranscodeCodec validates the user input codec selection.
+func ValidateTranscodeCodec(c string, accel string) (codec string, err error) {
+
+	logging.D(3, "Checking codec %q with accelaration type %q...", c, accel)
+	c = strings.ToLower(c)
+	c = strings.ReplaceAll(c, ".", "")
+	switch c {
+	case "h264", "hevc":
+		return c, nil
+	case "avc", "x264":
+		return "h264", nil
+	case "h265":
+		return "hevc", nil
+	case "":
+		if accel == "" {
+			return "", nil
+		} else {
+			return "", fmt.Errorf("entered codec %q not supported with acceleration type %q. Tubarr supports h264 and HEVC (h265)", c, accel)
+		}
+	default:
+		return "", fmt.Errorf("entered codec %q not supported. Tubarr supports h264 and HEVC (h265)", c)
+	}
+}
+
+// validateTranscodeQuality validates the transcode quality preset.
+func ValidateTranscodeQuality(q string) (quality string, err error) {
+	q = strings.ToLower(q)
+	q = strings.ReplaceAll(q, " ", "")
+
+	switch q {
+	case "p1", "p2", "p3", "p4", "p5", "p6", "p7":
+		logging.I("Got transcode quality profile %q", q)
+		return q, nil
+	}
+
+	qNum, err := strconv.Atoi(q)
+	if err != nil {
+		return "", fmt.Errorf("input should be p1 to p7, validation of transcoder quality failed")
+	}
+
+	var qualProf string
+	switch {
+	case qNum < 0:
+		qualProf = "p1"
+	case qNum > 7:
+		qualProf = "p7"
+	default:
+		qualProf = "p" + strconv.Itoa(qNum)
+	}
+	logging.I("Got transcode quality profile %q", qualProf)
+	return qualProf, nil
+}
+
+// validateTranscodeVideoFilter validates the transcode video filter preset.
+func ValidateTranscodeVideoFilter(q string) (vf string, err error) {
+	logging.D(1, "No checks in place for transcode video filter at present...")
+	return q, nil
 }

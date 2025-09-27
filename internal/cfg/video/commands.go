@@ -4,7 +4,7 @@ package cfgvideo
 import (
 	"errors"
 	"strconv"
-	cfgchannel "tubarr/internal/cfg/channel"
+	cfgflags "tubarr/internal/cfg/flags"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/utils/logging"
@@ -70,7 +70,7 @@ func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra
 	}
 
 	// Primary channel elements
-	cfgchannel.SetPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
+	cfgflags.SetPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
 	delCmd.Flags().StringVar(&url, "delete-url", "", "Video URL")
 
 	return delCmd

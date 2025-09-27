@@ -75,7 +75,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	}
 
 	// Ensure the directory exists
-	if err := validation.ValidateDirectory(d.Video.VideoDir); err != nil {
+	if _, err := validation.ValidateDirectory(d.Video.VideoDir, true); err != nil {
 		return err
 	}
 

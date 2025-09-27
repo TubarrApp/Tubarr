@@ -17,20 +17,20 @@ func InitAllFileTransformers(rootCmd *cobra.Command) error {
 	}
 
 	// Prefix files with date tag
-	rootCmd.PersistentFlags().String(keys.InputFileDatePfx, "", "Looks for dates in metadata to prefix the video with. (date:format [e.g. Ymd for yyyy-mm-dd])")
-	if err := viper.BindPFlag(keys.InputFileDatePfx, rootCmd.PersistentFlags().Lookup(keys.InputFileDatePfx)); err != nil {
+	rootCmd.PersistentFlags().String(keys.MInputFileDatePfx, "", "Looks for dates in metadata to prefix the video with. (date:format [e.g. Ymd for yyyy-mm-dd])")
+	if err := viper.BindPFlag(keys.MInputFileDatePfx, rootCmd.PersistentFlags().Lookup(keys.MInputFileDatePfx)); err != nil {
 		return err
 	}
 
 	// Rename convention
-	rootCmd.PersistentFlags().StringP(keys.RenameStyle, "r", "fixes-only", "Rename flag (spaces, underscores, fixes-only, or skip)")
-	if err := viper.BindPFlag(keys.RenameStyle, rootCmd.PersistentFlags().Lookup(keys.RenameStyle)); err != nil {
+	rootCmd.PersistentFlags().StringP(keys.MRenameStyle, "r", "fixes-only", "Rename flag (spaces, underscores, fixes-only, or skip)")
+	if err := viper.BindPFlag(keys.MRenameStyle, rootCmd.PersistentFlags().Lookup(keys.MRenameStyle)); err != nil {
 		return err
 	}
 
 	// Replace filename suffix
-	rootCmd.PersistentFlags().StringSlice(keys.FilenameReplaceSuffix, nil, "Replaces a specified suffix on filenames. (suffix:replacement)")
-	if err := viper.BindPFlag(keys.FilenameReplaceSuffix, rootCmd.PersistentFlags().Lookup(keys.FilenameReplaceSuffix)); err != nil {
+	rootCmd.PersistentFlags().StringSlice(keys.MFilenameReplaceSuffix, nil, "Replaces a specified suffix on filenames. (suffix:replacement)")
+	if err := viper.BindPFlag(keys.MFilenameReplaceSuffix, rootCmd.PersistentFlags().Lookup(keys.MFilenameReplaceSuffix)); err != nil {
 		return err
 	}
 
@@ -44,7 +44,10 @@ func InitAllFileTransformers(rootCmd *cobra.Command) error {
 }
 
 // SetFileDirFlags sets the primary video and JSON directories.
-func SetFileDirFlags(cmd *cobra.Command, jsonDir, videoDir *string) {
+func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) {
+	if configFile != nil {
+		cmd.Flags().StringVar(configFile, keys.ChannelConfigFile, "", "This is where the channel config file is stored (do not use templating)")
+	}
 	if videoDir != nil {
 		cmd.Flags().StringVar(videoDir, keys.VideoDir, "", "This is where videos will be saved (some {{}} templating commands available)")
 	}

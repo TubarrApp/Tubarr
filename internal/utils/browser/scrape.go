@@ -481,7 +481,7 @@ func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename stri
 	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
 
 	// Ensure the directory exists
-	if err := validation.ValidateDirectory(outputDir); err != nil {
+	if _, err := validation.ValidateDirectory(outputDir, true); err != nil {
 		return err
 	}
 

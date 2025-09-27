@@ -22,10 +22,11 @@ const (
 
 // Files and directories
 const (
-	VideoDir       string = "video-directory"
-	JSONDir        string = "json-directory"
-	MetarrPreset   string = "metarr-preset"
-	OutputFiletype string = "ext"
+	ChannelConfigFile string = "channel-config-file"
+	VideoDir          string = "video-directory"
+	JSONDir           string = "json-directory"
+	MetarrPreset      string = "metarr-preset"
+	OutputFiletype    string = "ext"
 )
 
 // Transcoding
@@ -40,6 +41,7 @@ const (
 
 // Downloading
 const (
+	AutoDownload           string = "auto-download"
 	YtdlpOutputExt         string = "ytdlp-output-extension"
 	MaxFilesize            string = "max-filesize"
 	CookieSource           string = "cookie-source"
@@ -76,18 +78,26 @@ const (
 
 // Metarr operations
 const (
-	InputFileDatePfx      string = "metarr-filename-date-tag"
-	FilenameReplaceSuffix string = "metarr-filename-replace-suffix"
-	MDescDatePfx          string = "metarr-desc-date-prefix"
-	MDescDateSfx          string = "metarr-desc-date-suffix"
-	MetaOps               string = "metarr-meta-ops"
-	MetaPurge             string = "metarr-purge-metafile"
-	MFilenamePfx          string = "metarr-metadata-filename-prefix"
-	RenameStyle           string = "metarr-rename-style"
-	MaxCPU                string = "metarr-max-cpu"
-	MinFreeMem            string = "metarr-min-free-mem"
-	NoFileOverwrite       string = "metarr-no-file-overwrite"
-	MetarrConcurrency     string = "metarr-concurrency"
-	MetarrOutputDir       string = "metarr-output-dir"
-	MetarrExt             string = "metarr-ext"
+	MInputFileDatePfx      string = "metarr-filename-date-tag"
+	MFilenameReplaceSuffix string = "metarr-filename-replace-suffix"
+	MDescDatePfx           string = "metarr-desc-date-prefix"
+	MDescDateSfx           string = "metarr-desc-date-suffix"
+	MGPU                   string = "metarr-gpu"
+	MGPUDirectory          string = "metarr-gpu-directory"
+	MMetaOps               string = "metarr-meta-ops"
+	MMetaPurge             string = "metarr-purge-metafile"
+	MFilenamePfx           string = "metarr-metadata-filename-prefix"
+	MRenameStyle           string = "metarr-rename-style"
+	MMaxCPU                string = "metarr-max-cpu"
+	MMinFreeMem            string = "metarr-min-free-mem"
+	MMetaOverwrite         string = "metarr-meta-overwrite"
+	MMetaPreserve          string = "metarr-meta-preserve"
+	MNoFileOverwrite       string = "metarr-no-file-overwrite"
+	MTranscodeAudioCodec   string = "metarr-transcode-audio-codec"
+	MTranscodeQuality      string = "metarr-transcode-quality"
+	MTranscodeVideoFilter  string = "metarr-transcode-video-filter"
+	MTranscodeVideoCodec   string = "metarr-transcode-codec"
+	MConcurrency           string = "metarr-concurrency"
+	MOutputDir             string = "metarr-output-dir"
+	MExt                   string = "metarr-ext"
 )
