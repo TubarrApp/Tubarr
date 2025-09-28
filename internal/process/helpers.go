@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 )
 
@@ -98,9 +99,7 @@ func checkMoveOps(v *models.Video) string {
 func filterRequests(v *models.Video) (valid bool, err error) {
 
 	// Load filter ops from file if present
-	if v.Channel.Settings.FilterFile != "" {
-		v.Settings.Filters = append(v.Settings.Filters, loadFilterOpsFromFile(v)...)
-	}
+	v.Settings.Filters = append(v.Settings.Filters, loadFilterOpsFromFile(v)...)
 
 	// Check filter ops
 	passFilterOps, err := filterOpsFilter(v)
@@ -280,7 +279,19 @@ func uploadDateFilter(v *models.Video) (bool, error) {
 
 // loadFilterOpsFromFile loads filter operations from a file (one per line).
 func loadFilterOpsFromFile(v *models.Video) []models.DLFilters {
+	var err error
+
+	if v.Channel.Settings.FilterFile == "" {
+		return nil
+	}
+
 	filterFile := v.Channel.Settings.FilterFile
+
+	p := parsing.NewDirectoryParser(v.Channel, v)
+	if filterFile, err = p.ParseDirectory(filterFile); err != nil {
+		logging.E(0, "Failed to parse directory %q: %v", filterFile, err)
+		return nil
+	}
 
 	logging.I("Adding filters from file %q...", filterFile)
 	filters, err := readFilterFile(filterFile)
@@ -306,7 +317,19 @@ func loadFilterOpsFromFile(v *models.Video) []models.DLFilters {
 
 // loadMoveOpsFromFile loads move operations from a file (one per line).
 func loadMoveOpsFromFile(v *models.Video) []models.MoveOps {
+	var err error
+
+	if v.Channel.Settings.MoveOpFile == "" {
+		return nil
+	}
+
 	moveOpFile := v.Channel.Settings.MoveOpFile
+
+	p := parsing.NewDirectoryParser(v.Channel, v)
+	if moveOpFile, err = p.ParseDirectory(moveOpFile); err != nil {
+		logging.E(0, "Failed to parse directory %q: %v", moveOpFile, err)
+		return nil
+	}
 
 	logging.I("Adding filter move operations from file %q...", moveOpFile)
 	moves, err := readFilterFile(moveOpFile)

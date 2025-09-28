@@ -1211,10 +1211,13 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	fmt.Printf("Retries: %d\n", s.Retries)
 	fmt.Printf("External Downloader: %s\n", s.ExternalDownloader)
 	fmt.Printf("External Downloader Args: %s\n", s.ExternalDownloaderArgs)
+	fmt.Printf("Filter Ops: %v\n", s.Filters)
 	fmt.Printf("Filter File: %s\n", s.FilterFile)
 	fmt.Printf("From Date: %q\n", hyphenateYyyyMmDd(s.FromDate))
 	fmt.Printf("To Date: %q\n", hyphenateYyyyMmDd(s.ToDate))
 	fmt.Printf("Max Filesize: %s\n", s.MaxFilesize)
+	fmt.Printf("Move Ops: %v\n", s.MoveOps)
+	fmt.Printf("Move Ops File: %s\n", s.MoveOpFile)
 	fmt.Printf("Use Global Cookies: %v\n", s.UseGlobalCookies)
 	fmt.Printf("Yt-dlp Output Extension: %s\n", s.YtdlpOutputExt)
 
