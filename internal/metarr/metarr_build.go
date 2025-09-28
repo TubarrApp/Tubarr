@@ -57,9 +57,9 @@ func makeMetarrCommand(v *models.Video) []string {
 			cmdKey:      metcmd.Ext,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.FileDatePfx},
+			metarrValue: metVals{str: v.MetarrArgs.FilenameDateTag},
 			valType:     str,
-			viperKey:    keys.MInputFileDatePfx,
+			viperKey:    keys.MFilenameDateTag,
 			cmdKey:      metcmd.FilenameDateTag,
 		},
 		{

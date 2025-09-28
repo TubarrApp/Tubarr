@@ -33,14 +33,16 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 
 // SetProgramRelatedFlags sets flags for the Tubarr instance.
 func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd *string, pause *bool, isUpdate bool) {
+
 	if concurrency != nil {
 		def := 0
 		if !isUpdate {
-			def = 3
+			def = 1
 		}
 		cmd.Flags().IntVarP(concurrency, keys.Concurrency, "l", def, "Maximum concurrent videos to download/process for this instance")
 
 	}
+
 	if crawlFreq != nil {
 		def := 0
 		if !isUpdate {
@@ -48,20 +50,15 @@ func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 		}
 		cmd.Flags().IntVar(crawlFreq, keys.CrawlFreq, def, "New crawl frequency in minutes")
 	}
+
 	if downloadCmd != nil {
-		def := ""
-		if !isUpdate {
-			def = ""
-		}
-		cmd.Flags().StringVar(downloadCmd, keys.ExternalDownloader, def, "External downloader command")
+		cmd.Flags().StringVar(downloadCmd, keys.ExternalDownloader, "", "External downloader command")
 	}
+
 	if downloadArgs != nil {
-		def := ""
-		if !isUpdate {
-			def = ""
-		}
-		cmd.Flags().StringVar(downloadArgs, keys.ExternalDownloaderArgs, def, "External downloader arguments")
+		cmd.Flags().StringVar(downloadArgs, keys.ExternalDownloaderArgs, "", "External downloader arguments")
 	}
+
 	if pause != nil {
 		cmd.Flags().BoolVar(pause, keys.Pause, false, "Pause/unpause this channel")
 	}

@@ -29,7 +29,7 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPUPtr *float64, metarrConcurrencyPtr
 		cmd.Flags().StringVar(extPtr, keys.MExt, "", "Output filetype for videos passed into Metarr")
 	}
 	if filenameDateTagPtr != nil {
-		cmd.Flags().StringVar(filenameDateTagPtr, keys.MInputFileDatePfx, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
+		cmd.Flags().StringVar(filenameDateTagPtr, keys.MFilenameDateTag, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
 	}
 	if minFreeMemPtr != nil {
 		cmd.Flags().StringVar(minFreeMemPtr, keys.MMinFreeMem, "", "Min free mem for Metarr process")
@@ -53,7 +53,7 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPUPtr *float64, metarrConcurrencyPtr
 		Ext:                ext,
 		FilenameReplaceSfx: fileSfxReplace,
 		RenameStyle:        renameStyle,
-		FileDatePfx:        filenameDateTag,
+		FilenameDateTag:    filenameDateTag,
 		MetaOps:            metaOps,
 		OutputDir:          outDir,
 		Concurrency:        metarrConcurrency,

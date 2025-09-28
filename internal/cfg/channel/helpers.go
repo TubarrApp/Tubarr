@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	validation "tubarr/internal/cfg/validation"
@@ -19,7 +20,7 @@ import (
 type cobraMetarrArgs struct {
 	filenameReplaceSfx   []string
 	renameStyle          string
-	fileDatePfx          string
+	filenameDateTag      string
 	metarrExt            string
 	metaOps              []string
 	outputDir            string
@@ -36,9 +37,15 @@ type cobraMetarrArgs struct {
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
 func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
-	if c.minFreeMem != "" {
-		if err := validation.ValidateMinFreeMem(c.minFreeMem); err != nil {
-			return nil, err
+
+	f := cmd.Flags()
+
+	// Min free memory
+	if f.Changed(keys.MMinFreeMem) {
+		if c.minFreeMem != "" {
+			if err := validation.ValidateMinFreeMem(c.minFreeMem); err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.MinFreeMem = c.minFreeMem
@@ -46,10 +53,13 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.metarrExt != "" {
-		_, err := validation.ValidateOutputFiletype(c.metarrExt)
-		if err != nil {
-			return nil, err
+	// Metarr final video output extension (e.g. 'mp4')
+	if f.Changed(keys.MExt) {
+		if c.metarrExt != "" {
+			_, err := validation.ValidateOutputFiletype(c.metarrExt)
+			if err != nil {
+				return nil, err
+			}
 		}
 		c.metarrExt = strings.ToLower(c.metarrExt)
 		fns = append(fns, func(m *models.MetarrArgs) error {
@@ -58,9 +68,12 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.renameStyle != "" {
-		if err := validation.ValidateRenameFlag(c.renameStyle); err != nil {
-			return nil, err
+	// Rename style (e.g. 'spaces')
+	if f.Changed(keys.MRenameStyle) {
+		if c.renameStyle != "" {
+			if err := validation.ValidateRenameFlag(c.renameStyle); err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.RenameStyle = c.renameStyle
@@ -68,20 +81,28 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.fileDatePfx != "" {
-		if !validation.ValidateDateFormat(c.fileDatePfx) {
-			return nil, errors.New("invalid Metarr filename date tag format")
+	// Filename date tag
+	if f.Changed(keys.MFilenameDateTag) {
+		if c.filenameDateTag != "" {
+			if !validation.ValidateDateFormat(c.filenameDateTag) {
+				return nil, errors.New("invalid Metarr filename date tag format")
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FileDatePfx = c.fileDatePfx
+			m.FilenameDateTag = c.filenameDateTag
 			return nil
 		})
 	}
 
-	if len(c.filenameReplaceSfx) != 0 {
-		valid, err := validation.ValidateFilenameSuffixReplace(c.filenameReplaceSfx)
-		if err != nil {
-			return nil, err
+	// Filename replace suffix (e.g. '_1' to '')
+	if f.Changed(keys.MFilenameReplaceSuffix) {
+		valid := c.filenameReplaceSfx
+
+		if len(c.filenameReplaceSfx) > 0 {
+			valid, err = validation.ValidateFilenameSuffixReplace(c.filenameReplaceSfx)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.FilenameReplaceSfx = valid
@@ -89,9 +110,12 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.outputDir != "" {
-		if _, err = validation.ValidateDirectory(c.outputDir, false); err != nil {
-			return nil, err
+	// Output directory
+	if f.Changed(keys.MOutputDir) {
+		if c.outputDir != "" {
+			if _, err = validation.ValidateDirectory(c.outputDir, false); err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.OutputDir = c.outputDir
@@ -99,10 +123,15 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if len(c.metaOps) > 0 {
-		valid, err := validation.ValidateMetaOps(c.metaOps)
-		if err != nil {
-			return nil, err
+	// Meta operations (e.g. 'all-credits:set:author')
+	if f.Changed(keys.MMetaOps) {
+		valid := c.metaOps
+
+		if len(c.metaOps) > 0 {
+			valid, err = validation.ValidateMetaOps(c.metaOps)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.MetaOps = valid
@@ -110,23 +139,24 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.useGPU != "" {
-		validGPU, _, err := validation.ValidateGPU(c.useGPU, c.gpuDir)
-		if err != nil {
-			return nil, err
+	// Use GPU for transcoding
+	if f.Changed(keys.TranscodeGPU) {
+		validGPU := c.useGPU
+
+		if c.useGPU != "" {
+			validGPU, _, err = validation.ValidateGPU(c.useGPU, c.gpuDir)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.UseGPU = validGPU
 			return nil
 		})
-	} else if cmd.Flags().Changed(keys.TranscodeGPU) && c.useGPU == "" {
-		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.UseGPU = c.useGPU
-			return nil
-		})
 	}
 
-	if cmd.Flags().Changed(keys.TranscodeGPUDir) {
+	// Transcoding GPU directory
+	if f.Changed(keys.TranscodeGPUDir) {
 		fns = append(fns, func(m *models.MetarrArgs) error {
 
 			if c.gpuDir != "" {
@@ -144,26 +174,31 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.transcodeCodec != "" {
-		validTranscodeCodec, err := validation.ValidateTranscodeCodec(c.transcodeCodec, c.useGPU)
-		if err != nil {
-			return nil, err
+	// Video codec
+	if f.Changed(keys.TranscodeCodec) {
+		validTranscodeCodec := c.transcodeCodec
+
+		if c.transcodeCodec != "" {
+			validTranscodeCodec, err = validation.ValidateTranscodeCodec(c.transcodeCodec, c.useGPU)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeCodec = validTranscodeCodec
 			return nil
 		})
-	} else if cmd.Flags().Changed(keys.TranscodeCodec) && c.transcodeCodec == "" {
-		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.TranscodeCodec = c.transcodeCodec
-			return nil
-		})
 	}
 
-	if c.transcodeAudioCodec != "" || cmd.Flags().Changed(keys.TranscodeAudioCodec) {
-		validTranscodeAudioCodec, err := validation.ValidateTranscodeAudioCodec(c.transcodeAudioCodec)
-		if err != nil {
-			return nil, err
+	// Audio codec
+	if f.Changed(keys.TranscodeAudioCodec) {
+		validTranscodeAudioCodec := c.transcodeAudioCodec
+
+		if c.transcodeAudioCodec != "" {
+			validTranscodeAudioCodec, err = validation.ValidateTranscodeAudioCodec(c.transcodeAudioCodec)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeAudioCodec = validTranscodeAudioCodec
@@ -171,10 +206,15 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.transcodeQuality != "" || cmd.Flags().Changed(keys.TranscodeQuality) {
-		validTranscodeQuality, err := validation.ValidateTranscodeQuality(c.transcodeQuality)
-		if err != nil {
-			return nil, err
+	// Transcode quality
+	if f.Changed(keys.TranscodeQuality) {
+		validTranscodeQuality := c.transcodeQuality
+
+		if c.transcodeQuality != "" {
+			validTranscodeQuality, err = validation.ValidateTranscodeQuality(c.transcodeQuality)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeQuality = validTranscodeQuality
@@ -182,17 +222,21 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	if c.transcodeVideoFilter != "" {
-		validTranscodeVideoFilter, err := validation.ValidateTranscodeVideoFilter(c.transcodeVideoFilter)
-		if err != nil {
-			return nil, err
+	// Transcode video filter
+	if f.Changed(keys.TranscodeVideoFilter) {
+		validTranscodeVideoFilter := c.transcodeVideoFilter
+
+		if c.transcodeVideoFilter != "" {
+			validTranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(c.transcodeVideoFilter)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeVideoFilter = validTranscodeVideoFilter
 			return nil
 		})
 	}
-
 	return fns, nil
 }
 
@@ -212,56 +256,65 @@ type chanSettings struct {
 	retries                int
 	toDate                 string
 	videoDir               string
+	useGlobalCookies       bool
 	ytdlpOutputExt         string
 }
 
-func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) error, err error) {
+// getSettingsArgsFns creates the functions to send in to update the database with new values.
+func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models.ChannelSettings) error, err error) {
 
-	logging.I("CHECKING JSON DIR %q", c.jsonDir)
+	f := cmd.Flags()
 
-	if c.concurrency > 0 {
+	// Concurrency
+	if f.Changed(keys.Concurrency) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.Concurrency = c.concurrency
+			s.Concurrency = max(c.concurrency, 1)
 			return nil
 		})
 	}
 
-	if c.channelConfigFile != "" {
+	// Channel config file location
+	if f.Changed(keys.ChannelConfigFile) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.ChannelConfigFile = c.channelConfigFile
 			return nil
 		})
 	}
 
-	if c.cookieSource != "" {
+	// Cookie source
+	if f.Changed(keys.CookieSource) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.CookieSource = c.cookieSource
 			return nil
 		})
 	}
 
-	if c.crawlFreq > 0 {
+	// Crawl frequency
+	if f.Changed(keys.CrawlFreq) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.CrawlFreq = c.crawlFreq
+			s.CrawlFreq = max(c.crawlFreq, 1)
 			return nil
 		})
 	}
 
-	if c.externalDownloader != "" {
+	// External downloader
+	if f.Changed(keys.ExternalDownloader) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.ExternalDownloader = c.externalDownloader
 			return nil
 		})
 	}
 
-	if c.externalDownloaderArgs != "" {
+	// External downloader arguments
+	if f.Changed(keys.ExternalDownloaderArgs) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.ExternalDownloaderArgs = c.externalDownloaderArgs
 			return nil
 		})
 	}
 
-	if len(c.filters) > 0 {
+	// Filter ops ('field:contains:frogs:must')
+	if f.Changed(keys.FilterOpsInput) {
 		dlFilters, err := validation.ValidateChannelOps(c.filters)
 		if err != nil {
 			return nil, err
@@ -272,10 +325,15 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	if c.fromDate != "" {
-		validFromDate, err := validation.ValidateToFromDate(c.fromDate)
-		if err != nil {
-			return nil, err
+	// From date
+	if f.Changed(keys.FromDate) {
+		var validFromDate string
+
+		if c.fromDate != "" {
+			validFromDate, err = validation.ValidateToFromDate(c.fromDate)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.FromDate = validFromDate
@@ -283,7 +341,15 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	if c.jsonDir != "" {
+	// JSON directory
+	if f.Changed(keys.JSONDir) {
+		if c.jsonDir == "" {
+			if c.videoDir != "" {
+				c.jsonDir = c.videoDir
+			} else {
+				return nil, fmt.Errorf("json directory cannot be empty. Attempted to default to video directory but video directory is also empty")
+			}
+		}
 		if _, err = validation.ValidateDirectory(c.jsonDir, false); err != nil {
 			return nil, err
 		}
@@ -293,10 +359,13 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	if c.maxFilesize != "" {
-		c.maxFilesize, err = validation.ValidateMaxFilesize(c.maxFilesize)
-		if err != nil {
-			return nil, err
+	// Max download filesize
+	if f.Changed(keys.MaxFilesize) {
+		if c.maxFilesize != "" {
+			c.maxFilesize, err = validation.ValidateMaxFilesize(c.maxFilesize)
+			if err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.MaxFilesize = c.maxFilesize
@@ -304,30 +373,45 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	fns = append(fns, func(s *models.ChannelSettings) error {
-		s.Paused = c.paused
-		return nil
-	})
+	// Pause channel
+	if f.Changed(keys.Pause) {
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.Paused = c.paused
+			return nil
+		})
+	}
 
-	if c.retries > 0 {
+	// Download retry amount
+	if f.Changed(keys.DLRetries) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.Retries = c.retries
 			return nil
 		})
 	}
 
-	if c.toDate != "" {
-		validToDate, err := validation.ValidateToFromDate(c.toDate)
-		if err != nil {
-			return nil, err
+	// To date
+	if f.Changed(keys.ToDate) {
+		var validToDate string
+
+		if c.toDate != "" {
+			validToDate, err = validation.ValidateToFromDate(c.toDate)
+			if err != nil {
+				return nil, err
+			}
 		}
+
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.ToDate = validToDate
 			return nil
 		})
 	}
 
-	if c.videoDir != "" {
+	// Video directory
+	if f.Changed(keys.VideoDir) {
+		if c.videoDir == "" {
+			return nil, fmt.Errorf("video directory cannot be empty")
+		}
+
 		if _, err = validation.ValidateDirectory(c.videoDir, false); err != nil {
 			return nil, err
 		}
@@ -337,10 +421,21 @@ func getSettingsArgFns(c chanSettings) (fns []func(m *models.ChannelSettings) er
 		})
 	}
 
-	if c.ytdlpOutputExt != "" {
-		c.ytdlpOutputExt = strings.ToLower(c.ytdlpOutputExt)
-		if err := validation.ValidateYtdlpOutputExtension(c.ytdlpOutputExt); err != nil {
-			return nil, err
+	// Use global cookies
+	if f.Changed(keys.UseGlobalCookies) {
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.UseGlobalCookies = c.useGlobalCookies
+			return nil
+		})
+	}
+
+	// YT-DLP output filetype for 'merge-output-format'
+	if f.Changed(keys.YtdlpOutputExt) {
+		if c.ytdlpOutputExt != "" {
+			c.ytdlpOutputExt = strings.ToLower(c.ytdlpOutputExt)
+			if err := validation.ValidateYtdlpOutputExtension(c.ytdlpOutputExt); err != nil {
+				return nil, err
+			}
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.YtdlpOutputExt = c.ytdlpOutputExt
@@ -361,7 +456,7 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 		key = consts.QChanName
 		val = name
 	default:
-		return "", "", errors.New("please enter either a channel ID, name, or URL")
+		return "", "", errors.New("please enter either a channel ID or channel name")
 	}
 	return key, val, nil
 }
@@ -400,98 +495,104 @@ func hyphenateYyyyMmDd(d string) string {
 	return b.String()
 }
 
-// parseAuthDetails parses authorization details for a particular channel URL.
-func parseAuthDetails(usernames, passwords, loginURLs []string) (map[string]*models.ChannelAccessDetails, error) {
-	logging.D(3, "Parsing authorization details...")
-	if usernames == nil && passwords == nil && loginURLs == nil {
+// parseAuthDetails parses authorization details for channel URLs.
+func parseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[string]*models.ChannelAccessDetails, error) {
+
+	var (
+		authMap = make(map[string]*models.ChannelAccessDetails, len(cURLs))
+	)
+
+	// Should delete all?
+	if deleteAll {
+		for _, cURL := range cURLs {
+			authMap[cURL] = &models.ChannelAccessDetails{
+				Username: "",
+				Password: "",
+				LoginURL: "",
+			}
+		}
+		logging.I("Deleted authentication details for channel URLs: %v", cURLs)
+		return authMap, nil
+	}
+
+	// Proceed
+	if len(a) == 0 && (u == "" || l == "") {
 		logging.D(3, "No authorization details to parse...")
 		return nil, nil
 	}
 
-	// Initialize the map
-	authMap := make(map[string]*models.ChannelAccessDetails)
+	// For full auth strings with ONE channel URL
+	if len(a) > 0 && len(cURLs) == 1 {
+		for _, details := range a {
 
-	// Process usernames
-	for _, u := range usernames {
-		if !strings.Contains(u, " ") {
-			return nil, fmt.Errorf("must input auth username as 'URL username' with a space between the two. %q is invalid", u)
-		}
+			// Split
+			d := strings.Split(details, "|")
 
-		uParts := strings.Split(u, " ")
-		if len(uParts) != 2 {
-			return nil, fmt.Errorf("too many space separated elements in the username %q", u)
-		}
+			// Validate
+			if len(d) < 3 || len(d) > 4 {
+				return nil, fmt.Errorf("authentication details should be in format 'username|password|login URL'")
+			}
 
-		// Initialize the struct if it doesn't exist
-		if authMap[uParts[0]] == nil {
-			authMap[uParts[0]] = &models.ChannelAccessDetails{}
+			if len(d) == 4 {
+				if d[0] != cURLs[0] {
+					return nil, fmt.Errorf("failsafe for user error: entered authentication channel URL as %q but channel's actual URL is %q. Aborting in case of mistake", d[0], cURLs[0])
+				}
+			}
+
+			// Add to model
+			authMap[cURLs[0]] = &models.ChannelAccessDetails{
+				Username: d[0],
+				Password: d[1],
+				LoginURL: d[2],
+			}
 		}
-		authMap[uParts[0]].Username = uParts[1]
+		return authMap, nil
 	}
 
-	// Process passwords
-	for _, p := range passwords {
-		if !strings.Contains(p, " ") {
-			return nil, fmt.Errorf("must input auth password as 'URL password' with a space between the two")
-		}
+	// For full auth strings with multiple channel URLs
+	if len(a) > 0 && len(cURLs) > 1 {
+		for _, details := range a {
 
-		pParts := strings.Split(p, " ")
-		if len(pParts) != 2 {
-			return nil, fmt.Errorf("too many space separated elements in the URL password entry")
-		}
+			// Split
+			d := strings.Split(details, "|")
 
-		// Initialize the struct if it doesn't exist
-		if authMap[pParts[0]] == nil {
-			authMap[pParts[0]] = &models.ChannelAccessDetails{}
+			// Validate length
+			if len(d) != 4 {
+				if len(d) == 3 {
+					return nil, fmt.Errorf("channel has multiple URLs, authentication details must be in format 'channel URL|username|password|login URL'")
+				}
+				return nil, fmt.Errorf("authentication details should be in format 'username|password|login URL'")
+			}
+
+			// Validate URL exists for channel
+			var validURL bool
+			if slices.Contains(cURLs, d[0]) {
+				validURL = true
+			}
+
+			if !validURL {
+				return nil, fmt.Errorf("channel URL %q in authentication string does not exist for channel with URLs %v", d[0], cURLs)
+			}
+
+			// Add to model
+			authMap[d[0]] = &models.ChannelAccessDetails{
+				Username: d[1],
+				Password: d[2],
+				LoginURL: d[3],
+			}
 		}
-		authMap[pParts[0]].Password = pParts[1]
+		return authMap, nil
 	}
 
-	// Process login URLs
-	for _, l := range loginURLs {
-		if !strings.Contains(l, " ") {
-			return nil, fmt.Errorf("must input auth login URL as 'channelURL loginURL' with a space between the two. %q is invalid", l)
-		}
-
-		lParts := strings.Split(l, " ")
-		if len(lParts) != 2 {
-			return nil, fmt.Errorf("too many space separated elements in the channel URL's login URL entry: %q", l)
-		}
-
-		// Initialize the struct if it doesn't exist
-		if authMap[lParts[0]] == nil {
-			authMap[lParts[0]] = &models.ChannelAccessDetails{}
-		}
-		authMap[lParts[0]].LoginURL = lParts[1]
-	}
-
-	// Validate that all required fields are present
-	for chanURL, details := range authMap {
-		if chanURL == "" {
-			continue
-		}
-
-		var count int
-		if details.LoginURL != "" {
-			count++
-		}
-		if details.Username != "" {
-			count++
-		}
-		if details.Password != "" {
-			count++
-		}
-
-		if count != 3 {
-			return nil, fmt.Errorf("every channel URL must have a username, password, and login URL")
+	// Continuation means no full authentication strings were input,
+	// but username and login URL are not empty (checked earlier)
+	for _, cURL := range cURLs {
+		authMap[cURL] = &models.ChannelAccessDetails{
+			Username: u,
+			Password: p,
+			LoginURL: l,
 		}
 	}
-
-	if len(authMap) == 0 {
-		logging.I("No auth details added")
-		return nil, nil
-	}
-
 	return authMap, nil
 }
 

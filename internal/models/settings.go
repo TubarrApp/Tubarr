@@ -34,7 +34,7 @@ type MetarrArgs struct {
 	Ext                  string   `json:"metarr_ext" mapstructure:"metarr-ext"`
 	FilenameReplaceSfx   []string `json:"metarr_filename_replace_suffix" mapstructure:"metarr-filename-replace-suffix"`
 	RenameStyle          string   `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
-	FileDatePfx          string   `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
+	FilenameDateTag      string   `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
 	MetaOps              []string `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`
 	OutputDir            string   `json:"metarr_output_directory" mapstructure:"metarr-output-dir"`
 	Concurrency          int      `json:"metarr_concurrency" mapstructure:"metarr-concurrency"`

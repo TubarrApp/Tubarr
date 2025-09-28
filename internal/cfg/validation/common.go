@@ -99,18 +99,20 @@ func ValidateViperFlags() error {
 	if viper.IsSet(keys.OutputFiletype) {
 		ext := strings.ToLower(viper.GetString(keys.OutputFiletype))
 
-		dottedExt, err := ValidateOutputFiletype(ext)
-		if err != nil {
-			return fmt.Errorf("invalid output filetype %q", ext)
+		if ext != "" {
+			dottedExt, err := ValidateOutputFiletype(ext)
+			if err != nil {
+				return fmt.Errorf("invalid output filetype %q", ext)
 
+			}
+			viper.Set(keys.OutputFiletype, dottedExt)
 		}
-		viper.Set(keys.OutputFiletype, dottedExt)
 	}
 
 	// Meta purge
 	if viper.IsSet(keys.MMetaPurge) {
 		purge := viper.GetString(keys.MMetaPurge)
-		if !ValidatePurgeMetafiles(purge) {
+		if purge != "" && !ValidatePurgeMetafiles(purge) {
 			return fmt.Errorf("invalid meta purge type %q", purge)
 		}
 	}
@@ -185,14 +187,7 @@ func ValidateYtdlpOutputExtension(e string) error {
 
 // ValidateLoggingLevel checks and validates the debug level.
 func ValidateLoggingLevel() {
-	l := viper.GetInt(keys.DebugLevel)
-	if l < 0 {
-		l = 0
-	}
-
-	if l > 5 {
-		l = 5
-	}
+	l := min(max(viper.GetInt(keys.DebugLevel), 0), 5)
 
 	logging.Level = l
 	fmt.Printf("Logging level: %d\n", logging.Level)

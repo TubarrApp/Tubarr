@@ -13,6 +13,7 @@ const (
 	AuthUsername string = "auth-username"
 	AuthPassword string = "auth-password"
 	AuthURL      string = "auth-url"
+	AuthDetails  string = "auth-details"
 )
 
 // Notification
@@ -78,7 +79,7 @@ const (
 
 // Metarr operations
 const (
-	MInputFileDatePfx      string = "metarr-filename-date-tag"
+	MFilenameDateTag       string = "metarr-filename-date-tag"
 	MFilenameReplaceSuffix string = "metarr-filename-replace-suffix"
 	MDescDatePfx           string = "metarr-desc-date-prefix"
 	MDescDateSfx           string = "metarr-desc-date-suffix"

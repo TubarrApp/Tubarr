@@ -18,7 +18,6 @@ import (
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // InitChannelCmds is the entrypoint for initializing channel commands.
@@ -39,7 +38,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	channelCmd.AddCommand(addChannelCmd(cs, s, ctx))
 	channelCmd.AddCommand(dlURLs(cs, s, ctx))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s, ctx))
-	channelCmd.AddCommand(addCrawlToIgnore(cs, s, ctx))
+	channelCmd.AddCommand(ignoreCrawl(cs, s, ctx))
 	channelCmd.AddCommand(addVideoURLToIgnore(cs))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
 	channelCmd.AddCommand(deleteVideoURLs(cs))
@@ -58,9 +57,10 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 // addAuth adds authentication details to a channel.
 func addAuth(cs interfaces.ChannelStore) *cobra.Command {
 	var (
-		channelName                     string
-		usernames, passwords, loginURLs []string
-		channelID                       int
+		channelName                  string
+		username, password, loginURL string
+		authDetails                  []string
+		channelID                    int
 	)
 
 	addAuthCmd := &cobra.Command{
@@ -68,38 +68,56 @@ func addAuth(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "Add authentication details to a channel.",
 		Long:  "Add authentication details to a channel for use in crawls.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if usernames == nil || passwords == nil || loginURLs == nil {
-				return errors.New("must enter a username, password, and login URL")
+
+			// Valid items set?
+			if len(authDetails) == 0 && (username == "" || loginURL == "") {
+				return errors.New("must enter a username and login URL, or fully qualified authentication detail string ('channel URL|username|password|login URL')")
 			}
 
-			chanID := int64(channelID)
-
-			if channelID == 0 {
-				key, val, err := getChanKeyVal(channelID, channelName)
-				if err != nil {
-					return err
-				}
-
-				if chanID, err = cs.GetID(key, val); err != nil {
-					return err
-				}
+			// Get and check key/val pair
+			key, val, err := getChanKeyVal(channelID, channelName)
+			if err != nil {
+				return err
 			}
 
-			authDetails, err := parseAuthDetails(usernames, passwords, loginURLs)
+			// Get and check ID
+			id, err := cs.GetID(key, val)
+			if err != nil {
+				return err
+			}
+
+			if id == 0 {
+				return fmt.Errorf("could not get valid ID (got %d) for channel with %s %q", id, key, val)
+			}
+
+			// Fetch channel model (retrieve the URLs)
+			c, err, hasRows := cs.FetchChannelModel(key, val)
+			if !hasRows {
+				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
+			}
+			if err != nil {
+				return err
+			}
+
+			// Parse and set authentication details
+			authDetails, err := parseAuthDetails(username, password, loginURL, authDetails, c.URLs, false)
 			if err != nil {
 				return err
 			}
 
 			if len(authDetails) > 0 {
-				if err := cs.AddAuth(chanID, authDetails); err != nil {
+				if err := cs.AddAuth(id, authDetails); err != nil {
 					return err
 				}
 			}
+
+			// Success
+			logging.S(0, "Channel with %s %q set authentication details", key, val)
 			return nil
 		},
 	}
 	cfgflags.SetPrimaryChannelFlags(addAuthCmd, &channelName, nil, &channelID)
-	cfgflags.SetAuthFlags(addAuthCmd, &usernames, &passwords, &loginURLs)
+	cfgflags.SetAuthFlags(addAuthCmd, &username, &password, &loginURL, &authDetails)
 	return addAuthCmd
 }
 
@@ -153,10 +171,17 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 	)
 
 	dlURLFileCmd := &cobra.Command{
-		Use:   "get-urls",
+		Use:   "download-urls",
 		Short: "Download inputted URLs (plaintext or file).",
 		Long:  "If using a file, the file should contain one URL per line.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Valid items set?
+			if cFile == "" && len(urls) == 0 {
+				return errors.New("must enter URLs into the source file, or set at least one URL directly")
+			}
+
+			// Check URL file if existent
 			cFileInfo, err := validation.ValidateFile(cFile, false)
 			if err != nil {
 				return fmt.Errorf("file entered (%q) is not valid: %v", cFile, err)
@@ -165,26 +190,25 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 				return fmt.Errorf("url file %q is blank", cFile)
 			}
 
-			if cFile == "" && len(urls) == 0 {
-				return errors.New("must enter URLs into the source file, or set at least one URL directly")
-			}
+			// URL length already determined to be > 0 earlier.
 
+			// Get and check key/val pair
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				return err
 			}
 
-			if len(urls) > 0 {
-				viper.Set(keys.URLAdd, urls)
-			}
+			// Set Viper flags
+			cfgflags.SetChangedFlag(keys.URLAdd, urls, cmd.Flags())
+			cfgflags.SetChangedFlag(keys.URLFile, cFile, cmd.Flags())
 
-			if cFile != "" {
-				viper.Set(keys.URLFile, cFile)
-			}
-
+			// Crawl channel
 			if err := cs.CrawlChannel(key, val, s, ctx); err != nil {
 				return err
 			}
+
+			// Success
+			logging.S(0, "Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -210,29 +234,33 @@ func deleteNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 		Long:  "Enter a fully qualified notification URL here to delete from the database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			// Valid items set?
 			if len(notifyURLs) == 0 && len(notifyNames) == 0 {
 				return errors.New("must enter at least one notify URL or name to delete")
 			}
 
-			var (
-				id = int64(channelID)
-			)
-			if id == 0 {
-				key, val, err := getChanKeyVal(channelID, channelName)
-				if err != nil {
-					return err
-				}
-
-				id, err = cs.GetID(key, val)
-				if err != nil {
-					return err
-				}
+			// Get and check ID
+			key, val, err := getChanKeyVal(channelID, channelName)
+			if err != nil {
+				return err
 			}
 
+			id, err := cs.GetID(key, val)
+			if err != nil {
+				return err
+			}
+
+			if id == 0 {
+				return fmt.Errorf("could not get valid ID (got %d) for channel name %q", id, channelName)
+			}
+
+			// Run command
 			if err := cs.DeleteNotifyURLs(id, notifyURLs, notifyNames); err != nil {
 				return err
 			}
 
+			// Success
+			logging.S(0, "Deleted notify URLs for channel with %s %q: %v", key, val, notifyURLs)
 			return nil
 		},
 	}
@@ -259,25 +287,27 @@ func addNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 		Long:  "Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. (notification pair format is 'URL|Friendly Name')",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			// Valid items set?
 			if len(notification) == 0 {
 				return errors.New("no notification URL|Name pairs entered")
 			}
 
-			var (
-				id = int64(channelID)
-			)
-			if id == 0 {
-				key, val, err := getChanKeyVal(channelID, channelName)
-				if err != nil {
-					return err
-				}
-
-				id, err = cs.GetID(key, val)
-				if err != nil {
-					return err
-				}
+			// Get and check ID
+			key, val, err := getChanKeyVal(channelID, channelName)
+			if err != nil {
+				return err
 			}
 
+			id, err := cs.GetID(key, val)
+			if err != nil {
+				return err
+			}
+
+			if id == 0 {
+				return fmt.Errorf("could not get valid ID (got %d) for channel name %q", id, channelName)
+			}
+
+			// Validate and add notification URLs
 			validPairs, err := validation.ValidateNotificationPairs(notification)
 			if err != nil {
 				return err
@@ -287,6 +317,8 @@ func addNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
+			// Success
+			logging.S(0, "Added notify URLs for channel with %s %q: %v", key, val, validPairs)
 			return nil
 		},
 	}
@@ -310,10 +342,13 @@ func addVideoURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "Adds a video URL to ignore.",
 		Long:  "URLs added to this list will not be grabbed from channel crawls.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Valid items set?
 			if ignoreURL == "" {
 				return errors.New("cannot enter the target ignore URL blank")
 			}
 
+			// Get and check ID
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
@@ -324,9 +359,17 @@ func addVideoURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
+			if id == 0 {
+				return fmt.Errorf("could not get valid ID (got %d) for channel name %q", id, name)
+			}
+
+			// Add URLs to ignore
 			if err := cs.AddURLToIgnore(id, ignoreURL); err != nil {
 				return err
 			}
+
+			// Success
+			logging.S(0, "Ignoring URL %q for channel with %s %q", ignoreURL, key, val)
 			return nil
 		},
 	}
@@ -338,8 +381,8 @@ func addVideoURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
 	return ignoreURLCmd
 }
 
-// addCrawlToIgnore crawls the current state of the channel page and adds the URLs as though they are already grabbed.
-func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
+// ignoreCrawl crawls the current state of the channel page and adds the URLs as though they are already grabbed.
+func ignoreCrawl(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
 	var (
 		name string
 		id   int
@@ -351,14 +394,19 @@ func addCrawlToIgnore(cs interfaces.ChannelStore, s interfaces.Store, ctx contex
 		Long:  "Crawls the current state of a channel page and adds all video URLs to ignore.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			// Get and check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
+			// Run an ignore crawl
 			if err := cs.CrawlChannelIgnore(key, val, s, ctx); err != nil {
 				return err
 			}
+
+			// Success
+			logging.S(0, "Completed ignore crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -381,19 +429,23 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "Pause a channel.",
 		Long:  "Paused channels won't download new videos when the main program runs a crawl.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Get and check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
+			// Get channel model
 			c, err, hasRows := cs.FetchChannelModel(key, val)
+			if !hasRows {
+				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
+			}
 			if err != nil {
 				return err
 			}
-			if !hasRows {
-				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
-			}
 
+			// Alter and save model settings
 			c.Settings.Paused = true
 
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
@@ -404,6 +456,7 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return fmt.Errorf("failed to unpause channel: %w", err)
 			}
 
+			// Success
 			logging.S(0, "Paused channel %q", c.Name)
 			return nil
 		},
@@ -427,19 +480,23 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "Unpause a channel.",
 		Long:  "Unpauses a channel, allowing it to download new videos when the main program runs a crawl.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Get and check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
+			// Get channel model
 			c, err, hasRows := cs.FetchChannelModel(key, val)
-			if err != nil {
-				return err
-			}
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
 			}
+			if err != nil {
+				return err
+			}
 
+			// Alter and save model settings
 			c.Settings.Paused = false
 
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
@@ -450,6 +507,7 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return fmt.Errorf("failed to unpause channel: %w", err)
 			}
 
+			// Success
 			logging.S(0, "Unpaused channel %q", c.Name)
 			return nil
 		},
@@ -467,41 +525,42 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
-		usernames, passwords, loginURLs                                                           []string
-		notification                                                                              []string
-		fromDate, toDate                                                                          string
-		dlFilters, metaOps, fileSfxReplace                                                        []string
-		configFile, dlFilterFile                                                                  string
-		crawlFreq, concurrency, metarrConcurrency, retries                                        int
-		maxCPU                                                                                    float64
-		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
-		pause, ignoreRun, useGlobalCookies                                                        bool
+		username, password, loginURL                                                                    string
+		authDetails                                                                                     []string
+		notification                                                                                    []string
+		fromDate, toDate                                                                                string
+		dlFilters, metaOps, fileSfxReplace                                                              []string
+		configFile, dlFilterFile                                                                        string
+		crawlFreq, concurrency, metarrConcurrency, retries                                              int
+		maxCPU                                                                                          float64
+		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
+		pause, ignoreRun, useGlobalCookies                                                              bool
 	)
 
-	now := time.Now()
 	addCmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a channel.",
 		Long:  "Add channel adds a new channel to the database using inputted URLs, names, settings, etc.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			// Files and directories
+			// Load in config file
+			if configFile != "" {
+				if err := cfgfiles.LoadConfigFile(configFile); err != nil {
+					return err
+				}
+			}
+
+			// Got valid items?
 			if vDir == "" || len(urls) == 0 || name == "" {
 				return errors.New("new channels require a video directory, name, and at least one channel URL")
 			}
 
-			if jDir == "" { // Do not stat, due to templating
+			if jDir == "" {
 				jDir = vDir
 			}
 
 			if _, err := validation.ValidateDirectory(vDir, true); err != nil {
 				return err
-			}
-
-			if configFile != "" {
-				if err := cfgfiles.LoadConfigFile(configFile); err != nil {
-					return err
-				}
 			}
 
 			// Verify filters
@@ -510,72 +569,84 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				return err
 			}
 
+			// Filename date tag
 			if filenameDateTag != "" {
 				if !validation.ValidateDateFormat(filenameDateTag) {
 					return errors.New("invalid Metarr filename date tag format")
 				}
 			}
 
+			// Meta operations
 			if len(metaOps) > 0 {
 				if metaOps, err = validation.ValidateMetaOps(metaOps); err != nil {
 					return err
 				}
 			}
 
+			// Filename suffix replace (e.g. '_1' to '')
 			if len(fileSfxReplace) > 0 {
 				if fileSfxReplace, err = validation.ValidateFilenameSuffixReplace(fileSfxReplace); err != nil {
 					return err
 				}
 			}
 
+			// Rename style
 			if renameStyle != "" {
 				if err := validation.ValidateRenameFlag(renameStyle); err != nil {
 					return err
 				}
 			}
 
+			// Min free memory
 			if minFreeMem != "" {
 				if err := validation.ValidateMinFreeMem(minFreeMem); err != nil {
 					return err
 				}
 			}
 
+			// From date
 			if fromDate != "" {
 				if fromDate, err = validation.ValidateToFromDate(fromDate); err != nil {
 					return err
 				}
 			}
 
+			// To date
 			if toDate != "" {
 				if toDate, err = validation.ValidateToFromDate(toDate); err != nil {
 					return err
 				}
 			}
 
-			if useGPU != "" {
-				if useGPU, gpuDir, err = validation.ValidateGPU(useGPU, gpuDir); err != nil {
+			// HW Acceleration GPU
+			if transcodeGPU != "" {
+				if transcodeGPU, gpuDir, err = validation.ValidateGPU(transcodeGPU, gpuDir); err != nil {
 					return err
 				}
 			}
 
+			// Video codec
 			if codec != "" {
-				if codec, err = validation.ValidateTranscodeCodec(codec, useGPU); err != nil {
+				if codec, err = validation.ValidateTranscodeCodec(codec, transcodeGPU); err != nil {
 					return err
 				}
 			}
 
+			// Audio codec
 			if audioCodec != "" {
 				if audioCodec, err = validation.ValidateTranscodeAudioCodec(audioCodec); err != nil {
 					return err
 				}
 			}
 
+			// Transcode quality
 			if transcodeQuality != "" {
 				if transcodeQuality, err = validation.ValidateTranscodeQuality(transcodeQuality); err != nil {
 					return err
 				}
 			}
 
+			// YTDLP output extension ('merge-output-format')
 			if ytdlpOutputExt != "" {
 				ytdlpOutputExt = strings.ToLower(ytdlpOutputExt)
 				if err = validation.ValidateYtdlpOutputExtension(ytdlpOutputExt); err != nil {
@@ -583,6 +654,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				}
 			}
 
+			now := time.Now()
 			c := &models.Channel{
 				URLs: urls,
 				Name: name,
@@ -610,14 +682,14 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				MetarrArgs: models.MetarrArgs{
 					Ext:                  metarrExt,
 					MetaOps:              metaOps,
-					FileDatePfx:          filenameDateTag,
+					FilenameDateTag:      filenameDateTag,
 					RenameStyle:          renameStyle,
 					FilenameReplaceSfx:   fileSfxReplace,
 					MaxCPU:               maxCPU,
 					MinFreeMem:           minFreeMem,
 					OutputDir:            outDir,
 					Concurrency:          metarrConcurrency,
-					UseGPU:               useGPU,
+					UseGPU:               transcodeGPU,
 					GPUDir:               gpuDir,
 					TranscodeCodec:       codec,
 					TranscodeAudioCodec:  audioCodec,
@@ -630,22 +702,25 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				UpdatedAt: now,
 			}
 
+			// Add channel to database
 			channelID, err := cs.AddChannel(c)
 			if err != nil {
 				return err
 			}
 
-			authDetails, err := parseAuthDetails(usernames, passwords, loginURLs)
+			// Parse and validate authentication details
+			authMap, err := parseAuthDetails(username, password, loginURL, authDetails, urls, false)
 			if err != nil {
 				return err
 			}
 
-			if len(authDetails) > 0 {
-				if err := cs.AddAuth(channelID, authDetails); err != nil {
+			if len(authMap) > 0 {
+				if err := cs.AddAuth(channelID, authMap); err != nil {
 					return err
 				}
 			}
 
+			// Validate notification URLs
 			if len(notification) != 0 {
 				validPairs, err := validation.ValidateNotificationPairs(notification)
 				if err != nil {
@@ -666,6 +741,8 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				}
 			}
 
+			// Success
+			logging.S(0, "Completed addition of channel %q to Tubarr", name)
 			return nil
 		},
 	}
@@ -677,23 +754,34 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 	cfgflags.SetFileDirFlags(addCmd, &configFile, &jDir, &vDir)
 
 	// Program related
-	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq, &externalDownloaderArgs, &externalDownloader, &pause, false)
+	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq,
+		&externalDownloaderArgs, &externalDownloader, &pause,
+		false)
 
 	// Download
-	cfgflags.SetDownloadFlags(addCmd, &retries, &useGlobalCookies, &ytdlpOutputExt, &fromDate, &toDate, &cookieSource, &maxFilesize, &dlFilterFile, &dlFilters)
+	cfgflags.SetDownloadFlags(addCmd, &retries, &useGlobalCookies,
+		&ytdlpOutputExt, &fromDate, &toDate,
+		&cookieSource, &maxFilesize, &dlFilterFile,
+		&dlFilters)
 
 	// Metarr
-	cfgflags.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency, &metarrExt, &filenameDateTag, &minFreeMem, &outDir, &renameStyle, &fileSfxReplace, &metaOps)
+	cfgflags.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency,
+		&metarrExt, &filenameDateTag, &minFreeMem,
+		&outDir, &renameStyle, &fileSfxReplace,
+		&metaOps)
 
 	// Login credentials
-	cfgflags.SetAuthFlags(addCmd, &usernames, &passwords, &loginURLs)
+	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL, &authDetails)
 
 	// Transcoding
-	cfgflags.SetTranscodeFlags(addCmd, &useGPU, &gpuDir, &transcodeVideoFilter, &codec, &audioCodec, &transcodeQuality)
+	cfgflags.SetTranscodeFlags(addCmd, &transcodeGPU, &gpuDir,
+		&transcodeVideoFilter, &codec, &audioCodec,
+		&transcodeQuality)
 
 	// Notification URL
 	cfgflags.SetNotifyFlags(addCmd, &notification)
 
+	// Pause or ignore run
 	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
 	addCmd.Flags().BoolVar(&ignoreRun, "ignore-run", false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
 
@@ -713,15 +801,20 @@ func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "Delete channels.",
 		Long:  "Delete a channel by ID, name, or URL.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Get and check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
+			// Delete channel
 			if err := cs.DeleteChannel(key, val); err != nil {
 				return err
 			}
-			logging.S(0, "Successfully deleted channel with key %q and value %q", key, val)
+
+			// Success
+			logging.S(0, "Successfully deleted channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -735,9 +828,8 @@ func deleteChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 // listAllChannel returns details about a single channel in the database.
 func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	var (
-		name, key, val string
-		err            error
-		channelID      int
+		name      string
+		channelID int
 	)
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -745,29 +837,24 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Long:  "Lists details of a channel in the database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			id := int64(channelID)
-			if id == 0 {
-				key, val, err = getChanKeyVal(channelID, name)
-				if err != nil {
-					return err
-				}
-
-				if id, err = cs.GetID(key, val); err != nil {
-					return err
-				}
+			// Get and check key/val pair
+			key, val, err := getChanKeyVal(channelID, name)
+			if err != nil {
+				return err
 			}
 
-			ch, err, hasRows := cs.FetchChannelModel("id", strconv.FormatInt(id, 10))
+			// Fetch channel model
+			ch, err, hasRows := cs.FetchChannelModel(key, val)
 			if !hasRows {
-				logging.I("Entry for channel with ID %d does not exist in the database", id)
+				logging.I("Entry for channel with %s %q does not exist in the database", key, val)
 				return nil
 			}
 			if err != nil {
 				return err
 			}
 
+			// Display settings and return
 			displaySettings(cs, ch)
-
 			return nil
 		},
 	}
@@ -783,6 +870,8 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Short: "List all channels.",
 		Long:  "Lists all channels currently saved in the database.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Fetch channels from database
 			chans, err, hasRows := cs.FetchAllChannels()
 			if !hasRows {
 				logging.I("No entries in the database")
@@ -792,6 +881,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
+			// Display settings and return
 			for _, ch := range chans {
 				displaySettings(cs, ch)
 			}
@@ -813,14 +903,20 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 		Short: "Crawl a channel for new URLs.",
 		Long:  "Initiate a crawl for new URLs of a channel that have not yet been downloaded.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Get and check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
+			// Crawl channel
 			if err := cs.CrawlChannel(key, val, s, ctx); err != nil {
 				return err
 			}
+
+			// Success
+			logging.S(0, "Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -841,14 +937,15 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		name, cookieSource                                                        string
 		minFreeMem, renameStyle, filenameDateTag, metarrExt                       string
 		maxFilesize, externalDownloader, externalDownloaderArgs                   string
-		username, password, loginURL                                              []string
+		username, password, loginURL                                              string
+		authDetails                                                               []string
 		dlFilters, metaOps                                                        []string
 		configFile, dlFilterFile                                                  string
 		fileSfxReplace                                                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
-		useGlobalCookies, pause                                                   bool
+		useGlobalCookies, pause, deleteAuth                                       bool
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -857,34 +954,63 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		Long:  "Update channel settings with various parameters, both for Tubarr itself and for external software like Metarr.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			logging.I("Updating channel with name %v", name)
+			// Load in config
+			if configFile != "" {
+				if err := cfgfiles.LoadConfigFile(configFile); err != nil {
+					return err
+				}
+			}
 
+			// Check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
-			// Update from config file
-			if configFile != "" {
+			// Fetch model from database
+			c, err, _ := cs.FetchChannelModel(key, val)
+			if err != nil {
+				return err
+			}
+
+			// Load config file location if existent and one wasn't hardcoded into terminal
+			if configFile == "" && c.Settings.ChannelConfigFile != "" {
 				if err := cfgfiles.LoadConfigFile(configFile); err != nil {
 					return err
 				}
-			} else {
-				c, err, _ := cs.FetchChannelModel(key, val)
+			}
+
+			// Parse and set authentication details if set by user, clear all if flag is set
+			if cmd.Flags().Changed(keys.AuthUsername) ||
+				cmd.Flags().Changed(keys.AuthPassword) ||
+				cmd.Flags().Changed(keys.AuthURL) ||
+				cmd.Flags().Changed(keys.AuthDetails) ||
+				deleteAuth {
+
+				// Get and check ID
+				id, err := cs.GetID(key, val)
 				if err != nil {
 					return err
 				}
 
-				if c.Settings.ChannelConfigFile != "" {
+				if id == 0 {
+					return fmt.Errorf("could not get valid ID (got %d) for channel with %s %q", id, key, val)
+				}
 
-					if err := cfgfiles.LoadConfigFile(configFile); err != nil {
+				authDetails, err := parseAuthDetails(username, password, loginURL, authDetails, c.URLs, deleteAuth)
+				if err != nil {
+					return err
+				}
+
+				if len(authDetails) > 0 {
+					if err := cs.AddAuth(id, authDetails); err != nil {
 						return err
 					}
 				}
 			}
 
-			// Settings
-			fnSettingsArgs, err := getSettingsArgFns(chanSettings{
+			// Gather channel settings
+			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
 				channelConfigFile:      configFile,
 				concurrency:            concurrency,
 				cookieSource:           cookieSource,
@@ -899,6 +1025,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				retries:                retries,
 				toDate:                 toDate,
 				videoDir:               vDir,
+				useGlobalCookies:       useGlobalCookies,
 				ytdlpOutputExt:         ytdlpOutExt,
 			})
 			if err != nil {
@@ -914,15 +1041,18 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 					}
 					return nil
 				}
+
+				// Save channel settings to database
 				if _, err := cs.UpdateChannelSettingsJSON(key, val, finalUpdateFn); err != nil {
 					return err
 				}
 			}
 
+			// Metarr arguments
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
 				filenameReplaceSfx:   fileSfxReplace,
 				renameStyle:          renameStyle,
-				fileDatePfx:          filenameDateTag,
+				filenameDateTag:      filenameDateTag,
 				metarrExt:            metarrExt,
 				metaOps:              metaOps,
 				outputDir:            outDir,
@@ -949,10 +1079,15 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 					}
 					return nil
 				}
+
+				// Save Metarr arguments to database
 				if _, err := cs.UpdateChannelMetarrArgsJSON(key, val, finalUpdateFn); err != nil {
 					return err
 				}
 			}
+
+			// Success
+			logging.S(0, "Completed update for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -984,7 +1119,9 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		&transcodeVideoFilter, &codec, &audioCodec, &transcodeQuality)
 
 	// Auth
-	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL)
+	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL, &authDetails)
+
+	updateSettingsCmd.Flags().BoolVar(&deleteAuth, "delete-auth", false, "Clear all authentication details for this channel and its URLs")
 
 	return updateSettingsCmd
 }
@@ -1002,17 +1139,23 @@ func updateChannelValue(cs interfaces.ChannelStore) *cobra.Command {
 		Long:  "Enter a column to update and a value to update that column to.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			// Check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
+			// Check validity
 			if err := verifyChanRowUpdateValid(col, newVal); err != nil {
 				return err
 			}
+
+			// Update value in database
 			if err := cs.UpdateChannelValue(key, val, col, newVal); err != nil {
 				return err
 			}
+
+			// Success
 			logging.S(0, "Updated channel column: %q → %q", col, newVal)
 			return nil
 		},
@@ -1026,7 +1169,6 @@ func updateChannelValue(cs interfaces.ChannelStore) *cobra.Command {
 	return updateRowCmd
 }
 
-// displaySettings displays fields relevant to a channel.
 // displaySettings displays fields relevant to a channel.
 func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	notifyURLs, err := cs.GetNotifyURLs(c.ID)
@@ -1079,7 +1221,7 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
 	fmt.Printf("Filename Suffix Replace: %v\n", m.FilenameReplaceSfx)
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
-	fmt.Printf("Filename Date Format: %s\n", m.FileDatePfx)
+	fmt.Printf("Filename Date Format: %s\n", m.FilenameDateTag)
 
 	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Notification URLs: %v\n", notifyURLs)
@@ -1235,11 +1377,11 @@ func applyConfigMetarrSettings(c *models.Channel) (err error) {
 		}
 		c.MetarrArgs.RenameStyle = v
 	}
-	if v, ok := getConfigValue[string](keys.MInputFileDatePfx); ok {
+	if v, ok := getConfigValue[string](keys.MFilenameDateTag); ok {
 		if ok := validation.ValidateDateFormat(v); !ok {
 			return fmt.Errorf("date format %q in config file %q is invalid", v, c.Settings.ChannelConfigFile)
 		}
-		c.MetarrArgs.FileDatePfx = v
+		c.MetarrArgs.FilenameDateTag = v
 	}
 	if v, ok := getConfigValue[[]string](keys.MMetaOps); ok {
 		c.MetarrArgs.MetaOps, err = validation.ValidateMetaOps(v)
@@ -1288,6 +1430,7 @@ func applyConfigMetarrSettings(c *models.Channel) (err error) {
 		}
 	}
 
+	// Transcode GPU validation
 	if gpuGot != "" || gpuDirGot != "" {
 		c.MetarrArgs.UseGPU, c.MetarrArgs.GPUDir, err = validation.ValidateGPU(gpuGot, gpuDirGot)
 		if err != nil {
@@ -1295,6 +1438,7 @@ func applyConfigMetarrSettings(c *models.Channel) (err error) {
 		}
 	}
 
+	// Validate video codec against transcode GPU
 	if c.MetarrArgs.TranscodeCodec, err = validation.ValidateTranscodeCodec(videoCodecGot, c.MetarrArgs.UseGPU); err != nil {
 		return err
 	}

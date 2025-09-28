@@ -17,13 +17,13 @@ func InitAllFileTransformers(rootCmd *cobra.Command) error {
 	}
 
 	// Prefix files with date tag
-	rootCmd.PersistentFlags().String(keys.MInputFileDatePfx, "", "Looks for dates in metadata to prefix the video with. (date:format [e.g. Ymd for yyyy-mm-dd])")
-	if err := viper.BindPFlag(keys.MInputFileDatePfx, rootCmd.PersistentFlags().Lookup(keys.MInputFileDatePfx)); err != nil {
+	rootCmd.PersistentFlags().String(keys.MFilenameDateTag, "", "Looks for dates in metadata to prefix the video with. (date:format [e.g. Ymd for yyyy-mm-dd])")
+	if err := viper.BindPFlag(keys.MFilenameDateTag, rootCmd.PersistentFlags().Lookup(keys.MFilenameDateTag)); err != nil {
 		return err
 	}
 
 	// Rename convention
-	rootCmd.PersistentFlags().StringP(keys.MRenameStyle, "r", "fixes-only", "Rename flag (spaces, underscores, fixes-only, or skip)")
+	rootCmd.PersistentFlags().StringP(keys.MRenameStyle, "r", "skip", "Rename flag (spaces, underscores, fixes-only, or skip)")
 	if err := viper.BindPFlag(keys.MRenameStyle, rootCmd.PersistentFlags().Lookup(keys.MRenameStyle)); err != nil {
 		return err
 	}
