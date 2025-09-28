@@ -252,6 +252,8 @@ type chanSettings struct {
 	fromDate               string
 	jsonDir                string
 	maxFilesize            string
+	moveOps                []string
+	moveOpsFile            string
 	paused                 bool
 	retries                int
 	toDate                 string
@@ -315,12 +317,24 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Filter ops ('field:contains:frogs:must')
 	if f.Changed(keys.FilterOpsInput) {
-		dlFilters, err := validation.ValidateChannelOps(c.filters)
+		dlFilters, err := validation.ValidateFilterOps(c.filters)
 		if err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.Filters = dlFilters
+			return nil
+		})
+	}
+
+	// Move ops ('field:value:output directory')
+	if f.Changed(keys.MoveOps) {
+		moveOperations, err := validation.ValidateMoveOps(c.moveOps)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.MoveOps = moveOperations
 			return nil
 		})
 	}

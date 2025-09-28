@@ -38,79 +38,98 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 		return false, fmt.Errorf("failed to decode JSON: %w", err)
 	}
 
-	if len(m) > 0 {
-		v.MetadataMap = m
-
-		// Extract title from metadata
-		if title, ok := m["title"].(string); ok {
-			v.Title = title
-			logging.D(2, "Extracted title from metadata: %s", title)
-		} else {
-			logging.D(2, "No title found in metadata or invalid type")
-		}
-
-		// Extract upload date if available
-		if uploadDate, ok := m["upload_date"].(string); ok {
-			if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
-				v.UploadDate = t
-				logging.D(2, "Extracted upload date: %s", t.Format("2006-01-02"))
-			} else {
-				logging.D(2, "Failed to parse upload date %q: %v", uploadDate, err)
-			}
-		}
-
-		// Extract any additional metadata fields you want to store
-		if description, ok := m["description"].(string); ok {
-			v.Description = description
-			logging.D(2, "Extracted description from metadata")
-		}
-
-	} else {
+	if len(m) == 0 {
 		return false, nil
 	}
 
-	if valid, err = filterRequests(v); err != nil {
-		return false, err
-	} else if !valid {
-		return false, nil
+	v.MetadataMap = m
+
+	// Extract title from metadata
+	if title, ok := m["title"].(string); ok {
+		v.Title = title
+		logging.D(2, "Extracted title from metadata: %s", title)
+	} else {
+		logging.D(2, "No title found in metadata or invalid type")
+	}
+
+	// Extract upload date if available
+	if uploadDate, ok := m["upload_date"].(string); ok {
+		if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
+			v.UploadDate = t
+			logging.D(2, "Extracted upload date: %s", t.Format("2006-01-02"))
+		} else {
+			logging.D(2, "Failed to parse upload date %q: %v", uploadDate, err)
+		}
+	}
+
+	// Extract description
+	if description, ok := m["description"].(string); ok {
+		v.Description = description
+		logging.D(2, "Extracted description from metadata")
 	}
 
 	logging.D(1, "Successfully validated and stored metadata for video: %s (Title: %s)", v.URL, v.Title)
 	return true, nil
 }
 
-// filterRequests uses user input filters to check if the video should be downloaded.
-func filterRequests(v *models.Video) (valid bool, err error) {
-	// Apply filters if any match metadata content
-
-	if v.Channel.Settings.FilterFile != "" {
-		logging.I("Adding filters from file %v...", v.Channel.Settings.FilterFile)
-		filters, err := loadFiltersFromFile(v.Channel.Settings.FilterFile)
-		if err != nil {
-			logging.E(0, "Error loading filters from file %v: %v", v.Channel.Settings.FilterFile, err)
-		}
-
-		if len(filters) > 0 {
-			validFilters, err := validation.ValidateChannelOps(filters)
-			if err != nil {
-				logging.E(0, "Error loading filters from file %v: %v", v.Channel.Settings.FilterFile, err)
-			}
-			if len(validFilters) > 0 {
-				logging.D(1, "Found following filters in file:\n\n%v", validFilters)
-				v.Settings.Filters = append(v.Settings.Filters, validFilters...)
-			}
-		} else {
-			logging.I("No valid filters found in file. Format is one per line 'field:contains:dogs:must' (Only download videos with 'dogs' in the title)")
-		}
+// checkMoveOps checks if Metarr should use an output directory based on existent metadata.
+func checkMoveOps(v *models.Video) string {
+	// Load move ops from file if present
+	if v.Channel.Settings.MoveOpFile != "" {
+		v.Settings.MoveOps = append(v.Settings.MoveOps, loadMoveOpsFromFile(v)...)
 	}
 
-	mustTotal := 0
-	mustPassed := 0
-	anyTotal := 0
-	anyPassed := 0
+	for _, op := range v.Settings.MoveOps {
+		if raw, exists := v.MetadataMap[op.Field]; exists {
+			// Convert any type to string
+			val := fmt.Sprint(raw)
+
+			if strings.Contains(strings.ToLower(val), strings.ToLower(op.Value)) {
+				logging.I("Move op filters matched: Field %q contains the value %q. Output directory retrieved as %q", op.Field, op.Value, op.OutputDir)
+				return op.OutputDir
+			}
+		}
+	}
+	logging.I("MOVE OP FILTERS DID NOT MATCH")
+	return ""
+}
+
+// filterRequests uses user input filters to check if the video should be downloaded.
+func filterRequests(v *models.Video) (valid bool, err error) {
+
+	// Load filter ops from file if present
+	if v.Channel.Settings.FilterFile != "" {
+		v.Settings.Filters = append(v.Settings.Filters, loadFilterOpsFromFile(v)...)
+	}
+
+	// Check filter ops
+	passFilterOps, err := filterOpsFilter(v)
+	if err != nil {
+		return false, err
+	}
+	if !passFilterOps {
+		return false, nil
+	}
+
+	// Upload date filter
+	passUploadDate, err := uploadDateFilter(v)
+	if err != nil {
+		return false, err
+	}
+	if !passUploadDate {
+		return false, nil
+	}
+
+	logging.I("Video %q for channel %q passed filter checks", v.URL, v.Channel.Name)
+	return true, nil
+}
+
+// filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
+func filterOpsFilter(v *models.Video) (bool, error) {
+	mustTotal, mustPassed := 0, 0
+	anyTotal, anyPassed := 0, 0
 
 	for _, filter := range v.Settings.Filters {
-
 		switch filter.MustAny {
 		case "must":
 			mustTotal++
@@ -119,147 +138,93 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 		}
 
 		val, exists := v.MetadataMap[filter.Field]
+		strVal := strings.ToLower(fmt.Sprint(val))
+		filterVal := strings.ToLower(filter.Value)
 
-		// Empty field logic
-		if filter.Value == "" {
-			if !exists {
-				switch filter.Type {
-				case consts.FilterContains:
+		passed, failHard := false, false
 
-					logging.I("Filtering: Field %q not found in metadata for URL %q and filter is set to require it, filtering out", filter.Field, v.URL)
-					if err := removeUnwantedJSON(v.JSONPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %s: %v", v.JSONPath, err.Error())
-					}
-					return false, nil // Empty field cannot contain any contain filter, return here.
-
-				case consts.FilterOmits:
-					logging.D(2, "Passed check: Field %q does not exist", filter.Field)
-
-					switch filter.MustAny {
-					case "must":
-						mustPassed++
-						logging.D(3, "'Must' filter %v passed for field %v", filter.Value, val)
-					case "any":
-						anyPassed++
-						logging.D(3, "'Any' filter %v passed for field %v", filter.Value, val)
-					}
-
-					continue
-				}
-			}
-
-			if exists {
-				switch filter.Type {
-				case consts.FilterOmits:
-
-					switch filter.MustAny {
-
-					case "must":
-						logging.I("Filtering: Field %q found in metadata for URL %q and filter is set to omit it, filtering out", filter.Field, v.URL)
-						if err := removeUnwantedJSON(v.JSONPath); err != nil {
-							logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-						}
-						return false, nil // Must omit but contains the field
-					case "any":
-						continue
-					}
-
-				case consts.FilterContains:
-					logging.D(2, "Passed check: Field %q exists", filter.Field)
-
-					switch filter.MustAny {
-					case "must":
-						mustPassed++
-						logging.D(3, "'Must' filter %v passed for field %v", filter.Value, val)
-					case "any":
-						anyPassed++
-						logging.D(3, "'Any' filter %v passed for field %v", filter.Value, val)
-					}
-
-					continue
-				}
-			}
+		switch filter.Value {
+		case "": // empty filter value
+			passed, failHard = checkFilterWithEmptyValue(filter, exists)
+		default: // non-empty filter value
+			passed, failHard = checkFilterWithValue(filter, strVal, filterVal) // Treats non-existent and empty metadata fields the same...
 		}
 
-		// Non-empty field logic
-		if filter.Value != "" {
-
-			passed := false
-
-			strVal, ok := val.(string)
-			if !ok {
-				logging.E(0, "Unexpected type for field %s: expected string, got %T", filter.Field, val)
-				continue
+		if failHard {
+			if err := removeUnwantedJSON(v.JSONPath); err != nil {
+				logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 			}
+			return false, nil
+		}
 
-			lowerStrVal := strings.ToLower(strVal)
-			lowerFilterVal := strings.ToLower(filter.Value)
-
-			// Apply the filter logic
-			switch filter.Type {
-			case consts.FilterOmits:
-
-				if !strings.Contains(lowerStrVal, lowerFilterVal) {
-					passed = true
-				} else if filter.MustAny == "must" {
-					// Fail hard for must
-					logging.D(1, "Filtering out video %q which contains %q in field %q", v.URL, filter.Value, filter.Field)
-					if err := removeUnwantedJSON(v.JSONPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-					}
-					return false, nil
-				}
-
-			case consts.FilterContains:
-
-				if strings.Contains(lowerStrVal, lowerFilterVal) {
-					passed = true
-				} else if filter.MustAny == "must" {
-					logging.D(1, "Filtering out video %q which does not contain %q in field %q", v.URL, filter.Value, filter.Field)
-					if err := removeUnwantedJSON(v.JSONPath); err != nil {
-						logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-					}
-					return false, nil
-				}
-
-			default:
-				logging.D(1, "Unrecognized filter type, skipping...")
-				continue
-			}
-
-			if passed {
-				switch filter.MustAny {
-				case "must":
-					mustPassed++
-					logging.D(3, "'Must' filter %v passed for field %v", filter.Value, val)
-				case "any":
-					anyPassed++
-					logging.D(3, "'Any' filter %v passed for field %v", filter.Value, val)
-				}
+		if passed {
+			switch filter.MustAny {
+			case "must":
+				mustPassed++
+			case "any":
+				anyPassed++
 			}
 		}
 	}
 
-	// Some "must" filters failed
+	// Tally checks
 	if mustPassed != mustTotal {
-		logging.D(1, "Filtering out video %q which does not meet 'must contain' threshold (number of 'musts': %d 'musts' found: %d)", v.URL, mustTotal, mustPassed)
 		return false, nil
 	}
-
-	// No "any" filters passed and no "must" filters passed
 	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
-		logging.D(1, "Filtering out video %q which does not meet any filter threshold.\n\nNumber of 'anys': %d\n'Anys' found: %d\n\nNumber of 'musts': %d\n'Musts' found: %d\n\n", v.URL, anyTotal, anyPassed, mustTotal, mustPassed)
 		return false, nil
 	}
 
 	if len(v.Settings.Filters) > 0 {
 		logging.I("Video passed download filter checks: %v", v.Settings.Filters)
 	}
+	return true, nil
+}
 
-	logging.D(3, "Filter tally:\n\nNumber of 'anys': %d\n'Anys' found: %d\n\nNumber of 'musts': %d\n'Musts' found: %d\n\n", anyTotal, anyPassed, mustTotal, mustPassed)
+// checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
+func checkFilterWithEmptyValue(filter models.DLFilters, exists bool) (passed, failHard bool) {
+	switch filter.Type {
+	case consts.FilterContains:
+		if !exists {
+			logging.I("Filtering: field %q not found and must contain it", filter.Field)
+			return false, true
+		}
+		return true, false
+	case consts.FilterOmits:
+		if exists && filter.MustAny == "must" {
+			logging.I("Filtering: field %q exists but must omit it", filter.Field)
+			return false, true
+		}
+		return !exists, false
+	}
+	return false, false
+}
 
-	// Other filters
-	// Upload date filter
+// checkFilterWithValue checks a filter's value against its matching metadata field.
+func checkFilterWithValue(filter models.DLFilters, strVal, filterVal string) (passed, failHard bool) {
+	switch filter.Type {
+	case consts.FilterContains:
+		if strings.Contains(strVal, filterVal) {
+			return true, false
+		}
+		if filter.MustAny == "must" {
+			logging.I("Filtering out: does not contain %q in %q", filter.Value, filter.Field)
+			return false, true
+		}
+	case consts.FilterOmits:
+		if !strings.Contains(strVal, filterVal) {
+			return true, false
+		}
+		if filter.MustAny == "must" {
+			logging.I("Filtering out: contains %q in %q", filter.Value, filter.Field)
+			return false, true
+		}
+	}
+	return false, false
+}
+
+// uploadDateFilter filters a video based on its upload date.
+func uploadDateFilter(v *models.Video) (bool, error) {
 	if !v.UploadDate.IsZero() {
 		uploadDateNum, err := strconv.Atoi(v.UploadDate.Format("20060102"))
 		if err != nil {
@@ -310,13 +275,63 @@ func filterRequests(v *models.Video) (valid bool, err error) {
 	} else {
 		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
 	}
-
-	logging.I("Video %q for channel %q passed filter checks", v.URL, v.Channel.Name)
 	return true, nil
 }
 
-// loadFiltersFromFile loads filters from a file (one per line).
-func loadFiltersFromFile(path string) ([]string, error) {
+// loadFilterOpsFromFile loads filter operations from a file (one per line).
+func loadFilterOpsFromFile(v *models.Video) []models.DLFilters {
+	filterFile := v.Channel.Settings.FilterFile
+
+	logging.I("Adding filters from file %q...", filterFile)
+	filters, err := readFilterFile(filterFile)
+	if err != nil {
+		logging.E(0, "Error loading filters from file %q: %v", filterFile, err)
+	}
+
+	if len(filters) == 0 {
+		logging.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
+		return nil
+	}
+
+	validFilters, err := validation.ValidateFilterOps(filters)
+	if err != nil {
+		logging.E(0, "Error loading filters from file %v: %v", filterFile, err)
+	}
+	if len(validFilters) > 0 {
+		logging.D(1, "Found following filters in file:\n\n%v", validFilters)
+	}
+
+	return validFilters
+}
+
+// loadMoveOpsFromFile loads move operations from a file (one per line).
+func loadMoveOpsFromFile(v *models.Video) []models.MoveOps {
+	moveOpFile := v.Channel.Settings.MoveOpFile
+
+	logging.I("Adding filter move operations from file %q...", moveOpFile)
+	moves, err := readFilterFile(moveOpFile)
+	if err != nil {
+		logging.E(0, "Error loading filter move operations from file %q: %v", moveOpFile, err)
+	}
+
+	if len(moves) == 0 {
+		logging.I("No valid filter move operations found in file. Format is one per line 'title:dogs:/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs)")
+	}
+
+	validMoves, err := validation.ValidateMoveOps(moves)
+	if err != nil {
+		logging.E(0, "Error loading filter move operations from file %q: %v", moveOpFile, err)
+	}
+	if len(validMoves) > 0 {
+		logging.D(1, "Found following filter move operations in file:\n\n%v", validMoves)
+		v.Settings.MoveOps = append(v.Settings.MoveOps, validMoves...)
+	}
+
+	return validMoves
+}
+
+// readFilterFile loads filters from a file (one per line).
+func readFilterFile(path string) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -327,7 +342,7 @@ func loadFiltersFromFile(path string) ([]string, error) {
 		}
 	}()
 
-	filters := []string{}
+	f := []string{}
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
@@ -335,14 +350,14 @@ func loadFiltersFromFile(path string) ([]string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue // skip blank lines and comments
 		}
-		filters = append(filters, line)
+		f = append(f, line)
 	}
 
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 
-	return filters, nil
+	return f, nil
 }
 
 // removeUnwantedJSON removes filtered out JSON files.

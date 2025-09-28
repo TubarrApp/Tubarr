@@ -237,24 +237,41 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 // parseOutputDir parses and returns the output directory.
 func parseOutputDir(v *models.Video) string {
 	dirParser := parsing.NewDirectoryParser(v.Channel, v)
+
 	switch {
-	case cfg.IsSet(keys.MoveOnComplete) && v.MetarrArgs.OutputDir == "":
-		parsedDir, err := dirParser.ParseDirectory(cfg.GetString(keys.MoveOnComplete))
+	// #1 Priority: Explicit Viper flag set
+	case cfg.IsSet(keys.MoveOnComplete):
+		d := cfg.GetString(keys.MoveOnComplete)
+
+		parsed, err := dirParser.ParseDirectory(d)
 		if err != nil {
-			logging.E(0, "Failed to parse directory for video with ID %d: %v", v.ID, err)
+			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", d, v.URL, err)
 			break
 		}
-		cfg.Set(keys.MoveOnComplete, parsedDir)
-		return parsedDir
 
+		cfg.Set(keys.MoveOnComplete, parsed)
+		return parsed
+
+		// #2 Priority: Move operation filter output directory
+	case v.Channel.MoveOpOutputDir != "":
+		parsed, err := dirParser.ParseDirectory(v.Channel.MoveOpOutputDir)
+		if err != nil {
+			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", v.Channel.MoveOpOutputDir, v.URL, err)
+			break
+		}
+		return parsed
+
+		// #3 Priority: Channel default output directory
 	case v.MetarrArgs.OutputDir != "":
 		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDir)
 		if err != nil {
-			logging.E(0, "Failed to parse directory at %q: %v", v.MetarrArgs.OutputDir, err)
+			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", v.MetarrArgs.OutputDir, v.URL, err)
 			break
 		}
 		return parsed
 	}
+
+	// Return blank
 	return ""
 }
 

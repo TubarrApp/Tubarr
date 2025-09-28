@@ -529,8 +529,8 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		authDetails                                                                                     []string
 		notification                                                                                    []string
 		fromDate, toDate                                                                                string
-		dlFilters, metaOps, fileSfxReplace                                                              []string
-		configFile, dlFilterFile                                                                        string
+		dlFilters, metaOps, moveOps, fileSfxReplace                                                     []string
+		configFile, dlFilterFile, moveOpFile                                                            string
 		crawlFreq, concurrency, metarrConcurrency, retries                                              int
 		maxCPU                                                                                          float64
 		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
@@ -563,8 +563,14 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				return err
 			}
 
-			// Verify filters
-			dlFilters, err := validation.ValidateChannelOps(dlFilters)
+			// Validate filter operations
+			dlFilters, err := validation.ValidateFilterOps(dlFilters)
+			if err != nil {
+				return err
+			}
+
+			// Validate move operation filters
+			moveOps, err := validation.ValidateMoveOps(moveOps)
 			if err != nil {
 				return err
 			}
@@ -671,6 +677,8 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 					FromDate:               fromDate,
 					JSONDir:                jDir,
 					MaxFilesize:            maxFilesize,
+					MoveOps:                moveOps,
+					MoveOpFile:             moveOpFile,
 					Paused:                 pause,
 					Retries:                retries,
 					ToDate:                 toDate,
@@ -755,7 +763,8 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 
 	// Program related
 	cfgflags.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq,
-		&externalDownloaderArgs, &externalDownloader, &pause,
+		&externalDownloaderArgs, &externalDownloader,
+		&moveOpFile, &moveOps, &pause,
 		false)
 
 	// Download
@@ -939,8 +948,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		maxFilesize, externalDownloader, externalDownloaderArgs                   string
 		username, password, loginURL                                              string
 		authDetails                                                               []string
-		dlFilters, metaOps                                                        []string
-		configFile, dlFilterFile                                                  string
+		dlFilters, metaOps, moveOps                                               []string
+		configFile, dlFilterFile, moveOpsFile                                     string
 		fileSfxReplace                                                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
@@ -1021,6 +1030,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				filterFile:             dlFilterFile,
 				fromDate:               fromDate,
 				maxFilesize:            maxFilesize,
+				moveOps:                moveOps,
+				moveOpsFile:            moveOpsFile,
 				paused:                 pause,
 				retries:                retries,
 				toDate:                 toDate,
@@ -1100,7 +1111,8 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Program related
 	cfgflags.SetProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq,
-		&externalDownloaderArgs, &externalDownloader, &pause, true)
+		&externalDownloaderArgs, &externalDownloader, &moveOpsFile,
+		&moveOps, &pause, true)
 
 	// Download
 	cfgflags.SetDownloadFlags(updateSettingsCmd, &retries, &useGlobalCookies,

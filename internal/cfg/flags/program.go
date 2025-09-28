@@ -32,7 +32,7 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 }
 
 // SetProgramRelatedFlags sets flags for the Tubarr instance.
-func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd *string, pause *bool, isUpdate bool) {
+func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd, moveOpsFile *string, moveOps *[]string, pause *bool, isUpdate bool) {
 
 	if concurrency != nil {
 		def := 0
@@ -57,6 +57,14 @@ func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 
 	if downloadArgs != nil {
 		cmd.Flags().StringVar(downloadArgs, keys.ExternalDownloaderArgs, "", "External downloader arguments")
+	}
+
+	if moveOpsFile != nil {
+		cmd.Flags().StringVar(moveOpsFile, keys.MoveOpsFile, "", "File containing move filter operations, one per line (format is 'metafield:value:output directory')")
+	}
+
+	if moveOps != nil {
+		cmd.Flags().StringSliceVar(moveOps, keys.MoveOps, nil, "Move to an output directory in Metarr based on metadata (format is 'metafield:value:output directory')")
 	}
 
 	if pause != nil {

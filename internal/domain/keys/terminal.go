@@ -68,6 +68,8 @@ const (
 const (
 	FilterOpsInput string = "filter-ops"
 	FilterOpsFile  string = "filter-ops-file"
+	MoveOps        string = "move-ops"
+	MoveOpsFile    string = "move-ops-file"
 	CrawlFreq      string = "crawl-freq"
 )
 

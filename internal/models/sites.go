@@ -17,6 +17,7 @@ type Channel struct {
 	LastScan          time.Time       `db:"last_scan"`
 	CreatedAt         time.Time       `db:"created_at"`
 	UpdatedAt         time.Time       `db:"updated_at"`
+	MoveOpOutputDir   string
 	UpdatedFromConfig bool
 }
 

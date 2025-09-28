@@ -216,38 +216,45 @@ func ValidateMaxFilesize(m string) (string, error) {
 	return m, nil
 }
 
-// ValidateChannelOps verifies that the user inputted filters are valid.
-func ValidateChannelOps(ops []string) ([]models.DLFilters, error) {
+// ValidateFilterOps verifies that the user inputted filters are valid.
+func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 
 	const (
 		filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omits:must' omits videos only when the metafile contains a date field"
 	)
 
 	var filters = make([]models.DLFilters, 0, len(ops))
+
 	for _, op := range ops {
-		split := strings.Split(op, ":")
+
+		split, err := parseOp(op)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(split) < 3 {
 			logging.E(0, filterFormatError)
 			return nil, errors.New("filter format error")
 		}
+
 		switch len(split) {
 		case 4:
 
-			split[0] = strings.ToLower(split[0])
-			split[1] = strings.ToLower(split[1])
-			split[2] = strings.ToLower(split[2])
-			split[3] = strings.ToLower(split[3])
+			field := strings.ToLower(strings.TrimSpace(split[0]))
+			containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
+			value := strings.ToLower(split[2])
+			mustAny := strings.ToLower(strings.TrimSpace(split[3]))
 
-			switch split[1] {
+			switch containsOmits {
 			case "contains", "omits":
 
-				switch split[3] {
+				switch mustAny {
 				case "must", "any":
 					filters = append(filters, models.DLFilters{
-						Field:   split[0],
-						Type:    split[1],
-						Value:   split[2],
-						MustAny: split[3],
+						Field:   field,
+						Type:    containsOmits,
+						Value:   value,
+						MustAny: mustAny,
 					})
 				default:
 					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
@@ -259,19 +266,19 @@ func ValidateChannelOps(ops []string) ([]models.DLFilters, error) {
 			}
 		case 3:
 
-			split[0] = strings.ToLower(split[0])
-			split[1] = strings.ToLower(split[1])
-			split[2] = strings.ToLower(split[2])
+			field := strings.ToLower(strings.TrimSpace(split[0]))
+			containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
+			mustAny := strings.ToLower(strings.TrimSpace(split[2]))
 
 			switch split[1] {
 			case "contains", "omits":
 
-				switch split[2] {
+				switch mustAny {
 				case "must", "any":
 					filters = append(filters, models.DLFilters{
-						Field:   split[0],
-						Type:    split[1],
-						MustAny: split[2],
+						Field:   field,
+						Type:    containsOmits,
+						MustAny: mustAny,
 					})
 				default:
 					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
@@ -286,6 +293,45 @@ func ValidateChannelOps(ops []string) ([]models.DLFilters, error) {
 		}
 	}
 	return filters, nil
+}
+
+// ValidateMoveOps validates that the user's inputted move filter operations are valid.
+func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
+	if len(ops) == 0 {
+		return nil, nil
+	}
+
+	const (
+		moveOpFormatError string = "please enter move operations in the format 'field:value:output directory'.\n\n'title:frogs:/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
+	)
+
+	m := make([]models.MoveOps, 0, len(ops))
+
+	for _, op := range ops {
+		split, err := parseOp(op)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(split) != 3 {
+			return nil, errors.New(moveOpFormatError)
+		}
+
+		field := strings.ToLower(strings.TrimSpace(split[0]))
+		value := strings.ToLower(split[1])
+		outputDir := strings.TrimSpace(strings.TrimSpace(split[2]))
+
+		if _, err := ValidateDirectory(outputDir, false); err != nil {
+			return nil, err
+		}
+
+		m = append(m, models.MoveOps{
+			Field:     field,
+			Value:     value,
+			OutputDir: outputDir,
+		})
+	}
+	return m, nil
 }
 
 // ValidateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".

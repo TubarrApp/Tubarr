@@ -37,7 +37,12 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		logging.E(0, "JSON parsing/storage failed for %q: %v", v.URL, err)
 	}
 
-	if !jsonValid { // JSON failed checks, exclude video
+	passedFilters, err := filterRequests(v)
+	if err != nil {
+		logging.E(0, "filter operation checks failed for %q: %v", v.URL, err)
+	}
+
+	if !jsonValid || !passedFilters { // JSON failed checks, exclude video
 
 		v.DownloadStatus.Status = consts.DLStatusCompleted
 		v.DownloadStatus.Pct = 100.0
@@ -48,6 +53,8 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		}
 		return false, nil
 	}
+
+	v.Channel.MoveOpOutputDir = checkMoveOps(v)
 
 	if v.ID, err = vs.AddVideo(v); err != nil {
 		return false, fmt.Errorf("failed to update video DB entry: %w", err)

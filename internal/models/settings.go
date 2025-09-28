@@ -10,6 +10,8 @@ type ChannelSettings struct {
 	ExternalDownloaderArgs string      `json:"external_downloader_args" mapstructure:"external-downloader-args"`
 	Filters                []DLFilters `json:"filters" mapstructure:"filters"`
 	FilterFile             string      `json:"filter_file" mapstructure:"filter-file"`
+	MoveOps                []MoveOps   `json:"move_ops" mapstructure:"move-ops"`
+	MoveOpFile             string      `json:"move_ops_file" mapstructure:"move-ops-file"`
 	FromDate               string      `json:"from_date" mapstructure:"from-date"`
 	JSONDir                string      `json:"json_directory" mapstructure:"json-directory"`
 	MaxFilesize            string      `json:"max_filesize" mapstructure:"max-filesize"`
@@ -27,6 +29,13 @@ type DLFilters struct {
 	Type    string `json:"filter_type"`
 	Value   string `json:"filter_value"`
 	MustAny string `json:"filter_must_any"`
+}
+
+// MoveOps are used to set an output directory in Metarr based on matching metadata fields.
+type MoveOps struct {
+	Field     string `json:"move_op_field"`
+	Value     string `json:"move_op_value"`
+	OutputDir string `json:"move_op_output_dir"`
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
