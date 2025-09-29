@@ -1484,6 +1484,8 @@ func applyConfigMetarrSettings(c *models.Channel) (err error) {
 			split := strings.Split(d, "|")
 			if len(split) == 2 && split[1] != "" {
 				valid = append(valid, d)
+			} else {
+				logging.W("Removed invalid per-URL output directory pair %q", d)
 			}
 		}
 
