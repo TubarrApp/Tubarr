@@ -24,6 +24,7 @@ type cobraMetarrArgs struct {
 	metarrExt            string
 	metaOps              []string
 	outputDir            string
+	urlOutputDirs        []string
 	concurrency          int
 	maxCPU               float64
 	minFreeMem           string
@@ -36,7 +37,7 @@ type cobraMetarrArgs struct {
 }
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
-func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
+func getMetarrArgFns(cmd *cobra.Command, channel *models.Channel, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
 
 	f := cmd.Flags()
 
@@ -122,6 +123,49 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 			return nil
 		})
 	}
+
+	// Output directory strings
+	if f.Changed(keys.MURLOutputDirs) {
+		validOutDirs := make([]string, 0, len(c.urlOutputDirs))
+		if len(c.urlOutputDirs) != 0 {
+			for _, u := range c.urlOutputDirs {
+				if _, err = validation.ValidateDirectory(u, false); err != nil {
+					return nil, err
+				}
+				validOutDirs = append(validOutDirs, u)
+			}
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.URLOutputDirs = validOutDirs
+			return nil
+		})
+	}
+
+	// // Validate output directory for map
+	// if f.Changed(keys.MOutputDir) || f.Changed(keys.MURLOutputDirs) {
+
+	// 	if c.outputDir != "" {
+	// 		if _, err = validation.ValidateDirectory(c.outputDir, false); err != nil {
+	// 			return nil, err
+	// 		}
+	// 	} else {
+	// 		c.outputDir = channel.MetarrArgs.OutputDir
+	// 	}
+
+	// 	if c.urlOutputDirs == nil {
+	// 		c.urlOutputDirs = channel.MetarrArgs.URLOutputDirs
+	// 	}
+
+	// 	finalOutDirs, err := validation.ValidateMetarrOutputDirs(c.outputDir, c.urlOutputDirs, channel)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+
+	// 	fns = append(fns, func(m *models.MetarrArgs) error {
+	// 		m.OutputDirMap = finalOutDirs
+	// 		return nil
+	// 	})
+	// }
 
 	// Meta operations (e.g. 'all-credits:set:author')
 	if f.Changed(keys.MMetaOps) {
@@ -299,6 +343,14 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
+	// Download retry amount
+	if f.Changed(keys.DLRetries) {
+		fns = append(fns, func(s *models.ChannelSettings) error {
+			s.Retries = c.retries
+			return nil
+		})
+	}
+
 	// External downloader
 	if f.Changed(keys.ExternalDownloader) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
@@ -391,14 +443,6 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	if f.Changed(keys.Pause) {
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.Paused = c.paused
-			return nil
-		})
-	}
-
-	// Download retry amount
-	if f.Changed(keys.DLRetries) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
-			s.Retries = c.retries
 			return nil
 		})
 	}

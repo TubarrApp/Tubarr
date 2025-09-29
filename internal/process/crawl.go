@@ -120,7 +120,7 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 
 		settings := c.Settings
 
-		if settings.ChannelConfigFile != "" && c.UpdatedFromConfig {
+		if settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
 			if err := cfgchannel.UpdateChannelFromConfig(cs, c); err != nil {
 				return err
 			}

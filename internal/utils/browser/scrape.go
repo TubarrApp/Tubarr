@@ -182,6 +182,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 				newRequests = append(newRequests, &models.Video{
 					ChannelID:  c.ID,
 					URL:        newURL,
+					ChannelURL: channelURL,
 					VideoDir:   c.Settings.VideoDir,
 					JSONDir:    c.Settings.JSONDir,
 					Channel:    c,

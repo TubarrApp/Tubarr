@@ -45,7 +45,8 @@ type MetarrArgs struct {
 	RenameStyle          string   `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
 	FilenameDateTag      string   `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
 	MetaOps              []string `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`
-	OutputDir            string   `json:"metarr_output_directory" mapstructure:"metarr-output-dir"`
+	OutputDir            string   `json:"metarr_output_directory" mapstructure:"metarr-default-output-dir"`
+	URLOutputDirs        []string `json:"metarr_url_output_directories" mapstructure:"metarr-url-output-dirs"`
 	Concurrency          int      `json:"metarr_concurrency" mapstructure:"metarr-concurrency"`
 	MaxCPU               float64  `json:"metarr_max_cpu_usage" mapstructure:"metarr-max-cpu"`
 	MinFreeMem           string   `json:"metarr_min_free_mem" mapstructure:"metarr-min-free-mem"`
@@ -55,6 +56,7 @@ type MetarrArgs struct {
 	TranscodeCodec       string   `json:"metarr_transcode_codec" mapstructure:"transcode-codec"`
 	TranscodeAudioCodec  string   `json:"metarr_transcode_audio_codec" mapstructure:"transcode-audio-codec"`
 	TranscodeQuality     string   `json:"metarr_transcode_quality" mapstructure:"transcode-quality"`
+	OutputDirMap         map[string]string
 }
 
 // ChannelAccessDetails holds details related to authentication and cookies.

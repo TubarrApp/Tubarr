@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"tubarr/internal/cfg"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/metcmd"
 	"tubarr/internal/models"
@@ -87,9 +88,9 @@ func makeMetarrCommand(v *models.Video) []string {
 			cmdKey:      metcmd.MinFreeMem,
 		},
 		{
-			metarrValue: metVals{str: parseOutputDir(v)},
+			metarrValue: metVals{str: parseMetarrOutputDir(v)},
 			valType:     str,
-			viperKey:    "", // Fallback logic already exists in parseOutputDir.
+			viperKey:    "", // Fallback logic already exists in parseMetarrOutputDir.
 			cmdKey:      metcmd.OutputDir,
 		},
 		{
@@ -234,9 +235,17 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 	return false
 }
 
-// parseOutputDir parses and returns the output directory.
-func parseOutputDir(v *models.Video) string {
-	dirParser := parsing.NewDirectoryParser(v.Channel, v)
+// parseMetarrOutputDir parses and returns the output directory.
+func parseMetarrOutputDir(v *models.Video) string {
+	var (
+		dirParser = parsing.NewDirectoryParser(v.Channel, v)
+		mArgs     = v.Channel.MetarrArgs
+		err       error
+	)
+
+	if mArgs.OutputDirMap, err = validation.ValidateMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, v.Channel); err != nil {
+		logging.E(0, "Could not parse output directory map: %v", err)
+	}
 
 	switch {
 	// #1 Priority: Explicit Viper flag set
@@ -262,8 +271,8 @@ func parseOutputDir(v *models.Video) string {
 		return parsed
 
 		// #3 Priority: Channel default output directory
-	case v.MetarrArgs.OutputDir != "":
-		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDir)
+	case mArgs.OutputDirMap[v.ChannelURL] != "":
+		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDirMap[v.ChannelURL])
 		if err != nil {
 			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", v.MetarrArgs.OutputDir, v.URL, err)
 			break

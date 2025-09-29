@@ -11,12 +11,12 @@ import (
 type Channel struct {
 	ID                int64 `db:"id"`
 	URLs              []string
-	Name              string          `db:"name"`
-	Settings          ChannelSettings `json:"settings" db:"settings"`
-	MetarrArgs        MetarrArgs      `json:"metarr" db:"metarr"`
-	LastScan          time.Time       `db:"last_scan"`
-	CreatedAt         time.Time       `db:"created_at"`
-	UpdatedAt         time.Time       `db:"updated_at"`
+	Name              string           `db:"name"`
+	Settings          *ChannelSettings `json:"settings" db:"settings"`
+	MetarrArgs        *MetarrArgs      `json:"metarr" db:"metarr"`
+	LastScan          time.Time        `db:"last_scan"`
+	CreatedAt         time.Time        `db:"created_at"`
+	UpdatedAt         time.Time        `db:"updated_at"`
 	MoveOpOutputDir   string
 	UpdatedFromConfig bool
 }
@@ -34,17 +34,18 @@ type Video struct {
 	Finished            bool   `db:"finished"`
 	JSONCustomFile      string
 	URL                 string `db:"url"`
+	ChannelURL          string
 	DirectVideoURL      string
-	Title               string          `db:"title"`
-	Description         string          `db:"description"`
-	UploadDate          time.Time       `db:"upload_date"`
-	MetadataMap         map[string]any  `db:"-"`
-	Channel             *Channel        `db:"-"`
-	Settings            ChannelSettings `json:"settings" db:"settings"`
-	MetarrArgs          MetarrArgs      `json:"metarr" db:"metarr"`
-	DownloadStatus      DLStatus        `json:"download_status" db:"download_status"`
-	CreatedAt           time.Time       `db:"created_at"`
-	UpdatedAt           time.Time       `db:"updated_at"`
+	Title               string           `db:"title"`
+	Description         string           `db:"description"`
+	UploadDate          time.Time        `db:"upload_date"`
+	MetadataMap         map[string]any   `db:"-"`
+	Channel             *Channel         `db:"-"`
+	Settings            *ChannelSettings `json:"settings" db:"settings"`
+	MetarrArgs          *MetarrArgs      `json:"metarr" db:"metarr"`
+	DownloadStatus      DLStatus         `json:"download_status" db:"download_status"`
+	CreatedAt           time.Time        `db:"created_at"`
+	UpdatedAt           time.Time        `db:"updated_at"`
 	Username            string
 	Password            string
 	LoginURL            string

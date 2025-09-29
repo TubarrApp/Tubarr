@@ -2,63 +2,46 @@ package cfgflags
 
 import (
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/models"
 
 	"github.com/spf13/cobra"
 )
 
 // SetMetarrFlags sets flags for interaction with the Metarr software.
-func SetMetarrFlags(cmd *cobra.Command, maxCPUPtr *float64, metarrConcurrencyPtr *int, extPtr, filenameDateTagPtr, minFreeMemPtr, outDirPtr, renameStylePtr *string, fileSfxReplacePtr, metaOpsPtr *[]string) models.MetarrArgs {
-	var (
-		maxCPU                                                float64
-		metarrConcurrency                                     int
-		ext, filenameDateTag, minFreeMem, outDir, renameStyle string
-		fileSfxReplace, metaOps                               []string
-	)
-
+func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, filenameDateTag, minFreeMem, outDir, renameStyle *string, urlOutDirs, fileSfxReplace, metaOps *[]string) {
 	// Numbers
-	if maxCPUPtr != nil {
-		cmd.Flags().Float64Var(maxCPUPtr, keys.MMaxCPU, 0, "Max CPU usage for Metarr")
+	if maxCPU != nil {
+		cmd.Flags().Float64Var(maxCPU, keys.MMaxCPU, 0, "Max CPU usage for Metarr")
 	}
-	if metarrConcurrencyPtr != nil {
-		cmd.Flags().IntVar(metarrConcurrencyPtr, keys.MConcurrency, 0, "Max concurrent processes for Metarr")
+	if metarrConcurrency != nil {
+		cmd.Flags().IntVar(metarrConcurrency, keys.MConcurrency, 0, "Max concurrent processes for Metarr")
 	}
 
 	// String
-	if extPtr != nil {
-		cmd.Flags().StringVar(extPtr, keys.MExt, "", "Output filetype for videos passed into Metarr")
+	if ext != nil {
+		cmd.Flags().StringVar(ext, keys.MExt, "", "Output filetype for videos passed into Metarr")
 	}
-	if filenameDateTagPtr != nil {
-		cmd.Flags().StringVar(filenameDateTagPtr, keys.MFilenameDateTag, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
+	if filenameDateTag != nil {
+		cmd.Flags().StringVar(filenameDateTag, keys.MFilenameDateTag, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
 	}
-	if minFreeMemPtr != nil {
-		cmd.Flags().StringVar(minFreeMemPtr, keys.MMinFreeMem, "", "Min free mem for Metarr process")
+	if minFreeMem != nil {
+		cmd.Flags().StringVar(minFreeMem, keys.MMinFreeMem, "", "Min free mem for Metarr process")
 	}
-	if outDirPtr != nil {
-		cmd.Flags().StringVar(outDirPtr, keys.MOutputDir, "", "Metarr will move files to this location on completion (some {{}} templating commands available)")
+	if outDir != nil {
+		cmd.Flags().StringVar(outDir, keys.MOutputDir, "", "Metarr will move files to this location on completion (some {{}} templating commands available)")
 	}
-	if renameStylePtr != nil {
-		cmd.Flags().StringVar(renameStylePtr, keys.MRenameStyle, "", "Renaming style applied by Metarr (skip, fixes-only, underscores, spaces)")
+	if renameStyle != nil {
+		cmd.Flags().StringVar(renameStyle, keys.MRenameStyle, "", "Renaming style applied by Metarr (skip, fixes-only, underscores, spaces)")
 	}
 
 	// Arrays
-	if fileSfxReplacePtr != nil {
-		cmd.Flags().StringSliceVar(fileSfxReplacePtr, keys.MFilenameReplaceSuffix, nil, "Replace a filename suffix element in Metarr")
+	if fileSfxReplace != nil {
+		cmd.Flags().StringSliceVar(fileSfxReplace, keys.MFilenameReplaceSuffix, nil, "Replace a filename suffix element in Metarr")
 	}
-	if metaOpsPtr != nil {
-		cmd.Flags().StringSliceVar(metaOpsPtr, keys.MMetaOps, nil, "Meta operations to perform in Metarr")
+	if metaOps != nil {
+		cmd.Flags().StringSliceVar(metaOps, keys.MMetaOps, nil, "Meta operations to perform in Metarr")
 	}
-
-	return models.MetarrArgs{
-		Ext:                ext,
-		FilenameReplaceSfx: fileSfxReplace,
-		RenameStyle:        renameStyle,
-		FilenameDateTag:    filenameDateTag,
-		MetaOps:            metaOps,
-		OutputDir:          outDir,
-		Concurrency:        metarrConcurrency,
-		MaxCPU:             maxCPU,
-		MinFreeMem:         minFreeMem,
+	if urlOutDirs != nil {
+		cmd.Flags().StringSliceVar(urlOutDirs, keys.MURLOutputDirs, nil, "Metarr will move a channel URL's files to this location on completion (some {{}} templating commands available)")
 	}
 }
 

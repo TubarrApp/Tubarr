@@ -101,6 +101,7 @@ const (
 	MTranscodeVideoFilter  string = "metarr-transcode-video-filter"
 	MTranscodeVideoCodec   string = "metarr-transcode-codec"
 	MConcurrency           string = "metarr-concurrency"
-	MOutputDir             string = "metarr-output-dir"
+	MOutputDir             string = "metarr-default-output-dir"
+	MURLOutputDirs         string = "metarr-url-output-dirs"
 	MExt                   string = "metarr-ext"
 )

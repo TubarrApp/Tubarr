@@ -525,6 +525,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
+		urlOutDirs                                                                                      []string
 		username, password, loginURL                                                                    string
 		authDetails                                                                                     []string
 		notification                                                                                    []string
@@ -660,12 +661,14 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				}
 			}
 
+			// Initialize channel
 			now := time.Now()
 			c := &models.Channel{
 				URLs: urls,
 				Name: name,
 
-				Settings: models.ChannelSettings{
+				// Fill channel
+				Settings: &models.ChannelSettings{
 					ChannelConfigFile:      configFile,
 					Concurrency:            concurrency,
 					CookieSource:           cookieSource,
@@ -687,7 +690,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 					YtdlpOutputExt:         ytdlpOutputExt,
 				},
 
-				MetarrArgs: models.MetarrArgs{
+				MetarrArgs: &models.MetarrArgs{
 					Ext:                  metarrExt,
 					MetaOps:              metaOps,
 					FilenameDateTag:      filenameDateTag,
@@ -696,6 +699,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 					MaxCPU:               maxCPU,
 					MinFreeMem:           minFreeMem,
 					OutputDir:            outDir,
+					URLOutputDirs:        urlOutDirs,
 					Concurrency:          metarrConcurrency,
 					UseGPU:               transcodeGPU,
 					GPUDir:               gpuDir,
@@ -776,8 +780,8 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 	// Metarr
 	cfgflags.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &filenameDateTag, &minFreeMem,
-		&outDir, &renameStyle, &fileSfxReplace,
-		&metaOps)
+		&outDir, &renameStyle, &urlOutDirs,
+		&fileSfxReplace, &metaOps)
 
 	// Login credentials
 	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL, &authDetails)
@@ -943,6 +947,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		id, concurrency, crawlFreq, metarrConcurrency, retries                    int
 		maxCPU                                                                    float64
 		vDir, jDir, outDir                                                        string
+		urlOutDirs                                                                []string
 		name, cookieSource                                                        string
 		minFreeMem, renameStyle, filenameDateTag, metarrExt                       string
 		maxFilesize, externalDownloader, externalDownloaderArgs                   string
@@ -1060,13 +1065,14 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Metarr arguments
-			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
+			fnMetarrArray, err := getMetarrArgFns(cmd, c, cobraMetarrArgs{
 				filenameReplaceSfx:   fileSfxReplace,
 				renameStyle:          renameStyle,
 				filenameDateTag:      filenameDateTag,
 				metarrExt:            metarrExt,
 				metaOps:              metaOps,
 				outputDir:            outDir,
+				urlOutputDirs:        urlOutDirs,
 				concurrency:          metarrConcurrency,
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
@@ -1123,15 +1129,17 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 	// Metarr
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &filenameDateTag, &minFreeMem,
-		&outDir, &renameStyle, &fileSfxReplace,
-		&metaOps)
+		&outDir, &renameStyle, &urlOutDirs,
+		&fileSfxReplace, &metaOps)
 
 	// Transcoding
 	cfgflags.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuDir,
-		&transcodeVideoFilter, &codec, &audioCodec, &transcodeQuality)
+		&transcodeVideoFilter, &codec, &audioCodec,
+		&transcodeQuality)
 
 	// Auth
-	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password, &loginURL, &authDetails)
+	cfgflags.SetAuthFlags(updateSettingsCmd, &username, &password,
+		&loginURL, &authDetails)
 
 	updateSettingsCmd.Flags().BoolVar(&deleteAuth, "delete-auth", false, "Clear all authentication details for this channel and its URLs")
 
@@ -1224,6 +1232,7 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	// Metarr settings
 	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Output Directory: %s\n", m.OutputDir)
+	fmt.Printf("URL Output Directories: %v\n", m.URLOutputDirs)
 	fmt.Printf("Output Filetype: %s\n", m.Ext)
 	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
 	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
@@ -1273,7 +1282,10 @@ func UpdateChannelFromConfig(cs interfaces.ChannelStore, c *models.Channel) erro
 	}
 
 	_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
-		*s = c.Settings
+		if c.Settings == nil {
+			return fmt.Errorf("c.Settings is nil")
+		}
+		*s = *c.Settings
 		return nil
 	})
 	if err != nil {
@@ -1281,7 +1293,10 @@ func UpdateChannelFromConfig(cs interfaces.ChannelStore, c *models.Channel) erro
 	}
 
 	_, err = cs.UpdateChannelMetarrArgsJSON(key, val, func(m *models.MetarrArgs) error {
-		*m = c.MetarrArgs
+		if c.MetarrArgs == nil {
+			return fmt.Errorf("c.MetarrArgs is nil")
+		}
+		*m = *c.MetarrArgs
 		return nil
 	})
 	if err != nil {
@@ -1294,39 +1309,65 @@ func UpdateChannelFromConfig(cs interfaces.ChannelStore, c *models.Channel) erro
 
 // applyConfigChannelSettings applies the channel settings to the model and saves to database.
 func applyConfigChannelSettings(c *models.Channel) (err error) {
+	// Initialize settings model if nil
+	if c.Settings == nil {
+		c.Settings = &models.ChannelSettings{}
+	}
 
+	// Channel config file location
 	if v, ok := getConfigValue[string](keys.ChannelConfigFile); ok {
 		if _, err = validation.ValidateFile(v, false); err != nil {
 			return err
 		}
 		c.Settings.ChannelConfigFile = v
 	}
+
+	// Concurrency limit
 	if v, ok := getConfigValue[int](keys.ConcurrencyLimitInput); ok {
 		c.Settings.Concurrency = validation.ValidateConcurrencyLimit(v)
 	}
+
+	// Cookie source
 	if v, ok := getConfigValue[string](keys.CookieSource); ok {
 		c.Settings.CookieSource = v // No check for this currently! (cookies-from-browser)
 	}
+
+	// Crawl frequency
 	if v, ok := getConfigValue[int](keys.CrawlFreq); ok {
 		c.Settings.CrawlFreq = v
 	}
+
+	// Download retries
+	if v, ok := getConfigValue[int](keys.DLRetries); ok {
+		c.Settings.Retries = v
+	}
+
+	// External downloader
 	if v, ok := getConfigValue[string](keys.ExternalDownloader); ok {
 		c.Settings.ExternalDownloader = v // No checks for this yet.
 	}
+
+	// External downloader arguments
 	if v, ok := getConfigValue[string](keys.ExternalDownloaderArgs); ok {
 		c.Settings.ExternalDownloaderArgs = v // No checks for this yet.
 	}
+
+	// Filter ops file
 	if v, ok := getConfigValue[string](keys.FilterOpsFile); ok {
 		if _, err := validation.ValidateFile(v, false); err != nil {
 			return err
 		}
 		c.Settings.FilterFile = v
 	}
+
+	// From date
 	if v, ok := getConfigValue[string](keys.FromDate); ok {
 		if c.Settings.FromDate, err = validation.ValidateToFromDate(v); err != nil {
 			return err
 		}
 	}
+
+	// JSON directory
 	if v, ok := getConfigValue[string](keys.JSONDir); ok {
 		if _, err = validation.ValidateDirectory(v, false); err != nil {
 			return err
@@ -1334,29 +1375,37 @@ func applyConfigChannelSettings(c *models.Channel) (err error) {
 		c.Settings.JSONDir = v
 	}
 
+	// Max filesize to download
 	if v, ok := getConfigValue[string](keys.MaxFilesize); ok {
 		c.Settings.MaxFilesize = v
 	}
+
+	// Pause channel
 	if v, ok := getConfigValue[bool](keys.Pause); ok {
 		c.Settings.Paused = v
 	}
-	if v, ok := getConfigValue[int](keys.DLRetries); ok {
-		c.Settings.Retries = v
-	}
+
+	// To date
 	if v, ok := getConfigValue[string](keys.ToDate); ok {
 		if c.Settings.ToDate, err = validation.ValidateToFromDate(v); err != nil {
 			return err
 		}
 	}
+
+	// Use global cookies?
 	if v, ok := getConfigValue[bool](keys.UseGlobalCookies); ok {
 		c.Settings.UseGlobalCookies = v
 	}
+
+	// Video directory
 	if v, ok := getConfigValue[string](keys.VideoDir); ok {
 		if _, err = validation.ValidateDirectory(v, false); err != nil {
 			return err
 		}
 		c.Settings.VideoDir = v
 	}
+
+	// YTDLP output format
 	if v, ok := getConfigValue[string](keys.YtdlpOutputExt); ok {
 		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
 			return err
@@ -1368,77 +1417,113 @@ func applyConfigChannelSettings(c *models.Channel) (err error) {
 
 // applyConfigMetarrSettings applies the Metarr settings to the model and saves to database.
 func applyConfigMetarrSettings(c *models.Channel) (err error) {
+	// Initialize MetarrArgs model if nil
+	if c.MetarrArgs == nil {
+		c.MetarrArgs = &models.MetarrArgs{}
+	}
 
 	var (
 		gpuDirGot, gpuGot string
 		videoCodecGot     string
 	)
 
+	// Metarr output extension
 	if v, ok := getConfigValue[string](keys.MExt); ok {
 		if _, err := validation.ValidateOutputFiletype(c.Settings.ChannelConfigFile); err != nil {
 			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.Settings.ChannelConfigFile)
 		}
 		c.MetarrArgs.Ext = v
 	}
+
+	// Filename suffix replacements
 	if v, ok := getConfigValue[[]string](keys.MFilenameReplaceSuffix); ok {
 		c.MetarrArgs.FilenameReplaceSfx, err = validation.ValidateFilenameSuffixReplace(v)
 		if err != nil {
 			return err
 		}
 	}
+
+	// Rename style
 	if v, ok := getConfigValue[string](keys.MRenameStyle); ok {
 		if err := validation.ValidateRenameFlag(v); err != nil {
 			return err
 		}
 		c.MetarrArgs.RenameStyle = v
 	}
+
+	// Filename date tag
 	if v, ok := getConfigValue[string](keys.MFilenameDateTag); ok {
 		if ok := validation.ValidateDateFormat(v); !ok {
 			return fmt.Errorf("date format %q in config file %q is invalid", v, c.Settings.ChannelConfigFile)
 		}
 		c.MetarrArgs.FilenameDateTag = v
 	}
+
+	// Meta ops
 	if v, ok := getConfigValue[[]string](keys.MMetaOps); ok {
 		c.MetarrArgs.MetaOps, err = validation.ValidateMetaOps(v)
 		if err != nil {
 			return err
 		}
 	}
+
+	// Output directories
 	if v, ok := getConfigValue[string](keys.MOutputDir); ok {
 		if _, err := validation.ValidateDirectory(v, false); err != nil {
 			return err
 		}
 		c.MetarrArgs.OutputDir = v
 	}
+	if v, ok := getConfigValue[[]string](keys.MURLOutputDirs); ok {
+		if len(v) != 0 {
+			c.MetarrArgs.URLOutputDirs = v
+		}
+	}
+
+	// Metarr concurrency
 	if v, ok := getConfigValue[int](keys.MConcurrency); ok {
 		c.MetarrArgs.Concurrency = validation.ValidateConcurrencyLimit(v)
 	}
+
+	// Metarr max CPU
 	if v, ok := getConfigValue[float64](keys.MMaxCPU); ok {
 		c.MetarrArgs.MaxCPU = v // Handled in Metarr
 	}
+
+	// Metarr minimum memory to reserve
 	if v, ok := getConfigValue[string](keys.MMinFreeMem); ok {
 		c.MetarrArgs.MinFreeMem = v // Handled in Metarr
 	}
+
+	// Metarr GPU
 	if v, ok := getConfigValue[string](keys.TranscodeGPU); ok {
 		gpuGot = v
 	}
 	if v, ok := getConfigValue[string](keys.TranscodeGPUDir); ok {
 		gpuDirGot = v
 	}
+
+	// Metarr video filter
 	if v, ok := getConfigValue[string](keys.TranscodeVideoFilter); ok {
 		c.MetarrArgs.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(v)
 		if err != nil {
 			return err
 		}
 	}
+
+	// Metarr video codec
 	if v, ok := getConfigValue[string](keys.TranscodeCodec); ok {
 		videoCodecGot = v
 	}
+
+	// Metarr audio codec
 	if v, ok := getConfigValue[string](keys.TranscodeAudioCodec); ok {
 		if c.MetarrArgs.TranscodeAudioCodec, err = validation.ValidateTranscodeAudioCodec(v); err != nil {
 			return err
 		}
 	}
+
+	// Metarr transcode quality
 	if v, ok := getConfigValue[string](keys.MTranscodeQuality); ok {
 		if c.MetarrArgs.TranscodeQuality, err = validation.ValidateTranscodeQuality(v); err != nil {
 			return err

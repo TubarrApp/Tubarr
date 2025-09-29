@@ -91,7 +91,6 @@ func checkMoveOps(v *models.Video) string {
 			}
 		}
 	}
-	logging.I("MOVE OP FILTERS DID NOT MATCH")
 	return ""
 }
 

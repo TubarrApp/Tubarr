@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,71 @@ import (
 
 	"github.com/spf13/viper"
 )
+
+// ValidateMetarrOutputDirs validates the output directories for Metarr.
+func ValidateMetarrOutputDirs(d string, dURLs []string, c *models.Channel) (map[string]string, error) {
+
+	if len(dURLs) == 0 && d == "" {
+		return nil, nil
+	}
+
+	// Initialize outDirs map
+	outDirMap := c.MetarrArgs.OutputDirMap
+	if outDirMap == nil {
+		outDirMap = make(map[string]string)
+	}
+
+	// Validation output directories
+	validateOutDir := make(map[string]bool, len(c.URLs))
+
+	// Handle multi-level arguments
+	if len(dURLs) > 0 {
+		for _, d := range dURLs {
+			if !strings.ContainsRune(d, '|') {
+				return nil, fmt.Errorf("malformed URL output directory format. Should be 'url|output directory'")
+			}
+
+			split := strings.Split(d, "|")
+			if len(split) != 2 {
+				return nil, fmt.Errorf("malformed URL output directory format. Should only contain one '|' rune")
+			}
+
+			dURL := split[0]
+			dOutDir := split[1]
+
+			urlExists := slices.Contains(c.URLs, dURL)
+
+			if !urlExists {
+				return nil, fmt.Errorf("channel does not contain URL %q, but sent in output directory argument %q", dURL, d)
+			}
+
+			outDirMap[dURL] = dOutDir
+		}
+	}
+
+	// Fill empty channel URL output directories with backup string
+	if d != "" {
+		for _, cURL := range c.URLs {
+			if cOutDir := outDirMap[cURL]; cOutDir == "" {
+				outDirMap[cURL] = d
+			}
+		}
+	}
+
+	// Validate directories
+	for _, dir := range outDirMap {
+		if !validateOutDir[dir] {
+			if _, err := ValidateDirectory(dir, false); err != nil {
+				return nil, err
+			}
+			validateOutDir[dir] = true
+		}
+	}
+
+	logging.D(1, "Metarr output directories: %q", outDirMap)
+
+	return outDirMap, nil
+}
 
 // ValidateDirectory validates that the directory exists, else creates it if desired.
 func ValidateDirectory(d string, createIfNotFound bool) (os.FileInfo, error) {
@@ -46,7 +112,9 @@ func ValidateDirectory(d string, createIfNotFound bool) (os.FileInfo, error) {
 					break // Directory successfully created
 				}
 			default:
-				return dirInfo, fmt.Errorf("directory %q does not exist: %w", d, err)
+				if !possibleTemplate {
+					return dirInfo, fmt.Errorf("directory %q does not exist: %w", d, err)
+				}
 			}
 		} else {
 			return dirInfo, fmt.Errorf("failed to stat directory %q: %w", d, err)
