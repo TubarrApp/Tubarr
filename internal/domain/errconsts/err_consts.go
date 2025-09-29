@@ -5,3 +5,8 @@ package errconsts
 const (
 	YTDLPFailure = "yt-dlp command failed: %w"
 )
+
+// File
+const (
+	ConfigFileUpdateFail = "failed to update from config file %q: %v"
+)

@@ -10,7 +10,7 @@ import (
 	"tubarr/internal/cfg"
 	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/domain/metcmd"
+	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
@@ -49,99 +49,99 @@ func makeMetarrCommand(v *models.Video) []string {
 			metarrValue: metVals{i: v.MetarrArgs.Concurrency},
 			valType:     i,
 			viperKey:    "", // Don't use Tubarr concurrency key, Metarr has more potential resource constraints
-			cmdKey:      metcmd.Concurrency,
+			cmdKey:      metkeys.Concurrency,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.Ext},
 			valType:     str,
 			viperKey:    keys.OutputFiletype,
-			cmdKey:      metcmd.Ext,
+			cmdKey:      metkeys.Ext,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.FilenameDateTag},
 			valType:     str,
 			viperKey:    keys.MFilenameDateTag,
-			cmdKey:      metcmd.FilenameDateTag,
+			cmdKey:      metkeys.FilenameDateTag,
 		},
 		{
 			metarrValue: metVals{strSlice: v.MetarrArgs.FilenameReplaceSfx},
 			valType:     strSlice,
 			viperKey:    keys.MFilenameReplaceSuffix,
-			cmdKey:      metcmd.FilenameReplaceSfx,
+			cmdKey:      metkeys.FilenameReplaceSfx,
 		},
 		{
 			metarrValue: metVals{f64: v.MetarrArgs.MaxCPU},
 			valType:     f64,
 			viperKey:    "",
-			cmdKey:      metcmd.MaxCPU,
+			cmdKey:      metkeys.MaxCPU,
 		},
 		{
 			metarrValue: metVals{strSlice: v.MetarrArgs.MetaOps},
 			valType:     strSlice,
 			viperKey:    keys.MMetaOps,
-			cmdKey:      metcmd.MetaOps,
+			cmdKey:      metkeys.MetaOps,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.MinFreeMem},
 			valType:     str,
 			viperKey:    keys.MMinFreeMem,
-			cmdKey:      metcmd.MinFreeMem,
+			cmdKey:      metkeys.MinFreeMem,
 		},
 		{
 			metarrValue: metVals{str: parseMetarrOutputDir(v)},
 			valType:     str,
 			viperKey:    "", // Fallback logic already exists in parseMetarrOutputDir.
-			cmdKey:      metcmd.OutputDir,
+			cmdKey:      metkeys.OutputDir,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.RenameStyle},
 			valType:     str,
 			viperKey:    keys.MRenameStyle,
-			cmdKey:      metcmd.RenameStyle,
+			cmdKey:      metkeys.RenameStyle,
 		},
 		// Transcoding
 		{
 			metarrValue: metVals{str: v.MetarrArgs.UseGPU},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metcmd.HWAccel,
+			cmdKey:      metkeys.HWAccel,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.GPUDir},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metcmd.GPUDir,
+			cmdKey:      metkeys.GPUDir,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.TranscodeCodec},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metcmd.TranscodeCodec,
+			cmdKey:      metkeys.TranscodeCodec,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.TranscodeQuality},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metcmd.TranscodeQuality,
+			cmdKey:      metkeys.TranscodeQuality,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.TranscodeAudioCodec},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metcmd.TranscodeAudioCodec,
+			cmdKey:      metkeys.TranscodeAudioCodec,
 		},
 		{
 			metarrValue: metVals{str: v.MetarrArgs.TranscodeVideoFilter},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metcmd.TranscodeVideoFilter,
+			cmdKey:      metkeys.TranscodeVideoFilter,
 		},
 		// Other
 		{
 			metarrValue: metVals{str: ""},
 			valType:     str,
 			viperKey:    keys.DebugLevel,
-			cmdKey:      metcmd.Debug,
+			cmdKey:      metkeys.Debug,
 		},
 	}
 
@@ -152,15 +152,15 @@ func makeMetarrCommand(v *models.Video) []string {
 	argSlicesMap := make(map[string][]string, sliceLen)
 
 	// Viper slice comma parsing issue workaround, may need to do the same for all strSlice arguments
-	argMap[metcmd.VideoFile] = cleanAndWrapCommaPaths(v.VideoPath)
+	argMap[metkeys.VideoFile] = cleanAndWrapCommaPaths(v.VideoPath)
 
 	if v.JSONCustomFile == "" {
-		argMap[metcmd.JSONFile] = cleanAndWrapCommaPaths(v.JSONPath)
+		argMap[metkeys.JSONFile] = cleanAndWrapCommaPaths(v.JSONPath)
 	} else {
-		argMap[metcmd.JSONFile] = cleanAndWrapCommaPaths(v.JSONCustomFile)
+		argMap[metkeys.JSONFile] = cleanAndWrapCommaPaths(v.JSONCustomFile)
 	}
 
-	logging.I("Making Metarr argument for video %q and JSON file %q.", argMap[metcmd.VideoFile], argMap[metcmd.JSONFile])
+	logging.I("Making Metarr argument for video %q and JSON file %q.", argMap[metkeys.VideoFile], argMap[metkeys.JSONFile])
 
 	// Final args
 	args := make([]string, 0, singlesLen+sliceLen)
@@ -183,7 +183,7 @@ func makeMetarrCommand(v *models.Video) []string {
 	}
 
 	if metaOW {
-		args = append(args, metcmd.MetaOW)
+		args = append(args, metkeys.MetaOW)
 	}
 
 	logging.I("Built Metarr argument list: %v", args)
@@ -219,7 +219,7 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 		}
 
 		// Set Meta Overwrite flag if meta-ops arguments exist
-		if f.cmdKey == metcmd.MetaOps {
+		if f.cmdKey == metkeys.MetaOps {
 			elemCount := len(f.metarrValue.strSlice)
 
 			if cfg.IsSet(f.viperKey) {

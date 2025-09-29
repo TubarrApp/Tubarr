@@ -1,3 +1,4 @@
+// Package cfgfiles handles configuration files.
 package cfgfiles
 
 import (

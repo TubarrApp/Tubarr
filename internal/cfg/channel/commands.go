@@ -184,7 +184,7 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 			// Check URL file if existent
 			cFileInfo, err := validation.ValidateFile(cFile, false)
 			if err != nil {
-				return fmt.Errorf("file entered (%q) is not valid: %v", cFile, err)
+				return fmt.Errorf("file entered (%q) is not valid: %w", cFile, err)
 			}
 			if cFile != "" && cFileInfo.Size() == 0 {
 				return fmt.Errorf("url file %q is blank", cFile)

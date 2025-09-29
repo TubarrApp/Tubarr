@@ -197,7 +197,11 @@ func (cs *ChannelStore) AddNotifyURLs(id int64, notifications []string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			logging.E(0, "Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", id, notifications, err)
+		}
+	}()
 
 	for _, n := range notifications {
 		nPair := strings.Split(n, "|")

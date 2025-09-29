@@ -1,5 +1,5 @@
-// Package metcmd holds command flag constants for Metarr.
-package metcmd
+// Package metkeys holds command flag constants for Metarr.
+package metkeys
 
 const (
 	Concurrency = "--concurrency"

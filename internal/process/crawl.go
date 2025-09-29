@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/cfg"
 	cfgchannel "tubarr/internal/cfg/channel"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/errconsts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
@@ -62,7 +63,9 @@ func initClients() {
 // Essentially it marks the URLs it finds as though they have already been downloaded.
 func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) error {
 	if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
-		cfgchannel.UpdateChannelFromConfig(s.ChannelStore(), c)
+		if err := cfgchannel.UpdateChannelFromConfig(s.ChannelStore(), c); err != nil {
+			logging.E(0, errconsts.YTDLPFailure, c.Settings.ChannelConfigFile, err)
+		}
 	}
 
 	videos, err := browserInstance.GetNewReleases(s.ChannelStore(), c, ctx)
@@ -99,6 +102,8 @@ func CrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) 
 
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(s interfaces.Store, ctx context.Context) error {
+
+	// Grab all channels from database
 	cs := s.ChannelStore()
 	chans, err, hasRows := cs.FetchAllChannels()
 	if !hasRows {
@@ -116,13 +121,14 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 	sem := make(chan struct{}, conc)
 	errChan := make(chan error, len(chans))
 
+	// Iterate over channels
 	for _, c := range chans {
 
 		settings := c.Settings
 
 		if settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
 			if err := cfgchannel.UpdateChannelFromConfig(cs, c); err != nil {
-				return err
+				logging.E(0, errconsts.YTDLPFailure, c.Settings.ChannelConfigFile, err)
 			}
 
 			c.UpdatedFromConfig = true
@@ -192,7 +198,9 @@ func ChannelCrawl(s interfaces.Store, c *models.Channel, ctx context.Context) er
 
 	cs := s.ChannelStore()
 	if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
-		cfgchannel.UpdateChannelFromConfig(cs, c)
+		if err := cfgchannel.UpdateChannelFromConfig(cs, c); err != nil {
+			logging.E(0, errconsts.YTDLPFailure, c.Settings.ChannelConfigFile, err)
+		}
 	}
 
 	switch {

@@ -236,10 +236,10 @@ func ValidateGPU(g, devDir string) (gpu, gpuDir string, err error) {
 	return gpu, devDir, nil
 }
 
-// validateTranscodeCodec validates the user input codec selection.
+// ValidateTranscodeCodec validates the user input codec selection.
 func ValidateTranscodeCodec(c string, accel string) (codec string, err error) {
 
-	logging.D(3, "Checking codec %q with accelaration type %q...", c, accel)
+	logging.D(3, "Checking codec %q with acceleration type %q...", c, accel)
 	c = strings.ToLower(c)
 	c = strings.ReplaceAll(c, ".", "")
 	switch c {
@@ -260,7 +260,7 @@ func ValidateTranscodeCodec(c string, accel string) (codec string, err error) {
 	}
 }
 
-// validateTranscodeQuality validates the transcode quality preset.
+// ValidateTranscodeQuality validates the transcode quality preset.
 func ValidateTranscodeQuality(q string) (quality string, err error) {
 	q = strings.ToLower(q)
 	q = strings.ReplaceAll(q, " ", "")
@@ -289,7 +289,7 @@ func ValidateTranscodeQuality(q string) (quality string, err error) {
 	return qualProf, nil
 }
 
-// validateTranscodeVideoFilter validates the transcode video filter preset.
+// ValidateTranscodeVideoFilter validates the transcode video filter preset.
 func ValidateTranscodeVideoFilter(q string) (vf string, err error) {
 	logging.D(1, "No checks in place for transcode video filter at present...")
 	return q, nil

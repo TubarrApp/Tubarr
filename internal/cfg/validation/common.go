@@ -244,7 +244,7 @@ func ValidateNotificationPairs(pairs []string) ([]string, error) {
 	return pairs, nil
 }
 
-// ValidateYtdlpOutputFiletype validates the merge-output-format compatability of the inputted extension.
+// ValidateYtdlpOutputExtension validates the merge-output-format compatibility of the inputted extension.
 func ValidateYtdlpOutputExtension(e string) error {
 	e = strings.TrimPrefix(strings.ToLower(e), ".")
 	switch e {
