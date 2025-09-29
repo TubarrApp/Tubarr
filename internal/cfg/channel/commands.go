@@ -1231,7 +1231,7 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 
 	// Metarr settings
 	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
-	fmt.Printf("Output Directory: %s\n", m.OutputDir)
+	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
 	fmt.Printf("URL-Specific Output Directories: %v\n", m.URLOutputDirs)
 	fmt.Printf("Output Filetype: %s\n", m.Ext)
 	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
