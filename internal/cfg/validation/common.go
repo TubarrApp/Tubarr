@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"tubarr/internal/domain/errconsts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/regex"
 	"tubarr/internal/domain/templates"
@@ -101,6 +102,7 @@ func ValidateDirectory(d string, createIfNotFound bool) (os.FileInfo, error) {
 			}
 			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
 		}
+		logging.D(3, "Directory %q appears to contain templating elements, will not stat", d)
 		return nil, nil // templates are valid, no need to stat
 	}
 
@@ -289,10 +291,6 @@ func ValidateMaxFilesize(m string) (string, error) {
 // ValidateFilterOps verifies that the user inputted filters are valid.
 func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 
-	const (
-		filterFormatError string = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omits:must' omits videos only when the metafile contains a date field"
-	)
-
 	var filters = make([]models.DLFilters, 0, len(ops))
 
 	for _, op := range ops {
@@ -303,7 +301,7 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 		}
 
 		if len(split) < 3 {
-			logging.E(0, filterFormatError)
+			logging.E(0, errconsts.FilterOpsFormatError)
 			return nil, errors.New("filter format error")
 		}
 
@@ -331,7 +329,7 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 				}
 
 			default:
-				logging.E(0, filterFormatError)
+				logging.E(0, errconsts.FilterOpsFormatError)
 				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
 			}
 		case 3:
@@ -358,7 +356,7 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
 			}
 		default:
-			logging.E(0, filterFormatError)
+			logging.E(0, errconsts.FilterOpsFormatError)
 			return nil, errors.New("filter format error")
 		}
 	}
@@ -477,7 +475,6 @@ func checkTemplateTags(d string) (hasTemplating bool) {
 
 	if s > -1 && e > s+2 {
 		if exists := templates.TemplateMap[d[(s+2):e]]; exists { // "+ 2" to skip the "{{" opening tag and leave just the tag
-			logging.D(3, "Directory %q appears to contain templating elements. Will not stat.")
 			return true
 		}
 	}
