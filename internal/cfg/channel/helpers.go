@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	validation "tubarr/internal/cfg/validation"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
@@ -20,6 +20,7 @@ import (
 type cobraMetarrArgs struct {
 	filenameReplaceSfx   []string
 	renameStyle          string
+	extraFFmpegArgs      string
 	filenameDateTag      string
 	metarrExt            string
 	metaOps              []string
@@ -37,7 +38,7 @@ type cobraMetarrArgs struct {
 }
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
-func getMetarrArgFns(cmd *cobra.Command, channel *models.Channel, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
+func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
 
 	f := cmd.Flags()
 
@@ -78,6 +79,14 @@ func getMetarrArgFns(cmd *cobra.Command, channel *models.Channel, c cobraMetarrA
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.RenameStyle = c.renameStyle
+			return nil
+		})
+	}
+
+	// Extra FFmpeg arguments
+	if f.Changed(keys.MExtraFFmpegArgs) {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.ExtraFFmpegArgs = c.extraFFmpegArgs
 			return nil
 		})
 	}
@@ -140,32 +149,6 @@ func getMetarrArgFns(cmd *cobra.Command, channel *models.Channel, c cobraMetarrA
 			return nil
 		})
 	}
-
-	// // Validate output directory for map
-	// if f.Changed(keys.MOutputDir) || f.Changed(keys.MURLOutputDirs) {
-
-	// 	if c.outputDir != "" {
-	// 		if _, err = validation.ValidateDirectory(c.outputDir, false); err != nil {
-	// 			return nil, err
-	// 		}
-	// 	} else {
-	// 		c.outputDir = channel.MetarrArgs.OutputDir
-	// 	}
-
-	// 	if c.urlOutputDirs == nil {
-	// 		c.urlOutputDirs = channel.MetarrArgs.URLOutputDirs
-	// 	}
-
-	// 	finalOutDirs, err := validation.ValidateMetarrOutputDirs(c.outputDir, c.urlOutputDirs, channel)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-
-	// 	fns = append(fns, func(m *models.MetarrArgs) error {
-	// 		m.OutputDirMap = finalOutDirs
-	// 		return nil
-	// 	})
-	// }
 
 	// Meta operations (e.g. 'all-credits:set:author')
 	if f.Changed(keys.MMetaOps) {

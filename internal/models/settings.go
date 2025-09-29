@@ -56,6 +56,7 @@ type MetarrArgs struct {
 	TranscodeCodec       string   `json:"metarr_transcode_codec" mapstructure:"transcode-codec"`
 	TranscodeAudioCodec  string   `json:"metarr_transcode_audio_codec" mapstructure:"transcode-audio-codec"`
 	TranscodeQuality     string   `json:"metarr_transcode_quality" mapstructure:"transcode-quality"`
+	ExtraFFmpegArgs      string   `json:"metarr_extra_ffmpeg_args" mapstructure:"extra-ffmpeg-args"`
 	OutputDirMap         map[string]string
 }
 

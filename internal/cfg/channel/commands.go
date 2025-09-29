@@ -536,6 +536,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 		maxCPU                                                                                          float64
 		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
 		pause, ignoreRun, useGlobalCookies                                                              bool
+		extraFFmpegArgs                                                                                 string
 	)
 
 	addCmd := &cobra.Command{
@@ -692,6 +693,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 
 				MetarrArgs: &models.MetarrArgs{
 					Ext:                  metarrExt,
+					ExtraFFmpegArgs:      extraFFmpegArgs,
 					MetaOps:              metaOps,
 					FilenameDateTag:      filenameDateTag,
 					RenameStyle:          renameStyle,
@@ -779,9 +781,9 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 
 	// Metarr
 	cfgflags.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency,
-		&metarrExt, &filenameDateTag, &minFreeMem,
-		&outDir, &renameStyle, &urlOutDirs,
-		&fileSfxReplace, &metaOps)
+		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
+		&minFreeMem, &outDir, &renameStyle,
+		&urlOutDirs, &fileSfxReplace, &metaOps)
 
 	// Login credentials
 	cfgflags.SetAuthFlags(addCmd, &username, &password, &loginURL, &authDetails)
@@ -960,6 +962,7 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
 		useGlobalCookies, pause, deleteAuth                                       bool
+		extraFFmpegArgs                                                           string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -1065,9 +1068,10 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Metarr arguments
-			fnMetarrArray, err := getMetarrArgFns(cmd, c, cobraMetarrArgs{
+			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
 				filenameReplaceSfx:   fileSfxReplace,
 				renameStyle:          renameStyle,
+				extraFFmpegArgs:      extraFFmpegArgs,
 				filenameDateTag:      filenameDateTag,
 				metarrExt:            metarrExt,
 				metaOps:              metaOps,
@@ -1128,9 +1132,9 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 
 	// Metarr
 	cfgflags.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
-		&metarrExt, &filenameDateTag, &minFreeMem,
-		&outDir, &renameStyle, &urlOutDirs,
-		&fileSfxReplace, &metaOps)
+		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
+		&minFreeMem, &outDir, &renameStyle,
+		&urlOutDirs, &fileSfxReplace, &metaOps)
 
 	// Transcoding
 	cfgflags.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuDir,
@@ -1247,6 +1251,10 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
 	fmt.Printf("Filename Date Format: %s\n", m.FilenameDateTag)
 
+	// Extra arguments
+	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
+
+	// Notification URLs
 	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Notification URLs: %v\n", notifyURLs)
 }
@@ -1449,6 +1457,11 @@ func applyConfigMetarrSettings(c *models.Channel) (err error) {
 			return err
 		}
 		c.MetarrArgs.RenameStyle = v
+	}
+
+	// Extra FFmpeg arguments
+	if v, ok := getConfigValue[string](keys.MExtraFFmpegArgs); ok {
+		c.MetarrArgs.ExtraFFmpegArgs = v
 	}
 
 	// Filename date tag

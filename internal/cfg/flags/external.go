@@ -7,7 +7,7 @@ import (
 )
 
 // SetMetarrFlags sets flags for interaction with the Metarr software.
-func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, filenameDateTag, minFreeMem, outDir, renameStyle *string, urlOutDirs, fileSfxReplace, metaOps *[]string) {
+func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, filenameDateTag, minFreeMem, outDir, renameStyle *string, urlOutDirs, fileSfxReplace, metaOps *[]string) {
 	// Numbers
 	if maxCPU != nil {
 		cmd.Flags().Float64Var(maxCPU, keys.MMaxCPU, 0, "Max CPU usage for Metarr")
@@ -19,6 +19,9 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	// String
 	if ext != nil {
 		cmd.Flags().StringVar(ext, keys.MExt, "", "Output filetype for videos passed into Metarr")
+	}
+	if extraFFmpegargs != nil {
+		cmd.Flags().StringVar(extraFFmpegargs, keys.MExtraFFmpegArgs, "", "Arguments to add on to FFmpeg commands")
 	}
 	if filenameDateTag != nil {
 		cmd.Flags().StringVar(filenameDateTag, keys.MFilenameDateTag, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")

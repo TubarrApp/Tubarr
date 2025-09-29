@@ -104,4 +104,5 @@ const (
 	MOutputDir             string = "metarr-default-output-dir"
 	MURLOutputDirs         string = "metarr-url-output-dirs"
 	MExt                   string = "metarr-ext"
+	MExtraFFmpegArgs       string = "extra-ffmpeg-args"
 )

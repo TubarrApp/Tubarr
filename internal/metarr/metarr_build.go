@@ -101,6 +101,12 @@ func makeMetarrCommand(v *models.Video) []string {
 		},
 		// Transcoding
 		{
+			metarrValue: metVals{str: v.MetarrArgs.ExtraFFmpegArgs},
+			valType:     str,
+			viperKey:    keys.MExtraFFmpegArgs,
+			cmdKey:      metkeys.ExtraFFmpegArgs,
+		},
+		{
 			metarrValue: metVals{str: v.MetarrArgs.UseGPU},
 			valType:     str,
 			viperKey:    "",

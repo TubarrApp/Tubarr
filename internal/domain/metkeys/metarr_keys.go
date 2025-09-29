@@ -31,7 +31,9 @@ const (
 	VideoFile      = "--video-file"
 )
 
+// FFmpeg
 const (
+	ExtraFFmpegArgs      = "--extra-ffmpeg-args"
 	HWAccel              = "--hwaccel"
 	GPUDir               = "--transcode-gpu-directory"
 	TranscodeCodec       = "--transcode-codec"
