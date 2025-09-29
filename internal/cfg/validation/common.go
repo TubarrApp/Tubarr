@@ -4,6 +4,8 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -19,115 +21,115 @@ import (
 )
 
 // ValidateMetarrOutputDirs validates the output directories for Metarr.
-func ValidateMetarrOutputDirs(d string, dURLs []string, c *models.Channel) (map[string]string, error) {
-
-	if len(dURLs) == 0 && d == "" {
+func ValidateMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Channel) (map[string]string, error) {
+	if len(urlDirs) == 0 && defaultDir == "" {
 		return nil, nil
 	}
 
-	// Initialize outDirs map
-	outDirMap := c.MetarrArgs.OutputDirMap
-	if outDirMap == nil {
-		outDirMap = make(map[string]string)
+	// Initialize map and fill from existing
+	outDirMap := make(map[string]string)
+	if c.MetarrArgs.OutputDirMap != nil {
+		maps.Copy(outDirMap, c.MetarrArgs.OutputDirMap)
 	}
 
-	// Validation output directories
-	validateOutDir := make(map[string]bool, len(c.URLs))
+	validatedDirs := make(map[string]bool, len(c.URLs))
 
-	// Handle multi-level arguments
-	if len(dURLs) > 0 {
-		for _, d := range dURLs {
-			if !strings.ContainsRune(d, '|') {
-				return nil, fmt.Errorf("malformed URL output directory format. Should be 'url|output directory'")
-			}
-
-			split := strings.Split(d, "|")
-			if len(split) != 2 {
-				return nil, fmt.Errorf("malformed URL output directory format. Should only contain one '|' rune")
-			}
-
-			dURL := split[0]
-			dOutDir := split[1]
-
-			urlExists := slices.Contains(c.URLs, dURL)
-
-			if !urlExists {
-				return nil, fmt.Errorf("channel does not contain URL %q, but sent in output directory argument %q", dURL, d)
-			}
-
-			outDirMap[dURL] = dOutDir
+	// Parse and validate URL output directory pairs
+	for _, pair := range urlDirs {
+		url, dir, err := parseURLDirPair(pair)
+		if err != nil {
+			return nil, err
 		}
+		if !slices.Contains(c.URLs, url) {
+			return nil, fmt.Errorf("channel does not contain URL %q, provided in output directory mapping", url)
+		}
+		outDirMap[url] = dir
 	}
 
-	// Fill empty channel URL output directories with backup string
-	if d != "" {
-		for _, cURL := range c.URLs {
-			if cOutDir := outDirMap[cURL]; cOutDir == "" {
-				outDirMap[cURL] = d
-			}
+	// Fill blank channel entries
+	for _, cURL := range c.URLs {
+		if outDirMap[cURL] == "" && defaultDir != "" {
+			outDirMap[cURL] = defaultDir
 		}
 	}
 
 	// Validate directories
 	for _, dir := range outDirMap {
-		if !validateOutDir[dir] {
+		if !validatedDirs[dir] {
 			if _, err := ValidateDirectory(dir, false); err != nil {
 				return nil, err
 			}
-			validateOutDir[dir] = true
+			validatedDirs[dir] = true
 		}
 	}
 
 	logging.D(1, "Metarr output directories: %q", outDirMap)
-
 	return outDirMap, nil
+}
+
+// parseURLDirPair parses a 'url:output directory' pairing and validates the format.
+func parseURLDirPair(pair string) (u string, d string, err error) {
+	parts := strings.Split(pair, "|")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid URL|directory pair: %q", pair)
+	}
+
+	u = parts[0]
+	if _, err := url.ParseRequestURI(u); err != nil {
+		return "", "", fmt.Errorf("invalid URL format: %q", u)
+	}
+
+	d = parts[1]
+	if _, err := ValidateDirectory(d, false); err != nil {
+		return "", "", err
+	}
+
+	return parts[0], parts[1], nil
 }
 
 // ValidateDirectory validates that the directory exists, else creates it if desired.
 func ValidateDirectory(d string, createIfNotFound bool) (os.FileInfo, error) {
+	possibleTemplate := strings.Contains(d, "{{") && strings.Contains(d, "}}")
+	logging.D(3, "Statting directory %q. Templating detected? %v...", d, possibleTemplate)
 
-	possibleTemplate := (strings.Contains(d, "{{") && strings.Contains(d, "}}"))
-
-	logging.D(3, "Statting directory %q. Suspected templating: %v...", d, possibleTemplate)
-
-	dirInfo, err := os.Stat(d)
+	// Handle templated directories
 	if possibleTemplate {
-		if checkTags(d) {
+		if !checkTemplateTags(d) {
+			t := make([]string, 0, len(templates.TemplateMap))
+			for k := range templates.TemplateMap {
+				t = append(t, k)
+			}
+			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
+		}
+		return nil, nil // templates are valid, no need to stat
+	}
+
+	// Check directory existence
+	dirInfo, err := os.Stat(d)
+	switch {
+	case err == nil:
+		// path exists, ensure it's a directory
+		if !dirInfo.IsDir() {
+			return dirInfo, fmt.Errorf("path %q is a file, not a directory", d)
+		}
+		return dirInfo, nil
+
+	case os.IsNotExist(err):
+		// path does not exist
+		if createIfNotFound {
+			logging.D(3, "Directory %q does not exist, creating it...", d)
+			if err := os.MkdirAll(d, 0o755); err != nil {
+				return nil, fmt.Errorf("directory %q does not exist and failed to create: %w", d, err)
+			}
+			dirInfo, _ = os.Stat(d) // re-stat to get correct FileInfo
 			return dirInfo, nil
 		}
+		return nil, fmt.Errorf("directory %q does not exist", d)
+
+	default:
+		// other error
+		return nil, fmt.Errorf("failed to stat directory %q: %w", d, err)
 	}
-	if err != nil {
-
-		if possibleTemplate {
-			logging.W("directory appears to contain a templating element not included in the supported list.\nSupported template tags are: %q", templates.TemplateMap)
-		}
-
-		if os.IsNotExist(err) {
-			switch {
-			case createIfNotFound:
-				logging.D(3, "Directory %q does not exist, creating it...", d)
-				if err := os.MkdirAll(d, 0o755); err != nil {
-					return dirInfo, fmt.Errorf("directory %q does not exist and Tubarr failed to create it: %w", d, err)
-				} else {
-					break // Directory successfully created
-				}
-			default:
-				if !possibleTemplate {
-					return dirInfo, fmt.Errorf("directory %q does not exist: %w", d, err)
-				}
-			}
-		} else {
-			return dirInfo, fmt.Errorf("failed to stat directory %q: %w", d, err)
-		}
-	}
-
-	if dirInfo != nil {
-		if !dirInfo.IsDir() {
-			return dirInfo, fmt.Errorf("directory entered %q is a file", d)
-		}
-	}
-
-	return dirInfo, nil
 }
 
 // ValidateFile validates that the file exists, else creates it if desired.
@@ -468,8 +470,8 @@ func ValidateToFromDate(d string) (string, error) {
 	return output, nil
 }
 
-// checkTags checks if templating tags are present.
-func checkTags(d string) (hasTemplating bool) {
+// checkTemplateTags checks if templating tags are present.
+func checkTemplateTags(d string) (hasTemplating bool) {
 	s := strings.Index(d, "{{")
 	e := strings.Index(d, "}}")
 
@@ -482,7 +484,7 @@ func checkTags(d string) (hasTemplating bool) {
 
 	if e+2 < len(d) {
 		if s := strings.Index(d[e+2:], "{{"); s >= 0 {
-			return checkTags(d[e+2:])
+			return checkTemplateTags(d[e+2:])
 		}
 	}
 	return false

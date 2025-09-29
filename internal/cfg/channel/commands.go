@@ -1467,16 +1467,30 @@ func applyConfigMetarrSettings(c *models.Channel) (err error) {
 		}
 	}
 
-	// Output directories
+	// Default output directory
 	if v, ok := getConfigValue[string](keys.MOutputDir); ok {
 		if _, err := validation.ValidateDirectory(v, false); err != nil {
 			return err
 		}
 		c.MetarrArgs.OutputDir = v
 	}
-	if v, ok := getConfigValue[[]string](keys.MURLOutputDirs); ok {
-		if len(v) != 0 {
-			c.MetarrArgs.URLOutputDirs = v
+
+	// Per-URL output directory
+	if v, ok := getConfigValue[[]string](keys.MURLOutputDirs); ok && len(v) != 0 {
+
+		valid := make([]string, 0, len(v))
+
+		for _, d := range v {
+			split := strings.Split(d, "|")
+			if len(split) == 2 && split[1] != "" {
+				valid = append(valid, d)
+			}
+		}
+
+		if len(valid) == 0 {
+			c.MetarrArgs.URLOutputDirs = nil
+		} else {
+			c.MetarrArgs.URLOutputDirs = valid
 		}
 	}
 
