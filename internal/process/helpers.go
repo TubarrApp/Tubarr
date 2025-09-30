@@ -74,7 +74,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 }
 
 // checkMoveOps checks if Metarr should use an output directory based on existent metadata.
-func checkMoveOps(v *models.Video) string {
+func checkMoveOps(v *models.Video) (outputDir string, channelURL string) {
 	// Load move ops from file if present
 	if v.Channel.Settings.MoveOpFile != "" {
 		v.Settings.MoveOps = append(v.Settings.MoveOps, loadMoveOpsFromFile(v)...)
@@ -87,11 +87,11 @@ func checkMoveOps(v *models.Video) string {
 
 			if strings.Contains(strings.ToLower(val), strings.ToLower(op.Value)) {
 				logging.I("Move op filters matched: Field %q contains the value %q. Output directory retrieved as %q", op.Field, op.Value, op.OutputDir)
-				return op.OutputDir
+				return op.OutputDir, op.ChannelURL
 			}
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // filterRequests uses user input filters to check if the video should be downloaded.
@@ -128,6 +128,13 @@ func filterOpsFilter(v *models.Video) (bool, error) {
 	anyTotal, anyPassed := 0, 0
 
 	for _, filter := range v.Settings.Filters {
+
+		// Skip filter if it is associated with a channel URL, and that URL does not match the channel URL associated with the video.
+		if filter.ChannelURL != "" && (!strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(v.ChannelURL))) {
+			logging.D(2, "Skipping filter %v. This filter's channel URL does not match video (%q)'s associated channel URL %q", filter, v.URL, v.ChannelURL)
+			continue
+		}
+
 		switch filter.MustAny {
 		case "must":
 			mustTotal++

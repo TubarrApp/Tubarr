@@ -1,12 +1,13 @@
 package validation
 
 import (
-	"errors"
+	"net/url"
 	"strings"
+	"tubarr/internal/utils/logging"
 )
 
-// parseOp allows users to escape colons without messing up 'strings.Split' logic.
-func parseOp(op string) ([]string, error) {
+// parseOp allows users to escape separator characters without messing up 'strings.Split' logic.
+func parseOp(op string, desiredSeparator rune) []string {
 	var parts []string
 	var buf strings.Builder
 	escaped := false
@@ -22,7 +23,7 @@ func parseOp(op string) ([]string, error) {
 			// Escape next character
 			escaped = true
 
-		case r == ':':
+		case r == desiredSeparator:
 			// Separator
 			parts = append(parts, buf.String())
 			buf.Reset()
@@ -33,11 +34,31 @@ func parseOp(op string) ([]string, error) {
 	}
 
 	if escaped {
-		return nil, errors.New("invalid escape at end of string")
+		// Trailing '\' treated as literal backslash
+		buf.WriteRune('\\')
 	}
 
 	// Add last segment
 	parts = append(parts, buf.String())
 
-	return parts, nil
+	return parts
+}
+
+// CheckForOpURL checks if a specific URL is attached to a particular meta operation.
+func CheckForOpURL(op string) (chanURL string, ops string) {
+
+	// Check if valid
+	split := parseOp(op, '|')
+	if len(split) < 2 {
+		return "", op
+	}
+
+	u := split[0]
+
+	if _, err := url.ParseRequestURI(u); err != nil {
+		logging.E(1, "invalid URL format grabbed as %q. Ignore this if the filter (%q) does not contain a channel URL (format is 'channel URL|filter:ops:go:here')", u, op)
+		return "", strings.Join(split[1:], "|")
+	}
+
+	return u, strings.Join(split[1:], "|")
 }

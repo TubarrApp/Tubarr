@@ -10,83 +10,96 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-// ValidateMetaOps parses the meta transformation operations.
+// ValidateMetaOps parses and validates meta transformation operations.
 func ValidateMetaOps(metaOps []string) ([]string, error) {
 	if len(metaOps) == 0 {
-		logging.I("No meta operations passed in to verification")
+		logging.D(4, "No meta operations passed in to verification")
 		return metaOps, nil
 	}
 
-	const (
-		dupMsg = "Duplicate meta operation %q, skipping"
-	)
-	var b strings.Builder
+	const dupMsg = "Duplicate meta operation %q, skipping"
 
-	logging.D(1, "Validating meta operations...")
+	var b strings.Builder
 	valid := make([]string, 0, len(metaOps))
 	exists := make(map[string]bool, len(metaOps))
 
-	for _, m := range metaOps {
-		split := strings.Split(m, ":")
-		switch len(split) {
-		case 3:
-			switch split[1] {
-			case "append", "copy-to", "paste-from", "prefix", "trim-prefix", "trim-suffix", "replace", "set":
+	logging.D(1, "Validating meta operations %v...", metaOps)
 
-				b.Grow(len(m))
+	for _, op := range metaOps {
+		u, op := CheckForOpURL(op)
+		split := parseOp(op, ':')
+
+		switch len(split) {
+		// 'director:set:Spielberg'
+		case 3:
+			action := split[1]
+			switch action {
+			case "append", "copy-to", "paste-from", "prefix", "trim-prefix",
+				"trim-suffix", "replace", "set":
+
+				// Build uniqueness key
+				b.Grow(len(op))
 				b.WriteString(split[0])
 				b.WriteByte(':')
-				b.WriteString(split[1])
+				b.WriteString(action)
 				b.WriteByte(':')
 				b.WriteString(split[2])
 				key := b.String()
 				b.Reset()
 
 				if exists[key] {
-					logging.I(dupMsg, m)
+					logging.I(dupMsg, op)
 					continue
 				}
+
 				exists[key] = true
-				valid = append(valid, m)
+				totalOp := u + "|" + op
+				valid = append(valid, totalOp)
+
 			default:
-				return nil, fmt.Errorf("invalid meta operation %q", split[1])
+				return nil, fmt.Errorf("invalid meta operation %q", action)
 			}
+
+			// 'title:date-tag:suffix:ymd'
 		case 4:
 			if split[1] == "date-tag" {
 				switch split[2] {
 				case "prefix", "suffix":
 					if ValidateDateFormat(split[3]) {
-
-						b.Grow(len(m))
+						// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
+						b.Grow(len(op))
 						b.WriteString(split[0])
 						b.WriteByte(':')
-						b.WriteString(split[1])
+						b.WriteString("date-tag")
 						b.WriteByte(':')
-						b.WriteString(split[2]) // Leave out split[3], probably don't want multiple date tags with diff formats
+						b.WriteString(split[2])
 						key := b.String()
 						b.Reset()
 
 						if exists[key] {
-							logging.I(dupMsg, m)
+							logging.I(dupMsg, op)
 							continue
 						}
+
 						exists[key] = true
-						valid = append(valid, m)
+						totalOp := u + "|" + op
+						valid = append(valid, totalOp)
 					}
 				default:
 					return nil, fmt.Errorf("invalid date tag location %q, use prefix or suffix", split[2])
 				}
 			}
+
 		default:
-			return nil, fmt.Errorf("invalid meta op %q", m)
+			return nil, fmt.Errorf("invalid meta op %q", op)
 		}
 	}
 
-	if len(valid) != 0 {
-		return valid, nil
+	if len(valid) == 0 {
+		return nil, errors.New("no valid meta operations")
 	}
 
-	return nil, errors.New("no valid meta operations")
+	return valid, nil
 }
 
 // ValidateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid.

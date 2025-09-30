@@ -42,6 +42,9 @@ const (
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video) []string {
 
+	// Remove non-matching URL-specific meta ops
+	validOps := filterMetaOps(v.MetarrArgs.MetaOps, v.ChannelURL)
+
 	fields := []metCmdMapping{
 
 		// Metarr args:
@@ -76,7 +79,7 @@ func makeMetarrCommand(v *models.Video) []string {
 			cmdKey:      metkeys.MaxCPU,
 		},
 		{
-			metarrValue: metVals{strSlice: v.MetarrArgs.MetaOps},
+			metarrValue: metVals{strSlice: validOps},
 			valType:     strSlice,
 			viperKey:    keys.MMetaOps,
 			cmdKey:      metkeys.MetaOps,
@@ -196,6 +199,21 @@ func makeMetarrCommand(v *models.Video) []string {
 	return args
 }
 
+// filterMetaOps filters valid meta ops for this video and linked channel.
+func filterMetaOps(ops []string, videoChanURL string) (validOps []string) {
+	logging.D(2, "Filtering meta ops %v", ops)
+	for _, op := range ops {
+		opChanURL, opPart := validation.CheckForOpURL(op)
+		if opChanURL == "" || strings.EqualFold(strings.TrimSpace(opChanURL), strings.TrimSpace(videoChanURL)) {
+			logging.D(2, "Meta ops channels match. Op URL %q, Channel URL %q", opChanURL, videoChanURL)
+			validOps = append(validOps, opPart)
+		} else {
+			logging.I("Skipping meta op %q: channel URL mismatch (expected %q, got %q)", op, videoChanURL, opChanURL)
+		}
+	}
+	return validOps
+}
+
 // processField processes each field in the argument map.
 func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string) (metaOW bool) {
 	switch f.valType {
@@ -244,9 +262,11 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 // parseMetarrOutputDir parses and returns the output directory.
 func parseMetarrOutputDir(v *models.Video) string {
 	var (
-		dirParser = parsing.NewDirectoryParser(v.Channel, v)
-		mArgs     = v.Channel.MetarrArgs
-		err       error
+		dirParser  = parsing.NewDirectoryParser(v.Channel, v)
+		mArgs      = v.Channel.MetarrArgs
+		mOpOutDir  = v.Channel.MoveOpOutputDir
+		mOpChanURL = v.Channel.MoveOpChannelURL
+		err        error
 	)
 
 	if mArgs.OutputDirMap, err = validation.ValidateMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, v.Channel); err != nil {
@@ -268,21 +288,31 @@ func parseMetarrOutputDir(v *models.Video) string {
 		return parsed
 
 		// #2 Priority: Move operation filter output directory
-	case v.Channel.MoveOpOutputDir != "":
-		parsed, err := dirParser.ParseDirectory(v.Channel.MoveOpOutputDir)
+	case mOpOutDir != "" && (mOpChanURL == "" || strings.EqualFold(strings.TrimSpace(mOpChanURL), strings.TrimSpace(v.ChannelURL))):
+		parsed, err := dirParser.ParseDirectory(mOpOutDir)
 		if err != nil {
-			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", v.Channel.MoveOpOutputDir, v.URL, err)
+			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mOpOutDir, v.URL, err)
 			break
 		}
 		return parsed
 
 		// #3 Priority: Channel default output directory
 	case mArgs.OutputDirMap[v.ChannelURL] != "":
-		parsed, err := dirParser.ParseDirectory(v.MetarrArgs.OutputDirMap[v.ChannelURL])
+		parsed, err := dirParser.ParseDirectory(mArgs.OutputDirMap[v.ChannelURL])
 		if err != nil {
-			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", v.MetarrArgs.OutputDir, v.URL, err)
+			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDirMap[v.ChannelURL], v.URL, err)
 			break
 		}
+		return parsed
+
+	// Fallback: Dev error did not fill the default output directory if above fails, fill it here
+	case mArgs.OutputDir != "":
+		parsed, err := dirParser.ParseDirectory(mArgs.OutputDir)
+		if err != nil {
+			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDir, v.URL, err)
+			break
+		}
+		logging.W("Dev Error: No default fallback output directory specified in map %v... Fetching from model instead.", mArgs.OutputDirMap)
 		return parsed
 	}
 

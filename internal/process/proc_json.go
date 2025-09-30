@@ -54,7 +54,7 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		return false, nil
 	}
 
-	v.Channel.MoveOpOutputDir = checkMoveOps(v)
+	v.Channel.MoveOpOutputDir, v.Channel.MoveOpChannelURL = checkMoveOps(v)
 
 	if v.ID, err = vs.AddVideo(v); err != nil {
 		return false, fmt.Errorf("failed to update video DB entry: %w", err)

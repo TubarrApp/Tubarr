@@ -290,76 +290,53 @@ func ValidateMaxFilesize(m string) (string, error) {
 
 // ValidateFilterOps verifies that the user inputted filters are valid.
 func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
+	if len(ops) == 0 {
+		return nil, nil
+	}
 
 	var filters = make([]models.DLFilters, 0, len(ops))
 
 	for _, op := range ops {
 
-		split, err := parseOp(op)
-		if err != nil {
-			return nil, err
-		}
+		// Extract optional channel URL and remaining filter string
+		chanURL, op := CheckForOpURL(op)
+		split := parseOp(op, ':')
 
 		if len(split) < 3 {
 			logging.E(0, errconsts.FilterOpsFormatError)
 			return nil, errors.New("filter format error")
 		}
 
-		switch len(split) {
-		case 4:
-
-			field := strings.ToLower(strings.TrimSpace(split[0]))
-			containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
-			value := strings.ToLower(split[2])
-			mustAny := strings.ToLower(strings.TrimSpace(split[3]))
-
-			switch containsOmits {
-			case "contains", "omits":
-
-				switch mustAny {
-				case "must", "any":
-					filters = append(filters, models.DLFilters{
-						Field:   field,
-						Type:    containsOmits,
-						Value:   value,
-						MustAny: mustAny,
-					})
-				default:
-					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
-				}
-
-			default:
-				logging.E(0, errconsts.FilterOpsFormatError)
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
-			}
-		case 3:
-
-			field := strings.ToLower(strings.TrimSpace(split[0]))
-			containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
-			mustAny := strings.ToLower(strings.TrimSpace(split[2]))
-
-			switch split[1] {
-			case "contains", "omits":
-
-				switch mustAny {
-				case "must", "any":
-					filters = append(filters, models.DLFilters{
-						Field:   field,
-						Type:    containsOmits,
-						MustAny: mustAny,
-					})
-				default:
-					return nil, errors.New("filter type must be set to 'and' (must match) or 'or' (only one filter must match)")
-				}
-
-			default:
-				return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
-			}
-		default:
-			logging.E(0, errconsts.FilterOpsFormatError)
-			return nil, errors.New("filter format error")
+		// Normalize values
+		field := strings.ToLower(strings.TrimSpace(split[0]))
+		containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
+		mustAny := strings.ToLower(strings.TrimSpace(split[len(split)-1]))
+		var value string
+		if len(split) == 4 {
+			value = strings.ToLower(split[2])
 		}
+
+		// Validate contains/omits
+		if containsOmits != "contains" && containsOmits != "omits" {
+			logging.E(0, errconsts.FilterOpsFormatError)
+			return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
+		}
+
+		// Validate must/any
+		if mustAny != "must" && mustAny != "any" {
+			return nil, errors.New("filter type must be set to 'must' or 'any'")
+		}
+
+		// Append filter
+		filters = append(filters, models.DLFilters{
+			Field:      field,
+			Type:       containsOmits,
+			Value:      value,
+			MustAny:    mustAny,
+			ChannelURL: chanURL,
+		})
 	}
+
 	return filters, nil
 }
 
@@ -376,10 +353,9 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 	m := make([]models.MoveOps, 0, len(ops))
 
 	for _, op := range ops {
-		split, err := parseOp(op)
-		if err != nil {
-			return nil, err
-		}
+
+		chanURL, op := CheckForOpURL(op)
+		split := parseOp(op, ':')
 
 		if len(split) != 3 {
 			return nil, errors.New(moveOpFormatError)
@@ -394,9 +370,10 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 		}
 
 		m = append(m, models.MoveOps{
-			Field:     field,
-			Value:     value,
-			OutputDir: outputDir,
+			Field:      field,
+			Value:      value,
+			OutputDir:  outputDir,
+			ChannelURL: chanURL,
 		})
 	}
 	return m, nil

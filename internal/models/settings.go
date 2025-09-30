@@ -25,17 +25,25 @@ type ChannelSettings struct {
 
 // DLFilters are used to filter in or out videos from download by metafields.
 type DLFilters struct {
-	Field   string `json:"filter_field"`
-	Type    string `json:"filter_type"`
-	Value   string `json:"filter_value"`
-	MustAny string `json:"filter_must_any"`
+	ChannelURL string `json:"filter_url_specific"`
+	Field      string `json:"filter_field"`
+	Type       string `json:"filter_type"`
+	Value      string `json:"filter_value"`
+	MustAny    string `json:"filter_must_any"`
 }
 
 // MoveOps are used to set an output directory in Metarr based on matching metadata fields.
 type MoveOps struct {
-	Field     string `json:"move_op_field"`
-	Value     string `json:"move_op_value"`
-	OutputDir string `json:"move_op_output_dir"`
+	ChannelURL string `json:"move_url_specific"`
+	Field      string `json:"move_op_field"`
+	Value      string `json:"move_op_value"`
+	OutputDir  string `json:"move_op_output_dir"`
+}
+
+// MetaOps are metadata operations set in Metarr.
+type MetaOps struct {
+	ChannelURL string `json:"meta_url_specific"`
+	Op         string
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
