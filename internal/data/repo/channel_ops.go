@@ -198,8 +198,11 @@ func (cs *ChannelStore) AddNotifyURLs(id int64, notifications []string) error {
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			logging.E(0, "Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", id, notifications, err)
+		if err != nil {
+			// Only rollback if function is returning an error
+			if err := tx.Rollback(); err != nil {
+				logging.E(0, "Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", id, notifications, err)
+			}
 		}
 	}()
 

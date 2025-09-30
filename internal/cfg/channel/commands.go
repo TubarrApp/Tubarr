@@ -468,7 +468,7 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	return pauseCmd
 }
 
-// pauseChannelCmd pauses a channel from downloads in upcoming crawls.
+// unpauseChannelCmd pauses a channel from downloads in upcoming crawls.
 func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	var (
 		name string
