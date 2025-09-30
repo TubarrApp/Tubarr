@@ -31,21 +31,6 @@ func NewDirectoryParser(c *models.Channel) (parseDir *Directory) {
 	}
 }
 
-// ParseDirPtr directly modifies an input directory string.
-func (dp *Directory) ParseDirPtr(input *string, v *models.Video, videoOrJSON string) error {
-	if input == nil {
-		return errors.New("input string is null")
-	}
-
-	var err error
-	*input, err = dp.ParseDirectory(*input, v, videoOrJSON)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // ParseDirectory returns the absolute directory path with template replacements.
 func (dp *Directory) ParseDirectory(dir string, v *models.Video, fileType string) (parsedDir string, err error) {
 	if dir == "" {
