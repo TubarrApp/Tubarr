@@ -19,15 +19,14 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 
 	const dupMsg = "Duplicate meta operation %q, skipping"
 
-	var b strings.Builder
 	valid := make([]string, 0, len(metaOps))
 	exists := make(map[string]bool, len(metaOps))
 
 	logging.D(1, "Validating meta operations %v...", metaOps)
 
 	for _, op := range metaOps {
-		u, op := CheckForOpURL(op)
-		split := parseOp(op, ':')
+		opURL, opPart := CheckForOpURL(op)
+		split := parseOp(opPart, ':')
 
 		switch len(split) {
 		// 'director:set:Spielberg'
@@ -38,25 +37,18 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 				"trim-suffix", "replace", "set":
 
 				// Build uniqueness key
-				b.Grow(len(op))
-				b.WriteString(split[0])
-				b.WriteByte(':')
-				b.WriteString(action)
-				b.WriteByte(':')
-				b.WriteString(split[2])
-				key := b.String()
-				b.Reset()
+				key := strings.Join([]string{split[0], action, split[2]}, ":")
 
 				if exists[key] {
-					logging.I(dupMsg, op)
+					logging.I(dupMsg, opPart)
 					continue
 				}
 
 				exists[key] = true
-				if u != "" {
-					op = u + "|" + op
+				if opURL != "" {
+					opPart = opURL + "|" + opPart
 				}
-				valid = append(valid, op)
+				valid = append(valid, opPart)
 
 			default:
 				return nil, fmt.Errorf("invalid meta operation %q", action)
@@ -69,25 +61,18 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 				case "prefix", "suffix":
 					if ValidateDateFormat(split[3]) {
 						// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
-						b.Grow(len(op))
-						b.WriteString(split[0])
-						b.WriteByte(':')
-						b.WriteString("date-tag")
-						b.WriteByte(':')
-						b.WriteString(split[2])
-						key := b.String()
-						b.Reset()
+						key := strings.Join([]string{split[0], "date-tag", split[2]}, ":")
 
 						if exists[key] {
-							logging.I(dupMsg, op)
+							logging.I(dupMsg, opPart)
 							continue
 						}
 
 						exists[key] = true
-						if u != "" {
-							op = u + "|" + op
+						if opURL != "" {
+							opPart = opURL + "|" + opPart
 						}
-						valid = append(valid, op)
+						valid = append(valid, opPart)
 					}
 				default:
 					return nil, fmt.Errorf("invalid date tag location %q, use prefix or suffix", split[2])
@@ -95,7 +80,7 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 			}
 
 		default:
-			return nil, fmt.Errorf("invalid meta op %q", op)
+			return nil, fmt.Errorf("invalid meta op %q", opPart)
 		}
 	}
 
