@@ -53,8 +53,10 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 				}
 
 				exists[key] = true
-				totalOp := u + "|" + op
-				valid = append(valid, totalOp)
+				if u != "" {
+					op = u + "|" + op
+				}
+				valid = append(valid, op)
 
 			default:
 				return nil, fmt.Errorf("invalid meta operation %q", action)
@@ -82,8 +84,10 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 						}
 
 						exists[key] = true
-						totalOp := u + "|" + op
-						valid = append(valid, totalOp)
+						if u != "" {
+							op = u + "|" + op
+						}
+						valid = append(valid, op)
 					}
 				default:
 					return nil, fmt.Errorf("invalid date tag location %q, use prefix or suffix", split[2])
