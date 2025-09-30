@@ -52,8 +52,6 @@ const (
 	QVidURL         = "url"
 	QVidTitle       = "title"
 	QVidDescription = "description"
-	QVidVideoDir    = "video_directory"
-	QVidJSONDir     = "json_directory"
 	QVidVideoPath   = "video_path"
 	QVidJSONPath    = "json_path"
 	QVidSettings    = "settings"

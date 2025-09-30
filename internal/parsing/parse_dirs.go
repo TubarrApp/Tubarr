@@ -23,24 +23,22 @@ const (
 
 type Directory struct {
 	C *models.Channel
-	V *models.Video
 }
 
-func NewDirectoryParser(c *models.Channel, v *models.Video) (parseDir *Directory) {
+func NewDirectoryParser(c *models.Channel) (parseDir *Directory) {
 	return &Directory{
 		C: c,
-		V: v,
 	}
 }
 
 // ParseDirPtr directly modifies an input directory string.
-func (dp *Directory) ParseDirPtr(input *string) error {
+func (dp *Directory) ParseDirPtr(input *string, v *models.Video, videoOrJSON string) error {
 	if input == nil {
 		return errors.New("input string is null")
 	}
 
 	var err error
-	*input, err = dp.ParseDirectory(*input)
+	*input, err = dp.ParseDirectory(*input, v, videoOrJSON)
 	if err != nil {
 		return err
 	}
@@ -49,7 +47,7 @@ func (dp *Directory) ParseDirPtr(input *string) error {
 }
 
 // ParseDirectory returns the absolute directory path with template replacements.
-func (dp *Directory) ParseDirectory(dir string) (parsedDir string, err error) {
+func (dp *Directory) ParseDirectory(dir string, v *models.Video, fileType string) (parsedDir string, err error) {
 	if dir == "" {
 		return "", errors.New("directory sent in empty")
 	}
@@ -58,7 +56,7 @@ func (dp *Directory) ParseDirectory(dir string) (parsedDir string, err error) {
 	if strings.Contains(dir, open) {
 		var err error
 
-		parsed, err = dp.parseTemplate(dir)
+		parsed, err = dp.parseTemplate(dir, v)
 		if err != nil {
 			return "", fmt.Errorf("template parsing error: %w", err)
 		}
@@ -70,14 +68,14 @@ func (dp *Directory) ParseDirectory(dir string) (parsedDir string, err error) {
 		}
 	}
 
-	logging.S(1, "Parsed output directory as %q", parsed)
+	logging.S(1, "Parsed %s file output directory for video %q as %q", fileType, v.URL, parsed)
 	return parsed, nil
 }
 
 // parseTemplate parses template options inside the directory string.
 //
 // Returns error if the desired data isn't present, to prevent unexpected results for the user.
-func (dp *Directory) parseTemplate(dir string) (string, error) {
+func (dp *Directory) parseTemplate(dir string, v *models.Video) (string, error) {
 	opens := strings.Count(dir, open)
 	closes := strings.Count(dir, close)
 
@@ -105,7 +103,7 @@ func (dp *Directory) parseTemplate(dir string) (string, error) {
 
 		// Replacement string
 		tag := remaining[startIdx+len(open) : endIdx]
-		replacement, err := dp.replace(strings.TrimSpace(tag))
+		replacement, err := dp.replaceTemplateTags(strings.TrimSpace(tag), v)
 		if err != nil {
 			return "", err
 		}
@@ -121,11 +119,10 @@ func (dp *Directory) parseTemplate(dir string) (string, error) {
 	return b.String(), nil
 }
 
-// replace makes template replacements in the directory string.
-func (dp *Directory) replace(tag string) (string, error) {
+// replaceTemplateTags makes template replacements in the directory string.
+func (dp *Directory) replaceTemplateTags(tag string, v *models.Video) (string, error) {
 
 	c := dp.C
-	v := dp.V
 
 	switch strings.ToLower(tag) {
 

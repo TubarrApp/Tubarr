@@ -7,12 +7,13 @@ import (
 	"os/exec"
 
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 )
 
 // InitMetarr begins processing with Metarr
-func InitMetarr(v *models.Video, ctx context.Context) error {
-	args := makeMetarrCommand(v)
+func InitMetarr(v *models.Video, dirParser *parsing.Directory, ctx context.Context) error {
+	args := makeMetarrCommand(v, dirParser)
 	if len(args) == 0 {
 		logging.I("No Metarr arguments built, returning...")
 		return nil

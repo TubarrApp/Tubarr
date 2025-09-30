@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"sync"
 
 	"tubarr/internal/downloads"
 	"tubarr/internal/interfaces"
@@ -17,28 +16,20 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-var (
-	muErr sync.Mutex
-)
-
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, ctx context.Context) (bool, []error) {
+func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, ctx context.Context) (success bool, err error) {
 	var (
-		errs    []error
-		success bool
+		errs []error
 	)
 
 	select {
 	case <-ctx.Done():
 		errs = append(errs, errors.New("aborting process, context canceled"))
-		return false, errs
+		return false, errors.Join(errs...)
 	default:
 		// Process
 	}
-	conc := c.Settings.Concurrency
-	if conc < 1 {
-		conc = 1
-	}
+	conc := max(c.Settings.Concurrency, 1)
 
 	logging.I("Starting meta/video processing for %d videos", len(videos))
 
@@ -49,9 +40,10 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 	jobs := make(chan *models.Video, len(videos))
 	results := make(chan error, len(videos))
 
-	// Start workers
-	for w := 1; w <= conc; w++ {
-		go videoJob(w, jobs, results, s.VideoStore(), c, dlTracker, ctx)
+	dirParser := parsing.NewDirectoryParser(c)
+	// Start workers ('w + 1' to start workers at 1)
+	for w := range conc {
+		go videoJob(w+1, jobs, results, s.VideoStore(), c, dlTracker, dirParser, ctx)
 	}
 
 	// Send jobs
@@ -69,51 +61,40 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 	}
 	close(jobs)
 
-	for i := 0; i < len(videos); i++ {
+	for range videos {
 		if err := <-results; err != nil {
-			muErr.Lock()
 			errs = append(errs, err)
-			muErr.Unlock()
 		} else {
 			success = true
 		}
 	}
 
 	if len(errs) > 0 {
-		return success, errs
+		logging.E(0, "Finished with %d errors", len(errs))
+		return success, errors.Join(errs...)
 	}
 	return success, nil
 }
 
 // videoJob starts a worker's process for a video.
-func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs interfaces.VideoStore, c *models.Channel, dlTracker *downloads.DownloadTracker, ctx context.Context) {
+func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs interfaces.VideoStore, c *models.Channel, dlTracker *downloads.DownloadTracker, dirParser *parsing.Directory, ctx context.Context) {
 	for v := range videos {
 		var err error
 
 		// Initialize directory parser
-		if strings.Contains(v.JSONDir, "{") || strings.Contains(v.VideoDir, "{") {
-			dirParser := parsing.NewDirectoryParser(c, v)
+		if strings.Contains(c.Settings.JSONDir, "{") || strings.Contains(c.Settings.VideoDir, "{") {
 
-			var parseDirs = []*string{
-				&v.JSONDir, &v.VideoDir,
-				&c.Settings.JSONDir, &c.Settings.VideoDir,
+			if c.Settings.JSONDir, err = dirParser.ParseDirectory(c.Settings.JSONDir, v, "JSON"); err != nil {
+				logging.E(0, "Failed to parse JSON directory %q", c.Settings.JSONDir)
 			}
 
-			for _, ptr := range parseDirs {
-				if ptr == nil {
-					logging.E(0, "Null pointer in job with ID %d", id)
-					continue
-				}
-
-				if *ptr, err = dirParser.ParseDirectory(*ptr); err != nil {
-					logging.E(0, "Failed to parse directory %q", *ptr)
-					continue
-				}
+			if c.Settings.VideoDir, err = dirParser.ParseDirectory(c.Settings.VideoDir, v, "video"); err != nil {
+				logging.E(0, "Failed to parse video directory %q", c.Settings.VideoDir)
 			}
 		}
 
 		if v.JSONCustomFile == "" {
-			proceed, err := processJSON(ctx, v, vs, dlTracker)
+			proceed, err := processJSON(ctx, v, vs, dirParser, dlTracker)
 			if err != nil {
 				results <- fmt.Errorf("JSON processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 				continue
@@ -163,8 +144,8 @@ func videoJob(id int, videos <-chan *models.Video, results chan<- error, vs inte
 			continue
 		}
 
-		//
-		if err := metarr.InitMetarr(v, ctx); err != nil {
+		// Initialize Metarr
+		if err := metarr.InitMetarr(v, dirParser, ctx); err != nil {
 			results <- fmt.Errorf("error initializing Metarr: %w", err)
 			continue
 		}

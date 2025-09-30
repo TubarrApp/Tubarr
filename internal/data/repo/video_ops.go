@@ -55,9 +55,6 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 		case v.URL == "":
 			errArray = append(errArray, fmt.Errorf("must enter a url for video #%d", i))
 			continue
-		case v.VideoDir == "":
-			errArray = append(errArray, fmt.Errorf("must enter a video directory for video #%d", i))
-			continue
 		case v.ChannelID == 0:
 			if c.ID == 0 {
 				errArray = append(errArray, fmt.Errorf("video #%d has no channel ID", i))
@@ -66,9 +63,6 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 			v.ChannelID = c.ID
 		}
 
-		if v.JSONDir == "" {
-			v.JSONDir = v.VideoDir
-		}
 		validVideos = append(validVideos, v)
 	}
 
@@ -85,15 +79,11 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 					Columns(
 						consts.QVidChanID,
 						consts.QVidURL,
-						consts.QVidVideoDir,
-						consts.QVidJSONDir,
 						consts.QVidFinished,
 					).
 					Values(
 						v.ChannelID,
 						v.URL,
-						v.VideoDir,
-						v.JSONDir,
 						v.Finished,
 					).
 					RunWith(tx)
@@ -105,8 +95,6 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 				}
 			} else {
 				query := squirrel.Update(consts.DBVideos).
-					Set(consts.QVidVideoDir, v.VideoDir).
-					Set(consts.QVidJSONDir, v.JSONDir).
 					Set(consts.QVidFinished, v.Finished).
 					Where(squirrel.Eq{consts.QVidChanID: v.ChannelID, consts.QVidURL: v.URL}).
 					RunWith(tx)
@@ -149,11 +137,8 @@ func (vs VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*mo
 
 // AddVideo adds a new video to the database.
 func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
-	switch {
-	case v.URL == "":
+	if v.URL == "" {
 		return 0, errors.New("must enter a url for video")
-	case v.VideoDir == "":
-		return 0, errors.New("must enter a video directory where downloads will be stored")
 	}
 
 	if id, exists := vs.videoExists(v); exists {
@@ -164,17 +149,12 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		return id, nil
 	}
 
-	// JSON dir
-	if v.JSONDir == "" {
-		v.JSONDir = v.VideoDir
-	}
-	now := time.Now()
-
 	var (
 		metadataJSON,
 		settingsJSON,
 		metarrJSON []byte
-		err error
+		err       error
+		committed bool
 	)
 
 	// Convert metadata map to JSON string
@@ -187,7 +167,6 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	var committed bool
 	defer func() {
 		if !committed && tx != nil {
 			if err := tx.Rollback(); err != nil {
@@ -196,17 +175,19 @@ func (vs VideoStore) AddVideo(v *models.Video) (int64, error) {
 		}
 	}()
 
+	now := time.Now()
 	vidQuery := squirrel.Insert(consts.DBVideos).
 		Columns(
 			consts.QVidChanID, consts.QVidURL, consts.QVidTitle,
-			consts.QVidDescription, consts.QVidVideoDir, consts.QVidJSONDir,
-			consts.QVidFinished, consts.QVidUploadDate, consts.QVidMetadata,
-			consts.QVidSettings, consts.QVidMetarr, consts.QVidCreatedAt,
-			consts.QVidUpdatedAt,
+			consts.QVidDescription, consts.QVidFinished, consts.QVidUploadDate,
+			consts.QVidMetadata, consts.QVidSettings, consts.QVidMetarr,
+			consts.QVidCreatedAt, consts.QVidUpdatedAt,
 		).
 		Values(
-			v.ChannelID, v.URL, v.Title, v.Description, v.VideoDir, v.JSONDir,
-			v.Finished, v.UploadDate, metadataJSON, settingsJSON, metarrJSON, now, now,
+			v.ChannelID, v.URL, v.Title,
+			v.Description, v.Finished, v.UploadDate,
+			metadataJSON, settingsJSON, metarrJSON,
+			now, now,
 		).
 		RunWith(tx)
 
@@ -263,8 +244,6 @@ func (vs VideoStore) UpdateVideo(v *models.Video) error {
 		Update(consts.DBVideos).
 		Set(consts.QVidTitle, v.Title).
 		Set(consts.QVidDescription, v.Description).
-		Set(consts.QVidVideoDir, v.VideoDir).
-		Set(consts.QVidJSONDir, v.JSONDir).
 		Set(consts.QVidVideoPath, v.VideoPath).
 		Set(consts.QVidJSONPath, v.JSONPath).
 		Set(consts.QVidFinished, v.Finished).

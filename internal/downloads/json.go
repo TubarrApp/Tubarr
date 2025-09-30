@@ -22,7 +22,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args = append(args,
 		cmdjson.SkipVideo,
 		cmdjson.WriteInfoJSON,
-		cmdjson.P, d.Video.JSONDir)
+		cmdjson.P, d.Video.Channel.Settings.JSONDir)
 
 	if d.Video.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
@@ -75,7 +75,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	}
 
 	// Ensure the directory exists
-	if _, err := validation.ValidateDirectory(d.Video.VideoDir, true); err != nil {
+	if _, err := validation.ValidateDirectory(d.Video.Channel.Settings.VideoDir, true); err != nil {
 		return err
 	}
 

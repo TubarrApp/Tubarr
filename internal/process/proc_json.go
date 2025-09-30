@@ -9,11 +9,12 @@ import (
 	"tubarr/internal/downloads"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 )
 
 // processJSON downloads and processes JSON for a video.
-func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore, dlTracker *downloads.DownloadTracker) (proceed bool, err error) {
+func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore, dirParser *parsing.Directory, dlTracker *downloads.DownloadTracker) (proceed bool, err error) {
 	if v == nil {
 		logging.I("Null video entered")
 		return false, nil
@@ -37,7 +38,7 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		logging.E(0, "JSON parsing/storage failed for %q: %v", v.URL, err)
 	}
 
-	passedFilters, err := filterRequests(v)
+	passedFilters, err := filterRequests(v, dirParser)
 	if err != nil {
 		logging.E(0, "filter operation checks failed for %q: %v", v.URL, err)
 	}
@@ -54,7 +55,7 @@ func processJSON(ctx context.Context, v *models.Video, vs interfaces.VideoStore,
 		return false, nil
 	}
 
-	v.Channel.MoveOpOutputDir, v.Channel.MoveOpChannelURL = checkMoveOps(v)
+	v.Channel.MoveOpOutputDir, v.Channel.MoveOpChannelURL = checkMoveOps(v, dirParser)
 
 	if v.ID, err = vs.AddVideo(v); err != nil {
 		return false, fmt.Errorf("failed to update video DB entry: %w", err)

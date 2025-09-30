@@ -40,7 +40,7 @@ const (
 )
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
-func makeMetarrCommand(v *models.Video) []string {
+func makeMetarrCommand(v *models.Video, dirParser *parsing.Directory) []string {
 
 	// Remove non-matching URL-specific meta ops
 	validOps := filterMetaOps(v.MetarrArgs.MetaOps, v.ChannelURL)
@@ -91,7 +91,7 @@ func makeMetarrCommand(v *models.Video) []string {
 			cmdKey:      metkeys.MinFreeMem,
 		},
 		{
-			metarrValue: metVals{str: parseMetarrOutputDir(v)},
+			metarrValue: metVals{str: parseMetarrOutputDir(v, dirParser)},
 			valType:     str,
 			viperKey:    "", // Fallback logic already exists in parseMetarrOutputDir.
 			cmdKey:      metkeys.OutputDir,
@@ -260,9 +260,8 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 }
 
 // parseMetarrOutputDir parses and returns the output directory.
-func parseMetarrOutputDir(v *models.Video) string {
+func parseMetarrOutputDir(v *models.Video, dirParser *parsing.Directory) string {
 	var (
-		dirParser  = parsing.NewDirectoryParser(v.Channel, v)
 		mArgs      = v.Channel.MetarrArgs
 		mOpOutDir  = v.Channel.MoveOpOutputDir
 		mOpChanURL = v.Channel.MoveOpChannelURL
@@ -278,7 +277,7 @@ func parseMetarrOutputDir(v *models.Video) string {
 	case cfg.IsSet(keys.MoveOnComplete):
 		d := cfg.GetString(keys.MoveOnComplete)
 
-		parsed, err := dirParser.ParseDirectory(d)
+		parsed, err := dirParser.ParseDirectory(d, v, "Metarr video")
 		if err != nil {
 			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", d, v.URL, err)
 			break
@@ -289,7 +288,7 @@ func parseMetarrOutputDir(v *models.Video) string {
 
 		// #2 Priority: Move operation filter output directory
 	case mOpOutDir != "" && (mOpChanURL == "" || strings.EqualFold(strings.TrimSpace(mOpChanURL), strings.TrimSpace(v.ChannelURL))):
-		parsed, err := dirParser.ParseDirectory(mOpOutDir)
+		parsed, err := dirParser.ParseDirectory(mOpOutDir, v, "Metarr video")
 		if err != nil {
 			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mOpOutDir, v.URL, err)
 			break
@@ -298,7 +297,7 @@ func parseMetarrOutputDir(v *models.Video) string {
 
 		// #3 Priority: Channel default output directory
 	case mArgs.OutputDirMap[v.ChannelURL] != "":
-		parsed, err := dirParser.ParseDirectory(mArgs.OutputDirMap[v.ChannelURL])
+		parsed, err := dirParser.ParseDirectory(mArgs.OutputDirMap[v.ChannelURL], v, "Metarr video")
 		if err != nil {
 			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDirMap[v.ChannelURL], v.URL, err)
 			break
@@ -307,7 +306,7 @@ func parseMetarrOutputDir(v *models.Video) string {
 
 	// Fallback: Dev error did not fill the default output directory if above fails, fill it here
 	case mArgs.OutputDir != "":
-		parsed, err := dirParser.ParseDirectory(mArgs.OutputDir)
+		parsed, err := dirParser.ParseDirectory(mArgs.OutputDir, v, "Metarr video")
 		if err != nil {
 			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDir, v.URL, err)
 			break

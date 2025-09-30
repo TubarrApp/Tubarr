@@ -345,11 +345,7 @@ func P(msg string, args ...interface{}) {
 
 // AddToErrorArray adds an error to the error array under lock.
 func AddToErrorArray(err error) {
-	muErr.Lock()
-	if err != nil {
-		errorArray = append(errorArray, err)
-	}
-	muErr.Unlock()
+	errorArray = append(errorArray, err)
 }
 
 // GetErrorArray returns the error array.

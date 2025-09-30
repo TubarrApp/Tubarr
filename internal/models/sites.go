@@ -28,9 +28,7 @@ type Channel struct {
 type Video struct {
 	ID                  int64
 	ChannelID           int64  `db:"channel_id"`
-	VideoDir            string `db:"video_directory"`
 	VideoPath           string `db:"video_path"`
-	JSONDir             string `db:"json_directory"`
 	JSONPath            string `db:"json_path"`
 	Finished            bool   `db:"finished"`
 	JSONCustomFile      string

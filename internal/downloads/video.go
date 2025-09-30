@@ -50,7 +50,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		outputSyntax = cmdvideo.FilenameSyntax
 	}
 
-	args = append(args, cmdvideo.Output, filepath.Join(d.Video.VideoDir, outputSyntax))
+	args = append(args, cmdvideo.Output, filepath.Join(d.Video.Channel.Settings.VideoDir, outputSyntax))
 	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
 	if d.Video.CookiePath == "" {
@@ -125,7 +125,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	}
 
 	// Ensure the directory exists
-	if _, err := validation.ValidateDirectory(d.Video.JSONDir, true); err != nil {
+	if _, err := validation.ValidateDirectory(d.Video.Settings.JSONDir, true); err != nil {
 		return err
 	}
 

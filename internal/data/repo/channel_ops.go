@@ -451,7 +451,7 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
 
 	// Process crawling using the updated channel object
-	if err := process.CrawlIgnoreNew(s, &c, ctx); err != nil {
+	if err := process.ChannelCrawlIgnoreNew(s, &c, ctx); err != nil {
 		return err
 	}
 	return nil
@@ -468,7 +468,7 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
 
 	// Process crawling using the updated channel object
-	return process.ChannelCrawl(s, c, ctx)
+	return process.ChannelCrawl(s, cs, c, ctx)
 }
 
 // FetchChannelModel fills the channel model from the database.
