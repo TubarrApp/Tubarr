@@ -3,10 +3,13 @@ package downloads
 import (
 	"bufio"
 	"errors"
+	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"tubarr/internal/cfg"
@@ -132,51 +135,65 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 // executeVideoDownload executes the video download command and waits for completion.
 func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
+	if cmd == nil {
+		return fmt.Errorf("no command built for URL %s", d.Video.URL)
+	}
+
+	// Put the process in its own group so we can kill all children
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return fmt.Errorf("stdout pipe error: %w", err)
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return fmt.Errorf("stderr pipe error: %w", err)
 	}
 
+	lineChan := make(chan string, 100)
 	filenameChan := make(chan string, 1)
-	lineChan := make(chan string, 100) // channel for live output
 
 	if err := cmd.Start(); err != nil {
-		return err
+		return fmt.Errorf("failed to start command: %w", err)
 	}
 
-	// Separate goroutines to scan stdout and stderr
+	// Merge stdout and stderr into lineChan
 	go func() {
-		scanner := bufio.NewScanner(stdout)
+		scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
 		for scanner.Scan() {
-			lineChan <- scanner.Text()
-		}
-	}()
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			lineChan <- scanner.Text()
+			select {
+			case lineChan <- scanner.Text():
+			case <-d.Context.Done():
+				return
+			}
 		}
 	}()
 
-	// Parser reads from lineChan
-	go func() {
-		d.scanVideoCmdOutput(lineChan, filenameChan)
-	}()
+	// Start parser
+	go d.scanVideoCmdOutput(lineChan, filenameChan)
 
-	// Wait for final filename
-	filename := <-filenameChan
-	if filename == "" {
-		return errors.New("no output filename captured")
+	// Wait for either completion or cancellation
+	select {
+	case <-d.Context.Done():
+		// Kill process group (yt-dlp + aria2)
+		if cmd.Process != nil {
+			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		return d.Context.Err()
+	case filename := <-filenameChan:
+		if filename == "" {
+			return errors.New("no output filename captured")
+		}
+		d.Video.VideoPath = filename
 	}
-	d.Video.VideoPath = filename
 
+	// Wait for the command to finish
 	if err := cmd.Wait(); err != nil {
-		return err
+		return fmt.Errorf("yt-dlp failed: %w", err)
 	}
+
+	// Ensure file is fully written
 	if err := d.waitForFile(d.Video.VideoPath, 5*time.Second); err != nil {
 		return err
 	}
