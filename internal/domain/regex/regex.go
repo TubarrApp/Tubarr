@@ -8,6 +8,8 @@ import (
 
 const (
 	ansiEscapeStr    = `\x1b\[[0-9;]*m`
+	ariaItemCountStr = `Downloading\s+(\d+)\s+item`
+	ariaProgressStr  = `\((\d+(?:\.\d+)?)%\)`
 	dlPercentStr     = `\[download\]\s+(\d+\.?\d*)%`
 	extraSpacesStr   = `\s+`
 	invalidCharsStr  = `[<>:"/\\|?*\x00-\x1F]`
@@ -16,11 +18,13 @@ const (
 )
 
 var (
-	onceAnsiEscape, onceDLPercentage, onceExtraSpaces,
-	onceInvalidChars, onceSpecialChars, onceYearFragments sync.Once
+	onceAnsiEscape, onceAriaItemCount, onceAriaProgress,
+	onceDLPercentage, onceExtraSpaces, onceInvalidChars,
+	onceSpecialChars, onceYearFragments sync.Once
 
-	AnsiEscape, DLPercentage, ExtraSpaces,
-	InvalidChars, SpecialChars, YearFragments *regexp.Regexp
+	AnsiEscape, AriaItemCount, AriaProgress,
+	DLPercentage, ExtraSpaces, InvalidChars,
+	SpecialChars, YearFragments *regexp.Regexp
 )
 
 // AnsiEscapeCompile compiles regex for ANSI escape codes.
@@ -29,6 +33,22 @@ func AnsiEscapeCompile() *regexp.Regexp {
 		AnsiEscape = regexp.MustCompile(ansiEscapeStr)
 	})
 	return AnsiEscape
+}
+
+// AriaItemCountCompile compiles regex for Aria2 item counts.
+func AriaItemCountCompile() *regexp.Regexp {
+	onceAriaItemCount.Do(func() {
+		AriaItemCount = regexp.MustCompile(ariaItemCountStr)
+	})
+	return AriaItemCount
+}
+
+// AriaProgressCompile compiles regex for Aria percentage strings.
+func AriaProgressCompile() *regexp.Regexp {
+	onceAriaProgress.Do(func() {
+		AriaProgress = regexp.MustCompile(ariaProgressStr)
+	})
+	return AriaProgress
 }
 
 // DownloadPercentCompile compiles the regex for handling regular download progress bars.

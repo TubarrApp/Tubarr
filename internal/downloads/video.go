@@ -209,16 +209,22 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		Error:    nil,
 	}
 
+	totalItemsFound := 0
+	totalDownloadedItems := 0
 	completed := false
 
 	for line := range lineChan {
 		if line != "" {
-			logging.D(1, "Video %d download message: %q", d.Video.ID, line)
+			logging.D(4, "Video %d download terminal output: %q", d.Video.ID, line)
 		}
 
 		// Aria2 progress parsing
 		if d.DLTracker.downloader == consts.DownloaderAria {
-			gotLine, pct, status := downloaders.Aria2OutputParser(line, state.URL, state.Percentage, state.Status)
+			gotLine, itemsFound, downloadedItems, pct, status := downloaders.Aria2OutputParser(line, state.URL, totalItemsFound, totalDownloadedItems, state.Percentage, state.Status)
+
+			totalItemsFound = itemsFound
+			totalDownloadedItems = downloadedItems
+
 			if gotLine {
 				state.Percentage = pct
 				state.Status = status
