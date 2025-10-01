@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -29,9 +30,7 @@ type VideoDownloadState struct {
 	Status         consts.DownloadStatus
 }
 
-var (
-	states = make(map[string]*VideoDownloadState)
-)
+var states sync.Map
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
 func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
@@ -52,7 +51,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, cmdvideo.Output, filepath.Join(d.Video.Channel.Settings.VideoDir, outputSyntax))
 
 	// Print to console...
-	args = append(args, cmdvideo.Print, cmdvideo.AfterMove+",progress:%(progress._percent_str)s")
+	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
 	// Cookie path
 	if d.Video.CookiePath == "" {
@@ -139,9 +138,10 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("no command built for URL %s", d.Video.URL)
 	}
 
-	// Put the process in its own group so we can kill all children
+	// Set process group to allow killing children processes (e.g. Aria2c)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+	// Set pipes
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("stdout pipe error: %w", err)
@@ -151,6 +151,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("stderr pipe error: %w", err)
 	}
 
+	// Set channels
 	lineChan := make(chan string, 100)
 	filenameChan := make(chan string, 1)
 
@@ -173,14 +174,15 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	// Start parser
 	go d.scanVideoCmdOutput(lineChan, filenameChan)
 
-	// Wait for either completion or cancellation
+	// Wait for completion or cancel
 	select {
 	case <-d.Context.Done():
-		// Kill process group (yt-dlp + aria2)
-		if cmd.Process != nil {
-			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		// End the command
+		if err := cmd.Cancel(); err != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}
 		return d.Context.Err()
+
 	case filename := <-filenameChan:
 		if filename == "" {
 			return errors.New("no output filename captured")
@@ -208,14 +210,18 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan chan<- string) {
 	defer close(filenameChan)
 
-	state, exists := states[d.Video.URL]
-	if !exists {
+	// Try to load existing state
+	val, ok := states.Load(d.Video.URL)
+	var state *VideoDownloadState
+	if ok {
+		state = val.(*VideoDownloadState)
+	} else {
 		state = &VideoDownloadState{
 			URL:        d.Video.URL,
 			Percentage: d.Video.DownloadStatus.Pct,
 			Status:     d.Video.DownloadStatus.Status,
 		}
-		states[d.Video.URL] = state
+		states.Store(d.Video.URL, state)
 	}
 
 	lastUpdate := models.StatusUpdate{
@@ -226,9 +232,10 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		Error:    nil,
 	}
 
-	totalItemsFound := 0
-	totalDownloadedItems := 0
-	completed := false
+	var (
+		totalItemsFound, totalDownloadedItems int
+		completed                             bool
+	)
 
 	for line := range lineChan {
 		if line != "" {
@@ -237,7 +244,8 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 
 		// Aria2 progress parsing
 		if d.DLTracker.downloader == consts.DownloaderAria {
-			gotLine, itemsFound, downloadedItems, pct, status := downloaders.Aria2OutputParser(line, state.URL, totalItemsFound, totalDownloadedItems, state.Percentage, state.Status)
+			gotLine, itemsFound, downloadedItems, pct, status :=
+				downloaders.Aria2OutputParser(line, state.URL, totalItemsFound, totalDownloadedItems, state.Percentage, state.Status)
 
 			totalItemsFound = itemsFound
 			totalDownloadedItems = downloadedItems
@@ -265,7 +273,6 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 
 		// Detect completed filename
 		if !completed && strings.HasPrefix(line, "/") {
-			line = strings.Split(line, ",progress:")[0]
 			ext := filepath.Ext(line)
 			for _, validExt := range consts.AllVidExtensions {
 				if ext == validExt {
@@ -275,7 +282,9 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 					d.Video.DownloadStatus.Pct = 100.0
 					d.DLTracker.sendUpdate(d.Video)
 
-					delete(states, d.Video.URL)
+					// Safe delete
+					states.Delete(d.Video.URL)
+
 					filenameChan <- line
 					completed = true
 					break

@@ -48,21 +48,6 @@ func Aria2OutputParser(line string, uri string, totalItemCount, downloadedItemCo
 		}
 	}
 
-	// Final filename printout, command is done
-	if strings.HasPrefix(line, "/") {
-		line = strings.Split(line, ",progress:")[0]
-
-		logging.I("Checking output filename for video URL %q: %q", uri, line)
-		if !strings.HasSuffix(line, ".part") {
-
-			for _, validExt := range consts.AllVidExtensions {
-				if strings.HasSuffix(line, validExt) {
-					return true, totalItemCount, downloadedItemCount, 100.0, consts.DLStatusCompleted
-				}
-			}
-		}
-	}
-
 	// Nothing to parse
 	return false, totalItemCount, downloadedItemCount, currentPct, currentStatus
 }
