@@ -31,6 +31,9 @@ func verifyVideoDownload(videoPath string) error {
 	if videoInfo.Size() == 0 {
 		return fmt.Errorf("video file is empty: %s", videoPath)
 	}
+	if videoInfo.IsDir() {
+		return fmt.Errorf("dev error: video path created is a directory")
+	}
 
 	return nil
 }

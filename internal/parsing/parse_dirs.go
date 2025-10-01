@@ -25,6 +25,7 @@ type Directory struct {
 	C *models.Channel
 }
 
+// NewDirectoryParser returns a directory parser model.
 func NewDirectoryParser(c *models.Channel) (parseDir *Directory) {
 	return &Directory{
 		C: c,
@@ -72,7 +73,7 @@ func (dp *Directory) parseTemplate(dir string, v *models.Video) (string, error) 
 	b.Grow(len(dir) - (opens * templateLen) + (opens * avgReplaceLen)) // Approximate size
 	remaining := dir
 
-	for i := 0; i < opens; i++ {
+	for range opens {
 		startIdx := strings.Index(remaining, open)
 		if startIdx == -1 {
 			return "", errors.New("missing opening delimiter")

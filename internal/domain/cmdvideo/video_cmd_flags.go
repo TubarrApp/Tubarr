@@ -20,9 +20,14 @@ const (
 )
 
 const (
-	AriaLog = "--console-log-level=info"
+	AriaLog         = "--console-log-level=notice"
+	AriaLogFile     = "--log=-"
+	AriaInterval    = "--summary-interval=1"
+	AriaNoColor     = "--enable-color=false"
+	AriaNoRPC       = "--enable-rpc=false"
+	AriaShowConsole = "--show-console=true"
 )
 
 var (
-	RandomizeRequests = []string{"--sleep-interval", "2", "--max-sleep-interval", "10"}
+	RandomizeRequests = []string{"--sleep-interval", "5", "--max-sleep-interval", "20"}
 )

@@ -9,7 +9,6 @@ import (
 const (
 	ansiEscapeStr    = `\x1b\[[0-9;]*m`
 	dlPercentStr     = `\[download\]\s+(\d+\.?\d*)%`
-	ariaFragCountStr = `Downloading (\d+) item`
 	extraSpacesStr   = `\s+`
 	invalidCharsStr  = `[<>:"/\\|?*\x00-\x1F]`
 	specialCharsStr  = `[^\w\s-]`
@@ -17,8 +16,11 @@ const (
 )
 
 var (
-	onceAnsiEscape, onceDLPercentage, onceExtraSpaces, onceInvalidChars, onceSpecialChars, onceAria2FragCount, onceYearFragments sync.Once
-	AnsiEscape, DLPercentage, ExtraSpaces, InvalidChars, SpecialChars, Aria2FragCountRegex, YearFragments                        *regexp.Regexp
+	onceAnsiEscape, onceDLPercentage, onceExtraSpaces,
+	onceInvalidChars, onceSpecialChars, onceYearFragments sync.Once
+
+	AnsiEscape, DLPercentage, ExtraSpaces,
+	InvalidChars, SpecialChars, YearFragments *regexp.Regexp
 )
 
 // AnsiEscapeCompile compiles regex for ANSI escape codes.
@@ -27,14 +29,6 @@ func AnsiEscapeCompile() *regexp.Regexp {
 		AnsiEscape = regexp.MustCompile(ansiEscapeStr)
 	})
 	return AnsiEscape
-}
-
-// Aria2FragCountCompile compiles the Aria2C fragment count regex.
-func Aria2FragCountCompile() *regexp.Regexp {
-	onceAria2FragCount.Do(func() {
-		Aria2FragCountRegex = regexp.MustCompile(ariaFragCountStr)
-	})
-	return Aria2FragCountRegex
 }
 
 // DownloadPercentCompile compiles the regex for handling regular download progress bars.

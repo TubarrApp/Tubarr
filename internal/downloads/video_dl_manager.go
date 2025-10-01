@@ -24,7 +24,6 @@ func NewVideoDownload(ctx context.Context, video *models.Video, tracker *Downloa
 		Context:   ctx,
 	}
 
-	logging.I("Made 'VideoDownload' model with video URL: %q", video.URL)
 	if opts != nil {
 		dl.Options = *opts
 	} else {
@@ -92,8 +91,8 @@ func (d *VideoDownload) Execute() error {
 func (d *VideoDownload) videoDLAttempt() error {
 	cmd := d.buildVideoCommand()
 
-	// Update status to downloading
-	d.Video.DownloadStatus.Status = consts.DLStatusDownloading
+	// Set video "Pending" status
+	d.Video.DownloadStatus.Status = consts.DLStatusPending
 	d.Video.DownloadStatus.Pct = 0.0
 	d.DLTracker.sendUpdate(d.Video)
 

@@ -15,7 +15,6 @@ type DownloadTracker struct {
 	db         *sql.DB
 	updates    chan models.StatusUpdate
 	batchSize  int
-	flushTimer time.Duration
 	done       chan struct{}
 	dlStore    interfaces.DownloadStore
 	downloader string
@@ -27,7 +26,6 @@ func NewDownloadTracker(store interfaces.DownloadStore, externalDler string) *Do
 		db:         store.GetDB(),
 		updates:    make(chan models.StatusUpdate, 100),
 		batchSize:  50,
-		flushTimer: 500 * time.Millisecond,
 		done:       make(chan struct{}),
 		dlStore:    store,
 		downloader: externalDler,
@@ -64,10 +62,7 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 func (t *DownloadTracker) processUpdates(ctx context.Context) {
 	var (
 		lastUpdate models.StatusUpdate
-		newUpdate  models.StatusUpdate
-		ticker     = time.NewTicker(t.flushTimer)
 	)
-	defer ticker.Stop()
 
 	for {
 		select {
@@ -76,14 +71,13 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 				t.flushUpdates(ctx, []models.StatusUpdate{lastUpdate})
 			}
 			return
+
 		case update := <-t.updates:
-			newUpdate = update
-		case <-ticker.C:
-			if newUpdate != lastUpdate {
-				lastUpdate = newUpdate
+			if update != lastUpdate {
+				lastUpdate = update
 				logging.I("Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n",
-					newUpdate.VideoURL, newUpdate.Status, newUpdate.Percent, newUpdate.Error)
-				t.flushUpdates(ctx, []models.StatusUpdate{newUpdate})
+					update.VideoURL, update.Status, update.Percent, update.Error)
+				t.flushUpdates(ctx, []models.StatusUpdate{update})
 			}
 		}
 	}

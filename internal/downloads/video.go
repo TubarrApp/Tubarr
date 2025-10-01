@@ -3,8 +3,6 @@ package downloads
 import (
 	"bufio"
 	"errors"
-	"fmt"
-	"io"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -12,24 +10,20 @@ import (
 	"time"
 
 	"tubarr/internal/cfg"
-	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/cmdvideo"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/errconsts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
-const (
-	ariaBase = len(consts.DownloaderAria) + len(": ") + len(cmdvideo.AriaLog)
-)
-
 type VideoDownloadState struct {
 	TotalFrags     int
 	CompletedFrags int
 	URL            string
+	Percentage     float64
+	Status         consts.DownloadStatus
 }
 
 var (
@@ -40,6 +34,7 @@ var (
 func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args := make([]string, 0, 32)
 
+	// Restrict filenames
 	args = append(args, cmdvideo.RestrictFilenames)
 
 	var outputSyntax string
@@ -50,9 +45,13 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		outputSyntax = cmdvideo.FilenameSyntax
 	}
 
+	// Output location + restricted filename syntax
 	args = append(args, cmdvideo.Output, filepath.Join(d.Video.Channel.Settings.VideoDir, outputSyntax))
-	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
+	// Print to console...
+	args = append(args, cmdvideo.Print, cmdvideo.AfterMove+",progress:%(progress._percent_str)s")
+
+	// Cookie path
 	if d.Video.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
 			args = append(args, cmdvideo.CookiesFromBrowser, d.Video.Settings.CookieSource)
@@ -61,39 +60,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		args = append(args, cmdvideo.CookiePath, d.Video.CookiePath)
 	}
 
-	if d.Video.Settings.MaxFilesize != "" {
-		args = append(args, cmdvideo.MaxFilesize, d.Video.Settings.MaxFilesize)
-	}
-
-	if d.Video.Settings.ExternalDownloader != "" {
-		args = append(args, cmdvideo.ExternalDLer, d.Video.Settings.ExternalDownloader)
-		if d.Video.Settings.ExternalDownloaderArgs != "" {
-
-			switch d.Video.Settings.ExternalDownloader {
-			case consts.DownloaderAria:
-				var b strings.Builder
-
-				b.Grow(ariaBase + len(d.Video.Settings.ExternalDownloaderArgs))
-				b.WriteString(consts.DownloaderAria)
-				b.WriteByte(':')
-				b.WriteString(d.Video.Settings.ExternalDownloaderArgs) // "aria2c:-x 16 -s 16 --console-log-level=info"
-				b.WriteByte(' ')
-				b.WriteString(cmdvideo.AriaLog)
-
-				args = append(args, cmdvideo.ExternalDLArgs, b.String())
-			default:
-				args = append(args, cmdvideo.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
-			}
-		}
-	}
-
-	if d.Video.Settings.Retries != 0 {
-		args = append(args, cmdvideo.Retries, strconv.Itoa(d.Video.Settings.Retries))
-	}
-
-	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
-	args = append(args, cmdvideo.RandomizeRequests...)
-
+	// Cookie source
 	if cfg.IsSet(keys.CookieSource) {
 		browserCookieSource := cfg.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
@@ -102,127 +69,166 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Video.Channel.Name, d.Video.URL)
 	}
 
+	// Max filesize specified
+	if d.Video.Settings.MaxFilesize != "" {
+		args = append(args, cmdvideo.MaxFilesize, d.Video.Settings.MaxFilesize)
+	}
+
+	// External downloaders & arguments
+	if d.Video.Settings.ExternalDownloader != "" {
+		args = append(args, cmdvideo.ExternalDLer, d.Video.Settings.ExternalDownloader)
+		if d.Video.Settings.ExternalDownloaderArgs != "" {
+
+			switch d.Video.Settings.ExternalDownloader {
+			case consts.DownloaderAria:
+
+				ariaCmd := consts.DownloaderAria + ":" +
+					d.Video.Settings.ExternalDownloaderArgs +
+					" " +
+					cmdvideo.AriaLog +
+					" " +
+					cmdvideo.AriaNoRPC +
+					" " +
+					cmdvideo.AriaNoColor +
+					" " +
+					cmdvideo.AriaShowConsole +
+					" " +
+					cmdvideo.AriaInterval
+
+				args = append(args, cmdvideo.ExternalDLArgs, ariaCmd)
+			default:
+				args = append(args, cmdvideo.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
+			}
+		}
+	}
+
+	// Retry download X times
+	if d.Video.Settings.Retries != 0 {
+		args = append(args, cmdvideo.Retries, strconv.Itoa(d.Video.Settings.Retries))
+	}
+
+	// Randomize requests (avoid detection as bot)
+	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
+	args = append(args, cmdvideo.RandomizeRequests...)
+
+	// Merge output formats to extension if set
 	if d.Video.Channel.Settings.YtdlpOutputExt != "" {
 		args = append(args, cmdvideo.YtdlpOutputExtension, d.Video.Channel.Settings.YtdlpOutputExt)
 	}
 
+	// Add target URL
 	if d.Video.DirectVideoURL != "" {
 		args = append(args, d.Video.DirectVideoURL)
 	} else {
 		args = append(args, d.Video.URL)
 	}
 
+	// Combine command...
 	cmd := exec.CommandContext(d.Context, cmdvideo.YTDLP, args...)
 	logging.D(1, "Built video download command for URL %q:\n%v", d.Video.URL, cmd.String())
 
 	return cmd
 }
 
-// executeVideoDownload executes a video download command.
+// executeVideoDownload executes the video download command and waits for completion.
 func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
-	if cmd == nil {
-		return fmt.Errorf("no command built for URL %s", d.Video.URL)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
 	}
-
-	// Ensure the directory exists
-	if _, err := validation.ValidateDirectory(d.Video.Settings.JSONDir, true); err != nil {
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
 		return err
 	}
 
-	// Execute video download
-	logging.D(3, "Executing video download command...")
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("stdout pipe error: %w", err)
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("stderr pipe error: %w", err)
-	}
 	filenameChan := make(chan string, 1)
+	lineChan := make(chan string, 100) // channel for live output
 
-	go d.scanVideoCmdOutput(io.MultiReader(stdout, stderr), filenameChan)
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf(errconsts.YTDLPFailure, err)
+		return err
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf(errconsts.YTDLPFailure, err)
-	}
+	// Separate goroutines to scan stdout and stderr
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			lineChan <- scanner.Text()
+		}
+	}()
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			lineChan <- scanner.Text()
+		}
+	}()
 
+	// Parser reads from lineChan
+	go func() {
+		d.scanVideoCmdOutput(lineChan, filenameChan)
+	}()
+
+	// Wait for final filename
 	filename := <-filenameChan
 	if filename == "" {
 		return errors.New("no output filename captured")
 	}
 	d.Video.VideoPath = filename
 
+	if err := cmd.Wait(); err != nil {
+		return err
+	}
 	if err := d.waitForFile(d.Video.VideoPath, 5*time.Second); err != nil {
 		return err
 	}
-
 	if err := verifyVideoDownload(d.Video.VideoPath); err != nil {
 		return err
 	}
 
-	logging.S(0, "Download successful: %s", d.Video.VideoPath)
 	return nil
 }
 
 // scanVideoCmdOutput scans the yt-dlp video download output for relevant information.
-func (d *VideoDownload) scanVideoCmdOutput(r io.Reader, filenameChan chan<- string) {
-	if d.Video.URL == "" {
-		logging.I("Video URL received blank")
-		return
+func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan chan<- string) {
+	defer close(filenameChan)
+
+	state, exists := states[d.Video.URL]
+	if !exists {
+		state = &VideoDownloadState{
+			URL:        d.Video.URL,
+			Percentage: d.Video.DownloadStatus.Pct,
+			Status:     d.Video.DownloadStatus.Status,
+		}
+		states[d.Video.URL] = state
 	}
-	scanner := bufio.NewScanner(r)
 
 	lastUpdate := models.StatusUpdate{
 		VideoID:  d.Video.ID,
 		VideoURL: d.Video.URL,
-		Status:   consts.DLStatusPending,
-		Percent:  0.0,
+		Status:   state.Status,
+		Percent:  state.Percentage,
 		Error:    nil,
 	}
 
-	// Initialize as pending
-	d.DLTracker.updates <- lastUpdate
+	completed := false
 
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Get or create state for this video
-		state, exists := states[d.Video.URL]
-		if !exists {
-			state = &VideoDownloadState{URL: d.Video.URL}
-			states[d.Video.URL] = state
+	for line := range lineChan {
+		if line != "" {
+			logging.D(1, "Video %d download message: %q", d.Video.ID, line)
 		}
 
-		switch d.DLTracker.downloader {
-		case consts.DownloaderAria:
-			newTotal, newCompleted, pct, err := downloaders.Aria2OutputParser(line, state.URL, state.TotalFrags, state.CompletedFrags)
-			if err != nil {
-				logging.E(0, "Could not parse Aria2 output line %q: %v", line, err)
-			}
-			// Update state
-			state.TotalFrags = newTotal
-			state.CompletedFrags = newCompleted
+		// Aria2 progress parsing
+		if d.DLTracker.downloader == consts.DownloaderAria {
+			gotLine, pct, status := downloaders.Aria2OutputParser(line, state.URL, state.Percentage, state.Status)
+			if gotLine {
+				state.Percentage = pct
+				state.Status = status
 
-			// Rest of status update logic
-			if pct > 0.0 {
 				newUpdate := models.StatusUpdate{
 					VideoID:  d.Video.ID,
 					VideoURL: d.Video.URL,
-					Status:   consts.DLStatusDownloading,
-					Percent:  pct,
+					Status:   state.Status,
+					Percent:  state.Percentage,
 					Error:    d.Video.DownloadStatus.Error,
-				}
-
-				if pct == 100.0 {
-					newUpdate.Status = consts.DLStatusCompleted
-					// Remove completed state
-					delete(states, d.Video.URL)
 				}
 
 				if newUpdate != lastUpdate {
@@ -234,20 +240,24 @@ func (d *VideoDownload) scanVideoCmdOutput(r io.Reader, filenameChan chan<- stri
 			}
 		}
 
-		// Check for completed file path
-		if strings.HasPrefix(line, "/") {
+		// Detect completed filename
+		if !completed && strings.HasPrefix(line, "/") {
+			line = strings.Split(line, ",progress:")[0]
 			ext := filepath.Ext(line)
 			for _, validExt := range consts.AllVidExtensions {
 				if ext == validExt {
+					state.Status = consts.DLStatusCompleted
+					state.Percentage = 100.0
+					d.Video.DownloadStatus.Status = consts.DLStatusCompleted
+					d.Video.DownloadStatus.Pct = 100.0
+					d.DLTracker.sendUpdate(d.Video)
+
+					delete(states, d.Video.URL)
 					filenameChan <- line
-					return
+					completed = true
+					break
 				}
 			}
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		logging.E(0, "Scanner error: %v", err)
-	}
-	close(filenameChan)
 }
