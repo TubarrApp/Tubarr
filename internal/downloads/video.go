@@ -50,7 +50,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Output location + restricted filename syntax
 	args = append(args, cmdvideo.Output, filepath.Join(d.Video.Channel.Settings.VideoDir, outputSyntax))
 
-	// Print to console...
+	// Print filename to console upon completion
 	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
 	// Cookie path
