@@ -171,7 +171,7 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 	)
 
 	dlURLFileCmd := &cobra.Command{
-		Use:   "download-urls",
+		Use:   "download-video-urls",
 		Short: "Download inputted URLs (plaintext or file).",
 		Long:  "If using a file, the file should contain one URL per line.",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -182,12 +182,14 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 			}
 
 			// Check URL file if existent
-			cFileInfo, err := validation.ValidateFile(cFile, false)
-			if err != nil {
-				return fmt.Errorf("file entered (%q) is not valid: %w", cFile, err)
-			}
-			if cFile != "" && cFileInfo.Size() == 0 {
-				return fmt.Errorf("url file %q is blank", cFile)
+			if cFile != "" {
+				cFileInfo, err := validation.ValidateFile(cFile, false)
+				if err != nil {
+					return fmt.Errorf("file entered (%q) is not valid: %w", cFile, err)
+				}
+				if cFile != "" && cFileInfo.Size() == 0 {
+					return fmt.Errorf("url file %q is blank", cFile)
+				}
 			}
 
 			// URL length already determined to be > 0 earlier.
@@ -214,8 +216,8 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 	}
 
 	cfgflags.SetPrimaryChannelFlags(dlURLFileCmd, &channelName, nil, &channelID)
-	dlURLFileCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to this channel")
-	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download")
+	dlURLFileCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to your given channel")
+	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download for a given channel")
 
 	return dlURLFileCmd
 }
