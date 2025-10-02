@@ -12,9 +12,11 @@ import (
 	cfgflags "tubarr/internal/cfg/flags"
 	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/errconsts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
+	"tubarr/internal/utils/files"
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
@@ -36,7 +38,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	// Add subcommands with dependencies
 	channelCmd.AddCommand(addAuth(cs))
 	channelCmd.AddCommand(addChannelCmd(cs, s, ctx))
-	channelCmd.AddCommand(dlURLs(cs, s, ctx))
+	channelCmd.AddCommand(downloadVideoURLs(cs, s, ctx))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s, ctx))
 	channelCmd.AddCommand(ignoreCrawl(cs, s, ctx))
 	channelCmd.AddCommand(addVideoURLToIgnore(cs))
@@ -162,8 +164,8 @@ func deleteVideoURLs(cs interfaces.ChannelStore) *cobra.Command {
 	return deleteURLsCmd
 }
 
-// dlURLs downloads a list of URLs inputted by the user.
-func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
+// downloadVideoURLs downloads a list of URLs inputted by the user.
+func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
 	var (
 		cFile, channelName string
 		channelID          int
@@ -181,6 +183,7 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 				return errors.New("must enter URLs into the source file, or set at least one URL directly")
 			}
 
+			var urlLines []string
 			// Check URL file if existent
 			if cFile != "" {
 				cFileInfo, err := validation.ValidateFile(cFile, false)
@@ -190,9 +193,22 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 				if cFile != "" && cFileInfo.Size() == 0 {
 					return fmt.Errorf("url file %q is blank", cFile)
 				}
+
+				if urlLines, err = files.ReadFileLines(cFile); err != nil {
+					return err
+				}
 			}
 
-			// URL length already determined to be > 0 earlier.
+			// Combine with video URLs if any
+			videoURLs := append(urls, urlLines...)
+
+			// Check URLs have valid syntax
+			for _, u := range videoURLs {
+				splitLen := len(strings.Split(u, "|"))
+				if splitLen > 2 {
+					return fmt.Errorf("url syntax entered incorrectly. Should be either just the URL or 'channel URL|video URL'")
+				}
+			}
 
 			// Get and check key/val pair
 			key, val, err := getChanKeyVal(channelID, channelName)
@@ -200,12 +216,17 @@ func dlURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context)
 				return err
 			}
 
-			// Set Viper flags
-			cfgflags.SetChangedFlag(keys.URLAdd, urls, cmd.Flags())
-			cfgflags.SetChangedFlag(keys.URLFile, cFile, cmd.Flags())
+			// Retrieve channel model
+			c, err, hasRows := cs.FetchChannelModel(key, val)
+			if err != nil {
+				return err
+			}
+			if !hasRows {
+				return fmt.Errorf("no channel model in database with %s %q", key, val)
+			}
 
 			// Crawl channel
-			if err := cs.CrawlChannel(key, val, s, ctx); err != nil {
+			if err := cs.DownloadVideoURLs(key, val, c, s, videoURLs, ctx); err != nil {
 				return err
 			}
 
@@ -927,8 +948,17 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 				return err
 			}
 
+			// Retrieve channel model
+			c, err, hasRows := cs.FetchChannelModel(key, val)
+			if err != nil {
+				return err
+			}
+			if !hasRows {
+				return fmt.Errorf("no channel model in database with %s %q", key, val)
+			}
+
 			// Crawl channel
-			if err := cs.CrawlChannel(key, val, s, ctx); err != nil {
+			if err := cs.CrawlChannel(key, val, c, s, ctx); err != nil {
 				return err
 			}
 
@@ -1261,8 +1291,20 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	fmt.Printf("Notification URLs: %v\n", notifyURLs)
 }
 
-// UpdateChannelFromConfig updates the channel settings from a config file if it exists.
-func UpdateChannelFromConfig(cs interfaces.ChannelStore, c *models.Channel) error {
+// LoadFromConfig loads in config file data.
+func LoadFromConfig(cs interfaces.ChannelStore, c *models.Channel) {
+
+	if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
+		if err := updateChannelFromConfig(cs, c); err != nil {
+			logging.E(0, errconsts.ConfigFileUpdateFail, c.Settings.ChannelConfigFile, err)
+		}
+
+		c.UpdatedFromConfig = true
+	}
+}
+
+// updateChannelFromConfig updates the channel settings from a config file if it exists.
+func updateChannelFromConfig(cs interfaces.ChannelStore, c *models.Channel) error {
 	cfgFile := c.Settings.ChannelConfigFile
 	if cfgFile == "" {
 		logging.D(2, "No config file path, nothing to apply")
@@ -1388,6 +1430,14 @@ func applyConfigChannelSettings(c *models.Channel) (err error) {
 	// Max filesize to download
 	if v, ok := getConfigValue[string](keys.MaxFilesize); ok {
 		c.Settings.MaxFilesize = v
+	}
+
+	// Move ops file
+	if v, ok := getConfigValue[string](keys.MoveOpsFile); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return err
+		}
+		c.Settings.MoveOpFile = v
 	}
 
 	// Pause channel

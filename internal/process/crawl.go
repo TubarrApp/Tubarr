@@ -14,13 +14,11 @@ import (
 
 	"tubarr/internal/cfg"
 	cfgchannel "tubarr/internal/cfg/channel"
+	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/errconsts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
-	"tubarr/internal/parsing"
-	"tubarr/internal/progflags"
 	"tubarr/internal/utils/browser"
 	"tubarr/internal/utils/logging"
 )
@@ -80,14 +78,8 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 	// Iterate over channels
 	for _, c := range channels {
 
-		// Load in config (config file might pause the channel)
-		if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
-			if err := cfgchannel.UpdateChannelFromConfig(cs, c); err != nil {
-				logging.E(0, errconsts.YTDLPFailure, c.Settings.ChannelConfigFile, err)
-			}
-
-			c.UpdatedFromConfig = true
-		}
+		// Load in config file
+		cfgchannel.LoadFromConfig(s.ChannelStore(), c)
 
 		// Ignore channel if paused
 		if c.Settings.Paused {
@@ -145,9 +137,6 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 
 // ChannelCrawl crawls a channel for new URLs.
 func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) (err error) {
-	const (
-		errMsg = "encountered errors during processing: %v"
-	)
 
 	logging.I("Initiating crawl for channel %q...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
 		c.Name, c.Settings.VideoDir, c.Settings.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
@@ -160,36 +149,9 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		return errors.New("output directories are blank")
 	}
 
-	// Initialize directory parser
-	dirParser := parsing.NewDirectoryParser(c)
-
-	// Load filter file
-	if c.Settings.FilterFile != "" {
-		if c.Settings.FilterFile, err = dirParser.ParseDirectory(c.Settings.FilterFile, nil, "filter file"); err != nil {
-			return fmt.Errorf("failed to parse filter file directory: %w", err)
-		}
-	}
-
 	videos, err := browserInstance.GetNewReleases(cs, c, ctx)
 	if err != nil {
 		return err
-	}
-
-	// Check for custom scraper needs
-	for _, v := range videos {
-
-		// Detect censored.tv links
-		if strings.Contains(v.URL, "censored.tv") {
-			if !progflags.CensoredTVUseCustom {
-				logging.I("Using regular censored.tv scraper...")
-			} else {
-				logging.I("Detected a censored.tv link. Using specialized scraper.")
-				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, c.Settings.JSONDir, v)
-				if err != nil {
-					return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
-				}
-			}
-		}
 	}
 
 	if len(videos) == 0 {
@@ -203,6 +165,11 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		return nil
 	}
 
+	// Check for custom scraper needs
+	if err := checkCustomScraperNeeds(videos, c, cs); err != nil {
+		return err
+	}
+
 	// Main process
 	success, errArray := InitProcess(s, c, videos, ctx)
 
@@ -213,7 +180,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	// Add errors to array on failure
 	if !success {
-		return fmt.Errorf(errMsg, errArray)
+		return fmt.Errorf("failed to process video downloads. Got errors: %v", errArray)
 	}
 
 	// Some successful downloads, notify URLs
@@ -227,26 +194,12 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	if len(notifyURLs) > 0 {
 		if errs := notify(c, notifyURLs); len(errs) != 0 {
-			var b strings.Builder
-			totalLength := 0
-			for _, err := range errs {
-				totalLength += len(err.Error())
-			}
-			b.Grow(totalLength + (len(errs)-1)*2)
-
-			for i, err := range errs {
-				b.WriteString(err.Error())
-				if i != len(errs)-1 {
-					b.WriteString(", ")
-				}
-
-			}
-			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%s", c.ID, b.String())
+			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%s", c.ID, errors.Join(errs...))
 		}
 	}
 
 	if errArray != nil {
-		return fmt.Errorf(errMsg, errArray)
+		return fmt.Errorf("encountered errors during processing: %v", errArray)
 	}
 
 	return nil
@@ -256,17 +209,17 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 //
 // Essentially it marks the URLs it finds as though they have already been downloaded.
 func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) error {
-	if c.Settings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
-		if err := cfgchannel.UpdateChannelFromConfig(s.ChannelStore(), c); err != nil {
-			logging.E(0, errconsts.YTDLPFailure, c.Settings.ChannelConfigFile, err)
-		}
-	}
 
+	// Load in config file
+	cfgchannel.LoadFromConfig(s.ChannelStore(), c)
+
+	// Get new releases
 	videos, err := browserInstance.GetNewReleases(s.ChannelStore(), c, ctx)
 	if err != nil {
 		return err
 	}
 
+	// Add videos to ignore
 	if len(videos) > 0 {
 		for _, v := range videos {
 			if v.URL == "" {
@@ -291,6 +244,108 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 
 		logging.S(0, "Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
 	}
+	return nil
+}
+
+// DownloadVideosToChannel downloads custom video URLs sent in to the channel.
+func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, videoURLs []string, ctx context.Context) error {
+
+	// Load in config file
+	cfgchannel.LoadFromConfig(s.ChannelStore(), c)
+
+	// Load already downloaded URLs
+	existingVideoURLsMap, _, err := browserInstance.GetExistingReleases(cs, c)
+	if err != nil {
+		return err
+	}
+
+	customVideoRequests := []*models.Video{}
+
+	for _, channelURL := range c.URLs {
+		for _, videoURL := range videoURLs {
+
+			var (
+				customVideoChanURL string
+				customVideoURL     = videoURL
+			)
+
+			if strings.Contains(videoURL, "|") {
+				split := strings.Split(videoURL, "|")
+				customVideoChanURL = split[0]
+				customVideoURL = split[1]
+			}
+
+			if _, exists := existingVideoURLsMap[customVideoURL]; exists {
+				return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-video-urls' first if you wish to re-download it", customVideoURL)
+			}
+
+			_, chanAccessDetails, err := browserInstance.GetChannelAccessDetails(cs, c, channelURL)
+			if err != nil {
+				return err
+			}
+
+			customVideoRequests = append(customVideoRequests, &models.Video{
+				ChannelID:  c.ID,
+				URL:        customVideoURL,
+				ChannelURL: customVideoChanURL,
+				Channel:    c,
+				Settings:   c.Settings,
+				MetarrArgs: c.MetarrArgs,
+				CookiePath: chanAccessDetails.CookiePath,
+			})
+		}
+	}
+
+	// Retrieve existing URL directory map.
+	urlDirMap, err := validation.ValidateMetarrOutputDirs(c.MetarrArgs.OutputDir, c.MetarrArgs.URLOutputDirs, c)
+	if err != nil {
+		return err
+	}
+
+	// Fill output directory from map where applicable.
+	for range urlDirMap {
+		for _, v := range customVideoRequests {
+			if v.ChannelURL == "" {
+				continue
+			}
+			if _, exists := urlDirMap[v.ChannelURL]; exists {
+				v.MetarrArgs.OutputDir = urlDirMap[v.ChannelURL]
+			}
+		}
+	}
+
+	// Main process
+	success, errArray := InitProcess(s, c, customVideoRequests, ctx)
+
+	// Last scan time update
+	if err := cs.UpdateLastScan(c.ID); err != nil {
+		return fmt.Errorf("failed to update last scan time: %w", err)
+	}
+
+	// Add errors to array on failure
+	if !success {
+		return fmt.Errorf("failed to process video downloads. Got errors: %v", errArray)
+	}
+
+	// Some successful downloads, notify URLs
+	notifyURLs, err := cs.GetNotifyURLs(c.ID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
+	}
+
+	if len(notifyURLs) > 0 {
+		if errs := notify(c, notifyURLs); len(errs) != 0 {
+			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%s", c.ID, errors.Join(errs...))
+		}
+	}
+
+	if errArray != nil {
+		return fmt.Errorf("encountered errors during processing: %v", errArray)
+	}
+
 	return nil
 }
 

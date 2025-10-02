@@ -286,7 +286,7 @@ func parseMetarrOutputDir(v *models.Video, dirParser *parsing.Directory) string 
 		cfg.Set(keys.MoveOnComplete, parsed)
 		return parsed
 
-		// #2 Priority: Move operation filter output directory
+	// #2 Priority: Move operation filter output directory
 	case mOpOutDir != "" && (mOpChanURL == "" || strings.EqualFold(strings.TrimSpace(mOpChanURL), strings.TrimSpace(v.ChannelURL))):
 		parsed, err := dirParser.ParseDirectory(mOpOutDir, v, "Metarr video")
 		if err != nil {
@@ -295,7 +295,7 @@ func parseMetarrOutputDir(v *models.Video, dirParser *parsing.Directory) string 
 		}
 		return parsed
 
-		// #3 Priority: Channel default output directory
+	// #3 Priority: Channel default output directory
 	case mArgs.OutputDirMap[v.ChannelURL] != "":
 		parsed, err := dirParser.ParseDirectory(mArgs.OutputDirMap[v.ChannelURL], v, "Metarr video")
 		if err != nil {
@@ -304,14 +304,13 @@ func parseMetarrOutputDir(v *models.Video, dirParser *parsing.Directory) string 
 		}
 		return parsed
 
-	// Fallback: Dev error did not fill the default output directory if above fails, fill it here
+	// #4 Priority: Use the output directory stored in channel directly
 	case mArgs.OutputDir != "":
 		parsed, err := dirParser.ParseDirectory(mArgs.OutputDir, v, "Metarr video")
 		if err != nil {
 			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDir, v.URL, err)
 			break
 		}
-		logging.W("Dev Error: No default fallback output directory specified in map %v... Fetching from model instead.", mArgs.OutputDirMap)
 		return parsed
 	}
 

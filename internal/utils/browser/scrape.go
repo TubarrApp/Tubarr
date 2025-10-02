@@ -79,16 +79,12 @@ func NewBrowser() *Browser {
 	}
 }
 
-// GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
-func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) ([]*models.Video, error) {
-	if len(c.URLs) == 0 {
-		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
-	}
-
+// GetExistingReleases returns releases already in the database.
+func (b *Browser) GetExistingReleases(cs interfaces.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
 	// Load already downloaded URLs
-	existingURLs, err := cs.LoadGrabbedURLs(c)
+	existingURLs, err = cs.LoadGrabbedURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Convert existing URLs into a map for quick lookup
@@ -98,76 +94,33 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	}
 
 	logging.D(2, "Loaded %d existing downloaded video URLs for channel %q", len(existingMap), c.Name)
+	return existingMap, existingURLs, nil
+}
+
+// GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
+func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) ([]*models.Video, error) {
+	if len(c.URLs) == 0 {
+		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
+	}
 
 	// Prepare data structures
 	var (
 		newRequests []*models.Video
 	)
 
+	// Fetch entries already in the database
+	existingMap, existingURLs, err := b.GetExistingReleases(cs, c)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process each URL separately
 	for _, channelURL := range c.URLs {
-		parsed, err := url.Parse(channelURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse URL %q: %w", channelURL, err)
-		}
-
-		hostname := parsed.Hostname()
 		logging.D(1, "Processing channel URL %q", channelURL)
 
-		// Retrieve authentication details for this specific video URL
-		username, password, loginURL, err := cs.GetAuth(c.ID, channelURL)
+		cookies, chanAccessDetails, err := b.GetChannelAccessDetails(cs, c, channelURL)
 		if err != nil {
-			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, channelURL, err)
-		}
-
-		var (
-			authCookies, regCookies, cookies []*http.Cookie
-			generatedCookiePath              string
-			chanAccessDetails                models.ChannelAccessDetails
-		)
-
-		doLogin := ((username != "" || password != "") && loginURL != "")
-
-		if doLogin || c.Settings.UseGlobalCookies {
-			generatedCookiePath = generateCookieFilePath(c.Name, channelURL)
-
-			baseDomain, err := BaseDomain(channelURL)
-			if err != nil {
-				logging.E(0, "Failed to grab base domain for video URL %q: %v", channelURL, err)
-			}
-
-			chanAccessDetails = models.ChannelAccessDetails{
-				Username:   username,
-				Password:   password,
-				LoginURL:   loginURL,
-				BaseDomain: baseDomain,
-				CookiePath: generatedCookiePath,
-			}
-
-			// If authorization details exist, perform login and store cookies.
-			if doLogin {
-				authCookies, err = channelAuth(hostname, &chanAccessDetails)
-				if err != nil {
-					logging.E(0, "Failed to get auth cookies for %q: %v", channelURL, err)
-				}
-			}
-
-			// Get cookies globally
-			if c.Settings.UseGlobalCookies {
-				regCookies, err = b.cookies.GetCookies(channelURL)
-				if err != nil {
-					logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", channelURL, c.Settings.CookieSource, err)
-				}
-			}
-
-			// Combine cookies
-			cookies = mergeCookies(authCookies, regCookies)
-
-			// Save cookies to file
-			err = saveCookiesToFile(cookies, &chanAccessDetails)
-			if err != nil {
-				return nil, err
-			}
+			return nil, err
 		}
 
 		// Fetch new episode URLs for this video URL
@@ -221,26 +174,24 @@ func (b *Browser) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 		}
 	}
 
-	// Only scrape website if we're not using a URL file
+	// Check if domain matches any custom Tubarr domains
 	var customDom bool
-	if !cfg.IsSet(keys.URLFile) {
-		pattern := patterns["default"]
-		for domain, p := range patterns {
-			if strings.Contains(targetURL, domain) {
-				pattern = p
-				logging.I("Detected %s link", p.name)
-				customDom = true
-				break
-			}
+	pattern := patterns["default"]
+	for domain, p := range patterns {
+		if strings.Contains(targetURL, domain) {
+			pattern = p
+			logging.I("Detected %s link", p.name)
+			customDom = true
+			break
 		}
-
-		b.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-			link := e.Request.AbsoluteURL(e.Attr("href"))
-			if strings.Contains(link, pattern.pattern) {
-				uniqueEpisodeURLs[link] = struct{}{}
-			}
-		})
 	}
+
+	b.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Request.AbsoluteURL(e.Attr("href"))
+		if strings.Contains(link, pattern.pattern) {
+			uniqueEpisodeURLs[link] = struct{}{}
+		}
+	})
 
 	if customDom {
 		if err := b.collector.Visit(targetURL); err != nil {

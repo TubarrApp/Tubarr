@@ -1,7 +1,6 @@
 package process
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,8 +13,11 @@ import (
 
 	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/progflags"
+	"tubarr/internal/utils/files"
 	"tubarr/internal/utils/logging"
 )
 
@@ -299,7 +301,7 @@ func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFil
 	}
 
 	logging.I("Adding filters from file %q...", filterFile)
-	filters, err := readFilterFile(filterFile)
+	filters, err := files.ReadFileLines(filterFile)
 	if err != nil {
 		logging.E(0, "Error loading filters from file %q: %v", filterFile, err)
 	}
@@ -336,7 +338,7 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 	}
 
 	logging.I("Adding filter move operations from file %q...", moveOpFile)
-	moves, err := readFilterFile(moveOpFile)
+	moves, err := files.ReadFileLines(moveOpFile)
 	if err != nil {
 		logging.E(0, "Error loading filter move operations from file %q: %v", moveOpFile, err)
 	}
@@ -355,36 +357,6 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 	}
 
 	return validMoves
-}
-
-// readFilterFile loads filters from a file (one per line).
-func readFilterFile(path string) ([]string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			logging.E(0, "failed to close file %v due to error: %v", path, err)
-		}
-	}()
-
-	f := []string{}
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue // skip blank lines and comments
-		}
-		f = append(f, line)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return f, nil
 }
 
 // removeUnwantedJSON removes filtered out JSON files.
@@ -551,4 +523,25 @@ func isPrivateIP(ip, h string) bool {
 
 	logging.I("Host %q resolved to public IP address %q.", h, ip)
 	return false
+}
+
+// checkCustomScraperNeeds checks if a custom scraper should be used for this release.
+func checkCustomScraperNeeds(videos []*models.Video, c *models.Channel, cs interfaces.ChannelStore) error {
+	// Check for custom scraper needs
+	for _, v := range videos {
+
+		// Detect censored.tv links
+		if strings.Contains(v.URL, "censored.tv") {
+			if !progflags.CensoredTVUseCustom {
+				logging.I("Using regular censored.tv scraper...")
+			} else {
+				logging.I("Detected a censored.tv link. Using specialized scraper.")
+				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, c.Settings.JSONDir, v)
+				if err != nil {
+					return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
+				}
+			}
+		}
+	}
+	return nil
 }

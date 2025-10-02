@@ -457,13 +457,17 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 	return nil
 }
 
-// CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded.
-func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx context.Context) error {
+// DownloadVideoURLs downloads new video URLs to a channel.
+func (cs *ChannelStore) DownloadVideoURLs(key, val string, c *models.Channel, s interfaces.Store, videoURLs []string, ctx context.Context) error {
 
-	c, err, _ := cs.FetchChannelModel(key, val)
-	if err != nil {
-		return err
-	}
+	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
+
+	// Process crawling using the updated channel object
+	return process.DownloadVideosToChannel(s, cs, c, videoURLs, ctx)
+}
+
+// CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded.
+func (cs *ChannelStore) CrawlChannel(key, val string, c *models.Channel, s interfaces.Store, ctx context.Context) error {
 
 	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, c.URLs)
 
@@ -472,7 +476,7 @@ func (cs *ChannelStore) CrawlChannel(key, val string, s interfaces.Store, ctx co
 }
 
 // FetchChannelModel fills the channel model from the database.
-func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, error, bool) {
+func (cs *ChannelStore) FetchChannelModel(key, val string) (channels *models.Channel, err error, hasRows bool) {
 	var (
 		settings, metarrJSON json.RawMessage
 	)
@@ -506,7 +510,7 @@ func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, err
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil, false
 		}
-		return nil, fmt.Errorf("failed to scan channel: %w", err), false
+		return nil, fmt.Errorf("failed to scan channel: %w", err), true
 	}
 
 	// Unmarshal settings

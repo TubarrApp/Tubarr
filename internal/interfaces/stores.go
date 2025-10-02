@@ -21,11 +21,12 @@ type ChannelStore interface {
 	AddChannel(c *models.Channel) (int64, error)
 	AddNotifyURLs(id int64, notifications []string) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
-	CrawlChannel(key, val string, s Store, ctx context.Context) error
+	CrawlChannel(key, val string, c *models.Channel, s Store, ctx context.Context) error
 	CrawlChannelIgnore(key, val string, s Store, ctx context.Context) error
 	DeleteChannel(key, val string) error
 	DeleteVideoURLs(channelID int64, urls []string) error
 	DeleteNotifyURLs(channelID int64, urls, names []string) error
+	DownloadVideoURLs(key, val string, c *models.Channel, s Store, videoURLs []string, ctx context.Context) error
 	FetchAllChannels() (channels []*models.Channel, err error, hasRows bool)
 	FetchChannelModel(key, val string) (c *models.Channel, err error, hasRows bool)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)

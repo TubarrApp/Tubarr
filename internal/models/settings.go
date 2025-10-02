@@ -1,5 +1,7 @@
 package models
 
+import "net/http"
+
 // ChannelSettings are the primary settings for a channel, affecting videos belonging to it.
 type ChannelSettings struct {
 	ChannelConfigFile      string      `json:"channel_config_file" mapstructure:"channel-config-file"`
@@ -75,4 +77,5 @@ type ChannelAccessDetails struct {
 	LoginURL   string
 	BaseDomain string
 	CookiePath string
+	Cookies    []*http.Cookie
 }
