@@ -27,8 +27,10 @@ type Channel struct {
 // Matches the order of the DB table, do not alter.
 type Video struct {
 	ID                  int64
-	ChannelID           int64  `db:"channel_id"`
+	ChannelID           int64 `db:"channel_id"`
+	ParsedVideoDir      string
 	VideoPath           string `db:"video_path"`
+	ParsedJSONDir       string
 	JSONPath            string `db:"json_path"`
 	Finished            bool   `db:"finished"`
 	JSONCustomFile      string

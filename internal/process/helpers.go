@@ -1,6 +1,7 @@
 package process
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -359,6 +360,26 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 	return validMoves
 }
 
+// notifyURLs notifies URLs set for the channel by the user.
+func notifyURLs(cs interfaces.ChannelStore, c *models.Channel) error {
+	// Some successful downloads, notify URLs
+	notifyURLs, err := cs.GetNotifyURLs(c.ID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
+	}
+
+	if len(notifyURLs) > 0 {
+		if errs := notify(c, notifyURLs); len(errs) != 0 {
+			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%w", c.ID, errors.Join(errs...))
+		}
+	}
+
+	return nil
+}
+
 // removeUnwantedJSON removes filtered out JSON files.
 func removeUnwantedJSON(path string) error {
 	if path == "" {
@@ -526,7 +547,7 @@ func isPrivateIP(ip, h string) bool {
 }
 
 // checkCustomScraperNeeds checks if a custom scraper should be used for this release.
-func checkCustomScraperNeeds(videos []*models.Video, c *models.Channel, cs interfaces.ChannelStore) error {
+func checkCustomScraperNeeds(videos []*models.Video) error {
 	// Check for custom scraper needs
 	for _, v := range videos {
 
@@ -536,7 +557,7 @@ func checkCustomScraperNeeds(videos []*models.Video, c *models.Channel, cs inter
 				logging.I("Using regular censored.tv scraper...")
 			} else {
 				logging.I("Detected a censored.tv link. Using specialized scraper.")
-				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, c.Settings.JSONDir, v)
+				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, v.ParsedJSONDir, v)
 				if err != nil {
 					return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
 				}
@@ -544,4 +565,27 @@ func checkCustomScraperNeeds(videos []*models.Video, c *models.Channel, cs inter
 		}
 	}
 	return nil
+}
+
+// parseVideoJSONDirs parses video and JSON directories.
+func parseVideoJSONDirs(v *models.Video, dirParser *parsing.Directory) (jsonDir, videoDir string) {
+	// Initialize directory parser
+	var (
+		cSettings = v.Channel.Settings
+		err       error
+	)
+
+	if strings.Contains(cSettings.JSONDir, "{") || strings.Contains(cSettings.VideoDir, "{") {
+
+		jsonDir, err = dirParser.ParseDirectory(cSettings.JSONDir, v, "JSON")
+		if err != nil {
+			logging.E(0, "Failed to parse JSON directory %q", cSettings.JSONDir)
+		}
+		videoDir, err = dirParser.ParseDirectory(cSettings.VideoDir, v, "video")
+		if err != nil {
+			logging.E(0, "Failed to parse video directory %q", cSettings.VideoDir)
+		}
+	}
+
+	return jsonDir, videoDir
 }

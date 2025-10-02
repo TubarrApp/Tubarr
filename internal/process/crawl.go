@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"crypto/tls"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -166,40 +165,31 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 	}
 
 	// Check for custom scraper needs
-	if err := checkCustomScraperNeeds(videos, c, cs); err != nil {
+	if err := checkCustomScraperNeeds(videos); err != nil {
 		return err
 	}
 
 	// Main process
-	success, errArray := InitProcess(s, c, videos, ctx)
+	nSucceeded, procErr := InitProcess(s, c, videos, ctx)
 
 	// Last scan time update
 	if err := cs.UpdateLastScan(c.ID); err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
 	}
 
-	// Add errors to array on failure
-	if !success {
-		return fmt.Errorf("failed to process video downloads. Got errors: %v", errArray)
+	// All videos failed
+	if nSucceeded == 0 {
+		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procErr)
 	}
 
-	// Some successful downloads, notify URLs
-	notifyURLs, err := cs.GetNotifyURLs(c.ID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
+	// Some succeeded, notify URLs
+	if err := notifyURLs(cs, c); err != nil {
+		return errors.Join(procErr, err)
 	}
 
-	if len(notifyURLs) > 0 {
-		if errs := notify(c, notifyURLs); len(errs) != 0 {
-			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%s", c.ID, errors.Join(errs...))
-		}
-	}
-
-	if errArray != nil {
-		return fmt.Errorf("encountered errors during processing: %v", errArray)
+	// Some errors encountered
+	if procErr != nil {
+		return fmt.Errorf("encountered errors during processing: %w", procErr)
 	}
 
 	return nil
@@ -315,35 +305,25 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 	}
 
 	// Main process
-	success, errArray := InitProcess(s, c, customVideoRequests, ctx)
+	nSucceeded, procErr := InitProcess(s, c, customVideoRequests, ctx)
 
 	// Last scan time update
 	if err := cs.UpdateLastScan(c.ID); err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
 	}
 
-	// Add errors to array on failure
-	if !success {
-		return fmt.Errorf("failed to process video downloads. Got errors: %v", errArray)
+	// No videos succeeded
+	if nSucceeded == 0 {
+		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(customVideoRequests), procErr)
 	}
 
-	// Some successful downloads, notify URLs
-	notifyURLs, err := cs.GetNotifyURLs(c.ID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
+	// Some succeeded, notify URLs
+	if err := notifyURLs(cs, c); err != nil {
+		return errors.Join(procErr, err)
 	}
 
-	if len(notifyURLs) > 0 {
-		if errs := notify(c, notifyURLs); len(errs) != 0 {
-			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%s", c.ID, errors.Join(errs...))
-		}
-	}
-
-	if errArray != nil {
-		return fmt.Errorf("encountered errors during processing: %v", errArray)
+	if procErr != nil {
+		return fmt.Errorf("encountered errors during processing: %w", procErr)
 	}
 
 	return nil

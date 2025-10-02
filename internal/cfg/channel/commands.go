@@ -93,7 +93,7 @@ func addAuth(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Fetch channel model (retrieve the URLs)
-			c, err, hasRows := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
 			}
@@ -217,12 +217,12 @@ func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx conte
 			}
 
 			// Retrieve channel model
-			c, err, hasRows := cs.FetchChannelModel(key, val)
-			if err != nil {
-				return err
-			}
+			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("no channel model in database with %s %q", key, val)
+			}
+			if err != nil {
+				return err
 			}
 
 			// Crawl channel
@@ -460,7 +460,7 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Get channel model
-			c, err, hasRows := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
 			}
@@ -511,7 +511,7 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Get channel model
-			c, err, hasRows := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
 			}
@@ -882,7 +882,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Fetch channel model
-			ch, err, hasRows := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
 				logging.I("Entry for channel with %s %q does not exist in the database", key, val)
 				return nil
@@ -892,7 +892,7 @@ func listChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Display settings and return
-			displaySettings(cs, ch)
+			displaySettings(cs, c)
 			return nil
 		},
 	}
@@ -949,12 +949,12 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 			}
 
 			// Retrieve channel model
-			c, err, hasRows := cs.FetchChannelModel(key, val)
-			if err != nil {
-				return err
-			}
+			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("no channel model in database with %s %q", key, val)
+			}
+			if err != nil {
+				return err
 			}
 
 			// Crawl channel
@@ -1017,7 +1017,10 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Fetch model from database
-			c, err, _ := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.FetchChannelModel(key, val)
+			if !hasRows {
+				return fmt.Errorf("no channel model in database with %s %q", key, val)
+			}
 			if err != nil {
 				return err
 			}

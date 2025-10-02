@@ -21,7 +21,6 @@ var (
 	Level      int  = -1
 	Loggable   bool = false
 	fileLogger zerolog.Logger
-	muErr      sync.Mutex
 	errorArray = make([]error, 0, 8)
 	console    = os.Stdout
 

@@ -22,7 +22,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args = append(args,
 		cmdjson.SkipVideo,
 		cmdjson.WriteInfoJSON,
-		cmdjson.P, d.Video.Channel.Settings.JSONDir)
+		cmdjson.P, d.Video.ParsedJSONDir)
 
 	if d.Video.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {

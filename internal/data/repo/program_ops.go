@@ -26,7 +26,7 @@ func NewProgController(database *sql.DB) *ProgControl {
 }
 
 // StartTubarr sets Tubarr fields in the database.
-func (pc ProgControl) StartTubarr() (pid int, err error) {
+func (pc *ProgControl) StartTubarr() (pid int, err error) {
 
 	// Check running or stale state
 	if id, running := pc.checkProgRunning(); running {
@@ -60,7 +60,7 @@ func (pc ProgControl) StartTubarr() (pid int, err error) {
 }
 
 // QuitTubarr sets the program exit fields, ready for next run.
-func (pc ProgControl) QuitTubarr() error {
+func (pc *ProgControl) QuitTubarr() error {
 	if id, running := pc.checkProgRunning(); !running {
 		return fmt.Errorf("tubarr is not marked as running. Process %d still active?", id)
 	}
@@ -88,7 +88,7 @@ func (pc ProgControl) QuitTubarr() error {
 //
 // This function is crucial for ensuring things like powercuts don't
 // permanently lock the user out of the database.
-func (pc ProgControl) UpdateHeartbeat() error {
+func (pc *ProgControl) UpdateHeartbeat() error {
 	query := squirrel.
 		Update(consts.DBProgram).
 		Set(consts.QProgHeartbeat, time.Now()).
@@ -104,7 +104,7 @@ func (pc ProgControl) UpdateHeartbeat() error {
 // Private ////////////////////////////////////////////////////////////////////////////////////////////
 
 // checkProgRunning checks if the program is already running.
-func (pc ProgControl) checkProgRunning() (int, bool) {
+func (pc *ProgControl) checkProgRunning() (int, bool) {
 	var (
 		running bool
 		pid     int
@@ -125,7 +125,7 @@ func (pc ProgControl) checkProgRunning() (int, bool) {
 }
 
 // resetStaleProcess is useful when there are powercuts, etc.
-func (pc ProgControl) resetStaleProcess() (reset bool, err error) {
+func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 	var lastHeartbeat time.Time
 
 	query := squirrel.
