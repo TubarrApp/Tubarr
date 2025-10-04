@@ -6,13 +6,13 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-// parseOp allows users to escape separator characters without messing up 'strings.Split' logic.
-func parseOp(op string, desiredSeparator rune) []string {
+// EscapedSplit allows users to escape separator characters without messing up 'strings.Split' logic.
+func EscapedSplit(s string, desiredSeparator rune) []string {
 	var parts []string
 	var buf strings.Builder
 	escaped := false
 
-	for _, r := range op {
+	for _, r := range s {
 		switch {
 		case escaped:
 			// Always take the next character literally
@@ -48,7 +48,7 @@ func parseOp(op string, desiredSeparator rune) []string {
 func CheckForOpURL(op string) (chanURL string, ops string) {
 
 	// Check if valid
-	split := parseOp(op, '|')
+	split := EscapedSplit(op, '|')
 	if len(split) < 2 {
 		return "", op
 	}

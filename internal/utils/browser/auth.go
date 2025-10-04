@@ -1,12 +1,14 @@
 package browser
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"tubarr/internal/models"
+	"tubarr/internal/utils"
 	"tubarr/internal/utils/logging"
 
 	"golang.org/x/net/publicsuffix"
@@ -15,9 +17,9 @@ import (
 )
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func channelAuth(channelHostname string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
+func channelAuth(channelHostname string, a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie, error) {
 	if customAuthCookies[channelHostname] == nil { // If the user is not already authenticated
-		cookies, err := login(a)
+		cookies, err := login(a, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -27,7 +29,7 @@ func channelAuth(channelHostname string, a *models.ChannelAccessDetails) ([]*htt
 }
 
 // login logs the user in and returns the authentication cookie.
-func login(a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
+func login(a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err
@@ -35,10 +37,10 @@ func login(a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 
 	client := &http.Client{Jar: jar}
 
-	logging.I("Logging in to %q with username %q", a.LoginURL, a.Username)
+	logging.I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, utils.StarPassword(a.Password))
 
 	// Fetch the login page to get a fresh token
-	req, err := http.NewRequest("GET", a.LoginURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", a.LoginURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +59,7 @@ func login(a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 		return nil, err
 	}
 
+	logging.D(4, "Got body %s", string(body))
 	// Parse the login page to find any hidden token fields
 	token := parseToken(string(body))
 

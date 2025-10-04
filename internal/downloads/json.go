@@ -24,12 +24,12 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		cmdjson.WriteInfoJSON,
 		cmdjson.P, d.Video.ParsedJSONDir)
 
-	if d.Video.CookiePath == "" {
+	if d.ChannelURL.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
 			args = append(args, cmdjson.CookiesFromBrowser, d.Video.Settings.CookieSource)
 		}
 	} else {
-		args = append(args, cmdjson.CookiePath, d.Video.CookiePath)
+		args = append(args, cmdjson.CookiePath, d.ChannelURL.CookiePath)
 	}
 
 	if d.Video.Settings.MaxFilesize != "" {
@@ -59,7 +59,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		logging.I("Using cookies from browser %q", browserCookieSource)
 		args = append(args, cmdjson.CookiesFromBrowser, browserCookieSource)
 	} else {
-		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Video.Channel.Name, d.Video.URL)
+		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 
 	cmd := exec.CommandContext(d.Context, cmdjson.YTDLP, args...)
@@ -75,7 +75,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	}
 
 	// Ensure the directory exists
-	if _, err := validation.ValidateDirectory(d.Video.Channel.Settings.VideoDir, true); err != nil {
+	if _, err := validation.ValidateDirectory(d.Video.Settings.VideoDir, true); err != nil {
 		return err
 	}
 

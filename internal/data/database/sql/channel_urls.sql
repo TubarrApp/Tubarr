@@ -5,6 +5,9 @@ CREATE TABLE IF NOT EXISTS channel_urls (
     username TEXT,
     password TEXT,
     login_url TEXT,
+    last_scan TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
 );
 

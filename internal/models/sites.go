@@ -2,24 +2,47 @@
 package models
 
 import (
+	"net/http"
 	"time"
 )
 
-// Channel contains fields relating to a channel.
-//
-// Matches the order of the DB table, do not alter.
+type Site struct {
+	ID        int64      `db:"id"`
+	Domain    string     `db:"domain"` // e.g. youtube.com
+	Name      string     `db:"name"`
+	Channels  []*Channel `json:"channels"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// Channel is the top level model for a channel.
 type Channel struct {
 	ID                int64 `db:"id"`
-	URLs              []string
+	URLModels         []*ChannelURL
 	Name              string           `db:"name"`
-	Settings          *ChannelSettings `json:"settings" db:"settings"`
-	MetarrArgs        *MetarrArgs      `json:"metarr" db:"metarr"`
-	LastScan          time.Time        `db:"last_scan"`
-	CreatedAt         time.Time        `db:"created_at"`
-	UpdatedAt         time.Time        `db:"updated_at"`
-	MoveOpOutputDir   string
-	MoveOpChannelURL  string
+	ChanSettings      *ChannelSettings `json:"settings" db:"settings"`
+	ChanMetarrArgs    *MetarrArgs      `json:"metarr" db:"metarr"`
 	UpdatedFromConfig bool
+	LastScan          time.Time `db:"last_scan"`
+	CreatedAt         time.Time `db:"created_at"`
+	UpdatedAt         time.Time `db:"updated_at"`
+}
+
+// ChannelURL contains fields relating to a channel's URL.
+//
+// Matches the order of the DB table, do not alter.
+type ChannelURL struct {
+	ID         int64  `db:"id"`
+	URL        string `db:"url"`
+	Videos     []*Video
+	Username   string `db:"username"`
+	Password   string `db:"password"`
+	LoginURL   string `db:"login_url"`
+	CookiePath string
+	Cookies    []*http.Cookie
+	LastScan   time.Time `db:"last_scan"`
+	CreatedAt  time.Time `db:"created_at"`
+	UpdatedAt  time.Time `db:"updated_at"`
 }
 
 // Video contains fields relating to a video, and a pointer to the channel it belongs to..
@@ -27,7 +50,7 @@ type Channel struct {
 // Matches the order of the DB table, do not alter.
 type Video struct {
 	ID                  int64
-	ChannelID           int64 `db:"channel_id"`
+	ChannelURLID        int64 `db:"channel_url_id"`
 	ParsedVideoDir      string
 	VideoPath           string `db:"video_path"`
 	ParsedJSONDir       string
@@ -35,22 +58,18 @@ type Video struct {
 	Finished            bool   `db:"finished"`
 	JSONCustomFile      string
 	URL                 string `db:"url"`
-	ChannelURL          string
 	DirectVideoURL      string
 	Title               string           `db:"title"`
 	Description         string           `db:"description"`
 	UploadDate          time.Time        `db:"upload_date"`
 	MetadataMap         map[string]any   `db:"-"`
-	Channel             *Channel         `db:"-"`
 	Settings            *ChannelSettings `json:"settings" db:"settings"`
 	MetarrArgs          *MetarrArgs      `json:"metarr" db:"metarr"`
 	DownloadStatus      DLStatus         `json:"download_status" db:"download_status"`
 	CreatedAt           time.Time        `db:"created_at"`
 	UpdatedAt           time.Time        `db:"updated_at"`
-	Username            string
-	Password            string
-	LoginURL            string
-	CookiePath          string
 	BaseDomain          string
 	BaseDomainWithProto string
+	MoveOpOutputDir     string
+	MoveOpChannelURL    string
 }

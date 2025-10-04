@@ -31,7 +31,7 @@ type ChannelStore interface {
 	FetchChannelModel(key, val string) (*models.Channel, bool, error)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetDB() *sql.DB
-	GetID(key, val string) (int64, error)
+	GetChannelID(key, val string) (int64, error)
 	GetNotifyURLs(id int64) ([]string, error)
 	LoadGrabbedURLs(c *models.Channel) (urls []string, err error)
 	UpdateChannelValue(key, val, col string, newVal any) error
@@ -48,9 +48,9 @@ type DownloadStore interface {
 
 // VideoStore allows access to video repo methods.
 type VideoStore interface {
-	AddVideo(v *models.Video) (int64, error)
+	AddVideo(v *models.Video, c *models.Channel) (int64, error)
 	AddVideos(videos []*models.Video, c *models.Channel) ([]*models.Video, []error)
 	GetDB() *sql.DB
 	DeleteVideo(key, val string, chanID int64) error
-	UpdateVideo(v *models.Video) error
+	UpdateVideo(v *models.Video, c *models.Channel) error
 }

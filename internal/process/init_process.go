@@ -17,16 +17,16 @@ import (
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, ctx context.Context) (nSucceeded int, err error) {
+func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, videos []*models.Video, ctx context.Context) (nSucceeded int, err error) {
 	var (
 		errs []error
 	)
 
-	conc := max(c.Settings.Concurrency, 1)
+	conc := max(c.ChanSettings.Concurrency, 1)
 
 	logging.I("Starting meta/video processing for %d videos", len(videos))
 
-	dlTracker := downloads.NewDownloadTracker(s.DownloadStore(), c.Settings.ExternalDownloader)
+	dlTracker := downloads.NewDownloadTracker(s.DownloadStore(), c.ChanSettings.ExternalDownloader)
 	dlTracker.Start(ctx)
 	defer dlTracker.Stop()
 
@@ -52,7 +52,15 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 		go func(workerID int) {
 			defer wg.Done()
 			for v := range jobs {
-				err := videoJob(ctx, v, s.VideoStore(), dirParser, dlTracker, metarrExists)
+				err := videoJob(
+					ctx,
+					v,
+					cu,
+					c,
+					s.VideoStore(),
+					dirParser,
+					dlTracker,
+					metarrExists)
 				results <- err
 			}
 		}(w + 1)
@@ -67,6 +75,11 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 
 		// Parse directories (templating options can include video elements)
 		video.ParsedJSONDir, video.ParsedVideoDir = parseVideoJSONDirs(video, dirParser)
+
+		// Check for custom scraper needs
+		if err := checkCustomScraperNeeds(video); err != nil {
+			return nSucceeded, err
+		}
 
 		if video.Finished {
 			logging.D(1, "Video in channel %q with URL %q is already marked as downloaded", c.Name, video.URL)
@@ -102,13 +115,15 @@ func InitProcess(s interfaces.Store, c *models.Channel, videos []*models.Video, 
 func videoJob(
 	ctx context.Context,
 	v *models.Video,
+	cu *models.ChannelURL,
+	c *models.Channel,
 	vs interfaces.VideoStore,
 	dirParser *parsing.Directory,
 	dlTracker *downloads.DownloadTracker,
 	metarrExists bool,
 ) error {
 	if v.JSONCustomFile == "" {
-		proceed, err := processJSON(ctx, v, vs, dirParser, dlTracker)
+		proceed, err := processJSON(ctx, v, cu, c, vs, dirParser, dlTracker)
 		if err != nil {
 			return fmt.Errorf("json processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 		}
@@ -117,28 +132,33 @@ func videoJob(
 			return nil
 		}
 	} else {
-		if _, err := vs.AddVideo(v); err != nil {
+		if _, err := vs.AddVideo(v, c); err != nil {
 			return fmt.Errorf("error adding video with URL %s to database: %w", v.URL, err)
 		}
 	}
 
-	if err := processVideo(ctx, v, dlTracker); err != nil {
+	if err := processVideo(ctx, v, cu, c, dlTracker); err != nil {
 		return fmt.Errorf("video processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 	}
 
 	if !metarrExists {
 		logging.I("No 'metarr' at $PATH, skipping Metarr process and marking video as finished")
-		v.Finished = true
-		if err := vs.UpdateVideo(v); err != nil {
-			return fmt.Errorf("failed to update video DB entry: %w", err)
-		}
-		return nil // stop here, don't continue with metarr
+		return markVideoComplete(vs, v, c)
 	}
 
 	// Run metarr step
-	if err := metarr.InitMetarr(v, dirParser, ctx); err != nil {
+	if err := metarr.InitMetarr(v, cu, c, dirParser, ctx); err != nil {
 		return fmt.Errorf("metarr processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 	}
 
+	return markVideoComplete(vs, v, c)
+}
+
+// completeVideo marks a video as complete.
+func markVideoComplete(vs interfaces.VideoStore, v *models.Video, c *models.Channel) error {
+	v.Finished = true
+	if err := vs.UpdateVideo(v, c); err != nil {
+		return fmt.Errorf("failed to update video DB entry: %w", err)
+	}
 	return nil
 }

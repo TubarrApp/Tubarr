@@ -42,6 +42,9 @@ const (
 	QChanURLsUsername  = "username"
 	QChanURLsPassword  = "password"
 	QChanURLsLoginURL  = "login_url"
+	QChanURLsLastScan  = "last_scan"
+	QChanURLsCreatedAt = "created_at"
+	QChanURLsUpdatedAt = "updated_at"
 )
 
 // Videos

@@ -10,7 +10,7 @@ import (
 )
 
 // processVideo processes video downloads.
-func processVideo(ctx context.Context, v *models.Video, dlTracker *downloads.DownloadTracker) error {
+func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) error {
 	if v == nil {
 		logging.I("Null video entered")
 		return nil
@@ -18,7 +18,7 @@ func processVideo(ctx context.Context, v *models.Video, dlTracker *downloads.Dow
 
 	logging.I("Processing video download for URL: %s", v.URL)
 
-	dl, err := downloads.NewVideoDownload(ctx, v, dlTracker, &downloads.Options{
+	dl, err := downloads.NewVideoDownload(ctx, v, cu, c, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
 	})

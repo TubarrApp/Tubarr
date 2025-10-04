@@ -33,17 +33,21 @@ var DefaultOptions = Options{
 
 // VideoDownload encapsulates a video download operation.
 type VideoDownload struct {
-	Video     *models.Video
-	DLStore   interfaces.DownloadStore
-	DLTracker *DownloadTracker
-	Options   Options
-	Context   context.Context
+	Video      *models.Video
+	ChannelURL *models.ChannelURL
+	Channel    *models.Channel
+	DLStore    interfaces.DownloadStore
+	DLTracker  *DownloadTracker
+	Options    Options
+	Context    context.Context
 }
 
 // JSONDownload encapsulates a JSON download operation.
 type JSONDownload struct {
-	Video     *models.Video
-	DLTracker *DownloadTracker
-	Options   Options
-	Context   context.Context
+	Video      *models.Video
+	Channel    *models.Channel
+	ChannelURL *models.ChannelURL
+	DLTracker  *DownloadTracker
+	Options    Options
+	Context    context.Context
 }

@@ -7,7 +7,6 @@ import (
 	"maps"
 	"net/url"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,11 +28,11 @@ func ValidateMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Cha
 
 	// Initialize map and fill from existing
 	outDirMap := make(map[string]string)
-	if c.MetarrArgs.OutputDirMap != nil {
-		maps.Copy(outDirMap, c.MetarrArgs.OutputDirMap)
+	if c.ChanMetarrArgs.OutputDirMap != nil {
+		maps.Copy(outDirMap, c.ChanMetarrArgs.OutputDirMap)
 	}
 
-	validatedDirs := make(map[string]bool, len(c.URLs))
+	validatedDirs := make(map[string]bool, len(c.URLModels))
 
 	// Parse and validate URL output directory pairs
 	for _, pair := range urlDirs {
@@ -41,16 +40,27 @@ func ValidateMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Cha
 		if err != nil {
 			return nil, err
 		}
-		if !slices.Contains(c.URLs, url) {
+
+		// Check if this URL exists in the channel
+		found := false
+		for _, cu := range c.URLModels {
+			if strings.EqualFold(strings.TrimSpace(cu.URL), strings.TrimSpace(url)) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
 			return nil, fmt.Errorf("channel does not contain URL %q, provided in output directory mapping", url)
 		}
+
 		outDirMap[url] = dir
 	}
 
-	// Fill blank channel entries
-	for _, cURL := range c.URLs {
-		if outDirMap[cURL] == "" && defaultDir != "" {
-			outDirMap[cURL] = defaultDir
+	// Fill blank channel entries with channel default
+	for _, cu := range c.URLModels {
+		if outDirMap[cu.URL] == "" && defaultDir != "" {
+			outDirMap[cu.URL] = defaultDir
 		}
 	}
 
@@ -300,7 +310,7 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 
 		// Extract optional channel URL and remaining filter string
 		chanURL, op := CheckForOpURL(op)
-		split := parseOp(op, ':')
+		split := EscapedSplit(op, ':')
 
 		if len(split) < 3 {
 			logging.E(0, errconsts.FilterOpsFormatError)
@@ -355,7 +365,7 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 	for _, op := range ops {
 
 		chanURL, op := CheckForOpURL(op)
-		split := parseOp(op, ':')
+		split := EscapedSplit(op, ':')
 
 		if len(split) != 3 {
 			return nil, errors.New(moveOpFormatError)

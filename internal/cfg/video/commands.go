@@ -56,7 +56,7 @@ func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra
 				return errors.New("must enter a channel name/URL, and a video URL to delete")
 			}
 
-			cid, err := cs.GetID(chanKey, chanVal)
+			cid, err := cs.GetChannelID(chanKey, chanVal)
 			if err != nil {
 				return err
 			}

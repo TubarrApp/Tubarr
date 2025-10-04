@@ -79,7 +79,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 // checkMoveOps checks if Metarr should use an output directory based on existent metadata.
 func checkMoveOps(v *models.Video, dirParser *parsing.Directory) (outputDir string, channelURL string) {
 	// Load move ops from file if present
-	if v.Channel.Settings.MoveOpFile != "" {
+	if v.Settings.MoveOpFile != "" {
 		v.Settings.MoveOps = append(v.Settings.MoveOps, loadMoveOpsFromFile(v, dirParser)...)
 	}
 
@@ -98,13 +98,13 @@ func checkMoveOps(v *models.Video, dirParser *parsing.Directory) (outputDir stri
 }
 
 // filterRequests uses user input filters to check if the video should be downloaded.
-func filterRequests(v *models.Video, dirParser *parsing.Directory) (valid bool, err error) {
+func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory) (valid bool, err error) {
 
 	// Load filter ops from file if present
 	v.Settings.Filters = append(v.Settings.Filters, loadFilterOpsFromFile(v, dirParser)...)
 
 	// Check filter ops
-	passFilterOps, err := filterOpsFilter(v)
+	passFilterOps, err := filterOpsFilter(v, cu)
 	if err != nil {
 		return false, err
 	}
@@ -121,20 +121,20 @@ func filterRequests(v *models.Video, dirParser *parsing.Directory) (valid bool, 
 		return false, nil
 	}
 
-	logging.I("Video %q for channel %q passed filter checks", v.URL, v.Channel.Name)
+	logging.I("Video %q for channel %q passed filter checks", v.URL, c.Name)
 	return true, nil
 }
 
 // filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
-func filterOpsFilter(v *models.Video) (bool, error) {
+func filterOpsFilter(v *models.Video, cu *models.ChannelURL) (bool, error) {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
 	for _, filter := range v.Settings.Filters {
 
 		// Skip filter if it is associated with a channel URL, and that URL does not match the channel URL associated with the video.
-		if filter.ChannelURL != "" && (!strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(v.ChannelURL))) {
-			logging.D(2, "Skipping filter %v. This filter's channel URL does not match video (%q)'s associated channel URL %q", filter, v.URL, v.ChannelURL)
+		if filter.ChannelURL != "" && (!strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(cu.URL))) {
+			logging.D(2, "Skipping filter %v. This filter's channel URL does not match video (%q)'s associated channel URL %q", filter, v.URL, cu.URL)
 			continue
 		}
 
@@ -239,8 +239,8 @@ func uploadDateFilter(v *models.Video) (bool, error) {
 			return false, fmt.Errorf("failed to convert upload date to integer: %w", err)
 		}
 
-		if v.Channel.Settings.FromDate != "" {
-			fromDate, err := strconv.Atoi(v.Channel.Settings.FromDate)
+		if v.Settings.FromDate != "" {
+			fromDate, err := strconv.Atoi(v.Settings.FromDate)
 			if err != nil {
 				if err := removeUnwantedJSON(v.JSONPath); err != nil {
 					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
@@ -248,20 +248,18 @@ func uploadDateFilter(v *models.Video) (bool, error) {
 				return false, fmt.Errorf("invalid 'from date' format: %w", err)
 			}
 			if uploadDateNum < fromDate {
-				logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Channel.Settings.FromDate)
+				logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Settings.FromDate)
 				if err := removeUnwantedJSON(v.JSONPath); err != nil {
 					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 				}
 				return false, nil
 			} else {
-				logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
+				logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
 			}
-		} else {
-			logging.D(1, "No 'from date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
 		}
 
-		if v.Channel.Settings.ToDate != "" {
-			toDate, err := strconv.Atoi(v.Channel.Settings.ToDate)
+		if v.Settings.ToDate != "" {
+			toDate, err := strconv.Atoi(v.Settings.ToDate)
 			if err != nil {
 				if err := removeUnwantedJSON(v.JSONPath); err != nil {
 					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
@@ -269,16 +267,14 @@ func uploadDateFilter(v *models.Video) (bool, error) {
 				return false, fmt.Errorf("invalid 'to date' format: %w", err)
 			}
 			if uploadDateNum > toDate {
-				logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Channel.Settings.ToDate)
+				logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Settings.ToDate)
 				if err := removeUnwantedJSON(v.JSONPath); err != nil {
 					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 				}
 				return false, nil
 			} else {
-				logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Channel.Settings.FromDate, uploadDateNum)
+				logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
 			}
-		} else {
-			logging.D(1, "No 'to date' grabbed for channel %q for URL %q", v.Channel.Name, v.URL)
 		}
 	} else {
 		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
@@ -290,11 +286,11 @@ func uploadDateFilter(v *models.Video) (bool, error) {
 func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFilters {
 	var err error
 
-	if v.Channel.Settings.FilterFile == "" {
+	if v.Settings.FilterFile == "" {
 		return nil
 	}
 
-	filterFile := v.Channel.Settings.FilterFile
+	filterFile := v.Settings.FilterFile
 
 	if filterFile, err = p.ParseDirectory(filterFile, v, "filter-ops"); err != nil {
 		logging.E(0, "Failed to parse directory %q: %v", filterFile, err)
@@ -327,11 +323,11 @@ func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFil
 func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps {
 	var err error
 
-	if v.Channel.Settings.MoveOpFile == "" {
+	if v.Settings.MoveOpFile == "" {
 		return nil
 	}
 
-	moveOpFile := v.Channel.Settings.MoveOpFile
+	moveOpFile := v.Settings.MoveOpFile
 
 	if moveOpFile, err = p.ParseDirectory(moveOpFile, v, "move-ops"); err != nil {
 		logging.E(0, "Failed to parse directory %q: %v", moveOpFile, err)
@@ -547,20 +543,18 @@ func isPrivateIP(ip, h string) bool {
 }
 
 // checkCustomScraperNeeds checks if a custom scraper should be used for this release.
-func checkCustomScraperNeeds(videos []*models.Video) error {
+func checkCustomScraperNeeds(v *models.Video) error {
 	// Check for custom scraper needs
-	for _, v := range videos {
 
-		// Detect censored.tv links
-		if strings.Contains(v.URL, "censored.tv") {
-			if !progflags.CensoredTVUseCustom {
-				logging.I("Using regular censored.tv scraper...")
-			} else {
-				logging.I("Detected a censored.tv link. Using specialized scraper.")
-				err := browserInstance.ScrapeCensoredTVMetadata(v.URL, v.ParsedJSONDir, v)
-				if err != nil {
-					return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
-				}
+	// Detect censored.tv links
+	if strings.Contains(v.URL, "censored.tv") {
+		if !progflags.CensoredTVUseCustom {
+			logging.I("Using regular censored.tv scraper...")
+		} else {
+			logging.I("Detected a censored.tv link. Using specialized scraper.")
+			err := browserInstance.ScrapeCensoredTVMetadata(v.URL, v.ParsedJSONDir, v)
+			if err != nil {
+				return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
 			}
 		}
 	}
@@ -571,7 +565,7 @@ func checkCustomScraperNeeds(videos []*models.Video) error {
 func parseVideoJSONDirs(v *models.Video, dirParser *parsing.Directory) (jsonDir, videoDir string) {
 	// Initialize directory parser
 	var (
-		cSettings = v.Channel.Settings
+		cSettings = v.Settings
 		err       error
 	)
 

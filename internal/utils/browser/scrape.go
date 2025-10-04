@@ -99,7 +99,7 @@ func (b *Browser) GetExistingReleases(cs interfaces.ChannelStore, c *models.Chan
 
 // GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
 func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) ([]*models.Video, error) {
-	if len(c.URLs) == 0 {
+	if len(c.URLModels) == 0 {
 		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
 	}
 
@@ -115,16 +115,24 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	}
 
 	// Process each URL separately
-	for _, channelURL := range c.URLs {
-		logging.D(1, "Processing channel URL %q", channelURL)
+	for _, cu := range c.URLModels {
+		logging.D(1, "Processing channel URL %q", cu.URL)
 
-		cookies, chanAccessDetails, err := b.GetChannelAccessDetails(cs, c, channelURL)
+		chanAccessDetails, err := b.GetChannelAccessDetails(cs, c, cu.URL, ctx)
 		if err != nil {
 			return nil, err
 		}
 
+		if chanAccessDetails != nil {
+			cu.CookiePath = chanAccessDetails.CookiePath
+			cu.Cookies = chanAccessDetails.Cookies
+			cu.Username = chanAccessDetails.Username
+			cu.Password = chanAccessDetails.Password
+			cu.LoginURL = chanAccessDetails.LoginURL
+		}
+
 		// Fetch new episode URLs for this video URL
-		newEpisodeURLs, err := b.newEpisodeURLs(channelURL, existingURLs, nil, cookies, chanAccessDetails.CookiePath, ctx)
+		newEpisodeURLs, err := b.newEpisodeURLs(cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -133,13 +141,10 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		for _, newURL := range newEpisodeURLs {
 			if _, exists := existingMap[newURL]; !exists {
 				newRequests = append(newRequests, &models.Video{
-					ChannelID:  c.ID,
-					URL:        newURL,
-					ChannelURL: channelURL,
-					Channel:    c,
-					Settings:   c.Settings,
-					MetarrArgs: c.MetarrArgs,
-					CookiePath: chanAccessDetails.CookiePath,
+					ChannelURLID: cu.ID,
+					URL:          newURL,
+					Settings:     c.ChanSettings,
+					MetarrArgs:   c.ChanMetarrArgs,
 				})
 			}
 		}

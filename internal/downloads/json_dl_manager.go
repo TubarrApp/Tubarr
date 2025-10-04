@@ -12,7 +12,7 @@ import (
 )
 
 // NewJSONDownload creates a download operation with specified options.
-func NewJSONDownload(ctx context.Context, video *models.Video, tracker *DownloadTracker, opts *Options) (*JSONDownload, error) {
+func NewJSONDownload(ctx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*JSONDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -20,9 +20,11 @@ func NewJSONDownload(ctx context.Context, video *models.Video, tracker *Download
 	logging.D(1, "JSON download called with video URL: %q", video.URL)
 
 	dl := &JSONDownload{
-		Video:     video,
-		DLTracker: tracker,
-		Context:   ctx,
+		Video:      video,
+		Channel:    channel,
+		ChannelURL: channelURL,
+		DLTracker:  tracker,
+		Context:    ctx,
 	}
 
 	if opts != nil {

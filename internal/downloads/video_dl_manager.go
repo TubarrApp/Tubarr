@@ -13,15 +13,17 @@ import (
 )
 
 // NewVideoDownload creates a download operation with specified options.
-func NewVideoDownload(ctx context.Context, video *models.Video, tracker *DownloadTracker, opts *Options) (*VideoDownload, error) {
+func NewVideoDownload(ctx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*VideoDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
 
 	dl := &VideoDownload{
-		Video:     video,
-		DLTracker: tracker,
-		Context:   ctx,
+		Video:      video,
+		ChannelURL: channelURL,
+		Channel:    channel,
+		DLTracker:  tracker,
+		Context:    ctx,
 	}
 
 	if opts != nil {

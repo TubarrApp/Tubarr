@@ -56,23 +56,20 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 			errArray = append(errArray, fmt.Errorf("video #%d must have a URL", i))
 			continue
 		}
-		if v.ChannelID == 0 {
-			if c.ID == 0 {
-				errArray = append(errArray, fmt.Errorf("video #%d has no channel ID", i))
-				continue
-			}
-			v.ChannelID = c.ID
+		if c.ID == 0 {
+			errArray = append(errArray, fmt.Errorf("video #%d has no channel ID", i))
+			continue
 		}
 		validVideos = append(validVideos, v)
 	}
 
 	for _, v := range validVideos {
-		videoID, exists := vs.videoExists(v)
+		videoID, exists := vs.videoExists(v, c)
 		if exists {
 			// Update finished status only
 			updateQuery := squirrel.Update(consts.DBVideos).
 				Set(consts.QVidFinished, v.Finished).
-				Where(squirrel.Eq{consts.QVidChanID: v.ChannelID, consts.QVidURL: v.URL}).
+				Where(squirrel.Eq{consts.QVidChanID: c.ID, consts.QVidURL: v.URL}).
 				RunWith(tx)
 
 			if _, err := updateQuery.Exec(); err != nil {
@@ -84,7 +81,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 			// Insert new video
 			insertQuery := squirrel.Insert(consts.DBVideos).
 				Columns(consts.QVidChanID, consts.QVidURL, consts.QVidFinished).
-				Values(v.ChannelID, v.URL, v.Finished).
+				Values(c.ID, v.URL, v.Finished).
 				RunWith(tx)
 
 			result, err := insertQuery.Exec()
@@ -122,15 +119,15 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 }
 
 // AddVideo adds a new video to the database or updates it if it already exists.
-func (vs *VideoStore) AddVideo(v *models.Video) (int64, error) {
+func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (int64, error) {
 	if v.URL == "" {
 		return 0, errors.New("must enter a url for video")
 	}
 
 	// Check if video already exists
-	if id, exists := vs.videoExists(v); exists {
+	if id, exists := vs.videoExists(v, c); exists {
 		logging.D(1, "Video %q already exists in the database with ID %d", v.URL, id)
-		if err := vs.UpdateVideo(v); err != nil {
+		if err := vs.UpdateVideo(v, c); err != nil {
 			return id, fmt.Errorf("failed to update existing video: %w", err)
 		}
 		return id, nil
@@ -168,7 +165,7 @@ func (vs *VideoStore) AddVideo(v *models.Video) (int64, error) {
 			consts.QVidCreatedAt, consts.QVidUpdatedAt,
 		).
 		Values(
-			v.ChannelID, v.URL, v.Title,
+			c.ID, v.URL, v.Title,
 			v.Description, v.Finished, v.UploadDate,
 			metadataJSON, settingsJSON, metarrJSON,
 			now, now,
@@ -207,7 +204,7 @@ func (vs *VideoStore) AddVideo(v *models.Video) (int64, error) {
 }
 
 // UpdateVideo updates the status of the video in the database.
-func (vs *VideoStore) UpdateVideo(v *models.Video) error {
+func (vs *VideoStore) UpdateVideo(v *models.Video, c *models.Channel) error {
 	var committed bool
 	tx, err := vs.DB.Begin()
 
@@ -243,7 +240,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video) error {
 		Set(consts.QVidUpdatedAt, time.Now()).
 		Where(squirrel.And{
 			squirrel.Eq{consts.QVidURL: v.URL},
-			squirrel.Eq{consts.QVidChanID: v.ChannelID},
+			squirrel.Eq{consts.QVidChanID: c.ID},
 		}).
 		RunWith(tx)
 
@@ -307,14 +304,14 @@ func (vs *VideoStore) DeleteVideo(key, val string, chanID int64) error {
 // Private /////////////////////////////////////////////////////////////////////
 
 // videoExists returns true if the video exists in the database.
-func (vs *VideoStore) videoExists(v *models.Video) (int64, bool) {
+func (vs *VideoStore) videoExists(v *models.Video, c *models.Channel) (int64, bool) {
 	var id int64
 	query := squirrel.
 		Select(consts.QVidID).
 		From(consts.DBVideos).
 		Where(squirrel.And{
 			squirrel.Eq{consts.QVidURL: v.URL},
-			squirrel.Eq{consts.QVidChanID: v.ChannelID},
+			squirrel.Eq{consts.QVidChanID: c.ID},
 		}).
 		RunWith(vs.DB)
 

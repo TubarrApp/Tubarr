@@ -26,7 +26,7 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 
 	for _, op := range metaOps {
 		opURL, opPart := CheckForOpURL(op)
-		split := parseOp(opPart, ':')
+		split := EscapedSplit(opPart, ':')
 
 		switch len(split) {
 		// 'director:set:Spielberg'

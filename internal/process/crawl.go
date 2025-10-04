@@ -81,19 +81,19 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 		cfgchannel.LoadFromConfig(s.ChannelStore(), c)
 
 		// Ignore channel if paused
-		if c.Settings.Paused {
+		if c.ChanSettings.Paused {
 			logging.I("Channel with name %q is paused, skipping checks.", c.Name)
 			continue
 		}
 
 		// Time for a scan?
 		timeSinceLastScan := time.Since(c.LastScan)
-		crawlFreqDuration := time.Duration(c.Settings.CrawlFreq) * time.Minute
+		crawlFreqDuration := time.Duration(c.ChanSettings.CrawlFreq) * time.Minute
 
 		logging.I("\nTime since last check for channel %q: %s\nCrawl frequency: %d minutes",
 			c.Name,
 			timeSinceLastScan.Round(time.Second),
-			c.Settings.CrawlFreq)
+			c.ChanSettings.CrawlFreq)
 
 		if timeSinceLastScan < crawlFreqDuration {
 			remainingTime := crawlFreqDuration - timeSinceLastScan
@@ -137,14 +137,13 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 // ChannelCrawl crawls a channel for new URLs.
 func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) (err error) {
 
-	logging.I("Initiating crawl for channel %q...\n\nVideo destination: %s\nJSON destination: %s\nFilters: %v\nCookies source: %s",
-		c.Name, c.Settings.VideoDir, c.Settings.JSONDir, c.Settings.Filters, c.Settings.CookieSource)
+	logging.I("Initiating crawl for channel %q...\n", c.Name)
 
 	// Check validity
-	if len(c.URLs) == 0 {
+	if len(c.URLModels) == 0 {
 		return errors.New("no channel URLs")
 	}
-	if c.Settings.VideoDir == "" || c.Settings.JSONDir == "" {
+	if c.ChanSettings.VideoDir == "" || c.ChanSettings.JSONDir == "" {
 		return errors.New("output directories are blank")
 	}
 
@@ -164,13 +163,17 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		return nil
 	}
 
-	// Check for custom scraper needs
-	if err := checkCustomScraperNeeds(videos); err != nil {
-		return err
-	}
-
 	// Main process
-	nSucceeded, procErr := InitProcess(s, c, videos, ctx)
+	var (
+		nSucceeded int
+		procError  error
+	)
+
+	for _, cu := range c.URLModels {
+		succeeded, procErr := InitProcess(s, cu, c, videos, ctx)
+		nSucceeded = nSucceeded + succeeded
+		procError = errors.Join(procError, procErr)
+	}
 
 	// Last scan time update
 	if err := cs.UpdateLastScan(c.ID); err != nil {
@@ -179,17 +182,17 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	// All videos failed
 	if nSucceeded == 0 {
-		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procErr)
+		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procError)
 	}
 
 	// Some succeeded, notify URLs
 	if err := notifyURLs(cs, c); err != nil {
-		return errors.Join(procErr, err)
+		return errors.Join(procError, err)
 	}
 
 	// Some errors encountered
-	if procErr != nil {
-		return fmt.Errorf("encountered errors during processing: %w", procErr)
+	if procError != nil {
+		return fmt.Errorf("encountered errors during processing: %w", procError)
 	}
 
 	return nil
@@ -251,7 +254,7 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 
 	customVideoRequests := []*models.Video{}
 
-	for _, channelURL := range c.URLs {
+	for _, channelURL := range c.URLModels {
 		for _, videoURL := range videoURLs {
 
 			var (
@@ -263,49 +266,69 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 				split := strings.Split(videoURL, "|")
 				customVideoChanURL = split[0]
 				customVideoURL = split[1]
+
+				channelURL.URL = customVideoChanURL
+			} else {
+				channelURL.URL = videoURL
 			}
 
 			if _, exists := existingVideoURLsMap[customVideoURL]; exists {
 				return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-video-urls' first if you wish to re-download it", customVideoURL)
 			}
 
-			_, chanAccessDetails, err := browserInstance.GetChannelAccessDetails(cs, c, channelURL)
+			chanAccessDetails, err := browserInstance.GetChannelAccessDetails(cs, c, channelURL.URL, ctx)
 			if err != nil {
 				return err
 			}
 
+			if chanAccessDetails != nil {
+				channelURL.CookiePath = chanAccessDetails.CookiePath
+				channelURL.Cookies = chanAccessDetails.Cookies
+				channelURL.Username = chanAccessDetails.Username
+				channelURL.Password = chanAccessDetails.Password
+				channelURL.LoginURL = chanAccessDetails.LoginURL
+			}
+
 			customVideoRequests = append(customVideoRequests, &models.Video{
-				ChannelID:  c.ID,
-				URL:        customVideoURL,
-				ChannelURL: customVideoChanURL,
-				Channel:    c,
-				Settings:   c.Settings,
-				MetarrArgs: c.MetarrArgs,
-				CookiePath: chanAccessDetails.CookiePath,
+				ChannelURLID: c.ID,
+				URL:          customVideoURL,
+				Settings:     c.ChanSettings,
+				MetarrArgs:   c.ChanMetarrArgs,
 			})
 		}
 	}
 
 	// Retrieve existing URL directory map.
-	urlDirMap, err := validation.ValidateMetarrOutputDirs(c.MetarrArgs.OutputDir, c.MetarrArgs.URLOutputDirs, c)
+	urlDirMap, err := validation.ValidateMetarrOutputDirs(c.ChanMetarrArgs.OutputDir, c.ChanMetarrArgs.URLOutputDirs, c)
 	if err != nil {
 		return err
 	}
 
 	// Fill output directory from map where applicable.
 	for range urlDirMap {
-		for _, v := range customVideoRequests {
-			if v.ChannelURL == "" {
-				continue
-			}
-			if _, exists := urlDirMap[v.ChannelURL]; exists {
-				v.MetarrArgs.OutputDir = urlDirMap[v.ChannelURL]
+		for _, cu := range c.URLModels {
+			for _, v := range customVideoRequests {
+				if cu.URL == "" {
+					continue
+				}
+				if _, exists := urlDirMap[cu.URL]; exists {
+					v.MetarrArgs.OutputDir = urlDirMap[cu.URL]
+				}
 			}
 		}
 	}
 
 	// Main process
-	nSucceeded, procErr := InitProcess(s, c, customVideoRequests, ctx)
+	var (
+		nSucceeded int
+		procError  error
+	)
+
+	for _, cu := range c.URLModels {
+		succeeded, procErr := InitProcess(s, cu, c, customVideoRequests, ctx)
+		nSucceeded = nSucceeded + succeeded
+		procError = errors.Join(procError, procErr)
+	}
 
 	// Last scan time update
 	if err := cs.UpdateLastScan(c.ID); err != nil {
@@ -314,16 +337,16 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 
 	// No videos succeeded
 	if nSucceeded == 0 {
-		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(customVideoRequests), procErr)
+		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(customVideoRequests), procError)
 	}
 
 	// Some succeeded, notify URLs
 	if err := notifyURLs(cs, c); err != nil {
-		return errors.Join(procErr, err)
+		return errors.Join(procError, err)
 	}
 
-	if procErr != nil {
-		return fmt.Errorf("encountered errors during processing: %w", procErr)
+	if procError != nil {
+		return fmt.Errorf("encountered errors during processing: %w", procError)
 	}
 
 	return nil

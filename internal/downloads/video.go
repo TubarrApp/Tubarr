@@ -56,12 +56,12 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
 
 	// Cookie path
-	if d.Video.CookiePath == "" {
+	if d.ChannelURL.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
 			args = append(args, cmdvideo.CookiesFromBrowser, d.Video.Settings.CookieSource)
 		}
 	} else {
-		args = append(args, cmdvideo.CookiePath, d.Video.CookiePath)
+		args = append(args, cmdvideo.CookiePath, d.ChannelURL.CookiePath)
 	}
 
 	// Cookie source
@@ -70,7 +70,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		logging.I("Using cookies from browser %q", browserCookieSource)
 		args = append(args, cmdvideo.CookiesFromBrowser, browserCookieSource)
 	} else {
-		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Video.Channel.Name, d.Video.URL)
+		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
 
 	// Max filesize specified
@@ -116,8 +116,8 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, cmdvideo.RandomizeRequests...)
 
 	// Merge output formats to extension if set
-	if d.Video.Channel.Settings.YtdlpOutputExt != "" {
-		args = append(args, cmdvideo.YtdlpOutputExtension, d.Video.Channel.Settings.YtdlpOutputExt)
+	if d.Video.Settings.YtdlpOutputExt != "" {
+		args = append(args, cmdvideo.YtdlpOutputExtension, d.Video.Settings.YtdlpOutputExt)
 	}
 
 	// Add target URL

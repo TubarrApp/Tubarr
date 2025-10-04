@@ -12,8 +12,8 @@ import (
 )
 
 // InitMetarr begins processing with Metarr
-func InitMetarr(v *models.Video, dirParser *parsing.Directory, ctx context.Context) error {
-	args := makeMetarrCommand(v, dirParser)
+func InitMetarr(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory, ctx context.Context) error {
+	args := makeMetarrCommand(v, cu, c, dirParser)
 	if len(args) == 0 {
 		logging.I("No Metarr arguments built, returning...")
 		return nil
