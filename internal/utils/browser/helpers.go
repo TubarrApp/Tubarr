@@ -22,69 +22,62 @@ func BaseDomain(rawURL string) (string, error) {
 }
 
 // GetChannelAccessDetails returns channel access details for a given video.
-func (b *Browser) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL, ctx context.Context) (cookies []*http.Cookie, generatedCookiePath string, err error) {
+func (b *Browser) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL, ctx context.Context) (cookies []*http.Cookie, cookieFilePath string, err error) {
 
-	// Retrieve authentication details for this specific video URL
-	username, password, loginURL, err := cs.GetAuth(c.ID, cu.URL)
-	if err != nil {
-		logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
+	// Fetch auth details if this is a manual entry or not from DB
+	if cu.IsManual || cu.ID == 0 {
+		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
+		if err != nil {
+			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
+		}
 	}
 
+	// Check if cookies are desired...
 	var (
 		authCookies, regCookies []*http.Cookie
-		chanAccessDetails       = &models.ChannelAccessDetails{}
+		doLogin                 = cu.Username != "" && cu.LoginURL != ""
 	)
 
-	doLogin := username != "" && loginURL != ""
+	// Early return if no cookies needed
+	if !doLogin && !c.ChanSettings.UseGlobalCookies {
+		return nil, "", nil
+	}
 
-	if doLogin || c.ChanSettings.UseGlobalCookies {
+	// Create cookie file path
+	cu.CookiePath = generateCookieFilePath(c.Name, cu.URL)
 
-		// Parse hostname for cookie search
+	if doLogin {
 		parsed, err := url.Parse(cu.URL)
 		if err != nil {
 			return nil, "", fmt.Errorf("failed to parse URL %q: %w", cu.URL, err)
 		}
-
 		hostname := parsed.Hostname()
 
-		// Create cookie file path
-		generatedCookiePath = generateCookieFilePath(c.Name, cu.URL)
-
-		chanAccessDetails = &models.ChannelAccessDetails{
-			ChannelURL: cu.URL,
-			Username:   username,
-			Password:   password,
-			LoginURL:   loginURL,
-			CookiePath: generatedCookiePath,
+		authCookies, err = channelAuth(hostname, cu.ToChannelAccessDetails(), ctx)
+		if ctx.Err() != nil {
+			return nil, "", ctx.Err()
 		}
-
-		// If authorization details exist, perform login and store cookies.
-		if doLogin {
-			authCookies, err = channelAuth(hostname, chanAccessDetails, ctx)
-			if ctx.Err() != nil {
-				return nil, "", ctx.Err()
-			}
-			if err != nil {
-				logging.E(0, "Failed to get auth cookies for %q: %v", cu.URL, err)
-			}
-		}
-
-		// Get cookies globally
-		if c.ChanSettings.UseGlobalCookies {
-			regCookies, err = b.cookies.GetCookies(cu.URL)
-			if err != nil {
-				logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookieSource, err)
-			}
-		}
-
-		// Combine cookies
-		cookies = mergeCookies(authCookies, regCookies)
-
-		// Save cookies to file
-		err = saveCookiesToFile(cookies, loginURL, generatedCookiePath)
 		if err != nil {
-			return nil, "", err
+			logging.E(0, "Failed to get auth cookies for %q: %v", cu.URL, err)
 		}
 	}
-	return cookies, generatedCookiePath, nil
+
+	// Get cookies globally
+	if c.ChanSettings.UseGlobalCookies {
+		regCookies, err = b.cookies.GetCookies(cu.URL)
+		if err != nil {
+			logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookieSource, err)
+		}
+	}
+
+	// Combine cookies
+	cookies = mergeCookies(authCookies, regCookies)
+
+	// Save cookies to file
+	err = saveCookiesToFile(cookies, cu.LoginURL, cu.CookiePath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return cookies, cu.CookiePath, nil
 }

@@ -46,6 +46,17 @@ type ChannelURL struct {
 	UpdatedAt  time.Time      `db:"updated_at"`
 }
 
+// ToChannelAccessDetails extracts authentication details from a ChannelURL
+func (cu *ChannelURL) ToChannelAccessDetails() *ChannelAccessDetails {
+	return &ChannelAccessDetails{
+		Username:   cu.Username,
+		Password:   cu.Password,
+		LoginURL:   cu.LoginURL,
+		ChannelURL: cu.URL,
+		CookiePath: cu.CookiePath,
+	}
+}
+
 // Video contains fields relating to a video, and a pointer to the channel it belongs to.
 //
 // Matches the order of the DB table, do not alter.
