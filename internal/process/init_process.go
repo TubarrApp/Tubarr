@@ -158,7 +158,7 @@ func videoJob(
 		if err != nil {
 			if botPauseChannel {
 				_, _ = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
-					s.Paused = true
+					s.BotBlocked = true
 					return nil
 				})
 			}

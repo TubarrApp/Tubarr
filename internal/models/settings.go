@@ -16,6 +16,7 @@ type ChannelSettings struct {
 	JSONDir                string      `json:"json_directory" mapstructure:"json-directory"`
 	MaxFilesize            string      `json:"max_filesize" mapstructure:"max-filesize"`
 	Paused                 bool        `json:"paused" mapstructure:"pause"`
+	BotBlocked             bool        `json:"bot_blocked"`
 	Retries                int         `json:"download_retries" mapstructure:"download-retries"`
 	ToDate                 string      `json:"to_date" mapstructure:"to-date"`
 	VideoDir               string      `json:"video_directory" mapstructure:"video-directory"`

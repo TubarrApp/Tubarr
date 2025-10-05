@@ -39,6 +39,7 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 	// Add subcommands with dependencies
 	channelCmd.AddCommand(addAuth(cs))
 	channelCmd.AddCommand(addChannelCmd(cs, s, ctx))
+	channelCmd.AddCommand(unblockChannelCmd(cs))
 	channelCmd.AddCommand(downloadVideoURLs(cs, s, ctx))
 	channelCmd.AddCommand(crawlChannelCmd(cs, s, ctx))
 	channelCmd.AddCommand(ignoreCrawl(cs, s, ctx))
@@ -495,7 +496,7 @@ func pauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	return pauseCmd
 }
 
-// unpauseChannelCmd pauses a channel from downloads in upcoming crawls.
+// unpauseChannelCmd unpauses a channel to allow for downloads in upcoming crawls.
 func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	var (
 		name string
@@ -523,11 +524,9 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Alter and save model settings
-			c.ChanSettings.Paused = false
-
+			// Send update
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
-				s.Paused = c.ChanSettings.Paused
+				s.Paused = false
 				return nil
 			})
 			if err != nil {
@@ -544,6 +543,55 @@ func unpauseChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 	cfgflags.SetPrimaryChannelFlags(unPauseCmd, &name, nil, &id)
 
 	return unPauseCmd
+}
+
+// unblockChannelCmd unblocks channels which were locked (usually due to bot activity detection).
+func unblockChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
+	var (
+		name string
+		id   int
+	)
+
+	unblockCmd := &cobra.Command{
+		Use:   "unblock",
+		Short: "Unblock a channel.",
+		Long:  "Unblocks a channel (usually blocked due to sites detecting Tubarr as a bot), allowing it to download new videos.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Get and check key/val pair
+			key, val, err := getChanKeyVal(id, name)
+			if err != nil {
+				return err
+			}
+
+			// Get channel model
+			c, hasRows, err := cs.FetchChannelModel(key, val)
+			if !hasRows {
+				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
+			}
+			if err != nil {
+				return err
+			}
+
+			// Send update
+			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
+				s.BotBlocked = false
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("failed to unblock channel: %w", err)
+			}
+
+			// Success
+			logging.S(0, "Unblocked channel %q", c.Name)
+			return nil
+		},
+	}
+
+	// Primary channel elements
+	cfgflags.SetPrimaryChannelFlags(unblockCmd, &name, nil, &id)
+
+	return unblockCmd
 }
 
 // addChannelCmd adds a new channel into the database.

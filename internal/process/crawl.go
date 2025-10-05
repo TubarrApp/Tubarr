@@ -86,6 +86,12 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 			continue
 		}
 
+		// Skip if locked due to a bot error
+		if c.ChanSettings.BotBlocked {
+			logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+			return nil
+		}
+
 		// Time for a scan?
 		timeSinceLastScan := time.Since(c.LastScan)
 		crawlFreqDuration := time.Duration(c.ChanSettings.CrawlFreq) * time.Minute
@@ -137,6 +143,14 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 // ChannelCrawl crawls a channel for new URLs.
 func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) (err error) {
 
+	// Check if site is blocked
+	if c.ChanSettings.BotBlocked {
+		logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+		return nil
+	}
+
+	// Proceed...
+	fmt.Println()
 	logging.I("%sINITIALIZING CRAWL:%s Channel %q:\n", consts.ColorGreen, consts.ColorReset, c.Name)
 
 	// Check validity
@@ -147,6 +161,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		return errors.New("output directories are blank")
 	}
 
+	// Get new releases for channel
 	videos, err := globalBrowserInstance.GetNewReleases(cs, c, ctx)
 	if err != nil {
 		return err
@@ -163,7 +178,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		return nil
 	}
 
-	// Main process
+	// Main process...
 	var (
 		nSucceeded     int
 		procError      error
@@ -232,6 +247,12 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 // Essentially it marks the URLs it finds as though they have already been downloaded.
 func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) error {
 
+	// Check if site is blocked
+	if c.ChanSettings.BotBlocked {
+		logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+		return nil
+	}
+
 	// Load in config file
 	cfgchannel.LoadFromConfig(s.ChannelStore(), c)
 
@@ -271,6 +292,14 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
 func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, videoURLs []string, ctx context.Context) error {
+
+	// Check if site is blocked
+	if c.ChanSettings.BotBlocked {
+		logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+		return nil
+	}
+
+	// Load config file settings
 	cfgchannel.LoadFromConfig(s.ChannelStore(), c)
 	existingVideoURLsMap, _, err := globalBrowserInstance.GetExistingReleases(cs, c)
 	if err != nil {
