@@ -82,7 +82,7 @@ func checkBotDetection(uri string, inputErr error) error {
 		}
 
 		avoidURLs.Store(siteHost.Hostname(), true)
-		return fmt.Errorf("url %q detected bot activity. Aborting without retries. Error message: %w", uri, inputErr)
+		return fmt.Errorf("url %q %s. Aborting without retries. Error message: %w", uri, consts.BotActivitySentinel, inputErr)
 	}
 	return nil
 }

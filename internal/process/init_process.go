@@ -54,7 +54,6 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 	var wg sync.WaitGroup
 
 	// Start workers
-	// Start workers
 	for w := range conc {
 		wg.Add(1)
 		go func(workerID int) {
@@ -63,9 +62,7 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 				// Check if context was cancelled (bot detected by another worker)
 				select {
 				case <-procCtx.Done():
-					logging.I("Worker %d: Skipping video %s - bot detection triggered", workerID, v.URL)
-					v.WasSkipped = true
-					results <- nil
+					results <- fmt.Errorf("skipped %q: %w", v.URL, procCtx.Err())
 					continue
 				default:
 				}
@@ -82,8 +79,8 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 					metarrExists)
 
 				// If bot was detected, cancel the context to stop other workers
-				if err != nil && strings.Contains(err.Error(), "bot") {
-					procCancel() // This stops all other workers
+				if err != nil && strings.Contains(err.Error(), consts.BotActivitySentinel) {
+					procCancel()
 				}
 
 				results <- err

@@ -31,5 +31,5 @@ const (
 
 // Sentinels
 const (
-	BotDetected = "bot detected"
+	BotActivitySentinel = "detected bot activity"
 )
