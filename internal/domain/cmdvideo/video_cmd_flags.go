@@ -11,8 +11,6 @@ const (
 	YtdlpOutputExtension = "--merge-output-format"
 	RestrictFilenames    = "--restrict-filenames"
 	Retries              = "--retries"
-	SleepRequests        = "--sleep-requests"
-	SleepRequestsNum     = "1"
 	MaxFilesize          = "--max-filesize"
 	Output               = "-o"
 	Print                = "--print"
@@ -29,5 +27,5 @@ const (
 )
 
 var (
-	RandomizeRequests = []string{"--sleep-interval", "5", "--max-sleep-interval", "20"}
+	RandomizeRequests = []string{"-t", "sleep"}
 )

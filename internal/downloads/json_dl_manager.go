@@ -12,7 +12,7 @@ import (
 )
 
 // NewJSONDownload creates a download operation with specified options.
-func NewJSONDownload(ctx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*JSONDownload, error) {
+func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*JSONDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -24,7 +24,7 @@ func NewJSONDownload(ctx context.Context, video *models.Video, channelURL *model
 		Channel:    channel,
 		ChannelURL: channelURL,
 		DLTracker:  tracker,
-		Context:    ctx,
+		Context:    procCtx,
 	}
 
 	if opts != nil {
@@ -37,14 +37,14 @@ func NewJSONDownload(ctx context.Context, video *models.Video, channelURL *model
 }
 
 // Execute performs the download with retries.
-func (d *JSONDownload) Execute() error {
+func (d *JSONDownload) Execute() (botPauseChannel bool, err error) {
 	if d.Video == nil {
-		return errors.New("video model is nil")
+		return false, errors.New("video model is nil")
 	}
 
 	if _, exists := ongoingDownloads.LoadOrStore(d.Video.URL, struct{}{}); exists {
 		logging.I("Skipping duplicate download for: %s", d.Video.URL)
-		return nil
+		return false, nil
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
@@ -55,29 +55,41 @@ func (d *JSONDownload) Execute() error {
 
 		select {
 		case <-d.Context.Done():
-			return d.cancelJSONDownload()
+			return false, d.cancelJSONDownload()
 		default:
 			if err := d.jsonDLAttempt(); err != nil {
+				// Check bot detection IMMEDIATELY after each attempt
+				if botErr := checkBotDetection(d.Video.URL, err); botErr != nil {
+					return true, botErr // Abort immediately, no retries
+				}
+
+				// Check if URL should be avoided (set by previous videos)
+				if avoidErr := checkIfAvoidURL(d.Video.URL); avoidErr != nil {
+					return false, avoidErr
+				}
+
+				// Other errors - continue with retry logic
 				lastErr = err
 				logging.E(0, "Download attempt %d failed: %v", attempt, err)
 
 				if attempt < d.Options.MaxRetries {
 					select {
 					case <-d.Context.Done():
-						return d.cancelJSONDownload()
+						return false, d.cancelJSONDownload()
 					case <-time.After(d.Options.RetryInterval):
 						continue
 					}
 				}
 			} else {
+				// Success
 				logging.S(0, "Successfully completed JSON download for URL: %s", d.Video.URL)
 				d.Video.UpdatedAt = time.Now()
-				return nil
+				return false, nil
 			}
 		}
 	}
-	return fmt.Errorf("all %d JSON download attempts failed for %s: %w",
-		d.Options.MaxRetries, d.Video.URL, lastErr)
+
+	return false, fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
 // executeAttempt performs a single download attempt.

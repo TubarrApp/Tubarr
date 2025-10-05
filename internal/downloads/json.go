@@ -11,6 +11,7 @@ import (
 	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/cmdjson"
 	"tubarr/internal/domain/cmdvideo"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"
 )
@@ -19,11 +20,13 @@ import (
 func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args := make([]string, 0, 32)
 
+	// Download JSON to directory
 	args = append(args,
 		cmdjson.SkipVideo,
 		cmdjson.WriteInfoJSON,
 		cmdjson.P, d.Video.ParsedJSONDir)
 
+	// Append cookies
 	if d.ChannelURL.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
 			args = append(args, cmdjson.CookiesFromBrowser, d.Video.Settings.CookieSource)
@@ -31,28 +34,6 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	} else {
 		args = append(args, cmdjson.CookiePath, d.ChannelURL.CookiePath)
 	}
-
-	if d.Video.Settings.MaxFilesize != "" {
-		args = append(args, cmdjson.MaxFilesize, d.Video.Settings.MaxFilesize)
-	}
-
-	if d.Video.Settings.ExternalDownloader != "" {
-		args = append(args, cmdjson.ExternalDLer, d.Video.Settings.ExternalDownloader)
-
-		if d.Video.Settings.ExternalDownloaderArgs != "" {
-			args = append(args, cmdjson.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
-		}
-	}
-
-	if d.Video.Settings.Retries != 0 {
-		args = append(args, cmdjson.Retries, strconv.Itoa(d.Video.Settings.Retries))
-	}
-
-	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
-	args = append(args, cmdvideo.RandomizeRequests...)
-
-	args = append(args, cmdjson.RestrictFilenames, cmdjson.Output, cmdjson.FilenameSyntax,
-		d.Video.URL)
 
 	if cfg.IsSet(keys.CookieSource) {
 		browserCookieSource := cfg.GetString(keys.CookieSource)
@@ -62,6 +43,52 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 
+	// Max video filesize
+	if d.Video.Settings.MaxFilesize != "" {
+		args = append(args, cmdjson.MaxFilesize, d.Video.Settings.MaxFilesize)
+	}
+
+	// External downloaders & arguments
+	if d.Video.Settings.ExternalDownloader != "" {
+		args = append(args, cmdvideo.ExternalDLer, d.Video.Settings.ExternalDownloader)
+		if d.Video.Settings.ExternalDownloaderArgs != "" {
+
+			switch d.Video.Settings.ExternalDownloader {
+			case consts.DownloaderAria:
+
+				ariaCmd := consts.DownloaderAria + ":" +
+					d.Video.Settings.ExternalDownloaderArgs +
+					" " +
+					cmdvideo.AriaLog +
+					" " +
+					cmdvideo.AriaNoRPC +
+					" " +
+					cmdvideo.AriaNoColor +
+					" " +
+					cmdvideo.AriaShowConsole +
+					" " +
+					cmdvideo.AriaInterval
+
+				args = append(args, cmdvideo.ExternalDLArgs, ariaCmd)
+			default:
+				args = append(args, cmdvideo.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
+			}
+		}
+	}
+
+	// Retries
+	if d.Video.Settings.Retries != 0 {
+		args = append(args, cmdjson.Retries, strconv.Itoa(d.Video.Settings.Retries))
+	}
+
+	// Yt-dlp randomization preset for safety:
+	args = append(args, cmdvideo.RandomizeRequests...)
+
+	// Output file format and syntax [ MUST GO LAST ! ]
+	args = append(args, cmdjson.RestrictFilenames, cmdjson.Output, cmdjson.FilenameSyntax,
+		d.Video.URL)
+
+	// Build commant with context
 	cmd := exec.CommandContext(d.Context, cmdjson.YTDLP, args...)
 	logging.D(1, "Built metadata download command for URL %q:\n%v", d.Video.URL, cmd.String())
 

@@ -12,14 +12,14 @@ import (
 )
 
 // InitMetarr begins processing with Metarr
-func InitMetarr(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory, ctx context.Context) error {
+func InitMetarr(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory, procCtx context.Context) error {
 	args := makeMetarrCommand(v, cu, c, dirParser)
 	if len(args) == 0 {
 		logging.I("No Metarr arguments built, returning...")
 		return nil
 	}
 
-	cmd := exec.CommandContext(ctx, "metarr", args...)
+	cmd := exec.CommandContext(procCtx, "metarr", args...)
 
 	if err := runMetarr(cmd); err != nil {
 		return err

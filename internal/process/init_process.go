@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/downloads"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/metarr"
@@ -25,6 +28,10 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 	conc := max(c.ChanSettings.Concurrency, 1)
 
 	logging.I("Starting meta/video processing for %d videos", len(videos))
+
+	// Bot detection context
+	procCtx, procCancel := context.WithCancel(ctx)
+	defer procCancel()
 
 	dlTracker := downloads.NewDownloadTracker(s.DownloadStore(), c.ChanSettings.ExternalDownloader)
 	dlTracker.Start(ctx)
@@ -47,20 +54,38 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 	var wg sync.WaitGroup
 
 	// Start workers
+	// Start workers
 	for w := range conc {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
 			for v := range jobs {
+				// Check if context was cancelled (bot detected by another worker)
+				select {
+				case <-procCtx.Done():
+					logging.I("Worker %d: Skipping video %s - bot detection triggered", workerID, v.URL)
+					v.WasSkipped = true
+					results <- nil
+					continue
+				default:
+				}
+
 				err := videoJob(
-					ctx,
+					procCtx,
 					v,
 					cu,
 					c,
+					s.ChannelStore(),
 					s.VideoStore(),
 					dirParser,
 					dlTracker,
 					metarrExists)
+
+				// If bot was detected, cancel the context to stop other workers
+				if err != nil && strings.Contains(err.Error(), "bot") {
+					procCancel() // This stops all other workers
+				}
+
 				results <- err
 			}
 		}(w + 1)
@@ -120,19 +145,27 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 
 // videoJob starts a worker's process for a video.
 func videoJob(
-	ctx context.Context,
+	procCtx context.Context,
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
+	cs interfaces.ChannelStore,
 	vs interfaces.VideoStore,
 	dirParser *parsing.Directory,
 	dlTracker *downloads.DownloadTracker,
 	metarrExists bool,
 ) error {
+
 	if v.JSONCustomFile == "" {
-		proceed, err := processJSON(ctx, v, cu, c, vs, dirParser, dlTracker)
+		proceed, botPauseChannel, err := processJSON(procCtx, v, cu, c, vs, dirParser, dlTracker)
 		if err != nil {
-			return fmt.Errorf("json processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
+			if botPauseChannel {
+				_, _ = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+					s.Paused = true
+					return nil
+				})
+			}
+			return fmt.Errorf("json processing error for video URL %q): %w", v.URL, err)
 		}
 		if !proceed {
 			logging.I("Skipping further processing for ignored video: %s", v.URL)
@@ -144,7 +177,17 @@ func videoJob(
 		}
 	}
 
-	if err := processVideo(ctx, v, cu, c, dlTracker); err != nil {
+	botPauseChannel, err := processVideo(procCtx, v, cu, c, dlTracker)
+	if err != nil {
+		if botPauseChannel {
+			_, pauseErr := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+				s.Paused = true
+				return nil
+			})
+			if pauseErr != nil {
+				logging.E(0, "Failed to pause channel %q despite bot activity detection", c.Name)
+			}
+		}
 		return fmt.Errorf("video processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 	}
 
@@ -154,7 +197,7 @@ func videoJob(
 	}
 
 	// Run metarr step
-	if err := metarr.InitMetarr(v, cu, c, dirParser, ctx); err != nil {
+	if err := metarr.InitMetarr(v, cu, c, dirParser, procCtx); err != nil {
 		return fmt.Errorf("metarr processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 	}
 

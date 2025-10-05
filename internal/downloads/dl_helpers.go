@@ -3,9 +3,12 @@ package downloads
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/utils/logging"
 )
 
 // verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
@@ -65,4 +68,40 @@ func (d *VideoDownload) cancelVideoDownload() error {
 // cancelJSONDownload cancels the download, typically due to user input.
 func (d *JSONDownload) cancelJSONDownload() error {
 	return fmt.Errorf("user canceled JSON download for %s: %w", d.Video.URL, d.Context.Err())
+}
+
+// checkBotDetection checks and handles detection of bot activity.
+func checkBotDetection(uri string, inputErr error) error {
+	if strings.Contains(strings.ToLower(inputErr.Error()), "confirm you’re not a bot") || // Curly apostrophe
+		strings.Contains(strings.ToLower(inputErr.Error()), "confirm you're not a bot") || // Straight apostrophe
+		strings.Contains(strings.ToLower(inputErr.Error()), "not a robot") {
+
+		siteHost, err := url.Parse(uri) // Avoid using the 'ChannelURL' URL, which can be the manual download value
+		if err != nil {
+			logging.E(0, "Failed to parse URL %q after bot detection", uri)
+		}
+
+		avoidURLs.Store(siteHost.Hostname(), true)
+		return fmt.Errorf("url %q detected bot activity. Aborting without retries. Error message: %w", uri, inputErr)
+	}
+	return nil
+}
+
+// checkIfAvoidURL checks if the hostname of the URL should be skipped.
+func checkIfAvoidURL(uri string) error {
+	var siteHost string
+
+	parsedURL, err := url.Parse(uri)
+	if err != nil {
+		logging.E(0, "Could not parse URL %q, will check against full URL instead")
+		siteHost = uri
+	} else {
+		siteHost = parsedURL.Hostname()
+	}
+
+	if _, exists := avoidURLs.Load(siteHost); exists {
+		return fmt.Errorf("skipping download for %q due to site %q detecting bot activity", uri, siteHost)
+	}
+
+	return nil
 }

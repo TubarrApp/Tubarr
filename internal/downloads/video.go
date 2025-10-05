@@ -39,6 +39,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Restrict filenames
 	args = append(args, cmdvideo.RestrictFilenames)
 
+	// Uses JSON file (e.g. 'filename.json') to set 'filename.%(ext)s'
 	var outputSyntax string
 	if d.Video.JSONCustomFile != "" {
 		JSONFileName := filepath.Base(d.Video.JSONCustomFile)
@@ -111,16 +112,15 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		args = append(args, cmdvideo.Retries, strconv.Itoa(d.Video.Settings.Retries))
 	}
 
-	// Randomize requests (avoid detection as bot)
-	args = append(args, cmdvideo.SleepRequests, cmdvideo.SleepRequestsNum)
-	args = append(args, cmdvideo.RandomizeRequests...)
-
 	// Merge output formats to extension if set
 	if d.Video.Settings.YtdlpOutputExt != "" {
 		args = append(args, cmdvideo.YtdlpOutputExtension, d.Video.Settings.YtdlpOutputExt)
 	}
 
-	// Add target URL
+	// Randomize requests (avoid detection as bot)
+	args = append(args, cmdvideo.RandomizeRequests...)
+
+	// Add target URL [ MUST GO LAST !! ]
 	if d.Video.DirectVideoURL != "" {
 		args = append(args, d.Video.DirectVideoURL)
 	} else {

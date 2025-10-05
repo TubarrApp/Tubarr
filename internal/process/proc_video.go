@@ -10,26 +10,29 @@ import (
 )
 
 // processVideo processes video downloads.
-func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) error {
+func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) (botPauseChannel bool, err error) {
 	if v == nil {
 		logging.I("Null video entered")
-		return nil
+		return false, nil
 	}
 
 	logging.I("Processing video download for URL: %s", v.URL)
 
-	dl, err := downloads.NewVideoDownload(ctx, v, cu, c, dlTracker, &downloads.Options{
+	dl, err := downloads.NewVideoDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	if err := dl.Execute(); err != nil {
-		return err
+	if botPauseChannel, err := dl.Execute(); err != nil {
+		if botPauseChannel {
+			return true, err // Only 'TRUE' bot pause channel path
+		}
+		return false, err
 	}
 
 	logging.D(1, "Successfully processed and marked as downloaded: %s", v.URL)
-	return nil
+	return false, nil
 }

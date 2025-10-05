@@ -14,25 +14,31 @@ import (
 )
 
 // processJSON downloads and processes JSON for a video.
-func processJSON(ctx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, vs interfaces.VideoStore, dirParser *parsing.Directory, dlTracker *downloads.DownloadTracker) (proceed bool, err error) {
+func processJSON(procCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, vs interfaces.VideoStore, dirParser *parsing.Directory, dlTracker *downloads.DownloadTracker) (proceed, botPauseChannel bool, err error) {
 	if v == nil {
 		logging.I("Null video entered")
-		return false, nil
+		return false, false, nil
 	}
 	logging.D(2, "Processing JSON download for URL: %s", v.URL)
 
-	dl, err := downloads.NewJSONDownload(ctx, v, cu, c, dlTracker, &downloads.Options{
+	dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
 	})
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
-	if err := dl.Execute(); err != nil {
-		return false, err
+	if botPauseChannel, err := dl.Execute(); err != nil {
+		if botPauseChannel {
+			return false, true, err // Only 'TRUE' bot detected path
+		}
+		return false, false, err
 	}
 
+	// Pause channel if bot is detected (avoid hammering DB)
+
+	// Proceed
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
 		logging.E(0, "JSON parsing/storage failed for %q: %v", v.URL, err)
@@ -51,17 +57,17 @@ func processJSON(ctx context.Context, v *models.Video, cu *models.ChannelURL, c 
 		v.WasSkipped = true
 
 		if v.ID, err = vs.AddVideo(v, c); err != nil {
-			return false, fmt.Errorf("failed to update ignored video in DB: %w", err)
+			return false, false, fmt.Errorf("failed to update ignored video in DB: %w", err)
 		}
-		return false, nil
+		return false, false, nil
 	}
 
 	v.MoveOpOutputDir, v.MoveOpChannelURL = checkMoveOps(v, dirParser)
 
 	if v.ID, err = vs.AddVideo(v, c); err != nil {
-		return false, fmt.Errorf("failed to update video DB entry: %w", err)
+		return false, false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 
 	logging.S(0, "Processed metadata for: %s", v.URL)
-	return true, nil
+	return true, false, nil
 }

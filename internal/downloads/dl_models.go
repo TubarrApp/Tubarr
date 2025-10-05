@@ -10,6 +10,7 @@ import (
 )
 
 var ongoingDownloads sync.Map
+var avoidURLs sync.Map // Avoid attempting downloads for these URLs (e.g. when bot activity detection triggers)
 
 // DownloadType represents the type of download operation.
 type DownloadType string

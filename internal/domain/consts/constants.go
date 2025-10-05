@@ -28,3 +28,8 @@ const (
 	FilterContains = "contains"
 	FilterOmits    = "omits"
 )
+
+// Sentinels
+const (
+	BotDetected = "bot detected"
+)

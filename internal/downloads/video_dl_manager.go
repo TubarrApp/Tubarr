@@ -13,7 +13,7 @@ import (
 )
 
 // NewVideoDownload creates a download operation with specified options.
-func NewVideoDownload(ctx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*VideoDownload, error) {
+func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*VideoDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -23,7 +23,7 @@ func NewVideoDownload(ctx context.Context, video *models.Video, channelURL *mode
 		ChannelURL: channelURL,
 		Channel:    channel,
 		DLTracker:  tracker,
-		Context:    ctx,
+		Context:    procCtx,
 	}
 
 	if opts != nil {
@@ -36,31 +36,47 @@ func NewVideoDownload(ctx context.Context, video *models.Video, channelURL *mode
 }
 
 // Execute performs the download with retries.
-func (d *VideoDownload) Execute() error {
+func (d *VideoDownload) Execute() (botPauseChannel bool, err error) {
 	if d.Video == nil {
-		return errors.New("video model is nil")
+		return false, errors.New("video model is nil")
 	}
 
 	if _, exists := ongoingDownloads.LoadOrStore(d.Video.URL, struct{}{}); exists {
 		logging.I("Skipping duplicate download for: %s", d.Video.URL)
-		return nil
+		return false, nil
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
 	var lastErr error
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
+		// Check if URL should be avoided (set by previous videos)
+		if err := checkIfAvoidURL(d.Video.URL); err != nil {
+			return false, err
+		}
+
+		// Continue to attempt download
 		logging.I("Starting video download attempt %d/%d for URL: %s",
 			attempt, d.Options.MaxRetries, d.Video.URL)
 
 		select {
 		case <-d.Context.Done():
 			logging.I("Context is done for video with URL %q", d.Video.URL)
-			return d.cancelVideoDownload()
+			return false, d.cancelVideoDownload()
 		default:
 			if err := d.videoDLAttempt(); err != nil {
+				// Check bot detection FIRST - abort immediately if detected
+				if botErr := checkBotDetection(d.Video.URL, err); botErr != nil {
+					return true, botErr // Only 'TRUE' path for bot detected
+				}
+
+				// Check if URL should be avoided (in case bot was just detected)
+				if avoidErr := checkIfAvoidURL(d.Video.URL); avoidErr != nil {
+					return false, avoidErr
+				}
+
+				// Other errors - continue retry logic
 				lastErr = err
 				logging.E(0, "Download attempt %d failed: %v", attempt, err)
-
 				d.Video.DownloadStatus.Status = consts.DLStatusFailed
 				d.Video.DownloadStatus.Error = err
 				d.DLTracker.sendUpdate(d.Video)
@@ -68,25 +84,22 @@ func (d *VideoDownload) Execute() error {
 				if attempt < d.Options.MaxRetries {
 					select {
 					case <-d.Context.Done():
-						return d.cancelVideoDownload()
+						return false, d.cancelVideoDownload()
 					case <-time.After(d.Options.RetryInterval):
 						continue
 					}
 				}
 			} else {
 				logging.S(0, "Successfully completed video download for URL: %s", d.Video.URL)
-
 				d.Video.UpdatedAt = time.Now()
 				d.Video.DownloadStatus.Status = consts.DLStatusCompleted
 				d.Video.DownloadStatus.Pct = 100.0
-
 				d.DLTracker.sendUpdate(d.Video)
-				return nil
+				return false, nil
 			}
 		}
 	}
-	return fmt.Errorf("all %d download attempts failed for %s: %w",
-		d.Options.MaxRetries, d.Video.URL, lastErr)
+	return false, fmt.Errorf("all %d download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
 // executeAttempt performs a single download attempt.
