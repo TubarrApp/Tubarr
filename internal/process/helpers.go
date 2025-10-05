@@ -581,7 +581,7 @@ func checkCustomScraperNeeds(v *models.Video) error {
 			logging.I("Using regular censored.tv scraper...")
 		} else {
 			logging.I("Detected a censored.tv link. Using specialized scraper.")
-			err := browserInstance.ScrapeCensoredTVMetadata(v.URL, v.ParsedJSONDir, v)
+			err := globalBrowserInstance.ScrapeCensoredTVMetadata(v.URL, v.ParsedJSONDir, v)
 			if err != nil {
 				return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
 			}
@@ -611,4 +611,37 @@ func parseVideoJSONDirs(v *models.Video, dirParser *parsing.Directory) (jsonDir,
 	}
 
 	return jsonDir, videoDir
+}
+
+// ensureManualDownloadsChannelURL ensures a special "manual-downloads" ChannelURL exists for the channel.
+func ensureManualDownloadsChannelURL(cs interfaces.ChannelStore, channelID int64) (*models.ChannelURL, error) {
+	const manualDownloadsURL = "manual-downloads"
+
+	// Check if it already exists
+	channelURLs, err := cs.FetchChannelURLModels(channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cu := range channelURLs {
+		if cu.IsManual {
+			return cu, nil
+		}
+	}
+
+	manualChanURL := &models.ChannelURL{
+		URL: manualDownloadsURL,
+	}
+
+	// Create it if it doesn't exist
+	id, err := cs.AddChannelURL(channelID, manualChanURL, true) // true for is_manual
+	if err != nil {
+		return nil, fmt.Errorf("failed to create manual downloads channel URL: %w", err)
+	}
+
+	return &models.ChannelURL{
+		ID:       id,
+		URL:      manualDownloadsURL,
+		IsManual: true,
+	}, nil
 }

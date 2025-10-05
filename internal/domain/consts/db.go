@@ -42,6 +42,7 @@ const (
 	QChanURLsUsername  = "username"
 	QChanURLsPassword  = "password"
 	QChanURLsLoginURL  = "login_url"
+	QChanURLsIsManual  = "is_manual"
 	QChanURLsLastScan  = "last_scan"
 	QChanURLsCreatedAt = "created_at"
 	QChanURLsUpdatedAt = "updated_at"

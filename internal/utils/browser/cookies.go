@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
@@ -108,21 +107,21 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 }
 
 // saveCookiesToFile saves the cookies to a file in Netscape format.
-func saveCookiesToFile(cookies []*http.Cookie, access *models.ChannelAccessDetails) error {
+func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) error {
 	// Return early if no cookies exist
 	if len(cookies) == 0 {
-		access.CookiePath = ""
-		logging.I("%d cookies to write to file %q, won't use '--cookies' in commands", len(cookies), access.CookiePath)
+		cookieFilePath = ""
+		logging.I("%d cookies to write to file %q, won't use '--cookies' in commands", len(cookies), cookieFilePath)
 		return nil
 	}
 
-	file, err := os.Create(access.CookiePath)
+	file, err := os.Create(cookieFilePath)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E(0, "failed to close file %q due to error: %v", access.CookiePath, err)
+			logging.E(0, "failed to close file %q due to error: %v", cookieFilePath, err)
 		}
 	}()
 
@@ -133,12 +132,12 @@ func saveCookiesToFile(cookies []*http.Cookie, access *models.ChannelAccessDetai
 	}
 
 	// Log the cookies for debugging
-	logging.D(1, "Saving %d cookies to file %s...", len(cookies), access.CookiePath)
+	logging.D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
 
 	for _, cookie := range cookies {
 		domain := cookie.Domain
 		if domain == "" {
-			domain = access.LoginURL
+			domain = loginURL
 		}
 
 		if !strings.HasPrefix(domain, ".") && strings.Count(domain, ".") > 1 {

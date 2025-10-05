@@ -18,14 +18,28 @@ import (
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
 func channelAuth(channelHostname string, a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie, error) {
-	if customAuthCookies[channelHostname] == nil { // If the user is not already authenticated
-		cookies, err := login(a, ctx)
-		if err != nil {
-			return nil, err
-		}
-		customAuthCookies[channelHostname] = cookies
+	// First check exact hostname
+	if globalChannelAuthCookies[channelHostname] != nil {
+		return globalChannelAuthCookies[channelHostname], nil
 	}
-	return customAuthCookies[channelHostname], nil
+
+	// Then check base domain as fallback
+	baseDomain, err := BaseDomain(channelHostname)
+	if err == nil && baseDomain != channelHostname {
+		if globalChannelAuthCookies[baseDomain] != nil {
+			return globalChannelAuthCookies[baseDomain], nil
+		}
+	}
+
+	// If neither exists, login and store under exact hostname
+	cookies, err := login(a, ctx)
+	if err != nil {
+		return nil, err
+	}
+	globalChannelAuthCookies[channelHostname] = cookies
+
+	// Return cookies
+	return cookies, nil
 }
 
 // login logs the user in and returns the authentication cookie.

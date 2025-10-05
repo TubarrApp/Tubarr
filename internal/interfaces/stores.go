@@ -19,6 +19,7 @@ type Store interface {
 type ChannelStore interface {
 	AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error
 	AddChannel(c *models.Channel) (int64, error)
+	AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error)
 	AddNotifyURLs(channelID int64, notifications []*models.Notification) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
 	CrawlChannel(key, val string, c *models.Channel, s Store, ctx context.Context) error
@@ -29,6 +30,7 @@ type ChannelStore interface {
 	DownloadVideoURLs(key, val string, c *models.Channel, s Store, videoURLs []string, ctx context.Context) error
 	FetchAllChannels() (channels []*models.Channel, err error, hasRows bool)
 	FetchChannelModel(key, val string) (*models.Channel, bool, error)
+	FetchChannelURLModels(channelID int64) ([]*models.ChannelURL, error)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetDB() *sql.DB
 	GetChannelID(key, val string) (int64, error)

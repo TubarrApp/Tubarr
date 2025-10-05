@@ -35,14 +35,15 @@ type ChannelURL struct {
 	ID         int64  `db:"id"`
 	URL        string `db:"url"`
 	Videos     []*Video
-	Username   string `db:"username"`
-	Password   string `db:"password"`
-	LoginURL   string `db:"login_url"`
-	CookiePath string
-	Cookies    []*http.Cookie
-	LastScan   time.Time `db:"last_scan"`
-	CreatedAt  time.Time `db:"created_at"`
-	UpdatedAt  time.Time `db:"updated_at"`
+	Username   string         `db:"username"`
+	Password   string         `db:"password"`
+	LoginURL   string         `db:"login_url"`
+	CookiePath string         `db:"-" json:"-"`
+	Cookies    []*http.Cookie `db:"-" json:"-"`
+	IsManual   bool           `db:"is_manual"`
+	LastScan   time.Time      `db:"last_scan"`
+	CreatedAt  time.Time      `db:"created_at"`
+	UpdatedAt  time.Time      `db:"updated_at"`
 }
 
 // Video contains fields relating to a video, and a pointer to the channel it belongs to.

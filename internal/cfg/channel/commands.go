@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
+	"tubarr/internal/utils"
 	"tubarr/internal/utils/files"
 	"tubarr/internal/utils/logging"
 
@@ -696,25 +697,32 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 			var chanURLs []*models.ChannelURL
 			for _, u := range urls {
 				if u != "" {
+
+					logging.I("GETTING AUTH DETAILS FROM MAP. USERNAME: %q LOGINURL %q", authMap[u].Username, authMap[u].LoginURL)
 					// Fill auth details if existent
-					var username, password, loginURL string
+					var parsedUsername, parsedPassword, parsedLoginURL string
 					if _, exists := authMap[u]; exists {
-						username = authMap[u].Username
-						password = authMap[u].Password
-						loginURL = authMap[u].LoginURL
+						parsedUsername = authMap[u].Username
+						parsedPassword = authMap[u].Password
+						parsedLoginURL = authMap[u].LoginURL
 					}
-					// Create ChannelURL model
+
+					// Create channel model
 					newChanURL := &models.ChannelURL{
 						URL:       u,
-						Username:  username,
-						Password:  password,
-						LoginURL:  loginURL,
+						Username:  parsedUsername,
+						Password:  parsedPassword,
+						LoginURL:  parsedLoginURL,
 						LastScan:  now,
 						CreatedAt: now,
 						UpdatedAt: now,
 					}
 					chanURLs = append(chanURLs, newChanURL)
 				}
+			}
+
+			for _, cu := range chanURLs {
+				logging.I("GOT MODEL WITH USERNAME: %q LOGIN URL %q", cu.Username, cu.LoginURL)
 			}
 
 			// Initialize channel
@@ -1328,6 +1336,28 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	}
 	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Notification URLs: %v\n", nURLs)
+
+	fmt.Printf("\n%sAuthentication:%s\n", consts.ColorCyan, consts.ColorReset)
+
+	// Auth details
+	gotAuthModels := false
+	for _, cu := range c.URLModels {
+		if cu.Username != "" || cu.LoginURL != "" || cu.Password != "" {
+			fmt.Printf("\nChannel URL: %s, Username: %s, Password: %s, Login URL: %s",
+				cu.URL,
+				cu.Username,
+				utils.StarPassword(cu.Password),
+				cu.LoginURL)
+
+			if !gotAuthModels {
+				gotAuthModels = true
+			}
+		}
+	}
+	if !gotAuthModels {
+		fmt.Printf("[]\n")
+	}
+
 }
 
 // LoadFromConfig loads in config file data.

@@ -23,10 +23,10 @@ import (
 )
 
 var (
-	regClient       *http.Client
-	lanClient       *http.Client
-	initClientsOnce sync.Once
-	browserInstance *browser.Browser
+	regClient             *http.Client
+	lanClient             *http.Client
+	initClientsOnce       sync.Once
+	globalBrowserInstance *browser.Browser
 )
 
 const (
@@ -34,7 +34,7 @@ const (
 )
 
 func init() {
-	browserInstance = browser.NewBrowser()
+	globalBrowserInstance = browser.NewBrowser()
 }
 
 // initClients initializes HTTP clients for web activities.
@@ -147,7 +147,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		return errors.New("output directories are blank")
 	}
 
-	videos, err := browserInstance.GetNewReleases(cs, c, ctx)
+	videos, err := globalBrowserInstance.GetNewReleases(cs, c, ctx)
 	if err != nil {
 		return err
 	}
@@ -172,6 +172,10 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	// Process channel URLs
 	for _, cu := range c.URLModels {
+		// Skip manual channel entry
+		if cu.IsManual {
+			continue
+		}
 
 		// Get requests for this channel
 		var vRequests []*models.Video
@@ -232,7 +236,7 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 	cfgchannel.LoadFromConfig(s.ChannelStore(), c)
 
 	// Get new releases
-	videos, err := browserInstance.GetNewReleases(s.ChannelStore(), c, ctx)
+	videos, err := globalBrowserInstance.GetNewReleases(s.ChannelStore(), c, ctx)
 	if err != nil {
 		return err
 	}
@@ -267,80 +271,98 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
 func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, videoURLs []string, ctx context.Context) error {
-
-	// Load in config file
 	cfgchannel.LoadFromConfig(s.ChannelStore(), c)
-
-	// Load already downloaded URLs
-	existingVideoURLsMap, _, err := browserInstance.GetExistingReleases(cs, c)
+	existingVideoURLsMap, _, err := globalBrowserInstance.GetExistingReleases(cs, c)
 	if err != nil {
 		return err
 	}
 
-	customVideoRequests := []*models.Video{}
+	// Populate AccessDetails for all ChannelURLs upfront
+	for _, cu := range c.URLModels {
+		cu.Cookies, cu.CookiePath, err = globalBrowserInstance.GetChannelCookies(cs, c, cu, ctx)
+		if err != nil {
+			return err
+		}
+	}
 
-	for _, channelURL := range c.URLModels {
-		for _, videoURL := range videoURLs {
+	// Build a map of channel URL -> ChannelURL model for quick lookup
+	channelURLMap := make(map[string]*models.ChannelURL)
+	for _, cu := range c.URLModels {
+		channelURLMap[cu.URL] = cu
+	}
 
-			var (
-				customVideoChanURL string
-				customVideoURL     = videoURL
-			)
+	var customVideoRequests []*models.Video
+	// Track which ChannelURL model each video uses (by ChannelURLID)
+	channelURLModels := make(map[int64]*models.ChannelURL)
 
-			if strings.Contains(videoURL, "|") {
-				split := strings.Split(videoURL, "|")
-				customVideoChanURL = split[0]
-				customVideoURL = split[1]
+	for _, videoURL := range videoURLs {
+		var (
+			targetChannelURLModel *models.ChannelURL
+			actualVideoURL        string
+		)
 
-				channelURL.URL = customVideoChanURL
-			} else {
-				channelURL.URL = videoURL
+		// Parse pipe-delimited format: "channelURL|videoURL"
+		if strings.Contains(videoURL, "|") {
+			parts := strings.Split(videoURL, "|")
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid video URL format %q, expected 'channelURL|videoURL'", videoURL)
 			}
+			channelURLStr := parts[0]
+			actualVideoURL = parts[1]
 
-			if _, exists := existingVideoURLsMap[customVideoURL]; exists {
-				return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-video-urls' first if you wish to re-download it", customVideoURL)
+			// Find the matching ChannelURL
+			var found bool
+			targetChannelURLModel, found = channelURLMap[channelURLStr]
+			if !found {
+				return fmt.Errorf("channel URL %q not found in channel's URL models", channelURLStr)
 			}
-
-			chanAccessDetails, err := browserInstance.GetChannelAccessDetails(cs, c, channelURL.URL, ctx)
+		} else {
+			// No channel URL entered - use special manual downloads entry
+			targetChannelURLModel, err = ensureManualDownloadsChannelURL(cs, c.ID)
 			if err != nil {
 				return err
 			}
 
-			if chanAccessDetails != nil {
-				channelURL.CookiePath = chanAccessDetails.CookiePath
-				channelURL.Cookies = chanAccessDetails.Cookies
-				channelURL.Username = chanAccessDetails.Username
-				channelURL.Password = chanAccessDetails.Password
-				channelURL.LoginURL = chanAccessDetails.LoginURL
+			// Get access details for manual downloads
+			targetChannelURLModel.Cookies, targetChannelURLModel.CookiePath, err = globalBrowserInstance.GetChannelCookies(cs, c, targetChannelURLModel, ctx)
+			if err != nil {
+				return err
 			}
 
-			customVideoRequests = append(customVideoRequests, &models.Video{
-				ChannelID:  c.ID,
-				URL:        customVideoURL,
-				Settings:   c.ChanSettings,
-				MetarrArgs: c.ChanMetarrArgs,
-			})
+			actualVideoURL = videoURL
 		}
+
+		// Check if already downloaded
+		if _, exists := existingVideoURLsMap[actualVideoURL]; exists {
+			return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-video-urls' first if you wish to re-download it", actualVideoURL)
+		}
+
+		// Store the model for later use
+		channelURLModels[targetChannelURLModel.ID] = targetChannelURLModel
+
+		customVideoRequests = append(customVideoRequests, &models.Video{
+			ChannelID:    c.ID,
+			ChannelURLID: targetChannelURLModel.ID,
+			ChannelURL:   targetChannelURLModel.URL,
+			URL:          actualVideoURL,
+			Settings:     c.ChanSettings,
+			MetarrArgs:   c.ChanMetarrArgs,
+		})
 	}
 
-	// Retrieve existing URL directory map.
+	// Retrieve existing URL directory map
 	urlDirMap, err := validation.ValidateMetarrOutputDirs(c.ChanMetarrArgs.OutputDir, c.ChanMetarrArgs.URLOutputDirs, c)
 	if err != nil {
 		return err
 	}
 
-	// Fill output directory from map where applicable.
-	for range urlDirMap {
-		for _, cu := range c.URLModels {
-			for _, v := range customVideoRequests {
-				if cu.URL == "" {
-					continue
-				}
-				if _, exists := urlDirMap[cu.URL]; exists {
-					v.MetarrArgs.OutputDir = urlDirMap[cu.URL]
-				}
-			}
+	// Fill output directories and batch channels together
+	videosByChannelURL := make(map[int64][]*models.Video)
+	for _, v := range customVideoRequests {
+		if outputDir, exists := urlDirMap[v.ChannelURL]; exists {
+			v.MetarrArgs.OutputDir = outputDir
 		}
+		videosByChannelURL[v.ChannelURLID] = append(videosByChannelURL[v.ChannelURLID], v)
 	}
 
 	// Main process
@@ -350,13 +372,22 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 		channelsGotNew []string
 	)
 
-	// Process custom video requests
-	for _, cu := range c.URLModels {
-		succeeded, nDownloaded, procErr := InitProcess(s, cu, c, customVideoRequests, ctx)
+	// Process each ChannelURL's videos
+	for channelURLID, videos := range videosByChannelURL {
+		if len(videos) == 0 {
+			continue
+		}
 
+		// Get the ChannelURL model we stored earlier
+		cu, exists := channelURLModels[channelURLID]
+		if !exists {
+			logging.E(0, "Could not find ChannelURL model for ID %d", channelURLID)
+			continue
+		}
+
+		succeeded, nDownloaded, procErr := InitProcess(s, cu, c, videos, ctx)
 		if succeeded != 0 {
 			nSucceeded += succeeded
-
 			if nDownloaded > 0 {
 				channelsGotNew = append(channelsGotNew, cu.URL)
 			}
@@ -364,17 +395,16 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 		procError = errors.Join(procError, procErr)
 	}
 
-	// Last scan time update
+	// Update last scan time
 	if err := cs.UpdateLastScan(c.ID); err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
 	}
 
-	// No videos succeeded
+	// Handle results
 	if nSucceeded == 0 {
 		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(customVideoRequests), procError)
 	}
 
-	// Some succeeded, notify URLs
 	if err := notifyURLs(cs, c, channelsGotNew); err != nil {
 		return errors.Join(procError, err)
 	}

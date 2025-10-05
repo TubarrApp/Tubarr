@@ -70,7 +70,7 @@ var patterns = map[string]urlPattern{
 	defaultDom: {name: defaultDom, pattern: defaultPattern},
 }
 
-var customAuthCookies = make(map[string][]*http.Cookie)
+var globalChannelAuthCookies = make(map[string][]*http.Cookie)
 
 func NewBrowser() *Browser {
 	return &Browser{
@@ -103,59 +103,47 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
 	}
 
-	// Prepare data structures
-	var (
-		newRequests []*models.Video
-	)
-
-	// Fetch entries already in the database
 	existingMap, existingURLs, err := b.GetExistingReleases(cs, c)
 	if err != nil {
 		return nil, err
 	}
 
-	// Process each URL separately
+	var newRequests []*models.Video
+
+	// Process each ChannelURL
 	for _, cu := range c.URLModels {
-		var cuNewRequests []*models.Video
 		logging.D(1, "Processing channel URL %q", cu.URL)
 
-		chanAccessDetails, err := b.GetChannelAccessDetails(cs, c, cu.URL, ctx)
+		// Get access details once per ChannelURL
+		cu.Cookies, cu.CookiePath, err = b.GetChannelCookies(cs, c, cu, ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		if chanAccessDetails != nil {
-			cu.CookiePath = chanAccessDetails.CookiePath
-			cu.Cookies = chanAccessDetails.Cookies
-			cu.Username = chanAccessDetails.Username
-			cu.Password = chanAccessDetails.Password
-			cu.LoginURL = chanAccessDetails.LoginURL
-		}
-
-		// Fetch new episode URLs for this video URL
+		// Fetch new episode URLs
 		newEpisodeURLs, err := b.newEpisodeURLs(cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		// Filter out already downloaded URLs
+		// Filter and create video requests
 		for _, newURL := range newEpisodeURLs {
 			if _, exists := existingMap[newURL]; !exists {
-				cuNewRequests = append(cuNewRequests, &models.Video{
+				video := &models.Video{
 					ChannelID:    c.ID,
 					ChannelURLID: cu.ID,
 					ChannelURL:   cu.URL,
 					URL:          newURL,
 					Settings:     c.ChanSettings,
 					MetarrArgs:   c.ChanMetarrArgs,
-				})
+				}
+				cu.Videos = append(cu.Videos, video)
+				newRequests = append(newRequests, video)
 			}
 		}
-		cu.Videos = append(cu.Videos, cuNewRequests...)
-		newRequests = append(newRequests, cuNewRequests...)
 	}
 
-	// Print summary if new videos were found
+	// Print summary
 	if len(newRequests) > 0 {
 		logging.I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
 		for i, v := range newRequests {
@@ -163,11 +151,12 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 				continue
 			}
 			logging.P("%s#%d%s - %q", consts.ColorBlue, i+1, consts.ColorReset, v.URL)
-			if i >= 24 { // 25 (i starts at 0)
+			if i >= 24 {
 				break
 			}
 		}
 	}
+
 	return newRequests, nil
 }
 
@@ -311,7 +300,7 @@ func (b *Browser) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)
 	}
-	if cookies, ok := customAuthCookies[parsedURL.Host]; ok {
+	if cookies, ok := globalChannelAuthCookies[parsedURL.Host]; ok {
 		jar.SetCookies(parsedURL, cookies)
 	} else {
 		return fmt.Errorf("no authentication cookies available for %s", parsedURL.Host)
