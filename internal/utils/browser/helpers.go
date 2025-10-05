@@ -32,11 +32,8 @@ func (b *Browser) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channe
 		}
 	}
 
-	// Check if cookies are desired...
-	var (
-		authCookies, regCookies []*http.Cookie
-		doLogin                 = cu.Username != "" && cu.LoginURL != ""
-	)
+	// Should login?
+	doLogin := cu.Username != "" && cu.LoginURL != "" // 'True' if BOTH username and login URL are non-empty
 
 	// Early return if no cookies needed
 	if !doLogin && !c.ChanSettings.UseGlobalCookies {
@@ -46,6 +43,10 @@ func (b *Browser) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channe
 	// Create cookie file path
 	cu.CookiePath = generateCookieFilePath(c.Name, cu.URL)
 
+	// Collect cookies...
+	var authCookies, regCookies []*http.Cookie
+
+	// Cookies from direct login
 	if doLogin {
 		parsed, err := url.Parse(cu.URL)
 		if err != nil {
@@ -62,7 +63,7 @@ func (b *Browser) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channe
 		}
 	}
 
-	// Get cookies globally
+	// Cookies from Kooky's 'FindAllCookieStores()' function
 	if c.ChanSettings.UseGlobalCookies {
 		regCookies, err = b.cookies.GetCookies(cu.URL)
 		if err != nil {
