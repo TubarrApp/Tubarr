@@ -174,10 +174,11 @@ func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx conte
 		urls               []string
 	)
 
-	dlURLFileCmd := &cobra.Command{
-		Use:   "download-video-urls",
-		Short: "Download inputted URLs (plaintext or file).",
-		Long:  "If using a file, the file should contain one URL per line.",
+	manualURLCmd := &cobra.Command{
+		Use:          "download-video-urls",
+		Short:        "Download inputted URLs (plaintext or file).",
+		Long:         "If using a file, the file should contain one URL per line.",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Valid items set?
@@ -238,11 +239,11 @@ func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx conte
 		},
 	}
 
-	cfgflags.SetPrimaryChannelFlags(dlURLFileCmd, &channelName, nil, &channelID)
-	dlURLFileCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to your given channel")
-	dlURLFileCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download for a given channel")
+	cfgflags.SetPrimaryChannelFlags(manualURLCmd, &channelName, nil, &channelID)
+	manualURLCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to your given channel")
+	manualURLCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download for a given channel")
 
-	return dlURLFileCmd
+	return manualURLCmd
 }
 
 // deleteNotifyURLs deletes notification URLs from a channel.
@@ -414,9 +415,10 @@ func ignoreCrawl(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Con
 	)
 
 	ignoreCrawlCmd := &cobra.Command{
-		Use:   "ignore-crawl",
-		Short: "Crawl a channel for URLs to ignore.",
-		Long:  "Crawls the current state of a channel page and adds all video URLs to ignore.",
+		Use:          "ignore-crawl",
+		Short:        "Crawl a channel for URLs to ignore.",
+		Long:         "Crawls the current state of a channel page and adds all video URLs to ignore.",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Get and check key/val pair
@@ -970,9 +972,10 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 	)
 
 	crawlCmd := &cobra.Command{
-		Use:   "crawl",
-		Short: "Crawl a channel for new URLs.",
-		Long:  "Initiate a crawl for new URLs of a channel that have not yet been downloaded.",
+		Use:          "crawl",
+		Short:        "Crawl a channel for new URLs.",
+		Long:         "Initiate a crawl for new URLs of a channel that have not yet been downloaded.",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Get and check key/val pair
