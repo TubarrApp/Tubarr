@@ -17,7 +17,7 @@ import (
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, videos []*models.Video, ctx context.Context) (nSucceeded int, err error) {
+func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, videos []*models.Video, ctx context.Context) (nSucceeded int, nDownloaded int, err error) {
 	var (
 		errs []error
 	)
@@ -39,7 +39,7 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 	_, err = exec.LookPath("metarr")
 	if err != nil {
 		if !errors.Is(err, exec.ErrNotFound) {
-			return 0, fmt.Errorf("could not find 'metarr' at $PATH, check permissions and ensure the file is executable")
+			return 0, 0, fmt.Errorf("error checking for 'metarr' at $PATH: %w", err)
 		}
 	}
 	metarrExists := err == nil
@@ -78,7 +78,7 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 
 		// Check for custom scraper needs
 		if err := checkCustomScraperNeeds(video); err != nil {
-			return nSucceeded, err
+			return nSucceeded, nDownloaded, err
 		}
 
 		if video.Finished {
@@ -104,11 +104,18 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 		}
 	}
 
+	// Count videos that were actually downloaded (not skipped)
+	for _, video := range videos {
+		if video.Finished && !video.WasSkipped {
+			nDownloaded++
+		}
+	}
+
 	if len(errs) > 0 {
 		logging.E(0, "Finished with %d errors", len(errs))
-		return nSucceeded, errors.Join(errs...)
+		return nSucceeded, nDownloaded, errors.Join(errs...)
 	}
-	return nSucceeded, nil
+	return nSucceeded, nDownloaded, nil
 }
 
 // videoJob starts a worker's process for a video.

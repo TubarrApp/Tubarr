@@ -51,6 +51,7 @@ const (
 const (
 	QVidID          = "id"
 	QVidChanID      = "channel_id"
+	QVidChanURLID   = "channel_url_id"
 	QVidFinished    = "finished"
 	QVidURL         = "url"
 	QVidTitle       = "title"
@@ -80,6 +81,7 @@ const (
 	QNotifyChanID    = "channel_id"
 	QNotifyName      = "name"
 	QNotifyURL       = "notify_url"
+	QNotifyChanURL   = "channel_url"
 	QNotifyCreatedAt = "created_at"
 	QNotifyUpdatedAt = "updated_at"
 )

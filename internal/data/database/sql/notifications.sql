@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY,
     channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
+    channel_url TEXT,
     notify_url TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

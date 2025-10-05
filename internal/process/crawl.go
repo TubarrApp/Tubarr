@@ -137,7 +137,7 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 // ChannelCrawl crawls a channel for new URLs.
 func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) (err error) {
 
-	logging.I("Initiating crawl for channel %q...\n", c.Name)
+	logging.I("%sINITIALIZING CRAWL:%s Channel %q:\n", consts.ColorGreen, consts.ColorReset, c.Name)
 
 	// Check validity
 	if len(c.URLModels) == 0 {
@@ -165,13 +165,38 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	// Main process
 	var (
-		nSucceeded int
-		procError  error
+		nSucceeded     int
+		procError      error
+		channelsGotNew []string
 	)
 
+	// Process channel URLs
 	for _, cu := range c.URLModels {
-		succeeded, procErr := InitProcess(s, cu, c, videos, ctx)
-		nSucceeded = nSucceeded + succeeded
+
+		// Get requests for this channel
+		var vRequests []*models.Video
+		for _, v := range videos {
+			if v.ChannelURL == cu.URL {
+				vRequests = append(vRequests, v)
+			}
+		}
+		if len(vRequests) == 0 {
+			continue
+		}
+		logging.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
+
+		// Process video batch
+		succeeded, nDownloaded, procErr := InitProcess(s, cu, c, vRequests, ctx)
+
+		// Succeeded/downloaded
+		if succeeded != 0 {
+			nSucceeded += succeeded
+
+			if nDownloaded > 0 {
+				logging.I("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", nDownloaded, cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
+				channelsGotNew = append(channelsGotNew, cu.URL)
+			}
+		}
 		procError = errors.Join(procError, procErr)
 	}
 
@@ -186,7 +211,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 	}
 
 	// Some succeeded, notify URLs
-	if err := notifyURLs(cs, c); err != nil {
+	if err := notifyURLs(cs, c, channelsGotNew); err != nil {
 		return errors.Join(procError, err)
 	}
 
@@ -290,10 +315,10 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 			}
 
 			customVideoRequests = append(customVideoRequests, &models.Video{
-				ChannelURLID: c.ID,
-				URL:          customVideoURL,
-				Settings:     c.ChanSettings,
-				MetarrArgs:   c.ChanMetarrArgs,
+				ChannelID:  c.ID,
+				URL:        customVideoURL,
+				Settings:   c.ChanSettings,
+				MetarrArgs: c.ChanMetarrArgs,
 			})
 		}
 	}
@@ -320,13 +345,22 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 
 	// Main process
 	var (
-		nSucceeded int
-		procError  error
+		nSucceeded     int
+		procError      error
+		channelsGotNew []string
 	)
 
+	// Process custom video requests
 	for _, cu := range c.URLModels {
-		succeeded, procErr := InitProcess(s, cu, c, customVideoRequests, ctx)
-		nSucceeded = nSucceeded + succeeded
+		succeeded, nDownloaded, procErr := InitProcess(s, cu, c, customVideoRequests, ctx)
+
+		if succeeded != 0 {
+			nSucceeded += succeeded
+
+			if nDownloaded > 0 {
+				channelsGotNew = append(channelsGotNew, cu.URL)
+			}
+		}
 		procError = errors.Join(procError, procErr)
 	}
 
@@ -341,7 +375,7 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 	}
 
 	// Some succeeded, notify URLs
-	if err := notifyURLs(cs, c); err != nil {
+	if err := notifyURLs(cs, c, channelsGotNew); err != nil {
 		return errors.Join(procError, err)
 	}
 

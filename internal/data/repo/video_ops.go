@@ -80,8 +80,18 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 		} else {
 			// Insert new video
 			insertQuery := squirrel.Insert(consts.DBVideos).
-				Columns(consts.QVidChanID, consts.QVidURL, consts.QVidFinished).
-				Values(c.ID, v.URL, v.Finished).
+				Columns(
+					consts.QVidChanID,
+					consts.QVidChanURLID,
+					consts.QVidURL,
+					consts.QVidFinished,
+				).
+				Values(
+					c.ID,
+					v.ChannelURLID,
+					v.URL,
+					v.Finished,
+				).
 				RunWith(tx)
 
 			result, err := insertQuery.Exec()
@@ -119,7 +129,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 }
 
 // AddVideo adds a new video to the database or updates it if it already exists.
-func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (int64, error) {
+func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (videoID int64, err error) {
 	if v.URL == "" {
 		return 0, errors.New("must enter a url for video")
 	}
@@ -159,16 +169,32 @@ func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (int64, error
 	// Insert into videos table
 	vidQuery := squirrel.Insert(consts.DBVideos).
 		Columns(
-			consts.QVidChanID, consts.QVidURL, consts.QVidTitle,
-			consts.QVidDescription, consts.QVidFinished, consts.QVidUploadDate,
-			consts.QVidMetadata, consts.QVidSettings, consts.QVidMetarr,
-			consts.QVidCreatedAt, consts.QVidUpdatedAt,
+			consts.QVidChanID,
+			consts.QVidChanURLID,
+			consts.QVidURL,
+			consts.QVidTitle,
+			consts.QVidDescription,
+			consts.QVidFinished,
+			consts.QVidUploadDate,
+			consts.QVidMetadata,
+			consts.QVidSettings,
+			consts.QVidMetarr,
+			consts.QVidCreatedAt,
+			consts.QVidUpdatedAt,
 		).
 		Values(
-			c.ID, v.URL, v.Title,
-			v.Description, v.Finished, v.UploadDate,
-			metadataJSON, settingsJSON, metarrJSON,
-			now, now,
+			c.ID,
+			v.ChannelURLID,
+			v.URL,
+			v.Title,
+			v.Description,
+			v.Finished,
+			v.UploadDate,
+			metadataJSON,
+			settingsJSON,
+			metarrJSON,
+			now,
+			now,
 		).
 		RunWith(tx)
 
@@ -177,7 +203,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (int64, error
 		return 0, fmt.Errorf("failed to insert video %q: %w", v.URL, err)
 	}
 
-	videoID, err := result.LastInsertId()
+	videoID, err = result.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get inserted video ID for %q: %w", v.URL, err)
 	}

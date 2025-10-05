@@ -116,6 +116,7 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 
 	// Process each URL separately
 	for _, cu := range c.URLModels {
+		var cuNewRequests []*models.Video
 		logging.D(1, "Processing channel URL %q", cu.URL)
 
 		chanAccessDetails, err := b.GetChannelAccessDetails(cs, c, cu.URL, ctx)
@@ -140,14 +141,18 @@ func (b *Browser) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		// Filter out already downloaded URLs
 		for _, newURL := range newEpisodeURLs {
 			if _, exists := existingMap[newURL]; !exists {
-				newRequests = append(newRequests, &models.Video{
+				cuNewRequests = append(cuNewRequests, &models.Video{
+					ChannelID:    c.ID,
 					ChannelURLID: cu.ID,
+					ChannelURL:   cu.URL,
 					URL:          newURL,
 					Settings:     c.ChanSettings,
 					MetarrArgs:   c.ChanMetarrArgs,
 				})
 			}
 		}
+		cu.Videos = append(cu.Videos, cuNewRequests...)
+		newRequests = append(newRequests, cuNewRequests...)
 	}
 
 	// Print summary if new videos were found

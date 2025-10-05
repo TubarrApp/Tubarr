@@ -1,7 +1,6 @@
 package process
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -357,20 +356,50 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 }
 
 // notifyURLs notifies URLs set for the channel by the user.
-func notifyURLs(cs interfaces.ChannelStore, c *models.Channel) error {
-	// Some successful downloads, notify URLs
-	notifyURLs, err := cs.GetNotifyURLs(c.ID)
+func notifyURLs(cs interfaces.ChannelStore, c *models.Channel, channelsWithNew []string) error {
+
+	// Retrieve notifications for this channel
+	notifications, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-		logging.D(1, "No notification URL for channel with name %q and ID: %d", c.Name, c.ID)
+		return fmt.Errorf("failed to get notification URLs for channel %q (ID: %d): %w", c.Name, c.ID, err)
+	}
+	if len(notifications) == 0 {
+		logging.D(1, "No notification URLs configured for channel %q (ID: %d)", c.Name, c.ID)
+		return nil
 	}
 
-	if len(notifyURLs) > 0 {
-		if errs := notify(c, notifyURLs); len(errs) != 0 {
-			return fmt.Errorf("errors sending notifications for channel with ID %d:\n%w", c.ID, errors.Join(errs...))
+	// Create lookup map for new channels
+	channelsWithNewMap := make(map[string]bool, len(channelsWithNew))
+	for _, u := range channelsWithNew {
+		channelsWithNewMap[strings.ToLower(u)] = true
+	}
+
+	// Append valid URLs
+	var urls []string
+	for _, n := range notifications {
+
+		if n.ChannelURL == "" {
+			logging.D(3, "Channel URL is empty for notification URL %q", n.ChannelURL)
+			urls = append(urls, n.NotifyURL)
+			continue
 		}
+
+		logging.D(2, "Checking %q exists in notification", n.ChannelURL)
+		if channelsWithNewMap[strings.ToLower(n.ChannelURL)] {
+			logging.D(3, "Found %q in notification", n.ChannelURL)
+			urls = append(urls, n.NotifyURL)
+		}
+	}
+
+	// Check if any valid URLs
+	if len(urls) == 0 {
+		logging.D(2, "No notification URLs matched for channel %q (ID: %d)", c.Name, c.ID)
+		return nil
+	}
+
+	// Send notifications
+	if errs := notify(c, urls); len(errs) != 0 {
+		return fmt.Errorf("errors sending notifications for channel with ID %d: %w", c.ID, errors.Join(errs...))
 	}
 
 	return nil

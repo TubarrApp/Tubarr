@@ -45,12 +45,14 @@ type ChannelURL struct {
 	UpdatedAt  time.Time `db:"updated_at"`
 }
 
-// Video contains fields relating to a video, and a pointer to the channel it belongs to..
+// Video contains fields relating to a video, and a pointer to the channel it belongs to.
 //
 // Matches the order of the DB table, do not alter.
 type Video struct {
 	ID                  int64
-	ChannelURLID        int64 `db:"channel_url_id"`
+	ChannelID           int64
+	ChannelURLID        int64
+	ChannelURL          string
 	ParsedVideoDir      string
 	VideoPath           string `db:"video_path"`
 	ParsedJSONDir       string
@@ -72,4 +74,13 @@ type Video struct {
 	BaseDomainWithProto string
 	MoveOpOutputDir     string
 	MoveOpChannelURL    string
+	WasSkipped          bool
+}
+
+// Notifications holds notification data for channels.
+type Notification struct {
+	ChannelID  int64
+	ChannelURL string
+	NotifyURL  string
+	Name       string
 }

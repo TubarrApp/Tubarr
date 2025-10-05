@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/interfaces"
@@ -125,9 +123,14 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 }
 
 // GetNotifyURLs returns all notification URLs for a given channel.
-func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
+func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) {
 	query := squirrel.
-		Select(consts.QNotifyURL).
+		Select(
+			consts.QNotifyChanID,
+			consts.QNotifyName,
+			consts.QNotifyChanURL,
+			consts.QNotifyURL,
+		).
 		From(consts.DBNotifications).
 		Where(squirrel.Eq{consts.QNotifyChanID: id}).
 		RunWith(cs.DB)
@@ -143,14 +146,23 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 		}
 	}()
 
-	// Collect all URLs
-	var urls []string
+	// Collect notification models
+	var notificationModels []*models.Notification
+
 	for rows.Next() {
-		var url string
-		if err := rows.Scan(&url); err != nil {
+		var nModel models.Notification
+
+		err := rows.Scan(
+			&nModel.ChannelID,
+			&nModel.Name,
+			&nModel.ChannelURL,
+			&nModel.NotifyURL,
+		)
+		if err != nil {
 			return nil, fmt.Errorf("failed to scan notification URL: %w", err)
 		}
-		urls = append(urls, url)
+
+		notificationModels = append(notificationModels, &nModel)
 	}
 
 	// Check for errors from iterating over rows
@@ -158,7 +170,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]string, error) {
 		return nil, fmt.Errorf("error iterating notification URLs: %w", err)
 	}
 
-	return urls, nil
+	return notificationModels, nil
 }
 
 // DeleteNotifyURLs deletes notify URLs from the channel.
@@ -197,43 +209,33 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 }
 
 // AddNotifyURLs sets notification pairs in the database.
-func (cs *ChannelStore) AddNotifyURLs(id int64, notifications []string) error {
+func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.Notification) error {
 	tx, err := cs.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
-			// Only rollback if function is returning an error
 			if err := tx.Rollback(); err != nil {
-				logging.E(0, "Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", id, notifications, err)
+				logging.E(0, "Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", channelID, notifications, err)
 			}
 		}
 	}()
 
 	for _, n := range notifications {
-		split := strings.Split(n, "|")
-		if len(split) < 2 {
-			return fmt.Errorf("notify URL format incorrect, should be 'URL:Friendly name'")
-		}
+		chanURL := n.ChannelURL
+		notifyURL := n.NotifyURL
+		name := n.Name
 
-		uri := split[0]
-		notifyName := split[1]
-
-		if _, err = url.Parse(uri); err != nil {
-			return fmt.Errorf("notification URL %q not valid: %w", uri, err)
-		}
-
-		if err := cs.addNotifyURL(tx, id, notifyName, uri); err != nil {
+		if err := cs.addNotifyURL(tx, channelID, chanURL, notifyURL, name); err != nil {
 			return err
 		}
 	}
-
 	return tx.Commit()
 }
 
 // addNotifyURL sets a notification table entry for a channel with a given ID.
-func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, notifyName, notifyURL string) error {
+func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, notifyName string) error {
 	if notifyURL == "" {
 		return errors.New("please enter a notification URL")
 	}
@@ -249,6 +251,7 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, notifyName, notifyURL
 		Columns(
 			consts.QNotifyChanID,
 			consts.QNotifyName,
+			consts.QNotifyChanURL,
 			consts.QNotifyURL,
 			consts.QNotifyCreatedAt,
 			consts.QNotifyUpdatedAt,
@@ -256,12 +259,13 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, notifyName, notifyURL
 		Values(
 			id,
 			notifyName,
+			chanURL,
 			notifyURL,
 			now,
 			now,
 		).
 		Suffix(querySuffix).
-		RunWith(tx) // use the transaction here
+		RunWith(tx)
 
 	if _, err := query.Exec(); err != nil {
 		return err

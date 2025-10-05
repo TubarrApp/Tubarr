@@ -332,7 +332,7 @@ func addNotifyURLs(cs interfaces.ChannelStore) *cobra.Command {
 			}
 
 			// Validate and add notification URLs
-			validPairs, err := validation.ValidateNotificationPairs(notification)
+			validPairs, err := validation.ValidateNotificationStrings(notification)
 			if err != nil {
 				return err
 			}
@@ -784,7 +784,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 
 			// Validate notification URLs
 			if len(notification) != 0 {
-				validPairs, err := validation.ValidateNotificationPairs(notification)
+				validPairs, err := validation.ValidateNotificationStrings(notification)
 				if err != nil {
 					return err
 				}
@@ -1318,8 +1318,16 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
 
 	// Notification URLs
+	var nURLs []string
+	for _, n := range notifyURLs {
+		newNUrl := n.NotifyURL
+		if n.ChannelURL != "" {
+			newNUrl = n.ChannelURL + "|" + n.NotifyURL
+		}
+		nURLs = append(nURLs, newNUrl)
+	}
 	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
-	fmt.Printf("Notification URLs: %v\n", notifyURLs)
+	fmt.Printf("Notification URLs: %v\n", nURLs)
 }
 
 // LoadFromConfig loads in config file data.

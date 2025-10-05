@@ -218,42 +218,74 @@ func ValidateConcurrencyLimit(c int) int {
 	return c
 }
 
-// ValidateNotificationPairs verifies that the notification pairs entered are valid.
-func ValidateNotificationPairs(pairs []string) ([]string, error) {
-	if len(pairs) == 0 {
+// ValidateNotificationStrings verifies that the notification pairs entered are valid.
+func ValidateNotificationStrings(notifications []string) ([]*models.Notification, error) {
+	if len(notifications) == 0 {
 		return nil, nil
 	}
 
-	for i, p := range pairs {
+	notificationModels := make([]*models.Notification, 0, len(notifications))
+	for _, n := range notifications {
 
-		if !strings.ContainsRune(p, '|') {
-			return nil, fmt.Errorf("notification entry %q does not contain a '|' separator (should be in 'URL|friendly name' format", p)
+		if !strings.ContainsRune(n, '|') {
+			return nil, fmt.Errorf("notification entry %q does not contain a '|' separator (should be in 'URL|friendly name' format", n)
 		}
 
-		entry := strings.Split(p, "|")
+		entry := EscapedSplit(n, '|')
 
+		// Check entries for validity and fill field details
+		var chanURL, nURL, name string
 		switch {
-		case len(entry) > 2:
-			return nil, fmt.Errorf("too many entries for %q, should be in 'URL|friendly name' format", p)
-		case entry[0] == "":
-			return nil, fmt.Errorf("missing URL from notification entry %q, should be in 'URL|friendly name' format", p)
+		case len(entry) > 3 || len(entry) < 2:
+			return nil, fmt.Errorf("malformed notification entry %q, should be in 'Channel URL|Notify URL|Friendly Name' or 'Notify URL|Friendly Name' format", n)
+
+			// 'Notify URL|Name'
+		case len(entry) == 2:
+			if entry[0] == "" {
+				return nil, fmt.Errorf("missing URL from notification entry %q, should be in 'Notify URL|Friendly Name' format", n)
+			}
+			nURL = entry[0]
+			name = entry[1]
+
+			if _, err := url.Parse(nURL); err != nil {
+				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
+			}
+
+			// 'Channel URL|Notify URL|Name'
+		case len(entry) == 3:
+			if entry[0] == "" || entry[1] == "" {
+				return nil, fmt.Errorf("missing channel URL or notification URL from notification entry %q, should be in 'Channel URL|Notify URL|Friendly Name' format", n)
+			}
+			chanURL = entry[0]
+			nURL = entry[1]
+			name = entry[2]
+
+			if _, err := url.Parse(chanURL); err != nil {
+				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
+			}
+			if _, err := url.Parse(nURL); err != nil {
+				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
+			}
 		}
 
-		if entry[1] == "" {
-			entry[1] = entry[0] // Use URL as name if name field is missing
+		// Use URL as name if name field is missing
+		if name == "" {
+			name = nURL
 		}
 
-		entry[0] = strings.ReplaceAll(entry[0], `'`, ``)
-		entry[0] = strings.ReplaceAll(entry[0], `"`, ``)
-		entry[1] = strings.ReplaceAll(entry[1], `'`, ``)
-		entry[1] = strings.ReplaceAll(entry[1], `"`, ``)
+		// Create model
+		newNotificationModel := models.Notification{
+			ChannelURL: chanURL,
+			NotifyURL:  nURL,
+			Name:       name,
+		}
 
-		pairs[i] = (entry[0] + "|" + entry[1])
-
-		logging.D(2, "Made notification pair: %v", pairs[i])
+		// Append to collection
+		notificationModels = append(notificationModels, &newNotificationModel)
+		logging.D(3, "Added notification model: %+v", newNotificationModel)
 	}
 
-	return pairs, nil
+	return notificationModels, nil
 }
 
 // ValidateYtdlpOutputExtension validates the merge-output-format compatibility of the inputted extension.
