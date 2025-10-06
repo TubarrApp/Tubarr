@@ -41,7 +41,7 @@ func (ds *DownloadStore) SetDownloadStatuses(videos []*models.Video, status cons
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E(0, "Error rolling back download status for videos %+v: %v", videos, rollbackErr)
+				logging.E("Error rolling back download status for videos %+v: %v", videos, rollbackErr)
 			}
 		}
 	}()
@@ -84,7 +84,7 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E(0, "Error rolling back download status for video with URL %q: %v", v.URL, rollbackErr)
+				logging.E("Error rolling back download status for video with URL %q: %v", v.URL, rollbackErr)
 			}
 		}
 	}()
@@ -119,7 +119,7 @@ func (ds *DownloadStore) UpdateDownloadStatuses(ctx context.Context, updates []m
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E(0, "Failed to rollback transaction for updates: %+v: %v", updates, rollbackErr)
+				logging.E("Failed to rollback transaction for updates: %+v: %v", updates, rollbackErr)
 			}
 		}
 	}()
@@ -174,7 +174,7 @@ func normalizeDownloadStatus(pctPtr *float64, statusPtr *consts.DownloadStatus, 
 		status consts.DownloadStatus
 	)
 	if pctPtr == nil || statusPtr == nil {
-		logging.E(0, "Status or percentage passed into function null for video with ID %d", videoID)
+		logging.E("Status or percentage passed into function null for video with ID %d", videoID)
 		return
 	}
 

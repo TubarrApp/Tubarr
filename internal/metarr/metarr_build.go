@@ -269,7 +269,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 	)
 
 	if mArgs.OutputDirMap, err = validation.ValidateMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, c); err != nil {
-		logging.E(0, "Could not parse output directory map: %v", err)
+		logging.E("Could not parse output directory map: %v", err)
 	}
 
 	switch {
@@ -279,7 +279,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 
 		parsed, err := dirParser.ParseDirectory(d, v, "Metarr video")
 		if err != nil {
-			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", d, v.URL, err)
+			logging.E("Failed to parse directory %q for video with URL %q: %v", d, v.URL, err)
 			break
 		}
 
@@ -290,7 +290,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 	case mOpOutDir != "" && (mOpChanURL == "" || strings.EqualFold(strings.TrimSpace(mOpChanURL), strings.TrimSpace(cu.URL))):
 		parsed, err := dirParser.ParseDirectory(mOpOutDir, v, "Metarr video")
 		if err != nil {
-			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mOpOutDir, v.URL, err)
+			logging.E("Failed to parse directory %q for video with URL %q: %v", mOpOutDir, v.URL, err)
 			break
 		}
 		return parsed
@@ -299,7 +299,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 	case mArgs.OutputDirMap[cu.URL] != "":
 		parsed, err := dirParser.ParseDirectory(mArgs.OutputDirMap[cu.URL], v, "Metarr video")
 		if err != nil {
-			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDirMap[cu.URL], v.URL, err)
+			logging.E("Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDirMap[cu.URL], v.URL, err)
 			break
 		}
 		return parsed
@@ -308,7 +308,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 	case mArgs.OutputDir != "":
 		parsed, err := dirParser.ParseDirectory(mArgs.OutputDir, v, "Metarr video")
 		if err != nil {
-			logging.E(0, "Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDir, v.URL, err)
+			logging.E("Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDir, v.URL, err)
 			break
 		}
 		return parsed
@@ -341,7 +341,7 @@ func cleanAndWrapCommaPaths(path string) string {
 		if strings.ContainsRune(path, '"') {
 			escaped := strings.ReplaceAll(path, `"`, `\"`)
 			if err := os.Rename(path, escaped); err != nil {
-				logging.E(0, "Failed to escape quotes in filename %q: %v", path, err)
+				logging.E("Failed to escape quotes in filename %q: %v", path, err)
 			} else {
 				path = escaped
 			}

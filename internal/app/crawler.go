@@ -61,7 +61,7 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 		if c.IsBlocked() {
 			unlocked, err := cs.CheckAndUnlockChannel(c)
 			if err != nil {
-				logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+				logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 				return nil
 			}
 
@@ -106,7 +106,7 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 	close(errChan)
 
 	// Aggregate errors
-	var allErrs []error
+	allErrs := make([]error, 0, len(channels))
 	for e := range errChan {
 		allErrs = append(allErrs, e)
 	}
@@ -125,7 +125,7 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 	if c.IsBlocked() {
 		unlocked, err := cs.CheckAndUnlockChannel(c)
 		if err != nil {
-			logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
 
@@ -153,14 +153,16 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 	}
 
 	// Build a map of channel URL -> ChannelURL model for quick lookup
-	channelURLMap := make(map[string]*models.ChannelURL)
+	channelURLMap := make(map[string]*models.ChannelURL, len(c.URLModels))
 	for _, cu := range c.URLModels {
 		channelURLMap[cu.URL] = cu
 	}
 
-	var customVideoRequests []*models.Video
+	// Video request model slice
+	customVideoRequests := make([]*models.Video, 0, len(videoURLs))
+
 	// Track which ChannelURL model each video uses (by ChannelURLID)
-	channelURLModels := make(map[int64]*models.ChannelURL)
+	channelURLModels := make(map[int64]*models.ChannelURL, len(videoURLs))
 
 	for _, videoURL := range videoURLs {
 		var (
@@ -170,33 +172,15 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 
 		// Parse pipe-delimited format: "channelURL|videoURL"
 		if strings.Contains(videoURL, "|") {
-			parts := strings.Split(videoURL, "|")
-			if len(parts) != 2 {
-				return fmt.Errorf("invalid video URL format %q, expected 'channelURL|videoURL'", videoURL)
-			}
-			channelURLStr := parts[0]
-			actualVideoURL = parts[1]
-
-			// Find the matching ChannelURL
-			var found bool
-			targetChannelURLModel, found = channelURLMap[channelURLStr]
-			if !found {
-				return fmt.Errorf("channel URL %q not found in channel's URL models", channelURLStr)
+			targetChannelURLModel, actualVideoURL, err = parsePipedVideoURL(videoURL, channelURLMap)
+			if err != nil {
+				return err
 			}
 		} else {
-			// No channel URL entered - use special manual downloads entry
-			targetChannelURLModel, err = ensureManualDownloadsChannelURL(cs, c.ID)
+			targetChannelURLModel, actualVideoURL, err = parseManualVideoURL(cs, c, scrape, videoURL, ctx)
 			if err != nil {
 				return err
 			}
-
-			// Get access details for manual downloads
-			targetChannelURLModel.Cookies, targetChannelURLModel.CookiePath, err = scrape.GetChannelCookies(cs, c, targetChannelURLModel, ctx)
-			if err != nil {
-				return err
-			}
-
-			actualVideoURL = videoURL
 		}
 
 		// Check if already downloaded
@@ -248,11 +232,11 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 		// Get the ChannelURL model we stored earlier
 		cu, exists := channelURLModels[channelURLID]
 		if !exists {
-			logging.E(0, "Could not find ChannelURL model for ID %d", channelURLID)
+			logging.E("Could not find ChannelURL model for ID %d", channelURLID)
 			continue
 		}
 
-		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, videos)
+		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, scrape, videos)
 		if succeeded != 0 {
 			nSucceeded += succeeded
 			if nDownloaded > 0 {
@@ -290,7 +274,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 	if c.IsBlocked() {
 		unlocked, err := cs.CheckAndUnlockChannel(c)
 		if err != nil {
-			logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
 
@@ -356,7 +340,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		logging.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
 
 		// Process video batch
-		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, vRequests)
+		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, scrape, vRequests)
 
 		// Succeeded/downloaded
 		if succeeded != 0 {
@@ -393,9 +377,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 	return nil
 }
 
-// ChannelCrawlIgnoreNew gets the channel's currently displayed videos and ignores them on subsequent crawls.
-//
-// Essentially it marks the URLs it finds as though they have already been downloaded.
+// ChannelCrawlIgnoreNew gets the channel's currently displayed videos and marks them as complete without downloading.
 func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) error {
 
 	cs := s.ChannelStore()
@@ -404,7 +386,7 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 	if c.IsBlocked() {
 		unlocked, err := cs.CheckAndUnlockChannel(c)
 		if err != nil {
-			logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
 
@@ -489,7 +471,7 @@ func blockChannelBotDetected(cs interfaces.ChannelStore, c *models.Channel, cu *
 	parsedCURL, err := url.Parse(cu.URL)
 	hostname := parsedCURL.Hostname()
 	if err != nil {
-		logging.E(0, "Could not parse %q, will use full domain", cu.URL)
+		logging.E("Could not parse %q, will use full domain", cu.URL)
 		hostname = cu.URL
 	}
 
@@ -512,4 +494,39 @@ func blockChannelBotDetected(cs interfaces.ChannelStore, c *models.Channel, cu *
 
 	logging.W("Blocked channel %q due to bot detection on hostname %q", c.Name, hostname)
 	return nil
+}
+
+// parsePipedVideoURL parses a video URL in the format "channelURL|videoURL".
+func parsePipedVideoURL(videoURL string, channelURLMap map[string]*models.ChannelURL) (*models.ChannelURL, string, error) {
+	parts := strings.Split(videoURL, "|")
+	if len(parts) != 2 {
+		return nil, "", fmt.Errorf("invalid video URL format %q, expected 'channelURL|videoURL'", videoURL)
+	}
+
+	channelURLStr := parts[0]
+	actualVideoURL := parts[1]
+
+	targetChannelURLModel, found := channelURLMap[channelURLStr]
+	if !found {
+		return nil, "", fmt.Errorf("channel URL %q not found in channel's URL models", channelURLStr)
+	}
+
+	return targetChannelURLModel, actualVideoURL, nil
+}
+
+// parseManualVideoURL handles video URLs without a channel URL prefix.
+func parseManualVideoURL(cs interfaces.ChannelStore, c *models.Channel, scrape *scraper.Scraper, videoURL string, ctx context.Context) (*models.ChannelURL, string, error) {
+	// Use special manual downloads entry
+	targetChannelURLModel, err := ensureManualDownloadsChannelURL(cs, c.ID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Get access details for manual downloads
+	targetChannelURLModel.Cookies, targetChannelURLModel.CookiePath, err = scrape.GetChannelCookies(cs, c, targetChannelURLModel, ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return targetChannelURLModel, videoURL, nil
 }

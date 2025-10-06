@@ -70,7 +70,7 @@ func (d *JSONDownload) Execute() (botPauseChannel bool, err error) {
 
 				// Other errors - continue with retry logic
 				lastErr = err
-				logging.E(0, "Download attempt %d failed: %v", attempt, err)
+				logging.E("Download attempt %d failed: %v", attempt, err)
 
 				if attempt < d.Options.MaxRetries {
 					select {

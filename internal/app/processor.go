@@ -23,7 +23,14 @@ import (
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(ctx context.Context, s interfaces.Store, cu *models.ChannelURL, c *models.Channel, videos []*models.Video) (nSucceeded int, nDownloaded int, err error) {
+func InitProcess(
+	ctx context.Context,
+	s interfaces.Store,
+	cu *models.ChannelURL,
+	c *models.Channel,
+	scrape *scraper.Scraper,
+	videos []*models.Video) (nSucceeded int, nDownloaded int, err error) {
+
 	var (
 		errs []error
 	)
@@ -57,12 +64,11 @@ func InitProcess(ctx context.Context, s interfaces.Store, cu *models.ChannelURL,
 	var wg sync.WaitGroup
 
 	// Start workers
-	for w := range conc {
+	for range conc {
 		wg.Add(1)
-		go func(workerID int) {
+		go func() {
 			defer wg.Done()
 			for v := range jobs {
-				// Check if context was cancelled (bot detected by another worker)
 				select {
 				case <-procCtx.Done():
 					results <- fmt.Errorf("skipped %q: %w", v.URL, procCtx.Err())
@@ -85,16 +91,15 @@ func InitProcess(ctx context.Context, s interfaces.Store, cu *models.ChannelURL,
 				if err != nil && strings.Contains(err.Error(), consts.BotActivitySentinel) {
 					procCancel()
 				}
-
 				results <- err
 			}
-		}(w + 1)
+		}()
 	}
 
 	// Send jobs
 	for _, video := range videos {
 		if video == nil {
-			logging.E(0, "Video in queue for channel %q is nil", c.Name)
+			logging.E("Video in queue for channel %q is nil", c.Name)
 			continue
 		}
 
@@ -102,7 +107,7 @@ func InitProcess(ctx context.Context, s interfaces.Store, cu *models.ChannelURL,
 		video.ParsedJSONDir, video.ParsedVideoDir = parseVideoJSONDirs(video, dirParser)
 
 		// Check for custom scraper needs
-		if err := checkCustomScraperNeeds(video); err != nil {
+		if err := checkCustomScraperNeeds(scrape, video); err != nil {
 			return nSucceeded, nDownloaded, err
 		}
 
@@ -137,14 +142,14 @@ func InitProcess(ctx context.Context, s interfaces.Store, cu *models.ChannelURL,
 	}
 
 	if len(errs) > 0 {
-		logging.E(0, "Finished with %d errors", len(errs))
+		logging.E("Finished with %d errors", len(errs))
 		return nSucceeded, nDownloaded, errors.Join(errs...)
 	}
 	return nSucceeded, nDownloaded, nil
 }
 
 // checkCustomScraperNeeds checks if a custom scraper should be used for this release.
-func checkCustomScraperNeeds(v *models.Video) error {
+func checkCustomScraperNeeds(s *scraper.Scraper, v *models.Video) error {
 	// Check for custom scraper needs
 
 	// Detect censored.tv links
@@ -153,7 +158,6 @@ func checkCustomScraperNeeds(v *models.Video) error {
 			logging.I("Using regular scraper for censored.tv ...")
 		} else {
 			logging.I("Detected a censored.tv link. Using specialized scraper.")
-			s := scraper.New()
 			err := s.ScrapeCensoredTVMetadata(v.URL, v.ParsedJSONDir, v)
 			if err != nil {
 				return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
@@ -175,16 +179,11 @@ func videoJob(
 	dlTracker *downloads.DownloadTracker,
 	metarrExists bool,
 ) error {
-
+	// Process JSON phase
 	if v.JSONCustomFile == "" {
-		proceed, botPauseChannel, err := processJSON(procCtx, v, cu, c, vs, dirParser, dlTracker)
+		proceed, err := handleJSONProcessing(procCtx, v, cu, c, cs, vs, dirParser, dlTracker)
 		if err != nil {
-			if botPauseChannel {
-				if blockErr := blockChannelBotDetected(cs, c, cu); blockErr != nil {
-					logging.E(0, "Failed to block channel: %v", blockErr)
-				}
-			}
-			return fmt.Errorf("json processing error for video URL %q: %w", v.URL, err)
+			return err
 		}
 		if !proceed {
 			logging.I("Skipping further processing for ignored video: %s", v.URL)
@@ -196,16 +195,13 @@ func videoJob(
 		}
 	}
 
+	// Process video download phase
 	botPauseChannel, err := processVideo(procCtx, v, cu, c, dlTracker)
 	if err != nil {
-		if botPauseChannel {
-			if blockErr := blockChannelBotDetected(cs, c, cu); blockErr != nil {
-				logging.E(0, "Failed to block channel: %v", blockErr)
-			}
-		}
-		return fmt.Errorf("json processing error for video URL %q: %w", v.URL, err)
+		return handleBotError(cs, c, cu, v.URL, botPauseChannel, err, "video processing")
 	}
 
+	// Check if Metarr is available
 	if !metarrExists {
 		logging.I("No 'metarr' at $PATH, skipping Metarr process and marking video as finished")
 		return markVideoComplete(vs, v, c)
@@ -217,6 +213,43 @@ func videoJob(
 	}
 
 	return markVideoComplete(vs, v, c)
+}
+
+// handleJSONProcessing processes JSON metadata with bot detection and error handling.
+func handleJSONProcessing(
+	procCtx context.Context,
+	v *models.Video,
+	cu *models.ChannelURL,
+	c *models.Channel,
+	cs interfaces.ChannelStore,
+	vs interfaces.VideoStore,
+	dirParser *parsing.Directory,
+	dlTracker *downloads.DownloadTracker,
+) (bool, error) {
+	proceed, botPauseChannel, err := processJSON(procCtx, v, cu, c, vs, dirParser, dlTracker)
+	if err != nil {
+		return false, handleBotError(cs, c, cu, v.URL, botPauseChannel, err, "JSON processing")
+	}
+
+	return proceed, nil
+}
+
+// handleBotError handles bot detection errors with channel blocking.
+func handleBotError(
+	cs interfaces.ChannelStore,
+	c *models.Channel,
+	cu *models.ChannelURL,
+	videoURL string,
+	botPauseChannel bool,
+	err error,
+	phase string,
+) error {
+	if botPauseChannel {
+		if blockErr := blockChannelBotDetected(cs, c, cu); blockErr != nil {
+			logging.E("Failed to block channel: %v", blockErr)
+		}
+	}
+	return fmt.Errorf("%s error for video URL %q: %w", phase, videoURL, err)
 }
 
 // markVideoComplete marks a video as complete.
@@ -320,11 +353,11 @@ func parseVideoJSONDirs(v *models.Video, dirParser *parsing.Directory) (jsonDir,
 
 		jsonDir, err = dirParser.ParseDirectory(cSettings.JSONDir, v, "JSON")
 		if err != nil {
-			logging.E(0, "Failed to parse JSON directory %q", cSettings.JSONDir)
+			logging.E("Failed to parse JSON directory %q", cSettings.JSONDir)
 		}
 		videoDir, err = dirParser.ParseDirectory(cSettings.VideoDir, v, "video")
 		if err != nil {
-			logging.E(0, "Failed to parse video directory %q", cSettings.VideoDir)
+			logging.E("Failed to parse video directory %q", cSettings.VideoDir)
 		}
 	}
 

@@ -13,15 +13,10 @@ import (
 func IsPrivateNetwork(host string) bool {
 	h, _, err := net.SplitHostPort(host)
 	if err != nil {
-		if u, err := url.Parse(host); err == nil { // err IS nil
+		if u, parseErr := url.Parse(host); parseErr == nil {
 			h = u.Hostname()
 		} else {
-			parts := strings.Split(host, ":")
-			if _, afterProto, found := strings.Cut(parts[0], "//"); found {
-				h = afterProto
-			} else {
-				h = parts[0]
-			}
+			h = host // (Fallback unlikely to ever be used)
 		}
 	}
 
@@ -91,7 +86,7 @@ func IsPrivateNetworkFallback(h string) bool {
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil || n < 0 || n > 255 {
-				logging.E(0, "Malformed IP string %q", h)
+				logging.E("Malformed IP string %q", h)
 				return false
 			}
 			octets[i] = n
@@ -106,7 +101,7 @@ func IsPrivateNetworkFallback(h string) bool {
 		}
 	}
 
-	logging.E(0, "Failed to resolve hostname %q", h)
+	logging.E("Failed to resolve hostname %q", h)
 	return false
 }
 

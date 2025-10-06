@@ -19,7 +19,7 @@ func main() {
 	startTime := time.Now()
 	store, progControl, err := initializeApplication(startTime)
 	if err != nil {
-		logging.E(0, "error initializing Tubarr: %v", err)
+		logging.E("error initializing Tubarr: %v", err)
 		return
 	}
 	logging.I("Tubarr (PID: %d) started at: %v", progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
@@ -46,7 +46,7 @@ func main() {
 	// Check channels
 	if cfg.GetBool(keys.CheckChannels) {
 		if err := app.CheckChannels(store, ctx); err != nil {
-			logging.E(0, "Encountered errors while checking channels: %v\n", err)
+			logging.E("Encountered errors while checking channels: %v\n", err)
 			return
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"strings"
+	"sync"
 	"tubarr/internal/auth"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -16,18 +17,20 @@ import (
 	"golang.org/x/net/html"
 )
 
+var globalAuthCache sync.Map
+
 // channelAuth authenticates a user for a given channel, if login credentials are present.
 func (s *Scraper) channelAuth(channelHostname string, a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie, error) {
 	// First check exact hostname
-	if s.authCache[channelHostname] != nil {
-		return s.authCache[channelHostname], nil
+	if val, ok := globalAuthCache.Load(channelHostname); ok {
+		return val.([]*http.Cookie), nil
 	}
 
 	// Then check base domain as fallback
 	baseDomain, err := baseDomain(channelHostname)
 	if err == nil && baseDomain != channelHostname {
-		if s.authCache[baseDomain] != nil {
-			return s.authCache[baseDomain], nil
+		if val, ok := globalAuthCache.Load(baseDomain); ok {
+			return val.([]*http.Cookie), nil
 		}
 	}
 
@@ -36,7 +39,7 @@ func (s *Scraper) channelAuth(channelHostname string, a *models.ChannelAccessDet
 	if err != nil {
 		return nil, err
 	}
-	s.authCache[channelHostname] = cookies
+	globalAuthCache.Store(channelHostname, cookies)
 
 	// Return cookies
 	return cookies, nil
@@ -64,7 +67,7 @@ func login(a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie,
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			logging.E(0, "failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
+			logging.E("failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
 		}
 	}()
 
@@ -100,7 +103,7 @@ func login(a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie,
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			logging.E(0, "failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
+			logging.E("failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
 		}
 	}()
 

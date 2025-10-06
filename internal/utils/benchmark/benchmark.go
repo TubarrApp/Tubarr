@@ -96,28 +96,28 @@ func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
 	if b.cpuFile != nil {
 		pprof.StopCPUProfile()
 		if err := b.cpuFile.Close(); err != nil {
-			logging.E(0, "Failed to close file %q: %v", b.cpuFile.Name(), err)
+			logging.E("Failed to close file %q: %v", b.cpuFile.Name(), err)
 		}
 	}
 
 	if b.traceFile != nil {
 		if err := b.traceFile.Close(); err != nil {
-			logging.E(0, "Failed to close file %q: %v", b.traceFile.Name(), err)
+			logging.E("Failed to close file %q: %v", b.traceFile.Name(), err)
 		}
 	}
 
 	if b.memFile != nil {
 		runtime.GC()
 		if err := pprof.WriteHeapProfile(b.memFile); err != nil {
-			logging.E(0, "Could not write memory profile: %v", err)
+			logging.E("Could not write memory profile: %v", err)
 		}
 		if err := b.memFile.Close(); err != nil {
-			logging.E(0, "Failed to close file %q: %v", b.memFile.Name(), err)
+			logging.E("Failed to close file %q: %v", b.memFile.Name(), err)
 		}
 	}
 
 	if setupErr != nil {
-		logging.E(0, "Benchmarking failure: %v", setupErr)
+		logging.E("Benchmarking failure: %v", setupErr)
 	}
 
 	logging.I("%s", noErrExit)

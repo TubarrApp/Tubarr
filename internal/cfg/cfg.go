@@ -76,7 +76,7 @@ var rootCmd = &cobra.Command{
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		if benchmarking {
 			if benchFiles == nil {
-				logging.E(0, "Null benchFiles")
+				logging.E("Null benchFiles")
 				return
 			}
 			benchmark.CloseBenchFiles(benchFiles, fmt.Sprintf("Benchmark ended at %v", time.Now().Format(time.RFC1123Z)), nil)

@@ -855,7 +855,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 				logging.I("Running an 'ignore crawl'...")
 				cID := strconv.FormatInt(channelID, 10)
 				if err := cs.CrawlChannelIgnore("id", cID, s, ctx); err != nil {
-					logging.E(0, "Failed to complete ignore crawl run: %v", err)
+					logging.E("Failed to complete ignore crawl run: %v", err)
 				}
 			}
 
@@ -1114,13 +1114,14 @@ func updateChannelSettingsCmd(cs interfaces.ChannelStore) *cobra.Command {
 				}
 			}
 
-			// Parse and set authentication details if set by user, clear all if flag is set
-			if cmd.Flags().Changed(keys.AuthUsername) ||
+			// Check if the user got auth details from flags
+			gotAuthDetails := cmd.Flags().Changed(keys.AuthUsername) ||
 				cmd.Flags().Changed(keys.AuthPassword) ||
 				cmd.Flags().Changed(keys.AuthURL) ||
-				cmd.Flags().Changed(keys.AuthDetails) ||
-				deleteAuth {
+				cmd.Flags().Changed(keys.AuthDetails)
 
+			// Parse and set authentication details if set by user, clear all if flag is set
+			if gotAuthDetails || deleteAuth {
 				// Get and check ID
 				id, err := cs.GetChannelID(key, val)
 				if err != nil {
@@ -1315,7 +1316,7 @@ func updateChannelValue(cs interfaces.ChannelStore) *cobra.Command {
 func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	notifyURLs, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {
-		logging.E(0, "Unable to fetch notification URLs for channel %q: %v", c.Name, err)
+		logging.E("Unable to fetch notification URLs for channel %q: %v", c.Name, err)
 	}
 
 	s := c.ChanSettings
@@ -1414,7 +1415,7 @@ func UpdateFromConfig(cs interfaces.ChannelStore, c *models.Channel) {
 
 	if c.ChanSettings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
 		if err := updateChannelFromConfig(cs, c); err != nil {
-			logging.E(0, "failed to update from config file %q: %v", c.ChanSettings.ChannelConfigFile, err)
+			logging.E("failed to update from config file %q: %v", c.ChanSettings.ChannelConfigFile, err)
 		}
 
 		c.UpdatedFromConfig = true

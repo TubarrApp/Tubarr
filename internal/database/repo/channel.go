@@ -143,7 +143,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E(0, "Failed to close rows for notify URLs in channel with ID %d", id)
+			logging.E("Failed to close rows for notify URLs in channel with ID %d", id)
 		}
 	}()
 
@@ -218,7 +218,7 @@ func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.N
 	defer func() {
 		if err != nil {
 			if err := tx.Rollback(); err != nil {
-				logging.E(0, "Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", channelID, notifications, err)
+				logging.E("Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", channelID, notifications, err)
 			}
 		}
 	}()
@@ -657,7 +657,7 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, hasRows 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E(0, "Failed to close rows: %v", err)
+			logging.E("Failed to close rows: %v", err)
 		}
 	}()
 
@@ -830,8 +830,12 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 
 	// Print SQL query
 	if logging.Level > 1 {
-		sqlStr, args, _ := query.ToSql()
-		fmt.Printf("Executing SQL: %s with args: %v\n", sqlStr, args)
+		sqlStr, args, err := query.ToSql()
+		if err != nil {
+			logging.W("Cannot print SQL string for update query in channel with %s %q: %v", key, val, err)
+		} else {
+			logging.P("Executing SQL: %s with args: %v\n", sqlStr, args)
+		}
 	}
 
 	// Execute query
@@ -906,7 +910,7 @@ func (cs *ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err e
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E(0, "Failed to close rows for channel %v: %v", c.Name, err)
+			logging.E("Failed to close rows for channel %v: %v", c.Name, err)
 		}
 	}()
 
@@ -951,7 +955,7 @@ func (cs *ChannelStore) FetchChannelURLModels(channelID int64) ([]*models.Channe
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E(0, "Failed to close rows: %v", err)
+			logging.E("Failed to close rows: %v", err)
 		}
 	}()
 
@@ -1044,7 +1048,7 @@ func (cs *ChannelStore) channelExists(key, val string) bool {
 		RunWith(cs.DB)
 
 	if err := query.QueryRow().Scan(&count); err != nil {
-		logging.E(0, "failed to check if channel exists with key=%s val=%s: %v", key, val, err)
+		logging.E("failed to check if channel exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}
 	return count > 0
@@ -1060,7 +1064,7 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 		RunWith(cs.DB)
 
 	if err := query.QueryRow().Scan(&count); err != nil {
-		logging.E(0, "failed to check if channel URL exists with key=%s val=%s: %v", key, val, err)
+		logging.E("failed to check if channel URL exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}
 	return count > 0
@@ -1078,7 +1082,7 @@ func (cs ChannelStore) channelExistsID(id int64) bool {
 	if err := query.QueryRow().Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return false
 	} else if err != nil {
-		logging.E(0, "Failed to check if channel with ID %d exists", id)
+		logging.E("Failed to check if channel with ID %d exists", id)
 		return exists
 	}
 	return exists
@@ -1113,7 +1117,7 @@ func (cs *ChannelStore) fetchChannelURLModelsMap(channelID int64) (map[int64][]*
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E(0, "Failed to close rows: %v", err)
+			logging.E("Failed to close rows: %v", err)
 		}
 	}()
 

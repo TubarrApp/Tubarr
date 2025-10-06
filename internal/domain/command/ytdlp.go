@@ -1,3 +1,4 @@
+// Package command holds constants used for building argument strings for commands.
 package command
 
 // General

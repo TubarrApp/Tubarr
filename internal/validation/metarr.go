@@ -29,56 +29,60 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 		split := EscapedSplit(opPart, ':')
 
 		switch len(split) {
-		// 'director:set:Spielberg'
+		// e.g. 'director:set:Spielberg'
 		case 3:
 			action := split[1]
-			switch action {
-			case "append", "copy-to", "paste-from", "prefix", "trim-prefix",
-				"trim-suffix", "replace", "set":
+			validActions := map[string]struct{}{
+				"append": {}, "copy-to": {}, "paste-from": {}, "prefix": {},
+				"trim-prefix": {}, "trim-suffix": {}, "replace": {}, "set": {},
+			}
 
-				// Build uniqueness key
-				key := strings.Join([]string{split[0], action, split[2]}, ":")
-
-				if exists[key] {
-					logging.I(dupMsg, opPart)
-					continue
-				}
-
-				exists[key] = true
-				if opURL != "" {
-					opPart = opURL + "|" + opPart
-				}
-				valid = append(valid, opPart)
-
-			default:
+			if _, ok := validActions[action]; !ok {
 				return nil, fmt.Errorf("invalid meta operation %q", action)
 			}
 
-			// 'title:date-tag:suffix:ymd'
-		case 4:
-			if split[1] == "date-tag" {
-				switch split[2] {
-				case "prefix", "suffix":
-					if ValidateDateFormat(split[3]) {
-						// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
-						key := strings.Join([]string{split[0], "date-tag", split[2]}, ":")
+			// Build uniqueness key
+			key := strings.Join([]string{split[0], action, split[2]}, ":")
 
-						if exists[key] {
-							logging.I(dupMsg, opPart)
-							continue
-						}
-
-						exists[key] = true
-						if opURL != "" {
-							opPart = opURL + "|" + opPart
-						}
-						valid = append(valid, opPart)
-					}
-				default:
-					return nil, fmt.Errorf("invalid date tag location %q, use prefix or suffix", split[2])
-				}
+			if exists[key] {
+				logging.I(dupMsg, opPart)
+				continue
 			}
 
+			exists[key] = true
+			if opURL != "" {
+				opPart = opURL + "|" + opPart
+			}
+			valid = append(valid, opPart)
+
+			// e.g. 'title:date-tag:suffix:ymd'
+		case 4:
+			if split[1] != "date-tag" {
+				break
+			}
+
+			loc := split[2]
+			if loc != "prefix" && loc != "suffix" {
+				return nil, fmt.Errorf("invalid date tag location %q, use prefix or suffix", loc)
+			}
+
+			if !ValidateDateFormat(split[3]) {
+				break
+			}
+
+			// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
+			key := strings.Join([]string{split[0], "date-tag", loc}, ":")
+
+			if exists[key] {
+				logging.I(dupMsg, opPart)
+				break
+			}
+
+			exists[key] = true
+			if opURL != "" {
+				opPart = opURL + "|" + opPart
+			}
+			valid = append(valid, opPart)
 		default:
 			return nil, fmt.Errorf("invalid meta op %q", opPart)
 		}
@@ -129,7 +133,7 @@ func ValidateDateFormat(dateFmt string) bool {
 			return true
 		}
 	}
-	logging.E(0, "Invalid date format entered as %q, please enter up to three characters (where 'Y' is yyyy and 'y' is yy)", dateFmt)
+	logging.E("Invalid date format entered as %q, please enter up to three characters (where 'Y' is yyyy and 'y' is yy)", dateFmt)
 	return false
 }
 

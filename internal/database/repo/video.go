@@ -42,7 +42,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E(0, "Error rolling back transaction: %v", rollbackErr)
+				logging.E("Error rolling back transaction: %v", rollbackErr)
 			}
 		}
 	}()
@@ -158,7 +158,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (videoID int6
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E(0, "Error rolling back transaction for video %q: %v", v.URL, rollbackErr)
+				logging.E("Error rolling back transaction for video %q: %v", v.URL, rollbackErr)
 			}
 		}
 	}()
@@ -240,7 +240,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, c *models.Channel) error {
 	defer func() {
 		if !committed {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E(0, "Error rolling back download status for video with URL %s: %v", v.URL, rollbackErr)
+				logging.E("Error rolling back download status for video with URL %s: %v", v.URL, rollbackErr)
 			}
 		}
 	}()
@@ -344,7 +344,7 @@ func (vs *VideoStore) videoExists(v *models.Video, c *models.Channel) (int64, bo
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, false
 	} else if err != nil {
-		logging.E(0, "Error checking if video exists: %v", err)
+		logging.E("Error checking if video exists: %v", err)
 		return 0, false
 	}
 

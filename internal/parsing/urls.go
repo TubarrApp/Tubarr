@@ -40,7 +40,7 @@ func (up *URLFileParser) ParseURLs() ([]string, error) {
 	defer func() {
 		if err := f.Close(); err != nil {
 			errMsg := err.Error()
-			logging.E(0, "Failed to close file %q: %s", up.Filepath, errMsg)
+			logging.E("Failed to close file %q: %s", up.Filepath, errMsg)
 		}
 	}()
 
@@ -55,7 +55,7 @@ func (up *URLFileParser) ParseURLs() ([]string, error) {
 
 		parsedURL, err := url.Parse(u)
 		if err != nil {
-			logging.E(0, "URL %q is invalid: %v", u, err)
+			logging.E("URL %q is invalid: %v", u, err)
 			continue
 		}
 		urls[parsedURL.String()] = struct{}{}

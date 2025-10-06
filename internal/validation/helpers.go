@@ -56,7 +56,7 @@ func CheckForOpURL(op string) (chanURL string, ops string) {
 	u := split[0]
 
 	if _, err := url.ParseRequestURI(u); err != nil {
-		logging.E(1, "invalid URL format grabbed as %q. Ignore this if the filter (%q) does not contain a channel URL (format is 'channel URL|filter:ops:go:here')", u, op)
+		logging.W("Invalid URL format grabbed as %q. Ignore this if the filter (%q) does not contain a channel URL (format is 'channel URL|filter:ops:go:here')", u, op)
 		return "", strings.Join(split[1:], "|")
 	}
 

@@ -40,7 +40,10 @@ func (pc *ProgControl) StartTubarr() (pid int, err error) {
 	}
 
 	pid = os.Getpid()
-	host, _ := os.Hostname()
+	host, err := os.Hostname()
+	if err != nil {
+		logging.E("Failed to get device hostname: %v", err)
+	}
 
 	now := time.Now()
 	query := squirrel.
@@ -66,7 +69,10 @@ func (pc *ProgControl) QuitTubarr() error {
 	}
 
 	now := time.Now()
-	host, _ := os.Hostname()
+	host, err := os.Hostname()
+	if err != nil {
+		logging.E("Failed to get device hostname: %v", err)
+	}
 
 	query := squirrel.
 		Update(consts.DBProgram).
@@ -117,7 +123,7 @@ func (pc *ProgControl) checkProgRunning() (int, bool) {
 		RunWith(pc.DB)
 
 	if err := query.QueryRow().Scan(&running, &pid); err != nil {
-		logging.E(0, "Failed to query program running row: %v", err)
+		logging.E("Failed to query program running row: %v", err)
 		return pid, false
 	}
 

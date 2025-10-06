@@ -98,48 +98,50 @@ func parseURLDirPair(pair string) (u string, d string, err error) {
 }
 
 // ValidateDirectory validates that the directory exists, else creates it if desired.
-func ValidateDirectory(d string, createIfNotFound bool) (os.FileInfo, error) {
-	possibleTemplate := strings.Contains(d, "{{") && strings.Contains(d, "}}")
-	logging.D(3, "Statting directory %q. Templating detected? %v...", d, possibleTemplate)
+func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
+	possibleTemplate := strings.Contains(dir, "{{") && strings.Contains(dir, "}}")
+	logging.D(3, "Statting directory %q. Templating detected? %v...", dir, possibleTemplate)
 
 	// Handle templated directories
 	if possibleTemplate {
-		if !checkTemplateTags(d) {
+		if !checkTemplateTags(dir) {
 			t := make([]string, 0, len(templates.TemplateMap))
 			for k := range templates.TemplateMap {
 				t = append(t, k)
 			}
 			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
 		}
-		logging.D(3, "Directory %q appears to contain templating elements, will not stat", d)
+		logging.D(3, "Directory %q appears to contain templating elements, will not stat", dir)
 		return nil, nil // templates are valid, no need to stat
 	}
 
 	// Check directory existence
-	dirInfo, err := os.Stat(d)
+	dirInfo, err := os.Stat(dir)
 	switch {
 	case err == nil:
 		// path exists, ensure it's a directory
 		if !dirInfo.IsDir() {
-			return dirInfo, fmt.Errorf("path %q is a file, not a directory", d)
+			return dirInfo, fmt.Errorf("path %q is a file, not a directory", dir)
 		}
 		return dirInfo, nil
 
 	case os.IsNotExist(err):
 		// path does not exist
 		if createIfNotFound {
-			logging.D(3, "Directory %q does not exist, creating it...", d)
-			if err := os.MkdirAll(d, 0o755); err != nil {
-				return nil, fmt.Errorf("directory %q does not exist and failed to create: %w", d, err)
+			logging.D(3, "Directory %q does not exist, creating it...", dir)
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, fmt.Errorf("directory %q does not exist and failed to create: %w", dir, err)
 			}
-			dirInfo, _ = os.Stat(d) // re-stat to get correct FileInfo
+			if dirInfo, err = os.Stat(dir); err != nil { // re-stat to get correct FileInfo
+				return dirInfo, fmt.Errorf("failed to stat %q", dir)
+			}
 			return dirInfo, nil
 		}
-		return nil, fmt.Errorf("directory %q does not exist", d)
+		return nil, fmt.Errorf("directory %q does not exist", dir)
 
 	default:
 		// other error
-		return nil, fmt.Errorf("failed to stat directory %q: %w", d, err)
+		return nil, fmt.Errorf("failed to stat directory %q: %w", dir, err)
 	}
 }
 
@@ -348,7 +350,7 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 		split := EscapedSplit(op, ':')
 
 		if len(split) < 3 {
-			logging.E(0, formatErrorMsg)
+			logging.E(formatErrorMsg)
 			return nil, errors.New("filter format error")
 		}
 
@@ -363,7 +365,7 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 
 		// Validate contains/omits
 		if containsOmits != "contains" && containsOmits != "omits" {
-			logging.E(0, formatErrorMsg)
+			logging.E(formatErrorMsg)
 			return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
 		}
 
@@ -469,11 +471,21 @@ func ValidateToFromDate(d string) (string, error) {
 		}
 	}
 
-	// Validate ranges
-	yearInt, _ := strconv.Atoi(year)
-	monthInt, _ := strconv.Atoi(month)
-	dayInt, _ := strconv.Atoi(day)
+	// Convert to integers
+	yearInt, err := strconv.Atoi(year)
+	if err != nil {
+		return "", fmt.Errorf("unable to convert year %q", year)
+	}
+	monthInt, err := strconv.Atoi(month)
+	if err != nil {
+		return "", fmt.Errorf("unable to convert month %q", month)
+	}
+	dayInt, err := strconv.Atoi(day)
+	if err != nil {
+		return "", fmt.Errorf("unable to convert day %q", day)
+	}
 
+	// Check validity
 	if yearInt < 1000 || yearInt > 9999 {
 		return "", fmt.Errorf("invalid year in yyyy-mm-dd date %q: year must be 4 digits", d)
 	}

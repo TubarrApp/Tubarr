@@ -45,7 +45,7 @@ func (t *DownloadTracker) Stop() {
 // sendUpdate constructs the update and sends it into the processing channel.
 func (t *DownloadTracker) sendUpdate(v *models.Video) {
 	if v == nil || v.URL == "" {
-		logging.E(0, "Invalid video struct before status update: %+v", v)
+		logging.E("Invalid video struct before status update: %+v", v)
 		return
 	}
 
@@ -100,7 +100,7 @@ func (t *DownloadTracker) flushUpdates(ctx context.Context, updates []models.Sta
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if err := t.dlStore.UpdateDownloadStatuses(ctx, updates); err != nil {
 			if attempt == maxRetries-1 {
-				logging.E(0, "Failed to update download statuses after %d attempts: %v", maxRetries, err)
+				logging.E("Failed to update download statuses after %d attempts: %v", maxRetries, err)
 				return
 			}
 			logging.W("Retrying update after failure (attempt %d/%d): %v",

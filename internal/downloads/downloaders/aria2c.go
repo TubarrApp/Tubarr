@@ -17,7 +17,7 @@ func Aria2OutputParser(line string, uri string, totalItemCount, downloadedItemCo
 	if matches := regex.AriaItemCountCompile().FindStringSubmatch(line); matches != nil {
 		count, err := strconv.Atoi(matches[1])
 		if err != nil {
-			logging.E(0, "Failed to parse Aria2 batch count from line %q: %v", line, err)
+			logging.E("Failed to parse Aria2 batch count from line %q: %v", line, err)
 			count = 0
 		}
 		logging.D(1, "New aria2 batch detected: %d item(s)", count)

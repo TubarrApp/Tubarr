@@ -1,52 +1,89 @@
 linters-settings:
   cyclop:
-    max-complexity: 15
+    max-complexity: 12
   gocognit:
-    min-complexity: 15
+    min-complexity: 12
   gocyclo:
-    min-complexity: 15
+    min-complexity: 12
   lll:
     line-length: 120
   funlen:
-    lines: 100
+    lines: 80
+    statements: 50
+  dupl:
+    threshold: 150
+  revive:
+    severity: warning
+    confidence: 0.8
+  depguard:
+    list-type: deny
+    include-go-root: false
+    packages:
+      - github.com/pkg/errors
+    packages-with-error-message:
+      github.com/pkg/errors: "Use the standard 'errors' package or Go 1.13+ error wrapping instead."
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
 
 linters:
   enable:
-    - bodyclose
-    - contextcheck
-    - errcheck
-    - errorlint
-    - gofmt
-    - goimports
+    # Core correctness & safety
     - govet
-    - ineffassign
-    - misspell
     - staticcheck
-    - stylecheck
     - typecheck
     - unused
+    - errcheck
+    - errorlint
+    - ineffassign
+    - contextcheck
+
+    # Style & consistency
+    - gofmt
+    - goimports
+    - misspell
+    - stylecheck
+    - revive
+    # - lll
+    - bodyclose
+
+    # Complexity & structure
+    - cyclop
+    - gocognit
+    - gocyclo
+    # - funlen
+    - dupl
+    - nestif
+
+    # Modernization & best practices
+    - gosimple
+    - prealloc
+    - unparam
+    - nilerr
+    - makezero
+
+    # Concurrency / loop safety
+    - copyloopvar
+    - tenv
 
 presets:
   - bugs
-  - comment
-  - complexity
   - error
-  - format
-  - import
-  - metalinter
-  - module
   - performance
-  - sql
   - style
-  - test
   - unused
 
 run:
   timeout: 5m
   tests: true
+  modules-download-mode: readonly
+  allow-parallel-runners: true
 
 issues:
   exclude-use-default: false
+  exclude-dirs:
+    - vendor
+    - generated
   exclude-rules:
     - path: _test\.go
       linters:
@@ -55,21 +92,10 @@ issues:
         - dupl
       text: "is duplicated"
     - linters:
-        - gocyclo
-      text: "function is too complex"
-    - linters:
-        - gocognit
-      text: "function is too complex"
-    - linters:
-        - funlen
-      text: "function is too long"
-    - linters:
         - lll
       text: "line is too long"
   exclude-files:
     - generated.go
-  exclude-dirs:
-    - vendor
 
 output:
   formats:
@@ -83,5 +109,4 @@ output:
   max-issues-per-linter: 0
   max-same-issues: 0
 
-# Enable only fast linters from enabled linters set (first run won't be fast)
 fast: false

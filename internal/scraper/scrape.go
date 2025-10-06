@@ -36,7 +36,6 @@ import (
 type Scraper struct {
 	cookies   *CookieManager
 	collector *colly.Collector
-	authCache map[string][]*http.Cookie
 }
 
 type urlPattern struct {
@@ -75,7 +74,6 @@ func New() *Scraper {
 	return &Scraper{
 		cookies:   NewCookieManager(),
 		collector: colly.NewCollector(),
-		authCache: make(map[string][]*http.Cookie),
 	}
 }
 
@@ -160,14 +158,14 @@ func (s *Scraper) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 	return newRequests, nil
 }
 
-// GetChannelAccessDetails returns channel access details for a given video.
+// GetChannelCookies returns channel access details for a given video.
 func (s *Scraper) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL, ctx context.Context) (cookies []*http.Cookie, cookieFilePath string, err error) {
 
 	// Fetch auth details if this is a manual entry or not from DB
 	if cu.IsManual || cu.ID == 0 {
 		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
 		if err != nil {
-			logging.E(0, "Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
+			logging.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
 		}
 	}
 
@@ -198,7 +196,7 @@ func (s *Scraper) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channe
 			return nil, "", ctx.Err()
 		}
 		if err != nil {
-			logging.E(0, "Failed to get auth cookies for %q: %v", cu.URL, err)
+			logging.E("Failed to get auth cookies for %q: %v", cu.URL, err)
 		}
 	}
 
@@ -206,7 +204,7 @@ func (s *Scraper) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channe
 	if c.ChanSettings.UseGlobalCookies {
 		regCookies, err = s.cookies.GetCookies(cu.URL)
 		if err != nil {
-			logging.E(0, "Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookieSource, err)
+			logging.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookieSource, err)
 		}
 	}
 
@@ -353,10 +351,11 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)
 	}
-	if cookies, ok := s.authCache[parsedURL.Host]; ok {
+	if val, ok := globalAuthCache.Load(parsedURL.Host); ok {
+		cookies := val.([]*http.Cookie)
 		jar.SetCookies(parsedURL, cookies)
 	} else {
-		return fmt.Errorf("no authentication cookies available for %s", parsedURL.Host)
+		logging.W("no authentication cookies available for %q", parsedURL.Host)
 	}
 
 	// Create a Colly collector with the custom HTTP client
@@ -391,7 +390,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 		// Description
 		description, err := doc.Find("#about .raised-content").Html()
 		if err != nil {
-			logging.E(0, "Failed to grab description: %v", err.Error())
+			logging.E("Failed to grab description: %v", err.Error())
 			return
 		}
 
@@ -424,7 +423,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 		if date != "" {
 			parsedDate, err := parsing.ParseWordDate(date)
 			if err != nil {
-				logging.E(0, err.Error())
+				logging.E(err.Error())
 			}
 			logging.D(2, "Scraped release date: %s", date)
 			metadata["release_date"] = parsedDate
@@ -493,7 +492,7 @@ func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename stri
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E(0, "failed to close file %v due to error: %v", filePath, err)
+			logging.E("failed to close file %v due to error: %v", filePath, err)
 		}
 	}()
 

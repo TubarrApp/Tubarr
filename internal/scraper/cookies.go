@@ -49,10 +49,7 @@ func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 	cm.mu.RUnlock()
 
 	// Load cookies for domain
-	cookies, err := cm.loadCookiesForDomain(baseURL)
-	if err != nil {
-		return nil, err
-	}
+	cookies := cm.loadCookiesForDomain(baseURL)
 
 	// Store cookies
 	cm.mu.Lock()
@@ -63,9 +60,9 @@ func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 }
 
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
-func (cm *CookieManager) loadCookiesForDomain(domain string) ([]*http.Cookie, error) {
+func (cm *CookieManager) loadCookiesForDomain(domain string) []*http.Cookie {
 	var cookies []*http.Cookie
-	var attempted []string
+	attempted := make([]string, 0, len(cm.stores))
 
 	for _, store := range cm.stores {
 		browserName := store.Browser()
@@ -88,7 +85,7 @@ func (cm *CookieManager) loadCookiesForDomain(domain string) ([]*http.Cookie, er
 		logging.I("No cookies found for %s", domain)
 	}
 
-	return cookies, nil
+	return cookies
 }
 
 // convertToHTTPCookies converts kooky cookies to http.Cookie format.
@@ -121,7 +118,7 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E(0, "failed to close file %q due to error: %v", cookieFilePath, err)
+			logging.E("failed to close file %q due to error: %v", cookieFilePath, err)
 		}
 	}()
 

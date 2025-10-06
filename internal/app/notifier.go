@@ -91,7 +91,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				logging.E(0, "Failed to close HTTP response body: %v", err)
+				logging.E("Failed to close HTTP response body: %v", err)
 			}
 		}()
 

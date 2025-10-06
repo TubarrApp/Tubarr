@@ -20,7 +20,7 @@ func startHeartbeat(progControl *repo.ProgControl, ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := progControl.UpdateHeartbeat(); err != nil {
-				logging.E(0, "Failed to update heartbeat for process ID %d: %v", progControl.ProcessID, err)
+				logging.E("Failed to update heartbeat for process ID %d: %v", progControl.ProcessID, err)
 			}
 		}
 	}
@@ -31,11 +31,11 @@ func cleanup(progControl *repo.ProgControl) {
 	defer func() {
 		r := recover() // grab panic condition
 		if r != nil {
-			logging.E(0, "Panic occurred: %v", r)
+			logging.E("Panic occurred: %v", r)
 		}
 
 		if err := progControl.QuitTubarr(); err != nil {
-			logging.E(0, "!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes)")
+			logging.E("!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes)")
 		}
 
 		if r != nil {

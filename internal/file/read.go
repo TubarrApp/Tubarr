@@ -16,7 +16,7 @@ func ReadFileLines(path string) ([]string, error) {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E(0, "failed to close file %v due to error: %v", path, err)
+			logging.E("failed to close file %v due to error: %v", path, err)
 		}
 	}()
 

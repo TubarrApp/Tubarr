@@ -181,7 +181,9 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	case <-d.Context.Done():
 		// End the command
 		if err := cmd.Cancel(); err != nil {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			if err = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+				logging.E("Failed to kill process %v: %v", cmd.Process.Pid, err)
+			}
 		}
 		return d.Context.Err()
 

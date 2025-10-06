@@ -50,7 +50,7 @@ func (d *Database) initTables() error {
 	defer func() {
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E(0, "transaction rollback failed: %v", rollbackErr)
+				logging.E("transaction rollback failed: %v", rollbackErr)
 			}
 		}
 	}()

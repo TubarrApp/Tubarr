@@ -49,7 +49,7 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) (bool, error) {
 
 		if failHard {
 			if err := removeUnwantedJSON(v.JSONPath); err != nil {
-				logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+				logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 			}
 			return false, nil
 		}
@@ -121,53 +121,85 @@ func checkFilterWithValue(filter models.DLFilters, strVal, filterVal string) (pa
 }
 
 // uploadDateFilter filters a video based on its upload date.
-func uploadDateFilter(v *models.Video) (bool, error) {
-	if !v.UploadDate.IsZero() {
-		uploadDateNum, err := strconv.Atoi(v.UploadDate.Format("20060102"))
-		if err != nil {
-			return false, fmt.Errorf("failed to convert upload date to integer: %w", err)
-		}
-
-		if v.Settings.FromDate != "" {
-			fromDate, err := strconv.Atoi(v.Settings.FromDate)
-			if err != nil {
-				if err := removeUnwantedJSON(v.JSONPath); err != nil {
-					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-				}
-				return false, fmt.Errorf("invalid 'from date' format: %w", err)
-			}
-			if uploadDateNum < fromDate {
-				logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Settings.FromDate)
-				if err := removeUnwantedJSON(v.JSONPath); err != nil {
-					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-				}
-				return false, nil
-			} else {
-				logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
-			}
-		}
-
-		if v.Settings.ToDate != "" {
-			toDate, err := strconv.Atoi(v.Settings.ToDate)
-			if err != nil {
-				if err := removeUnwantedJSON(v.JSONPath); err != nil {
-					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-				}
-				return false, fmt.Errorf("invalid 'to date' format: %w", err)
-			}
-			if uploadDateNum > toDate {
-				logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Settings.ToDate)
-				if err := removeUnwantedJSON(v.JSONPath); err != nil {
-					logging.E(0, "Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-				}
-				return false, nil
-			} else {
-				logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
-			}
-		}
-	} else {
+func uploadDateFilter(v *models.Video) (passed bool, err error) {
+	if v.UploadDate.IsZero() {
 		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
+		return true, nil
 	}
+
+	uploadDateNum, err := strconv.Atoi(v.UploadDate.Format("20060102"))
+	if err != nil {
+		return false, fmt.Errorf("failed to convert upload date to integer: %w", err)
+	}
+
+	// 'From date' filter
+	if passed, err = applyFromDateFilter(v, uploadDateNum); err != nil {
+		return false, err
+	}
+	if !passed {
+		return false, nil
+	}
+
+	// 'To date' filter
+	if passed, err = applyToDateFilter(v, uploadDateNum); err != nil {
+		return false, err
+	}
+	if !passed {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// applyFromDateFilter checks if the video passes the 'from date' filter.
+func applyFromDateFilter(v *models.Video, uploadDateNum int) (passed bool, err error) {
+	if v.Settings.FromDate == "" {
+		return true, nil
+	}
+
+	fromDate, err := strconv.Atoi(v.Settings.FromDate)
+	if err != nil {
+		if err := removeUnwantedJSON(v.JSONPath); err != nil {
+			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+		}
+		return false, fmt.Errorf("invalid 'from date' format: %w", err)
+	}
+
+	if uploadDateNum < fromDate {
+		logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Settings.FromDate)
+		if err := removeUnwantedJSON(v.JSONPath); err != nil {
+			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+		}
+		return false, nil
+	}
+
+	logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
+	return true, nil
+}
+
+// applyToDateFilter checks if the video passes the 'to date' filter.
+func applyToDateFilter(v *models.Video, uploadDateNum int) (passed bool, err error) {
+	if v.Settings.ToDate == "" {
+		return true, nil
+	}
+
+	toDate, err := strconv.Atoi(v.Settings.ToDate)
+	if err != nil {
+		if err := removeUnwantedJSON(v.JSONPath); err != nil {
+			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+		}
+		return false, fmt.Errorf("invalid 'to date' format: %w", err)
+	}
+
+	if uploadDateNum > toDate {
+		logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Settings.ToDate)
+		if err := removeUnwantedJSON(v.JSONPath); err != nil {
+			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+		}
+		return false, nil
+	}
+
+	logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
 	return true, nil
 }
 
@@ -182,14 +214,14 @@ func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFil
 	filterFile := v.Settings.FilterFile
 
 	if filterFile, err = p.ParseDirectory(filterFile, v, "filter-ops"); err != nil {
-		logging.E(0, "Failed to parse directory %q: %v", filterFile, err)
+		logging.E("Failed to parse directory %q: %v", filterFile, err)
 		return nil
 	}
 
 	logging.I("Adding filters from file %q...", filterFile)
 	filters, err := file.ReadFileLines(filterFile)
 	if err != nil {
-		logging.E(0, "Error loading filters from file %q: %v", filterFile, err)
+		logging.E("Error loading filters from file %q: %v", filterFile, err)
 	}
 
 	if len(filters) == 0 {
@@ -199,7 +231,7 @@ func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFil
 
 	validFilters, err := validation.ValidateFilterOps(filters)
 	if err != nil {
-		logging.E(0, "Error loading filters from file %v: %v", filterFile, err)
+		logging.E("Error loading filters from file %v: %v", filterFile, err)
 	}
 	if len(validFilters) > 0 {
 		logging.D(1, "Found following filters in file:\n\n%v", validFilters)
@@ -219,14 +251,14 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 	moveOpFile := v.Settings.MoveOpFile
 
 	if moveOpFile, err = p.ParseDirectory(moveOpFile, v, "move-ops"); err != nil {
-		logging.E(0, "Failed to parse directory %q: %v", moveOpFile, err)
+		logging.E("Failed to parse directory %q: %v", moveOpFile, err)
 		return nil
 	}
 
 	logging.I("Adding filter move operations from file %q...", moveOpFile)
 	moves, err := file.ReadFileLines(moveOpFile)
 	if err != nil {
-		logging.E(0, "Error loading filter move operations from file %q: %v", moveOpFile, err)
+		logging.E("Error loading filter move operations from file %q: %v", moveOpFile, err)
 	}
 
 	if len(moves) == 0 {
@@ -235,7 +267,7 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 
 	validMoves, err := validation.ValidateMoveOps(moves)
 	if err != nil {
-		logging.E(0, "Error loading filter move operations from file %q: %v", moveOpFile, err)
+		logging.E("Error loading filter move operations from file %q: %v", moveOpFile, err)
 	}
 	if len(validMoves) > 0 {
 		logging.D(1, "Found following filter move operations in file:\n\n%v", validMoves)
@@ -248,26 +280,30 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 // removeUnwantedJSON removes filtered out JSON files.
 func removeUnwantedJSON(path string) error {
 	if path == "" {
-		return errors.New("path sent in empty, not removing")
+		err := errors.New("path sent in empty, not removing")
+		return err
 	}
 
 	check, err := os.Stat(path)
 	if err != nil {
-		return fmt.Errorf("not deleting unwanted JSON file, got error: %w", err)
+		err = fmt.Errorf("not deleting unwanted JSON file, got error: %w", err)
+		return err
 	}
 
 	switch {
 	case check.IsDir():
-		return fmt.Errorf("JSON path sent in as a directory %q, not deleting", path)
+		err := fmt.Errorf("JSON path sent in as a directory %q, not deleting", path)
+		return err
 	case !check.Mode().IsRegular():
-		return fmt.Errorf("JSON file %q is not a regular file, not deleting", path)
+		err := fmt.Errorf("JSON file %q is not a regular file, not deleting", path)
+		return err
 	}
 
 	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("failed to remove unwanted JSON file %q due to error %w", path, err)
-	} else {
-		logging.S(0, "Removed unwanted JSON file %q", path)
+		err = fmt.Errorf("failed to remove unwanted JSON file at %q: %w", path, err)
+		return err
 	}
 
+	logging.S(0, "Removed unwanted JSON file %q", path)
 	return nil
 }

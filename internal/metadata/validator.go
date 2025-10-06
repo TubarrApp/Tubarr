@@ -18,13 +18,13 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
-		logging.E(0, "JSON parsing/storage failed for %q: %v", v.URL, err)
+		logging.E("JSON parsing/storage failed for %q: %v", v.URL, err)
 	}
 
 	// Apply filters
 	passedFilters, err := filterRequests(v, cu, c, dirParser)
 	if err != nil {
-		logging.E(0, "filter operation checks failed for %q: %v", v.URL, err)
+		logging.E("filter operation checks failed for %q: %v", v.URL, err)
 	}
 
 	if !jsonValid || !passedFilters {
@@ -45,7 +45,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			logging.E(0, "Failed to close file at %q", v.JSONPath)
+			logging.E("Failed to close file at %q", v.JSONPath)
 		}
 	}()
 

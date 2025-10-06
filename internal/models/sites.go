@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// SITE IS NOT YET IMPLEMENTED
+// Site is not yet implemented.
 type Site struct {
 	ID        int64      `db:"id"`
 	Domain    string     `db:"domain"` // e.g. youtube.com ??? Or just make empty of domain to hold channels ???
@@ -60,7 +60,7 @@ func (c *Channel) GetURLs() []string {
 	return urls
 }
 
-// Needs auth checks if this channel URL has details for authorization.
+// NeedsAuth checks if this channel URL has details for authorization.
 //
 // Returns true if both a username and login URL are provided. Password may be blank.
 func (cu *ChannelURL) NeedsAuth() bool {
@@ -128,7 +128,7 @@ type Video struct {
 	WasSkipped          bool
 }
 
-// Notifications holds notification data for channels.
+// Notification holds notification data for channels.
 type Notification struct {
 	ChannelID  int64
 	ChannelURL string

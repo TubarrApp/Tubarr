@@ -76,7 +76,7 @@ func (d *VideoDownload) Execute() (botPauseChannel bool, err error) {
 
 				// Other errors - continue retry logic
 				lastErr = err
-				logging.E(0, "Download attempt %d failed: %v", attempt, err)
+				logging.E("Download attempt %d failed: %v", attempt, err)
 				d.Video.DownloadStatus.Status = consts.DLStatusFailed
 				d.Video.DownloadStatus.Error = err
 				d.DLTracker.sendUpdate(d.Video)

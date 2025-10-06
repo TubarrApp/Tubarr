@@ -26,7 +26,7 @@ func initializeApplication(startTime time.Time) (store *repo.Store, progControl 
 	benchmark.InjectMainWorkDir(mainGoPath)
 
 	// Setup files/dirs
-	if err := setup.InitCfgFilesDirs(startTime.Format("2006-01-02 15:04:05.00 MST")); err != nil {
+	if err = setup.InitCfgFilesDirs(startTime.Format("2006-01-02 15:04:05.00 MST")); err != nil {
 		fmt.Printf("Tubarr exiting: %v\n", err)
 		os.Exit(0)
 	}
@@ -46,7 +46,7 @@ func initializeApplication(startTime time.Time) (store *repo.Store, progControl 
 	progControl = repo.NewProgController(database.DB)
 	if progControl.ProcessID, err = progControl.StartTubarr(); err != nil {
 		if strings.HasPrefix(err.Error(), "failure:") {
-			logging.E(0, "DB %v\n", err)
+			logging.E("DB %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Printf("Tubarr exiting: %v\n", err)
