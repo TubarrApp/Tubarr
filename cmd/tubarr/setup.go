@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"tubarr/internal/data/database"
-	"tubarr/internal/data/repo"
+	"tubarr/internal/database/db"
+	"tubarr/internal/database/repo"
 	"tubarr/internal/domain/setup"
 	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
@@ -35,15 +35,15 @@ func initializeApplication(startTime time.Time) (store *repo.Store, progControl 
 		setup.DBFilePath, setup.LogFilePath)
 
 	// Database & stores
-	db, err := database.InitDB()
+	database, err := db.InitDB()
 	if err != nil {
 		fmt.Printf("Tubarr exiting: %v\n", err)
 		os.Exit(0)
 	}
-	store = repo.InitStores(db.DB)
+	store = repo.InitStores(database.DB)
 
 	// Start controller
-	progControl = repo.NewProgController(db.DB)
+	progControl = repo.NewProgController(database.DB)
 	if progControl.ProcessID, err = progControl.StartTubarr(); err != nil {
 		if strings.HasPrefix(err.Error(), "failure:") {
 			logging.E(0, "DB %v\n", err)

@@ -1,5 +1,5 @@
-// Package database sets up/opens the program database.
-package database
+// Package db sets up/opens the program database.
+package db
 
 import (
 	"database/sql"

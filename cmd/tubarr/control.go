@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"tubarr/internal/data/repo"
+	"tubarr/internal/database/repo"
 	"tubarr/internal/utils/logging"
 )
 
