@@ -60,7 +60,7 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 
 	// Grab all channels from database
 	cs := s.ChannelStore()
-	channels, err, hasRows := cs.FetchAllChannels()
+	channels, hasRows, err := cs.FetchAllChannels()
 	if !hasRows {
 		logging.I("No channels in database")
 	} else if err != nil {
@@ -86,10 +86,18 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 			continue
 		}
 
-		// Skip if locked due to a bot error
+		// Check if site is blocked or should be unlocked
 		if c.ChanSettings.BotBlocked {
-			logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
-			return nil
+			unlocked, err := cs.CheckAndUnlockChannel(c)
+			if err != nil {
+				logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+				return nil
+			}
+
+			if !unlocked {
+				logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
+				return nil
+			}
 		}
 
 		// Time for a scan?
@@ -143,10 +151,18 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 // ChannelCrawl crawls a channel for new URLs.
 func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) (err error) {
 
-	// Check if site is blocked
+	// Check if site is blocked or should be unlocked
 	if c.ChanSettings.BotBlocked {
-		logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
-		return nil
+		unlocked, err := cs.CheckAndUnlockChannel(c)
+		if err != nil {
+			logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			return nil
+		}
+
+		if !unlocked {
+			logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
+			return nil
+		}
 	}
 
 	// Proceed...
@@ -205,7 +221,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		logging.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
 
 		// Process video batch
-		succeeded, nDownloaded, procErr := InitProcess(s, cu, c, vRequests, ctx)
+		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, vRequests)
 
 		// Succeeded/downloaded
 		if succeeded != 0 {
@@ -247,17 +263,27 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 // Essentially it marks the URLs it finds as though they have already been downloaded.
 func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Context) error {
 
-	// Check if site is blocked
+	cs := s.ChannelStore()
+
+	// Check if site is blocked or should be unlocked
 	if c.ChanSettings.BotBlocked {
-		logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
-		return nil
+		unlocked, err := cs.CheckAndUnlockChannel(c)
+		if err != nil {
+			logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			return nil
+		}
+
+		if !unlocked {
+			logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
+			return nil
+		}
 	}
 
 	// Load in config file
-	cfgchannel.LoadFromConfig(s.ChannelStore(), c)
+	cfgchannel.LoadFromConfig(cs, c)
 
 	// Get new releases
-	videos, err := globalBrowserInstance.GetNewReleases(s.ChannelStore(), c, ctx)
+	videos, err := globalBrowserInstance.GetNewReleases(cs, c, ctx)
 	if err != nil {
 		return err
 	}
@@ -293,10 +319,18 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
 func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, videoURLs []string, ctx context.Context) error {
 
-	// Check if site is blocked
+	// Check if site is blocked or should be unlocked
 	if c.ChanSettings.BotBlocked {
-		logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
-		return nil
+		unlocked, err := cs.CheckAndUnlockChannel(c)
+		if err != nil {
+			logging.E(0, "Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			return nil
+		}
+
+		if !unlocked {
+			logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
+			return nil
+		}
 	}
 
 	// Load config file settings
@@ -414,7 +448,7 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 			continue
 		}
 
-		succeeded, nDownloaded, procErr := InitProcess(s, cu, c, videos, ctx)
+		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, videos)
 		if succeeded != 0 {
 			nSucceeded += succeeded
 			if nDownloaded > 0 {

@@ -576,6 +576,8 @@ func unblockChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			// Send update
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
 				s.BotBlocked = false
+				s.BotBlockedHostname = ""
+				s.BotBlockedTimestamp = time.Time{}
 				return nil
 			})
 			if err != nil {
@@ -988,7 +990,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Fetch channels from database
-			chans, err, hasRows := cs.FetchAllChannels()
+			chans, hasRows, err := cs.FetchAllChannels()
 			if !hasRows {
 				logging.I("No entries in the database")
 				return nil

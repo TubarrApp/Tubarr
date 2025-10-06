@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/interfaces"
@@ -436,6 +437,59 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 	return nil
 }
 
+// CheckAndUnlockChannel checks if a blocked channel has exceeded its timeout and unlocks it.
+//
+// Returns true if the channel was unlocked, false if still blocked.
+func (cs *ChannelStore) CheckAndUnlockChannel(c *models.Channel) (bool, error) {
+
+	// NOT BLOCKED:
+	if !c.ChanSettings.BotBlocked {
+		return true, nil // Not blocked, consider it "unlocked"
+	}
+
+	// BLOCKED LOGIC:
+	logging.W("Channel %q was blocked by %q on %v", c.Name, c.ChanSettings.BotBlockedHostname, c.ChanSettings.BotBlockedTimestamp.Format(time.RFC1123))
+
+	if c.ChanSettings.BotBlockedTimestamp.IsZero() || c.ChanSettings.BotBlockedHostname == "" {
+		return false, nil // Invalid state, keep blocked
+	}
+
+	timeoutMinutes, exists := consts.BotTimeoutMap[c.ChanSettings.BotBlockedHostname]
+	if !exists {
+		return false, nil // No timeout configured for this hostname
+	}
+
+	minutesSinceBlock := time.Since(c.ChanSettings.BotBlockedTimestamp).Minutes()
+	if minutesSinceBlock >= timeoutMinutes {
+
+		// Update in-memory copy
+		c.ChanSettings.BotBlocked = false
+		c.ChanSettings.BotBlockedHostname = ""
+		c.ChanSettings.BotBlockedTimestamp = time.Time{}
+
+		// Unlock the channel
+		_, err := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+			s.BotBlocked = c.ChanSettings.BotBlocked
+			s.BotBlockedHostname = c.ChanSettings.BotBlockedHostname
+			s.BotBlockedTimestamp = c.ChanSettings.BotBlockedTimestamp
+			return nil
+		})
+		if err != nil {
+			return false, fmt.Errorf("failed to unlock channel: %w", err)
+		}
+
+		logging.S(0, "Unlocked channel %d (%s) after timeout for hostname %s", c.ID, c.Name, c.ChanSettings.BotBlockedHostname)
+		return true, nil
+	}
+
+	logging.I("%.0f more minutes before channel unlocks for domain %q. Unlock manually with:\n\ntubarr channel unblock -n %q",
+		(timeoutMinutes - time.Since(c.ChanSettings.BotBlockedTimestamp).Minutes()),
+		c.ChanSettings.BotBlockedHostname,
+		c.Name)
+
+	return false, nil // Still blocked
+}
+
 // CrawlChannelIgnore crawls a channel and adds the latest videos to the ignore list.
 func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, ctx context.Context) error {
 	var (
@@ -580,7 +634,7 @@ func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, boo
 }
 
 // FetchAllChannels retrieves all channels in the database.
-func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err error, hasRows bool) {
+func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, hasRows bool, err error) {
 	query := squirrel.
 		Select(
 			consts.QChanID,
@@ -597,9 +651,9 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 
 	rows, err := query.Query()
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, false
+		return nil, false, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to query channels: %w", err), true
+		return nil, true, fmt.Errorf("failed to query channels: %w", err)
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -623,17 +677,17 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 			&c.CreatedAt,
 			&c.UpdatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("failed to scan channel: %w", err), true
+			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 		}
 
 		if len(settingsJSON) > 0 {
 			if err := json.Unmarshal(settingsJSON, &c.ChanSettings); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal settings: %w", err), true
+				return nil, true, fmt.Errorf("failed to unmarshal settings: %w", err)
 			}
 		}
 		if len(metarrJSON) > 0 {
 			if err := json.Unmarshal(metarrJSON, &c.ChanMetarrArgs); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal metarr settings: %w", err), true
+				return nil, true, fmt.Errorf("failed to unmarshal metarr settings: %w", err)
 			}
 		}
 
@@ -644,7 +698,7 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 
 	urlMap, err := cs.fetchChannelURLModelsMap(0)
 	if err != nil {
-		return nil, err, true
+		return nil, true, err
 	}
 
 	for _, c := range channelList {
@@ -653,7 +707,7 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, err erro
 		}
 	}
 
-	return channelList, nil, len(channelList) > 0
+	return channelList, len(channelList) > 0, nil
 }
 
 // UpdateChannelMetarrArgsJSON updates args for Metarr output.

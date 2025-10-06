@@ -38,3 +38,32 @@ const (
 const (
 	BlockedChannelMessage = "Channel %q is blocked due to bot detection. Unblock with:\n\ntubarr channel unblock -n %q\n"
 )
+
+// Bot timeout map
+var (
+	BotTimeoutMap = map[string]float64{
+
+		// 2880: 48 hours
+		// 1440: 24 hours
+		// 720: 12 hours
+		// 360: 6 hours
+		// 240: 4 hours
+		// 180: 3 hours
+
+		"youtube.com":     2880,
+		"youtu.be":        2880,
+		"twitch.tv":       1440,
+		"twitter.com":     720,
+		"x.com":           720,
+		"reddit.com":      360,
+		"vimeo.com":       480,
+		"dailymotion.com": 360,
+		"tiktok.com":      720,
+		"instagram.com":   1440,
+		"facebook.com":    1440,
+		"soundcloud.com":  480,
+		"bandcamp.com":    240,
+		"streamable.com":  180,
+		"imgur.com":       180,
+	}
+)

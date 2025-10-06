@@ -19,6 +19,8 @@ import (
 	"tubarr/internal/progflags"
 	"tubarr/internal/utils/files"
 	"tubarr/internal/utils/logging"
+
+	"golang.org/x/net/publicsuffix"
 )
 
 // parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
@@ -644,4 +646,34 @@ func ensureManualDownloadsChannelURL(cs interfaces.ChannelStore, channelID int64
 		URL:      manualDownloadsURL,
 		IsManual: true,
 	}, nil
+}
+
+// blockChannelBotDetected blocks a channel due to bot detection on the given URL.
+func blockChannelBotDetected(cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL) error {
+	parsedCURL, err := url.Parse(cu.URL)
+	hostname := parsedCURL.Hostname()
+	if err != nil {
+		logging.E(0, "Could not parse %q, will use full domain", cu.URL)
+		hostname = cu.URL
+	}
+
+	// Extract the eTLD+1 (effective top-level domain + 1 label)
+	// e.g., m.youtube.com -> youtube.com, www.bbc.co.uk -> bbc.co.uk
+	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
+		hostname = strings.ToLower(domain)
+	}
+
+	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+		s.BotBlocked = true
+		s.BotBlockedHostname = hostname
+		s.BotBlockedTimestamp = time.Now()
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to block channel %q due to bot detection: %w", c.Name, err)
+	}
+
+	logging.W("Blocked channel %q due to bot detection on hostname %q", c.Name, hostname)
+	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -20,7 +19,7 @@ import (
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
-func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, videos []*models.Video, ctx context.Context) (nSucceeded int, nDownloaded int, err error) {
+func InitProcess(ctx context.Context, s interfaces.Store, cu *models.ChannelURL, c *models.Channel, videos []*models.Video) (nSucceeded int, nDownloaded int, err error) {
 	var (
 		errs []error
 	)
@@ -69,11 +68,11 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 
 				err := videoJob(
 					procCtx,
+					s.ChannelStore(),
+					s.VideoStore(),
 					v,
 					cu,
 					c,
-					s.ChannelStore(),
-					s.VideoStore(),
 					dirParser,
 					dlTracker,
 					metarrExists)
@@ -143,11 +142,11 @@ func InitProcess(s interfaces.Store, cu *models.ChannelURL, c *models.Channel, v
 // videoJob starts a worker's process for a video.
 func videoJob(
 	procCtx context.Context,
+	cs interfaces.ChannelStore,
+	vs interfaces.VideoStore,
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	cs interfaces.ChannelStore,
-	vs interfaces.VideoStore,
 	dirParser *parsing.Directory,
 	dlTracker *downloads.DownloadTracker,
 	metarrExists bool,
@@ -157,12 +156,11 @@ func videoJob(
 		proceed, botPauseChannel, err := processJSON(procCtx, v, cu, c, vs, dirParser, dlTracker)
 		if err != nil {
 			if botPauseChannel {
-				_, _ = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
-					s.BotBlocked = true
-					return nil
-				})
+				if blockErr := blockChannelBotDetected(cs, c, cu); blockErr != nil {
+					logging.E(0, "Failed to block channel: %v", blockErr)
+				}
 			}
-			return fmt.Errorf("json processing error for video URL %q): %w", v.URL, err)
+			return fmt.Errorf("json processing error for video URL %q: %w", v.URL, err)
 		}
 		if !proceed {
 			logging.I("Skipping further processing for ignored video: %s", v.URL)
@@ -177,15 +175,11 @@ func videoJob(
 	botPauseChannel, err := processVideo(procCtx, v, cu, c, dlTracker)
 	if err != nil {
 		if botPauseChannel {
-			_, pauseErr := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
-				s.Paused = true
-				return nil
-			})
-			if pauseErr != nil {
-				logging.E(0, "Failed to pause channel %q despite bot activity detection", c.Name)
+			if blockErr := blockChannelBotDetected(cs, c, cu); blockErr != nil {
+				logging.E(0, "Failed to block channel: %v", blockErr)
 			}
 		}
-		return fmt.Errorf("video processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
+		return fmt.Errorf("json processing error for video URL %q: %w", v.URL, err)
 	}
 
 	if !metarrExists {

@@ -1,5 +1,9 @@
 package models
 
+import (
+	"time"
+)
+
 // ChannelSettings are the primary settings for a channel, affecting videos belonging to it.
 type ChannelSettings struct {
 	ChannelConfigFile      string      `json:"channel_config_file" mapstructure:"channel-config-file"`
@@ -16,12 +20,14 @@ type ChannelSettings struct {
 	JSONDir                string      `json:"json_directory" mapstructure:"json-directory"`
 	MaxFilesize            string      `json:"max_filesize" mapstructure:"max-filesize"`
 	Paused                 bool        `json:"paused" mapstructure:"pause"`
-	BotBlocked             bool        `json:"bot_blocked"`
 	Retries                int         `json:"download_retries" mapstructure:"download-retries"`
 	ToDate                 string      `json:"to_date" mapstructure:"to-date"`
 	VideoDir               string      `json:"video_directory" mapstructure:"video-directory"`
 	UseGlobalCookies       bool        `json:"use_global_cookies" mapstructure:"use-global-cookies"`
 	YtdlpOutputExt         string      `json:"ytdlp_output_ext" mapstructure:"ytdlp-output-ext"`
+	BotBlocked             bool        `json:"bot_blocked"`
+	BotBlockedHostname     string      `json:"bot_blocked_hostname"`
+	BotBlockedTimestamp    time.Time   `json:"bot_blocked_timestamp"`
 }
 
 // DLFilters are used to filter in or out videos from download by metafields.
