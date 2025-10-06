@@ -36,5 +36,5 @@ const (
 
 // Errors
 const (
-	BlockedChannelMessage = "Channel %q is locked due to bot detection. Unlock with:\n\ntubarr channel unblock -n %q\n"
+	BlockedChannelMessage = "Channel %q is blocked due to bot detection. Unblock with:\n\ntubarr channel unblock -n %q\n"
 )
