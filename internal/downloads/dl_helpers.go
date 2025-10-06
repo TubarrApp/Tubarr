@@ -72,7 +72,7 @@ func (d *JSONDownload) cancelJSONDownload() error {
 
 // checkBotDetection checks and handles detection of bot activity.
 func checkBotDetection(uri string, inputErr error) error {
-	if strings.Contains(strings.ToLower(inputErr.Error()), "confirm you’re not a bot") || // Curly apostrophe
+	if strings.Contains(strings.ToLower(inputErr.Error()), "confirm you’re not a bot") || // Curly apostrophe (used by YouTube)
 		strings.Contains(strings.ToLower(inputErr.Error()), "confirm you're not a bot") || // Straight apostrophe
 		strings.Contains(strings.ToLower(inputErr.Error()), "not a robot") {
 
