@@ -748,7 +748,6 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 			for _, u := range urls {
 				if u != "" {
 
-					logging.I("GETTING AUTH DETAILS FROM MAP. USERNAME: %q LOGINURL %q", authMap[u].Username, authMap[u].LoginURL)
 					// Fill auth details if existent
 					var parsedUsername, parsedPassword, parsedLoginURL string
 					if _, exists := authMap[u]; exists {
@@ -769,10 +768,6 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 					}
 					chanURLs = append(chanURLs, newChanURL)
 				}
-			}
-
-			for _, cu := range chanURLs {
-				logging.I("GOT MODEL WITH USERNAME: %q LOGIN URL %q", cu.Username, cu.LoginURL)
 			}
 
 			// Initialize channel
