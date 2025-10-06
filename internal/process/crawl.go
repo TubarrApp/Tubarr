@@ -88,7 +88,7 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 
 		// Skip if locked due to a bot error
 		if c.ChanSettings.BotBlocked {
-			logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+			logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
 			return nil
 		}
 
@@ -145,7 +145,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	// Check if site is blocked
 	if c.ChanSettings.BotBlocked {
-		logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+		logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
 		return nil
 	}
 
@@ -249,7 +249,7 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 
 	// Check if site is blocked
 	if c.ChanSettings.BotBlocked {
-		logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+		logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
 		return nil
 	}
 
@@ -295,7 +295,7 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 
 	// Check if site is blocked
 	if c.ChanSettings.BotBlocked {
-		logging.I("Channel %q is locked due to bot detection. Unlock with 'tubarr channel unblock -n %q'", c.Name, c.Name)
+		logging.I(consts.BlockedChannelMessage, c.Name, c.Name)
 		return nil
 	}
 

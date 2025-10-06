@@ -33,3 +33,8 @@ const (
 const (
 	BotActivitySentinel = "detected bot activity"
 )
+
+// Errors
+const (
+	BlockedChannelMessage = "Channel %q is locked due to bot detection. Unlock with:\n\ntubarr channel unblock -n %q\n"
+)
