@@ -6,9 +6,10 @@ import (
 	"time"
 )
 
+// SITE IS NOT YET IMPLEMENTED
 type Site struct {
 	ID        int64      `db:"id"`
-	Domain    string     `db:"domain"` // e.g. youtube.com
+	Domain    string     `db:"domain"` // e.g. youtube.com ??? Or just make empty of domain to hold channels ???
 	Name      string     `db:"name"`
 	Channels  []*Channel `json:"channels"`
 	CreatedAt time.Time
@@ -16,6 +17,8 @@ type Site struct {
 }
 
 // Channel is the top level model for a channel.
+//
+// Contains ChannelURL models and top level configuration.
 type Channel struct {
 	ID                int64 `db:"id"`
 	URLModels         []*ChannelURL
@@ -26,6 +29,42 @@ type Channel struct {
 	LastScan          time.Time `db:"last_scan"`
 	CreatedAt         time.Time `db:"created_at"`
 	UpdatedAt         time.Time `db:"updated_at"`
+}
+
+// IsBlocked checks if a channel is currently blocked.
+//
+// Safely returns BotBlocked state.
+func (c *Channel) IsBlocked() bool {
+	return c.ChanSettings != nil && c.ChanSettings.BotBlocked
+}
+
+// ShouldCrawl determines if a channel should be included in the default crawl or not.
+//
+// Returns true if ChanSettings 'Paused' is true OR the time since last scan exceeds the crawl frequency.
+func (c *Channel) ShouldCrawl() bool {
+	if c.ChanSettings.Paused {
+		return false
+	}
+	timeSince := time.Since(c.LastScan)
+	return timeSince >= time.Duration(c.ChanSettings.CrawlFreq)*time.Minute
+}
+
+// GetURLs returns all URL models for a channel.
+func (c *Channel) GetURLs() []string {
+	urls := make([]string, 0, len(c.URLModels))
+	for _, cu := range c.URLModels {
+		if cu.URL != "" {
+			urls = append(urls, cu.URL)
+		}
+	}
+	return urls
+}
+
+// Needs auth checks if this channel URL has details for authorization.
+//
+// Returns true if both a username and login URL are provided. Password may be blank.
+func (cu *ChannelURL) NeedsAuth() bool {
+	return cu.Username != "" && cu.LoginURL != ""
 }
 
 // ChannelURL contains fields relating to a channel's URL.

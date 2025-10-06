@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"tubarr/internal/cfg"
-	"tubarr/internal/cfg/validation"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/validation"
 )
 
 type metCmdMapping struct {

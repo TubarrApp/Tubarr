@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
+	"tubarr/internal/app"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/process"
 	"tubarr/internal/utils/logging"
 )
 
@@ -45,7 +45,7 @@ func main() {
 
 	// Check channels
 	if cfg.GetBool(keys.CheckChannels) {
-		if err := process.CheckChannels(store, ctx); err != nil {
+		if err := app.CheckChannels(store, ctx); err != nil {
 			logging.E(0, "Encountered errors while checking channels: %v\n", err)
 			return
 		}

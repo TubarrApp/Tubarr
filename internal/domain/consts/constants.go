@@ -34,11 +34,6 @@ const (
 	BotActivitySentinel = "detected bot activity"
 )
 
-// Errors
-const (
-	BlockedChannelMessage = "Channel %q is blocked due to bot detection. Unblock with:\n\ntubarr channel unblock -n %q\n"
-)
-
 // Bot timeout map
 var (
 	BotTimeoutMap = map[string]float64{

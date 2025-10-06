@@ -8,15 +8,11 @@ import (
 	"strings"
 	"time"
 
-	cfgchannel "tubarr/internal/cfg/channel"
-	cfgfiles "tubarr/internal/cfg/files"
-	cfgflags "tubarr/internal/cfg/flags"
-	validation "tubarr/internal/cfg/validation"
-	cfgvideo "tubarr/internal/cfg/video"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/interfaces"
 	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/validation"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -60,7 +56,7 @@ var rootCmd = &cobra.Command{
 
 			if configFile != "" {
 				// load and normalize keys from any Viper-supported config file
-				if err := cfgfiles.LoadConfigFile(configFile); err != nil {
+				if err := loadConfigFile(configFile); err != nil {
 					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
 					os.Exit(1)
 				}
@@ -94,21 +90,21 @@ func InitCommands(s interfaces.Store, ctx context.Context) error {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert "video_directory" to "video-directory"
 
-	if err := cfgflags.InitProgramFlags(rootCmd); err != nil {
+	if err := initProgramFlags(rootCmd); err != nil {
 		return err
 	}
-	if err := cfgflags.InitAllFileTransformers(rootCmd); err != nil {
+	if err := initFileTransformers(rootCmd); err != nil {
 		return err
 	}
-	if err := cfgflags.InitMetaTransformers(rootCmd); err != nil {
+	if err := initMetaTransformers(rootCmd); err != nil {
 		return err
 	}
-	if err := cfgflags.InitVideoTransformers(rootCmd); err != nil {
+	if err := initVideoTransformers(rootCmd); err != nil {
 		return err
 	}
 
-	rootCmd.AddCommand(cfgchannel.InitChannelCmds(s, ctx))
-	rootCmd.AddCommand(cfgvideo.InitVideoCmds(s))
+	rootCmd.AddCommand(InitChannelCmds(s, ctx))
+	rootCmd.AddCommand(InitVideoCmds(s))
 
 	return nil
 }

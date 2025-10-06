@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"tubarr/internal/cfg"
-	"tubarr/internal/domain/cmdvideo"
+	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/downloads/downloaders"
@@ -37,7 +37,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args := make([]string, 0, 32)
 
 	// Restrict filenames
-	args = append(args, cmdvideo.RestrictFilenames)
+	args = append(args, command.RestrictFilenames)
 
 	// Uses JSON file (e.g. 'filename.json') to set 'filename.%(ext)s'
 	var outputSyntax string
@@ -45,80 +45,80 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		JSONFileName := filepath.Base(d.Video.JSONCustomFile)
 		outputSyntax = strings.TrimSuffix(JSONFileName, ".json") + ".%(ext)s"
 	} else {
-		outputSyntax = cmdvideo.FilenameSyntax
+		outputSyntax = command.FilenameSyntax
 	}
 
 	// Output location + restricted filename syntax
 	args = append(args,
-		cmdvideo.Output,
+		command.Output,
 		filepath.Join(d.Video.ParsedVideoDir, outputSyntax))
 
 	// Print filename to console upon completion
-	args = append(args, cmdvideo.Print, cmdvideo.AfterMove)
+	args = append(args, command.Print, command.AfterMove)
 
 	// Cookie path
 	if d.ChannelURL.CookiePath == "" {
 		if d.Video.Settings.CookieSource != "" {
-			args = append(args, cmdvideo.CookiesFromBrowser, d.Video.Settings.CookieSource)
+			args = append(args, command.CookiesFromBrowser, d.Video.Settings.CookieSource)
 		}
 	} else {
-		args = append(args, cmdvideo.CookiePath, d.ChannelURL.CookiePath)
+		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
 
 	// Cookie source
 	if cfg.IsSet(keys.CookieSource) {
 		browserCookieSource := cfg.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
-		args = append(args, cmdvideo.CookiesFromBrowser, browserCookieSource)
+		args = append(args, command.CookiesFromBrowser, browserCookieSource)
 	} else {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
 
 	// Max filesize specified
 	if d.Video.Settings.MaxFilesize != "" {
-		args = append(args, cmdvideo.MaxFilesize, d.Video.Settings.MaxFilesize)
+		args = append(args, command.MaxFilesize, d.Video.Settings.MaxFilesize)
 	}
 
 	// External downloaders & arguments
 	if d.Video.Settings.ExternalDownloader != "" {
-		args = append(args, cmdvideo.ExternalDLer, d.Video.Settings.ExternalDownloader)
+		args = append(args, command.ExternalDLer, d.Video.Settings.ExternalDownloader)
 		if d.Video.Settings.ExternalDownloaderArgs != "" {
 
 			switch d.Video.Settings.ExternalDownloader {
-			case consts.DownloaderAria:
+			case command.DownloaderAria:
 
-				ariaCmd := consts.DownloaderAria + ":" +
+				ariaCmd := command.DownloaderAria + ":" +
 					d.Video.Settings.ExternalDownloaderArgs +
 					" " +
-					cmdvideo.AriaLog +
+					command.AriaLog +
 					" " +
-					cmdvideo.AriaNoRPC +
+					command.AriaNoRPC +
 					" " +
-					cmdvideo.AriaNoColor +
+					command.AriaNoColor +
 					" " +
-					cmdvideo.AriaShowConsole +
+					command.AriaShowConsole +
 					" " +
-					cmdvideo.AriaInterval
+					command.AriaInterval
 
-				args = append(args, cmdvideo.ExternalDLArgs, ariaCmd)
+				args = append(args, command.ExternalDLArgs, ariaCmd)
 			default:
-				args = append(args, cmdvideo.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
+				args = append(args, command.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
 			}
 		}
 	}
 
 	// Retry download X times
 	if d.Video.Settings.Retries != 0 {
-		args = append(args, cmdvideo.Retries, strconv.Itoa(d.Video.Settings.Retries))
+		args = append(args, command.Retries, strconv.Itoa(d.Video.Settings.Retries))
 	}
 
 	// Merge output formats to extension if set
 	if d.Video.Settings.YtdlpOutputExt != "" {
-		args = append(args, cmdvideo.YtdlpOutputExtension, d.Video.Settings.YtdlpOutputExt)
+		args = append(args, command.YtDLPOutputExtension, d.Video.Settings.YtdlpOutputExt)
 	}
 
 	// Randomize requests (avoid detection as bot)
-	args = append(args, cmdvideo.RandomizeRequests...)
+	args = append(args, command.RandomizeRequests...)
 
 	// Add target URL [ MUST GO LAST !! ]
 	if d.Video.DirectVideoURL != "" {
@@ -128,7 +128,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Combine command...
-	cmd := exec.CommandContext(d.Context, cmdvideo.YTDLP, args...)
+	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
 	logging.D(1, "Built video download command for URL %q:\n%v", d.Video.URL, cmd.String())
 
 	return cmd
@@ -198,7 +198,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	}
 
 	// Ensure file is fully written
-	if err := d.waitForFile(d.Video.VideoPath, 5*time.Second); err != nil {
+	if err := d.waitForFile(d.Video.VideoPath, 10*time.Second); err != nil {
 		return err
 	}
 	if err := verifyVideoDownload(d.Video.VideoPath); err != nil {
@@ -245,7 +245,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		}
 
 		// Aria2 progress parsing
-		if d.DLTracker.downloader == consts.DownloaderAria {
+		if d.DLTracker.downloader == command.DownloaderAria {
 			gotLine, itemsFound, downloadedItems, pct, status :=
 				downloaders.Aria2OutputParser(line, state.URL, totalItemsFound, totalDownloadedItems, state.Percentage, state.Status)
 
