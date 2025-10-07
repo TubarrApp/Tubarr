@@ -25,7 +25,7 @@ var (
 	console    = os.Stdout
 
 	builderPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return new(strings.Builder)
 		},
 	}
@@ -227,7 +227,7 @@ func E(msg string, args ...any) {
 }
 
 // S logs success messages
-func S(l int, msg string, args ...interface{}) {
+func S(l int, msg string, args ...any) {
 	if Level < l {
 		return
 	}
@@ -243,17 +243,17 @@ func D(l int, msg string, args ...any) {
 }
 
 // W logs warning messages
-func W(msg string, args ...interface{}) {
+func W(msg string, args ...any) {
 	log(levelWarn, consts.YellowWarning, msg, true, args...)
 }
 
 // I logs info messages
-func I(msg string, args ...interface{}) {
+func I(msg string, args ...any) {
 	log(levelInfo, consts.BlueInfo, msg, false, args...)
 }
 
 // P logs plain messages
-func P(msg string, args ...interface{}) {
+func P(msg string, args ...any) {
 	log(levelPlain, "", msg, false, args...)
 }
 

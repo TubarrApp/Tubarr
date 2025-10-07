@@ -62,11 +62,11 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 			unlocked, err := cs.CheckAndUnlockChannel(c)
 			if err != nil {
 				logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
-				return nil
+				continue
 			}
 
 			if !unlocked {
-				return nil
+				continue
 			}
 		}
 

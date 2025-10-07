@@ -369,7 +369,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 	collector.SetCookieJar(jar)
 
 	// Metadata to populate
-	metadata := make(map[string]interface{})
+	metadata := make(map[string]any)
 
 	logging.I("Scraping %s for metadata...", urlStr)
 
@@ -478,7 +478,7 @@ func sanitizeFilename(name string) string {
 }
 
 // writeMetadataJSON writes the custom metadata file.
-func writeMetadataJSON(metadata map[string]interface{}, outputDir, filename string, v *models.Video) error {
+func writeMetadataJSON(metadata map[string]any, outputDir, filename string, v *models.Video) error {
 	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
 
 	// Ensure the directory exists
