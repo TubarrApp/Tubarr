@@ -448,7 +448,7 @@ func (cs *ChannelStore) CheckAndUnlockChannel(c *models.Channel) (bool, error) {
 	}
 
 	// BLOCKED LOGIC:
-	logging.W("%q was blocked (origin %q) on %v", c.ChanSettings.BotBlockedHostname, c.Name, c.ChanSettings.BotBlockedTimestamp.Format(time.RFC1123))
+	logging.W("Channel %q was blocked by %q on %v", c.Name, c.ChanSettings.BotBlockedHostname, c.ChanSettings.BotBlockedTimestamp.Format(time.RFC1123))
 
 	if c.ChanSettings.BotBlockedTimestamp.IsZero() || c.ChanSettings.BotBlockedHostname == "" {
 		return false, nil // Invalid state, keep blocked
