@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	Level      int  = -1
-	Loggable   bool = false
+	Level      = -1
+	Loggable   = false
 	fileLogger zerolog.Logger
 	errorArray = make([]error, 0, 8)
 	console    = os.Stdout

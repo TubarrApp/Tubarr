@@ -208,7 +208,7 @@ func videoJob(
 	}
 
 	// Run metarr step
-	if err := metarr.InitMetarr(v, cu, c, dirParser, procCtx); err != nil {
+	if err := metarr.InitMetarr(procCtx, v, cu, c, dirParser); err != nil {
 		return fmt.Errorf("metarr processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 	}
 

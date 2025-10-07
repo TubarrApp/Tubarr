@@ -85,7 +85,7 @@ var rootCmd = &cobra.Command{
 }
 
 // InitCommands initializes all commands and their flags.
-func InitCommands(s interfaces.Store, ctx context.Context) error {
+func InitCommands(ctx context.Context, s interfaces.Store) error {
 
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert "video_directory" to "video-directory"
@@ -103,7 +103,7 @@ func InitCommands(s interfaces.Store, ctx context.Context) error {
 		return err
 	}
 
-	rootCmd.AddCommand(InitChannelCmds(s, ctx))
+	rootCmd.AddCommand(InitChannelCmds(ctx, s))
 	rootCmd.AddCommand(InitVideoCmds(s))
 
 	return nil

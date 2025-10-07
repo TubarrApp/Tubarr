@@ -25,7 +25,7 @@ import (
 )
 
 // InitChannelCmds is the entrypoint for initializing channel commands.
-func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
+func InitChannelCmds(ctx context.Context, s interfaces.Store) *cobra.Command {
 	channelCmd := &cobra.Command{
 		Use:   "channel",
 		Short: "Channel commands.",
@@ -39,11 +39,11 @@ func InitChannelCmds(s interfaces.Store, ctx context.Context) *cobra.Command {
 
 	// Add subcommands with dependencies
 	channelCmd.AddCommand(addAuth(cs))
-	channelCmd.AddCommand(addChannelCmd(cs, s, ctx))
+	channelCmd.AddCommand(addChannelCmd(ctx, cs, s))
 	channelCmd.AddCommand(unblockChannelCmd(cs))
-	channelCmd.AddCommand(downloadVideoURLs(cs, s, ctx))
-	channelCmd.AddCommand(crawlChannelCmd(cs, s, ctx))
-	channelCmd.AddCommand(ignoreCrawl(cs, s, ctx))
+	channelCmd.AddCommand(downloadVideoURLs(ctx, cs, s))
+	channelCmd.AddCommand(crawlChannelCmd(ctx, cs, s))
+	channelCmd.AddCommand(ignoreCrawl(ctx, cs, s))
 	channelCmd.AddCommand(addVideoURLToIgnore(cs))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
 	channelCmd.AddCommand(deleteVideoURLs(cs))
@@ -169,7 +169,7 @@ func deleteVideoURLs(cs interfaces.ChannelStore) *cobra.Command {
 }
 
 // downloadVideoURLs downloads a list of URLs inputted by the user.
-func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
+func downloadVideoURLs(ctx context.Context, cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
 	var (
 		cFile, channelName string
 		channelID          int
@@ -243,7 +243,7 @@ func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx conte
 			}
 
 			// Download URLs - errors already logged, DON'T print here
-			if err := cs.DownloadVideoURLs(key, val, c, s, videoURLs, ctx); err != nil {
+			if err := cs.DownloadVideoURLs(ctx, key, val, c, s, videoURLs); err != nil {
 				return err
 			}
 
@@ -422,7 +422,7 @@ func addVideoURLToIgnore(cs interfaces.ChannelStore) *cobra.Command {
 }
 
 // ignoreCrawl crawls the current state of the channel page and adds the URLs as though they are already grabbed.
-func ignoreCrawl(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
+func ignoreCrawl(ctx context.Context, cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
 	var (
 		name string
 		id   int
@@ -442,7 +442,7 @@ func ignoreCrawl(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Con
 			}
 
 			// Run an ignore crawl
-			if err := cs.CrawlChannelIgnore(key, val, s, ctx); err != nil {
+			if err := cs.CrawlChannelIgnore(ctx, key, val, s); err != nil {
 				return err
 			}
 
@@ -610,7 +610,7 @@ func unblockChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 }
 
 // addChannelCmd adds a new channel into the database.
-func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
+func addChannelCmd(ctx context.Context, cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
 	var (
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
@@ -866,7 +866,7 @@ func addChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.C
 			if ignoreRun {
 				logging.I("Running an 'ignore crawl'...")
 				cID := strconv.FormatInt(channelID, 10)
-				if err := cs.CrawlChannelIgnore("id", cID, s, ctx); err != nil {
+				if err := cs.CrawlChannelIgnore(ctx, "id", cID, s); err != nil {
 					logging.E("Failed to complete ignore crawl run: %v", err)
 				}
 			}
@@ -1023,7 +1023,7 @@ func listAllChannelsCmd(cs interfaces.ChannelStore) *cobra.Command {
 }
 
 // crawlChannelCmd initiates a crawl of a given channel.
-func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context.Context) *cobra.Command {
+func crawlChannelCmd(ctx context.Context, cs interfaces.ChannelStore, s interfaces.Store) *cobra.Command {
 	var (
 		name string
 		id   int
@@ -1058,7 +1058,7 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 			}
 
 			// Don't print errors from CrawlChannel, already handled in function
-			if err := cs.CrawlChannel(key, val, c, s, ctx); err != nil {
+			if err := cs.CrawlChannel(ctx, key, val, c, s); err != nil {
 				return err
 			}
 
@@ -1393,7 +1393,7 @@ func displaySettings(cs interfaces.ChannelStore, c *models.Channel) {
 	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
 
 	// Notification URLs
-	var nURLs []string
+	nURLs := make([]string, 0, len(notifyURLs))
 	for _, n := range notifyURLs {
 		newNUrl := n.NotifyURL
 		if n.ChannelURL != "" {
@@ -2141,15 +2141,16 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	// JSON directory
 	if f.Changed(keys.JSONDir) {
 		if c.jsonDir == "" {
-			if c.videoDir != "" {
-				c.jsonDir = c.videoDir
-			} else {
+			if c.videoDir == "" {
 				return nil, fmt.Errorf("json directory cannot be empty. Attempted to default to video directory but video directory is also empty")
 			}
+			c.jsonDir = c.videoDir
 		}
+
 		if _, err = validation.ValidateDirectory(c.jsonDir, false); err != nil {
 			return nil, err
 		}
+
 		fns = append(fns, func(s *models.ChannelSettings) error {
 			s.JSONDir = c.jsonDir
 			return nil
@@ -2421,48 +2422,61 @@ func convertConfigValue[T any](v any) (T, bool) {
 		return val, true
 	}
 
-	// Let Viper handle the conversion - it's already good at this
 	switch any(zero).(type) {
 	case string:
 		if s, ok := v.(string); ok {
-			return any(s).(T), true
+			val := any(s).(T) // nolint:errcheck
+			return val, true
 		}
-		return any(fmt.Sprintf("%v", v)).(T), true
+		str := fmt.Sprintf("%v", v)
+		val := any(str).(T) // nolint:errcheck
+		return val, true
 
 	case int:
 		if i, ok := v.(int); ok {
-			return any(i).(T), true
+			val := any(i).(T) // nolint:errcheck
+			return val, true
 		}
 		if i64, ok := v.(int64); ok {
-			return any(int(i64)).(T), true
+			i := int(i64)
+			val := any(i).(T) // nolint:errcheck
+			return val, true
 		}
 		if f, ok := v.(float64); ok {
-			return any(int(f)).(T), true
+			i := int(f)
+			val := any(i).(T) // nolint:errcheck
+			return val, true
 		}
 
 	case float64:
 		if f, ok := v.(float64); ok {
-			return any(f).(T), true
+			val := any(f).(T) // nolint:errcheck
+			return val, true
 		}
 		if i, ok := v.(int); ok {
-			return any(float64(i)).(T), true
+			f := float64(i)
+			val := any(f).(T) // nolint:errcheck
+			return val, true
 		}
 
 	case bool:
 		if b, ok := v.(bool); ok {
-			return any(b).(T), true
+			val := any(b).(T) // nolint:errcheck
+			return val, true
 		}
 
 	case []string:
 		if slice, ok := v.([]string); ok {
-			return any(slice).(T), true
+			val := any(slice).(T) // nolint:errcheck
+			return val, true
 		}
 		if slice, ok := v.([]any); ok {
 			strSlice := make([]string, len(slice))
 			for i, item := range slice {
 				strSlice[i] = fmt.Sprintf("%v", item)
 			}
-			return any(strSlice).(T), true
+			val := any(strSlice).(T) // nolint:errcheck
+			return val, true
 		}
 	}
 

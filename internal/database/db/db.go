@@ -14,6 +14,7 @@ const (
 	dbDriver = "sqlite3"
 )
 
+// Database holds the global database instance for Tubarr.
 type Database struct {
 	DB *sql.DB
 }

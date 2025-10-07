@@ -20,7 +20,7 @@ import (
 var globalAuthCache sync.Map
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func (s *Scraper) channelAuth(channelHostname string, a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie, error) {
+func (s *Scraper) channelAuth(ctx context.Context, channelHostname string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 	// First check exact hostname
 	if val, ok := globalAuthCache.Load(channelHostname); ok {
 		return val.([]*http.Cookie), nil
@@ -35,7 +35,7 @@ func (s *Scraper) channelAuth(channelHostname string, a *models.ChannelAccessDet
 	}
 
 	// If neither exists, login and store under exact hostname
-	cookies, err := login(a, ctx)
+	cookies, err := login(ctx, a)
 	if err != nil {
 		return nil, err
 	}
@@ -46,14 +46,12 @@ func (s *Scraper) channelAuth(channelHostname string, a *models.ChannelAccessDet
 }
 
 // login logs the user in and returns the authentication cookie.
-func login(a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie, error) {
+func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err
 	}
-
 	client := &http.Client{Jar: jar}
-
 	logging.I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, auth.StarPassword(a.Password))
 
 	// Fetch the login page to get a fresh token
@@ -61,22 +59,24 @@ func login(a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie,
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	getResp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logging.E("failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
+		if getResp != nil && getResp.Body != nil {
+			if err := getResp.Body.Close(); err != nil {
+				logging.E("failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
+			}
 		}
 	}()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(getResp.Body)
 	if err != nil {
 		return nil, err
 	}
+	logging.D(4, "Got login page body %s", string(body))
 
-	logging.D(4, "Got body %s", string(body))
 	// Parse the login page to find any hidden token fields
 	token := parseToken(string(body))
 
@@ -91,30 +91,32 @@ func login(a *models.ChannelAccessDetails, ctx context.Context) ([]*http.Cookie,
 	logging.D(1, "Sending token %q", data.Get("_token"))
 
 	// Post the login form
-	req, err = http.NewRequest("POST", a.LoginURL, strings.NewReader(data.Encode()))
+	req, err = http.NewRequestWithContext(ctx, "POST", a.LoginURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err = client.Do(req)
+	postResp, err := client.Do(req) // Use different variable name to avoid shadowing
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logging.E("failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
+		if postResp != nil && postResp.Body != nil {
+			if err := postResp.Body.Close(); err != nil {
+				logging.E("failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
+			}
 		}
 	}()
 
 	// Log the cookies for debugging
 	if logging.Level > 1 {
-		for _, cookie := range resp.Cookies() {
+		for _, cookie := range postResp.Cookies() {
 			logging.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
 		}
 	}
 
-	return resp.Cookies(), nil
+	return postResp.Cookies(), nil
 }
 
 // parseToken parses the HTML body to find the value of the token field.

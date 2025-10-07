@@ -9,6 +9,7 @@ import (
 	"tubarr/internal/models"
 )
 
+// Store holds the database variable and sub-stores like ChannelStore etc.
 type Store struct {
 	db            *sql.DB
 	videoStore    *VideoStore

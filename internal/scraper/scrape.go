@@ -29,6 +29,7 @@ import (
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
 	"golang.org/x/net/publicsuffix"
 )
@@ -96,7 +97,7 @@ func (s *Scraper) GetExistingReleases(cs interfaces.ChannelStore, c *models.Chan
 }
 
 // GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
-func (s *Scraper) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) ([]*models.Video, error) {
+func (s *Scraper) GetNewReleases(ctx context.Context, cs interfaces.ChannelStore, c *models.Channel) ([]*models.Video, error) {
 	if len(c.URLModels) == 0 {
 		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
 	}
@@ -113,7 +114,7 @@ func (s *Scraper) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 		logging.D(1, "Processing channel URL %q", cu.URL)
 
 		// Get access details once per ChannelURL
-		cu.Cookies, cu.CookiePath, err = s.GetChannelCookies(cs, c, cu, ctx)
+		cu.Cookies, cu.CookiePath, err = s.GetChannelCookies(ctx, cs, c, cu)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +160,7 @@ func (s *Scraper) GetNewReleases(cs interfaces.ChannelStore, c *models.Channel, 
 }
 
 // GetChannelCookies returns channel access details for a given video.
-func (s *Scraper) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL, ctx context.Context) (cookies []*http.Cookie, cookieFilePath string, err error) {
+func (s *Scraper) GetChannelCookies(ctx context.Context, cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
 
 	// Fetch auth details if this is a manual entry or not from DB
 	if cu.IsManual || cu.ID == 0 {
@@ -191,7 +192,7 @@ func (s *Scraper) GetChannelCookies(cs interfaces.ChannelStore, c *models.Channe
 		}
 		hostname := parsed.Hostname()
 
-		authCookies, err = s.channelAuth(hostname, cu.ToChannelAccessDetails(), ctx)
+		authCookies, err = s.channelAuth(ctx, hostname, cu.ToChannelAccessDetails())
 		if ctx.Err() != nil {
 			return nil, "", ctx.Err()
 		}
@@ -340,20 +341,71 @@ func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, cookie
 
 // ScrapeCensoredTVMetadata scrapes Censored.TV links for metadata.
 func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.Video) error {
-	// Create a custom cookie jar to hold cookies
+	// Initialize collector with cookies
+	collector, err := initializeCollector(urlStr)
+	if err != nil {
+		return err
+	}
+
+	// Metadata to populate
+	metadata := make(map[string]any)
+
+	logging.I("Scraping %q for metadata...", urlStr)
+
+	collector.OnHTML("html", func(container *colly.HTMLElement) {
+		doc := container.DOM
+
+		// Extract all metadata
+		v.Title = extractTitle(consts.HTMLCensoredTitle, doc)
+		metadata[consts.MetadataTitle] = v.Title
+
+		v.Description = extractDescription(consts.HTMLCensoredDesc, doc)
+		metadata[consts.MetadataDesc] = v.Description
+
+		metadata[consts.MetadataDate] = extractDate(consts.HTMLCensoredDate, doc)
+
+		v.DirectVideoURL = extractVideoURL(consts.HTMLCensoredVideoURL, doc)
+		metadata[consts.MetadataVideoURL] = v.DirectVideoURL
+	})
+
+	// Visit the webpage
+	if err := collector.Visit(urlStr); err != nil {
+		return fmt.Errorf("failed to visit URL: %w", err)
+	}
+	collector.Wait()
+
+	// Validate required fields
+	if v.Title == "" || v.DirectVideoURL == "" {
+		logging.D(1, "Scraped metadata: %+v", metadata)
+		return fmt.Errorf("missing required metadata fields (title: %q, video URL: %q)", v.Title, v.DirectVideoURL)
+	}
+
+	// Write metadata to file
+	filename := fmt.Sprintf("%s.json", sanitizeFilename(v.Title))
+	if err := writeMetadataJSON(metadata, outputDir, filename, v); err != nil {
+		return fmt.Errorf("failed to write metadata JSON: %w", err)
+	}
+
+	logging.S(0, "Successfully wrote metadata JSON to %s/%s", outputDir, filename)
+	return nil
+}
+
+// initializeCollector initializes Colly with any cookies.
+func initializeCollector(urlStr string) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
-		return fmt.Errorf("failed to create cookie jar: %w", err)
+		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
 	}
 
 	// Set cookies for the domain
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
+		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 	if val, ok := globalAuthCache.Load(parsedURL.Host); ok {
-		cookies := val.([]*http.Cookie)
-		jar.SetCookies(parsedURL, cookies)
+		if cookies, ok := val.([]*http.Cookie); ok {
+			jar.SetCookies(parsedURL, cookies)
+		}
 	} else {
 		logging.W("no authentication cookies available for %q", parsedURL.Host)
 	}
@@ -368,103 +420,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 	})
 	collector.SetCookieJar(jar)
 
-	// Metadata to populate
-	metadata := make(map[string]any)
-
-	logging.I("Scraping %s for metadata...", urlStr)
-
-	collector.OnHTML("html", func(container *colly.HTMLElement) {
-		// Use .Find for all deep queries
-		doc := container.DOM
-
-		// Title
-		title := strings.TrimSpace(doc.Find("#episode-container .episode-title").Text())
-		if title != "" {
-			logging.D(2, "Scraped title: %s", title)
-			metadata["title"] = title
-			v.Title = title
-		} else {
-			logging.D(1, "Title not found")
-		}
-
-		// Description
-		description, err := doc.Find("#about .raised-content").Html()
-		if err != nil {
-			logging.E("Failed to grab description: %v", err.Error())
-			return
-		}
-
-		// Clean newline tags
-		description = strings.ReplaceAll(description, "<br>", "\n")
-		description = strings.ReplaceAll(description, "<br/>", "\n")
-		description = strings.ReplaceAll(description, "<br />", "\n")
-		description = strings.ReplaceAll(description, "&nbsp", "\n")
-
-		// Fix newline quirks
-		description = strings.ReplaceAll(description, " \n", "\n")
-		description = strings.ReplaceAll(description, "\n ", "\n")
-
-		// Trim space
-		description = strings.TrimSpace(description)
-
-		// Unescape special characters
-		description = html.UnescapeString(description)
-
-		if description != "" {
-			logging.D(2, "Scraped description: %s", description)
-			metadata["description"] = description
-			v.Description = description
-		} else {
-			logging.D(1, "Description not found")
-		}
-
-		// Release date
-		date := strings.TrimSpace(doc.Find("#about time").Text())
-		if date != "" {
-			parsedDate, err := parsing.ParseWordDate(date)
-			if err != nil {
-				logging.E(err.Error())
-			}
-			logging.D(2, "Scraped release date: %s", date)
-			metadata["release_date"] = parsedDate
-		} else {
-			logging.D(1, "Release date not found")
-		}
-
-		// Video URL
-		videoURL, ok := doc.Find("a.dropdown-item[href$='.mp4']").Attr("href")
-		if ok {
-			logging.D(2, "Scraped video URL: %s", videoURL)
-			metadata["direct_video_url"] = videoURL
-			v.DirectVideoURL = videoURL
-		} else {
-			logging.D(1, "Video URL not found")
-		}
-	})
-
-	// Visit the webpage
-	if err := collector.Visit(urlStr); err != nil {
-		return fmt.Errorf("failed to visit URL: %w", err)
-	}
-
-	collector.Wait()
-
-	// Ensure required fields are populated
-	if metadata["title"] == nil || metadata["direct_video_url"] == nil {
-		logging.D(1, "Scraped metadata: %+v", metadata)
-		return fmt.Errorf("missing required metadata fields (title [got: %s] or video URL [got: %v])", v.Title, metadata["direct_video_url"])
-	}
-
-	// Generate filename from title
-	filename := fmt.Sprintf("%s.json", sanitizeFilename(metadata["title"].(string)))
-
-	// Write metadata to JSON
-	if err := writeMetadataJSON(metadata, outputDir, filename, v); err != nil {
-		return fmt.Errorf("failed to write metadata JSON: %w", err)
-	}
-
-	logging.S(0, "Successfully wrote metadata JSON to %s/%s", outputDir, filename)
-	return nil
+	return collector, nil
 }
 
 // sanitizeFilename removes illegal characters.
@@ -525,4 +481,78 @@ func generateCookieFilePath(channelName, videoURL string) string {
 
 	// Construct file path (e.g., ~/.tubarr/CensoredTV_Show_a1b2c3d4.txt)
 	return filepath.Join(homeDir, tubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
+}
+
+// extractTitle grabs the title from the webpage.
+func extractTitle(findStr string, doc *goquery.Selection) string {
+	title := strings.TrimSpace(doc.Find(findStr).Text())
+	if title != "" {
+		logging.D(2, "Scraped title: %s", title)
+	} else {
+		logging.D(1, "Title not found")
+	}
+	return title
+}
+
+// extractDescription grabs the description from the webpage.
+func extractDescription(findStr string, doc *goquery.Selection) string {
+	description, err := doc.Find(findStr).Html()
+	if err != nil {
+		logging.E("Failed to grab description: %v", err.Error())
+		return ""
+	}
+
+	// Clean newline tags
+	description = strings.ReplaceAll(description, "<br>", "\n")
+	description = strings.ReplaceAll(description, "<br/>", "\n")
+	description = strings.ReplaceAll(description, "<br />", "\n")
+	description = strings.ReplaceAll(description, "&nbsp", "\n")
+
+	// Fix newline quirks
+	description = strings.ReplaceAll(description, " \n", "\n")
+	description = strings.ReplaceAll(description, "\n ", "\n")
+
+	// Trim space
+	description = strings.TrimSpace(description)
+
+	// Unescape special characters
+	description = html.UnescapeString(description)
+
+	if description != "" {
+		logging.D(2, "Scraped description: %s", description)
+	} else {
+		logging.D(1, "Description not found")
+	}
+
+	return description
+}
+
+// extractDate pulls the video release date from metadata.
+func extractDate(findStr string, doc *goquery.Selection) string {
+	var (
+		parsedDate string
+		err        error
+	)
+	date := strings.TrimSpace(doc.Find(findStr).Text())
+	if date != "" {
+		parsedDate, err = parsing.ParseWordDate(date)
+		if err != nil {
+			logging.E(err.Error())
+		}
+		logging.D(2, "Scraped release date: %s", date)
+	} else {
+		logging.D(1, "Release date not found")
+	}
+	return strings.TrimSpace(parsedDate)
+}
+
+// extract
+func extractVideoURL(findStr string, doc *goquery.Selection) string {
+	videoURL, ok := doc.Find(findStr).Attr("href")
+	if ok {
+		logging.D(2, "Scraped video URL: %s", videoURL)
+	} else {
+		logging.D(1, "Video URL not found")
+	}
+	return videoURL
 }

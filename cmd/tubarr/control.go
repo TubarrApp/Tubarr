@@ -11,7 +11,7 @@ import (
 // startHeartbeat starts the program heartbeat.
 //
 // Mainly useful for preventing DB lockouts.
-func startHeartbeat(progControl *repo.ProgControl, ctx context.Context) {
+func startHeartbeat(ctx context.Context, progControl *repo.ProgControl) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for {

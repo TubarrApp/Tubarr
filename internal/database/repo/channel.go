@@ -17,6 +17,7 @@ import (
 	"github.com/Masterminds/squirrel"
 )
 
+// ChannelStore holds the database variable.
 type ChannelStore struct {
 	DB *sql.DB
 }
@@ -531,7 +532,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 }
 
 // CrawlChannelIgnore crawls a channel and adds the latest videos to the ignore list.
-func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, ctx context.Context) error {
+func (cs *ChannelStore) CrawlChannelIgnore(ctx context.Context, key, val string, s interfaces.Store) error {
 	var (
 		c                    models.Channel
 		settings, metarrJSON json.RawMessage
@@ -588,30 +589,30 @@ func (cs *ChannelStore) CrawlChannelIgnore(key, val string, s interfaces.Store, 
 	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
 
 	// Process crawling using the updated channel object
-	if err := app.ChannelCrawlIgnoreNew(s, &c, ctx); err != nil {
+	if err := app.ChannelCrawlIgnoreNew(ctx, s, &c); err != nil {
 		return err
 	}
 	return nil
 }
 
 // DownloadVideoURLs downloads new video URLs to a channel.
-func (cs *ChannelStore) DownloadVideoURLs(key, val string, c *models.Channel, s interfaces.Store, videoURLs []string, ctx context.Context) error {
+func (cs *ChannelStore) DownloadVideoURLs(ctx context.Context, key, val string, c *models.Channel, s interfaces.Store, videoURLs []string) error {
 
 	cURLs := c.GetURLs()
 	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
 
 	// Process crawling using the updated channel object
-	return app.DownloadVideosToChannel(s, cs, c, videoURLs, ctx)
+	return app.DownloadVideosToChannel(ctx, s, cs, c, videoURLs)
 }
 
 // CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded.
-func (cs *ChannelStore) CrawlChannel(key, val string, c *models.Channel, s interfaces.Store, ctx context.Context) error {
+func (cs *ChannelStore) CrawlChannel(ctx context.Context, key, val string, c *models.Channel, s interfaces.Store) error {
 
 	cURLs := c.GetURLs()
 	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
 
 	// Process crawling using the updated channel object
-	return app.ChannelCrawl(s, cs, c, ctx)
+	return app.ChannelCrawl(ctx, s, cs, c)
 }
 
 // FetchChannelModel fills the channel model from the database.
@@ -892,10 +893,9 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("update failed: no rows affected")
-	} else {
-		logging.S(0, "Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
 	}
 
+	logging.S(0, "Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
 	return nil
 }
 

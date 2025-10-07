@@ -4,6 +4,7 @@ go 1.23.0
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/browserutils/kooky v0.2.2
 	github.com/gocolly/colly v1.2.0
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/PuerkitoBio/goquery v1.10.0 // indirect
 	github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a // indirect
 	github.com/Velocidex/ordereddict v0.0.0-20230909174157-2aa49cc5d11d // indirect
 	github.com/Velocidex/yaml/v2 v2.2.8 // indirect

@@ -24,13 +24,14 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 
 	logging.D(1, "Validating meta operations %v...", metaOps)
 
+	// Check meta ops
 	for _, op := range metaOps {
+
 		opURL, opPart := CheckForOpURL(op)
 		split := EscapedSplit(opPart, ':')
 
 		switch len(split) {
-		// e.g. 'director:set:Spielberg'
-		case 3:
+		case 3: // e.g. 'director:set:Spielberg'
 			action := split[1]
 			validActions := map[string]struct{}{
 				"append": {}, "copy-to": {}, "paste-from": {}, "prefix": {},
@@ -55,8 +56,7 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 			}
 			valid = append(valid, opPart)
 
-			// e.g. 'title:date-tag:suffix:ymd'
-		case 4:
+		case 4: // e.g. 'title:date-tag:suffix:ymd'
 			if split[1] != "date-tag" {
 				break
 			}
@@ -83,7 +83,8 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 				opPart = opURL + "|" + opPart
 			}
 			valid = append(valid, opPart)
-		default:
+
+		default: // Invalid operation
 			return nil, fmt.Errorf("invalid meta op %q", opPart)
 		}
 	}
@@ -118,7 +119,7 @@ func ValidateRenameFlag(flag string) error {
 	flag = strings.TrimSpace(strings.ToLower(flag))
 
 	switch flag {
-	case "spaces", "space", "underscores", "underscore", "fixes", "fix", "fixes-only", "fixesonly":
+	case "spaces", "underscores", "fixes-only":
 		return nil
 	default:
 		return errors.New("'spaces', 'underscores' or 'fixes-only' not selected for renaming style, skipping these modifications")

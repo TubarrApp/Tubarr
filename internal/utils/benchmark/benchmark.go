@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+// BenchFiles contain benchmarking files written on a benchmark-enabled run.
 type BenchFiles struct {
 	cpuFile   *os.File
 	memFile   *os.File

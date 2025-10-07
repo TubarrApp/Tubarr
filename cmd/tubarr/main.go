@@ -29,10 +29,10 @@ func main() {
 	defer cleanup(progControl)
 
 	// Start heatbeat
-	go startHeartbeat(progControl, ctx)
+	go startHeartbeat(ctx, progControl)
 
 	// Cobra/Viper commands
-	if err := cfg.InitCommands(store, ctx); err != nil {
+	if err := cfg.InitCommands(ctx, store); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
 	}
@@ -45,7 +45,7 @@ func main() {
 
 	// Check channels
 	if cfg.GetBool(keys.CheckChannels) {
-		if err := app.CheckChannels(store, ctx); err != nil {
+		if err := app.CheckChannels(ctx, store); err != nil {
 			logging.E("Encountered errors while checking channels: %v\n", err)
 			return
 		}
