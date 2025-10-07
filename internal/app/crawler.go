@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -57,19 +58,6 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 			continue
 		}
 
-		// Check if site is blocked or should be unlocked
-		if c.IsBlocked() {
-			unlocked, err := cs.CheckAndUnlockChannel(c)
-			if err != nil {
-				logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
-				continue
-			}
-
-			if !unlocked {
-				continue
-			}
-		}
-
 		// Time for a scan?
 		timeSinceLastScan := time.Since(c.LastScan)
 		crawlFreqDuration := time.Duration(c.ChanSettings.CrawlFreq) * time.Minute
@@ -112,26 +100,25 @@ func CheckChannels(s interfaces.Store, ctx context.Context) error {
 	}
 
 	if len(allErrs) > 0 {
-		return fmt.Errorf("encountered %d errors during processing: %w", len(allErrs), errors.Join(allErrs...))
+		return errors.Join(allErrs...)
 	}
 
 	return nil
 }
 
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
-func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, videoURLs []string, ctx context.Context) error {
+func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, videoURLs []string, ctx context.Context) (err error) {
 
 	// Check if site is blocked or should be unlocked
+	unlocked := false
 	if c.IsBlocked() {
-		unlocked, err := cs.CheckAndUnlockChannel(c)
+		unlocked, err = cs.CheckOrUnlockChannel(c)
 		if err != nil {
 			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
 
-		if !unlocked {
-			return nil
-		}
+		// Filter out matching hostnames later.
 	}
 
 	// Load config file settings
@@ -180,6 +167,22 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 			targetChannelURLModel, actualVideoURL, err = parseManualVideoURL(cs, c, scrape, videoURL, ctx)
 			if err != nil {
 				return err
+			}
+		}
+
+		if !unlocked {
+			parsed, err := url.Parse(targetChannelURLModel.URL)
+			if err != nil {
+				logging.W("Unable to parse %q, skipping...", targetChannelURLModel.URL)
+				continue
+			}
+			hostname := parsed.Hostname()
+			if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
+				hostname = strings.ToLower(domain)
+			}
+
+			if slices.Contains(c.ChanSettings.BotBlockedHostnames, hostname) {
+				continue // Hostname is blocked, skipping...
 			}
 		}
 
@@ -269,30 +272,61 @@ func DownloadVideosToChannel(s interfaces.Store, cs interfaces.ChannelStore, c *
 
 // ChannelCrawl crawls a channel for new URLs.
 func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, ctx context.Context) (err error) {
-
-	// Check if site is blocked or should be unlocked
-	if c.IsBlocked() {
-		unlocked, err := cs.CheckAndUnlockChannel(c)
-		if err != nil {
-			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
-			return nil
-		}
-
-		if !unlocked {
-			return nil
-		}
-	}
-
-	// Proceed...
-	fmt.Println()
-	logging.I("%sINITIALIZING CRAWL:%s Channel %q:\n", consts.ColorGreen, consts.ColorReset, c.Name)
-
 	// Check validity
 	if len(c.URLModels) == 0 {
 		return errors.New("no channel URLs")
 	}
 	if c.ChanSettings.VideoDir == "" || c.ChanSettings.JSONDir == "" {
 		return errors.New("output directories are blank")
+	}
+
+	fmt.Println()
+	logging.I("%sINITIALIZING CRAWL:%s Channel %q:\n", consts.ColorGreen, consts.ColorReset, c.Name)
+
+	// Check if site is blocked or should be unlocked, and filter URLs if needed
+	if c.IsBlocked() {
+		unlocked, err := cs.CheckOrUnlockChannel(c)
+		if err != nil {
+			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			return nil
+		}
+
+		// If still blocked, filter out URLs from blocked hostname
+		if !unlocked {
+			allowedURLModels := make([]*models.ChannelURL, 0, len(c.URLModels))
+
+			for _, cu := range c.URLModels {
+				if cu.IsManual {
+					continue
+				}
+
+				parsed, err := url.Parse(cu.URL)
+				if err != nil {
+					logging.W("Unable to parse %q, skipping...", cu.URL)
+					continue
+				}
+				hostname := parsed.Hostname()
+				if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
+					hostname = strings.ToLower(domain)
+				}
+
+				if slices.Contains(c.ChanSettings.BotBlockedHostnames, hostname) {
+					logging.D(1, "Skipping URL %q for channel %q. (Blocked by %q)", cu.URL, c.Name, hostname)
+					continue
+				}
+				// Hostname doesn't match the blocked site, safe to proceed
+				allowedURLModels = append(allowedURLModels, cu)
+			}
+
+			// If all URLs are blocked, exit early
+			if len(allowedURLModels) == 0 {
+				logging.D(1, "All URLs for channel %q are blocked by hostname(s) %v, skipping crawl", c.Name, c.ChanSettings.BotBlockedHostnames)
+				return nil
+			}
+
+			// Replace with filtered list
+			c.URLModels = allowedURLModels
+		}
 	}
 
 	// Get new releases for channel
@@ -304,12 +338,9 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	if len(videos) == 0 {
 		logging.I("No new releases for channel %q", c.Name)
-
 		if err := cs.UpdateLastScan(c.ID); err != nil {
 			return fmt.Errorf("failed to update last scan time: %w", err)
 		}
-
-		// Return early, no new releases...
 		return nil
 	}
 
@@ -337,6 +368,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		if len(vRequests) == 0 {
 			continue
 		}
+
 		logging.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
 
 		// Process video batch
@@ -345,7 +377,6 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 		// Succeeded/downloaded
 		if succeeded != 0 {
 			nSucceeded += succeeded
-
 			if nDownloaded > 0 {
 				logging.I("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", nDownloaded, cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
 				channelsGotNew = append(channelsGotNew, cu.URL)
@@ -371,7 +402,7 @@ func ChannelCrawl(s interfaces.Store, cs interfaces.ChannelStore, c *models.Chan
 
 	// Some errors encountered
 	if procError != nil {
-		return fmt.Errorf("encountered errors during processing: %w", procError)
+		return fmt.Errorf("channel %q encountered errors processing: %w", c.Name, procError)
 	}
 
 	return nil
@@ -384,7 +415,7 @@ func ChannelCrawlIgnoreNew(s interfaces.Store, c *models.Channel, ctx context.Co
 
 	// Check if site is blocked or should be unlocked
 	if c.IsBlocked() {
-		unlocked, err := cs.CheckAndUnlockChannel(c)
+		unlocked, err := cs.CheckOrUnlockChannel(c)
 		if err != nil {
 			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
@@ -483,8 +514,17 @@ func blockChannelBotDetected(cs interfaces.ChannelStore, c *models.Channel, cu *
 
 	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
 		s.BotBlocked = true
-		s.BotBlockedHostname = hostname
-		s.BotBlockedTimestamp = time.Now()
+
+		// Add hostname if not already in the list
+		if !slices.Contains(s.BotBlockedHostnames, hostname) {
+			s.BotBlockedHostnames = append(s.BotBlockedHostnames, hostname)
+		}
+
+		// Initialize map if nil
+		if s.BotBlockedTimestamps == nil {
+			s.BotBlockedTimestamps = make(map[string]time.Time)
+		}
+		s.BotBlockedTimestamps[hostname] = time.Now()
 		return nil
 	})
 

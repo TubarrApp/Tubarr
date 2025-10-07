@@ -22,7 +22,7 @@ type ChannelStore interface {
 	AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error)
 	AddNotifyURLs(channelID int64, notifications []*models.Notification) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
-	CheckAndUnlockChannel(c *models.Channel) (bool, error)
+	CheckOrUnlockChannel(c *models.Channel) (bool, error)
 	CrawlChannel(key, val string, c *models.Channel, s Store, ctx context.Context) error
 	CrawlChannelIgnore(key, val string, s Store, ctx context.Context) error
 	DeleteChannel(key, val string) error

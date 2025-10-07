@@ -437,10 +437,10 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 	return nil
 }
 
-// CheckAndUnlockChannel checks if a blocked channel has exceeded its timeout and unlocks it.
+// CheckOrUnlockChannel checks if a blocked channel has exceeded its timeout and unlocks it.
 //
 // Returns true if the channel was unlocked, false if still blocked.
-func (cs *ChannelStore) CheckAndUnlockChannel(c *models.Channel) (bool, error) {
+func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 
 	// NOT BLOCKED:
 	if !c.IsBlocked() {
@@ -448,46 +448,86 @@ func (cs *ChannelStore) CheckAndUnlockChannel(c *models.Channel) (bool, error) {
 	}
 
 	// BLOCKED LOGIC:
-	logging.W("Channel %q was blocked by %q on %v", c.Name, c.ChanSettings.BotBlockedHostname, c.ChanSettings.BotBlockedTimestamp.Format(time.RFC1123))
+	logging.W("Channel %q is currently blocked by %v", c.Name, c.ChanSettings.BotBlockedHostnames)
 
-	if c.ChanSettings.BotBlockedTimestamp.IsZero() || c.ChanSettings.BotBlockedHostname == "" {
+	if len(c.ChanSettings.BotBlockedHostnames) == 0 {
 		return false, nil // Invalid state, keep blocked
 	}
 
-	timeoutMinutes, exists := consts.BotTimeoutMap[c.ChanSettings.BotBlockedHostname]
-	if !exists {
-		return false, nil // No timeout configured for this hostname
+	// Initialize timestamps map if nil
+	if c.ChanSettings.BotBlockedTimestamps == nil {
+		c.ChanSettings.BotBlockedTimestamps = make(map[string]time.Time)
 	}
 
-	minutesSinceBlock := time.Since(c.ChanSettings.BotBlockedTimestamp).Minutes()
-	if minutesSinceBlock >= timeoutMinutes {
+	// Check each blocked hostname to see if any have exceeded timeout
+	stillBlockedHostnames := make([]string, 0, len(c.ChanSettings.BotBlockedHostnames))
+	anyUnlocked := false
 
+	for _, hostname := range c.ChanSettings.BotBlockedHostnames {
+		timeoutMinutes, exists := consts.BotTimeoutMap[hostname]
+		if !exists {
+			// No timeout configured, keep it blocked
+			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
+			continue
+		}
+
+		// Get the timestamp for this specific hostname
+		blockedTime, exists := c.ChanSettings.BotBlockedTimestamps[hostname]
+		if !exists || blockedTime.IsZero() {
+			// No timestamp found for this hostname, keep it blocked
+			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
+			logging.W("No timestamp found for hostname %q, keeping blocked", hostname)
+			continue
+		}
+
+		minutesSinceBlock := time.Since(blockedTime).Minutes()
+		if minutesSinceBlock >= timeoutMinutes {
+			// This hostname's timeout has expired
+			logging.S(0, "Unlocking hostname %q for channel %d (%s) after timeout", hostname, c.ID, c.Name)
+			anyUnlocked = true
+			// Remove from timestamps map
+			delete(c.ChanSettings.BotBlockedTimestamps, hostname)
+		} else {
+			// Still blocked
+			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
+			logging.W("%.0f more minute(s) before channel unlocks for domain %q. (Blocked on: %v)",
+				(timeoutMinutes - minutesSinceBlock), hostname, c.ChanSettings.BotBlockedTimestamps[hostname])
+		}
+	}
+
+	// Update the channel settings
+	if anyUnlocked {
 		// Update in-memory copy
-		c.ChanSettings.BotBlocked = false
-		c.ChanSettings.BotBlockedHostname = ""
-		c.ChanSettings.BotBlockedTimestamp = time.Time{}
+		c.ChanSettings.BotBlockedHostnames = stillBlockedHostnames
 
-		// Unlock the channel
+		// If no hostnames remain blocked, clear the blocked state entirely
+		if len(stillBlockedHostnames) == 0 {
+			c.ChanSettings.BotBlocked = false
+			c.ChanSettings.BotBlockedTimestamps = make(map[string]time.Time)
+		}
+
+		// Persist changes
 		_, err := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
 			s.BotBlocked = c.ChanSettings.BotBlocked
-			s.BotBlockedHostname = c.ChanSettings.BotBlockedHostname
-			s.BotBlockedTimestamp = c.ChanSettings.BotBlockedTimestamp
+			s.BotBlockedHostnames = c.ChanSettings.BotBlockedHostnames
+			s.BotBlockedTimestamps = c.ChanSettings.BotBlockedTimestamps
 			return nil
 		})
 		if err != nil {
 			return false, fmt.Errorf("failed to unlock channel: %w", err)
 		}
+	}
 
-		logging.S(0, "Unlocked channel %d (%s) after timeout for hostname %s", c.ID, c.Name, c.ChanSettings.BotBlockedHostname)
+	// Return true only if ALL hostnames are now unlocked
+	if len(stillBlockedHostnames) == 0 {
+		logging.S(0, "Channel %d (%s) fully unlocked - all hostnames cleared", c.ID, c.Name)
 		return true, nil
 	}
 
-	logging.W("%.0f more minute(s) before channel unlocks for domain %q. Unlock manually with:\n\ntubarr channel unblock -n %q",
-		(timeoutMinutes - time.Since(c.ChanSettings.BotBlockedTimestamp).Minutes()),
-		c.ChanSettings.BotBlockedHostname,
-		c.Name)
-
-	return false, nil // Still blocked
+	// Still some blocked hostnames remaining
+	logging.W("Unlock channel %q manually for hostnames %v with:\n\ntubarr channel unblock -n %q\n",
+		c.Name, stillBlockedHostnames, c.Name)
+	return false, nil
 }
 
 // CrawlChannelIgnore crawls a channel and adds the latest videos to the ignore list.

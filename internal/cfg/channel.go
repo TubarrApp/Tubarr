@@ -177,15 +177,17 @@ func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx conte
 	)
 
 	manualURLCmd := &cobra.Command{
-		Use:          "download-video-urls",
-		Short:        "Download inputted URLs (plaintext or file).",
-		Long:         "If using a file, the file should contain one URL per line.",
-		SilenceUsage: true,
+		Use:           "download-video-urls",
+		Short:         "Download inputted URLs (plaintext or file).",
+		Long:          "If using a file, the file should contain one URL per line.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			// Valid items set?
 			if cFile == "" && len(urls) == 0 {
-				return errors.New("must enter URLs into the source file, or set at least one URL directly")
+				err := errors.New("must enter URLs into the source file, or set at least one URL directly")
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
 			}
 
 			var urlLines []string
@@ -193,13 +195,17 @@ func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx conte
 			if cFile != "" {
 				cFileInfo, err := validation.ValidateFile(cFile, false)
 				if err != nil {
-					return fmt.Errorf("file entered (%q) is not valid: %w", cFile, err)
+					err = fmt.Errorf("file entered (%q) is not valid: %w", cFile, err)
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					return err
 				}
 				if cFile != "" && cFileInfo.Size() == 0 {
-					return fmt.Errorf("url file %q is blank", cFile)
+					err := fmt.Errorf("url file %q is blank", cFile)
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					return err
 				}
-
 				if urlLines, err = file.ReadFileLines(cFile); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					return err
 				}
 			}
@@ -211,26 +217,32 @@ func downloadVideoURLs(cs interfaces.ChannelStore, s interfaces.Store, ctx conte
 			for _, u := range videoURLs {
 				splitLen := len(strings.Split(u, "|"))
 				if splitLen > 2 {
-					return fmt.Errorf("url syntax entered incorrectly. Should be either just the URL or 'channel URL|video URL'")
+					err := fmt.Errorf("url syntax entered incorrectly. Should be either just the URL or 'channel URL|video URL'")
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					return err
 				}
 			}
 
 			// Get and check key/val pair
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}
 
 			// Retrieve channel model
 			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
-				return fmt.Errorf("no channel model in database with %s %q", key, val)
+				err := fmt.Errorf("no channel model in database with %s %q", key, val)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
 			}
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}
 
-			// Crawl channel
+			// Download URLs - errors already logged, DON'T print here
 			if err := cs.DownloadVideoURLs(key, val, c, s, videoURLs, ctx); err != nil {
 				return err
 			}
@@ -577,8 +589,8 @@ func unblockChannelCmd(cs interfaces.ChannelStore) *cobra.Command {
 			// Send update
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
 				s.BotBlocked = false
-				s.BotBlockedHostname = ""
-				s.BotBlockedTimestamp = time.Time{}
+				s.BotBlockedHostnames = nil
+				s.BotBlockedTimestamps = make(map[string]time.Time)
 				return nil
 			})
 			if err != nil {
@@ -1018,28 +1030,34 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 	)
 
 	crawlCmd := &cobra.Command{
-		Use:          "crawl",
-		Short:        "Crawl a channel for new URLs.",
-		Long:         "Initiate a crawl for new URLs of a channel that have not yet been downloaded.",
-		SilenceUsage: true,
+		Use:           "crawl",
+		Short:         "Crawl a channel for new URLs.",
+		Long:          "Initiate a crawl for new URLs of a channel that have not yet been downloaded.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Get and check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
+				// Print flag/validation errors since they're user-facing
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}
 
 			// Retrieve channel model
 			c, hasRows, err := cs.FetchChannelModel(key, val)
 			if !hasRows {
-				return fmt.Errorf("no channel model in database with %s %q", key, val)
+				err := fmt.Errorf("no channel model in database with %s %q", key, val)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
 			}
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}
 
-			// Crawl channel
+			// Don't print errors from CrawlChannel, already handled in function
 			if err := cs.CrawlChannel(key, val, c, s, ctx); err != nil {
 				return err
 			}
@@ -1052,7 +1070,6 @@ func crawlChannelCmd(cs interfaces.ChannelStore, s interfaces.Store, ctx context
 
 	// Primary channel elements
 	setPrimaryChannelFlags(crawlCmd, &name, nil, &id)
-
 	return crawlCmd
 }
 

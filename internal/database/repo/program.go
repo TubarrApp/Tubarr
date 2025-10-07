@@ -2,6 +2,7 @@ package repo
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -29,7 +30,11 @@ func NewProgController(database *sql.DB) *ProgControl {
 func (pc *ProgControl) StartTubarr() (pid int, err error) {
 
 	// Check running or stale state
-	if id, running := pc.checkProgRunning(); running {
+	id, running, err := pc.checkProgRunning()
+	if err != nil {
+		return 0, err
+	}
+	if running {
 		reset, err := pc.resetStaleProcess()
 		if err != nil {
 			return 0, fmt.Errorf("failure: could not correct stale process, unexpected error: %w", err)
@@ -64,7 +69,11 @@ func (pc *ProgControl) StartTubarr() (pid int, err error) {
 
 // QuitTubarr sets the program exit fields, ready for next run.
 func (pc *ProgControl) QuitTubarr() error {
-	if id, running := pc.checkProgRunning(); !running {
+	id, running, err := pc.checkProgRunning()
+	if err != nil {
+		return err
+	}
+	if !running {
 		return fmt.Errorf("tubarr is not marked as running. Process %d still active?", id)
 	}
 
@@ -110,10 +119,10 @@ func (pc *ProgControl) UpdateHeartbeat() error {
 // ******************************** Private ********************************
 
 // checkProgRunning checks if the program is already running.
-func (pc *ProgControl) checkProgRunning() (int, bool) {
+func (pc *ProgControl) checkProgRunning() (int, bool, error) {
 	var (
 		running bool
-		pid     int
+		pid     sql.NullInt64
 	)
 
 	query := squirrel.
@@ -122,12 +131,21 @@ func (pc *ProgControl) checkProgRunning() (int, bool) {
 		Where(squirrel.Eq{consts.QProgID: 1}).
 		RunWith(pc.DB)
 
-	if err := query.QueryRow().Scan(&running, &pid); err != nil {
-		logging.E("Failed to query program running row: %v", err)
-		return pid, false
+	err := query.QueryRow().Scan(&running, &pid)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, false, nil
+		}
+		return 0, false, fmt.Errorf("failed to query program running row: %w", err)
 	}
 
-	return pid, running
+	// Extract the int value, defaulting to 0 if NULL
+	pidValue := int(0)
+	if pid.Valid {
+		pidValue = int(pid.Int64)
+	}
+
+	return pidValue, running, nil
 }
 
 // resetStaleProcess is useful when there are powercuts, etc.

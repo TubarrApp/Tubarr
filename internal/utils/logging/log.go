@@ -212,7 +212,7 @@ func log(level logLevel, prefix, msg string, withCaller bool, args ...any) {
 
 	var caller *callerInfo
 	if withCaller {
-		c := getCaller(2) // Skip 2 frames: log() and the public function (E, D, W, etc.)
+		c := getCaller(3) // Skip: getCaller, log, and the public function (logging.E / logging.D)
 		caller = &c
 	}
 
@@ -244,7 +244,7 @@ func D(l int, msg string, args ...any) {
 
 // W logs warning messages
 func W(msg string, args ...any) {
-	log(levelWarn, consts.YellowWarning, msg, true, args...)
+	log(levelWarn, consts.YellowWarning, msg, false, args...)
 }
 
 // I logs info messages
