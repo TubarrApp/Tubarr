@@ -2294,7 +2294,7 @@ func parseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[st
 	// Check if there are any auth details to process
 	if len(a) == 0 && (u == "" || l == "") {
 		logging.D(3, "No authorization details to parse...")
-		return nil, nil
+		return authMap, nil
 	}
 
 	// Parse JSON auth strings

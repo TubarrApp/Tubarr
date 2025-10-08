@@ -70,7 +70,7 @@ func SetupLogging(targetDir string) error {
 	logfile, err := os.OpenFile(
 		filepath.Join(targetDir, tubarrLogFile),
 		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
-		0644,
+		consts.PermsLogFile,
 	)
 	if err != nil {
 		return err

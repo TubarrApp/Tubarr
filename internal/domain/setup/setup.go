@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"tubarr/internal/domain/consts"
 )
 
 const (
@@ -32,7 +33,7 @@ func InitCfgFilesDirs() error {
 	CfgDir = filepath.Join(dir, tDir)
 
 	if _, err := os.Stat(CfgDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(CfgDir, 0o755); err != nil {
+		if err := os.MkdirAll(CfgDir, consts.PermsConfigFile); err != nil {
 			return fmt.Errorf("failed to make directories: %w", err)
 		}
 	}

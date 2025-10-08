@@ -98,11 +98,7 @@ func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, d
 	v.Settings.Filters = append(v.Settings.Filters, loadFilterOpsFromFile(v, dirParser)...)
 
 	// Check filter ops
-	passFilterOps, err := filterOpsFilter(v, cu)
-	if err != nil {
-		return false, err
-	}
-	if !passFilterOps {
+	if passFilterOps := filterOpsFilter(v, cu); !passFilterOps {
 		return false, nil
 	}
 

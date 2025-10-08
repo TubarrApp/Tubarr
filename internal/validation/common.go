@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/regex"
 	"tubarr/internal/domain/templates"
@@ -129,7 +130,7 @@ func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 		// path does not exist
 		if createIfNotFound {
 			logging.D(3, "Directory %q does not exist, creating it...", dir)
-			if err := os.MkdirAll(dir, 0o755); err != nil {
+			if err := os.MkdirAll(dir, consts.PermsGenericDir); err != nil {
 				return nil, fmt.Errorf("directory %q does not exist and failed to create: %w", dir, err)
 			}
 			if dirInfo, err = os.Stat(dir); err != nil { // re-stat to get correct FileInfo

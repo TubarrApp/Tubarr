@@ -15,7 +15,7 @@ import (
 )
 
 // filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
-func filterOpsFilter(v *models.Video, cu *models.ChannelURL) (bool, error) {
+func filterOpsFilter(v *models.Video, cu *models.ChannelURL) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
@@ -38,8 +38,9 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) (bool, error) {
 		strVal := strings.ToLower(fmt.Sprint(val))
 		filterVal := strings.ToLower(filter.Value)
 
-		passed, failHard := false, false
-
+		var (
+			passed, failHard bool
+		)
 		switch filter.Value {
 		case "": // empty filter value
 			passed, failHard = checkFilterWithEmptyValue(filter, exists)
@@ -51,7 +52,7 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) (bool, error) {
 			if err := removeUnwantedJSON(v.JSONPath); err != nil {
 				logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 			}
-			return false, nil
+			return false
 		}
 
 		if passed {
@@ -66,16 +67,16 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) (bool, error) {
 
 	// Tally checks
 	if mustPassed != mustTotal {
-		return false, nil
+		return false
 	}
 	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
-		return false, nil
+		return false
 	}
 
 	if len(v.Settings.Filters) > 0 {
 		logging.I("Video passed download filter checks: %v", v.Settings.Filters)
 	}
-	return true, nil
+	return true
 }
 
 // checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
