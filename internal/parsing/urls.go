@@ -10,6 +10,9 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+// NOT YET IMPLEMENTED.
+
+// URLFileParser is used to parse
 type URLFileParser struct {
 	Filepath string
 	mu       sync.RWMutex

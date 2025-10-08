@@ -17,9 +17,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Global logging variables.
 var (
-	Level      = -1
-	Loggable   = false
+	Level    = -1
+	Loggable = false
+)
+
+var (
 	fileLogger zerolog.Logger
 	errorArray = make([]error, 0, 8)
 	console    = os.Stdout
@@ -40,9 +44,9 @@ const (
 	tagLine = " : " + consts.ColorDimCyan + "Line:" + consts.ColorReset + " "
 	tagEnd  = "]\n"
 
-	JFunction = "function"
-	JFile     = "file"
-	JLine     = "line"
+	jFunction = "function"
+	jFile     = "file"
+	jLine     = "line"
 )
 
 // logLevel represents different logging levels
@@ -180,9 +184,9 @@ func logToFile(level logLevel, msg string, caller *callerInfo) {
 	if caller != nil {
 		// Log with caller info
 		event := getZerologEvent(level).
-			Str(JFunction, caller.funcName).
-			Str(JFile, caller.file).
-			Int(JLine, caller.line)
+			Str(jFunction, caller.funcName).
+			Str(jFile, caller.file).
+			Int(jLine, caller.line)
 		event.Msg(cleanMsg)
 	} else {
 		// Log without caller info

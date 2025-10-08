@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"tubarr/internal/cfg"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
@@ -34,6 +34,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
+// Scraper contains cookies and a collector, used for scraping websites.
 type Scraper struct {
 	cookies   *CookieManager
 	collector *colly.Collector
@@ -71,6 +72,7 @@ var patterns = map[string]urlPattern{
 	defaultDom: {name: defaultDom, pattern: defaultPattern},
 }
 
+// New returns a new Scraper instance.
 func New() *Scraper {
 	return &Scraper{
 		cookies:   NewCookieManager(),
@@ -79,7 +81,7 @@ func New() *Scraper {
 }
 
 // GetExistingReleases returns releases already in the database.
-func (s *Scraper) GetExistingReleases(cs interfaces.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
+func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
 	// Load already downloaded URLs
 	existingURLs, err = cs.LoadGrabbedURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -97,7 +99,7 @@ func (s *Scraper) GetExistingReleases(cs interfaces.ChannelStore, c *models.Chan
 }
 
 // GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
-func (s *Scraper) GetNewReleases(ctx context.Context, cs interfaces.ChannelStore, c *models.Channel) ([]*models.Video, error) {
+func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore, c *models.Channel) ([]*models.Video, error) {
 	if len(c.URLModels) == 0 {
 		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
 	}
@@ -120,7 +122,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs interfaces.ChannelStore
 		}
 
 		// Fetch new episode URLs
-		newEpisodeURLs, err := s.newEpisodeURLs(cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, ctx)
+		newEpisodeURLs, err := s.newEpisodeURLs(ctx, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +162,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs interfaces.ChannelStore
 }
 
 // GetChannelCookies returns channel access details for a given video.
-func (s *Scraper) GetChannelCookies(ctx context.Context, cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
+func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
 
 	// Fetch auth details if this is a manual entry or not from DB
 	if cu.IsManual || cu.ID == 0 {
@@ -222,7 +224,7 @@ func (s *Scraper) GetChannelCookies(ctx context.Context, cs interfaces.ChannelSt
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func (s *Scraper) newEpisodeURLs(targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, cookiePath string, ctx context.Context) ([]string, error) {
+func (s *Scraper) newEpisodeURLs(ctx context.Context, targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, cookiePath string) ([]string, error) {
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	// Set cookies
@@ -260,7 +262,7 @@ func (s *Scraper) newEpisodeURLs(targetURL string, existingURLs, fileURLs []stri
 		s.collector.Wait()
 	} else {
 		var err error
-		if uniqueEpisodeURLs, err = ytDlpURLFetch(targetURL, uniqueEpisodeURLs, cookiePath, ctx); err != nil {
+		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, targetURL, uniqueEpisodeURLs, cookiePath); err != nil {
 			return nil, err
 		}
 	}
@@ -307,7 +309,7 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 }
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string, ctx context.Context) (map[string]struct{}, error) {
+func ytDlpURLFetch(ctx context.Context, chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
 	if uniqueEpisodeURLs == nil {
 		uniqueEpisodeURLs = make(map[string]struct{})
 	}

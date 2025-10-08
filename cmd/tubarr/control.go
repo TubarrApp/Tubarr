@@ -1,10 +1,11 @@
+// Package main is the entrypoint of Tubarr.
 package main
 
 import (
 	"context"
 	"time"
 
-	"tubarr/internal/database/repo"
+	"tubarr/internal/repo"
 	"tubarr/internal/utils/logging"
 )
 
@@ -27,14 +28,14 @@ func startHeartbeat(ctx context.Context, progControl *repo.ProgControl) {
 }
 
 // cleanup safely quits the program.
-func cleanup(progControl *repo.ProgControl) {
+func cleanup(progControl *repo.ProgControl, startTime time.Time) {
 	defer func() {
 		r := recover() // grab panic condition
 		if r != nil {
 			logging.E("Panic occurred: %v", r)
 		}
 
-		if err := progControl.QuitTubarr(); err != nil {
+		if err := progControl.QuitTubarr(startTime); err != nil {
 			logging.E("!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes)")
 		}
 

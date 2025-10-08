@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
+	// Use all browsers for Kooky:
 	_ "github.com/browserutils/kooky/browser/all"
 )
 
@@ -155,8 +156,8 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 			logging.W("Cookie %s has no expiration time set", cookie.Name)
 		}
 
-		_, err := file.WriteString(fmt.Sprintf("%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
-			domain, "FALSE", cookie.Path, secure, expires, cookie.Name, cookie.Value))
+		_, err := fmt.Fprintf(file, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+			domain, "FALSE", cookie.Path, secure, expires, cookie.Name, cookie.Value)
 		if err != nil {
 			return err
 		}

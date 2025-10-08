@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"tubarr/internal/interfaces"
+	"tubarr/internal/contracts"
 	"tubarr/internal/models"
 )
 
@@ -15,6 +15,7 @@ var avoidURLs sync.Map // Avoid attempting downloads for these URLs (e.g. when b
 // DownloadType represents the type of download operation.
 type DownloadType string
 
+// Denotes the type of file being downloaded.
 const (
 	TypeJSON  DownloadType = "JSON"
 	TypeVideo DownloadType = "video"
@@ -37,7 +38,7 @@ type VideoDownload struct {
 	Video      *models.Video
 	ChannelURL *models.ChannelURL
 	Channel    *models.Channel
-	DLStore    interfaces.DownloadStore
+	DLStore    contracts.DownloadStore
 	DLTracker  *DownloadTracker
 	Options    Options
 	Context    context.Context

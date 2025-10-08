@@ -204,7 +204,7 @@ func applyToDateFilter(v *models.Video, uploadDateNum int) (passed bool, err err
 }
 
 // loadFilterOpsFromFile loads filter operations from a file (one per line).
-func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFilters {
+func loadFilterOpsFromFile(v *models.Video, dp *parsing.DirectoryParser) []models.DLFilters {
 	var err error
 
 	if v.Settings.FilterFile == "" {
@@ -213,7 +213,7 @@ func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFil
 
 	filterFile := v.Settings.FilterFile
 
-	if filterFile, err = p.ParseDirectory(filterFile, v, "filter-ops"); err != nil {
+	if filterFile, err = dp.ParseDirectory(filterFile, v, "filter-ops"); err != nil {
 		logging.E("Failed to parse directory %q: %v", filterFile, err)
 		return nil
 	}
@@ -241,7 +241,7 @@ func loadFilterOpsFromFile(v *models.Video, p *parsing.Directory) []models.DLFil
 }
 
 // loadMoveOpsFromFile loads move operations from a file (one per line).
-func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps {
+func loadMoveOpsFromFile(v *models.Video, dp *parsing.DirectoryParser) []models.MoveOps {
 	var err error
 
 	if v.Settings.MoveOpFile == "" {
@@ -250,7 +250,7 @@ func loadMoveOpsFromFile(v *models.Video, p *parsing.Directory) []models.MoveOps
 
 	moveOpFile := v.Settings.MoveOpFile
 
-	if moveOpFile, err = p.ParseDirectory(moveOpFile, v, "move-ops"); err != nil {
+	if moveOpFile, err = dp.ParseDirectory(moveOpFile, v, "move-ops"); err != nil {
 		logging.E("Failed to parse directory %q: %v", moveOpFile, err)
 		return nil
 	}

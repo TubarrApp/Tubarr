@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"tubarr/internal/contracts"
 	"tubarr/internal/dev"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/downloads"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/metadata"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
@@ -25,7 +25,7 @@ import (
 // InitProcess begins processing metadata/videos and respective downloads.
 func InitProcess(
 	ctx context.Context,
-	s interfaces.Store,
+	s contracts.Store,
 	cu *models.ChannelURL,
 	c *models.Channel,
 	scrape *scraper.Scraper,
@@ -170,12 +170,12 @@ func checkCustomScraperNeeds(s *scraper.Scraper, v *models.Video) error {
 // videoJob starts a worker's process for a video.
 func videoJob(
 	procCtx context.Context,
-	cs interfaces.ChannelStore,
-	vs interfaces.VideoStore,
+	cs contracts.ChannelStore,
+	vs contracts.VideoStore,
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	dirParser *parsing.Directory,
+	dirParser *parsing.DirectoryParser,
 	dlTracker *downloads.DownloadTracker,
 	metarrExists bool,
 ) error {
@@ -221,9 +221,9 @@ func handleJSONProcessing(
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	cs interfaces.ChannelStore,
-	vs interfaces.VideoStore,
-	dirParser *parsing.Directory,
+	cs contracts.ChannelStore,
+	vs contracts.VideoStore,
+	dirParser *parsing.DirectoryParser,
 	dlTracker *downloads.DownloadTracker,
 ) (bool, error) {
 	proceed, botPauseChannel, err := processJSON(procCtx, v, cu, c, vs, dirParser, dlTracker)
@@ -236,7 +236,7 @@ func handleJSONProcessing(
 
 // handleBotError handles bot detection errors with channel blocking.
 func handleBotError(
-	cs interfaces.ChannelStore,
+	cs contracts.ChannelStore,
 	c *models.Channel,
 	cu *models.ChannelURL,
 	videoURL string,
@@ -253,7 +253,7 @@ func handleBotError(
 }
 
 // markVideoComplete marks a video as complete.
-func markVideoComplete(vs interfaces.VideoStore, v *models.Video, c *models.Channel) error {
+func markVideoComplete(vs contracts.VideoStore, v *models.Video, c *models.Channel) error {
 	v.Finished = true
 	if err := vs.UpdateVideo(v, c); err != nil {
 		return fmt.Errorf("failed to update video DB entry: %w", err)
@@ -267,8 +267,8 @@ func processJSON(
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	vs interfaces.VideoStore,
-	dirParser *parsing.Directory,
+	vs contracts.VideoStore,
+	dirParser *parsing.DirectoryParser,
 	dlTracker *downloads.DownloadTracker,
 ) (proceed, botPauseChannel bool, err error) {
 
@@ -342,7 +342,7 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 }
 
 // parseVideoJSONDirs parses video and JSON directories.
-func parseVideoJSONDirs(v *models.Video, dirParser *parsing.Directory) (jsonDir, videoDir string) {
+func parseVideoJSONDirs(v *models.Video, dirParser *parsing.DirectoryParser) (jsonDir, videoDir string) {
 	// Initialize directory parser
 	var (
 		cSettings = v.Settings

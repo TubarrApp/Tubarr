@@ -11,7 +11,7 @@ import (
 )
 
 // Aria2OutputParser parses the terminal output from Aria2C.
-func Aria2OutputParser(line string, uri string, totalItemCount, downloadedItemCount int, currentPct float64, currentStatus consts.DownloadStatus) (parsedLine bool, totalItemsFound, downloadedItems int, pct float64, status consts.DownloadStatus) {
+func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, currentPct float64, currentStatus consts.DownloadStatus) (parsedLine bool, totalItemsFound, downloadedItems int, pct float64, status consts.DownloadStatus) {
 
 	// New batch beginning....
 	if matches := regex.AriaItemCountCompile().FindStringSubmatch(line); matches != nil {

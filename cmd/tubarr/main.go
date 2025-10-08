@@ -17,7 +17,7 @@ import (
 // main is the main entrypoint of the program (duh!)
 func main() {
 	startTime := time.Now()
-	store, progControl, err := initializeApplication(startTime)
+	store, progControl, err := initializeApplication()
 	if err != nil {
 		logging.E("error initializing Tubarr: %v", err)
 		return
@@ -26,7 +26,7 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGSEGV)
 	defer cancel()
-	defer cleanup(progControl)
+	defer cleanup(progControl, startTime)
 
 	// Start heatbeat
 	go startHeartbeat(ctx, progControl)
@@ -50,10 +50,4 @@ func main() {
 			return
 		}
 	}
-
-	endTime := time.Now()
-	logging.I("Tubarr finished at: %v\n\nTime elapsed: %.2f seconds",
-		endTime.Format("2006-01-02 15:04:05.00 MST"),
-		endTime.Sub(startTime).Seconds())
-	fmt.Println()
 }

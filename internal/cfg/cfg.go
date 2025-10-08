@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
@@ -27,7 +27,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "tubarr",
 	Short: "Tubarr is a video downloading and metatagging tool.",
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRun: func(_ *cobra.Command, _ []string) {
 		if err := validation.ValidateViperFlags(); err != nil {
 			return
 		}
@@ -73,7 +73,7 @@ var rootCmd = &cobra.Command{
 		viper.Set("execute", true)
 		return nil
 	},
-	PersistentPostRun: func(cmd *cobra.Command, args []string) {
+	PersistentPostRun: func(_ *cobra.Command, _ []string) {
 		if benchmarking {
 			if benchFiles == nil {
 				logging.E("Null benchFiles")
@@ -85,7 +85,7 @@ var rootCmd = &cobra.Command{
 }
 
 // InitCommands initializes all commands and their flags.
-func InitCommands(ctx context.Context, s interfaces.Store) error {
+func InitCommands(ctx context.Context, s contracts.Store) error {
 
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert "video_directory" to "video-directory"

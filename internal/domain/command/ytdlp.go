@@ -1,7 +1,7 @@
 // Package command holds constants used for building argument strings for commands.
 package command
 
-// General
+// General yt-dlp commands.
 const (
 	AfterMove            = "after_move:%(filepath)s"
 	CookiesFromBrowser   = "--cookies-from-browser"
@@ -19,30 +19,29 @@ const (
 	YtDLPOutputExtension = "--merge-output-format"
 )
 
-// Scrape
+// Scrape-related yt-dlp commands.
 const (
 	YtDLPFlatPlaylist = "--flat-playlist"
 )
 
-// JSON only
+// JSON-specific yt-dlp commands.
 const (
 	SkipVideo     = "--skip-download"
 	WriteInfoJSON = "--write-info-json"
 	OutputJSON    = "-J"
 )
 
+// Sleep yt-dlp commands.
 var (
 	RandomizeRequests = []string{"-t", "sleep"}
 )
 
 // Downloaders
 
-// Aria2c:
+// Aria2c downloader and arg tags.
 const (
 	DownloaderAria = "aria2c"
-)
 
-const (
 	AriaLog         = "--console-log-level=notice"
 	AriaLogFile     = "--log=-"
 	AriaInterval    = "--summary-interval=1"

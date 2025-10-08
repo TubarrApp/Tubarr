@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	"tubarr/internal/interfaces"
+	"tubarr/internal/contracts"
 	"tubarr/internal/models"
 	"tubarr/internal/net"
 	"tubarr/internal/utils/logging"
@@ -30,7 +30,7 @@ func init() {
 }
 
 // NotifyServices notifies URLs set for the channel by the user.
-func NotifyServices(cs interfaces.ChannelStore, c *models.Channel, channelsWithNew []string) error {
+func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelsWithNew []string) error {
 
 	// Retrieve notifications for this channel
 	notifications, err := cs.GetNotifyURLs(c.ID)

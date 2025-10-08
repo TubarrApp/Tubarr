@@ -5,17 +5,16 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
-	"tubarr/internal/database/db"
-	"tubarr/internal/database/repo"
+	"tubarr/internal/database"
 	"tubarr/internal/domain/setup"
+	"tubarr/internal/repo"
 	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 )
 
 // initializeApplication sets up the application for the current run.
-func initializeApplication(startTime time.Time) (store *repo.Store, progControl *repo.ProgControl, err error) {
+func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, err error) {
 
 	// Get directory of main.go (helpful for benchmarking file save locations)
 	_, mainGoPath, _, ok := runtime.Caller(0)
@@ -26,7 +25,7 @@ func initializeApplication(startTime time.Time) (store *repo.Store, progControl 
 	benchmark.InjectMainWorkDir(mainGoPath)
 
 	// Setup files/dirs
-	if err = setup.InitCfgFilesDirs(startTime.Format("2006-01-02 15:04:05.00 MST")); err != nil {
+	if err = setup.InitCfgFilesDirs(); err != nil {
 		fmt.Printf("Tubarr exiting: %v\n", err)
 		os.Exit(0)
 	}
@@ -35,7 +34,7 @@ func initializeApplication(startTime time.Time) (store *repo.Store, progControl 
 		setup.DBFilePath, setup.LogFilePath)
 
 	// Database & stores
-	database, err := db.InitDB()
+	database, err := database.InitDB()
 	if err != nil {
 		fmt.Printf("Tubarr exiting: %v\n", err)
 		os.Exit(0)

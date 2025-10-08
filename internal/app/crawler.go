@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"tubarr/internal/cfg"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
 	"tubarr/internal/utils/logging"
@@ -28,7 +28,7 @@ const (
 )
 
 // CheckChannels checks channels and whether they are due for a crawl.
-func CheckChannels(ctx context.Context, s interfaces.Store) error {
+func CheckChannels(ctx context.Context, s contracts.Store) error {
 
 	// Grab all channels from database
 	cs := s.ChannelStore()
@@ -107,7 +107,7 @@ func CheckChannels(ctx context.Context, s interfaces.Store) error {
 }
 
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
-func DownloadVideosToChannel(ctx context.Context, s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel, videoURLs []string) (err error) {
+func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, videoURLs []string) (err error) {
 
 	// Check if site is blocked or should be unlocked
 	unlocked := false
@@ -271,7 +271,7 @@ func DownloadVideosToChannel(ctx context.Context, s interfaces.Store, cs interfa
 }
 
 // ChannelCrawl crawls a channel for new URLs.
-func ChannelCrawl(ctx context.Context, s interfaces.Store, cs interfaces.ChannelStore, c *models.Channel) (err error) {
+func ChannelCrawl(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel) (err error) {
 	// Check validity
 	if len(c.URLModels) == 0 {
 		return errors.New("no channel URLs")
@@ -385,7 +385,7 @@ func ChannelCrawl(ctx context.Context, s interfaces.Store, cs interfaces.Channel
 }
 
 // ChannelCrawlIgnoreNew gets the channel's currently displayed videos and marks them as complete without downloading.
-func ChannelCrawlIgnoreNew(ctx context.Context, s interfaces.Store, c *models.Channel) error {
+func ChannelCrawlIgnoreNew(ctx context.Context, s contracts.Store, c *models.Channel) error {
 
 	cs := s.ChannelStore()
 
@@ -473,7 +473,7 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 }
 
 // ensureManualDownloadsChannelURL ensures a special "manual-downloads" ChannelURL exists for the channel.
-func ensureManualDownloadsChannelURL(cs interfaces.ChannelStore, channelID int64) (*models.ChannelURL, error) {
+func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, channelID int64) (*models.ChannelURL, error) {
 	const manualDownloadsURL = "manual-downloads"
 
 	// Check if it already exists
@@ -506,7 +506,7 @@ func ensureManualDownloadsChannelURL(cs interfaces.ChannelStore, channelID int64
 }
 
 // blockChannelBotDetected blocks a channel due to bot detection on the given URL.
-func blockChannelBotDetected(cs interfaces.ChannelStore, c *models.Channel, cu *models.ChannelURL) error {
+func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) error {
 	parsedCURL, err := url.Parse(cu.URL)
 	hostname := parsedCURL.Hostname()
 	if err != nil {
@@ -563,7 +563,7 @@ func parsePipedVideoURL(videoURL string, channelURLMap map[string]*models.Channe
 }
 
 // parseManualVideoURL handles video URLs without a channel URL prefix.
-func parseManualVideoURL(ctx context.Context, cs interfaces.ChannelStore, c *models.Channel, scrape *scraper.Scraper, videoURL string) (*models.ChannelURL, string, error) {
+func parseManualVideoURL(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, scrape *scraper.Scraper, videoURL string) (*models.ChannelURL, string, error) {
 	// Use special manual downloads entry
 	targetChannelURLModel, err := ensureManualDownloadsChannelURL(cs, c.ID)
 	if err != nil {

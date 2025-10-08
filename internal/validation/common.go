@@ -440,6 +440,9 @@ func ValidateToFromDate(d string) (string, error) {
 	// Regex to extract explicitly marked years, months, and days
 	re := regex.YearFragmentsCompile()
 	matches := re.FindStringSubmatch(d)
+	if matches == nil {
+		return "", fmt.Errorf("invalid date format %q: expected yyyymmdd or formats like 2025y12m31d", d)
+	}
 
 	// Default values
 	year := strconv.Itoa(time.Now().Year())

@@ -118,6 +118,12 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 
 	// Find the line containing the JSON path
 	outputLines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	if len(outputLines) == 0 {
+		logging.D(1, "Full stdout: %s", stdout.String())
+		logging.D(1, "Full stderr: %s", stderr.String())
+		return fmt.Errorf("no output lines found for %s", d.Video.URL)
+	}
+
 	var jsonPath string
 
 	fileLine := outputLines[len(outputLines)-1]

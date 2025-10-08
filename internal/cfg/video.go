@@ -3,20 +3,20 @@ package cfg
 import (
 	"errors"
 	"strconv"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/interfaces"
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
 )
 
 // InitVideoCmds is the entrypoint for initializing video commands.
-func InitVideoCmds(s interfaces.Store) *cobra.Command {
+func InitVideoCmds(s contracts.Store) *cobra.Command {
 	vidCmd := &cobra.Command{
 		Use:   "video",
 		Short: "Video commands",
 		Long:  "Manage videos with various subcommands like delete and list.",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return errors.New("please specify a subcommand. Use --help to see available subcommands")
 		},
 	}
@@ -25,13 +25,13 @@ func InitVideoCmds(s interfaces.Store) *cobra.Command {
 	cs := s.ChannelStore()
 
 	// Add subcommands with dependencies
-	vidCmd.AddCommand(deletecmdvideo(vs, cs))
+	vidCmd.AddCommand(deleteCmdVideo(vs, cs))
 
 	return vidCmd
 }
 
-// deletecmdvideo deletes a channel from the database.
-func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra.Command {
+// deleteCmdVideo deletes a channel from the database.
+func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.Command {
 	var (
 		chanName, chanKey, chanVal, url string
 		chanID                          int
@@ -41,7 +41,7 @@ func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra
 		Use:   "delete",
 		Short: "Delete video entry",
 		Long:  "Delete a video entry from a channel by URL",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 
 			switch {
 			case chanName != "":
@@ -54,12 +54,16 @@ func deletecmdvideo(vs interfaces.VideoStore, cs interfaces.ChannelStore) *cobra
 				return errors.New("must enter a channel name/URL, and a video URL to delete")
 			}
 
-			cid, err := cs.GetChannelID(chanKey, chanVal)
+			if url == "" {
+				return errors.New("must enter a video URL to delete")
+			}
+
+			cID, err := cs.GetChannelID(chanKey, chanVal)
 			if err != nil {
 				return err
 			}
 
-			if err := vs.DeleteVideo(consts.QVidURL, url, cid); err != nil {
+			if err := vs.DeleteVideo(url, cID); err != nil {
 				return err
 			}
 			logging.S(0, "Successfully deleted video with URL %q", url)

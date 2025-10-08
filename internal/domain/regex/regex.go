@@ -17,14 +17,25 @@ const (
 	yearFragmentsStr = `(?:(\d{4})y)?(?:(\d{1,2})m)?(?:(\d{1,2})d)?`
 )
 
+// Regex expressions, compiled once.
 var (
-	onceAnsiEscape, onceAriaItemCount, onceAriaProgress,
-	onceDLPercentage, onceExtraSpaces, onceInvalidChars,
-	onceSpecialChars, onceYearFragments sync.Once
+	onceAnsiEscape    sync.Once
+	onceAriaItemCount sync.Once
+	onceAriaProgress  sync.Once
+	onceDLPercentage  sync.Once
+	onceExtraSpaces   sync.Once
+	onceInvalidChars  sync.Once
+	onceSpecialChars  sync.Once
+	onceYearFragments sync.Once
 
-	AnsiEscape, AriaItemCount, AriaProgress,
-	DLPercentage, ExtraSpaces, InvalidChars,
-	SpecialChars, YearFragments *regexp.Regexp
+	AnsiEscape    *regexp.Regexp
+	AriaItemCount *regexp.Regexp
+	AriaProgress  *regexp.Regexp
+	DLPercentage  *regexp.Regexp
+	ExtraSpaces   *regexp.Regexp
+	InvalidChars  *regexp.Regexp
+	SpecialChars  *regexp.Regexp
+	YearFragments *regexp.Regexp
 )
 
 // AnsiEscapeCompile compiles regex for ANSI escape codes.

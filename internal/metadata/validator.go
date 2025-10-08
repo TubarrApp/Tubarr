@@ -14,7 +14,7 @@ import (
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
 // Returns true if the video should be processed, false if it should be skipped.
-func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory) (bool, error) {
+func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (bool, error) {
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
@@ -92,7 +92,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 }
 
 // filterRequests uses user input filters to check if the video should be downloaded.
-func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory) (valid bool, err error) {
+func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (valid bool, err error) {
 
 	// Load filter ops from file if present
 	v.Settings.Filters = append(v.Settings.Filters, loadFilterOpsFromFile(v, dirParser)...)
@@ -120,7 +120,7 @@ func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, d
 }
 
 // checkMoveOps checks if Metarr should use an output directory based on existent metadata.
-func checkMoveOps(v *models.Video, dirParser *parsing.Directory) (outputDir string, channelURL string) {
+func checkMoveOps(v *models.Video, dirParser *parsing.DirectoryParser) (outputDir string, channelURL string) {
 	// Load move ops from file if present
 	if v.Settings.MoveOpFile != "" {
 		v.Settings.MoveOps = append(v.Settings.MoveOps, loadMoveOpsFromFile(v, dirParser)...)

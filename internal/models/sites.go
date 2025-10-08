@@ -8,11 +8,11 @@ import (
 
 // Site is not yet implemented.
 type Site struct {
-	ID        int64      `db:"id"`
-	Domain    string     `db:"domain"` // e.g. youtube.com ??? Or just make empty of domain to hold channels ???
-	Name      string     `db:"name"`
-	Channels  []*Channel `json:"channels"`
-	CreatedAt time.Time
+	ID       int64      `db:"id"`
+	Domain   string     `db:"domain"` // e.g. youtube.com ??? Or just make empty of domain to hold channels ???
+	Name     string     `db:"name"`
+	Channels []*Channel `json:"channels"`
+	CreatedAt,
 	UpdatedAt time.Time
 }
 
@@ -100,8 +100,8 @@ func (cu *ChannelURL) ToChannelAccessDetails() *ChannelAccessDetails {
 //
 // Matches the order of the DB table, do not alter.
 type Video struct {
-	ID                  int64
-	ChannelID           int64
+	ID,
+	ChannelID int64
 	ChannelURLID        int64
 	ChannelURL          string
 	ParsedVideoDir      string
@@ -130,8 +130,8 @@ type Video struct {
 
 // Notification holds notification data for channels.
 type Notification struct {
-	ChannelID  int64
-	ChannelURL string
-	NotifyURL  string
-	Name       string
+	ChannelID int64
+	ChannelURL,
+	NotifyURL,
+	Name string
 }

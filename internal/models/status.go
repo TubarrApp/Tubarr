@@ -9,12 +9,6 @@ type DLStatus struct {
 	Error  error                 `json:"error"`
 }
 
-var DLStatusDefault = DLStatus{
-	Status: consts.DLStatusPending,
-	Pct:    0.0,
-	Error:  nil,
-}
-
 // StatusUpdate models updates to the download status of a video.
 type StatusUpdate struct {
 	VideoID  int64

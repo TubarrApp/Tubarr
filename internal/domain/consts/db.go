@@ -1,6 +1,6 @@
 package consts
 
-// Tables
+// Database table names.
 const (
 	DBProgram       = "program"
 	DBChannels      = "channels"
@@ -10,7 +10,7 @@ const (
 	DBNotifications = "notifications"
 )
 
-// Program
+// Program database entry keys.
 const (
 	QProgHost      = "host"
 	QProgID        = "id"
@@ -20,7 +20,7 @@ const (
 	QProgRunning   = "running"
 )
 
-// Channel
+// Channel database entry keys.
 const (
 	QChanID              = "id"
 	QChanName            = "name"
@@ -34,7 +34,7 @@ const (
 	QChanUpdatedAt       = "updated_at"
 )
 
-// Channel URLs
+// Channel URL database entry keys.
 const (
 	QChanURLsID        = "id"
 	QChanURLsChannelID = "channel_id"
@@ -48,7 +48,7 @@ const (
 	QChanURLsUpdatedAt = "updated_at"
 )
 
-// Videos
+// Video database entry keys.
 const (
 	QVidID          = "id"
 	QVidChanID      = "channel_id"
@@ -68,7 +68,7 @@ const (
 	QVidUpdatedAt   = "updated_at"
 )
 
-// Downloads
+// Downloads database entry keys.
 const (
 	QDLVidID     = "video_id"
 	QDLStatus    = "status"
@@ -77,7 +77,7 @@ const (
 	QDLUpdatedAt = "updated_at"
 )
 
-// Notification
+// Notification database entry keys.
 const (
 	QNotifyChanID    = "channel_id"
 	QNotifyName      = "name"
@@ -90,6 +90,7 @@ const (
 // DownloadStatus holds constant download status strings.
 type DownloadStatus string
 
+// Download status strings.
 const (
 	DLStatusPending     DownloadStatus = "Pending"
 	DLStatusDownloading DownloadStatus = "Downloading"

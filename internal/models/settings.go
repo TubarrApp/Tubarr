@@ -77,9 +77,9 @@ type MetarrArgs struct {
 
 // ChannelAccessDetails holds details related to authentication and cookies.
 type ChannelAccessDetails struct {
-	Username   string
-	Password   string
-	LoginURL   string
-	ChannelURL string
+	Username,
+	Password,
+	LoginURL,
+	ChannelURL,
 	CookiePath string
 }

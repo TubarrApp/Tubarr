@@ -15,14 +15,15 @@ const (
 	logFile = "tubarr.log"
 )
 
+// File and directory path strings.
 var (
-	CfgDir,
-	DBFilePath,
+	CfgDir      string
+	DBFilePath  string
 	LogFilePath string
 )
 
 // InitCfgFilesDirs initializes necessary program directories and filepaths.
-func InitCfgFilesDirs(time string) error {
+func InitCfgFilesDirs() error {
 
 	dir, err := os.UserHomeDir()
 	if err != nil {

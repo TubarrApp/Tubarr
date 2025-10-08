@@ -1,6 +1,6 @@
 package consts
 
-// Colors
+// Colors.
 const (
 	ColorReset       = "\033[0m"
 	ColorRed         = "\033[91m"
@@ -15,6 +15,7 @@ const (
 	ColorDimWhite    = "\x1b[2;37m"
 )
 
+// Logging tags.
 const (
 	RedError      string = ColorRed + "[ERROR] " + ColorReset
 	GreenSuccess  string = ColorGreen + "[Success] " + ColorReset

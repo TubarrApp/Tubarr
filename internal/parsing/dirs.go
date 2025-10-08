@@ -15,31 +15,32 @@ import (
 )
 
 const (
-	open          = "{{"
-	close         = "}}"
+	openTemplate  = "{{"
+	closeTemplate = "}}"
 	avgReplaceLen = 32
-	templateLen   = len(open) + len(close) + 4
+	templateLen   = len(openTemplate) + len(closeTemplate) + 4
 )
 
-type Directory struct {
+// DirectoryParser holds a channel model, used for filling some template tags.
+type DirectoryParser struct {
 	C *models.Channel
 }
 
 // NewDirectoryParser returns a directory parser model.
-func NewDirectoryParser(c *models.Channel) (parseDir *Directory) {
-	return &Directory{
+func NewDirectoryParser(c *models.Channel) (parseDir *DirectoryParser) {
+	return &DirectoryParser{
 		C: c,
 	}
 }
 
 // ParseDirectory returns the absolute directory path with template replacements.
-func (dp *Directory) ParseDirectory(dir string, v *models.Video, fileType string) (parsedDir string, err error) {
+func (dp *DirectoryParser) ParseDirectory(dir string, v *models.Video, fileType string) (parsedDir string, err error) {
 	if dir == "" {
 		return "", errors.New("directory sent in empty")
 	}
 
 	parsed := dir
-	if strings.Contains(dir, open) {
+	if strings.Contains(dir, openTemplate) {
 		var err error
 
 		parsed, err = dp.parseTemplate(dir, v)
@@ -61,9 +62,9 @@ func (dp *Directory) ParseDirectory(dir string, v *models.Video, fileType string
 // parseTemplate parses template options inside the directory string.
 //
 // Returns error if the desired data isn't present, to prevent unexpected results for the user.
-func (dp *Directory) parseTemplate(dir string, v *models.Video) (string, error) {
-	opens := strings.Count(dir, open)
-	closes := strings.Count(dir, close)
+func (dp *DirectoryParser) parseTemplate(dir string, v *models.Video) (string, error) {
+	opens := strings.Count(dir, openTemplate)
+	closes := strings.Count(dir, closeTemplate)
 
 	if opens != closes {
 		return "", fmt.Errorf("mismatched template delimiters: %d opens, %d closes", opens, closes)
@@ -74,12 +75,12 @@ func (dp *Directory) parseTemplate(dir string, v *models.Video) (string, error) 
 	remaining := dir
 
 	for range opens {
-		startIdx := strings.Index(remaining, open)
+		startIdx := strings.Index(remaining, openTemplate)
 		if startIdx == -1 {
 			return "", errors.New("missing opening delimiter")
 		}
 
-		endIdx := strings.Index(remaining, close)
+		endIdx := strings.Index(remaining, closeTemplate)
 		if endIdx == -1 {
 			return "", errors.New("missing closing delimiter")
 		}
@@ -88,7 +89,7 @@ func (dp *Directory) parseTemplate(dir string, v *models.Video) (string, error) 
 		b.WriteString(remaining[:startIdx])
 
 		// Replacement string
-		tag := remaining[startIdx+len(open) : endIdx]
+		tag := remaining[startIdx+len(openTemplate) : endIdx]
 		replacement, err := dp.replaceTemplateTags(strings.TrimSpace(tag), v)
 		if err != nil {
 			return "", err
@@ -96,7 +97,7 @@ func (dp *Directory) parseTemplate(dir string, v *models.Video) (string, error) 
 		b.WriteString(replacement)
 
 		// String after template close
-		remaining = remaining[endIdx+len(close):]
+		remaining = remaining[endIdx+len(closeTemplate):]
 	}
 
 	// Write any remaining text after last template
@@ -106,7 +107,7 @@ func (dp *Directory) parseTemplate(dir string, v *models.Video) (string, error) 
 }
 
 // replaceTemplateTags makes template replacements in the directory string.
-func (dp *Directory) replaceTemplateTags(tag string, v *models.Video) (string, error) {
+func (dp *DirectoryParser) replaceTemplateTags(tag string, v *models.Video) (string, error) {
 
 	c := dp.C
 

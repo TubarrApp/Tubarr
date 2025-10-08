@@ -164,10 +164,9 @@ func ValidateOutputFiletype(o string) (dottedExt string, err error) {
 	for _, ext := range consts.AllVidExtensions {
 		if o != ext {
 			continue
-		} else {
-			valid = true
-			break
 		}
+		valid = true
+		break
 	}
 
 	if valid {
@@ -259,9 +258,8 @@ func ValidateTranscodeCodec(c string, accel string) (codec string, err error) {
 	case "":
 		if accel == "" {
 			return "", nil
-		} else {
-			return "", fmt.Errorf("entered codec %q not supported with acceleration type %q. Tubarr supports h264 and HEVC (h265)", c, accel)
 		}
+		return "", fmt.Errorf("entered codec %q not supported with acceleration type %q. Tubarr supports h264 and HEVC (h265)", c, accel)
 	default:
 		return "", fmt.Errorf("entered codec %q not supported. Tubarr supports h264 and HEVC (h265)", c)
 	}

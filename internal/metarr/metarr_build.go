@@ -40,7 +40,7 @@ const (
 )
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
-func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory) []string {
+func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 
 	// Remove non-matching URL-specific meta ops
 	validOps := filterMetaOps(v.MetarrArgs.MetaOps, cu.URL)
@@ -260,7 +260,7 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 }
 
 // parseMetarrOutputDir parses and returns the output directory.
-func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.Directory) string {
+func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
 	var (
 		mArgs      = v.MetarrArgs
 		mOpOutDir  = v.MoveOpOutputDir

@@ -22,6 +22,7 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+// VideoDownloadState represents the current state of a video's download.
 type VideoDownloadState struct {
 	TotalFrags     int
 	CompletedFrags int
@@ -249,7 +250,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		// Aria2 progress parsing
 		if d.DLTracker.downloader == command.DownloaderAria {
 			gotLine, itemsFound, downloadedItems, pct, status :=
-				downloaders.Aria2OutputParser(line, state.URL, totalItemsFound, totalDownloadedItems, state.Percentage, state.Status)
+				downloaders.Aria2OutputParser(line, totalItemsFound, totalDownloadedItems, state.Percentage, state.Status)
 
 			totalItemsFound = itemsFound
 			totalDownloadedItems = downloadedItems

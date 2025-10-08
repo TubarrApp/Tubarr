@@ -1,0 +1,62 @@
+// Package contracts defines interfaces that decouple the application layer from storage implementations.
+//
+// Avoids circular imports.
+package contracts
+
+import (
+	"context"
+	"database/sql"
+
+	"tubarr/internal/models"
+)
+
+// Store allows access to the main store repo methods.
+type Store interface {
+	ChannelStore() ChannelStore
+	DownloadStore() DownloadStore
+	VideoStore() VideoStore
+}
+
+// ChannelStore allows access to channel repo methods.
+type ChannelStore interface {
+	AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error
+	AddChannel(c *models.Channel) (int64, error)
+	AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error)
+	AddNotifyURLs(channelID int64, notifications []*models.Notification) error
+	AddURLToIgnore(channelID int64, ignoreURL string) error
+	CheckOrUnlockChannel(c *models.Channel) (bool, error)
+	CrawlChannel(ctx context.Context, c *models.Channel, s Store) error
+	CrawlChannelIgnore(ctx context.Context, key, val string, s Store) error
+	DeleteChannel(key, val string) error
+	DeleteVideoURLs(channelID int64, urls []string) error
+	DeleteNotifyURLs(channelID int64, urls, names []string) error
+	DownloadVideoURLs(ctx context.Context, c *models.Channel, s Store, videoURLs []string) error
+	FetchAllChannels() (channels []*models.Channel, hasRows bool, err error)
+	FetchChannelModel(key, val string) (*models.Channel, bool, error)
+	FetchChannelURLModels(channelID int64) ([]*models.ChannelURL, error)
+	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
+	GetDB() *sql.DB
+	GetChannelID(key, val string) (int64, error)
+	GetNotifyURLs(id int64) ([]*models.Notification, error)
+	LoadGrabbedURLs(c *models.Channel) (urls []string, err error)
+	UpdateChannelValue(key, val, col string, newVal any) error
+	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
+	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error)
+	UpdateLastScan(channelID int64) error
+}
+
+// DownloadStore allows access to download repo methods.
+type DownloadStore interface {
+	GetDB() *sql.DB
+	SetDownloadStatus(v *models.Video) error
+	UpdateDownloadStatuses(ctx context.Context, updates []models.StatusUpdate) error
+}
+
+// VideoStore allows access to video repo methods.
+type VideoStore interface {
+	AddVideo(v *models.Video, c *models.Channel) (videoID int64, err error)
+	AddVideos(videos []*models.Video, c *models.Channel) ([]*models.Video, []error)
+	GetDB() *sql.DB
+	DeleteVideo(videoURL string, channelID int64) error
+	UpdateVideo(v *models.Video, c *models.Channel) error
+}

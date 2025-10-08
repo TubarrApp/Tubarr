@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"tubarr/internal/interfaces"
+	"tubarr/internal/contracts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
@@ -16,12 +16,12 @@ type DownloadTracker struct {
 	updates    chan models.StatusUpdate
 	batchSize  int
 	done       chan struct{}
-	dlStore    interfaces.DownloadStore
+	dlStore    contracts.DownloadStore
 	downloader string
 }
 
 // NewDownloadTracker returns the model used for tracking downloads.
-func NewDownloadTracker(store interfaces.DownloadStore, externalDler string) *DownloadTracker {
+func NewDownloadTracker(store contracts.DownloadStore, externalDler string) *DownloadTracker {
 	return &DownloadTracker{
 		db:         store.GetDB(),
 		updates:    make(chan models.StatusUpdate, 100),

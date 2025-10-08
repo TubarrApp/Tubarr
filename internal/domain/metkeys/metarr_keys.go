@@ -1,6 +1,7 @@
 // Package metkeys holds command flag constants for Metarr.
 package metkeys
 
+// Main program elements.
 const (
 	Concurrency = "--concurrency"
 	Debug       = "--debug"
@@ -9,7 +10,7 @@ const (
 	RenameStyle = "--rename-style"
 )
 
-// File ops
+// File operations.
 const (
 	Ext                = "--ext"
 	FilenameDateTag    = "--filename-date-tag"
@@ -17,13 +18,14 @@ const (
 	OutputDir          = "--output-directory"
 )
 
-// Meta ops
+// Metadata operations.
 const (
 	MetaOps = "--meta-ops"
 	MetaOW  = "--meta-overwrite"
 	MetaPS  = "--meta-preserve"
 )
 
+// JSON/Video files and directories.
 const (
 	JSONDirectory  = "--json-directory"
 	VideoDirectory = "--video-directory"
@@ -31,7 +33,7 @@ const (
 	VideoFile      = "--video-file"
 )
 
-// FFmpeg
+// FFmpeg related commands.
 const (
 	ExtraFFmpegArgs      = "--extra-ffmpeg-args"
 	HWAccel              = "--hwaccel"

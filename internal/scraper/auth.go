@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -63,6 +64,9 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	if err != nil {
 		return nil, err
 	}
+	if getResp == nil {
+		return nil, fmt.Errorf("'GET' request returned a nil response")
+	}
 	defer func() {
 		if getResp != nil && getResp.Body != nil {
 			if err := getResp.Body.Close(); err != nil {
@@ -100,6 +104,9 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	postResp, err := client.Do(req) // Use different variable name to avoid shadowing
 	if err != nil {
 		return nil, err
+	}
+	if postResp == nil {
+		return nil, fmt.Errorf("'POST' request returned a nil response")
 	}
 	defer func() {
 		if postResp != nil && postResp.Body != nil {
