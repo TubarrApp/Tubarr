@@ -148,7 +148,6 @@ func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 
 // ValidateFile validates that the file exists, else creates it if desired.
 func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
-
 	logging.D(3, "Statting file %q...", f)
 	fileInfo, err := os.Stat(f)
 	if err != nil {
@@ -178,7 +177,6 @@ func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {
-
 	// Output filetype
 	if viper.IsSet(keys.OutputFiletype) {
 		ext := strings.ToLower(viper.GetString(keys.OutputFiletype))
@@ -209,7 +207,6 @@ func ValidateViperFlags() error {
 
 // ValidateConcurrencyLimit checks and ensures correct concurrency limit input.
 func ValidateConcurrencyLimit(c int) int {
-
 	switch {
 	case c < 1:
 		c = 1

@@ -46,13 +46,13 @@ func EscapedSplit(s string, desiredSeparator rune) []string {
 
 // CheckForOpURL checks if a specific URL is attached to a particular meta operation.
 func CheckForOpURL(op string) (chanURL string, ops string) {
-
 	// Check if valid
 	split := EscapedSplit(op, '|')
 	if len(split) < 2 {
 		return "", op
 	}
 
+	// Parse URL
 	u := split[0]
 
 	if _, err := url.ParseRequestURI(u); err != nil {

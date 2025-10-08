@@ -10,6 +10,7 @@ import (
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
@@ -102,6 +103,57 @@ func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
 		return err
 	}
 	logging.S(0, "Deleted URLs %q for channel with ID '%d'", urls, channelID)
+	return nil
+}
+
+// UpdateChannelFromConfig updates the channel settings from a config file if it exists.
+func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
+	cfgFile := c.ChanSettings.ChannelConfigFile
+	if cfgFile == "" {
+		logging.D(2, "No config file path, nothing to apply")
+		return nil
+	}
+
+	logging.I("Updating channel from config file %q...", cfgFile)
+	if _, err := validation.ValidateFile(cfgFile, false); err != nil {
+		return err
+	}
+
+	if err := file.LoadConfigFile(cfgFile); err != nil {
+		return err
+	}
+
+	if err := cs.applyConfigChannelSettings(c); err != nil {
+		return err
+	}
+
+	if err := cs.applyConfigMetarrSettings(c); err != nil {
+		return err
+	}
+
+	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+		if c.ChanSettings == nil {
+			return fmt.Errorf("c.ChanSettings is nil")
+		}
+		*s = *c.ChanSettings
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = cs.UpdateChannelMetarrArgsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(m *models.MetarrArgs) error {
+		if c.ChanMetarrArgs == nil {
+			return fmt.Errorf("c.ChanMetarrArgs is nil")
+		}
+		*m = *c.ChanMetarrArgs
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	logging.S(0, "Updated channel %q from config file", c.Name)
 	return nil
 }
 
@@ -534,8 +586,8 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 	return false, nil
 }
 
-// FetchChannelModel fills the channel model from the database.
-func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, bool, error) {
+// GetChannelModel fills the channel model from the database.
+func (cs *ChannelStore) GetChannelModel(key, val string) (*models.Channel, bool, error) {
 	var (
 		settings, metarrJSON json.RawMessage
 		err                  error
@@ -585,7 +637,7 @@ func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, boo
 		}
 	}
 
-	c.URLModels, err = cs.FetchChannelURLModels(c.ID)
+	c.URLModels, err = cs.GetChannelURLModels(c.ID)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to fetch URL models for channel: %w", err)
 	}
@@ -593,8 +645,8 @@ func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, boo
 	return &c, true, nil
 }
 
-// FetchAllChannels retrieves all channels in the database.
-func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, hasRows bool, err error) {
+// GetAllChannels retrieves all channels in the database.
+func (cs *ChannelStore) GetAllChannels() (channels []*models.Channel, hasRows bool, err error) {
 	query := squirrel.
 		Select(
 			consts.QChanID,
@@ -656,7 +708,7 @@ func (cs *ChannelStore) FetchAllChannels() (channels []*models.Channel, hasRows 
 		channelList = append(channelList, &c)
 	}
 
-	urlMap, err := cs.fetchChannelURLModelsMap(0)
+	urlMap, err := cs.getChannelURLModelsMap(0)
 	if err != nil {
 		return nil, true, err
 	}
@@ -846,8 +898,8 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	return nil
 }
 
-// LoadGrabbedURLs loads already downloaded URLs from the database.
-func (cs *ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err error) {
+// GetAlreadyDownloadedURLs loads already downloaded URLs from the database.
+func (cs *ChannelStore) GetAlreadyDownloadedURLs(c *models.Channel) (urls []string, err error) {
 	if c.ID == 0 {
 		return nil, errors.New("model entered has no ID")
 	}
@@ -890,8 +942,8 @@ func (cs *ChannelStore) LoadGrabbedURLs(c *models.Channel) (urls []string, err e
 	return urls, nil
 }
 
-// FetchChannelURLModels fetches a filled list of ChannelURL models.
-func (cs *ChannelStore) FetchChannelURLModels(channelID int64) ([]*models.ChannelURL, error) {
+// GetChannelURLModels fetches a filled list of ChannelURL models.
+func (cs *ChannelStore) GetChannelURLModels(channelID int64) ([]*models.ChannelURL, error) {
 	urlQuery := squirrel.
 		Select(
 			consts.QChanURLsID,
@@ -996,7 +1048,7 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 }
 
 // ApplyConfigChannelSettings applies the channel settings to the model and saves to database.
-func (cs *ChannelStore) ApplyConfigChannelSettings(c *models.Channel) (err error) {
+func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error) {
 	// Initialize settings model if nil
 	if c.ChanSettings == nil {
 		c.ChanSettings = &models.ChannelSettings{}
@@ -1112,7 +1164,7 @@ func (cs *ChannelStore) ApplyConfigChannelSettings(c *models.Channel) (err error
 }
 
 // ApplyConfigMetarrSettings applies the Metarr settings to the model and saves to database.
-func (cs *ChannelStore) ApplyConfigMetarrSettings(c *models.Channel) (err error) {
+func (cs *ChannelStore) applyConfigMetarrSettings(c *models.Channel) (err error) {
 	// Initialize MetarrArgs model if nil
 	if c.ChanMetarrArgs == nil {
 		c.ChanMetarrArgs = &models.MetarrArgs{}
@@ -1315,10 +1367,10 @@ func (cs ChannelStore) channelExistsID(id int64) bool {
 	return exists
 }
 
-// fetchChannelURLs retrieves all ChannelURL rows for a given channel.
+// getChannelURLs retrieves all ChannelURL rows for a given channel.
 //
 // If channelID == 0, it fetches URLs for all channels.
-func (cs *ChannelStore) fetchChannelURLModelsMap(channelID int64) (map[int64][]*models.ChannelURL, error) {
+func (cs *ChannelStore) getChannelURLModelsMap(channelID int64) (map[int64][]*models.ChannelURL, error) {
 	query := squirrel.
 		Select(
 			consts.QChanURLsID,

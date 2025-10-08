@@ -36,7 +36,7 @@ func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *
 }
 
 // Execute performs the download with retries.
-func (d *VideoDownload) Execute() (botPauseChannel bool, err error) {
+func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	if d.Video == nil {
 		return false, errors.New("video model is nil")
 	}

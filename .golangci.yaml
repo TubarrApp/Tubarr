@@ -6,7 +6,7 @@ external:
   - name: nilaway
     command: nilaway
     args:
-      - ./...
+      - ./... # DOES NOT RUN, RUN MANUALLY IN TERMINAL: nilaway ./...
 
 linters:
   enable:

@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -33,7 +32,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 
 	// Grab all channels from database
 	cs := s.ChannelStore()
-	channels, hasRows, err := cs.FetchAllChannels()
+	channels, hasRows, err := cs.GetAllChannels()
 	if !hasRows {
 		logging.I("No channels in database")
 	} else if err != nil {
@@ -443,8 +442,8 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 // filterBlockedURLs filters out URLs blocked by the hostname of a given channel URL.
 func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
-	allowedURLModels := make([]*models.ChannelURL, 0, len(c.URLModels))
 
+	allowedURLModels := make([]*models.ChannelURL, 0, len(c.URLModels))
 	for _, cu := range c.URLModels {
 		if cu.IsManual {
 			continue
@@ -478,7 +477,7 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, channelID int64)
 	const manualDownloadsURL = "manual-downloads"
 
 	// Check if it already exists
-	channelURLs, err := cs.FetchChannelURLModels(channelID)
+	channelURLs, err := cs.GetChannelURLModels(channelID)
 	if err != nil {
 		return nil, err
 	}

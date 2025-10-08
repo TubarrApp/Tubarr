@@ -96,7 +96,7 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Fetch channel model (retrieve the URLs)
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
 			}
@@ -231,7 +231,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			}
 
 			// Retrieve channel model
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				err := fmt.Errorf("no channel model in database with %s %q", key, val)
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -243,7 +243,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			}
 
 			cURLs := c.GetURLs()
-			logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
+			logging.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Download URLs - errors already logged, DON'T print here
 			if err := app.DownloadVideosToChannel(ctx, s, cs, c, videoURLs); err != nil {
@@ -444,7 +444,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 				return err
 			}
 
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("no rows in the database for channel with %s %q", key, val)
 			}
@@ -453,13 +453,13 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			}
 
 			// Initialize URL list
-			c.URLModels, err = cs.FetchChannelURLModels(c.ID)
+			c.URLModels, err = cs.GetChannelURLModels(c.ID)
 			if err != nil {
 				return fmt.Errorf("failed to fetch URL models for channel: %w", err)
 			}
 
 			cURLs := c.GetURLs()
-			logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
+			logging.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Run an ignore crawl
 			if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
@@ -498,7 +498,7 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Get channel model
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
 			}
@@ -549,7 +549,7 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Get channel model
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
 			}
@@ -598,7 +598,7 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Get channel model
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
 			}
@@ -994,7 +994,7 @@ func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Fetch channel model
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				logging.I("Entry for channel with %s %q does not exist in the database", key, val)
 				return nil
@@ -1022,7 +1022,7 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 
 			// Fetch channels from database
-			chans, hasRows, err := cs.FetchAllChannels()
+			chans, hasRows, err := cs.GetAllChannels()
 			if !hasRows {
 				logging.I("No entries in the database")
 				return nil
@@ -1065,7 +1065,7 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 			}
 
 			// Retrieve channel model
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				err := fmt.Errorf("no channel model in database with %s %q", key, val)
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -1135,7 +1135,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Fetch model from database
-			c, hasRows, err := cs.FetchChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val)
 			if !hasRows {
 				return fmt.Errorf("no channel model in database with %s %q", key, val)
 			}

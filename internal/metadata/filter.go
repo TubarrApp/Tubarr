@@ -38,9 +38,7 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) bool {
 		strVal := strings.ToLower(fmt.Sprint(val))
 		filterVal := strings.ToLower(filter.Value)
 
-		var (
-			passed, failHard bool
-		)
+		var passed, failHard bool
 		switch filter.Value {
 		case "": // empty filter value
 			passed, failHard = checkFilterWithEmptyValue(filter, exists)

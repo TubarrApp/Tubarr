@@ -29,7 +29,6 @@ func NewProgController(database *sql.DB) *ProgControl {
 
 // StartTubarr sets Tubarr fields in the database.
 func (pc *ProgControl) StartTubarr() (pid int, err error) {
-
 	// Check running or stale state
 	id, running, err := pc.checkProgRunning()
 	if err != nil {

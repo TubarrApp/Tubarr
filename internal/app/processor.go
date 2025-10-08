@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"tubarr/internal/contracts"
 	"tubarr/internal/dev"
 	"tubarr/internal/domain/consts"
@@ -30,12 +29,11 @@ func InitProcess(
 	cu *models.ChannelURL,
 	videos []*models.Video,
 	scrape *scraper.Scraper) (nSucceeded int, nDownloaded int, err error) {
-
+	// Initialize variables
 	var (
 		errs []error
+		conc = max(c.ChanSettings.Concurrency, 1)
 	)
-
-	conc := max(c.ChanSettings.Concurrency, 1)
 
 	logging.I("Starting meta/video processing for %d videos", len(videos))
 
@@ -65,9 +63,7 @@ func InitProcess(
 
 	// Start workers
 	for range conc {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for v := range jobs {
 				select {
 				case <-procCtx.Done():
@@ -93,7 +89,7 @@ func InitProcess(
 				}
 				results <- err
 			}
-		}()
+		})
 	}
 
 	// Send jobs
@@ -150,8 +146,6 @@ func InitProcess(
 
 // checkCustomScraperNeeds checks if a custom scraper should be used for this release.
 func checkCustomScraperNeeds(s *scraper.Scraper, v *models.Video) error {
-	// Check for custom scraper needs
-
 	// Detect censored.tv links
 	if strings.Contains(v.URL, "censored.tv") {
 		if !dev.CensoredTVUseCustom {
@@ -196,9 +190,9 @@ func videoJob(
 	}
 
 	// Process video download phase
-	botPauseChannel, err := processVideo(procCtx, v, cu, c, dlTracker)
+	botBlockChannel, err := processVideo(procCtx, v, cu, c, dlTracker)
 	if err != nil {
-		return handleBotError(cs, c, cu, v.URL, botPauseChannel, err, "video processing")
+		return handleBotError(cs, c, cu, v.URL, botBlockChannel, err, "video processing")
 	}
 
 	// Check if Metarr is available
@@ -226,9 +220,10 @@ func handleJSONProcessing(
 	cu *models.ChannelURL,
 	v *models.Video,
 ) (bool, error) {
-	proceed, botPauseChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
+	// Process JSON downloading and filtering for this file.
+	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
 	if err != nil {
-		return false, handleBotError(cs, c, cu, v.URL, botPauseChannel, err, "JSON processing")
+		return false, handleBotError(cs, c, cu, v.URL, botBlockChannel, err, "JSON processing")
 	}
 
 	return proceed, nil
@@ -240,11 +235,12 @@ func handleBotError(
 	c *models.Channel,
 	cu *models.ChannelURL,
 	videoURL string,
-	botPauseChannel bool,
+	botBlockChannel bool,
 	err error,
 	phase string,
 ) error {
-	if botPauseChannel {
+	// Check if the channel is blocked due to bot activity
+	if botBlockChannel {
 		if blockErr := blockChannelBotDetected(cs, c, cu); blockErr != nil {
 			logging.E("Failed to block channel: %v", blockErr)
 		}
@@ -270,9 +266,8 @@ func processJSON(
 	c *models.Channel,
 	cu *models.ChannelURL,
 	v *models.Video,
-) (proceed, botPauseChannel bool, err error) {
-
-	// 1. Download JSON
+) (proceed, botBlockChannel bool, err error) {
+	// Download JSON
 	dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
 		MaxRetries:    3,
 		RetryInterval: 5 * time.Second,
@@ -281,11 +276,11 @@ func processJSON(
 		return false, false, err
 	}
 
-	if botPauseChannel, err := dl.Execute(); err != nil {
-		return false, botPauseChannel, err
+	if botBlockChannel, err := dl.Execute(); err != nil {
+		return false, botBlockChannel, err
 	}
 
-	// 2. Validate and filter (delegates to metadata package)
+	// Validate and filter (delegates to metadata package)
 	valid, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
 	if err != nil {
 		return false, false, err
@@ -304,7 +299,7 @@ func processJSON(
 		return false, false, nil
 	}
 
-	// 3. Save to database
+	// Save video to database
 	if v.ID, err = vs.AddVideo(v, c); err != nil {
 		return false, false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
@@ -314,7 +309,7 @@ func processJSON(
 }
 
 // processVideo processes video downloads.
-func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) (botPauseChannel bool, err error) {
+func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) (botBlockChannel bool, err error) {
 	if v == nil {
 		logging.I("Null video entered")
 		return false, nil
@@ -330,8 +325,8 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 		return false, err
 	}
 
-	if botPauseChannel, err := dl.Execute(); err != nil {
-		if botPauseChannel {
+	if botBlockChannel, err := dl.Execute(); err != nil {
+		if botBlockChannel {
 			return true, err // Only 'TRUE' bot pause channel path
 		}
 		return false, err

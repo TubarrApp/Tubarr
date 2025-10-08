@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-
 	"tubarr/internal/utils/logging"
 )
 
@@ -32,7 +31,6 @@ func NewURLFileParser(fpath string) *URLFileParser {
 // Users should put a single URL on each line in the file for proper parsing.
 // Hashtags should work to exclude lines (i.e. '# Comment').
 func (up *URLFileParser) ParseURLs() ([]string, error) {
-
 	up.mu.RLock()
 	defer up.mu.RUnlock()
 

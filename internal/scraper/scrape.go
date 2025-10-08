@@ -23,10 +23,10 @@ import (
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
-	"tubarr/internal/validation"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
@@ -83,7 +83,7 @@ func New() *Scraper {
 // GetExistingReleases returns releases already in the database.
 func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
 	// Load already downloaded URLs
-	existingURLs, err = cs.LoadGrabbedURLs(c)
+	existingURLs, err = cs.GetAlreadyDownloadedURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
@@ -163,7 +163,6 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 // GetChannelCookies returns channel access details for a given video.
 func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
-
 	// Fetch auth details if this is a manual entry or not from DB
 	if cu.IsManual || cu.ID == 0 {
 		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
@@ -292,6 +291,7 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, targetURL string, existing
 // ignoreDownloadedURLs filters out already downloaded URLs.
 func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 	var newURLs = make([]string, 0, len(inputURLs))
+
 	for _, url := range inputURLs {
 		normalizedURL := normalizeURL(url)
 		exists := false
@@ -384,7 +384,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 
 	// Write metadata to file
 	filename := fmt.Sprintf("%s.json", sanitizeFilename(v.Title))
-	if err := writeMetadataJSON(metadata, outputDir, filename, v); err != nil {
+	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v); err != nil {
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}
 
@@ -433,35 +433,6 @@ func sanitizeFilename(name string) string {
 		}
 		return r
 	}, name)
-}
-
-// writeMetadataJSON writes the custom metadata file.
-func writeMetadataJSON(metadata map[string]any, outputDir, filename string, v *models.Video) error {
-	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
-
-	// Ensure the directory exists
-	if _, err := validation.ValidateDirectory(outputDir, true); err != nil {
-		return err
-	}
-
-	file, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			logging.E("failed to close file %v due to error: %v", filePath, err)
-		}
-	}()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(metadata); err != nil {
-		return fmt.Errorf("failed to write JSON: %w", err)
-	}
-
-	v.JSONCustomFile = filePath
-	return nil
 }
 
 // generateCookieFilePath generates a unique authentication file path per channel and URL.

@@ -114,7 +114,6 @@ func ValidateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 
 // ValidateRenameFlag validates the rename style to apply.
 func ValidateRenameFlag(flag string) error {
-
 	// Trim whitespace for more robust validation
 	flag = strings.TrimSpace(strings.ToLower(flag))
 
@@ -244,10 +243,11 @@ func ValidateGPU(g, devDir string) (gpu, gpuDir string, err error) {
 
 // ValidateTranscodeCodec validates the user input codec selection.
 func ValidateTranscodeCodec(c string, accel string) (codec string, err error) {
-
 	logging.D(3, "Checking codec %q with acceleration type %q...", c, accel)
+
 	c = strings.ToLower(c)
 	c = strings.ReplaceAll(c, ".", "")
+
 	switch c {
 	case "h264", "hevc":
 		return c, nil

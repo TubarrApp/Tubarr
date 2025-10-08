@@ -74,10 +74,7 @@ func (ds *DownloadStore) GetDB() *sql.DB {
 
 // SetDownloadStatus updates the download status of a single video.
 func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
-	var (
-		committed bool
-	)
-
+	var committed bool
 	tx, err := ds.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)

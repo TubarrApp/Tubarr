@@ -93,7 +93,6 @@ func SetupBenchmarking() (*BenchFiles, error) {
 
 // CloseBenchFiles closes bench files on program termination.
 func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
-
 	if b.cpuFile != nil {
 		pprof.StopCPUProfile()
 		if err := b.cpuFile.Close(); err != nil {

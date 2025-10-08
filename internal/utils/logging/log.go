@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/regex"
 

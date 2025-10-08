@@ -6,7 +6,6 @@ package contracts
 import (
 	"context"
 	"database/sql"
-
 	"tubarr/internal/models"
 )
 
@@ -19,29 +18,38 @@ type Store interface {
 
 // ChannelStore allows access to channel repo methods.
 type ChannelStore interface {
+	GetDB() *sql.DB
+
+	// Add operations.
 	AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error
 	AddChannel(c *models.Channel) (int64, error)
 	AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error)
 	AddNotifyURLs(channelID int64, notifications []*models.Notification) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error
-	ApplyConfigChannelSettings(c *models.Channel) (err error)
-	ApplyConfigMetarrSettings(c *models.Channel) (err error)
-	CheckOrUnlockChannel(c *models.Channel) (bool, error)
-	DeleteChannel(key, val string) error
-	DeleteVideoURLs(channelID int64, urls []string) error
-	DeleteNotifyURLs(channelID int64, urls, names []string) error
-	FetchAllChannels() (channels []*models.Channel, hasRows bool, err error)
-	FetchChannelModel(key, val string) (*models.Channel, bool, error)
-	FetchChannelURLModels(channelID int64) ([]*models.ChannelURL, error)
-	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
-	GetDB() *sql.DB
-	GetChannelID(key, val string) (int64, error)
-	GetNotifyURLs(id int64) ([]*models.Notification, error)
-	LoadGrabbedURLs(c *models.Channel) (urls []string, err error)
+
+	// Update operations.
+	UpdateChannelFromConfig(c *models.Channel) (err error)
 	UpdateChannelValue(key, val, col string, newVal any) error
 	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
 	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error)
 	UpdateLastScan(channelID int64) error
+
+	// Delete operations.
+	DeleteChannel(key, val string) error
+	DeleteVideoURLs(channelID int64, urls []string) error
+	DeleteNotifyURLs(channelID int64, urls, names []string) error
+
+	// 'Get' operations.
+	GetAllChannels() (channels []*models.Channel, hasRows bool, err error)
+	GetAlreadyDownloadedURLs(c *models.Channel) (urls []string, err error)
+	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
+	GetChannelID(key, val string) (int64, error)
+	GetChannelModel(key, val string) (*models.Channel, bool, error)
+	GetChannelURLModels(channelID int64) ([]*models.ChannelURL, error)
+	GetNotifyURLs(id int64) ([]*models.Notification, error)
+
+	// Other channel database functions.
+	CheckOrUnlockChannel(c *models.Channel) (bool, error)
 }
 
 // DownloadStore allows access to download repo methods.
@@ -53,9 +61,15 @@ type DownloadStore interface {
 
 // VideoStore allows access to video repo methods.
 type VideoStore interface {
+	GetDB() *sql.DB
+
+	// Add operations.
 	AddVideo(v *models.Video, c *models.Channel) (videoID int64, err error)
 	AddVideos(videos []*models.Video, c *models.Channel) ([]*models.Video, []error)
-	GetDB() *sql.DB
-	DeleteVideo(videoURL string, channelID int64) error
+
+	// Update operations.
 	UpdateVideo(v *models.Video, c *models.Channel) error
+
+	// Delete operations.
+	DeleteVideo(videoURL string, channelID int64) error
 }

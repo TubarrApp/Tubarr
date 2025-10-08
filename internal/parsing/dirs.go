@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
 	"tubarr/internal/domain/templates"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -108,7 +107,6 @@ func (dp *DirectoryParser) parseTemplate(dir string, v *models.Video) (string, e
 
 // replaceTemplateTags makes template replacements in the directory string.
 func (dp *DirectoryParser) replaceTemplateTags(tag string, v *models.Video) (string, error) {
-
 	c := dp.C
 
 	switch strings.ToLower(tag) {

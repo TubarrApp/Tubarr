@@ -37,7 +37,7 @@ func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *m
 }
 
 // Execute performs the download with retries.
-func (d *JSONDownload) Execute() (botPauseChannel bool, err error) {
+func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 	if d.Video == nil {
 		return false, errors.New("video model is nil")
 	}
@@ -92,7 +92,7 @@ func (d *JSONDownload) Execute() (botPauseChannel bool, err error) {
 	return false, fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
-// executeAttempt performs a single download attempt.
+// jsonDLAttempt performs a single download attempt.
 func (d *JSONDownload) jsonDLAttempt() error {
 	cmd := d.buildJSONCommand()
 	return d.executeJSONDownload(cmd)
