@@ -13,7 +13,7 @@ import (
 func IsPrivateNetwork(host string) bool {
 	h, _, err := net.SplitHostPort(host)
 	if err != nil {
-		if u, parseErr := url.Parse(host); parseErr == nil {
+		if u, parseErr := url.Parse(host); parseErr == nil { // If parseErr IS nil
 			h = u.Hostname()
 		} else {
 			h = host // (Fallback unlikely to ever be used)
@@ -69,8 +69,7 @@ func IsPrivateNetwork(host string) bool {
 func IsPrivateNetworkFallback(h string) bool {
 	// Attempt to resolve hostname to IP addresses
 	ips, err := net.LookupIP(h)
-	if err == nil {
-		// Iterate through resolved IPs and check if any are private
+	if err == nil { // If err IS nil
 		for _, ip := range ips {
 			if IsPrivateIP(ip.String(), h) {
 				return true

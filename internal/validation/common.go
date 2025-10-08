@@ -119,8 +119,8 @@ func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 	// Check directory existence
 	dirInfo, err := os.Stat(dir)
 	switch {
-	case err == nil:
-		// path exists, ensure it's a directory
+	case err == nil: // If err IS nil
+
 		if !dirInfo.IsDir() {
 			return dirInfo, fmt.Errorf("path %q is a file, not a directory", dir)
 		}
@@ -442,7 +442,7 @@ func ValidateToFromDate(d string) (string, error) {
 	re := regex.YearFragmentsCompile()
 	matches := re.FindStringSubmatch(d)
 	if matches == nil {
-		return "", fmt.Errorf("invalid date format %q: expected yyyymmdd or formats like 2025y12m31d", d)
+		return "", fmt.Errorf("invalid date format %q: expected 'Ymd' format", d)
 	}
 
 	// Default values

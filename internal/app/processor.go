@@ -59,7 +59,7 @@ func InitProcess(
 			return 0, 0, fmt.Errorf("error checking for 'metarr' at $PATH: %w", err)
 		}
 	}
-	metarrExists := err == nil
+	metarrExists := (err == nil)
 
 	var wg sync.WaitGroup
 

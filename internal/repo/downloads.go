@@ -175,7 +175,7 @@ func normalizeDownloadStatus(pctPtr *float64, statusPtr *consts.DownloadStatus, 
 		status consts.DownloadStatus
 	)
 	if pctPtr == nil || statusPtr == nil {
-		logging.E("Status or percentage passed into function null for video with ID %d", videoID)
+		logging.E("Status or percentage passed into function as 'nil' for video with ID %d", videoID)
 		return
 	}
 

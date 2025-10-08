@@ -29,7 +29,7 @@ func (s *Scraper) channelAuth(ctx context.Context, channelHostname string, a *mo
 
 	// Then check base domain as fallback
 	baseDomain, err := baseDomain(channelHostname)
-	if err == nil && baseDomain != channelHostname {
+	if err == nil && baseDomain != channelHostname { // If err IS nil
 		if val, ok := globalAuthCache.Load(baseDomain); ok {
 			return val.([]*http.Cookie), nil
 		}
@@ -55,7 +55,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	client := &http.Client{Jar: jar}
 	logging.I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, auth.StarPassword(a.Password))
 
-	// Fetch the login page to get a fresh token
+	// 'GET' the login page to get a fresh token
 	req, err := http.NewRequestWithContext(ctx, "GET", a.LoginURL, nil)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	}
 	logging.D(1, "Sending token %q", data.Get("_token"))
 
-	// Post the login form
+	// 'POST' auth details to the login form
 	req, err = http.NewRequestWithContext(ctx, "POST", a.LoginURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err

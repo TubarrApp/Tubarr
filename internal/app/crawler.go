@@ -177,7 +177,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 				continue
 			}
 			hostname := parsed.Hostname()
-			if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
+			if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil
 				hostname = strings.ToLower(domain)
 			}
 
@@ -456,7 +456,7 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 		}
 
 		hostname := parsed.Hostname()
-		if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
+		if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil
 			hostname = strings.ToLower(domain)
 		}
 
@@ -516,7 +516,7 @@ func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *m
 
 	// Extract the eTLD+1 (effective top-level domain + 1 label)
 	// e.g., m.youtube.com -> youtube.com, www.bbc.co.uk -> bbc.co.uk
-	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
+	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil
 		hostname = strings.ToLower(domain)
 	}
 
