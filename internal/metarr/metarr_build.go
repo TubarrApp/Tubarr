@@ -7,13 +7,14 @@ import (
 	"strconv"
 	"strings"
 
-	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
+
+	"github.com/spf13/viper"
 )
 
 type metCmdMapping struct {
@@ -220,34 +221,34 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 	case i:
 		if f.metarrValue.i > 0 {
 			argMap[f.cmdKey] = strconv.Itoa(f.metarrValue.i)
-		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
-			argMap[f.cmdKey] = strconv.Itoa(cfg.GetInt(f.viperKey))
+		} else if f.viperKey != "" && viper.IsSet(f.viperKey) {
+			argMap[f.cmdKey] = strconv.Itoa(viper.GetInt(f.viperKey))
 		}
 	case f64:
 		if f.metarrValue.f64 > 0.0 {
 			argMap[f.cmdKey] = fmt.Sprintf("%.2f", f.metarrValue.f64)
-		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
-			argMap[f.cmdKey] = fmt.Sprintf("%.2f", cfg.GetFloat64(f.viperKey))
+		} else if f.viperKey != "" && viper.IsSet(f.viperKey) {
+			argMap[f.cmdKey] = fmt.Sprintf("%.2f", viper.GetFloat64(f.viperKey))
 		}
 	case str:
 		if f.metarrValue.str != "" {
 			argMap[f.cmdKey] = f.metarrValue.str
-		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
-			argMap[f.cmdKey] = cfg.GetString(f.viperKey)
+		} else if f.viperKey != "" && viper.IsSet(f.viperKey) {
+			argMap[f.cmdKey] = viper.GetString(f.viperKey)
 		}
 	case strSlice:
 		if len(f.metarrValue.strSlice) > 0 {
 			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(f.metarrValue.strSlice)
-		} else if f.viperKey != "" && cfg.IsSet(f.viperKey) {
-			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(cfg.GetStringSlice(f.viperKey))
+		} else if f.viperKey != "" && viper.IsSet(f.viperKey) {
+			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(viper.GetStringSlice(f.viperKey))
 		}
 
 		// Set Meta Overwrite flag if meta-ops arguments exist
 		if f.cmdKey == metkeys.MetaOps {
 			elemCount := len(f.metarrValue.strSlice)
 
-			if cfg.IsSet(f.viperKey) {
-				elemCount += len(cfg.GetStringSlice(f.viperKey))
+			if viper.IsSet(f.viperKey) {
+				elemCount += len(viper.GetStringSlice(f.viperKey))
 			}
 
 			if elemCount > 0 {
@@ -274,8 +275,8 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 
 	switch {
 	// #1 Priority: Explicit Viper flag set
-	case cfg.IsSet(keys.MoveOnComplete):
-		d := cfg.GetString(keys.MoveOnComplete)
+	case viper.IsSet(keys.MoveOnComplete):
+		d := viper.GetString(keys.MoveOnComplete)
 
 		parsed, err := dirParser.ParseDirectory(d, v, "Metarr video")
 		if err != nil {
@@ -283,7 +284,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 			break
 		}
 
-		cfg.Set(keys.MoveOnComplete, parsed)
+		viper.Set(keys.MoveOnComplete, parsed)
 		return parsed
 
 	// #2 Priority: Move operation filter output directory

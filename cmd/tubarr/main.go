@@ -12,6 +12,8 @@ import (
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"
+
+	"github.com/spf13/viper"
 )
 
 // main is the main entrypoint of the program (duh!)
@@ -44,7 +46,7 @@ func main() {
 	}
 
 	// Check channels
-	if cfg.GetBool(keys.CheckChannels) {
+	if viper.GetBool(keys.CheckChannels) {
 		if err := app.CheckChannels(ctx, store); err != nil {
 			logging.E("Encountered errors while checking channels: %v\n", err)
 			return

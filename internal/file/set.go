@@ -1,4 +1,4 @@
-package cfg
+package file
 
 import (
 	"tubarr/internal/validation"
@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// loadConfigFile loads in the preset configuration file.
-func loadConfigFile(file string) error {
+// LoadConfigFile loads in the preset configuration file.
+func LoadConfigFile(file string) error {
 	if _, err := validation.ValidateFile(file, false); err != nil {
 		return err
 	}

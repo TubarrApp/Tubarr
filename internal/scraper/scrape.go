@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"tubarr/internal/cfg"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
@@ -31,6 +30,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
+	"github.com/spf13/viper"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -274,8 +274,8 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, targetURL string, existing
 	}
 	episodeURLs = append(episodeURLs, fileURLs...)
 
-	if cfg.IsSet(keys.URLAdd) {
-		urls := cfg.GetStringSlice(keys.URLAdd)
+	if viper.IsSet(keys.URLAdd) {
+		urls := viper.GetStringSlice(keys.URLAdd)
 		episodeURLs = append(episodeURLs, urls...)
 	}
 

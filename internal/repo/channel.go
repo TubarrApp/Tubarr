@@ -1,20 +1,21 @@
 package repo
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
-	"tubarr/internal/app"
-	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/validation"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/spf13/viper"
 )
 
 // ChannelStore holds a pointer to the sql.DB.
@@ -533,90 +534,6 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 	return false, nil
 }
 
-// CrawlChannelIgnore crawls a channel and adds the latest videos to the ignore list.
-func (cs *ChannelStore) CrawlChannelIgnore(ctx context.Context, key, val string, s contracts.Store) error {
-	var (
-		c                    models.Channel
-		settings, metarrJSON json.RawMessage
-		err                  error
-	)
-
-	query := squirrel.
-		Select(
-			consts.QChanID,
-			consts.QChanName,
-			consts.QChanSettings,
-			consts.QChanMetarr,
-			consts.QChanLastScan,
-			consts.QChanCreatedAt,
-			consts.QChanUpdatedAt,
-		).
-		From(consts.DBChannels).
-		Where(squirrel.Eq{key: val})
-
-	if err := query.
-		RunWith(cs.DB).
-		QueryRow().
-		Scan(
-			&c.ID,
-			&c.Name,
-			&settings,
-			&metarrJSON,
-			&c.LastScan,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-		); err != nil {
-		return fmt.Errorf("failed to scan channel: %w", err)
-	}
-
-	// Unmarshal settings
-	if err := json.Unmarshal(settings, &c.ChanSettings); err != nil {
-		return fmt.Errorf("parsing channel settings: %w", err)
-	}
-
-	// Unmarshal metarr settings
-	if len(metarrJSON) > 0 {
-		if err := json.Unmarshal(metarrJSON, &c.ChanMetarrArgs); err != nil {
-			return fmt.Errorf("parsing metarr settings: %w", err)
-		}
-	}
-
-	// Initialize URL list
-	c.URLModels, err = cs.FetchChannelURLModels(c.ID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch URL models for channel: %w", err)
-	}
-
-	cURLs := c.GetURLs()
-	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
-
-	// Process crawling using the updated channel object
-	if err := app.ChannelCrawlIgnoreNew(ctx, s, &c); err != nil {
-		return err
-	}
-	return nil
-}
-
-// DownloadVideoURLs downloads new video URLs to a channel.
-func (cs *ChannelStore) DownloadVideoURLs(ctx context.Context, c *models.Channel, s contracts.Store, videoURLs []string) error {
-
-	cURLs := c.GetURLs()
-	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
-
-	// Process crawling using the updated channel object
-	return app.DownloadVideosToChannel(ctx, s, s.ChannelStore(), c, videoURLs)
-}
-
-// CrawlChannel crawls a channel and finds video URLs which have not yet been downloaded.
-func (cs *ChannelStore) CrawlChannel(ctx context.Context, c *models.Channel, s contracts.Store) error {
-
-	cURLs := c.GetURLs()
-	logging.D(1, "Retrieved channel (ID: %d) with URLs: %+v", c.ID, cURLs)
-
-	// Process crawling using the updated channel object
-	return app.ChannelCrawl(ctx, s, s.ChannelStore(), c)
-}
-
 // FetchChannelModel fills the channel model from the database.
 func (cs *ChannelStore) FetchChannelModel(key, val string) (*models.Channel, bool, error) {
 	var (
@@ -1078,6 +995,274 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 	return id, nil
 }
 
+// ApplyConfigChannelSettings applies the channel settings to the model and saves to database.
+func (cs *ChannelStore) ApplyConfigChannelSettings(c *models.Channel) (err error) {
+	// Initialize settings model if nil
+	if c.ChanSettings == nil {
+		c.ChanSettings = &models.ChannelSettings{}
+	}
+
+	// Channel config file location
+	if v, ok := getConfigValue[string](keys.ChannelConfigFile); ok {
+		if _, err = validation.ValidateFile(v, false); err != nil {
+			return err
+		}
+		c.ChanSettings.ChannelConfigFile = v
+	}
+
+	// Concurrency limit
+	if v, ok := getConfigValue[int](keys.ConcurrencyLimitInput); ok {
+		c.ChanSettings.Concurrency = validation.ValidateConcurrencyLimit(v)
+	}
+
+	// Cookie source
+	if v, ok := getConfigValue[string](keys.CookieSource); ok {
+		c.ChanSettings.CookieSource = v // No check for this currently! (cookies-from-browser)
+	}
+
+	// Crawl frequency
+	if v, ok := getConfigValue[int](keys.CrawlFreq); ok {
+		c.ChanSettings.CrawlFreq = v
+	}
+
+	// Download retries
+	if v, ok := getConfigValue[int](keys.DLRetries); ok {
+		c.ChanSettings.Retries = v
+	}
+
+	// External downloader
+	if v, ok := getConfigValue[string](keys.ExternalDownloader); ok {
+		c.ChanSettings.ExternalDownloader = v // No checks for this yet.
+	}
+
+	// External downloader arguments
+	if v, ok := getConfigValue[string](keys.ExternalDownloaderArgs); ok {
+		c.ChanSettings.ExternalDownloaderArgs = v // No checks for this yet.
+	}
+
+	// Filter ops file
+	if v, ok := getConfigValue[string](keys.FilterOpsFile); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return err
+		}
+		c.ChanSettings.FilterFile = v
+	}
+
+	// From date
+	if v, ok := getConfigValue[string](keys.FromDate); ok {
+		if c.ChanSettings.FromDate, err = validation.ValidateToFromDate(v); err != nil {
+			return err
+		}
+	}
+
+	// JSON directory
+	if v, ok := getConfigValue[string](keys.JSONDir); ok {
+		if _, err = validation.ValidateDirectory(v, false); err != nil {
+			return err
+		}
+		c.ChanSettings.JSONDir = v
+	}
+
+	// Max filesize to download
+	if v, ok := getConfigValue[string](keys.MaxFilesize); ok {
+		c.ChanSettings.MaxFilesize = v
+	}
+
+	// Move ops file
+	if v, ok := getConfigValue[string](keys.MoveOpsFile); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return err
+		}
+		c.ChanSettings.MoveOpFile = v
+	}
+
+	// Pause channel
+	if v, ok := getConfigValue[bool](keys.Pause); ok {
+		c.ChanSettings.Paused = v
+	}
+
+	// To date
+	if v, ok := getConfigValue[string](keys.ToDate); ok {
+		if c.ChanSettings.ToDate, err = validation.ValidateToFromDate(v); err != nil {
+			return err
+		}
+	}
+
+	// Use global cookies?
+	if v, ok := getConfigValue[bool](keys.UseGlobalCookies); ok {
+		c.ChanSettings.UseGlobalCookies = v
+	}
+
+	// Video directory
+	if v, ok := getConfigValue[string](keys.VideoDir); ok {
+		if _, err = validation.ValidateDirectory(v, false); err != nil {
+			return err
+		}
+		c.ChanSettings.VideoDir = v
+	}
+
+	// YTDLP output format
+	if v, ok := getConfigValue[string](keys.YtdlpOutputExt); ok {
+		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
+			return err
+		}
+		c.ChanSettings.YtdlpOutputExt = v
+	}
+	return nil
+}
+
+// ApplyConfigMetarrSettings applies the Metarr settings to the model and saves to database.
+func (cs *ChannelStore) ApplyConfigMetarrSettings(c *models.Channel) (err error) {
+	// Initialize MetarrArgs model if nil
+	if c.ChanMetarrArgs == nil {
+		c.ChanMetarrArgs = &models.MetarrArgs{}
+	}
+
+	var (
+		gpuDirGot, gpuGot string
+		videoCodecGot     string
+	)
+
+	// Metarr output extension
+	if v, ok := getConfigValue[string](keys.MExt); ok {
+		if _, err := validation.ValidateOutputFiletype(c.ChanSettings.ChannelConfigFile); err != nil {
+			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ChanSettings.ChannelConfigFile)
+		}
+		c.ChanMetarrArgs.Ext = v
+	}
+
+	// Filename suffix replacements
+	if v, ok := getConfigValue[[]string](keys.MFilenameReplaceSuffix); ok {
+		c.ChanMetarrArgs.FilenameReplaceSfx, err = validation.ValidateFilenameSuffixReplace(v)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Rename style
+	if v, ok := getConfigValue[string](keys.MRenameStyle); ok {
+		if err := validation.ValidateRenameFlag(v); err != nil {
+			return err
+		}
+		c.ChanMetarrArgs.RenameStyle = v
+	}
+
+	// Extra FFmpeg arguments
+	if v, ok := getConfigValue[string](keys.MExtraFFmpegArgs); ok {
+		c.ChanMetarrArgs.ExtraFFmpegArgs = v
+	}
+
+	// Filename date tag
+	if v, ok := getConfigValue[string](keys.MFilenameDateTag); ok {
+		if ok := validation.ValidateDateFormat(v); !ok {
+			return fmt.Errorf("date format %q in config file %q is invalid", v, c.ChanSettings.ChannelConfigFile)
+		}
+		c.ChanMetarrArgs.FilenameDateTag = v
+	}
+
+	// Meta ops
+	if v, ok := getConfigValue[[]string](keys.MMetaOps); ok {
+		c.ChanMetarrArgs.MetaOps, err = validation.ValidateMetaOps(v)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Default output directory
+	if v, ok := getConfigValue[string](keys.MOutputDir); ok {
+		if _, err := validation.ValidateDirectory(v, false); err != nil {
+			return err
+		}
+		c.ChanMetarrArgs.OutputDir = v
+	}
+
+	// Per-URL output directory
+	if v, ok := getConfigValue[[]string](keys.MURLOutputDirs); ok && len(v) != 0 {
+
+		valid := make([]string, 0, len(v))
+
+		for _, d := range v {
+			split := strings.Split(d, "|")
+			if len(split) == 2 && split[1] != "" {
+				valid = append(valid, d)
+			} else {
+				logging.W("Removed invalid per-URL output directory pair %q", d)
+			}
+		}
+
+		if len(valid) == 0 {
+			c.ChanMetarrArgs.URLOutputDirs = nil
+		} else {
+			c.ChanMetarrArgs.URLOutputDirs = valid
+		}
+	}
+
+	// Metarr concurrency
+	if v, ok := getConfigValue[int](keys.MConcurrency); ok {
+		c.ChanMetarrArgs.Concurrency = validation.ValidateConcurrencyLimit(v)
+	}
+
+	// Metarr max CPU
+	if v, ok := getConfigValue[float64](keys.MMaxCPU); ok {
+		c.ChanMetarrArgs.MaxCPU = v // Handled in Metarr
+	}
+
+	// Metarr minimum memory to reserve
+	if v, ok := getConfigValue[string](keys.MMinFreeMem); ok {
+		c.ChanMetarrArgs.MinFreeMem = v // Handled in Metarr
+	}
+
+	// Metarr GPU
+	if v, ok := getConfigValue[string](keys.TranscodeGPU); ok {
+		gpuGot = v
+	}
+	if v, ok := getConfigValue[string](keys.TranscodeGPUDir); ok {
+		gpuDirGot = v
+	}
+
+	// Metarr video filter
+	if v, ok := getConfigValue[string](keys.TranscodeVideoFilter); ok {
+		c.ChanMetarrArgs.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(v)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Metarr video codec
+	if v, ok := getConfigValue[string](keys.TranscodeCodec); ok {
+		videoCodecGot = v
+	}
+
+	// Metarr audio codec
+	if v, ok := getConfigValue[string](keys.TranscodeAudioCodec); ok {
+		if c.ChanMetarrArgs.TranscodeAudioCodec, err = validation.ValidateTranscodeAudioCodec(v); err != nil {
+			return err
+		}
+	}
+
+	// Metarr transcode quality
+	if v, ok := getConfigValue[string](keys.MTranscodeQuality); ok {
+		if c.ChanMetarrArgs.TranscodeQuality, err = validation.ValidateTranscodeQuality(v); err != nil {
+			return err
+		}
+	}
+
+	// Transcode GPU validation
+	if gpuGot != "" || gpuDirGot != "" {
+		c.ChanMetarrArgs.UseGPU, c.ChanMetarrArgs.GPUDir, err = validation.ValidateGPU(gpuGot, gpuDirGot)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Validate video codec against transcode GPU
+	if c.ChanMetarrArgs.TranscodeCodec, err = validation.ValidateTranscodeCodec(videoCodecGot, c.ChanMetarrArgs.UseGPU); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // ******************************** Private ********************************
 
 // channelExists returns true if the channel exists in the database.
@@ -1202,4 +1387,105 @@ func nullString(s sql.NullString) string {
 		return s.String
 	}
 	return ""
+}
+
+// getConfigValue normalizes and retrieves values from the config file.
+// Supports both kebab-case and snake_case keys.
+func getConfigValue[T any](key string) (T, bool) {
+	var zero T
+
+	// Try original key first
+	if viper.IsSet(key) {
+		if val, ok := convertConfigValue[T](viper.Get(key)); ok {
+			return val, true
+		}
+	}
+
+	// Try snake_case version
+	snakeKey := strings.ReplaceAll(key, "-", "_")
+	if snakeKey != key && viper.IsSet(snakeKey) {
+		if val, ok := convertConfigValue[T](viper.Get(snakeKey)); ok {
+			return val, true
+		}
+	}
+
+	// Try kebab-case version
+	kebabKey := strings.ReplaceAll(key, "_", "-")
+	if kebabKey != key && viper.IsSet(kebabKey) {
+		if val, ok := convertConfigValue[T](viper.Get(kebabKey)); ok {
+			return val, true
+		}
+	}
+
+	return zero, false
+}
+
+// convertConfigValue handles config entry conversions safely.
+func convertConfigValue[T any](v any) (T, bool) {
+	var zero T
+
+	// Direct type match
+	if val, ok := v.(T); ok {
+		return val, true
+	}
+
+	switch any(zero).(type) {
+	case string:
+		if s, ok := v.(string); ok {
+			val := any(s).(T)
+			return val, true
+		}
+		str := fmt.Sprintf("%v", v)
+		val := any(str).(T)
+		return val, true
+
+	case int:
+		if i, ok := v.(int); ok {
+			val := any(i).(T)
+			return val, true
+		}
+		if i64, ok := v.(int64); ok {
+			i := int(i64)
+			val := any(i).(T)
+			return val, true
+		}
+		if f, ok := v.(float64); ok {
+			i := int(f)
+			val := any(i).(T)
+			return val, true
+		}
+
+	case float64:
+		if f, ok := v.(float64); ok {
+			val := any(f).(T)
+			return val, true
+		}
+		if i, ok := v.(int); ok {
+			f := float64(i)
+			val := any(f).(T)
+			return val, true
+		}
+
+	case bool:
+		if b, ok := v.(bool); ok {
+			val := any(b).(T)
+			return val, true
+		}
+
+	case []string:
+		if slice, ok := v.([]string); ok {
+			val := any(slice).(T)
+			return val, true
+		}
+		if slice, ok := v.([]any); ok {
+			strSlice := make([]string, len(slice))
+			for i, item := range slice {
+				strSlice[i] = fmt.Sprintf("%v", item)
+			}
+			val := any(strSlice).(T)
+			return val, true
+		}
+	}
+
+	return zero, false
 }

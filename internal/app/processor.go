@@ -26,10 +26,10 @@ import (
 func InitProcess(
 	ctx context.Context,
 	s contracts.Store,
-	cu *models.ChannelURL,
 	c *models.Channel,
-	scrape *scraper.Scraper,
-	videos []*models.Video) (nSucceeded int, nDownloaded int, err error) {
+	cu *models.ChannelURL,
+	videos []*models.Video,
+	scrape *scraper.Scraper) (nSucceeded int, nDownloaded int, err error) {
 
 	var (
 		errs []error
@@ -78,13 +78,13 @@ func InitProcess(
 
 				err := videoJob(
 					procCtx,
-					s.ChannelStore(),
 					s.VideoStore(),
+					s.ChannelStore(),
+					dlTracker,
+					dirParser,
 					v,
 					cu,
 					c,
-					dirParser,
-					dlTracker,
 					metarrExists)
 
 				// If bot was detected, cancel the context to stop other workers
@@ -170,18 +170,18 @@ func checkCustomScraperNeeds(s *scraper.Scraper, v *models.Video) error {
 // videoJob starts a worker's process for a video.
 func videoJob(
 	procCtx context.Context,
-	cs contracts.ChannelStore,
 	vs contracts.VideoStore,
+	cs contracts.ChannelStore,
+	dlTracker *downloads.DownloadTracker,
+	dirParser *parsing.DirectoryParser,
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	dirParser *parsing.DirectoryParser,
-	dlTracker *downloads.DownloadTracker,
 	metarrExists bool,
 ) error {
 	// Process JSON phase
 	if v.JSONCustomFile == "" {
-		proceed, err := handleJSONProcessing(procCtx, v, cu, c, cs, vs, dirParser, dlTracker)
+		proceed, err := handleJSONProcessing(procCtx, cs, vs, dlTracker, dirParser, c, cu, v)
 		if err != nil {
 			return err
 		}
@@ -218,15 +218,15 @@ func videoJob(
 // handleJSONProcessing processes JSON metadata with bot detection and error handling.
 func handleJSONProcessing(
 	procCtx context.Context,
-	v *models.Video,
-	cu *models.ChannelURL,
-	c *models.Channel,
 	cs contracts.ChannelStore,
 	vs contracts.VideoStore,
-	dirParser *parsing.DirectoryParser,
 	dlTracker *downloads.DownloadTracker,
+	dirParser *parsing.DirectoryParser,
+	c *models.Channel,
+	cu *models.ChannelURL,
+	v *models.Video,
 ) (bool, error) {
-	proceed, botPauseChannel, err := processJSON(procCtx, v, cu, c, vs, dirParser, dlTracker)
+	proceed, botPauseChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
 	if err != nil {
 		return false, handleBotError(cs, c, cu, v.URL, botPauseChannel, err, "JSON processing")
 	}
@@ -264,12 +264,12 @@ func markVideoComplete(vs contracts.VideoStore, v *models.Video, c *models.Chann
 // processJSON coordinates JSON download, validation, and database updates.
 func processJSON(
 	procCtx context.Context,
-	v *models.Video,
-	cu *models.ChannelURL,
-	c *models.Channel,
 	vs contracts.VideoStore,
-	dirParser *parsing.DirectoryParser,
 	dlTracker *downloads.DownloadTracker,
+	dirParser *parsing.DirectoryParser,
+	c *models.Channel,
+	cu *models.ChannelURL,
+	v *models.Video,
 ) (proceed, botPauseChannel bool, err error) {
 
 	// 1. Download JSON

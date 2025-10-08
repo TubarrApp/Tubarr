@@ -10,6 +10,7 @@ import (
 
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/file"
 	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
@@ -56,7 +57,7 @@ var rootCmd = &cobra.Command{
 
 			if configFile != "" {
 				// load and normalize keys from any Viper-supported config file
-				if err := loadConfigFile(configFile); err != nil {
+				if err := file.LoadConfigFile(configFile); err != nil {
 					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
 					os.Exit(1)
 				}

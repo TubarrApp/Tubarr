@@ -7,11 +7,12 @@ import (
 	"strconv"
 	"strings"
 
-	"tubarr/internal/cfg"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
+
+	"github.com/spf13/viper"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
@@ -33,8 +34,8 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
 
-	if cfg.IsSet(keys.CookieSource) {
-		browserCookieSource := cfg.GetString(keys.CookieSource)
+	if viper.IsSet(keys.CookieSource) {
+		browserCookieSource := viper.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
 		args = append(args, command.CookiesFromBrowser, browserCookieSource)
 	} else {

@@ -11,15 +11,16 @@ import (
 	"sync"
 	"time"
 
-	"tubarr/internal/cfg"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
+	"github.com/spf13/viper"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -40,7 +41,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	}
 
 	var (
-		conc    = max(cfg.GetInt(keys.Concurrency), 1)
+		conc    = max(viper.GetInt(keys.Concurrency), 1)
 		errChan = make(chan error, len(channels))
 		sem     = make(chan struct{}, conc)
 		wg      sync.WaitGroup
@@ -50,7 +51,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	for _, c := range channels {
 
 		// Load in config file
-		cfg.UpdateFromConfig(s.ChannelStore(), c)
+		file.UpdateFromConfigFile(s.ChannelStore(), c)
 
 		// Ignore channel if paused
 		if c.ChanSettings.Paused {
@@ -84,7 +85,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 			}()
 
 			// Initiate crawl
-			if err := ChannelCrawl(ctx, s, cs, c); err != nil {
+			if err := CrawlChannel(ctx, s, cs, c); err != nil {
 				errChan <- err
 			}
 		}(c)
@@ -122,7 +123,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 	}
 
 	// Load config file settings
-	cfg.UpdateFromConfig(s.ChannelStore(), c)
+	file.UpdateFromConfigFile(s.ChannelStore(), c)
 
 	// Grab existing releases
 	scrape := scraper.New()
@@ -239,7 +240,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			continue
 		}
 
-		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, scrape, videos)
+		succeeded, nDownloaded, procErr := InitProcess(ctx, s, c, cu, videos, scrape)
 		if succeeded != 0 {
 			nSucceeded += succeeded
 			if nDownloaded > 0 {
@@ -270,8 +271,8 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 	return nil
 }
 
-// ChannelCrawl crawls a channel for new URLs.
-func ChannelCrawl(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel) (err error) {
+// CrawlChannel crawls a channel for new URLs.
+func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel) (err error) {
 	// Check validity
 	if len(c.URLModels) == 0 {
 		return errors.New("no channel URLs")
@@ -348,7 +349,7 @@ func ChannelCrawl(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 		logging.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
 
 		// Process video batch
-		succeeded, nDownloaded, procErr := InitProcess(ctx, s, cu, c, scrape, vRequests)
+		succeeded, nDownloaded, procErr := InitProcess(ctx, s, c, cu, vRequests, scrape)
 
 		// Succeeded/downloaded
 		if succeeded != 0 {
@@ -384,8 +385,8 @@ func ChannelCrawl(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 	return nil
 }
 
-// ChannelCrawlIgnoreNew gets the channel's currently displayed videos and marks them as complete without downloading.
-func ChannelCrawlIgnoreNew(ctx context.Context, s contracts.Store, c *models.Channel) error {
+// CrawlChannelIgnore gets the channel's currently displayed videos and marks them as complete without downloading.
+func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channel) error {
 
 	cs := s.ChannelStore()
 
@@ -403,7 +404,7 @@ func ChannelCrawlIgnoreNew(ctx context.Context, s contracts.Store, c *models.Cha
 	}
 
 	// Load in config file
-	cfg.UpdateFromConfig(cs, c)
+	file.UpdateFromConfigFile(cs, c)
 
 	// Get new releases
 	scrape := scraper.New()

@@ -13,13 +13,14 @@ import (
 	"syscall"
 	"time"
 
-	"tubarr/internal/cfg"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
+
+	"github.com/spf13/viper"
 )
 
 // VideoDownloadState represents the current state of a video's download.
@@ -67,8 +68,8 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Cookie source
-	if cfg.IsSet(keys.CookieSource) {
-		browserCookieSource := cfg.GetString(keys.CookieSource)
+	if viper.IsSet(keys.CookieSource) {
+		browserCookieSource := viper.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
 		args = append(args, command.CookiesFromBrowser, browserCookieSource)
 	} else {
