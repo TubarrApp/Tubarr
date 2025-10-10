@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -179,7 +180,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 }
 
 // GetChannelURLModel fetches a single ChannelURL model by channel ID and URL.
-func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*models.ChannelURL, error) {
+func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chanURL *models.ChannelURL, hasRows bool, err error) {
 	urlQuery := squirrel.
 		Select(
 			consts.QChanURLID,
@@ -207,7 +208,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*mod
 		settingsJSON, metarrJSON     []byte
 	)
 
-	err := urlQuery.QueryRow().Scan(
+	err = urlQuery.QueryRow().Scan(
 		&cu.ID,
 		&cu.URL,
 		&username,
@@ -222,10 +223,10 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*mod
 	)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil // Not found, return nil without error
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, false, nil // Not found, return nil without error
 		}
-		return nil, fmt.Errorf("failed to query channel URL: %w", err)
+		return nil, true, fmt.Errorf("failed to query channel URL: %w", err)
 	}
 
 	// Fill credentials
@@ -236,14 +237,14 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*mod
 	// Unmarshal settings
 	if len(settingsJSON) > 0 {
 		if err := json.Unmarshal(settingsJSON, &cu.ChanURLSettings); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal channel URL settings: %w", err)
+			return nil, true, fmt.Errorf("failed to unmarshal channel URL settings: %w", err)
 		}
 	}
 
 	// Unmarshal metarr args
 	if len(metarrJSON) > 0 {
 		if err := json.Unmarshal(metarrJSON, &cu.ChanURLMetarrArgs); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal channel URL metarr args: %w", err)
+			return nil, true, fmt.Errorf("failed to unmarshal channel URL metarr args: %w", err)
 		}
 	}
 
@@ -251,7 +252,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*mod
 	if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
 		c, hasRows, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
 		if err != nil {
-			return nil, err
+			return nil, true, err
 		}
 		if !hasRows {
 			logging.D(2, "Channel with ID %d not found in database", channelID)
@@ -274,7 +275,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*mod
 		}
 	}
 
-	return cu, nil
+	return cu, true, nil
 }
 
 // ******************************** Private ********************************

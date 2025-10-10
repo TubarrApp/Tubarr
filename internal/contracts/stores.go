@@ -43,7 +43,7 @@ type ChannelStore interface {
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetChannelID(key, val string) (int64, error)
 	GetChannelModel(key, val string) (*models.Channel, bool, error)
-	GetChannelURLModel(channelID int64, urlStr string) (*models.ChannelURL, error)
+	GetChannelURLModel(channelID int64, urlStr string) (chanURL *models.ChannelURL, hasRows bool, err error)
 	GetChannelURLModels(c *models.Channel) ([]*models.ChannelURL, error)
 	GetNotifyURLs(id int64) ([]*models.Notification, error)
 
