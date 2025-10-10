@@ -14,7 +14,7 @@ import (
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
 // Returns true if the video should be processed, false if it should be skipped.
-func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (bool, error) {
+func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, err error) {
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {

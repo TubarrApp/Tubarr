@@ -249,13 +249,16 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*mod
 
 	// Apply fallback logic if settings are nil
 	if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
-		c, _, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
+		c, hasRows, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
 		if err != nil {
 			return nil, err
 		}
+		if !hasRows {
+			logging.D(2, "Channel with ID %d not found in database", channelID)
+		}
 
 		if cu.ChanURLSettings == nil {
-			if c.ChanSettings != nil {
+			if c != nil && c.ChanSettings != nil {
 				cu.ChanURLSettings = c.ChanSettings
 			} else {
 				cu.ChanURLSettings = &models.Settings{}
@@ -263,7 +266,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (*mod
 		}
 
 		if cu.ChanURLMetarrArgs == nil {
-			if c.ChanMetarrArgs != nil {
+			if c != nil && c.ChanMetarrArgs != nil {
 				cu.ChanURLMetarrArgs = c.ChanMetarrArgs
 			} else {
 				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
@@ -327,9 +330,12 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 		}
 	}()
 
-	urlMap := make(map[int64][]*models.ChannelURL)
+	// Scan into models
+	var (
+		urlMap = make(map[int64][]*models.ChannelURL)
+		c      *models.Channel
+	)
 
-	var c *models.Channel
 	for rows.Next() {
 		cu := &models.ChannelURL{}
 		var username, password, loginURL sql.NullString
@@ -374,22 +380,26 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 
 		// Apply fallback logic if needed
 		if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
+			// Load channel if not cached or different channel
 			if c == nil || c.ID != channelID {
-				if c, _, err = cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10)); err != nil {
+				c, _, err = cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
+				if err != nil {
 					return nil, err
 				}
 			}
 
+			// Apply settings fallback
 			if cu.ChanURLSettings == nil {
-				if c.ChanSettings != nil {
+				if c != nil && c.ChanSettings != nil {
 					cu.ChanURLSettings = c.ChanSettings
 				} else {
 					cu.ChanURLSettings = &models.Settings{}
 				}
 			}
 
+			// Apply metarr args fallback
 			if cu.ChanURLMetarrArgs == nil {
-				if c.ChanMetarrArgs != nil {
+				if c != nil && c.ChanMetarrArgs != nil {
 					cu.ChanURLMetarrArgs = c.ChanMetarrArgs
 				} else {
 					cu.ChanURLMetarrArgs = &models.MetarrArgs{}

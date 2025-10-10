@@ -281,12 +281,12 @@ func processJSON(
 	}
 
 	// Validate and filter (delegates to metadata package)
-	valid, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
+	passedChecks, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
 	if err != nil {
 		return false, false, err
 	}
 
-	if !valid {
+	if !passedChecks {
 		// Mark as skipped
 		v.DownloadStatus.Status = consts.DLStatusCompleted
 		v.DownloadStatus.Pct = 100.0
