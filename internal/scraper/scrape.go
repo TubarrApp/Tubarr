@@ -113,6 +113,9 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 	// Process each ChannelURL
 	for _, cu := range c.URLModels {
+		if cu.IsManual {
+			continue
+		}
 		logging.D(1, "Processing channel URL %q", cu.URL)
 
 		// Get access details once per ChannelURL
@@ -135,8 +138,8 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 					ChannelURLID: cu.ID,
 					ChannelURL:   cu.URL,
 					URL:          newURL,
-					Settings:     c.ChanSettings,
-					MetarrArgs:   c.ChanMetarrArgs,
+					Settings:     cu.ChanURLSettings,
+					MetarrArgs:   cu.ChanURLMetarrArgs,
 				}
 				cu.Videos = append(cu.Videos, video)
 				newRequests = append(newRequests, video)

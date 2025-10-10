@@ -22,9 +22,9 @@ type Site struct {
 type Channel struct {
 	ID                int64 `db:"id"`
 	URLModels         []*ChannelURL
-	Name              string           `db:"name"`
-	ChanSettings      *ChannelSettings `json:"settings" db:"settings"`
-	ChanMetarrArgs    *MetarrArgs      `json:"metarr" db:"metarr"`
+	Name              string      `db:"name"`
+	ChanSettings      *Settings   `json:"settings" db:"settings"`
+	ChanMetarrArgs    *MetarrArgs `json:"metarr" db:"metarr"`
 	UpdatedFromConfig bool
 	LastScan          time.Time `db:"last_scan"`
 	CreatedAt         time.Time `db:"created_at"`
@@ -71,18 +71,20 @@ func (cu *ChannelURL) NeedsAuth() bool {
 //
 // Matches the order of the DB table, do not alter.
 type ChannelURL struct {
-	ID         int64  `db:"id"`
-	URL        string `db:"url"`
-	Videos     []*Video
-	Username   string         `db:"username"`
-	Password   string         `db:"password"`
-	LoginURL   string         `db:"login_url"`
-	CookiePath string         `db:"-" json:"-"`
-	Cookies    []*http.Cookie `db:"-" json:"-"`
-	IsManual   bool           `db:"is_manual"`
-	LastScan   time.Time      `db:"last_scan"`
-	CreatedAt  time.Time      `db:"created_at"`
-	UpdatedAt  time.Time      `db:"updated_at"`
+	ID                int64  `db:"id"`
+	URL               string `db:"url"`
+	Videos            []*Video
+	Username          string         `db:"username"`
+	Password          string         `db:"password"`
+	LoginURL          string         `db:"login_url"`
+	CookiePath        string         `db:"-" json:"-"`
+	Cookies           []*http.Cookie `db:"-" json:"-"`
+	IsManual          bool           `db:"is_manual"`
+	ChanURLSettings   *Settings      `json:"settings" db:"settings"`
+	ChanURLMetarrArgs *MetarrArgs    `json:"metarr" db:"metarr"`
+	LastScan          time.Time      `db:"last_scan"`
+	CreatedAt         time.Time      `db:"created_at"`
+	UpdatedAt         time.Time      `db:"updated_at"`
 }
 
 // ToChannelAccessDetails extracts authentication details from a ChannelURL
@@ -112,15 +114,15 @@ type Video struct {
 	JSONCustomFile      string
 	URL                 string `db:"url"`
 	DirectVideoURL      string
-	Title               string           `db:"title"`
-	Description         string           `db:"description"`
-	UploadDate          time.Time        `db:"upload_date"`
-	MetadataMap         map[string]any   `db:"-"`
-	Settings            *ChannelSettings `json:"settings" db:"settings"`
-	MetarrArgs          *MetarrArgs      `json:"metarr" db:"metarr"`
-	DownloadStatus      DLStatus         `json:"download_status" db:"download_status"`
-	CreatedAt           time.Time        `db:"created_at"`
-	UpdatedAt           time.Time        `db:"updated_at"`
+	Title               string         `db:"title"`
+	Description         string         `db:"description"`
+	UploadDate          time.Time      `db:"upload_date"`
+	MetadataMap         map[string]any `db:"-"`
+	Settings            *Settings      `json:"settings" db:"settings"`
+	MetarrArgs          *MetarrArgs    `json:"metarr" db:"metarr"`
+	DownloadStatus      DLStatus       `json:"download_status" db:"download_status"`
+	CreatedAt           time.Time      `db:"created_at"`
+	UpdatedAt           time.Time      `db:"updated_at"`
 	BaseDomain          string
 	BaseDomainWithProto string
 	MoveOpOutputDir     string

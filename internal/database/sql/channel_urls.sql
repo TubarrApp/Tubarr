@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS channel_urls (
     password TEXT,
     login_url TEXT,
     is_manual INTEGER DEFAULT 0 CHECK(is_manual IN (0, 1)),
+    settings JSON,
+    metarr JSON,
     last_scan TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

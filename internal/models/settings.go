@@ -4,8 +4,8 @@ import (
 	"time"
 )
 
-// ChannelSettings are the primary settings for a channel, affecting videos belonging to it.
-type ChannelSettings struct {
+// Settings are the primary settings for a channel, affecting videos belonging to it.
+type Settings struct {
 	// Configurations.
 	ChannelConfigFile string `json:"channel_config_file" mapstructure:"channel-config-file"`
 	Concurrency       int    `json:"max_concurrency" mapstructure:"max-concurrency"`

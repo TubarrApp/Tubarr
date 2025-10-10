@@ -65,14 +65,14 @@ func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password
 
 	query := squirrel.
 		Select(
-			consts.QChanURLsUsername,
-			consts.QChanURLsPassword,
-			consts.QChanURLsLoginURL,
+			consts.QChanURLUsername,
+			consts.QChanURLPassword,
+			consts.QChanURLLoginURL,
 		).
 		From(consts.DBChannelURLs).
 		Where(squirrel.And{
-			squirrel.Eq{consts.QChanURLsChannelID: channelID},
-			squirrel.Eq{consts.QChanURLsURL: url},
+			squirrel.Eq{consts.QChanURLChannelID: channelID},
+			squirrel.Eq{consts.QChanURLURL: url},
 		}).
 		RunWith(cs.DB)
 
@@ -127,11 +127,11 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	if err := cs.applyConfigMetarrSettings(c); err != nil {
+	if err := cs.applyConfigChannelMetarrSettings(c); err != nil {
 		return err
 	}
 
-	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
 		if c.ChanSettings == nil {
 			return fmt.Errorf("c.ChanSettings is nil")
 		}
@@ -289,47 +289,6 @@ func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.N
 	return tx.Commit()
 }
 
-// addNotifyURL sets a notification table entry for a channel with a given ID.
-func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, notifyName string) error {
-	if notifyURL == "" {
-		return errors.New("please enter a notification URL")
-	}
-	if notifyName == "" {
-		notifyName = notifyURL
-	}
-
-	const querySuffix = "ON CONFLICT (channel_id, notify_url) DO UPDATE SET notify_url = EXCLUDED.notify_url, updated_at = EXCLUDED.updated_at"
-
-	now := time.Now()
-	query := squirrel.
-		Insert(consts.DBNotifications).
-		Columns(
-			consts.QNotifyChanID,
-			consts.QNotifyName,
-			consts.QNotifyChanURL,
-			consts.QNotifyURL,
-			consts.QNotifyCreatedAt,
-			consts.QNotifyUpdatedAt,
-		).
-		Values(
-			id,
-			notifyName,
-			chanURL,
-			notifyURL,
-			now,
-			now,
-		).
-		Suffix(querySuffix).
-		RunWith(tx)
-
-	if _, err := query.Exec(); err != nil {
-		return err
-	}
-
-	logging.S(0, "Added notification URL %q to channel with ID: %d", notifyURL, id)
-	return nil
-}
-
 // AddAuth adds authentication details to a channel.
 func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error {
 	if !cs.channelExistsID(chanID) {
@@ -342,16 +301,16 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 	}
 
 	for chanURL, a := range authDetails {
-		if !cs.channelURLExists(consts.QChanURLsURL, chanURL) {
+		if !cs.channelURLExists(consts.QChanURLURL, chanURL) {
 			return fmt.Errorf("channel with URL %q does not exist", chanURL)
 		}
 
 		query := squirrel.
 			Update(consts.DBChannelURLs).
-			Set(consts.QChanURLsUsername, a.Username).
-			Set(consts.QChanURLsPassword, a.Password).
-			Set(consts.QChanURLsLoginURL, a.LoginURL).
-			Where(squirrel.Eq{consts.QChanURLsChannelID: chanID}).
+			Set(consts.QChanURLUsername, a.Username).
+			Set(consts.QChanURLPassword, a.Password).
+			Set(consts.QChanURLLoginURL, a.LoginURL).
+			Where(squirrel.Eq{consts.QChanURLChannelID: chanID}).
 			RunWith(cs.DB)
 
 		if _, err := query.Exec(); err != nil {
@@ -426,18 +385,23 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	// Insert URLs into the channel_urls table
-	for _, cu := range c.URLModels {
+	logging.D(1, "Inserting %d channel URLs for channel ID %d", len(c.URLModels), id)
+	for i, cu := range c.URLModels {
+		logging.D(1, "Inserting URL %d: %q", i+1, cu.URL)
 		urlQuery := squirrel.
 			Insert(consts.DBChannelURLs).
 			Columns(
-				consts.QChanURLsChannelID,
-				consts.QChanURLsURL,
-				consts.QChanURLsUsername,
-				consts.QChanURLsPassword,
-				consts.QChanURLsLoginURL,
-				consts.QChanURLsLastScan,
-				consts.QChanURLsCreatedAt,
-				consts.QChanURLsUpdatedAt,
+				consts.QChanURLChannelID,
+				consts.QChanURLURL,
+				consts.QChanURLUsername,
+				consts.QChanURLPassword,
+				consts.QChanURLLoginURL,
+				consts.QChanURLIsManual,
+				consts.QChanURLSettings,
+				consts.QChanURLMetarr,
+				consts.QChanURLLastScan,
+				consts.QChanURLCreatedAt,
+				consts.QChanURLUpdatedAt,
 			).
 			Values(
 				id,
@@ -445,15 +409,27 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 				cu.Username,
 				cu.Password,
 				cu.LoginURL,
+				false, // (Not a manual URL)
+				settingsJSON,
+				metarrJSON,
 				now,
 				now,
 				now,
 			).
 			RunWith(cs.DB)
 
-		if _, err := urlQuery.Exec(); err != nil {
+		result, err := urlQuery.Exec()
+		if err != nil {
 			return 0, fmt.Errorf("failed to insert URL %q for channel ID %d: %w", cu.URL, id, err)
 		}
+
+		urlID, err := result.LastInsertId()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get last insert ID for URL %q: %w", cu.URL, err)
+		}
+		cu.ID = urlID
+
+		logging.D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
 	}
 
 	cURLs := c.GetURLs()
@@ -563,7 +539,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 		}
 
 		// Persist changes
-		_, err := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+		_, err := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
 			s.BotBlocked = c.ChanSettings.BotBlocked
 			s.BotBlockedHostnames = c.ChanSettings.BotBlockedHostnames
 			s.BotBlockedTimestamps = c.ChanSettings.BotBlockedTimestamps
@@ -637,7 +613,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string) (*models.Channel, bool,
 		}
 	}
 
-	c.URLModels, err = cs.GetChannelURLModels(c.ID)
+	c.URLModels, err = cs.GetChannelURLModels(&c)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to fetch URL models for channel: %w", err)
 	}
@@ -774,7 +750,7 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 }
 
 // UpdateChannelSettingsJSON updates specific settings in the channel's settings JSON.
-func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error) {
+func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error) {
 	var settingsJSON json.RawMessage
 	query := squirrel.
 		Select(consts.QChanSettings).
@@ -790,7 +766,7 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 	}
 
 	// Unmarshal current settings
-	var settings models.ChannelSettings
+	var settings models.Settings
 	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
@@ -942,116 +918,13 @@ func (cs *ChannelStore) GetAlreadyDownloadedURLs(c *models.Channel) (urls []stri
 	return urls, nil
 }
 
-// GetChannelURLModels fetches a filled list of ChannelURL models.
-func (cs *ChannelStore) GetChannelURLModels(channelID int64) ([]*models.ChannelURL, error) {
-	urlQuery := squirrel.
-		Select(
-			consts.QChanURLsID,
-			consts.QChanURLsURL,
-			consts.QChanURLsUsername,
-			consts.QChanURLsPassword,
-			consts.QChanURLsLoginURL,
-			consts.QChanURLsIsManual,
-			consts.QChanURLsLastScan,
-			consts.QChanURLsCreatedAt,
-			consts.QChanURLsUpdatedAt,
-		).
-		From(consts.DBChannelURLs).
-		Where(squirrel.Eq{consts.QChanURLsChannelID: channelID}).
-		RunWith(cs.DB)
+// ******************************** Private ********************************
 
-	rows, err := urlQuery.Query()
-	if err != nil {
-		return nil, fmt.Errorf("failed to query channel URLs: %w", err)
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows: %v", err)
-		}
-	}()
-
-	var urlModels []*models.ChannelURL
-	for rows.Next() {
-		cu := &models.ChannelURL{}
-		var username, password, loginURL sql.NullString
-
-		if err := rows.Scan(
-			&cu.ID,
-			&cu.URL,
-			&username,
-			&password,
-			&loginURL,
-			&cu.IsManual,
-			&cu.LastScan,
-			&cu.CreatedAt,
-			&cu.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan channel URL: %w", err)
-		}
-
-		// Fill credentials
-		cu.Username = nullString(username)
-		cu.Password = nullString(password)
-		cu.LoginURL = nullString(loginURL)
-
-		urlModels = append(urlModels, cu)
-	}
-
-	return urlModels, nil
-}
-
-// AddChannelURL adds a new channel URL to the database.
-func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error) {
-	if !cs.channelExistsID(channelID) {
-		return 0, fmt.Errorf("channel with ID %d does not exist", channelID)
-	}
-
-	now := time.Now()
-	query := squirrel.
-		Insert(consts.DBChannelURLs).
-		Columns(
-			consts.QChanURLsChannelID,
-			consts.QChanURLsURL,
-			consts.QChanURLsLoginURL,
-			consts.QChanURLsPassword,
-			consts.QChanURLsLoginURL,
-			consts.QChanURLsIsManual,
-			consts.QChanURLsLastScan,
-			consts.QChanURLsCreatedAt,
-			consts.QChanURLsUpdatedAt,
-		).
-		Values(
-			channelID,
-			cu.URL,
-			cu.Username,
-			cu.Password,
-			cu.LoginURL,
-			isManual,
-			now,
-			now,
-			now,
-		).
-		RunWith(cs.DB)
-
-	result, err := query.Exec()
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert channel URL: %w", err)
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
-	}
-
-	logging.D(1, "Added channel URL %q (ID: %d, is_manual: %v) to channel ID %d", cu.URL, id, isManual, channelID)
-	return id, nil
-}
-
-// ApplyConfigChannelSettings applies the channel settings to the model and saves to database.
+// applyConfigChannelSettings applies the channel settings to the model and saves to database.
 func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error) {
 	// Initialize settings model if nil
 	if c.ChanSettings == nil {
-		c.ChanSettings = &models.ChannelSettings{}
+		c.ChanSettings = &models.Settings{}
 	}
 
 	// Channel config file location
@@ -1163,8 +1036,8 @@ func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error
 	return nil
 }
 
-// ApplyConfigMetarrSettings applies the Metarr settings to the model and saves to database.
-func (cs *ChannelStore) applyConfigMetarrSettings(c *models.Channel) (err error) {
+// applyConfigChannelMetarrSettings applies the Metarr settings to the model and saves to database.
+func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err error) {
 	// Initialize MetarrArgs model if nil
 	if c.ChanMetarrArgs == nil {
 		c.ChanMetarrArgs = &models.MetarrArgs{}
@@ -1315,7 +1188,46 @@ func (cs *ChannelStore) applyConfigMetarrSettings(c *models.Channel) (err error)
 	return nil
 }
 
-// ******************************** Private ********************************
+// addNotifyURL sets a notification table entry for a channel with a given ID.
+func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, notifyName string) error {
+	if notifyURL == "" {
+		return errors.New("please enter a notification URL")
+	}
+	if notifyName == "" {
+		notifyName = notifyURL
+	}
+
+	const querySuffix = "ON CONFLICT (channel_id, notify_url) DO UPDATE SET notify_url = EXCLUDED.notify_url, updated_at = EXCLUDED.updated_at"
+
+	now := time.Now()
+	query := squirrel.
+		Insert(consts.DBNotifications).
+		Columns(
+			consts.QNotifyChanID,
+			consts.QNotifyName,
+			consts.QNotifyChanURL,
+			consts.QNotifyURL,
+			consts.QNotifyCreatedAt,
+			consts.QNotifyUpdatedAt,
+		).
+		Values(
+			id,
+			notifyName,
+			chanURL,
+			notifyURL,
+			now,
+			now,
+		).
+		Suffix(querySuffix).
+		RunWith(tx)
+
+	if _, err := query.Exec(); err != nil {
+		return err
+	}
+
+	logging.S(0, "Added notification URL %q to channel with ID: %d", notifyURL, id)
+	return nil
+}
 
 // channelExists returns true if the channel exists in the database.
 func (cs *ChannelStore) channelExists(key, val string) bool {
@@ -1328,22 +1240,6 @@ func (cs *ChannelStore) channelExists(key, val string) bool {
 
 	if err := query.QueryRow().Scan(&count); err != nil {
 		logging.E("failed to check if channel exists with key=%s val=%s: %v", key, val, err)
-		return false
-	}
-	return count > 0
-}
-
-// channelURLExists returns true if the channel URL exists in the database.
-func (cs *ChannelStore) channelURLExists(key, val string) bool {
-	var count int
-	query := squirrel.
-		Select("COUNT(1)").
-		From(consts.DBChannelURLs).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
-
-	if err := query.QueryRow().Scan(&count); err != nil {
-		logging.E("failed to check if channel URL exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}
 	return count > 0
@@ -1365,72 +1261,6 @@ func (cs ChannelStore) channelExistsID(id int64) bool {
 		return exists
 	}
 	return exists
-}
-
-// getChannelURLs retrieves all ChannelURL rows for a given channel.
-//
-// If channelID == 0, it fetches URLs for all channels.
-func (cs *ChannelStore) getChannelURLModelsMap(channelID int64) (map[int64][]*models.ChannelURL, error) {
-	query := squirrel.
-		Select(
-			consts.QChanURLsID,
-			consts.QChanURLsChannelID,
-			consts.QChanURLsURL,
-			consts.QChanURLsUsername,
-			consts.QChanURLsPassword,
-			consts.QChanURLsLoginURL,
-			consts.QChanURLsIsManual,
-			consts.QChanURLsLastScan,
-			consts.QChanURLsCreatedAt,
-			consts.QChanURLsUpdatedAt,
-		).
-		From(consts.DBChannelURLs)
-
-	if channelID != 0 {
-		query = query.Where(squirrel.Eq{consts.QChanURLsChannelID: channelID})
-	}
-
-	rows, err := query.RunWith(cs.DB).Query()
-	if err != nil {
-		return nil, fmt.Errorf("failed to query channel URLs: %w", err)
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows: %v", err)
-		}
-	}()
-
-	urlMap := make(map[int64][]*models.ChannelURL)
-
-	for rows.Next() {
-		cu := &models.ChannelURL{}
-		var username, password, loginURL sql.NullString
-		var cid int64
-
-		if err := rows.Scan(
-			&cu.ID,
-			&cid,
-			&cu.URL,
-			&username,
-			&password,
-			&loginURL,
-			&cu.IsManual,
-			&cu.LastScan,
-			&cu.CreatedAt,
-			&cu.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan channel URL: %w", err)
-		}
-
-		// Fill credentials
-		cu.Username = nullString(username)
-		cu.Password = nullString(password)
-		cu.LoginURL = nullString(loginURL)
-
-		urlMap[cid] = append(urlMap[cid], cu)
-	}
-
-	return urlMap, nil
 }
 
 // nullString converts an sql.NullString into a string, or "".

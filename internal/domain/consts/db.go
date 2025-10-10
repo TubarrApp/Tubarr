@@ -36,16 +36,18 @@ const (
 
 // Channel URL database entry keys.
 const (
-	QChanURLsID        = "id"
-	QChanURLsChannelID = "channel_id"
-	QChanURLsURL       = "url"
-	QChanURLsUsername  = "username"
-	QChanURLsPassword  = "password"
-	QChanURLsLoginURL  = "login_url"
-	QChanURLsIsManual  = "is_manual"
-	QChanURLsLastScan  = "last_scan"
-	QChanURLsCreatedAt = "created_at"
-	QChanURLsUpdatedAt = "updated_at"
+	QChanURLID        = "id"
+	QChanURLChannelID = "channel_id"
+	QChanURLURL       = "url"
+	QChanURLUsername  = "username"
+	QChanURLPassword  = "password"
+	QChanURLLoginURL  = "login_url"
+	QChanURLIsManual  = "is_manual"
+	QChanURLSettings  = "settings"
+	QChanURLMetarr    = "metarr"
+	QChanURLLastScan  = "last_scan"
+	QChanURLCreatedAt = "created_at"
+	QChanURLUpdatedAt = "updated_at"
 )
 
 // Video database entry keys.

@@ -453,7 +453,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			}
 
 			// Initialize URL list
-			c.URLModels, err = cs.GetChannelURLModels(c.ID)
+			c.URLModels, err = cs.GetChannelURLModels(c)
 			if err != nil {
 				return fmt.Errorf("failed to fetch URL models for channel: %w", err)
 			}
@@ -509,7 +509,7 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			// Alter and save model settings
 			c.ChanSettings.Paused = true
 
-			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
+			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.Settings) error {
 				s.Paused = c.ChanSettings.Paused
 				return nil
 			})
@@ -558,7 +558,7 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Send update
-			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
+			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.Settings) error {
 				s.Paused = false
 				return nil
 			})
@@ -607,7 +607,7 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Send update
-			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.ChannelSettings) error {
+			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.Settings) error {
 				s.BotBlocked = false
 				s.BotBlockedHostnames = nil
 				s.BotBlockedTimestamps = make(map[string]time.Time)
@@ -811,7 +811,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				Name:      name,
 
 				// Fill channel
-				ChanSettings: &models.ChannelSettings{
+				ChanSettings: &models.Settings{
 					ChannelConfigFile:      configFile,
 					Concurrency:            concurrency,
 					CookieSource:           cookieSource,
@@ -858,11 +858,13 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				UpdatedAt: now,
 			}
 
-			// Add channel to database
+			// Add channel to database and retrieve ID
 			channelID, err := cs.AddChannel(c)
 			if err != nil {
 				return err
 			}
+			// Set the ID on the model
+			c.ID = channelID
 
 			if len(authMap) > 0 {
 				if err := cs.AddAuth(channelID, authMap); err != nil {
@@ -1207,7 +1209,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			if len(fnSettingsArgs) > 0 {
-				finalUpdateFn := func(s *models.ChannelSettings) error {
+				finalUpdateFn := func(s *models.Settings) error {
 					for _, fn := range fnSettingsArgs {
 						if err := fn(s); err != nil {
 							return err
@@ -1722,13 +1724,13 @@ type chanSettings struct {
 }
 
 // getSettingsArgsFns creates the functions to send in to update the database with new values.
-func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models.ChannelSettings) error, err error) {
+func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models.Settings) error, err error) {
 
 	f := cmd.Flags()
 
 	// Concurrency
 	if f.Changed(keys.Concurrency) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.Concurrency = max(c.concurrency, 1)
 			return nil
 		})
@@ -1736,7 +1738,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Channel config file location
 	if f.Changed(keys.ChannelConfigFile) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.ChannelConfigFile = c.channelConfigFile
 			return nil
 		})
@@ -1744,7 +1746,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Cookie source
 	if f.Changed(keys.CookieSource) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.CookieSource = c.cookieSource
 			return nil
 		})
@@ -1752,7 +1754,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Crawl frequency
 	if f.Changed(keys.CrawlFreq) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.CrawlFreq = max(c.crawlFreq, 0)
 			return nil
 		})
@@ -1760,7 +1762,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Download retry amount
 	if f.Changed(keys.DLRetries) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.Retries = c.retries
 			return nil
 		})
@@ -1768,7 +1770,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// External downloader
 	if f.Changed(keys.ExternalDownloader) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.ExternalDownloader = c.externalDownloader
 			return nil
 		})
@@ -1776,7 +1778,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// External downloader arguments
 	if f.Changed(keys.ExternalDownloaderArgs) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.ExternalDownloaderArgs = c.externalDownloaderArgs
 			return nil
 		})
@@ -1788,7 +1790,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		if err != nil {
 			return nil, err
 		}
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.Filters = dlFilters
 			return nil
 		})
@@ -1800,7 +1802,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		if err != nil {
 			return nil, err
 		}
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.MoveOps = moveOperations
 			return nil
 		})
@@ -1816,7 +1818,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 				return nil, err
 			}
 		}
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.FromDate = validFromDate
 			return nil
 		})
@@ -1835,7 +1837,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 			return nil, err
 		}
 
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.JSONDir = c.jsonDir
 			return nil
 		})
@@ -1849,7 +1851,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 				return nil, err
 			}
 		}
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.MaxFilesize = c.maxFilesize
 			return nil
 		})
@@ -1857,7 +1859,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Pause channel
 	if f.Changed(keys.Pause) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.Paused = c.paused
 			return nil
 		})
@@ -1874,7 +1876,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 			}
 		}
 
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.ToDate = validToDate
 			return nil
 		})
@@ -1889,7 +1891,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		if _, err = validation.ValidateDirectory(c.videoDir, false); err != nil {
 			return nil, err
 		}
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.VideoDir = c.videoDir
 			return nil
 		})
@@ -1897,7 +1899,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Use global cookies
 	if f.Changed(keys.UseGlobalCookies) {
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.UseGlobalCookies = c.useGlobalCookies
 			return nil
 		})
@@ -1911,7 +1913,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 				return nil, err
 			}
 		}
-		fns = append(fns, func(s *models.ChannelSettings) error {
+		fns = append(fns, func(s *models.Settings) error {
 			s.YtdlpOutputExt = c.ytdlpOutputExt
 			return nil
 		})

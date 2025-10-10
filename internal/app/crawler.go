@@ -191,6 +191,16 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-video-urls' first if you wish to re-download it", actualVideoURL)
 		}
 
+		settings := targetChannelURLModel.ChanURLSettings
+		if settings == nil {
+			settings = c.ChanSettings
+		}
+
+		metarrArgs := targetChannelURLModel.ChanURLMetarrArgs
+		if metarrArgs == nil {
+			metarrArgs = c.ChanMetarrArgs
+		}
+
 		// Store the model for later use
 		channelURLModels[targetChannelURLModel.ID] = targetChannelURLModel
 
@@ -199,8 +209,8 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			ChannelURLID: targetChannelURLModel.ID,
 			ChannelURL:   targetChannelURLModel.URL,
 			URL:          actualVideoURL,
-			Settings:     c.ChanSettings,
-			MetarrArgs:   c.ChanMetarrArgs,
+			Settings:     settings,
+			MetarrArgs:   metarrArgs,
 		})
 	}
 
@@ -330,7 +340,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 	// Process channel URLs
 	for _, cu := range c.URLModels {
 		// Skip manual channel entry
-		if cu.IsManual {
+		if cu.IsManual || cu.ChanURLSettings.Paused {
 			continue
 		}
 
@@ -473,36 +483,31 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 }
 
 // ensureManualDownloadsChannelURL ensures a special "manual-downloads" ChannelURL exists for the channel.
-func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, channelID int64) (*models.ChannelURL, error) {
+func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channel) (*models.ChannelURL, error) {
 	const manualDownloadsURL = "manual-downloads"
 
-	// Check if it already exists
-	channelURLs, err := cs.GetChannelURLModels(channelID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cu := range channelURLs {
+	for _, cu := range c.URLModels {
 		if cu.IsManual {
-			return cu, nil
+			return cu, nil // Return existing with its settings
 		}
 	}
 
+	// Get channel to inherit settings
 	manualChanURL := &models.ChannelURL{
-		URL: manualDownloadsURL,
+		URL:               manualDownloadsURL,
+		ChanURLSettings:   c.ChanSettings,   // Inherit from channel
+		ChanURLMetarrArgs: c.ChanMetarrArgs, // Inherit from channel
 	}
 
 	// Create it if it doesn't exist
-	id, err := cs.AddChannelURL(channelID, manualChanURL, true) // true for is_manual
+	id, err := cs.AddChannelURL(c.ID, manualChanURL, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manual downloads channel URL: %w", err)
 	}
 
-	return &models.ChannelURL{
-		ID:       id,
-		URL:      manualDownloadsURL,
-		IsManual: true,
-	}, nil
+	manualChanURL.ID = id
+	manualChanURL.IsManual = true
+	return manualChanURL, nil
 }
 
 // blockChannelBotDetected blocks a channel due to bot detection on the given URL.
@@ -520,7 +525,7 @@ func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *m
 		hostname = strings.ToLower(domain)
 	}
 
-	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.ChannelSettings) error {
+	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
 		s.BotBlocked = true
 
 		// Add hostname if not already in the list
@@ -565,7 +570,7 @@ func parsePipedVideoURL(videoURL string, channelURLMap map[string]*models.Channe
 // parseManualVideoURL handles video URLs without a channel URL prefix.
 func parseManualVideoURL(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, scrape *scraper.Scraper, videoURL string) (*models.ChannelURL, string, error) {
 	// Use special manual downloads entry
-	targetChannelURLModel, err := ensureManualDownloadsChannelURL(cs, c.ID)
+	targetChannelURLModel, err := ensureManualDownloadsChannelURL(cs, c)
 	if err != nil {
 		return nil, "", err
 	}

@@ -1,6 +1,4 @@
 // Package contracts defines interfaces that decouple the application layer from storage implementations.
-//
-// Avoids circular imports.
 package contracts
 
 import (
@@ -31,7 +29,7 @@ type ChannelStore interface {
 	UpdateChannelFromConfig(c *models.Channel) (err error)
 	UpdateChannelValue(key, val, col string, newVal any) error
 	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
-	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.ChannelSettings) error) (int64, error)
+	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error)
 	UpdateLastScan(channelID int64) error
 
 	// Delete operations.
@@ -45,7 +43,8 @@ type ChannelStore interface {
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetChannelID(key, val string) (int64, error)
 	GetChannelModel(key, val string) (*models.Channel, bool, error)
-	GetChannelURLModels(channelID int64) ([]*models.ChannelURL, error)
+	GetChannelURLModel(channelID int64, urlStr string) (*models.ChannelURL, error)
+	GetChannelURLModels(c *models.Channel) ([]*models.ChannelURL, error)
 	GetNotifyURLs(id int64) ([]*models.Notification, error)
 
 	// Other channel database functions.
@@ -55,6 +54,8 @@ type ChannelStore interface {
 // DownloadStore allows access to download repo methods.
 type DownloadStore interface {
 	GetDB() *sql.DB
+
+	// Update operations.
 	SetDownloadStatus(v *models.Video) error
 	UpdateDownloadStatuses(ctx context.Context, updates []models.StatusUpdate) error
 }
