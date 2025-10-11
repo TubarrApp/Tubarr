@@ -268,14 +268,15 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 
 		// Collect error messages
 		lowerLine := strings.ToLower(line)
-		if strings.Contains(lowerLine, "error") ||
-			strings.Contains(lowerLine, "forbidden") ||
-			strings.Contains(lowerLine, "403") ||
-			strings.Contains(lowerLine, "404") ||
-			strings.Contains(lowerLine, "failed") ||
-			strings.Contains(lowerLine, "unable to download") ||
-			strings.Contains(lowerLine, "http error") {
-			errorLines = append(errorLines, strings.TrimSpace(line))
+		if strings.HasPrefix(lowerLine, "error:") {
+
+			if strings.Contains(lowerLine, "forbidden") ||
+				strings.Contains(lowerLine, "error 403") ||
+				strings.Contains(lowerLine, "error 404") ||
+				strings.Contains(lowerLine, "unable to download") ||
+				strings.Contains(lowerLine, "http error") {
+				errorLines = append(errorLines, strings.TrimSpace(line))
+			}
 		}
 
 		// Aria2 progress parsing
