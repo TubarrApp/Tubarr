@@ -62,6 +62,7 @@ const (
 	URLAdd                string = "add-url"
 	URLs                  string = "urls"
 	Benchmarking          string = "benchmark"
+	SkipWait              string = "skip-wait"
 )
 
 // Settings

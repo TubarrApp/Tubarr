@@ -23,3 +23,8 @@ const (
 	YellowWarning string = ColorYellow + "[Warning] " + ColorReset
 	BlueInfo      string = ColorCyan + "[Info] " + ColorReset
 )
+
+// Clear line.
+const (
+	ClearLine = "\r\033[K"
+)

@@ -61,7 +61,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 		timeSinceLastScan := time.Since(c.LastScan)
 		crawlFreqDuration := time.Duration(c.ChanSettings.CrawlFreq) * time.Minute
 
-		logging.I("\nTime since last check for channel %q: %s\nCrawl frequency: %d minutes",
+		logging.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
 			c.Name,
 			timeSinceLastScan.Round(time.Second),
 			c.ChanSettings.CrawlFreq)
