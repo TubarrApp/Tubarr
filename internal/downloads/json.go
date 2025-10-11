@@ -19,21 +19,26 @@ import (
 func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args := make([]string, 0, 32)
 
+	// Restrict filenames
+	args = append(args, command.RestrictFilenames)
+
 	// Download JSON to directory
 	args = append(args,
 		command.SkipVideo,
 		command.WriteInfoJSON,
-		command.P, d.Video.ParsedJSONDir)
+		command.P, d.Video.ParsedJSONDir,
+		command.Output, command.FilenameSyntax)
 
-	// Append cookies
+	// Cookie path
 	if d.ChannelURL.CookiePath == "" {
-		if d.Video.Settings.CookieSource != "" {
-			args = append(args, command.CookiesFromBrowser, d.Video.Settings.CookieSource)
+		if d.ChannelURL.ChanURLSettings.CookieSource != "" {
+			args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookieSource)
 		}
 	} else {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
 
+	// Cookie source
 	if viper.IsSet(keys.CookieSource) {
 		browserCookieSource := viper.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
@@ -42,21 +47,19 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 
-	// Max video filesize
-	if d.Video.Settings.MaxFilesize != "" {
-		args = append(args, command.MaxFilesize, d.Video.Settings.MaxFilesize)
+	// Max filesize specified
+	if d.ChannelURL.ChanURLSettings.MaxFilesize != "" {
+		args = append(args, command.MaxFilesize, d.ChannelURL.ChanURLSettings.MaxFilesize)
 	}
 
 	// External downloaders & arguments
-	if d.Video.Settings.ExternalDownloader != "" {
-		args = append(args, command.ExternalDLer, d.Video.Settings.ExternalDownloader)
-		if d.Video.Settings.ExternalDownloaderArgs != "" {
-
-			switch d.Video.Settings.ExternalDownloader {
+	if d.ChannelURL.ChanURLSettings.ExternalDownloader != "" {
+		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)
+		if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
+			switch d.ChannelURL.ChanURLSettings.ExternalDownloader {
 			case command.DownloaderAria:
-
 				ariaCmd := command.DownloaderAria + ":" +
-					d.Video.Settings.ExternalDownloaderArgs +
+					d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs +
 					" " +
 					command.AriaLog +
 					" " +
@@ -67,30 +70,27 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 					command.AriaShowConsole +
 					" " +
 					command.AriaInterval
-
 				args = append(args, command.ExternalDLArgs, ariaCmd)
 			default:
-				args = append(args, command.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
+				args = append(args, command.ExternalDLArgs, d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs)
 			}
 		}
 	}
 
-	// Retries
-	if d.Video.Settings.Retries != 0 {
-		args = append(args, command.Retries, strconv.Itoa(d.Video.Settings.Retries))
+	// Retry download X times
+	if d.ChannelURL.ChanURLSettings.Retries != 0 {
+		args = append(args, command.Retries, strconv.Itoa(d.ChannelURL.ChanURLSettings.Retries))
 	}
 
-	// Yt-dlp randomization preset for safety:
+	// Randomize requests (avoid detection as bot)
 	args = append(args, command.RandomizeRequests...)
 
-	// Output file format and syntax [ MUST GO LAST ! ]
-	args = append(args, command.RestrictFilenames, command.Output, command.FilenameSyntax,
-		d.Video.URL)
+	// Add target URL [ MUST GO LAST !! ]
+	args = append(args, d.Video.URL)
 
-	// Build commant with context
+	// Build command with context
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
 	logging.D(1, "Built metadata download command for URL %q:\n%v", d.Video.URL, cmd.String())
-
 	return cmd
 }
 
@@ -101,7 +101,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	}
 
 	// Ensure the directory exists
-	if _, err := validation.ValidateDirectory(d.Video.Settings.VideoDir, true); err != nil {
+	if _, err := validation.ValidateDirectory(d.ChannelURL.ChanURLSettings.VideoDir, true); err != nil {
 		return err
 	}
 

@@ -15,8 +15,6 @@
     download_pct INTEGER,
     upload_date TIMESTAMP,
     metadata JSON,
-    settings JSON,
-    metarr JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(channel_id, url)

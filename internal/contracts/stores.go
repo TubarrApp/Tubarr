@@ -65,11 +65,11 @@ type VideoStore interface {
 	GetDB() *sql.DB
 
 	// Add operations.
-	AddVideo(v *models.Video, c *models.Channel) (videoID int64, err error)
-	AddVideos(videos []*models.Video, c *models.Channel) ([]*models.Video, []error)
+	AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error)
+	AddVideos(videos []*models.Video, channelID int64) (videoModels []*models.Video, err error)
 
 	// Update operations.
-	UpdateVideo(v *models.Video, c *models.Channel) error
+	UpdateVideo(v *models.Video, channelID int64) error
 
 	// Delete operations.
 	DeleteVideo(videoURL string, channelID int64) error

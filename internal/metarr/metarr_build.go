@@ -44,37 +44,37 @@ const (
 func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 
 	// Remove non-matching URL-specific meta ops
-	validOps := filterMetaOps(v.MetarrArgs.MetaOps, cu.URL)
+	validOps := filterMetaOps(cu.ChanURLMetarrArgs.MetaOps, cu.URL)
 
 	fields := []metCmdMapping{
 
 		// Metarr args:
 		{
-			metarrValue: metVals{i: v.MetarrArgs.Concurrency},
+			metarrValue: metVals{i: cu.ChanURLMetarrArgs.Concurrency},
 			valType:     i,
 			viperKey:    "", // Don't use Tubarr concurrency key, Metarr has more potential resource constraints
 			cmdKey:      metkeys.Concurrency,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.Ext},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.Ext},
 			valType:     str,
 			viperKey:    keys.OutputFiletype,
 			cmdKey:      metkeys.Ext,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.FilenameDateTag},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.FilenameDateTag},
 			valType:     str,
 			viperKey:    keys.MFilenameDateTag,
 			cmdKey:      metkeys.FilenameDateTag,
 		},
 		{
-			metarrValue: metVals{strSlice: v.MetarrArgs.FilenameReplaceSfx},
+			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.FilenameReplaceSfx},
 			valType:     strSlice,
 			viperKey:    keys.MFilenameReplaceSuffix,
 			cmdKey:      metkeys.FilenameReplaceSfx,
 		},
 		{
-			metarrValue: metVals{f64: v.MetarrArgs.MaxCPU},
+			metarrValue: metVals{f64: cu.ChanURLMetarrArgs.MaxCPU},
 			valType:     f64,
 			viperKey:    "",
 			cmdKey:      metkeys.MaxCPU,
@@ -86,7 +86,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.MetaOps,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.MinFreeMem},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.MinFreeMem},
 			valType:     str,
 			viperKey:    keys.MMinFreeMem,
 			cmdKey:      metkeys.MinFreeMem,
@@ -98,50 +98,50 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.OutputDir,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.RenameStyle},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.RenameStyle},
 			valType:     str,
 			viperKey:    keys.MRenameStyle,
 			cmdKey:      metkeys.RenameStyle,
 		},
 		// Transcoding
 		{
-			metarrValue: metVals{str: v.MetarrArgs.ExtraFFmpegArgs},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.ExtraFFmpegArgs},
 			valType:     str,
 			viperKey:    keys.MExtraFFmpegArgs,
 			cmdKey:      metkeys.ExtraFFmpegArgs,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.UseGPU},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.UseGPU},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.HWAccel,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.GPUDir},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.GPUDir},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.GPUDir,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.TranscodeCodec},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeCodec},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeCodec,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.TranscodeQuality},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeQuality},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeQuality,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.TranscodeAudioCodec},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeAudioCodec},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeAudioCodec,
 		},
 		{
-			metarrValue: metVals{str: v.MetarrArgs.TranscodeVideoFilter},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeVideoFilter},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeVideoFilter,
@@ -263,9 +263,9 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 // parseMetarrOutputDir parses and returns the output directory.
 func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
 	var (
-		mArgs      = v.MetarrArgs
-		mOpOutDir  = v.MoveOpOutputDir
-		mOpChanURL = v.MoveOpChannelURL
+		mArgs      = cu.ChanURLMetarrArgs
+		mOpOutDir  = cu.MoveOpOutputDir
+		mOpChanURL = cu.MoveOpChannelURL
 		err        error
 	)
 

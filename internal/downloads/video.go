@@ -41,27 +41,26 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Restrict filenames
 	args = append(args, command.RestrictFilenames)
 
-	// Uses JSON file (e.g. 'filename.json') to set 'filename.%(ext)s'
+	// Infer video filename from JSON filename
 	var outputSyntax string
 	if d.Video.JSONCustomFile != "" {
-		JSONFileName := filepath.Base(d.Video.JSONCustomFile)
-		outputSyntax = strings.TrimSuffix(JSONFileName, ".json") + ".%(ext)s"
+		JSONFileName := strings.TrimSuffix(filepath.Base(d.Video.JSONCustomFile), ".json")
+		outputSyntax = JSONFileName + ".%(ext)s"
 	} else {
 		outputSyntax = command.FilenameSyntax
 	}
 
 	// Output location + restricted filename syntax
-	args = append(args,
-		command.Output,
-		filepath.Join(d.Video.ParsedVideoDir, outputSyntax))
+	args = append(args, command.P, d.Video.ParsedVideoDir)
+	args = append(args, command.Output, outputSyntax)
 
 	// Print filename to console upon completion
 	args = append(args, command.Print, command.AfterMove)
 
 	// Cookie path
 	if d.ChannelURL.CookiePath == "" {
-		if d.Video.Settings.CookieSource != "" {
-			args = append(args, command.CookiesFromBrowser, d.Video.Settings.CookieSource)
+		if d.ChannelURL.ChanURLSettings.CookieSource != "" {
+			args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookieSource)
 		}
 	} else {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
@@ -77,20 +76,20 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Max filesize specified
-	if d.Video.Settings.MaxFilesize != "" {
-		args = append(args, command.MaxFilesize, d.Video.Settings.MaxFilesize)
+	if d.ChannelURL.ChanURLSettings.MaxFilesize != "" {
+		args = append(args, command.MaxFilesize, d.ChannelURL.ChanURLSettings.MaxFilesize)
 	}
 
 	// External downloaders & arguments
-	if d.Video.Settings.ExternalDownloader != "" {
-		args = append(args, command.ExternalDLer, d.Video.Settings.ExternalDownloader)
-		if d.Video.Settings.ExternalDownloaderArgs != "" {
+	if d.ChannelURL.ChanURLSettings.ExternalDownloader != "" {
+		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)
+		if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
 
-			switch d.Video.Settings.ExternalDownloader {
+			switch d.ChannelURL.ChanURLSettings.ExternalDownloader {
 			case command.DownloaderAria:
 
 				ariaCmd := command.DownloaderAria + ":" +
-					d.Video.Settings.ExternalDownloaderArgs +
+					d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs +
 					" " +
 					command.AriaLog +
 					" " +
@@ -104,19 +103,19 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 				args = append(args, command.ExternalDLArgs, ariaCmd)
 			default:
-				args = append(args, command.ExternalDLArgs, d.Video.Settings.ExternalDownloaderArgs)
+				args = append(args, command.ExternalDLArgs, d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs)
 			}
 		}
 	}
 
 	// Retry download X times
-	if d.Video.Settings.Retries != 0 {
-		args = append(args, command.Retries, strconv.Itoa(d.Video.Settings.Retries))
+	if d.ChannelURL.ChanURLSettings.Retries != 0 {
+		args = append(args, command.Retries, strconv.Itoa(d.ChannelURL.ChanURLSettings.Retries))
 	}
 
 	// Merge output formats to extension if set
-	if d.Video.Settings.YtdlpOutputExt != "" {
-		args = append(args, command.YtDLPOutputExtension, d.Video.Settings.YtdlpOutputExt)
+	if d.ChannelURL.ChanURLSettings.YtdlpOutputExt != "" {
+		args = append(args, command.YtDLPOutputExtension, d.ChannelURL.ChanURLSettings.YtdlpOutputExt)
 	}
 
 	// Randomize requests (avoid detection as bot)
@@ -158,6 +157,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	// Set channels
 	lineChan := make(chan string, 100)
 	filenameChan := make(chan string, 1)
+	errChan := make(chan error, 1)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
@@ -165,6 +165,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	// Merge stdout and stderr into lineChan
 	go func() {
+		defer close(lineChan)
 		scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
 		for scanner.Scan() {
 			select {
@@ -176,9 +177,12 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	}()
 
 	// Start parser
-	go d.scanVideoCmdOutput(lineChan, filenameChan)
+	go d.scanVideoCmdOutput(lineChan, filenameChan, errChan)
 
-	// Wait for completion or cancel
+	// Wait for completion, error, or cancel
+	var filename string
+	var parseErr error
+
 	select {
 	case <-d.Context.Done():
 		// End the command
@@ -189,7 +193,13 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		}
 		return d.Context.Err()
 
-	case filename := <-filenameChan:
+	case parseErr = <-errChan:
+		// Error detected by parser
+		if parseErr != nil {
+			return parseErr
+		}
+
+	case filename = <-filenameChan:
 		if filename == "" {
 			return errors.New("no output filename captured")
 		}
@@ -198,23 +208,30 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	// Wait for the command to finish
 	if err := cmd.Wait(); err != nil {
+		// If we already have a parse error, return that (more specific)
+		if parseErr != nil {
+			return parseErr
+		}
 		return fmt.Errorf("yt-dlp failed: %w", err)
 	}
 
-	// Ensure file is fully written
-	if err := d.waitForFile(d.Video.VideoPath, 10*time.Second); err != nil {
-		return err
+	// If we have a filename, verify it
+	if filename != "" {
+		// Ensure file is fully written
+		if err := d.waitForFile(d.Video.VideoPath, 10*time.Second); err != nil {
+			return err
+		}
+		if err := verifyVideoDownload(d.Video.VideoPath); err != nil {
+			return err
+		}
 	}
-	if err := verifyVideoDownload(d.Video.VideoPath); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // scanVideoCmdOutput scans the yt-dlp video download output for relevant information.
-func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan chan<- string) {
+func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan chan<- string, errChan chan<- error) {
 	defer close(filenameChan)
+	defer close(errChan)
 
 	// Try to load existing state
 	val, ok := states.Load(d.Video.URL)
@@ -241,11 +258,24 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 	var (
 		totalItemsFound, totalDownloadedItems int
 		completed                             bool
+		errorLines                            []string
 	)
 
 	for line := range lineChan {
 		if line != "" {
 			logging.D(4, "Video %d download terminal output: %q", d.Video.ID, line)
+		}
+
+		// Collect error messages
+		lowerLine := strings.ToLower(line)
+		if strings.Contains(lowerLine, "error") ||
+			strings.Contains(lowerLine, "forbidden") ||
+			strings.Contains(lowerLine, "403") ||
+			strings.Contains(lowerLine, "404") ||
+			strings.Contains(lowerLine, "failed") ||
+			strings.Contains(lowerLine, "unable to download") ||
+			strings.Contains(lowerLine, "http error") {
+			errorLines = append(errorLines, strings.TrimSpace(line))
 		}
 
 		// Aria2 progress parsing
@@ -297,5 +327,15 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 				}
 			}
 		}
+	}
+
+	// If download wasn't completed and we collected errors, send them
+	if !completed && len(errorLines) > 0 {
+		// Limit to last 5 error lines to avoid overwhelming the error message
+		if len(errorLines) > 5 {
+			errorLines = errorLines[len(errorLines)-5:]
+		}
+		errMsg := fmt.Sprintf("yt-dlp failed: %s", strings.Join(errorLines, "; "))
+		errChan <- errors.New(errMsg)
 	}
 }

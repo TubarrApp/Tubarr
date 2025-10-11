@@ -520,8 +520,11 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 		} else {
 			// Still blocked
 			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
-			logging.W("%.0f more minute(s) before channel unlocks for domain %q. (Blocked on: %v)",
-				(timeoutMinutes - minutesSinceBlock),
+
+			// Print time remaining until unlock
+			remainingDuration := time.Duration(timeoutMinutes-minutesSinceBlock) * time.Minute
+			logging.W("%v remaining before channel unlocks for domain %q (Blocked on: %v)",
+				remainingDuration.Round(time.Second),
 				hostname,
 				c.ChanSettings.BotBlockedTimestamps[hostname].Local().Format("Mon, Jan 2 2006, 15:04:05 MST"))
 		}

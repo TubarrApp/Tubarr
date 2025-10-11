@@ -3,6 +3,7 @@ package parsing
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/araddon/dateparse"
 )
@@ -35,4 +36,22 @@ func ParseWordDate(dateString string) (string, error) {
 		return "", fmt.Errorf("unable to parse date: %s", dateString)
 	}
 	return t.Format("2006-01-02"), nil
+}
+
+// FormatDuration00h00m formats a duration in '10h 15m' format.
+func FormatDuration00h00m(d time.Duration) string {
+	if d < time.Minute {
+		return "less than 1m"
+	}
+
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+
+	if hours > 0 {
+		if minutes > 0 {
+			return fmt.Sprintf("%dh %dm", hours, minutes)
+		}
+		return fmt.Sprintf("%dh", hours)
+	}
+	return fmt.Sprintf("%dm", minutes)
 }

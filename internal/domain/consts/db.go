@@ -61,8 +61,6 @@ const (
 	QVidDescription = "description"
 	QVidVideoPath   = "video_path"
 	QVidJSONPath    = "json_path"
-	QVidSettings    = "settings"
-	QVidMetarr      = "metarr"
 	QVidUploadDate  = "upload_date"
 	QVidMetadata    = "metadata"
 	QVidDLStatus    = "download_status"

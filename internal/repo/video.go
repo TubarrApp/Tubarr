@@ -32,11 +32,10 @@ func (vs *VideoStore) GetDB() *sql.DB {
 // AddVideos adds multiple videos to the database, returning them with filled IDs.
 //
 // Videos without URLs or channel IDs are skipped, and errors for each are returned.
-func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*models.Video, []error) {
-	var errArray []error
+func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoModels []*models.Video, err error) {
 	tx, err := vs.DB.Begin()
 	if err != nil {
-		return nil, []error{fmt.Errorf("failed to begin transaction: %w", err)}
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
 	committed := false
@@ -49,31 +48,32 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 	}()
 
 	validVideos := make([]*models.Video, 0, len(videos))
+	errs := make([]error, 0, len(videos))
 
 	// Validate videos
 	for i, v := range videos {
 		if v.URL == "" {
-			errArray = append(errArray, fmt.Errorf("video #%d must have a URL", i))
+			errs = append(errs, fmt.Errorf("video #%d must have a URL", i))
 			continue
 		}
-		if c.ID == 0 {
-			errArray = append(errArray, fmt.Errorf("video #%d has no channel ID", i))
+		if channelID == 0 {
+			errs = append(errs, fmt.Errorf("video #%d has no channel ID", i))
 			continue
 		}
 		validVideos = append(validVideos, v)
 	}
 
 	for _, v := range validVideos {
-		videoID, exists := vs.videoExists(v, c)
+		videoID, exists := vs.videoExists(v, channelID)
 		if exists {
 			// Update finished status only
 			updateQuery := squirrel.Update(consts.DBVideos).
 				Set(consts.QVidFinished, v.Finished).
-				Where(squirrel.Eq{consts.QVidChanID: c.ID, consts.QVidURL: v.URL}).
+				Where(squirrel.Eq{consts.QVidChanID: channelID, consts.QVidURL: v.URL}).
 				RunWith(tx)
 
 			if _, err := updateQuery.Exec(); err != nil {
-				errArray = append(errArray, fmt.Errorf("failed to update video %q: %w", v.URL, err))
+				errs = append(errs, fmt.Errorf("failed to update video %q: %w", v.URL, err))
 				continue
 			}
 			v.ID = videoID
@@ -87,7 +87,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 					consts.QVidFinished,
 				).
 				Values(
-					c.ID,
+					channelID,
 					v.ChannelURLID,
 					v.URL,
 					v.Finished,
@@ -96,13 +96,13 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 
 			result, err := insertQuery.Exec()
 			if err != nil {
-				errArray = append(errArray, fmt.Errorf("failed to insert video %q: %w", v.URL, err))
+				errs = append(errs, fmt.Errorf("failed to insert video %q: %w", v.URL, err))
 				continue
 			}
 
 			id, err := result.LastInsertId()
 			if err != nil {
-				errArray = append(errArray, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err))
+				errs = append(errs, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err))
 				continue
 			}
 			v.ID = id
@@ -115,36 +115,37 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, c *models.Channel) ([]*m
 			RunWith(tx)
 
 		if _, err := dlQuery.Exec(); err != nil {
-			errArray = append(errArray, fmt.Errorf("failed to insert download status for video %d: %w", v.ID, err))
+			errs = append(errs, fmt.Errorf("failed to insert download status for video %d: %w", v.ID, err))
 		}
 	}
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
-		return nil, append(errArray, fmt.Errorf("failed to commit transaction: %w", err))
+		errs = append(errs, fmt.Errorf("failed to commit transaction: %w", err))
+		return nil, errors.Join(errs...)
 	}
 	committed = true
 
-	return validVideos, errArray
+	return validVideos, errors.Join(errs...)
 }
 
 // AddVideo adds a new video to the database or updates it if it already exists.
-func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (videoID int64, err error) {
+func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error) {
 	if v.URL == "" {
 		return 0, errors.New("must enter a url for video")
 	}
 
 	// Check if video already exists
-	if id, exists := vs.videoExists(v, c); exists {
+	if id, exists := vs.videoExists(v, channelID); exists {
 		logging.D(1, "Video %q already exists in the database with ID %d", v.URL, id)
-		if err := vs.UpdateVideo(v, c); err != nil {
+		if err := vs.UpdateVideo(v, channelID); err != nil {
 			return id, fmt.Errorf("failed to update existing video: %w", err)
 		}
 		return id, nil
 	}
 
 	// Marshal JSON fields
-	metadataJSON, settingsJSON, metarrJSON, err := marshalVideoJSON(v)
+	metadataJSON, err := marshalVideoMetadataJSON(v)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal JSON for video %q: %w", v.URL, err)
 	}
@@ -177,22 +178,18 @@ func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (videoID int6
 			consts.QVidFinished,
 			consts.QVidUploadDate,
 			consts.QVidMetadata,
-			consts.QVidSettings,
-			consts.QVidMetarr,
 			consts.QVidCreatedAt,
 			consts.QVidUpdatedAt,
 		).
 		Values(
-			c.ID,
-			v.ChannelURLID,
+			channelID,
+			channelURLID,
 			v.URL,
 			v.Title,
 			v.Description,
 			v.Finished,
 			v.UploadDate,
 			metadataJSON,
-			settingsJSON,
-			metarrJSON,
 			now,
 			now,
 		).
@@ -230,7 +227,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, c *models.Channel) (videoID int6
 }
 
 // UpdateVideo updates the status of the video in the database.
-func (vs *VideoStore) UpdateVideo(v *models.Video, c *models.Channel) error {
+func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	var committed bool
 	tx, err := vs.DB.Begin()
 
@@ -246,7 +243,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, c *models.Channel) error {
 		}
 	}()
 
-	metadataJSON, settingsJSON, metarrJSON, err := marshalVideoJSON(v)
+	metadataJSON, err := marshalVideoMetadataJSON(v)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON for video with URL %q: %w", v.URL, err)
 	}
@@ -261,12 +258,10 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, c *models.Channel) error {
 		Set(consts.QVidFinished, v.Finished).
 		Set(consts.QVidUploadDate, v.UploadDate).
 		Set(consts.QVidMetadata, metadataJSON).
-		Set(consts.QVidSettings, settingsJSON).
-		Set(consts.QVidMetarr, metarrJSON).
 		Set(consts.QVidUpdatedAt, time.Now()).
 		Where(squirrel.And{
 			squirrel.Eq{consts.QVidURL: v.URL},
-			squirrel.Eq{consts.QVidChanID: c.ID},
+			squirrel.Eq{consts.QVidChanID: channelID},
 		}).
 		RunWith(tx)
 
@@ -331,14 +326,14 @@ func (vs *VideoStore) DeleteVideo(videoURL string, channelID int64) error {
 // ******************************** Private ********************************
 
 // videoExists returns true if the video exists in the database.
-func (vs *VideoStore) videoExists(v *models.Video, c *models.Channel) (int64, bool) {
+func (vs *VideoStore) videoExists(v *models.Video, channelID int64) (int64, bool) {
 	var id int64
 	query := squirrel.
 		Select(consts.QVidID).
 		From(consts.DBVideos).
 		Where(squirrel.And{
 			squirrel.Eq{consts.QVidURL: v.URL},
-			squirrel.Eq{consts.QVidChanID: c.ID},
+			squirrel.Eq{consts.QVidChanID: channelID},
 		}).
 		RunWith(vs.DB)
 

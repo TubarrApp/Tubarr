@@ -17,7 +17,6 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
 	"tubarr/internal/utils/logging"
-	"tubarr/internal/validation"
 
 	"github.com/spf13/viper"
 	"golang.org/x/net/publicsuffix"
@@ -191,41 +190,19 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-video-urls' first if you wish to re-download it", actualVideoURL)
 		}
 
-		settings := targetChannelURLModel.ChanURLSettings
-		if settings == nil {
-			settings = c.ChanSettings
-		}
-
-		metarrArgs := targetChannelURLModel.ChanURLMetarrArgs
-		if metarrArgs == nil {
-			metarrArgs = c.ChanMetarrArgs
-		}
-
 		// Store the model for later use
 		channelURLModels[targetChannelURLModel.ID] = targetChannelURLModel
 
 		customVideoRequests = append(customVideoRequests, &models.Video{
 			ChannelID:    c.ID,
 			ChannelURLID: targetChannelURLModel.ID,
-			ChannelURL:   targetChannelURLModel.URL,
 			URL:          actualVideoURL,
-			Settings:     settings,
-			MetarrArgs:   metarrArgs,
 		})
-	}
-
-	// Retrieve existing URL directory map
-	urlDirMap, err := validation.ValidateMetarrOutputDirs(c.ChanMetarrArgs.OutputDir, c.ChanMetarrArgs.URLOutputDirs, c)
-	if err != nil {
-		return err
 	}
 
 	// Fill output directories and batch channels together
 	videosByChannelURL := make(map[int64][]*models.Video)
 	for _, v := range customVideoRequests {
-		if outputDir, exists := urlDirMap[v.ChannelURL]; exists {
-			v.MetarrArgs.OutputDir = outputDir
-		}
 		videosByChannelURL[v.ChannelURLID] = append(videosByChannelURL[v.ChannelURLID], v)
 	}
 
@@ -332,7 +309,8 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 
 	// Main process...
 	var (
-		nSucceeded     int
+		nSucceeded,
+		nDownloaded int
 		procError      error
 		channelsGotNew []string
 	)
@@ -347,7 +325,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 		// Get requests for this channel
 		var vRequests []*models.Video
 		for _, v := range videos {
-			if v.ChannelURL == cu.URL {
+			if v.ChannelURLID == cu.ID {
 				vRequests = append(vRequests, v)
 			}
 		}
@@ -358,14 +336,15 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 		logging.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
 
 		// Process video batch
-		succeeded, nDownloaded, procErr := InitProcess(ctx, s, c, cu, vRequests, scrape)
+		succeeded, downloaded, procErr := InitProcess(ctx, s, c, cu, vRequests, scrape)
 
 		// Succeeded/downloaded
 		if succeeded != 0 {
 			nSucceeded += succeeded
-			if nDownloaded > 0 {
-				logging.I("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", nDownloaded, cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
+			if downloaded > 0 {
+				logging.I("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", downloaded, cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
 				channelsGotNew = append(channelsGotNew, cu.URL)
+				nDownloaded += downloaded
 			}
 		}
 		procError = errors.Join(procError, procErr)
@@ -382,8 +361,10 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 	}
 
 	// Some succeeded, notify URLs
-	if err := NotifyServices(cs, c, channelsGotNew); err != nil {
-		return errors.Join(procError, err)
+	if nDownloaded > 0 {
+		if err := NotifyServices(cs, c, channelsGotNew); err != nil {
+			return errors.Join(procError, err)
+		}
 	}
 
 	// Some errors encountered
@@ -434,12 +415,10 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 			v.Finished = true
 		}
 
-		validVideos, errArray := s.VideoStore().AddVideos(videos, c)
-		if len(errArray) > 0 {
-			logging.P("%s Encountered the following errors adding videos:", consts.RedError)
-			for _, err := range errArray {
-				logging.P("%v", err)
-			}
+		validVideos, err := s.VideoStore().AddVideos(videos, c.ID)
+		if err != nil {
+			logging.E("Encountered the following errors adding videos for channel %q: %v", c.Name, err)
+
 			if len(validVideos) == 0 {
 				return fmt.Errorf("no videos were successfully added to the ignore list for channel with ID %d", c.ID)
 			}

@@ -13,7 +13,8 @@ import (
 )
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
-// Returns true if the video should be processed, false if it should be skipped.
+//
+// Returns true if the video passes all filters and JSON validity checks.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, err error) {
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
@@ -22,17 +23,16 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Apply filters
-	passedFilters, err := filterRequests(v, cu, c, dirParser)
+	passedFilters, err := handleFilters(v, cu, c, dirParser)
 	if err != nil {
 		logging.E("filter operation checks failed for %q: %v", v.URL, err)
 	}
-
 	if !jsonValid || !passedFilters {
 		return false, nil
 	}
 
 	// Check move operations
-	v.MoveOpOutputDir, v.MoveOpChannelURL = checkMoveOps(v, dirParser)
+	cu.MoveOpOutputDir, cu.MoveOpChannelURL = handleMoveOps(v, cu, dirParser)
 
 	return true, nil
 }
@@ -91,11 +91,14 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	return true, nil
 }
 
-// filterRequests uses user input filters to check if the video should be downloaded.
-func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (valid bool, err error) {
+// handleFilters uses user input filters to check if the video should be downloaded.
+func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (valid bool, err error) {
 
 	// Load filter ops from file if present
-	v.Settings.Filters = append(v.Settings.Filters, loadFilterOpsFromFile(v, dirParser)...)
+	cu.ChanURLSettings.Filters = append(cu.ChanURLSettings.Filters, loadFilterOpsFromFile(v, cu, dirParser)...)
+
+	// Filter out irrelevant filter operations
+	cu.SetRelevantFilterOps()
 
 	// Check filter ops
 	if passFilterOps := filterOpsFilter(v, cu); !passFilterOps {
@@ -103,7 +106,7 @@ func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, d
 	}
 
 	// Upload date filter
-	passUploadDate, err := uploadDateFilter(v)
+	passUploadDate, err := uploadDateFilter(v, cu)
 	if err != nil {
 		return false, err
 	}
@@ -115,14 +118,15 @@ func filterRequests(v *models.Video, cu *models.ChannelURL, c *models.Channel, d
 	return true, nil
 }
 
-// checkMoveOps checks if Metarr should use an output directory based on existent metadata.
-func checkMoveOps(v *models.Video, dirParser *parsing.DirectoryParser) (outputDir string, channelURL string) {
+// handleMoveOps checks if Metarr should use an output directory based on existent metadata.
+func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (outputDir string, channelURL string) {
 	// Load move ops from file if present
-	if v.Settings.MoveOpFile != "" {
-		v.Settings.MoveOps = append(v.Settings.MoveOps, loadMoveOpsFromFile(v, dirParser)...)
-	}
+	cu.ChanURLSettings.MoveOps = append(cu.ChanURLSettings.MoveOps, loadMoveOpsFromFile(v, cu, dirParser)...)
 
-	for _, op := range v.Settings.MoveOps {
+	// Filter out irrelevant move operations
+	cu.SetRelevantMoveOps()
+
+	for _, op := range cu.ChanURLSettings.MoveOps {
 		if raw, exists := v.MetadataMap[op.Field]; exists {
 			// Convert any type to string
 			val := fmt.Sprint(raw)

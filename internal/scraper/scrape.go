@@ -136,10 +136,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 				video := &models.Video{
 					ChannelID:    c.ID,
 					ChannelURLID: cu.ID,
-					ChannelURL:   cu.URL,
 					URL:          newURL,
-					Settings:     cu.ChanURLSettings,
-					MetarrArgs:   cu.ChanURLMetarrArgs,
 				}
 				cu.Videos = append(cu.Videos, video)
 				newRequests = append(newRequests, video)

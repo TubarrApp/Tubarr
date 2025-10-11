@@ -100,7 +100,7 @@ func InitProcess(
 		}
 
 		// Parse directories (templating options can include video elements)
-		video.ParsedJSONDir, video.ParsedVideoDir = parseVideoJSONDirs(video, dirParser)
+		video.ParsedJSONDir, video.ParsedVideoDir = parseVideoJSONDirs(video, cu, dirParser)
 
 		// Check for custom scraper needs
 		if err := checkCustomScraperNeeds(scrape, video); err != nil {
@@ -184,7 +184,7 @@ func videoJob(
 			return nil
 		}
 	} else {
-		if _, err := vs.AddVideo(v, c); err != nil {
+		if _, err := vs.AddVideo(v, c.ID, cu.ID); err != nil {
 			return fmt.Errorf("error adding video with URL %s to database: %w", v.URL, err)
 		}
 	}
@@ -251,7 +251,7 @@ func handleBotError(
 // markVideoComplete marks a video as complete.
 func markVideoComplete(vs contracts.VideoStore, v *models.Video, c *models.Channel) error {
 	v.Finished = true
-	if err := vs.UpdateVideo(v, c); err != nil {
+	if err := vs.UpdateVideo(v, c.ID); err != nil {
 		return fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 	return nil
@@ -293,14 +293,14 @@ func processJSON(
 		v.Finished = true
 		v.WasSkipped = true
 
-		if v.ID, err = vs.AddVideo(v, c); err != nil {
+		if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
 			return false, false, fmt.Errorf("failed to update ignored video: %w", err)
 		}
 		return false, false, nil
 	}
 
 	// Save video to database
-	if v.ID, err = vs.AddVideo(v, c); err != nil {
+	if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
 		return false, false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 
@@ -337,10 +337,10 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 }
 
 // parseVideoJSONDirs parses video and JSON directories.
-func parseVideoJSONDirs(v *models.Video, dirParser *parsing.DirectoryParser) (jsonDir, videoDir string) {
+func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (jsonDir, videoDir string) {
 	// Initialize directory parser
 	var (
-		cSettings = v.Settings
+		cSettings = cu.ChanURLSettings
 		err       error
 	)
 

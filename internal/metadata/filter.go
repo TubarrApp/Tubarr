@@ -19,13 +19,7 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
-	for _, filter := range v.Settings.Filters {
-
-		// Skip filter if it is associated with a channel URL, and that URL does not match the channel URL associated with the video.
-		if filter.ChannelURL != "" && (!strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(cu.URL))) {
-			logging.D(2, "Skipping filter %v. This filter's channel URL does not match video (%q)'s associated channel URL %q", filter, v.URL, cu.URL)
-			continue
-		}
+	for _, filter := range cu.ChanURLSettings.Filters {
 
 		switch filter.MustAny {
 		case "must":
@@ -71,8 +65,8 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) bool {
 		return false
 	}
 
-	if len(v.Settings.Filters) > 0 {
-		logging.I("Video passed download filter checks: %v", v.Settings.Filters)
+	if len(cu.ChanURLSettings.Filters) > 0 {
+		logging.I("Video passed download filter checks: %v", cu.ChanURLSettings.Filters)
 	}
 	return true
 }
@@ -120,7 +114,7 @@ func checkFilterWithValue(filter models.DLFilters, strVal, filterVal string) (pa
 }
 
 // uploadDateFilter filters a video based on its upload date.
-func uploadDateFilter(v *models.Video) (passed bool, err error) {
+func uploadDateFilter(v *models.Video, cu *models.ChannelURL) (passed bool, err error) {
 	if v.UploadDate.IsZero() {
 		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
 		return true, nil
@@ -132,7 +126,7 @@ func uploadDateFilter(v *models.Video) (passed bool, err error) {
 	}
 
 	// 'From date' filter
-	if passed, err = applyFromDateFilter(v, uploadDateNum); err != nil {
+	if passed, err = applyFromDateFilter(v, cu, uploadDateNum); err != nil {
 		return false, err
 	}
 	if !passed {
@@ -140,7 +134,7 @@ func uploadDateFilter(v *models.Video) (passed bool, err error) {
 	}
 
 	// 'To date' filter
-	if passed, err = applyToDateFilter(v, uploadDateNum); err != nil {
+	if passed, err = applyToDateFilter(v, cu, uploadDateNum); err != nil {
 		return false, err
 	}
 	if !passed {
@@ -151,12 +145,12 @@ func uploadDateFilter(v *models.Video) (passed bool, err error) {
 }
 
 // applyFromDateFilter checks if the video passes the 'from date' filter.
-func applyFromDateFilter(v *models.Video, uploadDateNum int) (passed bool, err error) {
-	if v.Settings.FromDate == "" {
+func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int) (passed bool, err error) {
+	if cu.ChanURLSettings.FromDate == "" {
 		return true, nil
 	}
 
-	fromDate, err := strconv.Atoi(v.Settings.FromDate)
+	fromDate, err := strconv.Atoi(cu.ChanURLSettings.FromDate)
 	if err != nil {
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
 			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
@@ -165,24 +159,24 @@ func applyFromDateFilter(v *models.Video, uploadDateNum int) (passed bool, err e
 	}
 
 	if uploadDateNum < fromDate {
-		logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, v.Settings.FromDate)
+		logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.FromDate)
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
 			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
 		return false, nil
 	}
 
-	logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
+	logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum)
 	return true, nil
 }
 
 // applyToDateFilter checks if the video passes the 'to date' filter.
-func applyToDateFilter(v *models.Video, uploadDateNum int) (passed bool, err error) {
-	if v.Settings.ToDate == "" {
+func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int) (passed bool, err error) {
+	if cu.ChanURLSettings.ToDate == "" {
 		return true, nil
 	}
 
-	toDate, err := strconv.Atoi(v.Settings.ToDate)
+	toDate, err := strconv.Atoi(cu.ChanURLSettings.ToDate)
 	if err != nil {
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
 			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
@@ -191,26 +185,26 @@ func applyToDateFilter(v *models.Video, uploadDateNum int) (passed bool, err err
 	}
 
 	if uploadDateNum > toDate {
-		logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, v.Settings.ToDate)
+		logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.ToDate)
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
 			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
 		return false, nil
 	}
 
-	logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, v.Settings.FromDate, uploadDateNum)
+	logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum)
 	return true, nil
 }
 
 // loadFilterOpsFromFile loads filter operations from a file (one per line).
-func loadFilterOpsFromFile(v *models.Video, dp *parsing.DirectoryParser) []models.DLFilters {
+func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.DLFilters {
 	var err error
 
-	if v.Settings.FilterFile == "" {
+	if cu.ChanURLSettings.FilterFile == "" {
 		return nil
 	}
 
-	filterFile := v.Settings.FilterFile
+	filterFile := cu.ChanURLSettings.FilterFile
 
 	if filterFile, err = dp.ParseDirectory(filterFile, v, "filter-ops"); err != nil {
 		logging.E("Failed to parse directory %q: %v", filterFile, err)
@@ -240,14 +234,14 @@ func loadFilterOpsFromFile(v *models.Video, dp *parsing.DirectoryParser) []model
 }
 
 // loadMoveOpsFromFile loads move operations from a file (one per line).
-func loadMoveOpsFromFile(v *models.Video, dp *parsing.DirectoryParser) []models.MoveOps {
+func loadMoveOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MoveOps {
 	var err error
 
-	if v.Settings.MoveOpFile == "" {
+	if cu.ChanURLSettings.MoveOpFile == "" {
 		return nil
 	}
 
-	moveOpFile := v.Settings.MoveOpFile
+	moveOpFile := cu.ChanURLSettings.MoveOpFile
 
 	if moveOpFile, err = dp.ParseDirectory(moveOpFile, v, "move-ops"); err != nil {
 		logging.E("Failed to parse directory %q: %v", moveOpFile, err)
@@ -270,7 +264,7 @@ func loadMoveOpsFromFile(v *models.Video, dp *parsing.DirectoryParser) []models.
 	}
 	if len(validMoves) > 0 {
 		logging.D(1, "Found following filter move operations in file:\n\n%v", validMoves)
-		v.Settings.MoveOps = append(v.Settings.MoveOps, validMoves...)
+		cu.ChanURLSettings.MoveOps = append(cu.ChanURLSettings.MoveOps, validMoves...)
 	}
 
 	return validMoves
