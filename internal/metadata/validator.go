@@ -32,7 +32,7 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Check move operations
-	cu.MoveOpOutputDir, cu.MoveOpChannelURL = handleMoveOps(v, cu, dirParser)
+	v.MoveOpOutputDir = handleMoveOps(v, cu, dirParser)
 
 	return true, nil
 }
@@ -92,20 +92,24 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 }
 
 // handleFilters uses user input filters to check if the video should be downloaded.
-func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (valid bool, err error) {
+func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (bool, error) {
+	// Work with a copy of database filters
+	allFilters := make([]models.DLFilters, len(cu.ChanURLSettings.Filters))
+	copy(allFilters, cu.ChanURLSettings.Filters)
 
-	// Load filter ops from file if present
-	cu.ChanURLSettings.Filters = append(cu.ChanURLSettings.Filters, loadFilterOpsFromFile(v, cu, dirParser)...)
+	// Add file-based filters (ephemeral - re-read each time)
+	fileFilters := loadFilterOpsFromFile(v, cu, dirParser)
+	allFilters = append(allFilters, fileFilters...)
 
-	// Filter out irrelevant filter operations
-	cu.SetRelevantFilterOps()
+	// Filter to relevant ones for this URL (non-mutating)
+	relevantFilters := getRelevantFilters(allFilters, cu.URL)
 
-	// Check filter ops
-	if passFilterOps := filterOpsFilter(v, cu); !passFilterOps {
+	// Evaluate filter operations
+	if !filterOpsFilter(v, relevantFilters) {
 		return false, nil
 	}
 
-	// Upload date filter
+	// Check upload date filter
 	passUploadDate, err := uploadDateFilter(v, cu)
 	if err != nil {
 		return false, err
@@ -118,24 +122,67 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	return true, nil
 }
 
+// getRelevantFilters returns filters applicable to the given URL.
+func getRelevantFilters(filters []models.DLFilters, currentURL string) []models.DLFilters {
+	relevant := make([]models.DLFilters, 0, len(filters))
+
+	for _, filter := range filters {
+		// Include if no specific URL specified, or if it matches current URL
+		if filter.ChannelURL == "" ||
+			strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
+			relevant = append(relevant, filter)
+		} else {
+			logging.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
+				filter, filter.ChannelURL, currentURL)
+		}
+	}
+
+	return relevant
+}
+
 // handleMoveOps checks if Metarr should use an output directory based on existent metadata.
-func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (outputDir string, channelURL string) {
-	// Load move ops from file if present
-	cu.ChanURLSettings.MoveOps = append(cu.ChanURLSettings.MoveOps, loadMoveOpsFromFile(v, cu, dirParser)...)
+func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
+	// Work with a copy of database move ops
+	allMoveOps := make([]models.MoveOps, len(cu.ChanURLSettings.MoveOps))
+	copy(allMoveOps, cu.ChanURLSettings.MoveOps)
 
-	// Filter out irrelevant move operations
-	cu.SetRelevantMoveOps()
+	// Add file-based move ops (ephemeral - re-read each time)
+	fileMoveOps := loadMoveOpsFromFile(v, cu, dirParser)
+	allMoveOps = append(allMoveOps, fileMoveOps...)
 
-	for _, op := range cu.ChanURLSettings.MoveOps {
+	// Filter to relevant ones for this URL (non-mutating)
+	relevantMoveOps := getRelevantMoveOps(allMoveOps, cu.URL)
+
+	// Check each move operation against video metadata
+	for _, op := range relevantMoveOps {
 		if raw, exists := v.MetadataMap[op.Field]; exists {
 			// Convert any type to string
 			val := fmt.Sprint(raw)
 
 			if strings.Contains(strings.ToLower(val), strings.ToLower(op.Value)) {
-				logging.I("Move op filters matched: Field %q contains the value %q. Output directory retrieved as %q", op.Field, op.Value, op.OutputDir)
-				return op.OutputDir, op.ChannelURL
+				logging.I("Move op matched: Field %q contains the value %q. Output directory retrieved as %q",
+					op.Field, op.Value, op.OutputDir)
+				return op.OutputDir
 			}
 		}
 	}
-	return "", ""
+
+	return ""
+}
+
+// getRelevantMoveOps returns move operations applicable to the given URL.
+func getRelevantMoveOps(moveOps []models.MoveOps, currentURL string) []models.MoveOps {
+	relevant := make([]models.MoveOps, 0, len(moveOps))
+
+	for _, op := range moveOps {
+		// Include if no specific URL specified, or if it matches current URL
+		if op.ChannelURL == "" ||
+			strings.EqualFold(strings.TrimSpace(op.ChannelURL), strings.TrimSpace(currentURL)) {
+			relevant = append(relevant, op)
+		} else {
+			logging.D(2, "Skipping move op for different URL: %q != %q", op.ChannelURL, currentURL)
+		}
+	}
+
+	return relevant
 }

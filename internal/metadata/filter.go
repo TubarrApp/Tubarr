@@ -15,11 +15,11 @@ import (
 )
 
 // filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
-func filterOpsFilter(v *models.Video, cu *models.ChannelURL) bool {
+func filterOpsFilter(v *models.Video, filters []models.DLFilters) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
-	for _, filter := range cu.ChanURLSettings.Filters {
+	for _, filter := range filters {
 
 		switch filter.MustAny {
 		case "must":
@@ -65,8 +65,8 @@ func filterOpsFilter(v *models.Video, cu *models.ChannelURL) bool {
 		return false
 	}
 
-	if len(cu.ChanURLSettings.Filters) > 0 {
-		logging.I("Video passed download filter checks: %v", cu.ChanURLSettings.Filters)
+	if len(filters) > 0 {
+		logging.I("Video passed download filter checks: %v", filters)
 	}
 	return true
 }
@@ -264,7 +264,6 @@ func loadMoveOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.Dir
 	}
 	if len(validMoves) > 0 {
 		logging.D(1, "Found following filter move operations in file:\n\n%v", validMoves)
-		cu.ChanURLSettings.MoveOps = append(cu.ChanURLSettings.MoveOps, validMoves...)
 	}
 
 	return validMoves

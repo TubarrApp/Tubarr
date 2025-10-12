@@ -263,10 +263,8 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 // parseMetarrOutputDir parses and returns the output directory.
 func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
 	var (
-		mArgs      = cu.ChanURLMetarrArgs
-		mOpOutDir  = cu.MoveOpOutputDir
-		mOpChanURL = cu.MoveOpChannelURL
-		err        error
+		mArgs = cu.ChanURLMetarrArgs
+		err   error
 	)
 
 	if mArgs.OutputDirMap, err = validation.ValidateMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, c); err != nil {
@@ -288,10 +286,10 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 		return parsed
 
 	// #2 Priority: Move operation filter output directory
-	case mOpOutDir != "" && (mOpChanURL == "" || strings.EqualFold(strings.TrimSpace(mOpChanURL), strings.TrimSpace(cu.URL))):
-		parsed, err := dirParser.ParseDirectory(mOpOutDir, v, "Metarr video")
+	case v.MoveOpOutputDir != "":
+		parsed, err := dirParser.ParseDirectory(v.MoveOpOutputDir, v, "Metarr video")
 		if err != nil {
-			logging.E("Failed to parse directory %q for video with URL %q: %v", mOpOutDir, v.URL, err)
+			logging.E("Failed to parse directory %q for video with URL %q: %v", v.MoveOpOutputDir, v.URL, err)
 			break
 		}
 		return parsed

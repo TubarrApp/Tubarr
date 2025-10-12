@@ -28,6 +28,7 @@ type ChannelStore interface {
 	// Update operations.
 	UpdateChannelFromConfig(c *models.Channel) (err error)
 	UpdateChannelValue(key, val, col string, newVal any) error
+	UpdateChannelURLSettings(cu *models.ChannelURL) error
 	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
 	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error)
 	UpdateLastScan(channelID int64) error

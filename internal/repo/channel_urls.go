@@ -80,6 +80,34 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 	return id, nil
 }
 
+// UpdateChannelURLSettings updates the settings of a single ChannelURL model.
+func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
+	metarrJSON, err := json.Marshal(cu.ChanURLMetarrArgs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metarr args: %w", err)
+	}
+	settingsJSON, err := json.Marshal(cu.ChanURLSettings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	query := squirrel.Update(consts.DBChannelURLs).
+		Set(consts.QChanURLUsername, cu.Username).
+		Set(consts.QChanURLPassword, cu.Password).
+		Set(consts.QChanURLLoginURL, cu.LoginURL).
+		Set(consts.QChanURLMetarr, metarrJSON).
+		Set(consts.QChanURLSettings, settingsJSON).
+		Where(squirrel.Eq{consts.QChanURLID: cu.ID}).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return err
+	}
+
+	logging.S(0, "Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
+	return nil
+}
+
 // GetChannelURLModels fetches a filled list of ChannelURL models.
 func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.ChannelURL, error) {
 	urlQuery := squirrel.

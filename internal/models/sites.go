@@ -3,9 +3,7 @@ package models
 
 import (
 	"net/http"
-	"strings"
 	"time"
-	"tubarr/internal/utils/logging"
 )
 
 // Site is not yet implemented.
@@ -77,8 +75,6 @@ type ChannelURL struct {
 	IsManual          bool           `db:"is_manual"`
 	ChanURLSettings   *Settings      `json:"settings" db:"settings"`
 	ChanURLMetarrArgs *MetarrArgs    `json:"metarr" db:"metarr"`
-	MoveOpOutputDir   string         `db:"-"`
-	MoveOpChannelURL  string         `db:"-"`
 	LastScan          time.Time      `db:"last_scan"`
 	CreatedAt         time.Time      `db:"created_at"`
 	UpdatedAt         time.Time      `db:"updated_at"`
@@ -102,57 +98,30 @@ func (cu *ChannelURL) ToChannelAccessDetails() *ChannelAccessDetails {
 	}
 }
 
-// SetRelevantFilterOps filters out filter operations that are for a channel URL other than the current one.
-func (cu *ChannelURL) SetRelevantFilterOps() {
-	validFilters := make([]DLFilters, 0, len(cu.ChanURLSettings.Filters))
-
-	for _, filter := range cu.ChanURLSettings.Filters {
-		if filter.ChannelURL != "" && (!strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(cu.URL))) {
-			logging.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q", filter, filter.ChannelURL, cu.URL)
-			continue
-		}
-		validFilters = append(validFilters, filter)
-	}
-	cu.ChanURLSettings.Filters = validFilters
-}
-
-// SetRelevantMoveOps filters out filter operations that are for a channel URL other than the current one.
-func (cu *ChannelURL) SetRelevantMoveOps() {
-	validFilters := make([]MoveOps, 0, len(cu.ChanURLSettings.MoveOps))
-	for _, filter := range cu.ChanURLSettings.MoveOps {
-		if filter.ChannelURL != "" && (!strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(cu.URL))) {
-			logging.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q", filter, filter.ChannelURL, cu.URL)
-			continue
-		}
-
-		validFilters = append(validFilters, filter)
-	}
-	cu.ChanURLSettings.MoveOps = validFilters
-}
-
 // Video contains fields relating to a video, and a pointer to the channel it belongs to.
 //
 // Matches the order of the DB table, do not alter.
 type Video struct {
-	ID             int64
-	ChannelID      int64          `db:"channel_id"`
-	ChannelURLID   int64          `db:"channel_url_id"`
-	ParsedVideoDir string         `db:"-"`
-	VideoPath      string         `db:"video_path"`
-	ParsedJSONDir  string         `db:"-"`
-	JSONPath       string         `db:"json_path"`
-	Finished       bool           `db:"finished"`
-	JSONCustomFile string         `db:"-"`
-	URL            string         `db:"url"`
-	DirectVideoURL string         `db:"-"`
-	Title          string         `db:"title"`
-	Description    string         `db:"description"`
-	UploadDate     time.Time      `db:"upload_date"`
-	MetadataMap    map[string]any `db:"-"`
-	DownloadStatus DLStatus       `json:"download_status" db:"download_status"`
-	CreatedAt      time.Time      `db:"created_at"`
-	UpdatedAt      time.Time      `db:"updated_at"`
-	WasSkipped     bool
+	ID              int64
+	ChannelID       int64          `db:"channel_id"`
+	ChannelURLID    int64          `db:"channel_url_id"`
+	ParsedVideoDir  string         `db:"-"`
+	VideoPath       string         `db:"video_path"`
+	ParsedJSONDir   string         `db:"-"`
+	JSONPath        string         `db:"json_path"`
+	Finished        bool           `db:"finished"`
+	JSONCustomFile  string         `db:"-"`
+	URL             string         `db:"url"`
+	DirectVideoURL  string         `db:"-"`
+	Title           string         `db:"title"`
+	Description     string         `db:"description"`
+	UploadDate      time.Time      `db:"upload_date"`
+	MetadataMap     map[string]any `db:"-"`
+	DownloadStatus  DLStatus       `json:"download_status" db:"download_status"`
+	CreatedAt       time.Time      `db:"created_at"`
+	UpdatedAt       time.Time      `db:"updated_at"`
+	MoveOpOutputDir string         `db:"-"`
+	WasSkipped      bool
 }
 
 // Notification holds notification data for channels.
