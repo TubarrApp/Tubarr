@@ -174,7 +174,7 @@ func videoJob(
 	c *models.Channel,
 	metarrExists bool,
 ) error {
-	if err := times.WaitTime(procCtx, times.ReturnSeconds(16), c.Name, v.URL); err != nil {
+	if err := times.WaitTime(procCtx, times.RandomSecsDuration(15), c.Name, v.URL); err != nil {
 		return err
 	}
 

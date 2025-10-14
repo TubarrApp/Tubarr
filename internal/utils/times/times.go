@@ -21,7 +21,7 @@ func StartupWait(ctx context.Context) error {
 	}
 
 	// Add random stagger on startup (0-30 minutes)
-	stagger := ReturnMinutes(31) // 0 to 30 minutes
+	stagger := RandomMinsDuration(30) // 0 to 30 minutes
 	logging.I("Waiting %v before channel check (helps hide from bot detection). To skip startup jitter, use:\n\ntubarr -s\n", stagger.Round(time.Second))
 
 	// Countdown display
@@ -90,12 +90,14 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL 
 	}
 }
 
-// ReturnSeconds returns a time.Duration in seconds.
-func ReturnSeconds(s int) time.Duration {
+// RandomSecsDuration returns a random time.Duration in seconds, between 0 and the entered digit.
+func RandomSecsDuration(s int) time.Duration {
+	s++ // add 1, 16 is 0 - 15
 	return time.Duration(rand.Intn(s)) * time.Second
 }
 
-// ReturnMinutes returns a time.Duration in minutes.
-func ReturnMinutes(s int) time.Duration {
+// RandomMinsDuration returns a random time.Duration in minutes, between 0 and the entered digit.
+func RandomMinsDuration(s int) time.Duration {
+	s++ // add 1, 16 is 0 - 15
 	return time.Duration(rand.Intn(s)) * time.Second
 }
