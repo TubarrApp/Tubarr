@@ -105,12 +105,12 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	relevantFilters := getRelevantFilters(allFilters, cu.URL)
 
 	// Evaluate filter operations
-	if !filterOpsFilter(v, relevantFilters) {
+	if !filterOpsFilter(v, relevantFilters, c.Name) {
 		return false, nil
 	}
 
 	// Check upload date filter
-	passUploadDate, err := uploadDateFilter(v, cu)
+	passUploadDate, err := uploadDateFilter(v, cu, c.Name)
 	if err != nil {
 		return false, err
 	}
@@ -118,7 +118,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 		return false, nil
 	}
 
-	logging.I("Video %q for channel %q passed filter checks", v.URL, c.Name)
+	logging.S(0, "Video %q for channel %q passed all filter checks", v.URL, c.Name)
 	return true, nil
 }
 

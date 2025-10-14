@@ -15,7 +15,7 @@ import (
 )
 
 // filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
-func filterOpsFilter(v *models.Video, filters []models.DLFilters) bool {
+func filterOpsFilter(v *models.Video, filters []models.DLFilters, channelName string) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
@@ -44,6 +44,7 @@ func filterOpsFilter(v *models.Video, filters []models.DLFilters) bool {
 			if err := removeUnwantedJSON(v.JSONPath); err != nil {
 				logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 			}
+			logging.I("Video %q failed hard on filter %v for channel %q", v.URL, filter, channelName)
 			return false
 		}
 
@@ -54,6 +55,7 @@ func filterOpsFilter(v *models.Video, filters []models.DLFilters) bool {
 			case "any":
 				anyPassed++
 			}
+			logging.S(0, "Video %q passed filter %v for channel %q", v.URL, filter, channelName)
 		}
 	}
 
@@ -65,9 +67,6 @@ func filterOpsFilter(v *models.Video, filters []models.DLFilters) bool {
 		return false
 	}
 
-	if len(filters) > 0 {
-		logging.I("Video passed download filter checks: %v", filters)
-	}
 	return true
 }
 
@@ -114,7 +113,7 @@ func checkFilterWithValue(filter models.DLFilters, strVal, filterVal string) (pa
 }
 
 // uploadDateFilter filters a video based on its upload date.
-func uploadDateFilter(v *models.Video, cu *models.ChannelURL) (passed bool, err error) {
+func uploadDateFilter(v *models.Video, cu *models.ChannelURL, channelName string) (passed bool, err error) {
 	if v.UploadDate.IsZero() {
 		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
 		return true, nil
@@ -126,7 +125,7 @@ func uploadDateFilter(v *models.Video, cu *models.ChannelURL) (passed bool, err 
 	}
 
 	// 'From date' filter
-	if passed, err = applyFromDateFilter(v, cu, uploadDateNum); err != nil {
+	if passed, err = applyFromDateFilter(v, cu, uploadDateNum, channelName); err != nil {
 		return false, err
 	}
 	if !passed {
@@ -134,7 +133,7 @@ func uploadDateFilter(v *models.Video, cu *models.ChannelURL) (passed bool, err 
 	}
 
 	// 'To date' filter
-	if passed, err = applyToDateFilter(v, cu, uploadDateNum); err != nil {
+	if passed, err = applyToDateFilter(v, cu, uploadDateNum, channelName); err != nil {
 		return false, err
 	}
 	if !passed {
@@ -145,7 +144,7 @@ func uploadDateFilter(v *models.Video, cu *models.ChannelURL) (passed bool, err 
 }
 
 // applyFromDateFilter checks if the video passes the 'from date' filter.
-func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int) (passed bool, err error) {
+func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int, channelName string) (passed bool, err error) {
 	if cu.ChanURLSettings.FromDate == "" {
 		return true, nil
 	}
@@ -163,15 +162,16 @@ func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum i
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
 			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
+		logging.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, fromDate, uploadDateNum)
 		return false, nil
 	}
 
-	logging.D(1, "URL %q passed 'from date' (%q) filter, upload date is \"%d\"", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum)
+	logging.S(0, "Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
 	return true, nil
 }
 
 // applyToDateFilter checks if the video passes the 'to date' filter.
-func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int) (passed bool, err error) {
+func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int, channelName string) (passed bool, err error) {
 	if cu.ChanURLSettings.ToDate == "" {
 		return true, nil
 	}
@@ -189,10 +189,11 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
 			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
+		logging.I("Video %q failed 'To Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, toDate, uploadDateNum)
 		return false, nil
 	}
 
-	logging.D(1, "URL %q passed 'to date' (%q) filter, upload date is \"%d\"", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum)
+	logging.S(0, "Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
 	return true, nil
 }
 
