@@ -91,7 +91,7 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL 
 	}
 }
 
-// RandomSecsDuration returns a random duration between 0 and s seconds (inclusive).
+// RandomSecsDuration returns a random duration between 0 and s seconds.
 func RandomSecsDuration(s int) time.Duration {
 	if s <= 0 {
 		return 0
@@ -99,7 +99,7 @@ func RandomSecsDuration(s int) time.Duration {
 	return time.Duration(rand.IntN(s+1)) * time.Second
 }
 
-// RandomMinsDuration returns a random duration between 0 and s minutes (inclusive).
+// RandomMinsDuration returns a random duration between 0 and s minutes.
 func RandomMinsDuration(s int) time.Duration {
 	if s <= 0 {
 		return 0
