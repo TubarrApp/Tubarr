@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -108,6 +109,10 @@ func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
 
 // UpdateChannelFromConfig updates the channel settings from a config file if it exists.
 func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
+	if c == nil {
+		return fmt.Errorf("dev error: channel sent in nil")
+	}
+
 	cfgFile := c.ChanSettings.ChannelConfigFile
 	if cfgFile == "" {
 		logging.D(2, "No config file path, nothing to apply")
@@ -124,11 +129,9 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	if c == nil {
-		c = &models.Channel{}
-	}
+	// Make []byte copy of settings before
+	settingsBeforeJSON, metarrBeforeJSON := makeSettingsMetarrArgsCopy(c.ChanSettings, c.ChanMetarrArgs, c.Name)
 
-	cBefore := *c
 	// Apply changes to model
 	if err := cs.applyConfigChannelSettings(c); err != nil {
 		return err
@@ -137,7 +140,13 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	if err := cs.applyConfigChannelMetarrSettings(c); err != nil {
 		return err
 	}
-	if c == &cBefore {
+
+	// []byte copy of settings after for comparison
+	settingsAfterJSON, metarrAfterJSON := makeSettingsMetarrArgsCopy(c.ChanSettings, c.ChanMetarrArgs, c.Name)
+
+	// Return early if unchanged
+	if bytes.Equal(settingsBeforeJSON, settingsAfterJSON) &&
+		bytes.Equal(metarrBeforeJSON, metarrAfterJSON) {
 		logging.D(1, "No changes to channel from config file.")
 		return nil
 	}

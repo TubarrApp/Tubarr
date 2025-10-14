@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"tubarr/internal/contracts"
 	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
 )
 
 // Store holds the database variable and sub-stores like ChannelStore etc.
@@ -54,4 +55,25 @@ func marshalVideoMetadataJSON(v *models.Video) (metadata []byte, err error) {
 	}
 
 	return metadata, nil
+}
+
+// makeSettingsMetarrArgsCopy makes a copy of the current Settings and MetarrArgs for comparison.
+func makeSettingsMetarrArgsCopy(settings *models.Settings, metarrArgs *models.MetarrArgs, objectName string) (settingsCopy, metarrArgsCopy []byte) {
+	var err error
+
+	if settings != nil {
+		settingsCopy, err = json.Marshal(settings)
+		if err != nil {
+			logging.E("Failed to make copy of Settings JSON for %q: %v", objectName, err)
+		}
+	}
+
+	if metarrArgs != nil {
+		metarrArgsCopy, err = json.Marshal(metarrArgs)
+		if err != nil {
+			logging.E("Failed to make copy of MetarrArgs JSON for %q: %v", objectName, err)
+		}
+	}
+
+	return settingsCopy, metarrArgsCopy
 }
