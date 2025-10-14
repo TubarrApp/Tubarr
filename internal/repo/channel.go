@@ -119,7 +119,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return nil
 	}
 
-	logging.I("Updating channel from config file %q...", cfgFile)
+	logging.I("Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
 	if _, err := validation.ValidateFile(cfgFile, false); err != nil {
 		return err
 	}
