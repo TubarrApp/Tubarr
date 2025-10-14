@@ -465,17 +465,29 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channel) (*models.ChannelURL, error) {
 	const manualDownloadsURL = "manual-downloads"
 
+	// First check in-memory models
 	for _, cu := range c.URLModels {
 		if cu.IsManual {
-			return cu, nil // Return existing with its settings
+			return cu, nil // Return existing model
 		}
+	}
+
+	// If not found in memory, check database directly
+	// This handles cases where the channel was loaded before the manual entry was created
+	existingCU, hasRows, err := cs.GetChannelURLModel(c.ID, manualDownloadsURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing manual downloads URL: %w", err)
+	}
+	if hasRows && existingCU != nil {
+		c.URLModels = append(c.URLModels, existingCU)
+		return existingCU, nil
 	}
 
 	// Get channel to inherit settings
 	manualChanURL := &models.ChannelURL{
 		URL:               manualDownloadsURL,
-		ChanURLSettings:   c.ChanSettings,   // Inherit from channel
-		ChanURLMetarrArgs: c.ChanMetarrArgs, // Inherit from channel
+		ChanURLSettings:   c.ChanSettings,
+		ChanURLMetarrArgs: c.ChanMetarrArgs,
 	}
 
 	// Create it if it doesn't exist
@@ -486,6 +498,10 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 
 	manualChanURL.ID = id
 	manualChanURL.IsManual = true
+
+	// Add to in-memory models
+	c.URLModels = append(c.URLModels, manualChanURL)
+
 	return manualChanURL, nil
 }
 
