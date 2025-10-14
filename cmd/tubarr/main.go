@@ -7,12 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
 	"tubarr/internal/app"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/utils"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/utils/times"
 
 	"github.com/spf13/viper"
 )
@@ -53,7 +52,7 @@ func main() {
 			logging.W("Skipping wait period, running Tubarr immediately. You may encounter bot detection on some platforms if requests come at predictable intervals.")
 		}
 
-		if err := utils.Wait0to30Minutes(ctx); err != nil {
+		if err := times.StartupWait(ctx); err != nil {
 			logging.E("Exiting before startup timer exited")
 			return
 		}

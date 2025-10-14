@@ -16,8 +16,8 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
-	"tubarr/internal/utils"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/utils/times"
 
 	"github.com/spf13/viper"
 	"golang.org/x/net/publicsuffix"
@@ -109,7 +109,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
 func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, videoURLs []string) (err error) {
 	// Add random sleep before processing (added bot detection)
-	if err := utils.WaitSeconds(ctx, 16, c.Name, ""); err != nil {
+	if err := times.WaitTime(ctx, times.ReturnSeconds(16), c.Name, ""); err != nil {
 		return err
 	}
 
@@ -264,7 +264,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 // CrawlChannel crawls a channel for new URLs.
 func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel) (err error) {
 	// Add random sleep before processing (added bot detection)
-	if err := utils.WaitSeconds(ctx, 16, c.Name, ""); err != nil {
+	if err := times.WaitTime(ctx, times.ReturnSeconds(16), c.Name, ""); err != nil {
 		return err
 	}
 

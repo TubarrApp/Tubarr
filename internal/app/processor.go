@@ -19,6 +19,7 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/utils/times"
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
@@ -173,6 +174,10 @@ func videoJob(
 	c *models.Channel,
 	metarrExists bool,
 ) error {
+	if err := times.WaitTime(procCtx, times.ReturnSeconds(16), c.Name, v.URL); err != nil {
+		return err
+	}
+
 	// Process JSON phase
 	if v.JSONCustomFile == "" {
 		proceed, err := handleJSONProcessing(procCtx, cs, vs, dlTracker, dirParser, c, cu, v)

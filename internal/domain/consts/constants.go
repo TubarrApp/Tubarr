@@ -58,6 +58,7 @@ var BotTimeoutMap = map[string]float64{
 	"imgur.com":       180,
 }
 
+// Program messages
 const (
 	TimeRemainingMsg = ColorCyan + "Time remaining:" + ColorReset
 )
