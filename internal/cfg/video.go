@@ -66,7 +66,7 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 			if err := vs.DeleteVideo(url, cID); err != nil {
 				return err
 			}
-			logging.S(0, "Successfully deleted video with URL %q", url)
+			logging.S("Successfully deleted video with URL %q", url)
 			return nil
 		},
 	}

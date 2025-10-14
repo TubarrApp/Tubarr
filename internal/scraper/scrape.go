@@ -388,7 +388,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}
 
-	logging.S(0, "Successfully wrote metadata JSON to %s/%s", outputDir, filename)
+	logging.S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
 	return nil
 }
 

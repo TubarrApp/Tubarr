@@ -55,7 +55,7 @@ func filterOpsFilter(v *models.Video, filters []models.DLFilters, channelName st
 			case "any":
 				anyPassed++
 			}
-			logging.S(0, "Video %q passed filter %v for channel %q", v.URL, filter, channelName)
+			logging.S("Video %q passed filter %v for channel %q", v.URL, filter, channelName)
 		}
 	}
 
@@ -166,7 +166,7 @@ func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum i
 		return false, nil
 	}
 
-	logging.S(0, "Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
+	logging.S("Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
 	return true, nil
 }
 
@@ -193,7 +193,7 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 		return false, nil
 	}
 
-	logging.S(0, "Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
+	logging.S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
 	return true, nil
 }
 
@@ -297,6 +297,6 @@ func removeUnwantedJSON(path string) error {
 		return err
 	}
 
-	logging.S(0, "Removed unwanted JSON file %q", path)
+	logging.S("Removed unwanted JSON file %q", path)
 	return nil
 }

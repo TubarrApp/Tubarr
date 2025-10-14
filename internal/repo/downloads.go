@@ -68,7 +68,7 @@ func (ds *DownloadStore) GetDB() *sql.DB {
 // 	}
 
 // 	committed = true
-// 	logging.S(0, "Updated videos statuses %v", videos)
+// 	logging.S("Updated videos statuses %v", videos)
 // 	return nil
 // }
 

@@ -82,7 +82,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 				}
 			} else {
 				// Success
-				logging.S(0, "Successfully completed JSON download for URL: %s", d.Video.URL)
+				logging.S("Successfully completed JSON download for URL: %s", d.Video.URL)
 				d.Video.UpdatedAt = time.Now()
 				return false, nil
 			}

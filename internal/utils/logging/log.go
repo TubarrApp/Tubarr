@@ -49,15 +49,15 @@ const (
 )
 
 // logLevel represents different logging levels
-type logLevel int
+type logType int
 
 const (
-	levelError logLevel = iota
-	levelWarn
-	levelInfo
-	levelDebug
-	levelSuccess
-	levelPlain
+	logError logType = iota
+	logWarn
+	logInfo
+	logDebug
+	logSuccess
+	logPrint
 )
 
 func init() {
@@ -173,7 +173,7 @@ func buildLogMessage(prefix, msg string, caller *callerInfo) string {
 }
 
 // logToFile logs to the file logger based on level
-func logToFile(level logLevel, msg string, caller *callerInfo) {
+func logToFile(level logType, msg string, caller *callerInfo) {
 	if !Loggable {
 		return
 	}
@@ -194,13 +194,13 @@ func logToFile(level logLevel, msg string, caller *callerInfo) {
 }
 
 // getZerologEvent returns the appropriate zerolog event for the level
-func getZerologEvent(level logLevel) *zerolog.Event {
+func getZerologEvent(level logType) *zerolog.Event {
 	switch level {
-	case levelError:
+	case logError:
 		return fileLogger.Error()
-	case levelWarn:
+	case logWarn:
 		return fileLogger.Warn()
-	case levelDebug:
+	case logDebug:
 		return fileLogger.Debug()
 	default:
 		return fileLogger.Info()
@@ -208,7 +208,7 @@ func getZerologEvent(level logLevel) *zerolog.Event {
 }
 
 // log is the core logging function that handles all logging operations
-func log(level logLevel, prefix, msg string, withCaller bool, args ...any) {
+func log(level logType, prefix, msg string, withCaller bool, args ...any) {
 	if len(args) > 0 {
 		msg = fmt.Sprintf(msg, args...)
 	}
@@ -226,15 +226,12 @@ func log(level logLevel, prefix, msg string, withCaller bool, args ...any) {
 
 // E logs error messages
 func E(msg string, args ...any) {
-	log(levelError, consts.RedError, msg, true, args...)
+	log(logError, consts.RedError, msg, true, args...)
 }
 
 // S logs success messages
-func S(l int, msg string, args ...any) {
-	if Level < l {
-		return
-	}
-	log(levelSuccess, consts.GreenSuccess, msg, false, args...)
+func S(msg string, args ...any) {
+	log(logSuccess, consts.GreenSuccess, msg, false, args...)
 }
 
 // D logs debug messages
@@ -242,22 +239,22 @@ func D(l int, msg string, args ...any) {
 	if Level < l {
 		return
 	}
-	log(levelDebug, consts.YellowDebug, msg, true, args...)
+	log(logDebug, consts.YellowDebug, msg, true, args...)
 }
 
 // W logs warning messages
 func W(msg string, args ...any) {
-	log(levelWarn, consts.YellowWarning, msg, false, args...)
+	log(logWarn, consts.YellowWarning, msg, false, args...)
 }
 
 // I logs info messages
 func I(msg string, args ...any) {
-	log(levelInfo, consts.BlueInfo, msg, false, args...)
+	log(logInfo, consts.BlueInfo, msg, false, args...)
 }
 
 // P logs plain messages
 func P(msg string, args ...any) {
-	log(levelPlain, "", msg, false, args...)
+	log(logPrint, "", msg, false, args...)
 }
 
 // AddToErrorArray adds an error to the error array under lock.

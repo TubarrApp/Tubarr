@@ -118,7 +118,7 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Channel with %s %q set authentication details", key, val)
+			logging.S("Channel with %s %q set authentication details", key, val)
 			return nil
 		},
 	}
@@ -251,7 +251,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			}
 
 			// Success
-			logging.S(0, "Completed crawl for channel with %s %q", key, val)
+			logging.S("Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -303,7 +303,7 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Deleted notify URLs for channel with %s %q: %v", key, val, notifyURLs)
+			logging.S("Deleted notify URLs for channel with %s %q: %v", key, val, notifyURLs)
 			return nil
 		},
 	}
@@ -361,7 +361,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Added notify URLs for channel with %s %q: %v", key, val, validPairs)
+			logging.S("Added notify URLs for channel with %s %q: %v", key, val, validPairs)
 			return nil
 		},
 	}
@@ -412,7 +412,7 @@ func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Ignoring URL %q for channel with %s %q", ignoreURL, key, val)
+			logging.S("Ignoring URL %q for channel with %s %q", ignoreURL, key, val)
 			return nil
 		},
 	}
@@ -467,7 +467,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			}
 
 			// Success
-			logging.S(0, "Completed ignore crawl for channel with %s %q", key, val)
+			logging.S("Completed ignore crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -518,7 +518,7 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Paused channel %q", c.Name)
+			logging.S("Paused channel %q", c.Name)
 			return nil
 		},
 	}
@@ -567,7 +567,7 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Unpaused channel %q", c.Name)
+			logging.S("Unpaused channel %q", c.Name)
 			return nil
 		},
 	}
@@ -618,7 +618,7 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Unblocked channel %q", c.Name)
+			logging.S("Unblocked channel %q", c.Name)
 			return nil
 		},
 	}
@@ -893,7 +893,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			}
 
 			// Success
-			logging.S(0, "Completed addition of channel %q to Tubarr", name)
+			logging.S("Completed addition of channel %q to Tubarr", name)
 			return nil
 		},
 	}
@@ -966,7 +966,7 @@ func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Successfully deleted channel with %s %q", key, val)
+			logging.S("Successfully deleted channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -1084,7 +1084,7 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 			}
 
 			// Success
-			logging.S(0, "Completed crawl for channel with %s %q", key, val)
+			logging.S("Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -1265,7 +1265,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Completed update for channel with %s %q", key, val)
+			logging.S("Completed update for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -1337,7 +1337,7 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S(0, "Updated channel column: %q → %q", col, newVal)
+			logging.S("Updated channel column: %q → %q", col, newVal)
 			return nil
 		},
 	}

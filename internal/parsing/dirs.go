@@ -54,7 +54,7 @@ func (dp *DirectoryParser) ParseDirectory(dir string, v *models.Video, fileType 
 		}
 	}
 
-	logging.S(1, "Parsed %s file output directory for video %q as %q", fileType, v.URL, parsed)
+	logging.I("Parsed %s file output directory for video %q as %q", fileType, v.URL, parsed)
 	return parsed, nil
 }
 

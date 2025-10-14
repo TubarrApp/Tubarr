@@ -118,7 +118,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 		return false, nil
 	}
 
-	logging.S(0, "Video %q for channel %q passed all filter checks", v.URL, c.Name)
+	logging.S("Video %q for channel %q passed all filter checks", v.URL, c.Name)
 	return true, nil
 }
 

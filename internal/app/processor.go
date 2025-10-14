@@ -309,7 +309,7 @@ func processJSON(
 		return false, false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 
-	logging.S(0, "Processed metadata for: %s", v.URL)
+	logging.S("Processed metadata for: %s", v.URL)
 	return true, false, nil
 }
 

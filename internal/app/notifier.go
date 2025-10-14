@@ -120,11 +120,11 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 			errs = append(errs, fmt.Errorf("failed to notify URL %q: %w", notifyURL, err))
 			continue
 		}
-		logging.S(1, "Successfully notified URL %q for channel %q", notifyURL, c.Name)
+		logging.S("Successfully notified URL %q for channel %q", notifyURL, c.Name)
 	}
 
 	if len(errs) == 0 {
-		logging.S(0, "Successfully notified all URLs for channel %q: %v", c.Name, notifyURLs)
+		logging.S("Successfully notified all URLs for channel %q: %v", c.Name, notifyURLs)
 		return nil
 	}
 

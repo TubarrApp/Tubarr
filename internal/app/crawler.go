@@ -433,7 +433,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 			}
 		}
 
-		logging.S(0, "Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
+		logging.S("Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
 	}
 	return nil
 }

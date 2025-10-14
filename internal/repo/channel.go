@@ -102,7 +102,7 @@ func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
-	logging.S(0, "Deleted URLs %q for channel with ID '%d'", urls, channelID)
+	logging.S("Deleted URLs %q for channel with ID '%d'", urls, channelID)
 	return nil
 }
 
@@ -119,10 +119,17 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
+	// Use Viper to load in flags
 	if err := file.LoadConfigFile(cfgFile); err != nil {
 		return err
 	}
 
+	if c == nil {
+		c = &models.Channel{}
+	}
+
+	cBefore := *c
+	// Apply changes to model
 	if err := cs.applyConfigChannelSettings(c); err != nil {
 		return err
 	}
@@ -130,8 +137,14 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	if err := cs.applyConfigChannelMetarrSettings(c); err != nil {
 		return err
 	}
+	if c == &cBefore {
+		logging.D(1, "No changes to channel from config file.")
+		return nil
+	}
 
-	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
+	// Propagate into database
+	chanID := strconv.FormatInt(c.ID, 10)
+	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, chanID, func(s *models.Settings) error {
 		if c.ChanSettings == nil {
 			return fmt.Errorf("c.ChanSettings is nil")
 		}
@@ -142,7 +155,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	_, err = cs.UpdateChannelMetarrArgsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(m *models.MetarrArgs) error {
+	_, err = cs.UpdateChannelMetarrArgsJSON(consts.QChanID, chanID, func(m *models.MetarrArgs) error {
 		if c.ChanMetarrArgs == nil {
 			return fmt.Errorf("c.ChanMetarrArgs is nil")
 		}
@@ -153,7 +166,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	logging.S(0, "Updated channel %q from config file", c.Name)
+	logging.S("Updated channel %q from config file", c.Name)
 	return nil
 }
 
@@ -173,7 +186,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
-	logging.S(0, "Added URL %q to ignore list for channel with ID '%d'", ignoreURL, channelID)
+	logging.S("Added URL %q to ignore list for channel with ID '%d'", ignoreURL, channelID)
 	return nil
 }
 
@@ -252,13 +265,13 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 
 	switch {
 	case len(urls) > 0 && len(names) == 0:
-		logging.S(0, "Deleted notify URLs %v for channel with ID '%d'.", urls, channelID)
+		logging.S("Deleted notify URLs %v for channel with ID '%d'.", urls, channelID)
 	case len(urls) == 0 && len(names) > 0:
-		logging.S(0, "Deleted notify URLs with friendly names %v for channel with ID '%d'.", names, channelID)
+		logging.S("Deleted notify URLs with friendly names %v for channel with ID '%d'.", names, channelID)
 	case len(urls) > 0 && len(names) > 0:
-		logging.S(0, "Deleted notify URLs: %v and notify URLs with friendly names %v for channel with ID '%d'.", urls, names, channelID)
+		logging.S("Deleted notify URLs: %v and notify URLs with friendly names %v for channel with ID '%d'.", urls, names, channelID)
 	default:
-		logging.S(0, "No notify URLs to delete.")
+		logging.S("No notify URLs to delete.")
 	}
 	return nil
 }
@@ -316,7 +329,7 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 		if _, err := query.Exec(); err != nil {
 			return err
 		}
-		logging.S(0, "Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
+		logging.S("Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
 	}
 	return nil
 }
@@ -433,7 +446,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	cURLs := c.GetURLs()
-	logging.S(0, "Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
+	logging.S("Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
 		id, c.Name, cURLs, c.ChanSettings.CrawlFreq, c.ChanSettings.Filters, c.ChanSettings, c.ChanMetarrArgs)
 
 	return id, nil
@@ -513,7 +526,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 		minutesSinceBlock := time.Since(blockedTime).Minutes()
 		if minutesSinceBlock >= timeoutMinutes {
 			// This hostname's timeout has expired
-			logging.S(0, "Unlocking hostname %q for channel %d (%s) after timeout", hostname, c.ID, c.Name)
+			logging.S("Unlocking hostname %q for channel %d (%s) after timeout", hostname, c.ID, c.Name)
 			anyUnlocked = true
 			// Remove from timestamps map
 			delete(c.ChanSettings.BotBlockedTimestamps, hostname)
@@ -559,7 +572,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 
 	// Return true only if ALL hostnames are now unlocked
 	if len(stillBlockedHostnames) == 0 {
-		logging.S(0, "Channel %d (%s) fully unlocked - all hostnames cleared", c.ID, c.Name)
+		logging.S("Channel %d (%s) fully unlocked - all hostnames cleared", c.ID, c.Name)
 		return true, nil
 	}
 
@@ -739,7 +752,7 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 	}
 
 	// Print the updated settings
-	logging.S(0, "Updated MetarrArgs: %s", string(updatedArgs))
+	logging.S("Updated MetarrArgs: %s", string(updatedArgs))
 
 	// Update the database with the new settings
 	updateQuery := squirrel.
@@ -790,7 +803,7 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 	}
 
 	// Print the updated settings
-	logging.S(0, "Updated ChannelSettings: %s", string(updatedSettings))
+	logging.S("Updated ChannelSettings: %s", string(updatedSettings))
 
 	// Update the database with the new settings
 	updateQuery := squirrel.
@@ -849,7 +862,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 		return fmt.Errorf("update failed: no rows affected")
 	}
 
-	logging.S(0, "Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
+	logging.S("Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
 	return nil
 }
 
@@ -1232,7 +1245,7 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 		return err
 	}
 
-	logging.S(0, "Added notification URL %q to channel with ID: %d", notifyURL, id)
+	logging.S("Added notification URL %q to channel with ID: %d", notifyURL, id)
 	return nil
 }
 

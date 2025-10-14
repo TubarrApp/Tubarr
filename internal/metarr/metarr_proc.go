@@ -24,7 +24,6 @@ func InitMetarr(procCtx context.Context, v *models.Video, cu *models.ChannelURL,
 	if err := runMetarr(cmd); err != nil {
 		return err
 	}
-	logging.S(1, "Finished Metarr command for %q", v.VideoPath)
 	return nil
 }
 

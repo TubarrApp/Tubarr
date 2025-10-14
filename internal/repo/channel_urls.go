@@ -104,7 +104,7 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 		return err
 	}
 
-	logging.S(0, "Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
+	logging.S("Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
 	return nil
 }
 

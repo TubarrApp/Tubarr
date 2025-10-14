@@ -296,7 +296,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	}
 	committed = true
 
-	logging.S(0, "Updated video with URL: %s", v.URL)
+	logging.S("Updated video with URL: %s", v.URL)
 	return nil
 }
 

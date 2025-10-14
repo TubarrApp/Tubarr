@@ -89,7 +89,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 					}
 				}
 			} else {
-				logging.S(0, "Successfully completed video download for URL: %s", d.Video.URL)
+				logging.S("Successfully completed video download for URL: %s", d.Video.URL)
 				d.Video.UpdatedAt = time.Now()
 				d.Video.DownloadStatus.Status = consts.DLStatusCompleted
 				d.Video.DownloadStatus.Pct = 100.0
