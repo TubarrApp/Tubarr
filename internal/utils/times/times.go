@@ -99,5 +99,5 @@ func RandomSecsDuration(s int) time.Duration {
 // RandomMinsDuration returns a random time.Duration in minutes, between 0 and the entered digit.
 func RandomMinsDuration(s int) time.Duration {
 	s++ // add 1, 16 is 0 - 15
-	return time.Duration(rand.Intn(s)) * time.Second
+	return time.Duration(rand.Intn(s)) * time.Minute
 }
