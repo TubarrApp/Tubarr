@@ -4,7 +4,7 @@ package times
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -13,20 +13,22 @@ import (
 	"github.com/spf13/viper"
 )
 
-// StartupWait adds a 0 to 30 minute wait time with a visible countdown.
+// StartupWait adds a 0–30 minute wait time with a visible countdown.
 // This is used to help avoid bot detection.
 func StartupWait(ctx context.Context) error {
 	if viper.GetBool(keys.SkipWait) {
 		return nil
 	}
 
-	// Add random stagger on startup (0-30 minutes)
-	stagger := RandomMinsDuration(30) // 0 to 30 minutes
+	// Add random stagger on startup (0–30 minutes)
+	stagger := RandomMinsDuration(30)
 	logging.I("Waiting %v before channel check (helps hide from bot detection). To skip startup jitter, use:\n\ntubarr -s\n", stagger.Round(time.Second))
 
-	// Countdown display
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	waitTimer := time.NewTimer(stagger)
+	defer waitTimer.Stop()
 
 	endTime := time.Now().Add(stagger)
 	done := make(chan struct{})
@@ -52,14 +54,13 @@ func StartupWait(ctx context.Context) error {
 		}
 	}()
 
-	// Wait for the stagger delay
 	select {
-	case <-time.After(stagger):
+	case <-waitTimer.C:
 		fmt.Print(consts.ClearLine)
-		<-done // Wait for goroutine to clean up
+		<-done
 		return nil
 	case <-ctx.Done():
-		<-done // Wait for goroutine to clean up
+		<-done
 		return ctx.Err()
 	}
 }
@@ -76,11 +77,11 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL 
 		logging.I("Sleeping %v before processing video %q for channel %q", stagger.Round(time.Second), videoURL, channelName)
 	}
 
-	ticker := time.NewTimer(stagger)
-	defer ticker.Stop()
+	waitTimer := time.NewTimer(stagger)
+	defer waitTimer.Stop()
 
 	select {
-	case <-ticker.C:
+	case <-waitTimer.C:
 		return nil
 	case <-ctx.Done():
 		if videoURL == "" {
@@ -90,14 +91,18 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL 
 	}
 }
 
-// RandomSecsDuration returns a random time.Duration in seconds, between 0 and the entered digit.
+// RandomSecsDuration returns a random duration between 0 and s seconds (inclusive).
 func RandomSecsDuration(s int) time.Duration {
-	s++ // add 1, 16 is 0 - 15
-	return time.Duration(rand.Intn(s)) * time.Second
+	if s <= 0 {
+		return 0
+	}
+	return time.Duration(rand.IntN(s+1)) * time.Second
 }
 
-// RandomMinsDuration returns a random time.Duration in minutes, between 0 and the entered digit.
+// RandomMinsDuration returns a random duration between 0 and s minutes (inclusive).
 func RandomMinsDuration(s int) time.Duration {
-	s++ // add 1, 16 is 0 - 15
-	return time.Duration(rand.Intn(s)) * time.Minute
+	if s <= 0 {
+		return 0
+	}
+	return time.Duration(rand.IntN(s+1)) * time.Minute
 }
