@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,15 +10,11 @@ import (
 
 	"tubarr/internal/app"
 	"tubarr/internal/cfg"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/utils"
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/viper"
-)
-
-const (
-	timeRemainingMsg = consts.ColorCyan + "Time remaining:" + consts.ColorReset
 )
 
 // main is the main entrypoint of the program (duh!)
@@ -53,56 +48,18 @@ func main() {
 
 	// Check channels
 	if viper.GetBool(keys.CheckChannels) {
-		// Immediate run if skipping wait
+		// Wait with countdown (or skip if -s flag is set)
 		if viper.GetBool(keys.SkipWait) {
 			logging.W("Skipping wait period, running Tubarr immediately. You may encounter bot detection on some platforms if requests come at predictable intervals.")
-			if err := app.CheckChannels(ctx, store); err != nil {
-				logging.E("Encountered errors while checking channels: %v", err)
-			}
-		} else {
+		}
 
-			// Add random jitter on startup (0-30 minutes)
-			maxJitter := 30 * time.Minute
-			jitter := time.Duration(rand.Intn(int(maxJitter)))
+		if err := utils.Wait0to30Minutes(ctx); err != nil {
+			logging.E("Exiting before startup timer exited")
+			return
+		}
 
-			logging.I("Waiting %v before channel check (helps hide from bot detection). To skip startup jitter, use:\n\ntubarr -s\n", jitter.Round(time.Second))
-			// Countdown display
-			ticker := time.NewTicker(1 * time.Second)
-			defer ticker.Stop()
-
-			endTime := time.Now().Add(jitter)
-
-			go func() {
-				for {
-					select {
-					case <-ticker.C:
-						remaining := time.Until(endTime)
-						if remaining <= 0 {
-							fmt.Print(consts.ClearLine)
-							return
-						}
-						m := int(remaining.Minutes())
-						s := int(remaining.Seconds()) % 60
-						fmt.Print(consts.ClearLine)
-						fmt.Printf("\r%s %dm%ds", timeRemainingMsg, m, s)
-					case <-ctx.Done():
-						fmt.Print(consts.ClearLine)
-						return
-					}
-				}
-			}()
-
-			// Wait for the jitter delay
-			select {
-			case <-time.After(jitter):
-				fmt.Print(consts.ClearLine)
-				if err := app.CheckChannels(ctx, store); err != nil {
-					logging.E("Encountered errors while checking channels: %v", err)
-				}
-			case <-ctx.Done():
-				logging.I("Exiting before channel check")
-				return
-			}
+		if err := app.CheckChannels(ctx, store); err != nil {
+			logging.E("Encountered errors while checking channels: %v", err)
 		}
 	}
 }

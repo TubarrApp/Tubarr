@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
+	"tubarr/internal/utils"
 	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/viper"
@@ -107,6 +108,10 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
 func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, videoURLs []string) (err error) {
+	// Add random sleep before processing (added bot detection)
+	if err := utils.WaitSeconds(ctx, 16, c.Name, ""); err != nil {
+		return err
+	}
 
 	// Check if site is blocked or should be unlocked
 	unlocked := false
@@ -253,12 +258,16 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 	if procError != nil {
 		return fmt.Errorf("encountered errors during processing: %w", procError)
 	}
-
 	return nil
 }
 
 // CrawlChannel crawls a channel for new URLs.
 func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel) (err error) {
+	// Add random sleep before processing (added bot detection)
+	if err := utils.WaitSeconds(ctx, 16, c.Name, ""); err != nil {
+		return err
+	}
+
 	// Check validity
 	if len(c.URLModels) == 0 {
 		return errors.New("no channel URLs")

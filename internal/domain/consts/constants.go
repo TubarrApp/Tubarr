@@ -57,3 +57,7 @@ var BotTimeoutMap = map[string]float64{
 	"streamable.com":  180,
 	"imgur.com":       180,
 }
+
+const (
+	TimeRemainingMsg = ColorCyan + "Time remaining:" + ColorReset
+)

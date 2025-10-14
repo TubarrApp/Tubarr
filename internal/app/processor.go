@@ -221,7 +221,7 @@ func handleJSONProcessing(
 	v *models.Video,
 ) (bool, error) {
 	// Process JSON downloading and filtering for this file.
-	proceed, botBlockChannel, err := processJSON(procCtx, vs, cs, dlTracker, dirParser, c, cu, v)
+	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
 	if err != nil {
 		return false, handleBotError(cs, c, cu, v.URL, botBlockChannel, err, "JSON processing")
 	}
@@ -261,7 +261,6 @@ func markVideoComplete(vs contracts.VideoStore, v *models.Video, c *models.Chann
 func processJSON(
 	procCtx context.Context,
 	vs contracts.VideoStore,
-	cs contracts.ChannelStore,
 	dlTracker *downloads.DownloadTracker,
 	dirParser *parsing.DirectoryParser,
 	c *models.Channel,
