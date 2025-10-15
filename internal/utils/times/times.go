@@ -17,6 +17,7 @@ import (
 // This is used to help avoid bot detection.
 func StartupWait(ctx context.Context) error {
 	if viper.GetBool(keys.SkipWait) {
+		logging.W("Skipping wait period, running Tubarr immediately. You may encounter bot detection on some platforms if requests come at predictable intervals.")
 		return nil
 	}
 

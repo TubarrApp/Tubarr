@@ -48,10 +48,6 @@ func main() {
 	// Check channels
 	if viper.GetBool(keys.CheckChannels) {
 		// Wait with countdown (or skip if -s flag is set)
-		if viper.GetBool(keys.SkipWait) {
-			logging.W("Skipping wait period, running Tubarr immediately. You may encounter bot detection on some platforms if requests come at predictable intervals.")
-		}
-
 		if err := times.StartupWait(ctx); err != nil {
 			logging.E("Exiting before startup timer exited")
 			return
