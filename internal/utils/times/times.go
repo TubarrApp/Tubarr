@@ -69,6 +69,11 @@ func StartupWait(ctx context.Context) error {
 // WaitTime adds a specified wait time.
 func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL string) error {
 	if viper.GetBool(keys.SkipWait) {
+		if videoURL == "" {
+			logging.D(3, "Skipping wait time call for channel %q (video URL: %q)", channelName, videoURL)
+		} else {
+			logging.D(3, "Skipping wait time call for channel %q", channelName)
+		}
 		return nil
 	}
 
