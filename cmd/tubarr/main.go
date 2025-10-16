@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/app"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/utils/times"
 
@@ -18,6 +19,14 @@ import (
 
 // main is the main entrypoint of the program (duh!)
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.E("Panic recovered: %v", r)
+			benchmark.CloseBenchmarking()
+			panic(r) // Re-panic after cleanup
+		}
+	}()
+
 	startTime := time.Now()
 	store, progControl, err := initializeApplication()
 	if err != nil {
@@ -29,6 +38,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGSEGV)
 	defer cancel()
 	defer cleanup(progControl, startTime)
+
+	// Close benchmarking at the very end
+	defer benchmark.CloseBenchmarking()
 
 	// Start heatbeat
 	go startHeartbeat(ctx, progControl)

@@ -6,22 +6,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/file"
 	"tubarr/internal/utils/benchmark"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-)
-
-var (
-	benchmarking bool
-	benchFiles   *benchmark.BenchFiles
-	err          error
 )
 
 var rootCmd = &cobra.Command{
@@ -31,18 +23,20 @@ var rootCmd = &cobra.Command{
 		if err := validation.ValidateViperFlags(); err != nil {
 			return
 		}
-		if viper.IsSet(keys.Benchmarking) {
-			if benchFiles, err = benchmark.SetupBenchmarking(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+
+		// Setup benchmarking if flag is set
+		if viper.GetBool(keys.Benchmarking) {
+			var err error
+			benchmark.BenchmarkFiles, err = benchmark.SetupBenchmarking()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to setup benchmarking: %v\n", err)
 				return
 			}
-			benchmarking = true
 		}
 
 		// Setup channel flags from config file
 		if viper.IsSet(keys.ChannelConfigFile) {
 			configFile := viper.GetString(keys.ChannelConfigFile)
-
 			cInfo, err := os.Stat(configFile)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed check for config file path: %v", err)
@@ -53,7 +47,6 @@ var rootCmd = &cobra.Command{
 				fmt.Println()
 				os.Exit(1)
 			}
-
 			if configFile != "" {
 				// load and normalize keys from any Viper-supported config file
 				if err := file.LoadConfigFile(configFile); err != nil {
@@ -72,15 +65,6 @@ var rootCmd = &cobra.Command{
 		}
 		viper.Set("execute", true)
 		return nil
-	},
-	PersistentPostRun: func(_ *cobra.Command, _ []string) {
-		if benchmarking {
-			if benchFiles == nil {
-				logging.E("Null benchFiles")
-				return
-			}
-			benchmark.CloseBenchFiles(benchFiles, fmt.Sprintf("Benchmark ended at %v", time.Now().Format(time.RFC1123Z)), nil)
-		}
 	},
 }
 

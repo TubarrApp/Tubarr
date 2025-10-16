@@ -15,6 +15,8 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+var BenchmarkFiles *BenchFiles
+
 // BenchFiles contain benchmarking files written on a benchmark-enabled run.
 type BenchFiles struct {
 	cpuFile   *os.File
@@ -42,6 +44,14 @@ var (
 	memProfPath,
 	traceOutPath string
 )
+
+// CloseBenchmarking closes benchmark files if they exist
+func CloseBenchmarking() {
+	if BenchmarkFiles != nil {
+		CloseBenchFiles(BenchmarkFiles, fmt.Sprintf("Benchmark ended at %v", time.Now().Format(time.RFC1123Z)), nil)
+		BenchmarkFiles = nil
+	}
+}
 
 // InjectMainWorkDir injects the main.go path variable into this package.
 func InjectMainWorkDir(mainGoPath string) {
@@ -93,20 +103,30 @@ func SetupBenchmarking() (*BenchFiles, error) {
 
 // CloseBenchFiles closes bench files on program termination.
 func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
+	if b == nil {
+		return
+	}
+
 	if b.cpuFile != nil {
+		logging.I("Stopping CPU profile...")
 		pprof.StopCPUProfile()
 		if err := b.cpuFile.Close(); err != nil {
 			logging.E("Failed to close file %q: %v", b.cpuFile.Name(), err)
 		}
+		b.cpuFile = nil // Prevent double-close
 	}
 
 	if b.traceFile != nil {
+		logging.I("Stopping trace...")
+		trace.Stop()
 		if err := b.traceFile.Close(); err != nil {
 			logging.E("Failed to close file %q: %v", b.traceFile.Name(), err)
 		}
+		b.traceFile = nil
 	}
 
 	if b.memFile != nil {
+		logging.I("Writing memory profile...")
 		runtime.GC()
 		if err := pprof.WriteHeapProfile(b.memFile); err != nil {
 			logging.E("Could not write memory profile: %v", err)
@@ -114,12 +134,12 @@ func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
 		if err := b.memFile.Close(); err != nil {
 			logging.E("Failed to close file %q: %v", b.memFile.Name(), err)
 		}
+		b.memFile = nil
 	}
 
 	if setupErr != nil {
 		logging.E("Benchmarking failure: %v", setupErr)
 	}
-
 	logging.I("%s", noErrExit)
 }
 
