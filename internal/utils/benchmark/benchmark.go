@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
-	"strings"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/setup"
 	"tubarr/internal/utils/logging"
 )
@@ -31,12 +31,7 @@ const (
 	traceOut   = "trace_"
 	profExt    = ".prof"
 	outExt     = ".out"
-	timeFormat = "2006-01-02 15:04:05.00"
-	timeTag    = "2006-01-02_15:04:05"
-
-	cpuProfBaseLen  = len(cpuProf) + len(profExt)
-	memProfBaseLen  = len(memProf) + len(profExt)
-	traceOutBaseLen = len(traceOut) + len(outExt)
+	timeFormat = "2006-01-02_15-04-05"
 )
 
 var (
@@ -58,10 +53,10 @@ func SetupBenchmarking() (*BenchFiles, error) {
 	var err error
 	b := new(BenchFiles)
 
-	benchStartTime := time.Now().Format(timeFormat)
-	makeBenchFilepaths(setup.BenchmarkDir)
+	startTime := time.Now().Format(timeFormat)
+	makeBenchFilepaths(setup.BenchmarkDir, startTime)
 
-	logging.I("(Benchmarking this run. Start time: %s)", benchStartTime)
+	logging.I("(Benchmarking this run. Start time: %s)", startTime)
 
 	// CPU profile
 	b.cpuFile, err = os.Create(cpuProfPath)
@@ -138,35 +133,20 @@ func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
 	logging.I("%s", noErrExit)
 }
 
-// makeBenchFilepaths makes paths for benchmarking files.
-func makeBenchFilepaths(cwd string) {
-	time := time.Now().Format(timeTag)
-	var b strings.Builder
+// makeBenchFilepaths makes paths for benchmarking files in a timestamped subdirectory.
+func makeBenchFilepaths(baseDir, timestamp string) {
+	// Create timestamped subdirectory for this run
+	runDir := filepath.Join(baseDir, timestamp)
 
-	b.Grow(cpuProfBaseLen + len(time))
-	b.WriteString(cpuProf)
-	b.WriteString(time)
-	b.WriteString(profExt)
+	if err := os.MkdirAll(runDir, consts.PermsGenericDir); err != nil {
+		logging.E("Failed to create benchmark run directory: %v", err)
+		return
+	}
 
-	// Benchmarking files
-	cpuProfPath = filepath.Join(cwd, b.String())
-	logging.I("Made CPU profiling file: %q", cpuProfPath)
-	b.Reset()
+	// Simple filenames (no timestamp needed since they're in timestamped folder)
+	cpuProfPath = filepath.Join(runDir, "cpu.prof")
+	memProfPath = filepath.Join(runDir, "mem.prof")
+	traceOutPath = filepath.Join(runDir, "trace.out")
 
-	b.Grow(memProfBaseLen + len(time))
-	b.WriteString(memProf)
-	b.WriteString(time)
-	b.WriteString(profExt)
-
-	memProfPath = filepath.Join(cwd, b.String())
-	logging.I("Made mem profiling file: %q", memProfPath)
-	b.Reset()
-
-	b.Grow(traceOutBaseLen + len(time))
-	b.WriteString(traceOut)
-	b.WriteString(time)
-	b.WriteString(outExt)
-
-	traceOutPath = filepath.Join(cwd, b.String())
-	logging.I("Made trace file: %q", traceOutPath)
+	logging.I("Created benchmark directory: %q", runDir)
 }
