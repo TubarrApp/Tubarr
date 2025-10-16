@@ -156,7 +156,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	filenameChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 
-	logging.I("Running video download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
+	logging.I("Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}

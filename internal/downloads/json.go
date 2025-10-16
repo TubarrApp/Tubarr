@@ -108,7 +108,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	logging.I("Running metadata download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
+	logging.I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("yt-dlp error for %s: %w\nStderr: %s", d.Video.URL, err, stderr.String())

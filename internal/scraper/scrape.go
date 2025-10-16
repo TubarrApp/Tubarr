@@ -124,7 +124,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Fetch new episode URLs
-		newEpisodeURLs, err := s.newEpisodeURLs(ctx, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath)
+		newEpisodeURLs, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath)
 		if err != nil {
 			return nil, err
 		}
@@ -222,7 +222,7 @@ func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelSto
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func (s *Scraper) newEpisodeURLs(ctx context.Context, targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, cookiePath string) ([]string, error) {
+func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName, targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, cookiePath string) ([]string, error) {
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	// Set cookies
@@ -260,7 +260,7 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, targetURL string, existing
 		s.collector.Wait()
 	} else {
 		var err error
-		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, targetURL, uniqueEpisodeURLs, cookiePath); err != nil {
+		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, targetURL, uniqueEpisodeURLs, cookiePath); err != nil {
 			return nil, err
 		}
 	}
@@ -308,7 +308,7 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 }
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
+func ytDlpURLFetch(ctx context.Context, chanName, chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
 	if uniqueEpisodeURLs == nil {
 		uniqueEpisodeURLs = make(map[string]struct{})
 	}
@@ -318,7 +318,7 @@ func ytDlpURLFetch(ctx context.Context, chanURL string, uniqueEpisodeURLs map[st
 	if cookiePath != "" {
 		cmd.Args = append(cmd.Args, command.CookiePath, cookiePath)
 	}
-	logging.I("Executing YTDLP command for channel %q:\n%s", chanURL, cmd.String())
+	logging.I("Executing YTDLP command for channel %q URL %q:\n%s", chanURL, cmd.String())
 
 	j, err := cmd.Output()
 	if err != nil {
