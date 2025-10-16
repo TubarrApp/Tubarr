@@ -180,6 +180,7 @@ func mergeCookies(primary, secondary []*http.Cookie) []*http.Cookie {
 		cookieMap[key] = c
 	}
 
+	// Merge duduplicated (from map) cookies together
 	merged := make([]*http.Cookie, 0, len(cookieMap))
 	for _, c := range cookieMap {
 		merged = append(merged, c)

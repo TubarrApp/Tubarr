@@ -222,13 +222,18 @@ func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelSto
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
-func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName, targetURL string, existingURLs, fileURLs []string, cookies []*http.Cookie, cookiePath string) ([]string, error) {
+func (s *Scraper) newEpisodeURLs(
+	ctx context.Context,
+	channelName, channelURL string,
+	existingURLs, fileURLs []string,
+	cookies []*http.Cookie, cookiePath string) ([]string, error) {
+	// Episode map to avoid dedpulication
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	// Set cookies
 	if len(cookies) > 0 {
 		for _, cookie := range cookies {
-			if err := s.collector.SetCookies(targetURL, []*http.Cookie{cookie}); err != nil {
+			if err := s.collector.SetCookies(channelURL, []*http.Cookie{cookie}); err != nil {
 				return nil, err
 			}
 		}
@@ -238,7 +243,7 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName, targetURL str
 	var customDom bool
 	pattern := patterns["default"]
 	for domain, p := range patterns {
-		if strings.Contains(targetURL, domain) {
+		if strings.Contains(channelURL, domain) {
 			pattern = p
 			logging.I("Detected %s link", p.name)
 			customDom = true
@@ -254,13 +259,13 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName, targetURL str
 	})
 
 	if customDom {
-		if err := s.collector.Visit(targetURL); err != nil {
-			return nil, fmt.Errorf("error visiting webpage %q: %w", targetURL, err)
+		if err := s.collector.Visit(channelURL); err != nil {
+			return nil, fmt.Errorf("error visiting webpage %q: %w", channelURL, err)
 		}
 		s.collector.Wait()
 	} else {
 		var err error
-		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, targetURL, uniqueEpisodeURLs, cookiePath); err != nil {
+		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, uniqueEpisodeURLs, cookiePath); err != nil {
 			return nil, err
 		}
 	}
@@ -281,7 +286,7 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName, targetURL str
 	newURLs := ignoreDownloadedURLs(episodeURLs, existingURLs)
 
 	if len(newURLs) == 0 {
-		logging.I("No new videos at %s", targetURL)
+		logging.I("No new videos at %s", channelURL)
 		return nil, nil
 	}
 	return newURLs, nil
@@ -308,24 +313,24 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 }
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, channelName, chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
+func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
 	if uniqueEpisodeURLs == nil {
 		uniqueEpisodeURLs = make(map[string]struct{})
 	}
 
-	cmd := exec.CommandContext(ctx, command.YTDLP, command.YtDLPFlatPlaylist, command.OutputJSON, chanURL)
+	cmd := exec.CommandContext(ctx, command.YTDLP, command.YtDLPFlatPlaylist, command.OutputJSON, channelURL)
 
 	if cookiePath != "" {
 		cmd.Args = append(cmd.Args, command.CookiePath, cookiePath)
 	}
-	logging.I("Executing YTDLP command for channel %q URL %q:\n%s", channelName, chanURL, cmd.String())
+	logging.I("Executing YTDLP command for channel %q URL %q:\n%s", channelName, channelURL, cmd.String())
 
 	j, err := cmd.Output()
 	if err != nil {
 		return uniqueEpisodeURLs, fmt.Errorf("yt-dlp command failed: %w", err)
 	}
 
-	logging.D(5, "Retrieved command output from YTDLP for channel %q:\n\n%s", chanURL, string(j))
+	logging.D(5, "Retrieved command output from YTDLP for channel %q:\n\n%s", channelURL, string(j))
 
 	var result ytDlpOutput
 	if err := json.Unmarshal(j, &result); err != nil {
@@ -334,7 +339,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, chanURL string, uniqueEpiso
 
 	for _, entry := range result.Entries {
 		uniqueEpisodeURLs[entry.URL] = struct{}{}
-		logging.D(5, "Added entry for channel %q: %q", chanURL, entry)
+		logging.D(5, "Added entry for channel %q: %q", channelURL, entry)
 	}
 
 	return uniqueEpisodeURLs, nil
