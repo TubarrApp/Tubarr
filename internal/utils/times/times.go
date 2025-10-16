@@ -78,8 +78,10 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL 
 	}
 
 	if videoURL == "" {
+		fmt.Println()
 		logging.I("Sleeping %v before processing channel %q", stagger.Round(time.Second), channelName)
 	} else {
+		fmt.Println()
 		logging.I("Sleeping %v before processing video %q for channel %q", stagger.Round(time.Second), videoURL, channelName)
 	}
 
