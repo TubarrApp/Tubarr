@@ -90,7 +90,6 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	// Build command with context
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
-	logging.S("Built metadata download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
 	return cmd
 }
 
@@ -106,12 +105,11 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	}
 
 	// Execute JSON download
-	logging.D(3, "Executing JSON download command...")
-
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
+	logging.I("Running metadata download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("yt-dlp error for %s: %w\nStderr: %s", d.Video.URL, err, stderr.String())

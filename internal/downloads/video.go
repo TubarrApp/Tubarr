@@ -130,8 +130,6 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Combine command...
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
-	logging.S("Built video download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
-
 	return cmd
 }
 
@@ -159,6 +157,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	filenameChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 
+	logging.I("Running video download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
