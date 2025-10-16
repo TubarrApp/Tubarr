@@ -4,8 +4,8 @@ package consts
 const (
 	// ** World Readable **
 	// General directories
-	PermsGenericDir = 0o755
-	PermsConfigDir  = 0o700
+	PermsGenericDir    = 0o755
+	PermsHomeTubarrDir = 0o700
 
 	// Files
 	PermsLogFile = 0o644

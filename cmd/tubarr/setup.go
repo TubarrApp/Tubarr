@@ -13,7 +13,7 @@ import (
 // initializeApplication sets up the application for the current run.
 func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, err error) {
 	// Setup files/dirs
-	if err = setup.InitCfgFilesDirs(); err != nil {
+	if err = setup.InitProgFilesDirs(); err != nil {
 		fmt.Printf("Tubarr exiting: %v\n", err)
 		os.Exit(0)
 	}
@@ -41,7 +41,7 @@ func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, 
 	}
 
 	// Setup logging
-	if err := logging.SetupLogging(setup.CfgDir); err != nil {
+	if err := logging.SetupLogging(setup.HomeTubarrDir); err != nil {
 		fmt.Printf("could not set up logging, proceeding without: %v", err)
 	}
 

@@ -12,36 +12,36 @@ const (
 	tDir         = ".tubarr"
 	tFile        = "tubarr.db"
 	logFile      = "tubarr.log"
-	benchmarkDir = "benchmark" // NEW
+	benchmarkDir = "benchmark"
 )
 
 // File and directory path strings.
 var (
-	CfgDir       string
-	DBFilePath   string
-	LogFilePath  string
-	BenchmarkDir string // NEW - exported for benchmark package
+	HomeTubarrDir string
+	DBFilePath    string
+	LogFilePath   string
+	BenchmarkDir  string
 )
 
-// InitCfgFilesDirs initializes necessary program directories and filepaths.
-func InitCfgFilesDirs() error {
+// InitProgFilesDirs initializes necessary program directories and filepaths.
+func InitProgFilesDirs() error {
 	dir, err := os.UserHomeDir()
 	if err != nil {
 		return errors.New("failed to get home directory")
 	}
-	CfgDir = filepath.Join(dir, tDir)
-	if _, err := os.Stat(CfgDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(CfgDir, consts.PermsConfigDir); err != nil {
+	HomeTubarrDir = filepath.Join(dir, tDir)
+	if _, err := os.Stat(HomeTubarrDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(HomeTubarrDir, consts.PermsHomeTubarrDir); err != nil {
 			return fmt.Errorf("failed to make directories: %w", err)
 		}
 	}
 
 	// Main files
-	DBFilePath = filepath.Join(CfgDir, tFile)
-	LogFilePath = filepath.Join(CfgDir, logFile)
+	DBFilePath = filepath.Join(HomeTubarrDir, tFile)
+	LogFilePath = filepath.Join(HomeTubarrDir, logFile)
 
 	// Benchmark directory
-	BenchmarkDir = filepath.Join(CfgDir, benchmarkDir)
+	BenchmarkDir = filepath.Join(HomeTubarrDir, benchmarkDir)
 	if _, err := os.Stat(BenchmarkDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(BenchmarkDir, consts.PermsGenericDir); err != nil {
 			return fmt.Errorf("failed to make benchmark directory: %w", err)

@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -22,6 +21,7 @@ import (
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/setup"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -451,15 +451,9 @@ func sanitizeFilename(name string) string {
 
 // generateCookieFilePath generates a unique authentication file path per channel and URL.
 func generateCookieFilePath(channelName, videoURL string) string {
-	const tubarrDir = ".tubarr/"
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = "/"
-	}
-
 	// If no specific URL is provided, return the default per-channel auth file.
 	if videoURL == "" {
-		return filepath.Join(homeDir, tubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
+		return filepath.Join(setup.HomeTubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
 	}
 
 	// Generate a short hash for the URL to ensure uniqueness
@@ -467,7 +461,7 @@ func generateCookieFilePath(channelName, videoURL string) string {
 	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use the first 8 hex characters
 
 	// Construct file path (e.g., ~/.tubarr/CensoredTV_Show_a1b2c3d4.txt)
-	return filepath.Join(homeDir, tubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
+	return filepath.Join(setup.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
 }
 
 // extractTitle grabs the title from the webpage.
