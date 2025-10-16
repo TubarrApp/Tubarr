@@ -132,8 +132,10 @@ func parseToken(body string) string {
 		return ""
 	}
 
-	var token string
-	var f func(*html.Node)
+	var (
+		token string
+		f     func(*html.Node)
+	)
 	f = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "input" {
 			var name, value string

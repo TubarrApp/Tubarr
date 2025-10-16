@@ -105,6 +105,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 	errs := make([]error, 0, len(notifyURLs))
 
 	for _, notifyURL := range notifyURLs {
+		logging.I("Notifying %q", notifyURL)
 		parsed, err := url.Parse(notifyURL)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("invalid notification URL %q: %w", notifyURL, err))

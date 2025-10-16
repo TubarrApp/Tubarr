@@ -13,10 +13,10 @@ import (
 func IsPrivateNetwork(host string) bool {
 	h, _, err := net.SplitHostPort(host)
 	if err != nil {
-		if u, parseErr := url.Parse(host); parseErr == nil { // If parseErr IS nil
+		if u, parseErr := url.Parse(host); parseErr == nil && u.Hostname() != "" {
 			h = u.Hostname()
 		} else {
-			h = host // (Fallback unlikely to ever be used)
+			h = host // fallback to original input if Hostname() was empty
 		}
 	}
 

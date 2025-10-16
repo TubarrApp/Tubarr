@@ -361,7 +361,11 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Added notify URLs for channel with %s %q: %v", key, val, validPairs)
+			pairSlice := make([]string, 0, len(validPairs))
+			for _, vp := range validPairs {
+				pairSlice = append(pairSlice, (vp.ChannelURL + "|" + vp.NotifyURL + "|" + vp.Name))
+			}
+			logging.S("Added notify URLs for channel with %s %q: %v", key, val, pairSlice)
 			return nil
 		},
 	}
