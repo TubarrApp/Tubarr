@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-
 	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"

@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"

@@ -5,7 +5,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-
 	"tubarr/internal/database"
 	"tubarr/internal/domain/setup"
 	"tubarr/internal/repo"

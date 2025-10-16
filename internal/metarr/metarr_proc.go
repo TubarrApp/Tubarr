@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"

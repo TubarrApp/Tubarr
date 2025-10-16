@@ -13,9 +13,8 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
-	"golang.org/x/net/publicsuffix"
-
 	"golang.org/x/net/html"
+	"golang.org/x/net/publicsuffix"
 )
 
 var globalAuthCache sync.Map

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"time"
-
 	"tubarr/internal/contracts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"

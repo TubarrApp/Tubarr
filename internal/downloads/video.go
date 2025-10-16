@@ -12,7 +12,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"

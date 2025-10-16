@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )

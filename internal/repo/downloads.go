@@ -29,49 +29,6 @@ func (ds *DownloadStore) GetDB() *sql.DB {
 	return ds.DB
 }
 
-// // SetDownloadStatuses updates the download status of an array of videos.
-// func (ds *DownloadStore) SetDownloadStatuses(videos []*models.Video) error {
-// 	var (
-// 		committed bool
-// 	)
-
-// 	tx, err := ds.DB.Begin()
-// 	if err != nil {
-// 		return fmt.Errorf("failed to begin transaction: %w", err)
-// 	}
-// 	defer func() {
-// 		if !committed {
-// 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-// 				logging.E("Error rolling back download status for videos %+v: %v", videos, rollbackErr)
-// 			}
-// 		}
-// 	}()
-
-// 	for _, v := range videos {
-
-// 		normalizeDownloadStatus(&v.DownloadStatus.Pct, &v.DownloadStatus.Status, v.ID)
-
-// 		query := squirrel.Update(consts.DBDownloads).
-// 			Set(consts.QDLStatus, v.DownloadStatus.Status).
-// 			Set(consts.QDLPct, v.DownloadStatus.Pct).
-// 			Set(consts.QDLUpdatedAt, time.Now()).
-// 			Where(squirrel.Eq{consts.QVidID: v.ID}).
-// 			RunWith(tx)
-
-// 		if _, err := query.Exec(); err != nil {
-// 			return fmt.Errorf("failed to update status for video %d: %w", v.ID, err)
-// 		}
-// 	}
-
-// 	if err := tx.Commit(); err != nil {
-// 		return fmt.Errorf("failed to commit transaction: %w", err)
-// 	}
-
-// 	committed = true
-// 	logging.S("Updated videos statuses %v", videos)
-// 	return nil
-// }
-
 // SetDownloadStatus updates the download status of a single video.
 func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 	var committed bool
