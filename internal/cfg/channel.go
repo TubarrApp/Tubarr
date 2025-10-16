@@ -37,7 +37,7 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 
 	cs := s.ChannelStore()
 
-	// Add subcommands with dependencies
+	// Channel commands
 	channelCmd.AddCommand(addAuth(cs))
 	channelCmd.AddCommand(addChannelCmd(ctx, cs, s))
 	channelCmd.AddCommand(unblockChannelCmd(cs))
@@ -55,6 +55,9 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 	channelCmd.AddCommand(updateChannelValue(cs))
 	channelCmd.AddCommand(updateChannelSettingsCmd(cs))
 	channelCmd.AddCommand(addNotifyURLs(cs))
+
+	// Channel URL commands
+	channelCmd.AddCommand(updateChannelURLSettingsCmd(cs))
 
 	return channelCmd
 }
