@@ -23,7 +23,7 @@ func StartupWait(ctx context.Context) error {
 
 	// Add random stagger on startup (0–30 minutes)
 	stagger := RandomMinsDuration(30)
-	logging.I("Waiting %v before channel check (helps hide from bot detection). To skip startup jitter, use:\n\ntubarr -s\n", stagger.Round(time.Second))
+	logging.I("Waiting %v before beginning channel check (helps hide cronjobs from bot detection). To skip startup jitter, use:\n\ntubarr -s\n", stagger.Round(time.Second))
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
