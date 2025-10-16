@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -193,13 +194,18 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 				} else {
 					cu.ChanURLSettings = &models.Settings{}
 				}
+			} else {
+				mergeSettings(cu.ChanURLSettings, c.ChanSettings)
 			}
+
 			if cu.ChanURLMetarrArgs == nil {
 				if c.ChanMetarrArgs != nil {
 					cu.ChanURLMetarrArgs = c.ChanMetarrArgs
 				} else {
 					cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 				}
+			} else {
+				mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
 			}
 		}
 	}
@@ -276,30 +282,42 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chan
 		}
 	}
 
-	// Apply fallback logic if settings are nil
-	if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
-		c, hasRows, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
-		if err != nil {
-			return nil, true, err
-		}
-		if !hasRows {
-			logging.D(2, "Channel with ID %d not found in database", channelID)
-		}
+	// Apply fallback logic for empty settings
+	c, hasRows, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
+	if err != nil {
+		return nil, true, err
+	}
+	if !hasRows {
+		logging.D(2, "Channel with ID %d not found in database", channelID)
+	}
 
-		if cu.ChanURLSettings == nil {
-			if c != nil && c.ChanSettings != nil {
-				cu.ChanURLSettings = c.ChanSettings
-			} else {
-				cu.ChanURLSettings = &models.Settings{}
-			}
+	// Handle Settings
+	if cu.ChanURLSettings == nil {
+		// Struct-level inheritance: use entire channel settings
+		if c != nil && c.ChanSettings != nil {
+			cu.ChanURLSettings = c.ChanSettings
+		} else {
+			cu.ChanURLSettings = &models.Settings{}
 		}
+	} else {
+		// Field-level inheritance: merge empty fields from channel
+		if c != nil && c.ChanSettings != nil {
+			mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+		}
+	}
 
-		if cu.ChanURLMetarrArgs == nil {
-			if c != nil && c.ChanMetarrArgs != nil {
-				cu.ChanURLMetarrArgs = c.ChanMetarrArgs
-			} else {
-				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-			}
+	// Handle MetarrArgs
+	if cu.ChanURLMetarrArgs == nil {
+		// Struct-level inheritance: use entire channel metarr args
+		if c != nil && c.ChanMetarrArgs != nil {
+			cu.ChanURLMetarrArgs = c.ChanMetarrArgs
+		} else {
+			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+		}
+	} else {
+		// Field-level inheritance: merge empty fields from channel
+		if c != nil && c.ChanMetarrArgs != nil {
+			mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
 		}
 	}
 
@@ -643,9 +661,7 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) bool {
 	}
 	if len(urlMetarr.OutputDirMap) == 0 && len(channelMetarr.OutputDirMap) > 0 {
 		urlMetarr.OutputDirMap = make(map[string]string)
-		for k, v := range channelMetarr.OutputDirMap {
-			urlMetarr.OutputDirMap[k] = v
-		}
+		maps.Copy(urlMetarr.OutputDirMap, channelMetarr.OutputDirMap)
 		changed = true
 	}
 	if len(urlMetarr.URLOutputDirs) == 0 && len(channelMetarr.URLOutputDirs) > 0 {
