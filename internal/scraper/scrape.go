@@ -308,7 +308,7 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 }
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, chanName, chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
+func ytDlpURLFetch(ctx context.Context, channelName, chanURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
 	if uniqueEpisodeURLs == nil {
 		uniqueEpisodeURLs = make(map[string]struct{})
 	}
@@ -318,7 +318,7 @@ func ytDlpURLFetch(ctx context.Context, chanName, chanURL string, uniqueEpisodeU
 	if cookiePath != "" {
 		cmd.Args = append(cmd.Args, command.CookiePath, cookiePath)
 	}
-	logging.I("Executing YTDLP command for channel %q URL %q:\n%s", chanURL, cmd.String())
+	logging.I("Executing YTDLP command for channel %q URL %q:\n%s", channelName, chanURL, cmd.String())
 
 	j, err := cmd.Output()
 	if err != nil {
