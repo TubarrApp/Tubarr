@@ -460,6 +460,7 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 }
 
 // mergeSettings merges channel settings into URL settings, only updating empty fields.
+//
 // Returns true if any changes were made.
 func mergeSettings(urlSettings, channelSettings *models.Settings) bool {
 	if channelSettings == nil {
@@ -512,7 +513,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) bool {
 		changed = true
 	}
 
-	// Custom args - THIS IS THE KEY PART FOR YOUR ISSUE
+	// Custom args
 	if urlSettings.ExtraYTDLPVideoArgs == "" && channelSettings.ExtraYTDLPVideoArgs != "" {
 		urlSettings.ExtraYTDLPVideoArgs = channelSettings.ExtraYTDLPVideoArgs
 		changed = true
@@ -572,6 +573,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) bool {
 }
 
 // mergeMetarrArgs merges channel metarr args into URL metarr args, only updating empty fields.
+//
 // Returns true if any changes were made.
 func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) bool {
 	if channelMetarr == nil {
