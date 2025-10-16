@@ -25,15 +25,6 @@ type BenchFiles struct {
 	traceFile *os.File
 }
 
-const (
-	cpuProf    = "cpu_"
-	memProf    = "mem_"
-	traceOut   = "trace_"
-	profExt    = ".prof"
-	outExt     = ".out"
-	timeFormat = "2006-01-02_15-04-05"
-)
-
 var (
 	cpuProfPath,
 	memProfPath,
@@ -53,7 +44,7 @@ func SetupBenchmarking() (*BenchFiles, error) {
 	var err error
 	b := new(BenchFiles)
 
-	startTime := time.Now().Format(timeFormat)
+	startTime := time.Now().Format("2006-01-02_15-04-05")
 	makeBenchFilepaths(setup.BenchmarkDir, startTime)
 
 	logging.I("(Benchmarking this run. Start time: %s)", startTime)
