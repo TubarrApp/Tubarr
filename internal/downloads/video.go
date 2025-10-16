@@ -130,7 +130,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Combine command...
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
-	logging.D(1, "Built video download command for URL %q:\n%v", d.Video.URL, cmd.String())
+	logging.S("Built video download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
 
 	return cmd
 }

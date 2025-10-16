@@ -319,7 +319,7 @@ func ytDlpURLFetch(ctx context.Context, chanURL string, uniqueEpisodeURLs map[st
 	if cookiePath != "" {
 		cmd.Args = append(cmd.Args, command.CookiePath, cookiePath)
 	}
-	logging.D(2, "Executing YTDLP command for channel %q:\n%s", chanURL, cmd.String())
+	logging.I("Executing YTDLP command for channel %q:\n%s", chanURL, cmd.String())
 
 	j, err := cmd.Output()
 	if err != nil {

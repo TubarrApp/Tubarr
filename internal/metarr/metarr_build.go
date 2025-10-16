@@ -195,8 +195,6 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	if metaOW {
 		args = append(args, metkeys.MetaOW)
 	}
-
-	logging.I("Built Metarr argument list: %v", args)
 	return args
 }
 

@@ -90,7 +90,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	// Build command with context
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
-	logging.D(1, "Built metadata download command for URL %q:\n%v", d.Video.URL, cmd.String())
+	logging.S("Built metadata download command for URL %q:\n\n%v\n", d.Video.URL, cmd.String())
 	return cmd
 }
 
