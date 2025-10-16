@@ -12,6 +12,7 @@ import (
 	"runtime/trace"
 	"strings"
 	"time"
+	"tubarr/internal/domain/setup"
 	"tubarr/internal/utils/logging"
 )
 
@@ -39,7 +40,6 @@ const (
 )
 
 var (
-	mainWd,
 	cpuProfPath,
 	memProfPath,
 	traceOutPath string
@@ -53,18 +53,13 @@ func CloseBenchmarking() {
 	}
 }
 
-// InjectMainWorkDir injects the main.go path variable into this package.
-func InjectMainWorkDir(mainGoPath string) {
-	mainWd = filepath.Dir(mainGoPath)
-}
-
 // SetupBenchmarking sets up and initiates benchmarking for a program run.
 func SetupBenchmarking() (*BenchFiles, error) {
 	var err error
 	b := new(BenchFiles)
 
 	benchStartTime := time.Now().Format(timeFormat)
-	makeBenchFilepaths(mainWd)
+	makeBenchFilepaths(setup.BenchmarkDir)
 
 	logging.I("(Benchmarking this run. Start time: %s)", benchStartTime)
 

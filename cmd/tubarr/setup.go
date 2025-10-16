@@ -3,26 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"tubarr/internal/database"
 	"tubarr/internal/domain/setup"
 	"tubarr/internal/repo"
-	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 )
 
 // initializeApplication sets up the application for the current run.
 func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, err error) {
-
-	// Get directory of main.go (helpful for benchmarking file save locations)
-	_, mainGoPath, _, ok := runtime.Caller(0)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "Error getting current working directory. Got: %v\n", mainGoPath)
-		os.Exit(1)
-	}
-	benchmark.InjectMainWorkDir(mainGoPath)
-
 	// Setup files/dirs
 	if err = setup.InitCfgFilesDirs(); err != nil {
 		fmt.Printf("Tubarr exiting: %v\n", err)
