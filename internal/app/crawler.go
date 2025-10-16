@@ -213,9 +213,9 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 
 	// Main process
 	var (
-		nSucceeded     int
-		procError      error
-		channelsGotNew []string
+		nSucceeded        int
+		procError         error
+		channelURLsGotNew []string
 	)
 
 	// Process each ChannelURL's videos
@@ -235,7 +235,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		if succeeded != 0 {
 			nSucceeded += succeeded
 			if nDownloaded > 0 {
-				channelsGotNew = append(channelsGotNew, cu.URL)
+				channelURLsGotNew = append(channelURLsGotNew, cu.URL)
 			}
 		}
 		procError = errors.Join(procError, procErr)
@@ -251,7 +251,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(customVideoRequests), procError)
 	}
 
-	if err := NotifyServices(cs, c, channelsGotNew); err != nil {
+	if err := NotifyServices(cs, c, channelURLsGotNew); err != nil {
 		return errors.Join(procError, err)
 	}
 
@@ -320,8 +320,8 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 	var (
 		nSucceeded,
 		nDownloaded int
-		procError      error
-		channelsGotNew []string
+		procError         error
+		channelURLsGotNew []string
 	)
 
 	// Process channel URLs
@@ -351,8 +351,8 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 		if succeeded != 0 {
 			nSucceeded += succeeded
 			if downloaded > 0 {
-				logging.I("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", downloaded, cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
-				channelsGotNew = append(channelsGotNew, cu.URL)
+				logging.S("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", downloaded, cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
+				channelURLsGotNew = append(channelURLsGotNew, cu.URL)
 				nDownloaded += downloaded
 			}
 		}
@@ -371,7 +371,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 
 	// Some succeeded, notify URLs
 	if nDownloaded > 0 {
-		if err := NotifyServices(cs, c, channelsGotNew); err != nil {
+		if err := NotifyServices(cs, c, channelURLsGotNew); err != nil {
 			return errors.Join(procError, err)
 		}
 	}

@@ -30,7 +30,7 @@ func init() {
 }
 
 // NotifyServices notifies URLs set for the channel by the user.
-func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelsWithNew []string) error {
+func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew []string) error {
 
 	// Retrieve notifications for this channel
 	notifications, err := cs.GetNotifyURLs(c.ID)
@@ -43,24 +43,24 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelsWithNe
 	}
 
 	// Create lookup map for new channels
-	channelsWithNewMap := make(map[string]bool, len(channelsWithNew))
-	for _, u := range channelsWithNew {
+	channelsWithNewMap := make(map[string]bool, len(channelURLsWithNew))
+	for _, u := range channelURLsWithNew {
 		channelsWithNewMap[strings.ToLower(u)] = true
 	}
 
 	// Append valid URLs
-	var urls []string
+	urls := make([]string, 0, len(notifications))
 	for _, n := range notifications {
 
 		if n.ChannelURL == "" {
-			logging.D(3, "Channel URL is empty for notification URL %q", n.ChannelURL)
+			logging.D(3, "Channel URL is empty for notification URL %q, appending to notification list", n.ChannelURL)
 			urls = append(urls, n.NotifyURL)
 			continue
 		}
 
-		logging.D(2, "Checking %q exists in notification", n.ChannelURL)
+		logging.D(3, "Checking %q exists in notification", n.ChannelURL)
 		if channelsWithNewMap[strings.ToLower(n.ChannelURL)] {
-			logging.D(3, "Found %q in notification", n.ChannelURL)
+			logging.D(3, "Found %q in notification  appending to notification list", n.ChannelURL)
 			urls = append(urls, n.NotifyURL)
 		}
 	}
@@ -105,7 +105,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 	errs := make([]error, 0, len(notifyURLs))
 
 	for _, notifyURL := range notifyURLs {
-		logging.I("Notifying %q", notifyURL)
+		logging.D(1, "Notifying %q for channel %q", notifyURL, c.Name)
 		parsed, err := url.Parse(notifyURL)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("invalid notification URL %q: %w", notifyURL, err))
