@@ -87,6 +87,11 @@ const (
 	QNotifyUpdatedAt = "updated_at"
 )
 
+// Misc
+const (
+	ManualDownloadsCol = "manual-downloads"
+)
+
 // DownloadStatus holds constant download status strings.
 type DownloadStatus string
 

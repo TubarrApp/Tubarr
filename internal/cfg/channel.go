@@ -1386,6 +1386,9 @@ func displaySettings(cs contracts.ChannelStore, c *models.Channel) {
 	fmt.Printf("\n\n%s[ Channel: %q ]%s\n", consts.ColorGreen, c.Name, consts.ColorReset)
 
 	cURLs := c.GetURLs()
+	cURLs = slices.DeleteFunc(cURLs, func(url string) bool {
+		return url == consts.ManualDownloadsCol
+	})
 
 	// Channel basic info
 	fmt.Printf("\n%sBasic Info:%s\n", consts.ColorCyan, consts.ColorReset)
