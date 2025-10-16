@@ -440,3 +440,263 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 	}
 	return urlMap, nil
 }
+
+// CascadeChannelSettingsToURLs propagates channel settings to URLs, merging fields that are empty in the URL.
+func (cs *ChannelStore) CascadeChannelSettingsToURLs(c *models.Channel) error {
+	if c == nil {
+		return fmt.Errorf("channel is nil")
+	}
+
+	urlModels, err := cs.GetChannelURLModels(c)
+	if err != nil {
+		return fmt.Errorf("failed to get channel URL models: %w", err)
+	}
+
+	if len(urlModels) == 0 {
+		logging.D(2, "No URLs found for channel %q, nothing to cascade", c.Name)
+		return nil
+	}
+
+	for _, cu := range urlModels {
+		logging.D(2, "Checking URL for cascade: %s", cu.URL)
+
+		// Initialize if nil
+		if cu.ChanURLSettings == nil {
+			cu.ChanURLSettings = &models.Settings{}
+		}
+		if cu.ChanURLMetarrArgs == nil {
+			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+		}
+
+		// Merge settings - only update empty fields
+		settingsChanged := mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+		metarrChanged := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
+
+		if settingsChanged || metarrChanged {
+			// Update the URL's settings in the database using existing function
+			err := cs.UpdateChannelURLSettings(cu)
+			if err != nil {
+				logging.E("Failed to cascade settings to URL %s: %v", cu.URL, err)
+				continue
+			}
+
+			logging.I("Cascaded settings to URL: %s", cu.URL)
+		} else {
+			logging.D(2, "No changes needed for URL: %s", cu.URL)
+		}
+	}
+
+	return nil
+}
+
+// mergeSettings merges channel settings into URL settings, only updating empty fields.
+// Returns true if any changes were made.
+func mergeSettings(urlSettings, channelSettings *models.Settings) bool {
+	if channelSettings == nil {
+		return false
+	}
+
+	changed := false
+
+	// Configuration fields
+	if urlSettings.ChannelConfigFile == "" && channelSettings.ChannelConfigFile != "" {
+		urlSettings.ChannelConfigFile = channelSettings.ChannelConfigFile
+		changed = true
+	}
+	if urlSettings.Concurrency == 0 && channelSettings.Concurrency != 0 {
+		urlSettings.Concurrency = channelSettings.Concurrency
+		changed = true
+	}
+
+	// Download-related operations
+	if urlSettings.CookieSource == "" && channelSettings.CookieSource != "" {
+		urlSettings.CookieSource = channelSettings.CookieSource
+		changed = true
+	}
+	if urlSettings.CrawlFreq == 0 && channelSettings.CrawlFreq != 0 {
+		urlSettings.CrawlFreq = channelSettings.CrawlFreq
+		changed = true
+	}
+	if urlSettings.ExternalDownloader == "" && channelSettings.ExternalDownloader != "" {
+		urlSettings.ExternalDownloader = channelSettings.ExternalDownloader
+		changed = true
+	}
+	if urlSettings.ExternalDownloaderArgs == "" && channelSettings.ExternalDownloaderArgs != "" {
+		urlSettings.ExternalDownloaderArgs = channelSettings.ExternalDownloaderArgs
+		changed = true
+	}
+	if urlSettings.MaxFilesize == "" && channelSettings.MaxFilesize != "" {
+		urlSettings.MaxFilesize = channelSettings.MaxFilesize
+		changed = true
+	}
+	if urlSettings.Retries == 0 && channelSettings.Retries != 0 {
+		urlSettings.Retries = channelSettings.Retries
+		changed = true
+	}
+	if !urlSettings.UseGlobalCookies && channelSettings.UseGlobalCookies {
+		urlSettings.UseGlobalCookies = channelSettings.UseGlobalCookies
+		changed = true
+	}
+	if urlSettings.YtdlpOutputExt == "" && channelSettings.YtdlpOutputExt != "" {
+		urlSettings.YtdlpOutputExt = channelSettings.YtdlpOutputExt
+		changed = true
+	}
+
+	// Custom args - THIS IS THE KEY PART FOR YOUR ISSUE
+	if urlSettings.ExtraYTDLPVideoArgs == "" && channelSettings.ExtraYTDLPVideoArgs != "" {
+		urlSettings.ExtraYTDLPVideoArgs = channelSettings.ExtraYTDLPVideoArgs
+		changed = true
+	}
+	if urlSettings.ExtraYTDLPMetaArgs == "" && channelSettings.ExtraYTDLPMetaArgs != "" {
+		urlSettings.ExtraYTDLPMetaArgs = channelSettings.ExtraYTDLPMetaArgs
+		changed = true
+	}
+
+	// Metadata operations
+	if len(urlSettings.Filters) == 0 && len(channelSettings.Filters) > 0 {
+		urlSettings.Filters = make([]models.DLFilters, len(channelSettings.Filters))
+		copy(urlSettings.Filters, channelSettings.Filters)
+		changed = true
+	}
+	if urlSettings.FilterFile == "" && channelSettings.FilterFile != "" {
+		urlSettings.FilterFile = channelSettings.FilterFile
+		changed = true
+	}
+	if len(urlSettings.MoveOps) == 0 && len(channelSettings.MoveOps) > 0 {
+		urlSettings.MoveOps = make([]models.MoveOps, len(channelSettings.MoveOps))
+		copy(urlSettings.MoveOps, channelSettings.MoveOps)
+		changed = true
+	}
+	if urlSettings.MoveOpFile == "" && channelSettings.MoveOpFile != "" {
+		urlSettings.MoveOpFile = channelSettings.MoveOpFile
+		changed = true
+	}
+	if urlSettings.FromDate == "" && channelSettings.FromDate != "" {
+		urlSettings.FromDate = channelSettings.FromDate
+		changed = true
+	}
+	if urlSettings.ToDate == "" && channelSettings.ToDate != "" {
+		urlSettings.ToDate = channelSettings.ToDate
+		changed = true
+	}
+
+	// JSON and video directories
+	if urlSettings.JSONDir == "" && channelSettings.JSONDir != "" {
+		urlSettings.JSONDir = channelSettings.JSONDir
+		changed = true
+	}
+	if urlSettings.VideoDir == "" && channelSettings.VideoDir != "" {
+		urlSettings.VideoDir = channelSettings.VideoDir
+		changed = true
+	}
+
+	// Channel toggles
+	if !urlSettings.Paused && channelSettings.Paused {
+		urlSettings.Paused = channelSettings.Paused
+		changed = true
+	}
+
+	// Note: BotBlocked fields are runtime state, not cascaded
+
+	return changed
+}
+
+// mergeMetarrArgs merges channel metarr args into URL metarr args, only updating empty fields.
+// Returns true if any changes were made.
+func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) bool {
+	if channelMetarr == nil {
+		return false
+	}
+
+	changed := false
+
+	// Metarr file operations
+	if urlMetarr.Ext == "" && channelMetarr.Ext != "" {
+		urlMetarr.Ext = channelMetarr.Ext
+		changed = true
+	}
+	if len(urlMetarr.FilenameReplaceSfx) == 0 && len(channelMetarr.FilenameReplaceSfx) > 0 {
+		urlMetarr.FilenameReplaceSfx = make([]string, len(channelMetarr.FilenameReplaceSfx))
+		copy(urlMetarr.FilenameReplaceSfx, channelMetarr.FilenameReplaceSfx)
+		changed = true
+	}
+	if urlMetarr.RenameStyle == "" && channelMetarr.RenameStyle != "" {
+		urlMetarr.RenameStyle = channelMetarr.RenameStyle
+		changed = true
+	}
+	if urlMetarr.FilenameDateTag == "" && channelMetarr.FilenameDateTag != "" {
+		urlMetarr.FilenameDateTag = channelMetarr.FilenameDateTag
+		changed = true
+	}
+
+	// Metarr metadata operations
+	if len(urlMetarr.MetaOps) == 0 && len(channelMetarr.MetaOps) > 0 {
+		urlMetarr.MetaOps = make([]string, len(channelMetarr.MetaOps))
+		copy(urlMetarr.MetaOps, channelMetarr.MetaOps)
+		changed = true
+	}
+
+	// Metarr output directories
+	if urlMetarr.OutputDir == "" && channelMetarr.OutputDir != "" {
+		urlMetarr.OutputDir = channelMetarr.OutputDir
+		changed = true
+	}
+	if len(urlMetarr.OutputDirMap) == 0 && len(channelMetarr.OutputDirMap) > 0 {
+		urlMetarr.OutputDirMap = make(map[string]string)
+		for k, v := range channelMetarr.OutputDirMap {
+			urlMetarr.OutputDirMap[k] = v
+		}
+		changed = true
+	}
+	if len(urlMetarr.URLOutputDirs) == 0 && len(channelMetarr.URLOutputDirs) > 0 {
+		urlMetarr.URLOutputDirs = make([]string, len(channelMetarr.URLOutputDirs))
+		copy(urlMetarr.URLOutputDirs, channelMetarr.URLOutputDirs)
+		changed = true
+	}
+
+	// Program operations
+	if urlMetarr.Concurrency == 0 && channelMetarr.Concurrency != 0 {
+		urlMetarr.Concurrency = channelMetarr.Concurrency
+		changed = true
+	}
+	if urlMetarr.MaxCPU == 0 && channelMetarr.MaxCPU != 0 {
+		urlMetarr.MaxCPU = channelMetarr.MaxCPU
+		changed = true
+	}
+	if urlMetarr.MinFreeMem == "" && channelMetarr.MinFreeMem != "" {
+		urlMetarr.MinFreeMem = channelMetarr.MinFreeMem
+		changed = true
+	}
+
+	// FFmpeg transcoding operations
+	if urlMetarr.UseGPU == "" && channelMetarr.UseGPU != "" {
+		urlMetarr.UseGPU = channelMetarr.UseGPU
+		changed = true
+	}
+	if urlMetarr.GPUDir == "" && channelMetarr.GPUDir != "" {
+		urlMetarr.GPUDir = channelMetarr.GPUDir
+		changed = true
+	}
+	if urlMetarr.TranscodeVideoFilter == "" && channelMetarr.TranscodeVideoFilter != "" {
+		urlMetarr.TranscodeVideoFilter = channelMetarr.TranscodeVideoFilter
+		changed = true
+	}
+	if urlMetarr.TranscodeCodec == "" && channelMetarr.TranscodeCodec != "" {
+		urlMetarr.TranscodeCodec = channelMetarr.TranscodeCodec
+		changed = true
+	}
+	if urlMetarr.TranscodeAudioCodec == "" && channelMetarr.TranscodeAudioCodec != "" {
+		urlMetarr.TranscodeAudioCodec = channelMetarr.TranscodeAudioCodec
+		changed = true
+	}
+	if urlMetarr.TranscodeQuality == "" && channelMetarr.TranscodeQuality != "" {
+		urlMetarr.TranscodeQuality = channelMetarr.TranscodeQuality
+		changed = true
+	}
+	if urlMetarr.ExtraFFmpegArgs == "" && channelMetarr.ExtraFFmpegArgs != "" {
+		urlMetarr.ExtraFFmpegArgs = channelMetarr.ExtraFFmpegArgs
+		changed = true
+	}
+
+	return changed
+}

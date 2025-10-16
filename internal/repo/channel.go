@@ -175,6 +175,17 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
+	// Cascade settings to URL models
+	if err := cs.CascadeChannelSettingsToURLs(c); err != nil {
+		logging.E("Failed to cascade settings to URLs: %v", err)
+	}
+
+	// Reload URL models
+	c.URLModels, err = cs.GetChannelURLModels(c)
+	if err != nil {
+		return fmt.Errorf("failed to reload URL models after cascade: %w", err)
+	}
+
 	logging.S("Updated channel %q from config file", c.Name)
 	return nil
 }
@@ -410,6 +421,8 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	logging.D(1, "Inserting %d channel URLs for channel ID %d", len(c.URLModels), id)
 	for i, cu := range c.URLModels {
 		logging.D(1, "Inserting URL %d: %q", i+1, cu.URL)
+
+		// Do not insert Settings or MetarrArgs here
 		urlQuery := squirrel.
 			Insert(consts.DBChannelURLs).
 			Columns(
@@ -419,8 +432,6 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 				consts.QChanURLPassword,
 				consts.QChanURLLoginURL,
 				consts.QChanURLIsManual,
-				consts.QChanURLSettings,
-				consts.QChanURLMetarr,
 				consts.QChanURLLastScan,
 				consts.QChanURLCreatedAt,
 				consts.QChanURLUpdatedAt,
@@ -432,8 +443,6 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 				cu.Password,
 				cu.LoginURL,
 				false, // (Not a manual URL)
-				settingsJSON,
-				metarrJSON,
 				now,
 				now,
 				now,
