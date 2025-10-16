@@ -1062,6 +1062,16 @@ func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error
 		}
 		c.ChanSettings.YtdlpOutputExt = v
 	}
+
+	// Additional video download args
+	if v, ok := getConfigValue[string](keys.ExtraYTDLPVideoArgs); ok {
+		c.ChanSettings.ExtraYTDLPVideoArgs = v
+	}
+
+	// Additional meta download args
+	if v, ok := getConfigValue[string](keys.ExtraYTDLPMetaArgs); ok {
+		c.ChanSettings.ExtraYTDLPMetaArgs = v
+	}
 	return nil
 }
 

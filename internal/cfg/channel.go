@@ -325,7 +325,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	)
 
 	addNotifyCmd := &cobra.Command{
-		Use:   "notify",
+		Use:   "notify-add",
 		Short: "Adds notify function to a channel.",
 		Long:  "Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. (notification pair format is 'URL|Friendly Name')",
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -650,7 +650,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		maxCPU                                                                                          float64
 		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
 		pause, ignoreRun, useGlobalCookies                                                              bool
-		extraFFmpegArgs                                                                                 string
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                        string
 	)
 
 	addCmd := &cobra.Command{
@@ -835,6 +835,8 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 					UseGlobalCookies:       useGlobalCookies,
 					VideoDir:               vDir,
 					YtdlpOutputExt:         ytdlpOutputExt,
+					ExtraYTDLPVideoArgs:    extraYTDLPVideoArgs,
+					ExtraYTDLPMetaArgs:     extraYTDLPMetaArgs,
 				},
 
 				ChanMetarrArgs: &models.MetarrArgs{
@@ -933,6 +935,9 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	setTranscodeFlags(addCmd, &transcodeGPU, &gpuDir,
 		&transcodeVideoFilter, &codec, &audioCodec,
 		&transcodeQuality)
+
+	// YTDLPFlags
+	setCustomYDLPArgFlags(addCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
 
 	// Notification URL
 	setNotifyFlags(addCmd, &notification)
@@ -1118,7 +1123,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
 		useGlobalCookies, pause, deleteAuth                                       bool
-		extraFFmpegArgs                                                           string
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                  string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -1151,7 +1156,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Load config file location if existent and one wasn't hardcoded into terminal
 			if configFile == "" && c.ChanSettings.ChannelConfigFile != "" {
-				if err := file.LoadConfigFile(configFile); err != nil {
+				if err := file.LoadConfigFile(c.ChanSettings.ChannelConfigFile); err != nil {
 					return err
 				}
 			}
@@ -1207,6 +1212,8 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				videoDir:               vDir,
 				useGlobalCookies:       useGlobalCookies,
 				ytdlpOutputExt:         ytdlpOutExt,
+				extraYtdlpVideoArgs:    extraYTDLPVideoArgs,
+				extraYtdlpMetaArgs:     extraYTDLPMetaArgs,
 			})
 			if err != nil {
 				return err
@@ -1306,6 +1313,10 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	setAuthFlags(updateSettingsCmd, &username, &password,
 		&loginURL, &authDetails)
 
+	// Additional YTDLP args
+	// YTDLPFlags
+	setCustomYDLPArgFlags(updateSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
+
 	updateSettingsCmd.Flags().BoolVar(&deleteAuth, "delete-auth", false, "Clear all authentication details for this channel and its URLs")
 
 	return updateSettingsCmd
@@ -1395,6 +1406,8 @@ func displaySettings(cs contracts.ChannelStore, c *models.Channel) {
 	fmt.Printf("Move Ops File: %s\n", s.MoveOpFile)
 	fmt.Printf("Use Global Cookies: %v\n", s.UseGlobalCookies)
 	fmt.Printf("Yt-dlp Output Extension: %s\n", s.YtdlpOutputExt)
+	fmt.Printf("Yt-dlp Extra Video Args: %s\n", s.ExtraYTDLPVideoArgs)
+	fmt.Printf("Yt-dlp Extra Metadata Args: %s\n", s.ExtraYTDLPMetaArgs)
 
 	// Metarr settings
 	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
@@ -1725,6 +1738,8 @@ type chanSettings struct {
 	videoDir               string
 	useGlobalCookies       bool
 	ytdlpOutputExt         string
+	extraYtdlpVideoArgs    string
+	extraYtdlpMetaArgs     string
 }
 
 // getSettingsArgsFns creates the functions to send in to update the database with new values.
@@ -1923,6 +1938,21 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
+	// Additional yt-dlp video download arguments
+	if f.Changed(keys.ExtraYTDLPVideoArgs) {
+		fns = append(fns, func(s *models.Settings) error {
+			s.ExtraYTDLPVideoArgs = c.extraYtdlpVideoArgs
+			return nil
+		})
+	}
+
+	// Additional yt-dlp metadata download arguments
+	if f.Changed(keys.ExtraYTDLPMetaArgs) {
+		fns = append(fns, func(s *models.Settings) error {
+			s.ExtraYTDLPMetaArgs = c.extraYtdlpMetaArgs
+			return nil
+		})
+	}
 	return fns, nil
 }
 

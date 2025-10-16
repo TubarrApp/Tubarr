@@ -120,6 +120,14 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Randomize requests (avoid detection as bot)
 	args = append(args, command.RandomizeRequests...)
 
+	// Additional user arguments
+	if !viper.IsSet(keys.ExtraYTDLPVideoArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs != "" {
+		args = append(args, strings.Fields(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs)...)
+	}
+	if viper.IsSet(keys.ExtraYTDLPVideoArgs) {
+		args = append(args, strings.Fields(viper.GetString(keys.ExtraYTDLPVideoArgs))...)
+	}
+
 	// Add target URL [ MUST GO LAST !! ]
 	if d.Video.DirectVideoURL != "" {
 		args = append(args, d.Video.DirectVideoURL)

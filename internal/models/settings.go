@@ -20,6 +20,10 @@ type Settings struct {
 	UseGlobalCookies       bool   `json:"use_global_cookies" mapstructure:"use-global-cookies"`
 	YtdlpOutputExt         string `json:"ytdlp_output_ext" mapstructure:"ytdlp-output-ext"`
 
+	// Custom args
+	ExtraYTDLPVideoArgs string `json:"extra_ytdlp_video_args" mapstructure:"extra-ytdlp-video-args"`
+	ExtraYTDLPMetaArgs  string `json:"extra_ytdlp_meta_args" mapstructure:"extra-ytdlp-meta-args"`
+
 	// Metadata operations.
 	Filters    []DLFilters `json:"filters" mapstructure:"filters"`
 	FilterFile string      `json:"filter_file" mapstructure:"filter-file"`

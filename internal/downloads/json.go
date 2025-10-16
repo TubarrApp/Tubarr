@@ -84,6 +84,14 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	// Randomize requests (avoid detection as bot)
 	args = append(args, command.RandomizeRequests...)
 
+	// Additional user arguments
+	if !viper.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {
+		args = append(args, strings.Fields(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs)...)
+	}
+	if viper.IsSet(keys.ExtraYTDLPMetaArgs) {
+		args = append(args, strings.Fields(viper.GetString(keys.ExtraYTDLPMetaArgs))...)
+	}
+
 	// Add target URL [ MUST GO LAST !! ]
 	args = append(args, d.Video.URL)
 

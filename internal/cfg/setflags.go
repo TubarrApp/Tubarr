@@ -212,3 +212,13 @@ func setProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 		cmd.Flags().BoolVar(pause, keys.Pause, false, "Pause/unpause this channel")
 	}
 }
+
+// setCustomYDLPArgFlags sets flags for custom additional YTDLP download arguments.
+func setCustomYDLPArgFlags(cmd *cobra.Command, extraVideoArgs, extraMetaArgs *string) {
+	if extraVideoArgs != nil {
+		cmd.Flags().StringVar(extraVideoArgs, keys.ExtraYTDLPVideoArgs, "", "Additional commands to pass to yt-dlp when downloading videos")
+	}
+	if extraMetaArgs != nil {
+		cmd.Flags().StringVar(extraMetaArgs, keys.ExtraYTDLPMetaArgs, "", "Additional commands to pass to yt-dlp when downloading metadata")
+	}
+}

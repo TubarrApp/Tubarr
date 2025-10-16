@@ -107,3 +107,9 @@ const (
 	MExt                   string = "metarr-ext"
 	MExtraFFmpegArgs       string = "extra-ffmpeg-args"
 )
+
+// Custom additional commands
+const (
+	ExtraYTDLPVideoArgs = "extra-ytdlp-video-args" // applied only to video downloads
+	ExtraYTDLPMetaArgs  = "extra-ytdlp-meta-args"  // applies only to metadata downloads
+)
