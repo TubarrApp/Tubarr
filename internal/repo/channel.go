@@ -175,11 +175,6 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	// Cascade settings to URL models
-	if err := cs.CascadeChannelSettingsToURLs(c); err != nil {
-		logging.E("Failed to cascade settings to URLs: %v", err)
-	}
-
 	// Reload URL models
 	c.URLModels, err = cs.GetChannelURLModels(c)
 	if err != nil {

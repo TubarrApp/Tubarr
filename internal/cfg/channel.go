@@ -1278,11 +1278,6 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				}
 			}
 
-			// Cascade update down to URLs
-			if err := cs.CascadeChannelSettingsToURLs(c); err != nil {
-				return err
-			}
-
 			// Success
 			logging.S("Completed update for channel with %s %q", key, val)
 			return nil

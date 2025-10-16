@@ -459,54 +459,6 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 	return urlMap, nil
 }
 
-// CascadeChannelSettingsToURLs propagates channel settings to URLs, merging fields that are empty in the URL.
-func (cs *ChannelStore) CascadeChannelSettingsToURLs(c *models.Channel) error {
-	if c == nil {
-		return fmt.Errorf("channel is nil")
-	}
-
-	urlModels, err := cs.GetChannelURLModels(c)
-	if err != nil {
-		return fmt.Errorf("failed to get channel URL models: %w", err)
-	}
-
-	if len(urlModels) == 0 {
-		logging.D(2, "No URLs found for channel %q, nothing to cascade", c.Name)
-		return nil
-	}
-
-	for _, cu := range urlModels {
-		logging.D(2, "Checking URL for cascade: %s", cu.URL)
-
-		// Initialize if nil
-		if cu.ChanURLSettings == nil {
-			cu.ChanURLSettings = &models.Settings{}
-		}
-		if cu.ChanURLMetarrArgs == nil {
-			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-		}
-
-		// Merge settings - only update empty fields
-		settingsChanged := mergeSettings(cu.ChanURLSettings, c.ChanSettings)
-		metarrChanged := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
-
-		if settingsChanged || metarrChanged {
-			// Update the URL's settings in the database using existing function
-			err := cs.UpdateChannelURLSettings(cu)
-			if err != nil {
-				logging.E("Failed to cascade settings to URL %s: %v", cu.URL, err)
-				continue
-			}
-
-			logging.I("Cascaded settings to URL: %s", cu.URL)
-		} else {
-			logging.D(2, "No changes needed for URL: %s", cu.URL)
-		}
-	}
-
-	return nil
-}
-
 // mergeSettings merges channel settings into URL settings, only updating empty fields.
 // Returns true if any changes were made.
 func mergeSettings(urlSettings, channelSettings *models.Settings) bool {

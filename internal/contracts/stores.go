@@ -26,7 +26,6 @@ type ChannelStore interface {
 	AddURLToIgnore(channelID int64, ignoreURL string) error
 
 	// Update operations.
-	CascadeChannelSettingsToURLs(c *models.Channel) error
 	UpdateChannelFromConfig(c *models.Channel) (err error)
 	UpdateChannelValue(key, val, col string, newVal any) error
 	UpdateChannelURLSettings(cu *models.ChannelURL) error
