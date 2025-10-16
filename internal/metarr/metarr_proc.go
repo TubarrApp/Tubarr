@@ -41,6 +41,7 @@ func runMetarr(cmd *exec.Cmd) error {
 
 	if err = cmd.Run(); err != nil {
 		logging.E("Encountered error running command %q: %v", cmd.String(), err)
+		return err
 	}
-	return err // Returns nil by default unless an error is grabbed
+	return nil
 }
