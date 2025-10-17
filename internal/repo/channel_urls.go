@@ -557,7 +557,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 // Returns true if any changes were made.
 func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool) {
 	if urlMetarr == nil {
-		logging.E("Dev Error: mergeSettings called with nil urlMetarr - this should never happen")
+		logging.E("Dev Error: mergeMetarrArgs called with nil urlMetarr - this should never happen")
 		return false
 	}
 	if channelMetarr == nil {
