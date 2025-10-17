@@ -1377,7 +1377,7 @@ func displaySettings(cs contracts.ChannelStore, c *models.Channel) {
 	s := c.ChanSettings
 	m := c.ChanMetarrArgs
 
-	fmt.Printf("\n\n%s[ Channel: %q ]%s\n", consts.ColorGreen, c.Name, consts.ColorReset)
+	fmt.Printf("\n%s[ Channel: %q ]%s\n", consts.ColorGreen, c.Name, consts.ColorReset)
 
 	cURLs := c.GetURLs()
 	cURLs = slices.DeleteFunc(cURLs, func(url string) bool {
