@@ -646,7 +646,7 @@ func mergeSliceSettings[T any](urlSlice, chanSlice []T) ([]T, bool) {
 	return urlSlice, false
 }
 
-// mergeNumSettings checks and cascades ints to the URL model if empty.
+// mergeNumSettings checks and cascades numbers to the URL model if empty.
 func mergeNumSettings[T constraints.Integer | constraints.Float](urlNum, chanNum T) (T, bool) {
 	if urlNum == 0 && chanNum != 0 {
 		return chanNum, true
