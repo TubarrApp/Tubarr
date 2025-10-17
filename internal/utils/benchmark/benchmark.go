@@ -103,7 +103,7 @@ func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
 		if err := b.traceFile.Close(); err != nil {
 			logging.E("Failed to close file %q: %v", b.traceFile.Name(), err)
 		}
-		b.traceFile = nil
+		b.traceFile = nil // Prevent double-close
 	}
 
 	if b.memFile != nil {
@@ -115,7 +115,7 @@ func CloseBenchFiles(b *BenchFiles, noErrExit string, setupErr error) {
 		if err := b.memFile.Close(); err != nil {
 			logging.E("Failed to close file %q: %v", b.memFile.Name(), err)
 		}
-		b.memFile = nil
+		b.memFile = nil // Prevent double-close
 	}
 
 	if setupErr != nil {

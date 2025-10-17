@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/utils/logging"
 
 	"github.com/Masterminds/squirrel"
+	"golang.org/x/exp/constraints"
 )
 
 // AddChannelURL adds a new channel URL to the database.
@@ -195,7 +196,9 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 					cu.ChanURLSettings = &models.Settings{}
 				}
 			} else {
-				mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+				if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
+					logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+				}
 			}
 
 			if cu.ChanURLMetarrArgs == nil {
@@ -205,7 +208,9 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 					cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 				}
 			} else {
-				mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
+				if changed := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); changed {
+					logging.D(1, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
+				}
 			}
 		}
 	}
@@ -302,7 +307,9 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chan
 	} else {
 		// Field-level inheritance: merge empty fields from channel
 		if c != nil && c.ChanSettings != nil {
-			mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+			if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
+				logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+			}
 		}
 	}
 
@@ -425,33 +432,34 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 			}
 		}
 
-		// Apply fallback logic if needed
-		if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
-			// Load channel if not cached or different channel
-			if c == nil || c.ID != channelID {
-				c, _, err = cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
-				if err != nil {
-					return nil, err
-				}
+		// Load channel if not cached or different channel
+		if c == nil || c.ID != channelID {
+			c, _, err = cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
+			if err != nil {
+				return nil, err
 			}
+		}
 
-			// Apply settings fallback
-			if cu.ChanURLSettings == nil {
-				if c != nil && c.ChanSettings != nil {
-					cu.ChanURLSettings = c.ChanSettings
-				} else {
-					cu.ChanURLSettings = &models.Settings{}
-				}
+		// Handle Settings (struct-level or field-level)
+		if cu.ChanURLSettings == nil {
+			if c != nil && c.ChanSettings != nil {
+				cu.ChanURLSettings = c.ChanSettings
+			} else {
+				cu.ChanURLSettings = &models.Settings{}
 			}
+		} else if c != nil && c.ChanSettings != nil {
+			mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+		}
 
-			// Apply metarr args fallback
-			if cu.ChanURLMetarrArgs == nil {
-				if c != nil && c.ChanMetarrArgs != nil {
-					cu.ChanURLMetarrArgs = c.ChanMetarrArgs
-				} else {
-					cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-				}
+		// Handle MetarrArgs (struct-level or field-level)
+		if cu.ChanURLMetarrArgs == nil {
+			if c != nil && c.ChanMetarrArgs != nil {
+				cu.ChanURLMetarrArgs = c.ChanMetarrArgs
+			} else {
+				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 			}
+		} else if c != nil && c.ChanMetarrArgs != nil {
+			mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
 		}
 
 		urlMap[channelID] = append(urlMap[channelID], cu)
@@ -462,211 +470,203 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 // mergeSettings merges channel settings into URL settings, only updating empty fields.
 //
 // Returns true if any changes were made.
-func mergeSettings(urlSettings, channelSettings *models.Settings) bool {
+func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool) {
+	if urlSettings == nil {
+		logging.E("Dev Error: mergeSettings called with nil urlSettings - this should never happen")
+		return false
+	}
 	if channelSettings == nil {
 		return false
 	}
 
-	changed := false
-
+	var c bool
 	// Configuration fields
-	if urlSettings.ChannelConfigFile == "" && channelSettings.ChannelConfigFile != "" {
-		urlSettings.ChannelConfigFile = channelSettings.ChannelConfigFile
-		changed = true
-	}
-	if urlSettings.Concurrency == 0 && channelSettings.Concurrency != 0 {
-		urlSettings.Concurrency = channelSettings.Concurrency
-		changed = true
-	}
+	urlSettings.ChannelConfigFile, c = mergeStringSettings(urlSettings.ChannelConfigFile, channelSettings.ChannelConfigFile)
+	changed = changed || c
+
+	urlSettings.Concurrency, c = mergeNumSettings(urlSettings.Concurrency, channelSettings.Concurrency)
+	changed = changed || c
 
 	// Download-related operations
-	if urlSettings.CookieSource == "" && channelSettings.CookieSource != "" {
-		urlSettings.CookieSource = channelSettings.CookieSource
-		changed = true
-	}
-	if urlSettings.CrawlFreq == 0 && channelSettings.CrawlFreq != 0 {
-		urlSettings.CrawlFreq = channelSettings.CrawlFreq
-		changed = true
-	}
-	if urlSettings.ExternalDownloader == "" && channelSettings.ExternalDownloader != "" {
-		urlSettings.ExternalDownloader = channelSettings.ExternalDownloader
-		changed = true
-	}
-	if urlSettings.ExternalDownloaderArgs == "" && channelSettings.ExternalDownloaderArgs != "" {
-		urlSettings.ExternalDownloaderArgs = channelSettings.ExternalDownloaderArgs
-		changed = true
-	}
-	if urlSettings.MaxFilesize == "" && channelSettings.MaxFilesize != "" {
-		urlSettings.MaxFilesize = channelSettings.MaxFilesize
-		changed = true
-	}
-	if urlSettings.Retries == 0 && channelSettings.Retries != 0 {
-		urlSettings.Retries = channelSettings.Retries
-		changed = true
-	}
-	if !urlSettings.UseGlobalCookies && channelSettings.UseGlobalCookies {
-		urlSettings.UseGlobalCookies = channelSettings.UseGlobalCookies
-		changed = true
-	}
-	if urlSettings.YtdlpOutputExt == "" && channelSettings.YtdlpOutputExt != "" {
-		urlSettings.YtdlpOutputExt = channelSettings.YtdlpOutputExt
-		changed = true
-	}
+	urlSettings.CookieSource, c = mergeStringSettings(urlSettings.CookieSource, channelSettings.CookieSource)
+	changed = changed || c
+
+	urlSettings.CrawlFreq, c = mergeNumSettings(urlSettings.CrawlFreq, channelSettings.CrawlFreq)
+	changed = changed || c
+
+	urlSettings.ExternalDownloader, c = mergeStringSettings(urlSettings.ExternalDownloader, channelSettings.ExternalDownloader)
+	changed = changed || c
+
+	urlSettings.ExternalDownloaderArgs, c = mergeStringSettings(urlSettings.ExternalDownloaderArgs, channelSettings.ExternalDownloaderArgs)
+	changed = changed || c
+
+	urlSettings.MaxFilesize, c = mergeStringSettings(urlSettings.MaxFilesize, channelSettings.MaxFilesize)
+	changed = changed || c
+
+	urlSettings.Retries, c = mergeNumSettings(urlSettings.Retries, channelSettings.Retries)
+	changed = changed || c
+
+	urlSettings.UseGlobalCookies, c = mergeBoolSettings(urlSettings.UseGlobalCookies, channelSettings.UseGlobalCookies)
+	changed = changed || c
+
+	urlSettings.YtdlpOutputExt, c = mergeStringSettings(urlSettings.YtdlpOutputExt, channelSettings.YtdlpOutputExt)
+	changed = changed || c
 
 	// Custom args
-	if urlSettings.ExtraYTDLPVideoArgs == "" && channelSettings.ExtraYTDLPVideoArgs != "" {
-		urlSettings.ExtraYTDLPVideoArgs = channelSettings.ExtraYTDLPVideoArgs
-		changed = true
-	}
-	if urlSettings.ExtraYTDLPMetaArgs == "" && channelSettings.ExtraYTDLPMetaArgs != "" {
-		urlSettings.ExtraYTDLPMetaArgs = channelSettings.ExtraYTDLPMetaArgs
-		changed = true
-	}
+	urlSettings.ExtraYTDLPVideoArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPVideoArgs, channelSettings.ExtraYTDLPVideoArgs)
+	changed = changed || c
+	urlSettings.ExtraYTDLPMetaArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPMetaArgs, channelSettings.ExtraYTDLPMetaArgs)
+	changed = changed || c
 
 	// Metadata operations
-	if len(urlSettings.Filters) == 0 && len(channelSettings.Filters) > 0 {
-		urlSettings.Filters = make([]models.DLFilters, len(channelSettings.Filters))
-		copy(urlSettings.Filters, channelSettings.Filters)
-		changed = true
-	}
-	if urlSettings.FilterFile == "" && channelSettings.FilterFile != "" {
-		urlSettings.FilterFile = channelSettings.FilterFile
-		changed = true
-	}
-	if len(urlSettings.MoveOps) == 0 && len(channelSettings.MoveOps) > 0 {
-		urlSettings.MoveOps = make([]models.MoveOps, len(channelSettings.MoveOps))
-		copy(urlSettings.MoveOps, channelSettings.MoveOps)
-		changed = true
-	}
-	if urlSettings.MoveOpFile == "" && channelSettings.MoveOpFile != "" {
-		urlSettings.MoveOpFile = channelSettings.MoveOpFile
-		changed = true
-	}
-	if urlSettings.FromDate == "" && channelSettings.FromDate != "" {
-		urlSettings.FromDate = channelSettings.FromDate
-		changed = true
-	}
-	if urlSettings.ToDate == "" && channelSettings.ToDate != "" {
-		urlSettings.ToDate = channelSettings.ToDate
-		changed = true
-	}
+	urlSettings.Filters, c = mergeSliceSettings(urlSettings.Filters, channelSettings.Filters)
+	changed = changed || c
+
+	urlSettings.FilterFile, c = mergeStringSettings(urlSettings.FilterFile, channelSettings.FilterFile)
+	changed = changed || c
+
+	urlSettings.MoveOps, c = mergeSliceSettings(urlSettings.MoveOps, channelSettings.MoveOps)
+	changed = changed || c
+
+	urlSettings.MoveOpFile, c = mergeStringSettings(urlSettings.MoveOpFile, channelSettings.MoveOpFile)
+	changed = changed || c
+
+	urlSettings.FromDate, c = mergeStringSettings(urlSettings.FromDate, channelSettings.FromDate)
+	changed = changed || c
+
+	urlSettings.ToDate, c = mergeStringSettings(urlSettings.ToDate, channelSettings.ToDate)
+	changed = changed || c
 
 	// JSON and video directories
-	if urlSettings.JSONDir == "" && channelSettings.JSONDir != "" {
-		urlSettings.JSONDir = channelSettings.JSONDir
-		changed = true
-	}
-	if urlSettings.VideoDir == "" && channelSettings.VideoDir != "" {
-		urlSettings.VideoDir = channelSettings.VideoDir
-		changed = true
-	}
+	urlSettings.JSONDir, c = mergeStringSettings(urlSettings.JSONDir, channelSettings.JSONDir)
+	changed = changed || c
+
+	urlSettings.VideoDir, c = mergeStringSettings(urlSettings.VideoDir, channelSettings.VideoDir)
+	changed = changed || c
 
 	// Channel toggles
-	if !urlSettings.Paused && channelSettings.Paused {
-		urlSettings.Paused = channelSettings.Paused
-		changed = true
-	}
+	urlSettings.Paused, c = mergeBoolSettings(urlSettings.Paused, channelSettings.Paused)
+	changed = changed || c
 
 	// Note: BotBlocked fields are runtime state, not cascaded
-
 	return changed
 }
 
 // mergeMetarrArgs merges channel metarr args into URL metarr args, only updating empty fields.
 //
 // Returns true if any changes were made.
-func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) bool {
+func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool) {
+	if urlMetarr == nil {
+		logging.E("Dev Error: mergeSettings called with nil urlMetarr - this should never happen")
+		return false
+	}
 	if channelMetarr == nil {
 		return false
 	}
 
-	changed := false
-
+	var c bool
 	// Metarr file operations
-	if urlMetarr.Ext == "" && channelMetarr.Ext != "" {
-		urlMetarr.Ext = channelMetarr.Ext
-		changed = true
-	}
-	if len(urlMetarr.FilenameReplaceSfx) == 0 && len(channelMetarr.FilenameReplaceSfx) > 0 {
-		urlMetarr.FilenameReplaceSfx = make([]string, len(channelMetarr.FilenameReplaceSfx))
-		copy(urlMetarr.FilenameReplaceSfx, channelMetarr.FilenameReplaceSfx)
-		changed = true
-	}
-	if urlMetarr.RenameStyle == "" && channelMetarr.RenameStyle != "" {
-		urlMetarr.RenameStyle = channelMetarr.RenameStyle
-		changed = true
-	}
-	if urlMetarr.FilenameDateTag == "" && channelMetarr.FilenameDateTag != "" {
-		urlMetarr.FilenameDateTag = channelMetarr.FilenameDateTag
-		changed = true
-	}
+	urlMetarr.Ext, c = mergeStringSettings(urlMetarr.Ext, channelMetarr.Ext)
+	changed = changed || c
+
+	urlMetarr.FilenameReplaceSfx, c = mergeSliceSettings(urlMetarr.FilenameReplaceSfx, channelMetarr.FilenameReplaceSfx)
+	changed = changed || c
+
+	urlMetarr.RenameStyle, c = mergeStringSettings(urlMetarr.RenameStyle, channelMetarr.RenameStyle)
+	changed = changed || c
+
+	urlMetarr.FilenameDateTag, c = mergeStringSettings(urlMetarr.FilenameDateTag, channelMetarr.FilenameDateTag)
+	changed = changed || c
 
 	// Metarr metadata operations
-	if len(urlMetarr.MetaOps) == 0 && len(channelMetarr.MetaOps) > 0 {
-		urlMetarr.MetaOps = make([]string, len(channelMetarr.MetaOps))
-		copy(urlMetarr.MetaOps, channelMetarr.MetaOps)
-		changed = true
-	}
+	urlMetarr.MetaOps, c = mergeSliceSettings(urlMetarr.MetaOps, channelMetarr.MetaOps)
+	changed = changed || c
 
 	// Metarr output directories
-	if urlMetarr.OutputDir == "" && channelMetarr.OutputDir != "" {
-		urlMetarr.OutputDir = channelMetarr.OutputDir
-		changed = true
-	}
-	if len(urlMetarr.OutputDirMap) == 0 && len(channelMetarr.OutputDirMap) > 0 {
-		urlMetarr.OutputDirMap = make(map[string]string)
-		maps.Copy(urlMetarr.OutputDirMap, channelMetarr.OutputDirMap)
-		changed = true
-	}
-	if len(urlMetarr.URLOutputDirs) == 0 && len(channelMetarr.URLOutputDirs) > 0 {
-		urlMetarr.URLOutputDirs = make([]string, len(channelMetarr.URLOutputDirs))
-		copy(urlMetarr.URLOutputDirs, channelMetarr.URLOutputDirs)
-		changed = true
-	}
+	urlMetarr.OutputDirMap, c = mergeMapSettings(urlMetarr.OutputDirMap, channelMetarr.OutputDirMap)
+	changed = changed || c
+
+	urlMetarr.OutputDir, c = mergeStringSettings(urlMetarr.OutputDir, channelMetarr.OutputDir)
+	changed = changed || c
+
+	urlMetarr.URLOutputDirs, c = mergeSliceSettings(urlMetarr.URLOutputDirs, channelMetarr.URLOutputDirs)
+	changed = changed || c
 
 	// Program operations
-	if urlMetarr.Concurrency == 0 && channelMetarr.Concurrency != 0 {
-		urlMetarr.Concurrency = channelMetarr.Concurrency
-		changed = true
-	}
-	if urlMetarr.MaxCPU == 0 && channelMetarr.MaxCPU != 0 {
-		urlMetarr.MaxCPU = channelMetarr.MaxCPU
-		changed = true
-	}
-	if urlMetarr.MinFreeMem == "" && channelMetarr.MinFreeMem != "" {
-		urlMetarr.MinFreeMem = channelMetarr.MinFreeMem
-		changed = true
-	}
+	urlMetarr.Concurrency, c = mergeNumSettings(urlMetarr.Concurrency, channelMetarr.Concurrency)
+	changed = changed || c
 
-	// FFmpeg transcoding operations
-	if urlMetarr.UseGPU == "" && channelMetarr.UseGPU != "" {
-		urlMetarr.UseGPU = channelMetarr.UseGPU
-		changed = true
-	}
-	if urlMetarr.GPUDir == "" && channelMetarr.GPUDir != "" {
-		urlMetarr.GPUDir = channelMetarr.GPUDir
-		changed = true
-	}
-	if urlMetarr.TranscodeVideoFilter == "" && channelMetarr.TranscodeVideoFilter != "" {
-		urlMetarr.TranscodeVideoFilter = channelMetarr.TranscodeVideoFilter
-		changed = true
-	}
-	if urlMetarr.TranscodeCodec == "" && channelMetarr.TranscodeCodec != "" {
-		urlMetarr.TranscodeCodec = channelMetarr.TranscodeCodec
-		changed = true
-	}
-	if urlMetarr.TranscodeAudioCodec == "" && channelMetarr.TranscodeAudioCodec != "" {
-		urlMetarr.TranscodeAudioCodec = channelMetarr.TranscodeAudioCodec
-		changed = true
-	}
-	if urlMetarr.TranscodeQuality == "" && channelMetarr.TranscodeQuality != "" {
-		urlMetarr.TranscodeQuality = channelMetarr.TranscodeQuality
-		changed = true
-	}
-	if urlMetarr.ExtraFFmpegArgs == "" && channelMetarr.ExtraFFmpegArgs != "" {
-		urlMetarr.ExtraFFmpegArgs = channelMetarr.ExtraFFmpegArgs
-		changed = true
-	}
+	urlMetarr.MaxCPU, c = mergeNumSettings(urlMetarr.MaxCPU, channelMetarr.MaxCPU)
+	changed = changed || c
+
+	urlMetarr.MinFreeMem, c = mergeStringSettings(urlMetarr.MinFreeMem, channelMetarr.MinFreeMem)
+	changed = changed || c
+
+	// Transcoding
+	urlMetarr.UseGPU, c = mergeStringSettings(urlMetarr.UseGPU, channelMetarr.UseGPU)
+	changed = changed || c
+
+	urlMetarr.GPUDir, c = mergeStringSettings(urlMetarr.GPUDir, channelMetarr.GPUDir)
+	changed = changed || c
+
+	urlMetarr.TranscodeVideoFilter, c = mergeStringSettings(urlMetarr.TranscodeVideoFilter, channelMetarr.TranscodeVideoFilter)
+	changed = changed || c
+
+	urlMetarr.TranscodeCodec, c = mergeStringSettings(urlMetarr.TranscodeCodec, channelMetarr.TranscodeCodec)
+	changed = changed || c
+
+	urlMetarr.TranscodeAudioCodec, c = mergeStringSettings(urlMetarr.TranscodeAudioCodec, channelMetarr.TranscodeAudioCodec)
+	changed = changed || c
+
+	urlMetarr.TranscodeQuality, c = mergeStringSettings(urlMetarr.TranscodeQuality, channelMetarr.TranscodeQuality)
+	changed = changed || c
+
+	urlMetarr.ExtraFFmpegArgs, c = mergeStringSettings(urlMetarr.ExtraFFmpegArgs, channelMetarr.ExtraFFmpegArgs)
+	changed = changed || c
 
 	return changed
+}
+
+// mergeStringSettings checks and cascades strings to the URL model if empty.
+func mergeStringSettings(urlStr, chanStr string) (newURLStr string, changed bool) {
+	if urlStr == "" && chanStr != "" {
+		return chanStr, true
+	}
+	return urlStr, false
+}
+
+// mergeSliceSettings checks and cascades slices to the URL model if empty.
+func mergeSliceSettings[T any](urlSlice, chanSlice []T) ([]T, bool) {
+	if len(urlSlice) == 0 && len(chanSlice) > 0 {
+		newSlice := make([]T, len(chanSlice))
+		copy(newSlice, chanSlice)
+		return newSlice, true
+	}
+	return urlSlice, false
+}
+
+// mergeNumSettings checks and cascades ints to the URL model if empty.
+func mergeNumSettings[T constraints.Integer | constraints.Float](urlNum, chanNum T) (T, bool) {
+	if urlNum == 0 && chanNum != 0 {
+		return chanNum, true
+	}
+	return urlNum, false
+}
+
+// mergeBoolSettings checks and cascades bools to the URL model if false.
+func mergeBoolSettings(urlBool, chanBool bool) (bool, bool) {
+	if !urlBool && chanBool {
+		return chanBool, true
+	}
+	return urlBool, false
+}
+
+// mergeMapSettings checks and cascades maps to the URL model if empty.
+func mergeMapSettings[K comparable, V any](urlMap, chanMap map[K]V) (map[K]V, bool) {
+	if len(urlMap) == 0 && len(chanMap) > 0 {
+		newMap := make(map[K]V)
+		maps.Copy(newMap, chanMap)
+		return newMap, true
+	}
+	return urlMap, false
 }
