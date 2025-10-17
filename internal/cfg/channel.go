@@ -916,8 +916,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	// Program related
 	setProgramRelatedFlags(addCmd, &concurrency, &crawlFreq,
 		&externalDownloaderArgs, &externalDownloader,
-		&moveOpFile, &moveOps, &pause,
-		false)
+		&moveOpFile, &moveOps, &pause)
 
 	// Download
 	setDownloadFlags(addCmd, &retries, &useGlobalCookies,
@@ -1293,7 +1292,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	// Program related
 	setProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq,
 		&externalDownloaderArgs, &externalDownloader, &moveOpsFile,
-		&moveOps, &pause, true)
+		&moveOps, &pause)
 
 	// Download
 	setDownloadFlags(updateSettingsCmd, &retries, &useGlobalCookies,
@@ -1397,7 +1396,7 @@ func displaySettings(cs contracts.ChannelStore, c *models.Channel) {
 	fmt.Printf("Video Directory: %s\n", s.VideoDir)
 	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
 	fmt.Printf("Config File: %s\n", s.ChannelConfigFile)
-	fmt.Printf("Crawl Frequency: %d minutes\n", s.CrawlFreq)
+	fmt.Printf("Crawl Frequency: %d minutes\n", c.GetCrawlFreq())
 	fmt.Printf("Concurrency: %d\n", s.Concurrency)
 	fmt.Printf("Cookie Source: %s\n", s.CookieSource)
 	fmt.Printf("Retries: %d\n", s.Retries)
@@ -1780,7 +1779,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	// Crawl frequency
 	if f.Changed(keys.CrawlFreq) {
 		fns = append(fns, func(s *models.Settings) error {
-			s.CrawlFreq = max(c.crawlFreq, 0)
+			s.CrawlFreq = max(c.crawlFreq, -1)
 			return nil
 		})
 	}

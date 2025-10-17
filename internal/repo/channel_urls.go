@@ -484,14 +484,14 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.ChannelConfigFile, c = mergeStringSettings(urlSettings.ChannelConfigFile, channelSettings.ChannelConfigFile)
 	changed = changed || c // True if "changed" OR "c" is true (once changed is true, it remains true throughout function)
 
-	urlSettings.Concurrency, c = mergeNumSettings(urlSettings.Concurrency, channelSettings.Concurrency)
+	urlSettings.Concurrency, c = mergeNumSettings(urlSettings.Concurrency, channelSettings.Concurrency, 0)
 	changed = changed || c
 
 	// Download-related operations
 	urlSettings.CookieSource, c = mergeStringSettings(urlSettings.CookieSource, channelSettings.CookieSource)
 	changed = changed || c
 
-	urlSettings.CrawlFreq, c = mergeNumSettings(urlSettings.CrawlFreq, channelSettings.CrawlFreq)
+	urlSettings.CrawlFreq, c = mergeNumSettings(urlSettings.CrawlFreq, channelSettings.CrawlFreq, -1)
 	changed = changed || c
 
 	urlSettings.ExternalDownloader, c = mergeStringSettings(urlSettings.ExternalDownloader, channelSettings.ExternalDownloader)
@@ -503,7 +503,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.MaxFilesize, c = mergeStringSettings(urlSettings.MaxFilesize, channelSettings.MaxFilesize)
 	changed = changed || c
 
-	urlSettings.Retries, c = mergeNumSettings(urlSettings.Retries, channelSettings.Retries)
+	urlSettings.Retries, c = mergeNumSettings(urlSettings.Retries, channelSettings.Retries, 0)
 	changed = changed || c
 
 	urlSettings.UseGlobalCookies, c = mergeBoolSettings(urlSettings.UseGlobalCookies, channelSettings.UseGlobalCookies)
@@ -594,10 +594,10 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 	changed = changed || c
 
 	// Program operations
-	urlMetarr.Concurrency, c = mergeNumSettings(urlMetarr.Concurrency, channelMetarr.Concurrency)
+	urlMetarr.Concurrency, c = mergeNumSettings(urlMetarr.Concurrency, channelMetarr.Concurrency, 0)
 	changed = changed || c
 
-	urlMetarr.MaxCPU, c = mergeNumSettings(urlMetarr.MaxCPU, channelMetarr.MaxCPU)
+	urlMetarr.MaxCPU, c = mergeNumSettings(urlMetarr.MaxCPU, channelMetarr.MaxCPU, 0)
 	changed = changed || c
 
 	urlMetarr.MinFreeMem, c = mergeStringSettings(urlMetarr.MinFreeMem, channelMetarr.MinFreeMem)
@@ -647,8 +647,8 @@ func mergeSliceSettings[T any](urlSlice, chanSlice []T) ([]T, bool) {
 }
 
 // mergeNumSettings checks and cascades numbers to the URL model if empty.
-func mergeNumSettings[T constraints.Integer | constraints.Float](urlNum, chanNum T) (T, bool) {
-	if urlNum == 0 && chanNum != 0 {
+func mergeNumSettings[T constraints.Integer | constraints.Float](urlNum, chanNum, defaultNum T) (T, bool) {
+	if urlNum == defaultNum && chanNum != defaultNum {
 		return chanNum, true
 	}
 	return urlNum, false

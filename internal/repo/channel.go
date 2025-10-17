@@ -460,7 +460,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 	cURLs := c.GetURLs()
 	logging.S("Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
-		id, c.Name, cURLs, c.ChanSettings.CrawlFreq, c.ChanSettings.Filters, c.ChanSettings, c.ChanMetarrArgs)
+		id, c.Name, cURLs, c.GetCrawlFreq(), c.ChanSettings.Filters, c.ChanSettings, c.ChanMetarrArgs)
 
 	return id, nil
 }

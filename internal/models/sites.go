@@ -31,6 +31,14 @@ type Channel struct {
 	UpdatedAt         time.Time `db:"updated_at"`
 }
 
+// Getting effective crawl frequency
+func (c *Channel) GetCrawlFreq() int {
+	if c.ChanSettings.CrawlFreq < 0 {
+		return 30 // default
+	}
+	return c.ChanSettings.CrawlFreq
+}
+
 // IsBlocked checks if a channel is currently blocked.
 //
 // Safely returns BotBlocked state.
@@ -46,7 +54,7 @@ func (c *Channel) ShouldCrawl() bool {
 		return false
 	}
 	timeSince := time.Since(c.LastScan)
-	return timeSince >= time.Duration(c.ChanSettings.CrawlFreq)*time.Minute
+	return timeSince >= time.Duration(c.GetCrawlFreq())*time.Minute
 }
 
 // GetURLs returns all URL models for a channel.

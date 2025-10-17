@@ -194,7 +194,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	// Program related
 	setProgramRelatedFlags(updateURLSettingsCmd, &concurrency, &crawlFreq,
 		&externalDownloaderArgs, &externalDownloader, &moveOpsFile,
-		&moveOps, &pause, true)
+		&moveOps, &pause)
 
 	// Download
 	setDownloadFlags(updateURLSettingsCmd, &retries, &useGlobalCookies,
