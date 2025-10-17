@@ -17,9 +17,7 @@ import (
 // CookieManager holds cookies for a domain.
 type CookieManager struct {
 	mu      sync.RWMutex
-	stores  []kooky.CookieStore
 	cookies map[string][]*http.Cookie
-	init    sync.Once
 }
 
 // NewCookieManager initializes a new cookie manager instance.
@@ -35,11 +33,6 @@ func (cm *CookieManager) GetCookies(ctx context.Context, u string) ([]*http.Cook
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
-
-	// Initialize once
-	cm.init.Do(func() {
-		cm.stores = kooky.FindAllCookieStores(ctx)
-	})
 
 	// Check if we already have cookies for this domain
 	cm.mu.RLock()
@@ -62,31 +55,19 @@ func (cm *CookieManager) GetCookies(ctx context.Context, u string) ([]*http.Cook
 
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
 func (cm *CookieManager) loadCookiesForDomain(ctx context.Context, domain string) []*http.Cookie {
-	var cookies []*http.Cookie
-	attempted := make([]string, 0, len(cm.stores))
-
-	for _, store := range cm.stores {
-		browserName := store.Browser()
-		attempted = append(attempted, browserName)
-
-		kookieCookies, err := kooky.ReadCookies(ctx, kooky.Valid, kooky.Domain(domain))
-		if err != nil {
-			logging.D(2, "Failed reading cookies from %s: %v", browserName, err)
-			continue
-		}
-
-		if len(kookieCookies) > 0 {
-			logging.I("Found %d cookies in %s for %s", len(kookieCookies), browserName, domain)
-			cookies = append(cookies, convertToHTTPCookies(kookieCookies)...)
-		}
+	kookieCookies, err := kooky.ReadCookies(ctx, kooky.Valid, kooky.Domain(domain))
+	if err != nil {
+		logging.D(2, "Failed reading cookies: %v", err)
+		return nil
 	}
 
-	logging.I("Checked browsers: %v", attempted)
-	if len(cookies) == 0 {
-		logging.I("No cookies found for %s", domain)
+	if len(kookieCookies) > 0 {
+		logging.I("Found %d cookies for %s", len(kookieCookies), domain)
+		return convertToHTTPCookies(kookieCookies)
 	}
 
-	return cookies
+	logging.I("No cookies found for %s", domain)
+	return nil
 }
 
 // convertToHTTPCookies converts kooky cookies to http.Cookie format.
