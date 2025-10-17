@@ -980,7 +980,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error
 
 	// Crawl frequency
 	if v, ok := getConfigValue[int](keys.CrawlFreq); ok {
-		c.ChanSettings.CrawlFreq = v
+		c.ChanSettings.CrawlFreq = max(v, -1)
 	}
 
 	// Download retries

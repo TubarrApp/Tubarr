@@ -59,23 +59,22 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 		}
 
 		// Time for a scan?
-		crawlFreq := 30
-		if c.GetCrawlFreq() != 0 {
-			crawlFreq = c.ChanSettings.CrawlFreq
-		}
+		crawlFreq := c.GetCrawlFreq()
 		timeSinceLastScan := time.Since(c.LastScan)
-		crawlFreqDuration := time.Duration(crawlFreq) * time.Minute
 
 		logging.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
 			c.Name,
 			timeSinceLastScan.Round(time.Second),
 			crawlFreq)
 
-		if timeSinceLastScan < crawlFreqDuration {
-			remainingTime := crawlFreqDuration - timeSinceLastScan
-			logging.P("Next check in: %s", remainingTime.Round(time.Second))
-			fmt.Println()
-			continue
+		if crawlFreq > 0 {
+			crawlFreqDuration := time.Duration(crawlFreq) * time.Minute
+			if timeSinceLastScan < crawlFreqDuration {
+				remainingTime := crawlFreqDuration - timeSinceLastScan
+				logging.P("Next check in: %s", remainingTime.Round(time.Second))
+				fmt.Println()
+				continue
+			}
 		}
 
 		// Run concurrent jobs
