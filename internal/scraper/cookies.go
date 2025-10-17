@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -29,7 +30,7 @@ func NewCookieManager() *CookieManager {
 }
 
 // GetCookies retrieves cookies for a given URL.
-func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
+func (cm *CookieManager) GetCookies(ctx context.Context, u string) ([]*http.Cookie, error) {
 	baseURL, err := baseDomain(u)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
@@ -37,7 +38,7 @@ func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 
 	// Initialize once
 	cm.init.Do(func() {
-		cm.stores = kooky.FindAllCookieStores()
+		cm.stores = kooky.FindAllCookieStores(ctx)
 	})
 
 	// Check if we already have cookies for this domain
@@ -49,7 +50,7 @@ func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 	cm.mu.RUnlock()
 
 	// Load cookies for domain
-	cookies := cm.loadCookiesForDomain(baseURL)
+	cookies := cm.loadCookiesForDomain(ctx, baseURL)
 
 	// Store cookies
 	cm.mu.Lock()
@@ -60,7 +61,7 @@ func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 }
 
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
-func (cm *CookieManager) loadCookiesForDomain(domain string) []*http.Cookie {
+func (cm *CookieManager) loadCookiesForDomain(ctx context.Context, domain string) []*http.Cookie {
 	var cookies []*http.Cookie
 	attempted := make([]string, 0, len(cm.stores))
 
@@ -68,7 +69,7 @@ func (cm *CookieManager) loadCookiesForDomain(domain string) []*http.Cookie {
 		browserName := store.Browser()
 		attempted = append(attempted, browserName)
 
-		kookieCookies, err := store.ReadCookies(kooky.Valid, kooky.Domain(domain))
+		kookieCookies, err := kooky.ReadCookies(ctx, kooky.Valid, kooky.Domain(domain))
 		if err != nil {
 			logging.D(2, "Failed reading cookies from %s: %v", browserName, err)
 			continue
