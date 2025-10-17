@@ -515,6 +515,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	// Custom args
 	urlSettings.ExtraYTDLPVideoArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPVideoArgs, channelSettings.ExtraYTDLPVideoArgs)
 	changed = changed || c
+
 	urlSettings.ExtraYTDLPMetaArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPMetaArgs, channelSettings.ExtraYTDLPMetaArgs)
 	changed = changed || c
 
