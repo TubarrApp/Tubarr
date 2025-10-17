@@ -81,10 +81,9 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 
 // notify pings notification services as required.
 func notify(c *models.Channel, notifyURLs []string) []error {
-
 	// Inner function
 	notifyFunc := func(client *http.Client, notifyURL string) error {
-		resp, err := client.Post(notifyURL, applicationJSON, nil)
+		resp, err := client.Post(notifyURL, "application/json", nil)
 		if err != nil {
 			return fmt.Errorf("failed to send notification to URL %q for channel %q (ID: %d): %w",
 				notifyURL, c.Name, c.ID, err)

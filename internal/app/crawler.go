@@ -23,10 +23,6 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-const (
-	applicationJSON = "application/json"
-)
-
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(ctx context.Context, s contracts.Store) error {
 
