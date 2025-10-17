@@ -85,10 +85,9 @@ func (cm *CookieManager) loadCookiesForDomain(ctx context.Context, domain string
 
 		// Filter out temporary session tokens that bloat cookie files
 		// These are usually prefixed with ST-, CST-, or similar patterns
-		name := c.Name
-		if strings.HasPrefix(strings.ToLower(name), "st-") ||
-			strings.HasPrefix(strings.ToLower(name), "cst-") ||
-			strings.HasPrefix(strings.ToLower(name), "temp-") {
+		if strings.HasPrefix(strings.ToLower(c.Name), "st-") ||
+			strings.HasPrefix(strings.ToLower(c.Name), "cst-") ||
+			strings.HasPrefix(strings.ToLower(c.Name), "temp-") {
 			return false
 		}
 		return true
