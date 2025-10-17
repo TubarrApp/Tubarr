@@ -3,7 +3,6 @@ package scraper
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
@@ -14,14 +13,12 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/domain/setup"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -212,13 +209,20 @@ func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelSto
 	// Combine cookies
 	cookies = mergeCookies(authCookies, regCookies)
 
-	// Save cookies to file
-	err = saveCookiesToFile(cookies, cu.LoginURL, cu.CookiePath)
-	if err != nil {
-		return nil, "", err
+	for i := range cookies {
+		logging.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
 	}
 
-	return cookies, cu.CookiePath, nil
+	// Save cookies to file
+	if len(cookies) > 0 {
+		err = saveCookiesToFile(cookies, cu.LoginURL, cu.CookiePath)
+		if err != nil {
+			return nil, "", err
+		}
+		return cookies, cu.CookiePath, nil
+	}
+
+	return cookies, "", nil
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
@@ -447,21 +451,6 @@ func sanitizeFilename(name string) string {
 		}
 		return r
 	}, name)
-}
-
-// generateCookieFilePath generates a unique authentication file path per channel and URL.
-func generateCookieFilePath(channelName, videoURL string) string {
-	// If no specific URL is provided, return the default per-channel auth file.
-	if videoURL == "" {
-		return filepath.Join(setup.HomeTubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
-	}
-
-	// Generate a short hash for the URL to ensure uniqueness
-	urlHash := sha256.Sum256([]byte(videoURL))
-	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use the first 8 hex characters
-
-	// Construct file path (e.g., ~/.tubarr/CensoredTV_Show_a1b2c3d4.txt)
-	return filepath.Join(setup.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
 }
 
 // extractTitle grabs the title from the webpage.

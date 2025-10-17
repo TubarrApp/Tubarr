@@ -2,22 +2,28 @@ package scraper
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+	"tubarr/internal/domain/setup"
 	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
-	// Use all browsers for Kooky:
 	_ "github.com/browserutils/kooky/browser/all"
 )
 
 // CookieManager holds cookies for a domain.
 type CookieManager struct {
 	mu      sync.RWMutex
+	stores  []kooky.CookieStore
 	cookies map[string][]*http.Cookie
+	init    sync.Once
 }
 
 // NewCookieManager initializes a new cookie manager instance.
@@ -33,6 +39,11 @@ func (cm *CookieManager) GetCookies(ctx context.Context, u string) ([]*http.Cook
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
+
+	// Initialize stores once
+	cm.init.Do(func() {
+		cm.stores = kooky.FindAllCookieStores(ctx)
+	})
 
 	// Check if we already have cookies for this domain
 	cm.mu.RLock()
@@ -55,19 +66,59 @@ func (cm *CookieManager) GetCookies(ctx context.Context, u string) ([]*http.Cook
 
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
 func (cm *CookieManager) loadCookiesForDomain(ctx context.Context, domain string) []*http.Cookie {
-	kookieCookies, err := kooky.ReadCookies(ctx, kooky.Valid, kooky.Domain(domain))
-	if err != nil {
-		logging.D(2, "Failed reading cookies: %v", err)
-		return nil
+	var cookies []*http.Cookie
+	attempted := make([]string, 0, len(cm.stores))
+
+	// Silence kooky's verbose internal logging
+	oldLog := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(oldLog)
+
+	logging.D(1, "Searching for cookies for domain: %q", domain)
+
+	// Domain filter
+	domainFilter := kooky.FilterFunc(func(c *kooky.Cookie) bool {
+		matchesDomain := c.Domain == domain || c.Domain == "."+domain
+		if !matchesDomain {
+			return false
+		}
+
+		// Filter out temporary session tokens that bloat cookie files
+		// These are usually prefixed with ST-, CST-, or similar patterns
+		name := c.Name
+		if strings.HasPrefix(strings.ToLower(name), "st-") ||
+			strings.HasPrefix(strings.ToLower(name), "cst-") ||
+			strings.HasPrefix(strings.ToLower(name), "temp-") {
+			return false
+		}
+		return true
+	})
+
+	// Iterate over stores
+	for _, store := range cm.stores {
+		browserName := store.Browser()
+		attempted = append(attempted, browserName)
+
+		kookieCookies := store.TraverseCookies(
+			kooky.Valid,
+			domainFilter,
+		).Collect(ctx)
+
+		if len(kookieCookies) > 0 {
+			logging.I("Found %d cookies in %s for %s", len(kookieCookies), browserName, domain)
+			cookies = append(cookies, convertToHTTPCookies(kookieCookies)...)
+		}
 	}
 
-	if len(kookieCookies) > 0 {
-		logging.I("Found %d cookies for %s", len(kookieCookies), domain)
-		return convertToHTTPCookies(kookieCookies)
+	logging.D(1, "Checked browsers: %v", attempted)
+
+	if len(cookies) == 0 {
+		logging.I("No cookies found for %s", domain)
+	} else {
+		logging.I("Total: %d cookies for %s", len(cookies), domain)
 	}
 
-	logging.I("No cookies found for %s", domain)
-	return nil
+	return cookies
 }
 
 // convertToHTTPCookies converts kooky cookies to http.Cookie format.
@@ -87,13 +138,6 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 
 // saveCookiesToFile saves the cookies to a file in Netscape format.
 func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) error {
-	// Return early if no cookies exist
-	if len(cookies) == 0 {
-		cookieFilePath = ""
-		logging.I("%d cookies to write to file %q, won't use '--cookies' in commands", len(cookies), cookieFilePath)
-		return nil
-	}
-
 	file, err := os.Create(cookieFilePath)
 	if err != nil {
 		return err
@@ -123,22 +167,25 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 			domain = "." + domain
 		}
 
+		// Domain-specified flag: TRUE if domain starts with dot
+		domainSpecified := "FALSE"
+		if strings.HasPrefix(domain, ".") {
+			domainSpecified = "TRUE"
+		}
+
 		secure := "FALSE"
 		if cookie.Secure {
 			secure = "TRUE"
 		}
 
-		// Handle expiration time correctly
-		expires := int64(0)
+		// Handle expiration time
+		var expires int64
 		if !cookie.Expires.IsZero() {
 			expires = cookie.Expires.Unix()
-		} else {
-			// Log if the expiration time is zero
-			logging.W("Cookie %s has no expiration time set", cookie.Name)
 		}
 
 		_, err := fmt.Fprintf(file, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
-			domain, "FALSE", cookie.Path, secure, expires, cookie.Name, cookie.Value)
+			domain, domainSpecified, cookie.Path, secure, expires, cookie.Name, cookie.Value)
 		if err != nil {
 			return err
 		}
@@ -162,10 +209,25 @@ func mergeCookies(primary, secondary []*http.Cookie) []*http.Cookie {
 		cookieMap[key] = c
 	}
 
-	// Merge duduplicated (from map) cookies together
+	// Merge deduplicated (from map) cookies together
 	merged := make([]*http.Cookie, 0, len(cookieMap))
 	for _, c := range cookieMap {
 		merged = append(merged, c)
 	}
 	return merged
+}
+
+// generateCookieFilePath generates a unique authentication file path per channel and URL.
+func generateCookieFilePath(channelName, videoURL string) string {
+	// If no specific URL is provided, return the default per-channel auth file.
+	if videoURL == "" {
+		return filepath.Join(setup.HomeTubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
+	}
+
+	// Generate a short hash for the URL to ensure uniqueness
+	urlHash := sha256.Sum256([]byte(videoURL))
+	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use the first 8 hex characters
+
+	// Construct file path (e.g., ~/.tubarr/CensoredTV_Show_a1b2c3d4.txt)
+	return filepath.Join(setup.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
 }

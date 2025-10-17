@@ -922,8 +922,6 @@ func (cs *ChannelStore) GetAlreadyDownloadedURLs(c *models.Channel) (urls []stri
 		}).
 		RunWith(cs.DB)
 
-	logging.D(2, "Executing query to find downloaded videos: %v for channel %q", query, c.Name)
-
 	rows, err := query.Query()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
