@@ -20,25 +20,17 @@ import (
 var globalAuthCache sync.Map
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
-func (s *Scraper) channelAuth(ctx context.Context, channelHostname string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
+func channelAuth(ctx context.Context, channelURL string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 	// First check exact hostname
-	if val, ok := globalAuthCache.Load(channelHostname); ok {
-		if cookies, ok := val.([]*http.Cookie); ok {
-			return cookies, nil
-		}
-		// Invalid type in cache, delete and re-auth
-		globalAuthCache.Delete(channelHostname)
+	if cookies, found := tryLoadCachedCookies(channelURL); found {
+		return cookies, nil
 	}
 
-	// Then check base domain as fallback
-	baseDomain, err := baseDomain(channelHostname)
-	if err == nil && baseDomain != channelHostname { // If err IS nil
-		if val, ok := globalAuthCache.Load(channelHostname); ok {
-			if cookies, ok := val.([]*http.Cookie); ok {
-				return cookies, nil
-			}
-			// Invalid type in cache, delete and re-auth
-			globalAuthCache.Delete(channelHostname)
+	// Check base domain as fallback
+	baseDomain, err := getBaseDomain(channelURL)
+	if err == nil {
+		if cookies, found := tryLoadCachedCookies(baseDomain); found {
+			return cookies, nil
 		}
 	}
 
@@ -47,7 +39,7 @@ func (s *Scraper) channelAuth(ctx context.Context, channelHostname string, a *mo
 	if err != nil {
 		return nil, err
 	}
-	globalAuthCache.Store(channelHostname, cookies)
+	globalAuthCache.Store(channelURL, cookies)
 
 	// Return cookies
 	return cookies, nil

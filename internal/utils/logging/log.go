@@ -22,17 +22,45 @@ var (
 	Loggable = false
 )
 
+// Local logging variables.
 var (
 	fileLogger zerolog.Logger
-	errorArray = make([]error, 0, 8)
 	console    = os.Stdout
-
-	builderPool = sync.Pool{
-		New: func() any {
-			return new(strings.Builder)
-		},
-	}
 )
+
+// LogBuilder wraps strings.Builder for logging with automatic pooling.
+type LogBuilder struct {
+	*strings.Builder
+}
+
+var logBuilderPool = sync.Pool{
+	New: func() any {
+		return &LogBuilder{
+			Builder: &strings.Builder{},
+		}
+	},
+}
+
+// getLogBuilder retrieves a builder from the pool.
+func getLogBuilder() *LogBuilder {
+	lb := logBuilderPool.Get().(*LogBuilder)
+	lb.Reset()
+	return lb
+}
+
+// Release returns the builder to the pool.
+func (lb *LogBuilder) Release() {
+	if lb == nil || lb.Builder == nil {
+		return
+	}
+
+	// Prevent pool bloat from huge messages
+	const maxPooledSize = 4096
+	if lb.Cap() <= maxPooledSize {
+		lb.Reset()
+		logBuilderPool.Put(lb)
+	}
+}
 
 const (
 	timeFormat    = "01/02 15:04:05"
@@ -79,12 +107,8 @@ func SetupLogging(targetDir string) error {
 	fileLogger = zerolog.New(logfile).With().Timestamp().Logger()
 	Loggable = true
 
-	b := builderPool.Get().(*strings.Builder) //nolint:errcheck
-	b.Reset()
-	defer func() {
-		b.Reset()
-		builderPool.Put(b)
-	}()
+	b := getLogBuilder()
+	defer b.Release()
 
 	b.WriteString("=========== ")
 	b.WriteString(time.Now().Format(time.RFC1123Z))
@@ -127,25 +151,21 @@ func getCaller(skip int) callerInfo {
 
 // buildLogMessage constructs a log message with optional caller info
 func buildLogMessage(prefix, msg string, caller *callerInfo) string {
-	b := builderPool.Get().(*strings.Builder) //nolint:errcheck
-	b.Reset()
-	defer func() {
-		b.Reset()
-		builderPool.Put(b)
-	}()
+	b := getLogBuilder()
+	defer b.Release()
 
 	if caller != nil {
-		// Message with caller info
-		b.Grow(len(prefix) +
-			len(msg) +
-			1 +
-			len(tagFunc) +
-			len(caller.funcName) +
-			len(tagFile) +
-			len(caller.file) +
-			len(tagLine) +
-			len(caller.lineStr) +
-			len(tagEnd))
+		// Message with caller info - estimate size conservatively
+		estimatedSize := len(prefix) + len(msg) +
+			len(tagFunc) + len(caller.funcName) +
+			len(tagFile) + len(caller.file) +
+			len(tagLine) + len(caller.lineStr) +
+			len(tagEnd) + 10 // small buffer
+
+		// Only grow if current capacity is insufficient
+		if b.Cap() < estimatedSize {
+			b.Grow(estimatedSize - b.Len())
+		}
 
 		b.WriteString(prefix)
 		b.WriteString(msg)
@@ -163,12 +183,16 @@ func buildLogMessage(prefix, msg string, caller *callerInfo) string {
 		b.WriteString(tagEnd)
 	} else {
 		// Simple message without caller info
-		b.Grow(len(prefix) + len(msg) + 1)
+		estimatedSize := len(prefix) + len(msg) + 1
+
+		if b.Cap() < estimatedSize {
+			b.Grow(estimatedSize - b.Len())
+		}
+
 		b.WriteString(prefix)
 		b.WriteString(msg)
 		b.WriteByte('\n')
 	}
-
 	return b.String()
 }
 
@@ -255,14 +279,4 @@ func I(msg string, args ...any) {
 // P logs plain messages
 func P(msg string, args ...any) {
 	log(logPrint, "", msg, false, args...)
-}
-
-// AddToErrorArray adds an error to the error array under lock.
-func AddToErrorArray(err error) {
-	errorArray = append(errorArray, err)
-}
-
-// GetErrorArray returns the error array.
-func GetErrorArray() []error {
-	return errorArray
 }

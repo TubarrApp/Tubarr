@@ -47,6 +47,9 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
+	// Ensure cleanup on exit
+	defer d.cleanup()
+
 	var lastErr error
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
 		logging.I("Starting JSON download attempt %d/%d for URL: %s",
@@ -89,12 +92,14 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 			}
 		}
 	}
-
 	return false, fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
 // jsonDLAttempt performs a single download attempt.
 func (d *JSONDownload) jsonDLAttempt() error {
-	cmd := d.buildJSONCommand()
-	return d.executeJSONDownload(cmd)
+	d.mu.Lock()
+	d.cmd = d.buildJSONCommand()
+	d.mu.Unlock()
+
+	return d.executeJSONDownload(d.cmd)
 }

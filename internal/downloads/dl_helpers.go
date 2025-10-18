@@ -59,14 +59,16 @@ func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) erro
 
 // cancelVideoDownload cancels the download, typically due to user input.
 func (d *VideoDownload) cancelVideoDownload() error {
+	d.cleanup()
 	d.Video.DownloadStatus.Status = consts.DLStatusFailed
 	d.Video.DownloadStatus.Error = d.Context.Err()
 	d.DLTracker.sendUpdate(d.Video)
 	return fmt.Errorf("user canceled video download for %s: %w", d.Video.URL, d.Context.Err())
 }
 
-// cancelJSONDownload cancels the download, typically due to user input.
+// cancelJSONDownload cancels the download and cleans up resources.
 func (d *JSONDownload) cancelJSONDownload() error {
+	d.cleanup()
 	return fmt.Errorf("user canceled JSON download for %s: %w", d.Video.URL, d.Context.Err())
 }
 

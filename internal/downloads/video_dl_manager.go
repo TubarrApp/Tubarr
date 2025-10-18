@@ -46,6 +46,9 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
+	// Ensure cleanup on exit
+	defer d.cleanup()
+
 	var lastErr error
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
 		// Check if URL should be avoided (set by previous videos)
@@ -102,9 +105,11 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	return false, fmt.Errorf("all %d download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
-// executeAttempt performs a single download attempt.
+// videoDLAttempt performs a single download attempt.
 func (d *VideoDownload) videoDLAttempt() error {
-	cmd := d.buildVideoCommand()
+	d.mu.Lock()
+	d.cmd = d.buildVideoCommand()
+	d.mu.Unlock()
 
 	// Set video "Pending" status
 	d.Video.DownloadStatus.Status = consts.DLStatusPending
@@ -112,5 +117,5 @@ func (d *VideoDownload) videoDLAttempt() error {
 	d.DLTracker.sendUpdate(d.Video)
 
 	// Execute the video download
-	return d.executeVideoDownload(cmd)
+	return d.executeVideoDownload(d.cmd)
 }

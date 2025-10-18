@@ -1,4 +1,4 @@
-// Package scraper handles operations relating to web scraping, cookie gathering, etc.
+// Package scraper handles web scraping operations.
 package scraper
 
 import (
@@ -30,61 +30,27 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-// Scraper contains cookies and a collector, used for scraping websites.
+// Scraper handles web scraping operations.
 type Scraper struct {
-	cookies   *CookieManager
-	collector *colly.Collector
-}
-
-type urlPattern struct {
-	name    string
-	pattern string
-}
-
-type ytDlpOutput struct {
-	Entries []struct {
-		URL string `json:"url"`
-	} `json:"entries"`
-}
-
-const (
-	bitchute        = "bitchute.com"
-	bitchutePattern = "/video/"
-	censored        = "censored.tv"
-	censoredPattern = "/episodes/"
-	odysee          = "odysee.com"
-	odyseePattern   = "@"
-	rumble          = "rumble.com"
-	rumblePattern   = "/v"
-	defaultDom      = "default"
-	defaultPattern  = "/watch"
-)
-
-var patterns = map[string]urlPattern{
-	bitchute:   {name: bitchute, pattern: bitchutePattern},
-	censored:   {name: censored, pattern: censoredPattern},
-	odysee:     {name: odysee, pattern: odyseePattern},
-	rumble:     {name: rumble, pattern: rumblePattern},
-	defaultDom: {name: defaultDom, pattern: defaultPattern},
+	collector     *colly.Collector
+	cookieManager *CookieManager
 }
 
 // New returns a new Scraper instance.
 func New() *Scraper {
 	return &Scraper{
-		cookies:   NewCookieManager(),
-		collector: colly.NewCollector(),
+		collector:     colly.NewCollector(),
+		cookieManager: NewCookieManager(),
 	}
 }
 
 // GetExistingReleases returns releases already in the database.
 func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
-	// Load already downloaded URLs
 	existingURLs, err = cs.GetAlreadyDownloadedURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
 
-	// Convert existing URLs into a map for quick lookup
 	existingMap := make(map[string]struct{}, len(existingURLs))
 	for _, url := range existingURLs {
 		existingMap[url] = struct{}{}
@@ -114,8 +80,8 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 		logging.D(1, "Processing channel URL %q", cu.URL)
 
-		// Get access details once per ChannelURL
-		cu.Cookies, cu.CookiePath, err = s.GetChannelCookies(ctx, cs, c, cu)
+		// Get access details once per ChannelURL - delegated to CookieManager
+		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelCookies(ctx, cs, c, cu)
 		if err != nil {
 			return nil, err
 		}
@@ -157,72 +123,9 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 	return newRequests, nil
 }
 
-// GetChannelCookies returns channel access details for a given video.
+// GetChannelCookies is now just a wrapper that delegates to CookieManager
 func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
-	// Fetch auth details if this is a manual entry or not from DB
-	if cu.IsManual || cu.ID == 0 {
-		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
-		if err != nil {
-			logging.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
-		}
-	}
-
-	// Should login?
-	doLogin := cu.NeedsAuth()
-
-	// Early return if no cookies needed
-	if !doLogin && !c.ChanSettings.UseGlobalCookies {
-		return nil, "", nil
-	}
-
-	// Create cookie file path
-	cu.CookiePath = generateCookieFilePath(c.Name, cu.URL)
-
-	// Collect cookies...
-	var authCookies, regCookies []*http.Cookie
-
-	// Cookies from direct login
-	if doLogin {
-		parsed, err := url.Parse(cu.URL)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to parse URL %q: %w", cu.URL, err)
-		}
-		hostname := parsed.Hostname()
-
-		authCookies, err = s.channelAuth(ctx, hostname, cu.ToChannelAccessDetails())
-		if ctx.Err() != nil {
-			return nil, "", ctx.Err()
-		}
-		if err != nil {
-			logging.E("Failed to get auth cookies for %q: %v", cu.URL, err)
-		}
-	}
-
-	// Cookies from Kooky's 'FindAllCookieStores()' function
-	if c.ChanSettings.UseGlobalCookies {
-		regCookies, err = s.cookies.GetCookies(cu.URL)
-		if err != nil {
-			logging.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookieSource, err)
-		}
-	}
-
-	// Combine cookies
-	cookies = mergeCookies(authCookies, regCookies)
-
-	for i := range cookies {
-		logging.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
-	}
-
-	// Save cookies to file
-	if len(cookies) > 0 {
-		err = saveCookiesToFile(cookies, cu.LoginURL, cu.CookiePath)
-		if err != nil {
-			return nil, "", err
-		}
-		return cookies, cu.CookiePath, nil
-	}
-
-	return cookies, "", nil
+	return s.cookieManager.GetChannelCookies(ctx, cs, c, cu)
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
@@ -231,7 +134,7 @@ func (s *Scraper) newEpisodeURLs(
 	channelName, channelURL string,
 	existingURLs, fileURLs []string,
 	cookies []*http.Cookie, cookiePath string) ([]string, error) {
-	// Episode map to avoid dedpulication
+	// Episode map to avoid deduplication
 	uniqueEpisodeURLs := make(map[string]struct{})
 
 	// Set cookies
@@ -362,7 +265,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 // ScrapeCensoredTVMetadata scrapes Censored.TV links for metadata.
 func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.Video) error {
 	// Initialize collector with cookies
-	collector, err := initializeCollector(urlStr)
+	collector, err := initializeCollector(urlStr, s.cookieManager)
 	if err != nil {
 		return err
 	}
@@ -411,7 +314,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 }
 
 // initializeCollector initializes Colly with any cookies.
-func initializeCollector(urlStr string) (c *colly.Collector, err error) {
+func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
@@ -422,10 +325,10 @@ func initializeCollector(urlStr string) (c *colly.Collector, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
-	if val, ok := globalAuthCache.Load(parsedURL.Host); ok {
-		if cookies, ok := val.([]*http.Cookie); ok {
-			jar.SetCookies(parsedURL, cookies)
-		}
+
+	// Get cookies from auth cache via CookieManager
+	if cookies := cm.GetCachedAuthCookies(parsedURL.Host); cookies != nil {
+		jar.SetCookies(parsedURL, cookies)
 	} else {
 		logging.W("no authentication cookies available for %q", parsedURL.Host)
 	}
@@ -516,7 +419,7 @@ func extractDate(findStr string, doc *goquery.Selection) string {
 	return strings.TrimSpace(parsedDate)
 }
 
-// extract
+// extractVideoURL extracts the video URL from the webpage.
 func extractVideoURL(findStr string, doc *goquery.Selection) string {
 	videoURL, ok := doc.Find(findStr).Attr("href")
 	if ok {

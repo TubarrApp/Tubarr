@@ -60,10 +60,7 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 
 // processUpdates processes download status updates.
 func (t *DownloadTracker) processUpdates(ctx context.Context) {
-	var (
-		lastUpdate models.StatusUpdate
-	)
-
+	var lastUpdate models.StatusUpdate
 	for {
 		select {
 		case <-t.done:
