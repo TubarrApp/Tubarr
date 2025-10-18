@@ -52,7 +52,7 @@ func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) erro
 			return fmt.Errorf("unexpected error while checking file: %w", err)
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(consts.Interval100ms)
 	}
 	return fmt.Errorf("file not ready or empty after %v: %s", timeout, filepath)
 }

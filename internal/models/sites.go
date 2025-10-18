@@ -4,6 +4,7 @@ package models
 import (
 	"net/http"
 	"time"
+	"tubarr/internal/domain/consts"
 )
 
 // Site is not yet implemented.
@@ -130,6 +131,21 @@ type Video struct {
 	UpdatedAt       time.Time      `db:"updated_at"`
 	MoveOpOutputDir string         `db:"-"`
 	WasSkipped      bool
+}
+
+// SkipVideo marks the video as completed and skipped.
+func (v *Video) MarkVideoAsSkipped() {
+	v.DownloadStatus.Status = consts.DLStatusCompleted
+	v.DownloadStatus.Pct = 100.0
+	v.Finished = true
+	v.WasSkipped = true
+}
+
+// MarkVideoAsFinished marks the video with the finished status.
+func (v *Video) MarkVideoAsCompleted() {
+	v.DownloadStatus.Status = consts.DLStatusCompleted
+	v.DownloadStatus.Pct = 100.0
+	v.Finished = true
 }
 
 // Notification holds notification data for channels.

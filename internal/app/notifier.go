@@ -14,24 +14,20 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
-var (
-	regClient *http.Client
-	lanClient *http.Client
-)
-
-func init() {
-	regClient = &http.Client{Timeout: 10 * time.Second}
-	lanClient = &http.Client{
+// notifyHTTPClients returns HTTP clients for non-LAN and LAN use.
+func newNotifyHTTPClients(timeout time.Duration) (nolan *http.Client, lan *http.Client) {
+	nolan = &http.Client{Timeout: timeout}
+	lan = &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
+	return nolan, lan
 }
 
 // NotifyServices notifies URLs set for the channel by the user.
 func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew []string) error {
-
 	// Retrieve notifications for this channel
 	notifications, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {
@@ -111,6 +107,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 			continue
 		}
 
+		regClient, lanClient := newNotifyHTTPClients(10 * time.Second)
 		client := regClient
 		if net.IsPrivateNetwork(parsed.Host) {
 			client = lanClient

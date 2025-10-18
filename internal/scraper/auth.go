@@ -23,14 +23,22 @@ var globalAuthCache sync.Map
 func (s *Scraper) channelAuth(ctx context.Context, channelHostname string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
 	// First check exact hostname
 	if val, ok := globalAuthCache.Load(channelHostname); ok {
-		return val.([]*http.Cookie), nil
+		if cookies, ok := val.([]*http.Cookie); ok {
+			return cookies, nil
+		}
+		// Invalid type in cache, delete and re-auth
+		globalAuthCache.Delete(channelHostname)
 	}
 
 	// Then check base domain as fallback
 	baseDomain, err := baseDomain(channelHostname)
 	if err == nil && baseDomain != channelHostname { // If err IS nil
-		if val, ok := globalAuthCache.Load(baseDomain); ok {
-			return val.([]*http.Cookie), nil
+		if val, ok := globalAuthCache.Load(channelHostname); ok {
+			if cookies, ok := val.([]*http.Cookie); ok {
+				return cookies, nil
+			}
+			// Invalid type in cache, delete and re-auth
+			globalAuthCache.Delete(channelHostname)
 		}
 	}
 

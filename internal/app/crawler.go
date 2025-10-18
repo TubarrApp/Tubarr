@@ -25,7 +25,6 @@ import (
 
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(ctx context.Context, s contracts.Store) error {
-
 	// Grab all channels from database
 	cs := s.ChannelStore()
 	channels, hasRows, err := cs.GetAllChannels()
@@ -107,8 +106,12 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 
 // DownloadVideosToChannel downloads custom video URLs sent in to the channel.
 func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, videoURLs []string) (err error) {
+	if c == nil || c.ChanSettings == nil {
+		return fmt.Errorf("invalid nil parameters (channel: %v, channel settings: %v)", c == nil, c.ChanSettings == nil)
+	}
+
 	// Add random sleep before processing (added bot detection)
-	if err := times.WaitTime(ctx, times.RandomSecsDuration(15), c.Name, ""); err != nil {
+	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceDelay), c.Name, ""); err != nil {
 		return err
 	}
 
@@ -262,8 +265,12 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 
 // CrawlChannel crawls a channel for new URLs.
 func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel) (err error) {
+	if c == nil {
+		return fmt.Errorf("channel cannot be nil")
+	}
+
 	// Add random sleep before processing (added bot detection)
-	if err := times.WaitTime(ctx, times.RandomSecsDuration(15), c.Name, ""); err != nil {
+	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceDelay), c.Name, ""); err != nil {
 		return err
 	}
 
@@ -385,6 +392,9 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 
 // CrawlChannelIgnore gets the channel's currently displayed videos and marks them as complete without downloading.
 func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channel) error {
+	if c == nil {
+		return fmt.Errorf("channel cannot be nil")
+	}
 
 	cs := s.ChannelStore()
 
@@ -418,9 +428,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 				logging.D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
 				continue
 			}
-			v.DownloadStatus.Status = consts.DLStatusCompleted
-			v.DownloadStatus.Pct = 100.0
-			v.Finished = true
+			v.MarkVideoAsCompleted()
 		}
 
 		validVideos, err := s.VideoStore().AddVideos(videos, c.ID)
@@ -570,6 +578,10 @@ func parsePipedVideoURL(videoURL string, channelURLMap map[string]*models.Channe
 
 // parseManualVideoURL handles video URLs without a channel URL prefix.
 func parseManualVideoURL(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, scrape *scraper.Scraper, videoURL string) (*models.ChannelURL, string, error) {
+	if c == nil {
+		return nil, "", fmt.Errorf("channel cannot be nil")
+	}
+
 	// Use special manual downloads entry
 	targetChannelURLModel, err := ensureManualDownloadsChannelURL(cs, c)
 	if err != nil {

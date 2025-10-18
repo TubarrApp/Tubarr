@@ -54,6 +54,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 
 		select {
 		case <-d.Context.Done():
+			logging.W("Download cancelled: %v", d.Context.Err())
 			return false, d.cancelJSONDownload()
 		default:
 			if err := d.jsonDLAttempt(); err != nil {
@@ -74,6 +75,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 				if attempt < d.Options.MaxRetries {
 					select {
 					case <-d.Context.Done():
+						logging.W("Download cancelled: %v", d.Context.Err())
 						return false, d.cancelJSONDownload()
 					case <-time.After(d.Options.RetryInterval):
 						continue

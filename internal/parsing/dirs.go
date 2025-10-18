@@ -112,31 +112,31 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string, v *models.Video) (str
 	switch strings.ToLower(tag) {
 
 	case templates.ChannelID:
-		if c.ID != 0 {
+		if c != nil && c.ID != 0 {
 			return strconv.Itoa(int(c.ID)), nil
 		}
 		return "", errors.New("templating: channel ID is 0")
 
 	case templates.ChannelName:
-		if c.Name != "" {
+		if c != nil && c.Name != "" {
 			return c.Name, nil
 		}
 		return "", errors.New("templating: channel name empty")
 
 	case templates.VideoID:
-		if v.ID != 0 {
+		if v != nil && v.ID != 0 {
 			return strconv.Itoa(int(v.ID)), nil
 		}
 		return "", errors.New("templating: video ID is 0")
 
 	case templates.VideoTitle:
-		if v.Title != "" {
+		if v != nil && v.Title != "" {
 			return v.Title, nil
 		}
 		return "", errors.New("templating: video title is empty")
 
 	case templates.VideoURL:
-		if v.URL != "" {
+		if v != nil && v.URL != "" {
 			return v.URL, nil
 		}
 		return "", errors.New("templating: video URL is empty")

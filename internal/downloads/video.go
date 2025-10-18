@@ -177,6 +177,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 			select {
 			case lineChan <- scanner.Text():
 			case <-d.Context.Done():
+				logging.W("Download cancelled: %v", d.Context.Err())
 				return
 			}
 		}
@@ -191,10 +192,14 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	select {
 	case <-d.Context.Done():
+		logging.W("Download cancelled: %v", d.Context.Err())
+
 		// End the command
 		if err := cmd.Cancel(); err != nil {
-			if err = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
-				logging.E("Failed to kill process %v: %v", cmd.Process.Pid, err)
+			if cmd.Process != nil {
+				if err = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+					logging.E("Failed to kill process %v: %v", cmd.Process.Pid, err)
+				}
 			}
 		}
 		return d.Context.Err()

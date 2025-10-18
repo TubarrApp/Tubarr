@@ -148,7 +148,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 				continue
 			}
 			logging.P("%s#%d%s - %q", consts.ColorBlue, i+1, consts.ColorReset, v.URL)
-			if i >= 24 {
+			if i >= consts.MaxDisplayedVideos {
 				break
 			}
 		}
@@ -200,7 +200,7 @@ func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelSto
 
 	// Cookies from Kooky's 'FindAllCookieStores()' function
 	if c.ChanSettings.UseGlobalCookies {
-		regCookies, err = s.cookies.GetCookies(ctx, cu.URL)
+		regCookies, err = s.cookies.GetCookies(cu.URL)
 		if err != nil {
 			logging.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookieSource, err)
 		}

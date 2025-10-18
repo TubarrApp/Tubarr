@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
@@ -93,10 +94,10 @@ func (t *DownloadTracker) flushUpdates(ctx context.Context, updates []models.Sta
 	defer cancel()
 
 	// Retry logic for transient failures
-	backoff := time.Millisecond * 100
+	backoff := consts.Interval100ms
 	maxRetries := 3
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	for attempt := range maxRetries {
 		if err := t.dlStore.UpdateDownloadStatuses(ctx, updates); err != nil {
 			if attempt == maxRetries-1 {
 				logging.E("Failed to update download statuses after %d attempts: %v", maxRetries, err)

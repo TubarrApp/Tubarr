@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/repo"
 	"tubarr/internal/utils/logging"
 )
@@ -12,7 +13,7 @@ import (
 //
 // Mainly useful for preventing DB lockouts.
 func startHeartbeat(ctx context.Context, progControl *repo.ProgControl) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(consts.HeartbeatInterval)
 	defer ticker.Stop()
 	for {
 		select {

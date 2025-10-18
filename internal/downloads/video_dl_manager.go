@@ -59,7 +59,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 
 		select {
 		case <-d.Context.Done():
-			logging.I("Context is done for video with URL %q", d.Video.URL)
+			logging.W("Download cancelled: %v", d.Context.Err())
 			return false, d.cancelVideoDownload()
 		default:
 			if err := d.videoDLAttempt(); err != nil {
@@ -83,6 +83,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 				if attempt < d.Options.MaxRetries {
 					select {
 					case <-d.Context.Done():
+						logging.W("Download cancelled: %v", d.Context.Err())
 						return false, d.cancelVideoDownload()
 					case <-time.After(d.Options.RetryInterval):
 						continue

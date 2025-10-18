@@ -27,10 +27,6 @@ const (
 	FilterOmits    = "omits"
 )
 
-// BotActivitySentinel is a sentinel included by the dev in errors for functions to find when
-// an error has determined that a domain has blocked crawling due to detecting bot activity.
-const BotActivitySentinel = "detected bot activity"
-
 // BotTimeoutMap holds the cooldown times in minutes for popular domains (used if a domain blocks Tubarr).
 var BotTimeoutMap = map[string]float64{
 
@@ -57,8 +53,3 @@ var BotTimeoutMap = map[string]float64{
 	"streamable.com":  180,
 	"imgur.com":       180,
 }
-
-// Program messages
-const (
-	TimeRemainingMsg = ColorCyan + "Time remaining:" + ColorReset
-)

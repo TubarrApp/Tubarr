@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -299,7 +300,7 @@ func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.N
 	}
 	defer func() {
 		if err != nil {
-			if err := tx.Rollback(); err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
 				logging.E("Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", channelID, notifications, err)
 			}
 		}
@@ -379,6 +380,21 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("failed to marshal metarr settings: %w", err)
 	}
 
+	// Begin transaction
+	tx, err := cs.DB.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	// Ensure rollback on error
+	defer func() {
+		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				logging.E("Failed to rollback transaction for channel %q: %v", c.Name, rollbackErr)
+			}
+		}
+	}()
+
 	// Insert into the channels table
 	now := time.Now()
 	query := squirrel.
@@ -399,7 +415,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			now,
 			now,
 		).
-		RunWith(cs.DB)
+		RunWith(tx)
 
 	result, err := query.Exec()
 	if err != nil {
@@ -417,7 +433,12 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	for i, cu := range c.URLModels {
 		logging.D(1, "Inserting URL %d: %q", i+1, cu.URL)
 
-		// Do not insert Settings or MetarrArgs here
+		// Validate URL format
+		if _, urlErr := url.ParseRequestURI(cu.URL); urlErr != nil {
+			err = fmt.Errorf("invalid URL %q: %w", cu.URL, urlErr)
+			return 0, err
+		}
+
 		urlQuery := squirrel.
 			Insert(consts.DBChannelURLs).
 			Columns(
@@ -437,14 +458,14 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 				cu.Username,
 				cu.Password,
 				cu.LoginURL,
-				false, // (Not a manual URL)
+				false, // Not a manual URL
 				now,
 				now,
 				now,
 			).
-			RunWith(cs.DB)
+			RunWith(tx)
 
-		result, err := urlQuery.Exec()
+		result, err = urlQuery.Exec()
 		if err != nil {
 			return 0, fmt.Errorf("failed to insert URL %q for channel ID %d: %w", cu.URL, id, err)
 		}
@@ -456,6 +477,11 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		cu.ID = urlID
 
 		logging.D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	cURLs := c.GetURLs()
