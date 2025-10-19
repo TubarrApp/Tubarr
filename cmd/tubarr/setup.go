@@ -14,8 +14,8 @@ import (
 func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, err error) {
 	// Setup files/dirs
 	if err = setup.InitProgFilesDirs(); err != nil {
-		fmt.Printf("Tubarr exiting: %v\n", err)
-		os.Exit(0)
+		fmt.Printf("Tubarr exiting with error: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Printf("\nMain Tubarr file/dir locations:\n\nDatabase: %s\nLog file: %s\n\n",
@@ -24,10 +24,14 @@ func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, 
 	// Database & stores
 	database, err := database.InitDB()
 	if err != nil {
-		fmt.Printf("Tubarr exiting: %v\n", err)
-		os.Exit(0)
+		fmt.Printf("Tubarr exiting with error: %v\n", err)
+		os.Exit(1)
 	}
-	store = repo.InitStores(database.DB)
+	store, err = repo.InitStores(database.DB)
+	if err != nil {
+		fmt.Printf("Tubarr exiting with error: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Start controller
 	progControl = repo.NewProgController(database.DB)
@@ -36,8 +40,8 @@ func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, 
 			logging.E("DB %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Tubarr exiting: %v\n", err)
-		os.Exit(0)
+		fmt.Printf("Tubarr exiting with error: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Setup logging

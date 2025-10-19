@@ -11,13 +11,11 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/app"
-	"tubarr/internal/auth"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
-	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
@@ -1017,7 +1015,7 @@ func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Display settings and return
-			displaySettings(cs, c)
+			cs.DisplaySettings(c)
 			return nil
 		},
 	}
@@ -1046,7 +1044,7 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Display settings and return
 			for _, ch := range chans {
-				displaySettings(cs, ch)
+				cs.DisplaySettings(ch)
 			}
 			return nil
 		},
@@ -1365,110 +1363,6 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 	updateRowCmd.Flags().StringVarP(&col, "column-name", "c", "", "The name of the column in the table (e.g. video_directory)")
 	updateRowCmd.Flags().StringVarP(&newVal, "value", "v", "", "The value to set in the column (e.g. /my-directory)")
 	return updateRowCmd
-}
-
-// displaySettings displays fields relevant to a channel.
-func displaySettings(cs contracts.ChannelStore, c *models.Channel) {
-	notifyURLs, err := cs.GetNotifyURLs(c.ID)
-	if err != nil {
-		logging.E("Unable to fetch notification URLs for channel %q: %v", c.Name, err)
-	}
-
-	s := c.ChanSettings
-	m := c.ChanMetarrArgs
-
-	fmt.Printf("\n%s[ Channel: %q ]%s\n", consts.ColorGreen, c.Name, consts.ColorReset)
-
-	cURLs := c.GetURLs()
-	cURLs = slices.DeleteFunc(cURLs, func(url string) bool {
-		return url == consts.ManualDownloadsCol
-	})
-
-	// Channel basic info
-	fmt.Printf("\n%sBasic Info:%s\n", consts.ColorCyan, consts.ColorReset)
-	fmt.Printf("ID: %d\n", c.ID)
-	fmt.Printf("Name: %s\n", c.Name)
-	fmt.Printf("URLs: %+v\n", cURLs)
-	fmt.Printf("Paused: %v\n", s.Paused)
-
-	// Channel settings
-	fmt.Printf("\n%sChannel Settings:%s\n", consts.ColorCyan, consts.ColorReset)
-	fmt.Printf("Video Directory: %s\n", s.VideoDir)
-	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
-	fmt.Printf("Config File: %s\n", s.ChannelConfigFile)
-	fmt.Printf("Crawl Frequency: %d minutes\n", c.GetCrawlFreq())
-	fmt.Printf("Concurrency: %d\n", s.Concurrency)
-	fmt.Printf("Cookie Source: %s\n", s.CookieSource)
-	fmt.Printf("Retries: %d\n", s.Retries)
-	fmt.Printf("External Downloader: %s\n", s.ExternalDownloader)
-	fmt.Printf("External Downloader Args: %s\n", s.ExternalDownloaderArgs)
-	fmt.Printf("Filter Ops: %v\n", s.Filters)
-	fmt.Printf("Filter File: %s\n", s.FilterFile)
-	fmt.Printf("From Date: %q\n", parsing.HyphenateYyyyMmDd(s.FromDate))
-	fmt.Printf("To Date: %q\n", parsing.HyphenateYyyyMmDd(s.ToDate))
-	fmt.Printf("Max Filesize: %s\n", s.MaxFilesize)
-	fmt.Printf("Move Ops: %v\n", s.MoveOps)
-	fmt.Printf("Move Ops File: %s\n", s.MoveOpFile)
-	fmt.Printf("Use Global Cookies: %v\n", s.UseGlobalCookies)
-	fmt.Printf("Yt-dlp Output Extension: %s\n", s.YtdlpOutputExt)
-	fmt.Printf("Yt-dlp Extra Video Args: %s\n", s.ExtraYTDLPVideoArgs)
-	fmt.Printf("Yt-dlp Extra Metadata Args: %s\n", s.ExtraYTDLPMetaArgs)
-
-	// Metarr settings
-	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
-	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
-	fmt.Printf("URL-Specific Output Directories: %v\n", m.URLOutputDirs)
-	fmt.Printf("Output Filetype: %s\n", m.Ext)
-	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
-	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
-	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)
-	fmt.Printf("HW Acceleration: %s\n", m.UseGPU)
-	fmt.Printf("HW Acceleration Directory: %s\n", m.GPUDir)
-	fmt.Printf("Video Codec: %s\n", m.TranscodeCodec)
-	fmt.Printf("Audio Codec: %s\n", m.TranscodeAudioCodec)
-	fmt.Printf("Transcode Quality: %s\n", m.TranscodeQuality)
-	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
-	fmt.Printf("Filename Suffix Replace: %v\n", m.FilenameReplaceSfx)
-	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
-	fmt.Printf("Filename Date Format: %s\n", m.FilenameDateTag)
-
-	// Extra arguments
-	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
-
-	// Notification URLs
-	nURLs := make([]string, 0, len(notifyURLs))
-	for _, n := range notifyURLs {
-		newNUrl := n.NotifyURL
-		if n.ChannelURL != "" {
-			newNUrl = n.ChannelURL + "|" + n.NotifyURL
-		}
-		nURLs = append(nURLs, newNUrl)
-	}
-	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
-	fmt.Printf("Notification URLs: %v\n", nURLs)
-
-	fmt.Printf("\n%sAuthentication:%s\n", consts.ColorCyan, consts.ColorReset)
-
-	// Auth details
-	gotAuthModels := false
-	for _, cu := range c.URLModels {
-		if cu.Username != "" || cu.LoginURL != "" || cu.Password != "" {
-			fmt.Printf("Channel URL: %s, Username: %s, Password: %s, Login URL: %s\n",
-				cu.URL,
-				cu.Username,
-				auth.StarPassword(cu.Password),
-				cu.LoginURL)
-
-			if !gotAuthModels {
-				gotAuthModels = true
-			}
-		}
-	}
-	if !gotAuthModels {
-		fmt.Printf("[]\n")
-	}
-
-	fmt.Println()
 }
 
 // ******************************** Private ********************************

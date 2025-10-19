@@ -77,7 +77,8 @@ type ChannelURL struct {
 	URL               string `db:"url"`
 	Videos            []*Video
 	Username          string         `db:"username"`
-	Password          string         `db:"password"`
+	Password          string         `db:"-" json:"-"`
+	EncryptedPassword string         `db:"password"`
 	LoginURL          string         `db:"login_url"`
 	CookiePath        string         `db:"-" json:"-"`
 	Cookies           []*http.Cookie `db:"-" json:"-"`

@@ -103,6 +103,7 @@ type MetarrArgs struct {
 type ChannelAccessDetails struct {
 	Username,
 	Password,
+	EncryptedPassword,
 	LoginURL,
 	ChannelURL,
 	CookiePath string

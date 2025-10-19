@@ -19,13 +19,17 @@ type Store struct {
 }
 
 // InitStores injects databases into the store methods.
-func InitStores(db *sql.DB) *Store {
+func InitStores(db *sql.DB) (*Store, error) {
+	chanStore, err := GetChannelStore(db)
+	if err != nil {
+		return nil, err
+	}
 	return &Store{
 		db:            db,
 		videoStore:    GetVideoStore(db),
-		channelStore:  GetChannelStore(db),
+		channelStore:  chanStore,
 		downloadStore: GetDownloadStore(db),
-	}
+	}, nil
 }
 
 // ChannelStore with pointer receiver.

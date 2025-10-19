@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-var globalAuthCache sync.Map
+var globalAuthCookieCache sync.Map
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
 func channelAuth(ctx context.Context, channelURL string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
@@ -39,7 +39,7 @@ func channelAuth(ctx context.Context, channelURL string, a *models.ChannelAccess
 	if err != nil {
 		return nil, err
 	}
-	globalAuthCache.Store(channelURL, cookies)
+	globalAuthCookieCache.Store(channelURL, cookies)
 
 	// Return cookies
 	return cookies, nil

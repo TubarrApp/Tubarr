@@ -37,6 +37,13 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 		}
 	}
 
+	if cu.EncryptedPassword == "" && cu.Password != "" {
+		cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	now := time.Now()
 	query := squirrel.
 		Insert(consts.DBChannelURLs).
@@ -57,7 +64,7 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 			channelID,
 			cu.URL,
 			cu.Username,
-			cu.Password,
+			cu.EncryptedPassword,
 			cu.LoginURL,
 			isManual,
 			settingsJSON,
@@ -93,9 +100,16 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
+	if cu.EncryptedPassword == "" && cu.Password != "" {
+		cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
+		if err != nil {
+			return err
+		}
+	}
+
 	query := squirrel.Update(consts.DBChannelURLs).
 		Set(consts.QChanURLUsername, cu.Username).
-		Set(consts.QChanURLPassword, cu.Password).
+		Set(consts.QChanURLPassword, cu.EncryptedPassword).
 		Set(consts.QChanURLLoginURL, cu.LoginURL).
 		Set(consts.QChanURLMetarr, metarrJSON).
 		Set(consts.QChanURLSettings, settingsJSON).
@@ -166,8 +180,15 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 
 		// Fill credentials
 		cu.Username = nullString(username)
-		cu.Password = nullString(password)
+		cu.EncryptedPassword = nullString(password)
 		cu.LoginURL = nullString(loginURL)
+
+		if cu.Password == "" && cu.EncryptedPassword != "" {
+			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
+			if err != nil {
+				return nil, err
+			}
+		}
 
 		// Unmarshal settings
 		if len(settingsJSON) > 0 {
@@ -270,8 +291,15 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chan
 
 	// Fill credentials
 	cu.Username = nullString(username)
-	cu.Password = nullString(password)
+	cu.EncryptedPassword = nullString(password)
 	cu.LoginURL = nullString(loginURL)
+
+	if cu.Password == "" && cu.EncryptedPassword != "" {
+		cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
+		if err != nil {
+			return nil, true, err
+		}
+	}
 
 	// Unmarshal settings
 	if len(settingsJSON) > 0 {
@@ -415,8 +443,15 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 
 		// Fill credentials
 		cu.Username = nullString(username)
-		cu.Password = nullString(password)
+		cu.EncryptedPassword = nullString(password)
 		cu.LoginURL = nullString(loginURL)
+
+		if cu.Password == "" && cu.EncryptedPassword != "" {
+			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
+			if err != nil {
+				return nil, err
+			}
+		}
 
 		// Unmarshal settings
 		if len(settingsJSON) > 0 {

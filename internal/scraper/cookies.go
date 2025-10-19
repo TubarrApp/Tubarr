@@ -134,6 +134,18 @@ func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 	return cookies, nil
 }
 
+// GetCachedAuthCookies retrieves cookies from the global auth cache.
+func (cm *CookieManager) GetCachedAuthCookies(hostname string) []*http.Cookie {
+	if val, ok := globalAuthCookieCache.Load(hostname); ok {
+		if cookies, ok := val.([]*http.Cookie); ok {
+			return cookies
+		}
+	}
+	return nil
+}
+
+// ******************************** Private ********************************
+
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
 func (cm *CookieManager) loadCookiesForDomain(domain string) []*http.Cookie {
 	var cookies []*http.Cookie
@@ -194,16 +206,6 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 		}
 	}
 	return httpCookies
-}
-
-// GetCachedAuthCookies retrieves cookies from the global auth cache.
-func (cm *CookieManager) GetCachedAuthCookies(hostname string) []*http.Cookie {
-	if val, ok := globalAuthCache.Load(hostname); ok {
-		if cookies, ok := val.([]*http.Cookie); ok {
-			return cookies
-		}
-	}
-	return nil
 }
 
 // generateCookieFilePath generates a unique authentication file path per channel and URL.
@@ -308,7 +310,7 @@ func mergeCookies(primary, secondary []*http.Cookie) []*http.Cookie {
 
 // tryLoadCachedCookies attempts to load cookies from cache for a given key
 func tryLoadCachedCookies(key string) ([]*http.Cookie, bool) {
-	val, ok := globalAuthCache.Load(key)
+	val, ok := globalAuthCookieCache.Load(key)
 	if !ok {
 		return nil, false
 	}
@@ -316,7 +318,7 @@ func tryLoadCachedCookies(key string) ([]*http.Cookie, bool) {
 	cookies, ok := val.([]*http.Cookie)
 	if !ok {
 		// Invalid type in cache, delete and re-auth
-		globalAuthCache.Delete(key)
+		globalAuthCookieCache.Delete(key)
 		return nil, false
 	}
 

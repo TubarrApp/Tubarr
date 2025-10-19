@@ -50,6 +50,7 @@ type ChannelStore interface {
 
 	// Other channel database functions.
 	CheckOrUnlockChannel(c *models.Channel) (bool, error)
+	DisplaySettings(c *models.Channel)
 }
 
 // DownloadStore allows access to download repo methods.

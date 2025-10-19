@@ -7,13 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
@@ -23,14 +26,21 @@ import (
 
 // ChannelStore holds a pointer to the sql.DB.
 type ChannelStore struct {
-	DB *sql.DB
+	DB          *sql.DB
+	PasswordMgr *auth.PasswordManager
 }
 
 // GetChannelStore returns a channel store instance with injected database.
-func GetChannelStore(db *sql.DB) *ChannelStore {
-	return &ChannelStore{
-		DB: db,
+func GetChannelStore(db *sql.DB) (*ChannelStore, error) {
+	pm, err := auth.NewPasswordManager()
+	if err != nil {
+		return nil, err
 	}
+
+	return &ChannelStore{
+		DB:          db,
+		PasswordMgr: pm,
+	}, nil
 }
 
 // GetDB returns the database.
@@ -83,7 +93,14 @@ func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password
 		return "", "", "", err
 	}
 
-	return u.String, p.String, l.String, nil
+	var decryptedPassword string
+	if p.String != "" {
+		decryptedPassword, err = cs.PasswordMgr.Decrypt(p.String)
+		if err != nil {
+			return "", "", "", err
+		}
+	}
+	return u.String, decryptedPassword, l.String, nil
 }
 
 // DeleteVideoURLs deletes a URL from the downloaded database list.
@@ -319,7 +336,7 @@ func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.N
 }
 
 // AddAuth adds authentication details to a channel.
-func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error {
+func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) (err error) {
 	if !cs.channelExistsID(chanID) {
 		return fmt.Errorf("channel with ID %d does not exist", chanID)
 	}
@@ -334,10 +351,17 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 			return fmt.Errorf("channel with URL %q does not exist", chanURL)
 		}
 
+		if a.EncryptedPassword == "" && a.Password != "" {
+			a.EncryptedPassword, err = cs.PasswordMgr.Encrypt(a.Password)
+			if err != nil {
+				return err
+			}
+		}
+
 		query := squirrel.
 			Update(consts.DBChannelURLs).
 			Set(consts.QChanURLUsername, a.Username).
-			Set(consts.QChanURLPassword, a.Password).
+			Set(consts.QChanURLPassword, a.EncryptedPassword).
 			Set(consts.QChanURLLoginURL, a.LoginURL).
 			Where(squirrel.Eq{consts.QChanURLChannelID: chanID}).
 			RunWith(cs.DB)
@@ -439,6 +463,10 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			return 0, err
 		}
 
+		if cu.EncryptedPassword == "" && cu.Password != "" {
+			cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
+		}
+
 		urlQuery := squirrel.
 			Insert(consts.DBChannelURLs).
 			Columns(
@@ -456,7 +484,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 				id,
 				cu.URL,
 				cu.Username,
-				cu.Password,
+				cu.EncryptedPassword,
 				cu.LoginURL,
 				false, // Not a manual URL
 				now,
@@ -973,6 +1001,118 @@ func (cs *ChannelStore) GetAlreadyDownloadedURLs(c *models.Channel) (urls []stri
 
 	logging.I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
 	return urls, nil
+}
+
+// DisplaySettings displays fields relevant to a channel.
+func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
+	notifyURLs, err := cs.GetNotifyURLs(c.ID)
+	if err != nil {
+		logging.E("Unable to fetch notification URLs for channel %q: %v", c.Name, err)
+	}
+
+	s := c.ChanSettings
+	m := c.ChanMetarrArgs
+
+	fmt.Printf("\n%s[ Channel: %q ]%s\n", consts.ColorGreen, c.Name, consts.ColorReset)
+
+	cURLs := c.GetURLs()
+	cURLs = slices.DeleteFunc(cURLs, func(url string) bool {
+		return url == consts.ManualDownloadsCol
+	})
+
+	// Channel basic info
+	fmt.Printf("\n%sBasic Info:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("ID: %d\n", c.ID)
+	fmt.Printf("Name: %s\n", c.Name)
+	fmt.Printf("URLs: %+v\n", cURLs)
+	fmt.Printf("Paused: %v\n", s.Paused)
+
+	// Channel settings
+	fmt.Printf("\n%sChannel Settings:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("Video Directory: %s\n", s.VideoDir)
+	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
+	fmt.Printf("Config File: %s\n", s.ChannelConfigFile)
+	fmt.Printf("Crawl Frequency: %d minutes\n", c.GetCrawlFreq())
+	fmt.Printf("Concurrency: %d\n", s.Concurrency)
+	fmt.Printf("Cookie Source: %s\n", s.CookieSource)
+	fmt.Printf("Retries: %d\n", s.Retries)
+	fmt.Printf("External Downloader: %s\n", s.ExternalDownloader)
+	fmt.Printf("External Downloader Args: %s\n", s.ExternalDownloaderArgs)
+	fmt.Printf("Filter Ops: %v\n", s.Filters)
+	fmt.Printf("Filter File: %s\n", s.FilterFile)
+	fmt.Printf("From Date: %q\n", parsing.HyphenateYyyyMmDd(s.FromDate))
+	fmt.Printf("To Date: %q\n", parsing.HyphenateYyyyMmDd(s.ToDate))
+	fmt.Printf("Max Filesize: %s\n", s.MaxFilesize)
+	fmt.Printf("Move Ops: %v\n", s.MoveOps)
+	fmt.Printf("Move Ops File: %s\n", s.MoveOpFile)
+	fmt.Printf("Use Global Cookies: %v\n", s.UseGlobalCookies)
+	fmt.Printf("Yt-dlp Output Extension: %s\n", s.YtdlpOutputExt)
+	fmt.Printf("Yt-dlp Extra Video Args: %s\n", s.ExtraYTDLPVideoArgs)
+	fmt.Printf("Yt-dlp Extra Metadata Args: %s\n", s.ExtraYTDLPMetaArgs)
+
+	// Metarr settings
+	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
+	fmt.Printf("URL-Specific Output Directories: %v\n", m.URLOutputDirs)
+	fmt.Printf("Output Filetype: %s\n", m.Ext)
+	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
+	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
+	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)
+	fmt.Printf("HW Acceleration: %s\n", m.UseGPU)
+	fmt.Printf("HW Acceleration Directory: %s\n", m.GPUDir)
+	fmt.Printf("Video Codec: %s\n", m.TranscodeCodec)
+	fmt.Printf("Audio Codec: %s\n", m.TranscodeAudioCodec)
+	fmt.Printf("Transcode Quality: %s\n", m.TranscodeQuality)
+	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
+	fmt.Printf("Filename Suffix Replace: %v\n", m.FilenameReplaceSfx)
+	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
+	fmt.Printf("Filename Date Format: %s\n", m.FilenameDateTag)
+
+	// Extra arguments
+	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
+
+	// Notification URLs
+	nURLs := make([]string, 0, len(notifyURLs))
+	for _, n := range notifyURLs {
+		newNUrl := n.NotifyURL
+		if n.ChannelURL != "" {
+			newNUrl = n.ChannelURL + "|" + n.NotifyURL
+		}
+		nURLs = append(nURLs, newNUrl)
+	}
+	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("Notification URLs: %v\n", nURLs)
+
+	fmt.Printf("\n%sAuthentication:%s\n", consts.ColorCyan, consts.ColorReset)
+
+	// Auth details
+	gotAuthModels := false
+	for _, cu := range c.URLModels {
+
+		if cu.Password == "" && cu.EncryptedPassword != "" {
+			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
+			if err != nil {
+				logging.W("Failed to decrypt password (encrypted: %s) for channel %q", cu.EncryptedPassword, c.Name)
+			}
+		}
+
+		if cu.Username != "" || cu.LoginURL != "" || cu.Password != "" {
+			fmt.Printf("Channel URL: %s, Username: %s, Password: %s, Login URL: %s\n",
+				cu.URL,
+				cu.Username,
+				auth.StarPassword(cu.Password),
+				cu.LoginURL)
+
+			if !gotAuthModels {
+				gotAuthModels = true
+			}
+		}
+	}
+	if !gotAuthModels {
+		fmt.Printf("[]\n")
+	}
+
+	fmt.Println()
 }
 
 // ******************************** Private ********************************
