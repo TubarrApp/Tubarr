@@ -15,6 +15,8 @@ Please use "tubarr --help" to see other possible flags.
 
 Set up a CRON job to run the command as a script for Radarr/Sonarr-esque functionality for Tube sites. Utilizes yt-dlp and browser cookies of your specification to allow downloading even from sites requiring authentication such as censored.tv.
 
-Example crontab:
+Example crontab (check every 2 hours):
 0 */2 * * * tubarr
 
+On Linux systems, CRON is accessed and modified with:
+crontab -e
