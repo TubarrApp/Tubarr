@@ -32,7 +32,7 @@ type Channel struct {
 	UpdatedAt         time.Time `db:"updated_at"`
 }
 
-// Getting effective crawl frequency
+// GetCrawlFreq returns the program's crawl frequency (-1 is unset).
 func (c *Channel) GetCrawlFreq() int {
 	if c.ChanSettings.CrawlFreq < 0 {
 		return 30 // default
@@ -134,7 +134,7 @@ type Video struct {
 	WasSkipped      bool
 }
 
-// SkipVideo marks the video as completed and skipped.
+// MarkVideoAsSkipped marks the video as completed and skipped.
 func (v *Video) MarkVideoAsSkipped() {
 	v.DownloadStatus.Status = consts.DLStatusCompleted
 	v.DownloadStatus.Pct = 100.0
@@ -142,7 +142,7 @@ func (v *Video) MarkVideoAsSkipped() {
 	v.WasSkipped = true
 }
 
-// MarkVideoAsFinished marks the video with the finished status.
+// MarkVideoAsCompleted marks the video with the finished status.
 func (v *Video) MarkVideoAsCompleted() {
 	v.DownloadStatus.Status = consts.DLStatusCompleted
 	v.DownloadStatus.Pct = 100.0

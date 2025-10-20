@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+// BenchmarkFiles contain the main benchmarking *os.Files.
 var BenchmarkFiles *BenchFiles
 
 // BenchFiles contain benchmarking files written on a benchmark-enabled run.

@@ -1,3 +1,4 @@
+// Package setup initializes Tubarr's filepaths, directories, etc.
 package setup
 
 import (

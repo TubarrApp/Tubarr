@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/setup"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -32,7 +33,7 @@ type ChannelStore struct {
 
 // GetChannelStore returns a channel store instance with injected database.
 func GetChannelStore(db *sql.DB) (*ChannelStore, error) {
-	pm, err := auth.NewPasswordManager()
+	pm, err := auth.NewPasswordManager(setup.HomeTubarrDir)
 	if err != nil {
 		return nil, err
 	}

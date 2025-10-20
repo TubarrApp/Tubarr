@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/setup"
 	"tubarr/internal/utils/logging"
 )
 
@@ -27,10 +26,10 @@ type PasswordManager struct {
 }
 
 // NewPasswordManager returns a password manager using the configuration file's AES key file.
-func NewPasswordManager() (pm *PasswordManager, err error) {
-	pm = &PasswordManager{}
+func NewPasswordManager(homeDir string) (*PasswordManager, error) {
+	pm := &PasswordManager{}
 
-	hashedKey, err := pm.ensureAESKey()
+	hashedKey, err := pm.ensureAESKey(homeDir)
 	if err != nil {
 		return nil, err
 	}
@@ -113,30 +112,30 @@ func StarPassword(p string) string {
 }
 
 // ensureAESKey loads the key from the config file, or creates it if it doesn't exist.
-func (pe *PasswordManager) ensureAESKey() (hashed []byte, err error) {
+func (pm *PasswordManager) ensureAESKey(homeDir string) (hashed []byte, err error) {
 	const aesFilename = "/.passwords/aes.txt"
 
 	// Ensure directory exists
-	dir := filepath.Join(setup.HomeTubarrDir, "/.passwords")
+	dir := filepath.Join(homeDir, "/.passwords")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create password directory: %w", err)
 	}
 
-	pe.aesFilepath = filepath.Join(setup.HomeTubarrDir, aesFilename)
+	pm.aesFilepath = filepath.Join(homeDir, aesFilename)
 
 	// Check if key file exists
-	if _, err := os.Stat(pe.aesFilepath); os.IsNotExist(err) { // File doesn't exist, create new key
+	if _, err := os.Stat(pm.aesFilepath); os.IsNotExist(err) { // File doesn't exist, create new key
 		key := make([]byte, 32)
 		if _, err := rand.Read(key); err != nil {
 			return nil, fmt.Errorf("failed to generate encryption key: %w", err)
 		}
 
 		keyStr := base64.StdEncoding.EncodeToString(key)
-		if err := os.WriteFile(pe.aesFilepath, []byte(keyStr), consts.PermsPrivateFile); err != nil {
+		if err := os.WriteFile(pm.aesFilepath, []byte(keyStr), consts.PermsPrivateFile); err != nil {
 			return nil, fmt.Errorf("failed to write encryption key: %w", err)
 		}
 
-		logging.S("Generated new encryption key at: %s", pe.aesFilepath)
+		logging.S("Generated new encryption key at: %s", pm.aesFilepath)
 		return key, nil
 
 	} else if err != nil { // Some other error checking the file
@@ -144,7 +143,7 @@ func (pe *PasswordManager) ensureAESKey() (hashed []byte, err error) {
 	}
 
 	// File exists, read it
-	data, err := os.ReadFile(pe.aesFilepath)
+	data, err := os.ReadFile(pm.aesFilepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read encryption key: %w", err)
 	}
@@ -153,12 +152,12 @@ func (pe *PasswordManager) ensureAESKey() (hashed []byte, err error) {
 	keyStr := strings.TrimSpace(string(data))
 	key, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid encryption key format in %q: %w", pe.aesFilepath, err)
+		return nil, fmt.Errorf("invalid encryption key format in %q: %w", pm.aesFilepath, err)
 	}
 
 	// Validate key length
 	if len(key) != 32 {
-		return nil, fmt.Errorf("encryption key must be 32 bytes, got %d bytes in %q", len(key), pe.aesFilepath)
+		return nil, fmt.Errorf("encryption key must be 32 bytes, got %d bytes in %q", len(key), pm.aesFilepath)
 	}
 
 	return key, nil
