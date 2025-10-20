@@ -4,7 +4,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"tubarr/internal/domain/setup"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/utils/logging"
 
 	// Package sqlite3 provides interface to SQLite3 databases.
@@ -25,9 +25,9 @@ type Database struct {
 // Can initiate or return database, and perform main program operations.
 func InitDB() (d *Database, err error) {
 	d = new(Database)
-	d.DB, err = sql.Open(dbDriver, setup.DBFilePath)
+	d.DB, err = sql.Open(dbDriver, paths.DBFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database at path %q: %w", setup.DBFilePath, err)
+		return nil, fmt.Errorf("failed to open database at path %q: %w", paths.DBFilePath, err)
 	}
 
 	// Enable foreign key enforcement

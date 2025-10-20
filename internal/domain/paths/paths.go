@@ -1,5 +1,5 @@
-// Package setup initializes Tubarr's filepaths, directories, etc.
-package setup
+// Package paths initializes Tubarr's filepaths, directories, etc.
+package paths
 
 import (
 	"errors"

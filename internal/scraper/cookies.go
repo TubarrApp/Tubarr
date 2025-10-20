@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/setup"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
@@ -212,14 +212,14 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 func generateCookieFilePath(channelName, videoURL string) string {
 	// If no specific URL is provided, return the default per-channel auth file.
 	if videoURL == "" {
-		return filepath.Join(setup.HomeTubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
+		return filepath.Join(paths.HomeTubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
 	}
 
 	// Generate a short hash for the URL to ensure uniqueness
 	urlHash := sha256.Sum256([]byte(videoURL))
 	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use first 8 hex characters
 
-	return filepath.Join(setup.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
+	return filepath.Join(paths.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
 }
 
 // saveCookiesToFile saves the cookies to a file in Netscape format.

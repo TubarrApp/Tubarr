@@ -12,7 +12,7 @@ import (
 	"runtime/trace"
 	"time"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/setup"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/utils/logging"
 )
 
@@ -46,7 +46,7 @@ func SetupBenchmarking() (*BenchFiles, error) {
 	b := new(BenchFiles)
 
 	startTime := time.Now().Format("2006-01-02_15-04-05")
-	makeBenchFilepaths(setup.BenchmarkDir, startTime)
+	makeBenchFilepaths(paths.BenchmarkDir, startTime)
 
 	logging.I("(Benchmarking this run. Start time: %s)", startTime)
 

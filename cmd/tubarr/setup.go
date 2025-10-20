@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 	"tubarr/internal/database"
-	"tubarr/internal/domain/setup"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/repo"
 	"tubarr/internal/utils/logging"
 )
@@ -13,13 +13,13 @@ import (
 // initializeApplication sets up the application for the current run.
 func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, err error) {
 	// Setup files/dirs
-	if err = setup.InitProgFilesDirs(); err != nil {
+	if err = paths.InitProgFilesDirs(); err != nil {
 		fmt.Printf("Tubarr exiting with error: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("\nMain Tubarr file/dir locations:\n\nDatabase: %s\nLog file: %s\n\n",
-		setup.DBFilePath, setup.LogFilePath)
+		paths.DBFilePath, paths.LogFilePath)
 
 	// Database & stores
 	database, err := database.InitDB()
@@ -45,7 +45,7 @@ func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, 
 	}
 
 	// Setup logging
-	if err := logging.SetupLogging(setup.HomeTubarrDir); err != nil {
+	if err := logging.SetupLogging(paths.HomeTubarrDir); err != nil {
 		fmt.Printf("could not set up logging, proceeding without: %v", err)
 	}
 
