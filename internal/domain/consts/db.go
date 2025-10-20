@@ -1,5 +1,70 @@
 package consts
 
+// ValidDBKeys maps all valid database column keys to true for quick lookup.
+var ValidDBColumns = map[string]bool{
+	// Shared
+	QSharedID:        true,
+	QSharedChannelID: true,
+	QSharedSettings:  true,
+	QSharedMetarr:    true,
+	QSharedLastScan:  true,
+	QSharedCreatedAt: true,
+	QSharedUpdatedAt: true,
+
+	// Program keys
+	QProgHost:      true,
+	QProgHeartbeat: true,
+	QProgPID:       true,
+	QProgStartedAt: true,
+	QProgRunning:   true,
+
+	// Channel keys
+	QChanName:            true,
+	QChanConcurrency:     true,
+	QChanMetarrOutputDir: true,
+	QChanMetarrExt:       true,
+
+	// Channel URL keys
+	QChanURLURL:      true,
+	QChanURLUsername: true,
+	QChanURLPassword: true,
+	QChanURLLoginURL: true,
+	QChanURLIsManual: true,
+
+	// Video keys
+	QVidChanURLID:   true,
+	QVidFinished:    true,
+	QVidTitle:       true,
+	QVidDescription: true,
+	QVidVideoPath:   true,
+	QVidJSONPath:    true,
+	QVidUploadDate:  true,
+	QVidMetadata:    true,
+	QVidDLStatus:    true,
+
+	// Downloads keys
+	QDLVidID:  true,
+	QDLStatus: true,
+	QDLPct:    true,
+
+	// Notification keys
+	QNotifyURL:     true,
+	QNotifyChanURL: true,
+}
+
+// Shared column names for valid DB column name map.
+const (
+	QSharedID        = "id"
+	QSharedChannelID = "channel_id"
+	QSharedName      = "name"
+	QSharedURL       = "url"
+	QSharedLastScan  = "last_scan"
+	QSharedCreatedAt = "created_at"
+	QSharedUpdatedAt = "updated_at"
+	QSharedSettings  = "settings"
+	QSharedMetarr    = "metarr"
+)
+
 // Database table names.
 const (
 	DBProgram       = "program"

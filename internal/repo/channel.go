@@ -57,8 +57,9 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 			return 0, fmt.Errorf("please enter a value for key %q", key)
 		}
 	default:
-		return 0, errors.New("please input a unique constrained value, such as URL or name")
+		return 0, errors.New("please input a unique constrained value, such as ID or name")
 	}
+
 	var id int64
 	query := squirrel.
 		Select(consts.QChanID).
@@ -67,8 +68,12 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 		RunWith(cs.DB)
 
 	if err := query.QueryRow().Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("channel with %s %q does not exist", key, val)
+		}
 		return 0, err
 	}
+
 	return id, nil
 }
 
@@ -522,8 +527,8 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 // DeleteChannel deletes a channel from the database with a given key/value.
 func (cs *ChannelStore) DeleteChannel(key, val string) error {
-	if key == "" || val == "" {
-		return errors.New("please provide key and value to delete a channel")
+	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
+		return err
 	}
 
 	query := squirrel.
@@ -652,6 +657,10 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 
 // GetChannelModel fills the channel model from the database.
 func (cs *ChannelStore) GetChannelModel(key, val string) (*models.Channel, bool, error) {
+	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
+		return nil, false, err
+	}
+
 	var (
 		settings, metarrJSON json.RawMessage
 		err                  error
@@ -788,6 +797,10 @@ func (cs *ChannelStore) GetAllChannels() (channels []*models.Channel, hasRows bo
 
 // UpdateChannelMetarrArgsJSON updates args for Metarr output.
 func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error) {
+	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
+		return 0, err
+	}
+
 	var metarrArgs json.RawMessage
 	query := squirrel.
 		Select(consts.QChanMetarr).
@@ -839,6 +852,10 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 
 // UpdateChannelSettingsJSON updates specific settings in the channel's settings JSON.
 func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error) {
+	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
+		return 0, err
+	}
+
 	var settingsJSON json.RawMessage
 	query := squirrel.
 		Select(consts.QChanSettings).
@@ -1439,6 +1456,11 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 
 // channelExists returns true if the channel exists in the database.
 func (cs *ChannelStore) channelExists(key, val string) bool {
+	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
+		logging.E("Error validating column key/value pair, channel cannot exist in database: %v")
+		return false
+	}
+
 	var count int
 	query := squirrel.
 		Select("COUNT(1)").
