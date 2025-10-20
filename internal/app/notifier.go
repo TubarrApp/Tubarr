@@ -15,14 +15,16 @@ import (
 )
 
 // notifyHTTPClients returns HTTP clients for non-LAN and LAN use.
-func newNotifyHTTPClients(timeout time.Duration) (nolan *http.Client, lan *http.Client) {
-	nolan = &http.Client{Timeout: timeout}
+func newNotifyHTTPClients(noLANtimeout, lanTimeout time.Duration) (nolan *http.Client, lan *http.Client) {
+	nolan = &http.Client{Timeout: noLANtimeout}
+
 	lan = &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: lanTimeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
+
 	return nolan, lan
 }
 
@@ -107,7 +109,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 			continue
 		}
 
-		regClient, lanClient := newNotifyHTTPClients(10 * time.Second)
+		regClient, lanClient := newNotifyHTTPClients((30 * time.Second), (10 * time.Second))
 		client := regClient
 		if net.IsPrivateNetwork(parsed.Host) {
 			client = lanClient
