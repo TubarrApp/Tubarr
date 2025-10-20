@@ -28,14 +28,15 @@ type PasswordManager struct {
 
 // NewPasswordManager returns a password manager using the configuration file's AES key file.
 func NewPasswordManager() (pm *PasswordManager, err error) {
+	pm = &PasswordManager{}
+
 	hashedKey, err := pm.ensureAESKey()
 	if err != nil {
 		return nil, err
 	}
 
-	return &PasswordManager{
-		key: hashedKey,
-	}, nil
+	pm.key = hashedKey
+	return pm, nil
 }
 
 // Encrypt encrypts plaintext and returns base64 encoded ciphertext.
