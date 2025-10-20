@@ -3,11 +3,11 @@ Tubarr is a CLI program that can be used to crawl your favorite sites for new vi
 A channel may be added with a command like:
 
   tubarr channel add \
-  --channel-urls 'https://www.youtube.com/@VORWPodcast' \
-  --channel-name 'VORW Podcast' \
+  --channel-urls 'https://www.tubesite.com/@CoolChannel' \
+  --channel-name 'Cool Channel' \
   --video-directory /home/coolguy/tubarr/{{channel_name}} \
   --json-directory /home/coolguy/tubarr/{{channel_name}} \
-  --metarr-meta-ops 'title:date-tag:prefix:ymd','fulltitle:date-tag:prefix:ymd','all-credits:set:VORW Podcast' \
+  --metarr-meta-ops 'title:date-tag:prefix:ymd','fulltitle:date-tag:prefix:ymd','all-credits:set:Cool Channel' \
   --metarr-default-output-dir /home/coolguy/Videos/{{channel_name}}/{{year}} \
   --notify 'https://< YOUR PLEX SERVER IP OR DOMAIN >:32400/library/sections/1/refresh?X-Plex-Token=< YOUR PLEX TOKEN >|Plex'
 
