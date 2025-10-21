@@ -83,7 +83,7 @@ func setDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 
 // External programs
 // setMetarrFlags sets flags for interaction with the Metarr software.
-func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, filenameDateTag, minFreeMem, outDir, renameStyle *string, urlOutDirs, fileSfxReplace, metaOps *[]string) {
+func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, filenameDateTag, minFreeMem, outDir, renameStyle, metaOpsFile, filteredmetaOpsFile *string, urlOutDirs, fileSfxReplace, metaOps, filteredMetaOps *[]string) {
 	// Numbers
 	if maxCPU != nil {
 		cmd.Flags().Float64Var(maxCPU, keys.MMaxCPU, 0, "Max CPU usage for Metarr")
@@ -111,6 +111,12 @@ func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	if renameStyle != nil {
 		cmd.Flags().StringVar(renameStyle, keys.MRenameStyle, "", "Renaming style applied by Metarr (skip, fixes-only, underscores, spaces)")
 	}
+	if metaOpsFile != nil {
+		cmd.Flags().StringVar(metaOpsFile, keys.MMetaOpsFile, "", "File containing meta operations (one per line)")
+	}
+	if filteredmetaOpsFile != nil {
+		cmd.Flags().StringVar(filteredmetaOpsFile, keys.MFilteredMetaOpsFile, "", "File containing filtered meta operations (one per line, format: Filter Rules|Meta Ops)")
+	}
 
 	// Arrays
 	if fileSfxReplace != nil {
@@ -118,6 +124,9 @@ func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	}
 	if metaOps != nil {
 		cmd.Flags().StringSliceVar(metaOps, keys.MMetaOps, nil, "Meta operations to perform in Metarr")
+	}
+	if filteredMetaOps != nil {
+		cmd.Flags().StringSliceVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operations to perform in Metarr, based on filters matched in metadata")
 	}
 	if urlOutDirs != nil {
 		cmd.Flags().StringSliceVar(urlOutDirs, keys.MURLOutputDirs, nil, "Metarr will move a channel URL's files to this location on completion (some {{}} templating commands available)")

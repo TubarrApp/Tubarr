@@ -1,6 +1,6 @@
 package consts
 
-// ValidDBKeys maps all valid database column keys to true for quick lookup.
+// ValidDBColumns maps all valid database column keys to true for quick lookup.
 var ValidDBColumns = map[string]bool{
 	// Shared
 	QSharedID:        true,

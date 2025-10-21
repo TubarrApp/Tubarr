@@ -424,6 +424,48 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 	return m, nil
 }
 
+// ValidateFilteredMetaOps validates that filter-based meta operations are valid.
+func ValidateFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, error) {
+	if len(filteredMetaOps) == 0 {
+		return nil, nil
+	}
+
+	validFilteredMetaOps := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
+	for _, fmo := range filteredMetaOps {
+		if !strings.ContainsRune(fmo, '|') {
+			continue
+		}
+
+		split := EscapedSplit(fmo, '|')
+		if len(split) < 2 {
+			return nil, fmt.Errorf("invalid format for filtered meta operation (entered: %s). Please use 'Filter Rules|Meta Operations'", fmo)
+		}
+
+		filterRule := split[:1]
+		metaRules := split[1:]
+
+		filterOps, err := ValidateFilterOps(filterRule)
+		if err != nil {
+			return nil, err
+		}
+
+		metaOps, err := ValidateMetaOps(metaRules)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(filterOps) == 0 || len(metaOps) == 0 {
+			continue
+		}
+
+		validFilteredMetaOps = append(validFilteredMetaOps, models.FilteredMetaOps{
+			Filters: filterOps,
+			MetaOps: metaOps,
+		})
+	}
+	return validFilteredMetaOps, nil
+}
+
 // ValidateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
 func ValidateToFromDate(d string) (string, error) {
 	d = strings.ToLower(d)

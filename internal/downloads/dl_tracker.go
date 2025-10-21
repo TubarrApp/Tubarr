@@ -107,6 +107,5 @@ func (t *DownloadTracker) flushUpdates(ctx context.Context, updates []models.Sta
 		}
 		break
 	}
-
 	logging.D(2, "Successfully flushed %d status updates", len(updates))
 }

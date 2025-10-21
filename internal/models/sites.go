@@ -138,6 +138,7 @@ type Video struct {
 func (v *Video) MarkVideoAsSkipped() {
 	v.DownloadStatus.Status = consts.DLStatusCompleted
 	v.DownloadStatus.Pct = 100.0
+	v.DownloadStatus.Error = nil
 	v.Finished = true
 	v.WasSkipped = true
 }
@@ -146,6 +147,7 @@ func (v *Video) MarkVideoAsSkipped() {
 func (v *Video) MarkVideoAsCompleted() {
 	v.DownloadStatus.Status = consts.DLStatusCompleted
 	v.DownloadStatus.Pct = 100.0
+	v.DownloadStatus.Error = nil
 	v.Finished = true
 }
 

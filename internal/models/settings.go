@@ -45,6 +45,13 @@ type Settings struct {
 	Paused bool `json:"paused" mapstructure:"pause"`
 }
 
+// FilteredMetaOps allows meta operation entry based on filter matching.
+type FilteredMetaOps struct {
+	Filters        []DLFilters
+	MetaOps        []MetaOps
+	FiltersMatched bool
+}
+
 // DLFilters are used to filter in or out videos from download by metafields.
 type DLFilters struct {
 	ChannelURL string `json:"filter_url_specific"`
@@ -62,10 +69,14 @@ type MoveOps struct {
 	OutputDir  string `json:"move_op_output_dir"`
 }
 
-// MetaOps are metadata operations set in Metarr.
+// MetaOps are applied to fields by Metarr.
 type MetaOps struct {
-	ChannelURL string `json:"meta_url_specific"`
-	Op         string
+	ChannelURL string `json:"meta_op_channel_url"`
+	Field      string `json:"meta_op_field"`
+	OpType     string `json:"meta_op_type"`
+	OpValue    string `json:"meta_op_value"`
+	OpLoc      string `json:"meta_op_loc"`
+	DateFormat string `json:"meta_op_date_format"`
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
@@ -77,7 +88,10 @@ type MetarrArgs struct {
 	FilenameDateTag    string   `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
 
 	// Metarr metadata operations.
-	MetaOps []string `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`
+	MetaOps             []MetaOps         `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`
+	MetaOpsFile         string            `json:"metarr_meta_ops_file" mapstructure:"metarr-meta-ops-file"`
+	FilteredMetaOps     []FilteredMetaOps `json:"filtered_meta_ops" mapstructure:"metarr-filtered-meta-ops"`
+	FilteredMetaOpsFile string            `json:"filtered_meta_ops_file" mapstructure:"metarr-filtered-meta-ops-file"`
 
 	// Metarr output directories.
 	OutputDir     string `json:"metarr_output_directory" mapstructure:"metarr-default-output-dir"`

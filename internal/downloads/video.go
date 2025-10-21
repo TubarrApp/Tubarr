@@ -324,11 +324,9 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 			ext := filepath.Ext(line)
 			for _, validExt := range consts.AllVidExtensions {
 				if ext == validExt {
+					// Update local state for tracking
 					state.Status = consts.DLStatusCompleted
 					state.Percentage = 100.0
-					d.Video.DownloadStatus.Status = consts.DLStatusCompleted
-					d.Video.DownloadStatus.Pct = 100.0
-					d.DLTracker.sendUpdate(d.Video)
 
 					// Safe delete
 					states.Delete(d.Video.URL)

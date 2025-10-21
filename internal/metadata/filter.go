@@ -70,6 +70,97 @@ func filterOpsFilter(v *models.Video, filters []models.DLFilters, channelName st
 	return true
 }
 
+// filteredMetaOpsMatches checks which arguments match and returns the meta operations.
+func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMetaOps []models.FilteredMetaOps, channelName string) []models.FilteredMetaOps {
+	if len(filteredMetaOps) == 0 {
+		return nil
+	}
+
+	result := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
+	dedupMetaOpsMap := make(map[string]bool)
+
+	// Use buildKey for consistency
+	for _, mo := range cu.ChanURLMetarrArgs.MetaOps {
+		dedupMetaOpsMap[parsing.BuildMetaOpsKeyWithChannel(mo)] = true
+	}
+
+	for _, fmo := range filteredMetaOps {
+		// Check if filters match
+		filtersMatched := checkFiltersOnly(v, fmo.Filters)
+
+		// Deduplicate meta ops using buildKey
+		dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
+		for _, mo := range fmo.MetaOps {
+			key := parsing.BuildMetaOpsKeyWithChannel(mo)
+			if !dedupMetaOpsMap[key] {
+				dedupMetaOpsMap[key] = true
+				dedupMetaOps = append(dedupMetaOps, mo)
+			}
+		}
+
+		// Add to result, mark failures
+		fmo.MetaOps = dedupMetaOps
+		fmo.FiltersMatched = filtersMatched
+		result = append(result, fmo)
+	}
+
+	if logging.Level <= 3 {
+		logging.P("Filtered meta op results:")
+		for _, fmo := range result {
+			for _, mo := range fmo.MetaOps {
+				logging.P("%q [FILTERS MATCHED?: %v]", parsing.BuildMetaOpsKeyWithChannel(mo), fmo.FiltersMatched)
+			}
+		}
+	}
+	return result
+}
+
+// checkFiltersOnly checks if filters match WITHOUT removing JSON files on failure.
+func checkFiltersOnly(v *models.Video, filters []models.DLFilters) bool {
+	mustTotal, mustPassed := 0, 0
+	anyTotal, anyPassed := 0, 0
+
+	for _, filter := range filters {
+		switch filter.MustAny {
+		case "must":
+			mustTotal++
+		case "any":
+			anyTotal++
+		}
+
+		val, exists := v.MetadataMap[filter.Field]
+		strVal := strings.ToLower(fmt.Sprint(val))
+		filterVal := strings.ToLower(filter.Value)
+
+		var passed bool
+		switch filter.Value {
+		case "": // empty filter value
+			passed, _ = checkFilterWithEmptyValue(filter, exists)
+		default: // non-empty filter value
+			passed, _ = checkFilterWithValue(filter, strVal, filterVal)
+		}
+
+		if passed {
+			switch filter.MustAny {
+			case "must":
+				mustPassed++
+			case "any":
+				anyPassed++
+			}
+		}
+	}
+
+	// Tally checks
+	if mustPassed != mustTotal {
+		return false
+	}
+	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
+		return false
+	}
+
+	return true
+}
+
 // checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
 func checkFilterWithEmptyValue(filter models.DLFilters, exists bool) (passed, failHard bool) {
 	switch filter.Type {
@@ -224,6 +315,43 @@ func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.D
 	}
 
 	validFilters, err := validation.ValidateFilterOps(filters)
+	if err != nil {
+		logging.E("Error loading filters from file %v: %v", filterFile, err)
+	}
+	if len(validFilters) > 0 {
+		logging.D(1, "Found following filters in file:\n\n%v", validFilters)
+	}
+
+	return validFilters
+}
+
+// loadFilteredMetaOpsFromFile loads filter operations from a file (one per line).
+func loadFilteredMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredMetaOps {
+	var err error
+
+	if cu.ChanURLMetarrArgs.FilteredMetaOpsFile == "" {
+		return nil
+	}
+
+	filterFile := cu.ChanURLMetarrArgs.FilteredMetaOpsFile
+
+	if filterFile, err = dp.ParseDirectory(filterFile, v, "filtered-meta-ops"); err != nil {
+		logging.E("Failed to parse directory %q: %v", filterFile, err)
+		return nil
+	}
+
+	logging.I("Adding filtered meta ops from file %q...", filterFile)
+	filters, err := file.ReadFileLines(filterFile)
+	if err != nil {
+		logging.E("Error loading filters from file %q: %v", filterFile, err)
+	}
+
+	if len(filters) == 0 {
+		logging.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
+		return nil
+	}
+
+	validFilters, err := validation.ValidateFilteredMetaOps(filters)
 	if err != nil {
 		logging.E("Error loading filters from file %v: %v", filterFile, err)
 	}

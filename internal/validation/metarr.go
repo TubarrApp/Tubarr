@@ -7,20 +7,26 @@ import (
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
 
 // ValidateMetaOps parses and validates meta transformation operations.
-func ValidateMetaOps(metaOps []string) ([]string, error) {
+func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	if len(metaOps) == 0 {
 		logging.D(4, "No meta operations passed in to verification")
-		return metaOps, nil
+		return nil, nil
 	}
 
 	const dupMsg = "Duplicate meta operation %q, skipping"
 
-	valid := make([]string, 0, len(metaOps))
+	valid := make([]models.MetaOps, 0, len(metaOps))
 	exists := make(map[string]bool, len(metaOps))
+
+	validActions := map[string]bool{
+		"append": true, "copy-to": true, "paste-from": true, "prefix": true,
+		"trim-prefix": true, "trim-suffix": true, "replace": true, "set": true,
+	}
 
 	logging.D(1, "Validating meta operations %v...", metaOps)
 
@@ -30,20 +36,60 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 		opURL, opPart := CheckForOpURL(op)
 		split := EscapedSplit(opPart, ':')
 
+		var newOp models.MetaOps
 		switch len(split) {
 		case 3: // e.g. 'director:set:Spielberg'
-			action := split[1]
-			validActions := map[string]struct{}{
-				"append": {}, "copy-to": {}, "paste-from": {}, "prefix": {},
-				"trim-prefix": {}, "trim-suffix": {}, "replace": {}, "set": {},
-			}
+			field := split[0]
+			opType := split[1]
+			opValue := split[2]
 
-			if _, ok := validActions[action]; !ok {
-				return nil, fmt.Errorf("invalid meta operation %q", action)
+			if !validActions[opType] {
+				logging.E("invalid meta operation %q", opType)
+				continue
 			}
+			newOp.OpType = opType
 
 			// Build uniqueness key
-			key := strings.Join([]string{split[0], action, split[2]}, ":")
+			key := strings.Join([]string{field, opType, opValue}, ":")
+			if exists[key] {
+				logging.I(dupMsg, opPart)
+				continue
+			}
+			newOp.Field = field
+			newOp.OpValue = opValue
+
+			exists[key] = true
+			if opURL != "" {
+				newOp.ChannelURL = opURL
+			}
+			valid = append(valid, newOp)
+
+		case 4: // e.g. 'title:date-tag:suffix:ymd'
+			field := split[0]
+			opType := split[1]
+			opLoc := split[2]
+			opDateFmt := split[3]
+
+			if opType != "date-tag" {
+				logging.E("invalid meta operation, 4 fields but not date-tag %v", split)
+				continue
+			}
+			newOp.OpType = opType
+
+			if opLoc != "prefix" && opLoc != "suffix" {
+				logging.E("invalid date tag location %q, use prefix or suffix", opLoc)
+				continue
+			}
+			newOp.OpLoc = opLoc
+
+			if !ValidateDateFormat(split[3]) {
+				logging.E("invalid date tag format %q", split[3])
+				continue
+			}
+			newOp.DateFormat = opDateFmt
+
+			// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
+			key := strings.Join([]string{field, "date-tag", opLoc}, ":")
 
 			if exists[key] {
 				logging.I(dupMsg, opPart)
@@ -52,40 +98,13 @@ func ValidateMetaOps(metaOps []string) ([]string, error) {
 
 			exists[key] = true
 			if opURL != "" {
-				opPart = opURL + "|" + opPart
+				newOp.ChannelURL = opURL
 			}
-			valid = append(valid, opPart)
-
-		case 4: // e.g. 'title:date-tag:suffix:ymd'
-			if split[1] != "date-tag" {
-				break
-			}
-
-			loc := split[2]
-			if loc != "prefix" && loc != "suffix" {
-				return nil, fmt.Errorf("invalid date tag location %q, use prefix or suffix", loc)
-			}
-
-			if !ValidateDateFormat(split[3]) {
-				break
-			}
-
-			// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
-			key := strings.Join([]string{split[0], "date-tag", loc}, ":")
-
-			if exists[key] {
-				logging.I(dupMsg, opPart)
-				break
-			}
-
-			exists[key] = true
-			if opURL != "" {
-				opPart = opURL + "|" + opPart
-			}
-			valid = append(valid, opPart)
+			valid = append(valid, newOp)
 
 		default: // Invalid operation
-			return nil, fmt.Errorf("invalid meta op %q", opPart)
+			logging.E("invalid meta op %q", opPart)
+			continue
 		}
 	}
 

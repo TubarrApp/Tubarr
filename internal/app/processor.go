@@ -254,10 +254,11 @@ func processJSON(
 	}
 
 	// Validate and filter (delegates to metadata package)
-	passedChecks, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
+	passedChecks, useFilteredMetaOps, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
 	if err != nil {
 		return false, false, err
 	}
+	cu.ChanURLMetarrArgs.FilteredMetaOps = useFilteredMetaOps
 
 	if !passedChecks {
 		v.MarkVideoAsSkipped()
