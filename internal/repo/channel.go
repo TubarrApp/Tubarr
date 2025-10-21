@@ -1084,6 +1084,9 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
 	fmt.Printf("Filename Suffix Replace: %v\n", m.FilenameReplaceSfx)
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
+	fmt.Printf("Meta Operations File: %v\n", m.MetaOpsFile)
+	fmt.Printf("Filtered Meta Operations: %v\n", m.FilteredMetaOps)
+	fmt.Printf("Filtered Meta Operations File: %v\n", m.FilteredMetaOpsFile)
 	fmt.Printf("Filename Date Format: %s\n", m.FilenameDateTag)
 
 	// Extra arguments
