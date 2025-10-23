@@ -137,7 +137,7 @@ func InitProcess(
 	}
 
 	if len(errs) > 0 {
-		logging.E("Finished with %d errors", len(errs))
+		logging.E("Finished with %d error(s): %v", len(errs), err)
 		return nSucceeded, nDownloaded, errors.Join(errs...)
 	}
 	return nSucceeded, nDownloaded, nil

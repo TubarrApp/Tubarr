@@ -32,7 +32,7 @@ func runMetarr(cmd *exec.Cmd) error {
 	if cmd.String() == "" {
 		return errors.New("command string is empty")
 	}
-	logging.I("Running Metarr command:\n%s\n", cmd.String())
+	logging.I("Running Metarr command:\n\n%s\n", cmd.String())
 
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout

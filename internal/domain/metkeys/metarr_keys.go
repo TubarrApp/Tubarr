@@ -12,7 +12,7 @@ const (
 
 // File operations.
 const (
-	Ext                = "--ext"
+	Ext                = "--output-ext"
 	FilenameDateTag    = "--filename-date-tag"
 	FilenameReplaceSfx = "--filename-replace-suffix"
 	OutputDir          = "--output-directory"

@@ -27,7 +27,7 @@ const (
 	VideoDir          string = "video-directory"
 	JSONDir           string = "json-directory"
 	MetarrPreset      string = "metarr-preset"
-	OutputFiletype    string = "ext"
+	OutputFiletype    string = "output-ext"
 )
 
 // Transcoding
@@ -107,7 +107,7 @@ const (
 	MConcurrency           string = "metarr-concurrency"
 	MOutputDir             string = "metarr-default-output-dir"
 	MURLOutputDirs         string = "metarr-url-output-dirs"
-	MExt                   string = "metarr-ext"
+	MExt                   string = "metarr-output-ext"
 	MExtraFFmpegArgs       string = "extra-ffmpeg-args"
 )
 

@@ -43,11 +43,13 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 			opType := split[1]
 			opValue := split[2]
 
+			newOp.Field = field // e.g. 'director'
+
 			if !validActions[opType] {
 				logging.E("invalid meta operation %q", opType)
 				continue
 			}
-			newOp.OpType = opType
+			newOp.OpType = opType // e.g. 'set'
 
 			// Build uniqueness key
 			key := strings.Join([]string{field, opType, opValue}, ":")
@@ -55,8 +57,8 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 				logging.I(dupMsg, opPart)
 				continue
 			}
-			newOp.Field = field
-			newOp.OpValue = opValue
+
+			newOp.OpValue = opValue // e.g. 'Spielberg'
 
 			exists[key] = true
 			if opURL != "" {
@@ -70,23 +72,25 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 			opLoc := split[2]
 			opDateFmt := split[3]
 
+			newOp.Field = field // e.g. 'title'
+
 			if opType != "date-tag" {
 				logging.E("invalid meta operation, 4 fields but not date-tag %v", split)
 				continue
 			}
-			newOp.OpType = opType
+			newOp.OpType = opType // e.g. 'date-tag'
 
 			if opLoc != "prefix" && opLoc != "suffix" {
 				logging.E("invalid date tag location %q, use prefix or suffix", opLoc)
 				continue
 			}
-			newOp.OpLoc = opLoc
+			newOp.OpLoc = opLoc // e.g. 'suffix'
 
 			if !ValidateDateFormat(split[3]) {
 				logging.E("invalid date tag format %q", split[3])
 				continue
 			}
-			newOp.DateFormat = opDateFmt
+			newOp.DateFormat = opDateFmt // e.g. 'ymd'
 
 			// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
 			key := strings.Join([]string{field, "date-tag", opLoc}, ":")
