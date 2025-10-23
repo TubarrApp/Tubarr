@@ -84,6 +84,7 @@ const (
 const (
 	MFilenameDateTag       string = "metarr-filename-date-tag"
 	MFilenameReplaceSuffix string = "metarr-filename-replace-suffix"
+	MFilenameReplacePrefix string = "metarr-filename-replace-prefix"
 	MDescDatePfx           string = "metarr-desc-date-prefix"
 	MDescDateSfx           string = "metarr-desc-date-suffix"
 	MGPU                   string = "metarr-gpu"

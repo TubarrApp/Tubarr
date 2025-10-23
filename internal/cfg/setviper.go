@@ -35,6 +35,12 @@ func initFileTransformers(rootCmd *cobra.Command) error {
 		return err
 	}
 
+	// Replace filename suffix
+	rootCmd.PersistentFlags().StringSlice(keys.MFilenameReplacePrefix, nil, "Replaces a specified prefix on filenames. (prefix:replacement)")
+	if err := viper.BindPFlag(keys.MFilenameReplacePrefix, rootCmd.PersistentFlags().Lookup(keys.MFilenameReplacePrefix)); err != nil {
+		return err
+	}
+
 	// Output directory (can be external)
 	rootCmd.PersistentFlags().StringP(keys.MoveOnComplete, "o", "", "Move files to given directory on program completion")
 	if err := viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete)); err != nil {

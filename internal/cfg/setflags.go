@@ -83,7 +83,7 @@ func setDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 
 // External programs
 // setMetarrFlags sets flags for interaction with the Metarr software.
-func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, filenameDateTag, minFreeMem, outDir, renameStyle, metaOpsFile, filteredmetaOpsFile *string, urlOutDirs, fileSfxReplace, metaOps, filteredMetaOps *[]string) {
+func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, filenameDateTag, minFreeMem, outDir, renameStyle, metaOpsFile, filteredmetaOpsFile *string, urlOutDirs, fileSfxReplace, filePfxReplace, metaOps, filteredMetaOps *[]string) {
 	// Numbers
 	if maxCPU != nil {
 		cmd.Flags().Float64Var(maxCPU, keys.MMaxCPU, 0, "Max CPU usage for Metarr")
@@ -121,6 +121,9 @@ func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	// Arrays
 	if fileSfxReplace != nil {
 		cmd.Flags().StringSliceVar(fileSfxReplace, keys.MFilenameReplaceSuffix, nil, "Replace a filename suffix element in Metarr")
+	}
+	if filePfxReplace != nil {
+		cmd.Flags().StringSliceVar(filePfxReplace, keys.MFilenameReplacePrefix, nil, "Replace a filename prefix element in Metarr")
 	}
 	if metaOps != nil {
 		cmd.Flags().StringSliceVar(metaOps, keys.MMetaOps, nil, "Meta operations to perform in Metarr")

@@ -1292,6 +1292,14 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 		}
 	}
 
+	// Filename prefix replacements
+	if v, ok := getConfigValue[[]string](keys.MFilenameReplacePrefix); ok {
+		c.ChanMetarrArgs.FilenameReplacePfx, err = validation.ValidateFilenamePrefixReplace(v)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Rename style
 	if v, ok := getConfigValue[string](keys.MRenameStyle); ok {
 		if err := validation.ValidateRenameFlag(v); err != nil {

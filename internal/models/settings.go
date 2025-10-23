@@ -84,6 +84,7 @@ type MetarrArgs struct {
 	// Metarr file operations.
 	Ext                string   `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
 	FilenameReplaceSfx []string `json:"metarr_filename_replace_suffix" mapstructure:"metarr-filename-replace-suffix"`
+	FilenameReplacePfx []string `json:"metarr_filename_replace_prefix" mapstructure:"metarr-filename-replace-prefix"`
 	RenameStyle        string   `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
 	FilenameDateTag    string   `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
 

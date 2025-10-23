@@ -135,6 +135,22 @@ func ValidateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 	return valid, nil
 }
 
+// ValidateFilenamePrefixReplace checks if the input format for filename prefix replacement is valid.
+func ValidateFilenamePrefixReplace(filePfxReplace []string) ([]string, error) {
+	valid := make([]string, 0, len(filePfxReplace))
+
+	lengthStrings := 0
+	for _, pair := range filePfxReplace {
+		parts := strings.Split(pair, ":")
+		if len(parts) < 2 {
+			return nil, errors.New("invalid use of filename-replace-prefix, values must be written as (prefix:replacement)")
+		}
+		lengthStrings += len(parts[0]+parts[1]) + 1
+		valid = append(valid, pair)
+	}
+	return valid, nil
+}
+
 // ValidateRenameFlag validates the rename style to apply.
 func ValidateRenameFlag(flag string) error {
 	// Trim whitespace for more robust validation
