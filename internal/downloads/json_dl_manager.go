@@ -8,6 +8,7 @@ import (
 	"time"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/utils/times"
 )
 
 // NewJSONDownload creates a download operation with specified options.
@@ -76,11 +77,14 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 				logging.E("Download attempt %d failed: %v", attempt, err)
 
 				if attempt < d.Options.MaxRetries {
+					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
+					logging.I("Waiting %d seconds before retrying JSON download for %q...", d.Video.URL)
+
 					select {
 					case <-d.Context.Done():
 						logging.W("Download cancelled: %v", d.Context.Err())
 						return false, d.cancelJSONDownload()
-					case <-time.After(d.Options.RetryInterval):
+					case <-time.After(randWait):
 						continue
 					}
 				}

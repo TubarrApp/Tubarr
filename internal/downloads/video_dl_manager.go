@@ -9,6 +9,7 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/utils/times"
 )
 
 // NewVideoDownload creates a download operation with specified options.
@@ -84,11 +85,14 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 				d.DLTracker.sendUpdate(d.Video)
 
 				if attempt < d.Options.MaxRetries {
+					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
+					logging.I("Waiting %d seconds before retrying video download for %q...", d.Video.URL)
+
 					select {
 					case <-d.Context.Done():
 						logging.W("Download cancelled: %v", d.Context.Err())
 						return false, d.cancelVideoDownload()
-					case <-time.After(d.Options.RetryInterval):
+					case <-time.After(randWait):
 						continue
 					}
 				}

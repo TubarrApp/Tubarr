@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/dev"
 	"tubarr/internal/domain/consts"
@@ -242,8 +241,8 @@ func processJSON(
 
 	// Download JSON
 	dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
-		MaxRetries:    3,
-		RetryInterval: 5 * time.Second,
+		MaxRetries:       3,
+		RetryMaxInterval: 5,
 	})
 	if err != nil {
 		return false, false, err
@@ -286,8 +285,8 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 	logging.I("Processing video download for URL: %s", v.URL)
 
 	dl, err := downloads.NewVideoDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
-		MaxRetries:    3,
-		RetryInterval: 5 * time.Second,
+		MaxRetries:       3,
+		RetryMaxInterval: 20,
 	})
 	if err != nil {
 		return false, err

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -25,14 +24,14 @@ const (
 
 // Options holds configuration for download operations.
 type Options struct {
-	MaxRetries    int
-	RetryInterval time.Duration
+	MaxRetries       int
+	RetryMaxInterval int
 }
 
 // DefaultOptions provides sensible defaults.
 var DefaultOptions = Options{
-	MaxRetries:    3,
-	RetryInterval: 5 * time.Second,
+	MaxRetries:       3,
+	RetryMaxInterval: 20,
 }
 
 // VideoDownload encapsulates a video download operation.
