@@ -36,14 +36,15 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 		var newOp models.MetaOps
 		switch len(split) {
 		case 3: // e.g. 'director:set:Spielberg'
-			if !validActions[newOp.OpType] {
-				logging.E("invalid meta operation %q", newOp.OpType)
-				continue
-			}
 
 			newOp.Field = split[0]   // e.g. 'director'
 			newOp.OpType = split[1]  // e.g. 'set'
 			newOp.OpValue = split[2] // e.g. 'Spielberg'
+
+			if !validActions[newOp.OpType] {
+				logging.E("invalid meta operation %q", newOp.OpType)
+				continue
+			}
 
 			// Build uniqueness key
 			key := strings.Join([]string{newOp.Field, newOp.OpType, newOp.OpValue}, ":")
@@ -58,61 +59,54 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 			}
 			valid = append(valid, newOp)
 
-		case 4: // e.g. 'title:date-tag:suffix:ymd'
+		case 4: // e.g. 'title:date-tag:suffix:ymd' or 'title:replace:old:new'
+			newOp.Field = split[0]
+			newOp.OpType = split[1]
+
 			if !validActions[newOp.OpType] {
 				logging.E("invalid meta operation %q", newOp.OpType)
 				continue
 			}
 
-			newOp.Field = split[0]
-			newOp.OpType = split[1]
-
+			var key string
 			switch newOp.OpType {
 			case "date-tag":
-				newOp.OpLoc = split[2]      // e.g. 'suffix'
-				newOp.DateFormat = split[3] // e.g. 'ymd'
+				newOp.OpLoc = split[2]
+				newOp.DateFormat = split[3]
 
 				if newOp.OpLoc != "prefix" && newOp.OpLoc != "suffix" {
 					logging.E("invalid date tag location %q, use prefix or suffix", newOp.OpLoc)
 					continue
 				}
-
 				if !ValidateDateFormat(newOp.DateFormat) {
 					logging.E("invalid date tag format %q", newOp.DateFormat)
 					continue
 				}
 
-				key := strings.Join([]string{newOp.Field, newOp.OpType}, ":")
-				if exists[key] {
-					logging.I(dupMsg, opPart)
-					continue
-				}
-
-				exists[key] = true
-				if opURL != "" {
-					newOp.ChannelURL = opURL
-				}
-				valid = append(valid, newOp)
+				key = strings.Join([]string{newOp.Field, newOp.OpType}, ":")
 
 			case "replace":
 				newOp.OpFindString = split[2]
 				newOp.OpValue = split[3]
 
-				key := strings.Join([]string{newOp.Field, newOp.OpType, newOp.OpFindString, newOp.OpValue}, ":")
-				if exists[key] {
-					logging.I(dupMsg, opPart)
-					continue
-				}
-				exists[key] = true
-				if opURL != "" {
-					newOp.ChannelURL = opURL
-				}
-				valid = append(valid, newOp)
+				key = strings.Join([]string{newOp.Field, newOp.OpType, newOp.OpFindString, newOp.OpValue}, ":")
 
-			default: // Invalid operation
-				logging.E("invalid meta op %q", opPart)
+			default:
+				logging.E("invalid 4-part meta op type %q", newOp.OpType)
 				continue
 			}
+
+			if exists[key] {
+				logging.I(dupMsg, opPart)
+				continue
+			}
+			exists[key] = true
+
+			if opURL != "" {
+				newOp.ChannelURL = opURL
+			}
+			valid = append(valid, newOp)
+
 		default:
 			logging.E("invalid meta op %q", opPart)
 			continue
