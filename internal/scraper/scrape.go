@@ -233,9 +233,6 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		args = append(args, command.CookiePath, cookiePath)
 	}
 
-	// Sleep
-	args = append(args, command.RandomizeRequests...)
-
 	// Create command
 	args = append(args, channelURL)
 	cmd := exec.CommandContext(ctx, command.YTDLP, args...)

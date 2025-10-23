@@ -82,7 +82,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	}
 
 	// Randomize requests (avoid detection as bot)
-	args = append(args, command.RandomizeRequests...)
+	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments
 	if !viper.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {

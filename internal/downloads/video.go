@@ -118,7 +118,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Randomize requests (avoid detection as bot)
-	args = append(args, command.RandomizeRequests...)
+	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments
 	if !viper.IsSet(keys.ExtraYTDLPVideoArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs != "" {
