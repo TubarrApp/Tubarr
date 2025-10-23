@@ -71,7 +71,11 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 
 		case update := <-t.updates:
 			if update != lastUpdate {
+				if update.Percent > lastUpdate.Percent { // If percentage has increased, assume error cleared.
+					update.Error = nil
+				}
 				lastUpdate = update
+
 				logging.I("Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n",
 					update.VideoURL, update.Status, update.Percent, update.Error)
 				t.flushUpdates(ctx, []models.StatusUpdate{update})
