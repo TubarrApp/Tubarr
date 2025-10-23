@@ -17,7 +17,6 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 		logging.D(4, "No meta operations passed in to verification")
 		return nil, nil
 	}
-
 	const dupMsg = "Duplicate meta operation %q, skipping"
 
 	valid := make([]models.MetaOps, 0, len(metaOps))
@@ -27,38 +26,31 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 		"append": true, "copy-to": true, "paste-from": true, "prefix": true,
 		"trim-prefix": true, "trim-suffix": true, "replace": true, "set": true,
 	}
-
 	logging.D(1, "Validating meta operations %v...", metaOps)
 
 	// Check meta ops
 	for _, op := range metaOps {
-
 		opURL, opPart := CheckForOpURL(op)
 		split := EscapedSplit(opPart, ':')
 
 		var newOp models.MetaOps
 		switch len(split) {
 		case 3: // e.g. 'director:set:Spielberg'
-			field := split[0]
-			opType := split[1]
-			opValue := split[2]
-
-			newOp.Field = field // e.g. 'director'
-
-			if !validActions[opType] {
-				logging.E("invalid meta operation %q", opType)
+			if !validActions[newOp.OpType] {
+				logging.E("invalid meta operation %q", newOp.OpType)
 				continue
 			}
-			newOp.OpType = opType // e.g. 'set'
+
+			newOp.Field = split[0]   // e.g. 'director'
+			newOp.OpType = split[1]  // e.g. 'set'
+			newOp.OpValue = split[2] // e.g. 'Spielberg'
 
 			// Build uniqueness key
-			key := strings.Join([]string{field, opType, opValue}, ":")
+			key := strings.Join([]string{newOp.Field, newOp.OpType, newOp.OpValue}, ":")
 			if exists[key] {
 				logging.I(dupMsg, opPart)
 				continue
 			}
-
-			newOp.OpValue = opValue // e.g. 'Spielberg'
 
 			exists[key] = true
 			if opURL != "" {
@@ -67,55 +59,68 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 			valid = append(valid, newOp)
 
 		case 4: // e.g. 'title:date-tag:suffix:ymd'
-			field := split[0]
-			opType := split[1]
-			opLoc := split[2]
-			opDateFmt := split[3]
-
-			newOp.Field = field // e.g. 'title'
-
-			if opType != "date-tag" {
-				logging.E("invalid meta operation, 4 fields but not date-tag %v", split)
-				continue
-			}
-			newOp.OpType = opType // e.g. 'date-tag'
-
-			if opLoc != "prefix" && opLoc != "suffix" {
-				logging.E("invalid date tag location %q, use prefix or suffix", opLoc)
-				continue
-			}
-			newOp.OpLoc = opLoc // e.g. 'suffix'
-
-			if !ValidateDateFormat(split[3]) {
-				logging.E("invalid date tag format %q", split[3])
-				continue
-			}
-			newOp.DateFormat = opDateFmt // e.g. 'ymd'
-
-			// Build uniqueness key (ignore format so multiple date tags aren’t duplicated)
-			key := strings.Join([]string{field, "date-tag", opLoc}, ":")
-
-			if exists[key] {
-				logging.I(dupMsg, opPart)
+			if !validActions[newOp.OpType] {
+				logging.E("invalid meta operation %q", newOp.OpType)
 				continue
 			}
 
-			exists[key] = true
-			if opURL != "" {
-				newOp.ChannelURL = opURL
-			}
-			valid = append(valid, newOp)
+			newOp.Field = split[0]
+			newOp.OpType = split[1]
 
-		default: // Invalid operation
+			switch newOp.OpType {
+			case "date-tag":
+				newOp.OpLoc = split[2]      // e.g. 'suffix'
+				newOp.DateFormat = split[3] // e.g. 'ymd'
+
+				if newOp.OpLoc != "prefix" && newOp.OpLoc != "suffix" {
+					logging.E("invalid date tag location %q, use prefix or suffix", newOp.OpLoc)
+					continue
+				}
+
+				if !ValidateDateFormat(newOp.DateFormat) {
+					logging.E("invalid date tag format %q", newOp.DateFormat)
+					continue
+				}
+
+				key := strings.Join([]string{newOp.Field, newOp.OpType}, ":")
+				if exists[key] {
+					logging.I(dupMsg, opPart)
+					continue
+				}
+
+				exists[key] = true
+				if opURL != "" {
+					newOp.ChannelURL = opURL
+				}
+				valid = append(valid, newOp)
+
+			case "replace":
+				newOp.OpFindString = split[2]
+				newOp.OpValue = split[3]
+
+				key := strings.Join([]string{newOp.Field, newOp.OpType, newOp.OpFindString, newOp.OpValue}, ":")
+				if exists[key] {
+					logging.I(dupMsg, opPart)
+					continue
+				}
+				exists[key] = true
+				if opURL != "" {
+					newOp.ChannelURL = opURL
+				}
+				valid = append(valid, newOp)
+
+			default: // Invalid operation
+				logging.E("invalid meta op %q", opPart)
+				continue
+			}
+		default:
 			logging.E("invalid meta op %q", opPart)
 			continue
 		}
 	}
-
 	if len(valid) == 0 {
 		return nil, errors.New("no valid meta operations")
 	}
-
 	return valid, nil
 }
 

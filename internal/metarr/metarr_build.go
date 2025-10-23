@@ -257,7 +257,7 @@ func filterConflictingOps(fileOps, dbOps []models.MetaOps) []models.MetaOps {
 // isNonConflictingOp returns true for operations that don't conflict with others on the same field
 func isNonConflictingOp(opType string) bool {
 	switch opType {
-	case "copy-to", "prefix", "suffix":
+	case "copy-to", "prefix", "suffix", "replace":
 		return true
 	default:
 		return false

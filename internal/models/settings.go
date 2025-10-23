@@ -71,12 +71,13 @@ type MoveOps struct {
 
 // MetaOps are applied to fields by Metarr.
 type MetaOps struct {
-	ChannelURL string `json:"meta_op_channel_url"`
-	Field      string `json:"meta_op_field"`
-	OpType     string `json:"meta_op_type"`
-	OpValue    string `json:"meta_op_value"`
-	OpLoc      string `json:"meta_op_loc"`
-	DateFormat string `json:"meta_op_date_format"`
+	ChannelURL   string `json:"meta_op_channel_url"`
+	Field        string `json:"meta_op_field"`
+	OpFindString string `json:"meta_op_find_string"`
+	OpType       string `json:"meta_op_type"`
+	OpValue      string `json:"meta_op_value"`
+	OpLoc        string `json:"meta_op_loc"`
+	DateFormat   string `json:"meta_op_date_format"`
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.

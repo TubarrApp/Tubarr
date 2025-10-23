@@ -8,6 +8,8 @@ func BuildMetaOpsKey(mo models.MetaOps) string {
 	switch mo.OpType {
 	case "date-tag":
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpLoc + ":" + mo.DateFormat
+	case "replace":
+		key = mo.Field + ":" + mo.OpType + ":" + mo.OpFindString + ":" + mo.OpValue
 	default:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpValue
 	}
@@ -20,6 +22,8 @@ func BuildMetaOpsKeyWithChannel(mo models.MetaOps) string {
 	switch mo.OpType {
 	case "date-tag":
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpLoc + ":" + mo.DateFormat
+	case "replace":
+		key = mo.Field + ":" + mo.OpType + ":" + mo.OpFindString + ":" + mo.OpValue
 	default:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpValue
 	}
