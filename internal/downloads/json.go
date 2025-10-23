@@ -6,12 +6,11 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
-
-	"github.com/spf13/viper"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
@@ -38,8 +37,8 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	}
 
 	// Cookie source
-	if viper.IsSet(keys.CookieSource) {
-		browserCookieSource := viper.GetString(keys.CookieSource)
+	if abstractions.IsSet(keys.CookieSource) {
+		browserCookieSource := abstractions.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
 		args = append(args, command.CookiesFromBrowser, browserCookieSource)
 	} else {
@@ -85,11 +84,11 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments
-	if !viper.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {
+	if !abstractions.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {
 		args = append(args, strings.Fields(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs)...)
 	}
-	if viper.IsSet(keys.ExtraYTDLPMetaArgs) {
-		args = append(args, strings.Fields(viper.GetString(keys.ExtraYTDLPMetaArgs))...)
+	if abstractions.IsSet(keys.ExtraYTDLPMetaArgs) {
+		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPMetaArgs))...)
 	}
 
 	// Add target URL [ MUST GO LAST !! ]

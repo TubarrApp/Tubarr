@@ -12,14 +12,13 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
-
-	"github.com/spf13/viper"
 )
 
 // VideoDownloadState represents the current state of a video's download.
@@ -66,8 +65,8 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Cookie source
-	if viper.IsSet(keys.CookieSource) {
-		browserCookieSource := viper.GetString(keys.CookieSource)
+	if abstractions.IsSet(keys.CookieSource) {
+		browserCookieSource := abstractions.GetString(keys.CookieSource)
 		logging.I("Using cookies from browser %q", browserCookieSource)
 		args = append(args, command.CookiesFromBrowser, browserCookieSource)
 	} else {
@@ -121,11 +120,11 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments
-	if !viper.IsSet(keys.ExtraYTDLPVideoArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs != "" {
+	if !abstractions.IsSet(keys.ExtraYTDLPVideoArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs != "" {
 		args = append(args, strings.Fields(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs)...)
 	}
-	if viper.IsSet(keys.ExtraYTDLPVideoArgs) {
-		args = append(args, strings.Fields(viper.GetString(keys.ExtraYTDLPVideoArgs))...)
+	if abstractions.IsSet(keys.ExtraYTDLPVideoArgs) {
+		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPVideoArgs))...)
 	}
 
 	// Add target URL [ MUST GO LAST !! ]

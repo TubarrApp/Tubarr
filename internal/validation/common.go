@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/regex"
@@ -178,8 +179,8 @@ func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {
 	// Output filetype
-	if viper.IsSet(keys.OutputFiletype) {
-		ext := strings.ToLower(viper.GetString(keys.OutputFiletype))
+	if abstractions.IsSet(keys.OutputFiletype) {
+		ext := strings.ToLower(abstractions.GetString(keys.OutputFiletype))
 
 		if ext != "" {
 			dottedExt, err := ValidateOutputFiletype(ext)
@@ -187,13 +188,13 @@ func ValidateViperFlags() error {
 				return fmt.Errorf("invalid output filetype %q", ext)
 
 			}
-			viper.Set(keys.OutputFiletype, dottedExt)
+			abstractions.Set(keys.OutputFiletype, dottedExt)
 		}
 	}
 
 	// Meta purge
-	if viper.IsSet(keys.MMetaPurge) {
-		purge := viper.GetString(keys.MMetaPurge)
+	if abstractions.IsSet(keys.MMetaPurge) {
+		purge := abstractions.GetString(keys.MMetaPurge)
 		if purge != "" && !ValidatePurgeMetafiles(purge) {
 			return fmt.Errorf("invalid meta purge type %q", purge)
 		}
@@ -201,7 +202,7 @@ func ValidateViperFlags() error {
 
 	// Logging
 	ValidateLoggingLevel()
-	viper.Set(keys.Concurrency, ValidateConcurrencyLimit(viper.GetInt(keys.Concurrency)))
+	abstractions.Set(keys.Concurrency, ValidateConcurrencyLimit(abstractions.GetInt(keys.Concurrency)))
 	return nil
 }
 
@@ -300,7 +301,7 @@ func ValidateYtdlpOutputExtension(e string) error {
 
 // ValidateLoggingLevel checks and validates the debug level.
 func ValidateLoggingLevel() {
-	l := min(max(viper.GetInt(keys.DebugLevel), 0), 5)
+	l := min(max(abstractions.GetInt(keys.DebugLevel), 0), 5)
 
 	logging.Level = l
 	fmt.Printf("Logging level: %d\n", logging.Level)

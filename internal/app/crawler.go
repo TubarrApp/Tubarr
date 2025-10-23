@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -19,7 +20,6 @@ import (
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/utils/times"
 
-	"github.com/spf13/viper"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -35,7 +35,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	}
 
 	var (
-		conc    = max(viper.GetInt(keys.Concurrency), 1)
+		conc    = max(abstractions.GetInt(keys.Concurrency), 1)
 		errChan = make(chan error, len(channels))
 		sem     = make(chan struct{}, conc)
 		wg      sync.WaitGroup

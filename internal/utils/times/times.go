@@ -6,17 +6,16 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"time"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/logging"
-
-	"github.com/spf13/viper"
 )
 
 // StartupWait adds a 0–30 minute wait time with a visible countdown.
 // This is used to help avoid bot detection.
 func StartupWait(ctx context.Context) error {
-	if viper.GetBool(keys.SkipWait) {
+	if abstractions.GetBool(keys.SkipWait) {
 		logging.W("Skipping wait period, running Tubarr immediately. You may encounter bot detection on some platforms if requests come at predictable intervals.")
 		return nil
 	}
@@ -68,7 +67,7 @@ func StartupWait(ctx context.Context) error {
 
 // WaitTime adds a specified wait time.
 func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL string) error {
-	if viper.GetBool(keys.SkipWait) {
+	if abstractions.GetBool(keys.SkipWait) {
 		if videoURL == "" {
 			logging.D(3, "Skipping wait time call for channel %q (video URL: %q)", channelName, videoURL)
 		} else {

@@ -7,14 +7,13 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/app"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/utils/times"
-
-	"github.com/spf13/viper"
 )
 
 // main is the main entrypoint of the program (duh!)
@@ -58,7 +57,7 @@ func main() {
 	}
 
 	// Check channels
-	if viper.GetBool(keys.CheckChannels) {
+	if abstractions.GetBool(keys.CheckChannels) {
 		// Wait with countdown (or skip if -s flag is set)
 		if err := times.StartupWait(ctx); err != nil {
 			logging.E("Exiting before startup timer exited")

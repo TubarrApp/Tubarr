@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -22,7 +23,6 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/spf13/viper"
 )
 
 // ChannelStore holds a pointer to the sql.DB.
@@ -1520,24 +1520,24 @@ func getConfigValue[T any](key string) (T, bool) {
 	var zero T
 
 	// Try original key first
-	if viper.IsSet(key) {
-		if val, ok := convertConfigValue[T](viper.Get(key)); ok {
+	if abstractions.IsSet(key) {
+		if val, ok := convertConfigValue[T](abstractions.Get(key)); ok {
 			return val, true
 		}
 	}
 
 	// Try snake_case version
 	snakeKey := strings.ReplaceAll(key, "-", "_")
-	if snakeKey != key && viper.IsSet(snakeKey) {
-		if val, ok := convertConfigValue[T](viper.Get(snakeKey)); ok {
+	if snakeKey != key && abstractions.IsSet(snakeKey) {
+		if val, ok := convertConfigValue[T](abstractions.Get(snakeKey)); ok {
 			return val, true
 		}
 	}
 
 	// Try kebab-case version
 	kebabKey := strings.ReplaceAll(key, "_", "-")
-	if kebabKey != key && viper.IsSet(kebabKey) {
-		if val, ok := convertConfigValue[T](viper.Get(kebabKey)); ok {
+	if kebabKey != key && abstractions.IsSet(kebabKey) {
+		if val, ok := convertConfigValue[T](abstractions.Get(kebabKey)); ok {
 			return val, true
 		}
 	}
