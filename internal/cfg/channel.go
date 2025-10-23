@@ -645,7 +645,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		authDetails                                                                                     []string
 		notification                                                                                    []string
 		fromDate, toDate                                                                                string
-		dlFilters, metaOps, moveOps, filteredMetaOps, fileSfxReplace, filePfxReplace                    []string
+		dlFilters, metaOps, moveOps, filteredMetaOps, fileSfxReplace, filePfxReplace, fileStrReplace    []string
 		configFile, dlFilterFile, moveOpFile, metaOpsFile, filteredmetaOpsFile                          string
 		crawlFreq, concurrency, metarrConcurrency, retries                                              int
 		maxCPU                                                                                          float64
@@ -725,6 +725,13 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			// Filename prefix replace (e.g. '_1' to '')
 			if len(filePfxReplace) > 0 {
 				if filePfxReplace, err = validation.ValidateFilenameSuffixReplace(filePfxReplace); err != nil {
+					return err
+				}
+			}
+
+			// Filename strings replace (e.g. 'hello' to 'goodbye')
+			if len(fileStrReplace) > 0 {
+				if fileStrReplace, err = validation.ValidateFilenameReplaceStrings(fileStrReplace); err != nil {
 					return err
 				}
 			}
@@ -867,6 +874,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 					RenameStyle:          renameStyle,
 					FilenameReplaceSfx:   fileSfxReplace,
 					FilenameReplacePfx:   filePfxReplace,
+					FilenameReplaceStr:   fileStrReplace,
 					MaxCPU:               maxCPU,
 					MinFreeMem:           minFreeMem,
 					OutputDir:            outDir,
@@ -947,7 +955,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
 		&minFreeMem, &outDir, &renameStyle,
 		&metaOpsFile, &filteredmetaOpsFile, &urlOutDirs,
-		&fileSfxReplace, &filePfxReplace, &metaOps,
+		&fileSfxReplace, &filePfxReplace, &fileStrReplace, &metaOps,
 		&filteredMetaOps)
 
 	// Login credentials
@@ -1140,7 +1148,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		authDetails                                                               []string
 		dlFilters, metaOps, moveOps, filteredMetaOps                              []string
 		configFile, dlFilterFile, moveOpsFile, metaOpsFile, filteredmetaOpsFile   string
-		fileSfxReplace, filePfxReplace                                            []string
+		fileSfxReplace, filePfxReplace, fileStrReplace                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
@@ -1261,6 +1269,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
 				filenameReplaceSfx:   fileSfxReplace,
 				filenameReplacePfx:   filePfxReplace,
+				filenameReplaceStr:   fileStrReplace,
 				renameStyle:          renameStyle,
 				extraFFmpegArgs:      extraFFmpegArgs,
 				filenameDateTag:      filenameDateTag,
@@ -1329,8 +1338,8 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
 		&minFreeMem, &outDir, &renameStyle,
 		&metaOpsFile, &filteredmetaOpsFile, &urlOutDirs,
-		&fileSfxReplace, &filePfxReplace, &metaOps,
-		&filteredMetaOps)
+		&fileSfxReplace, &filePfxReplace, &fileStrReplace,
+		&metaOps, &filteredMetaOps)
 
 	// Transcoding
 	setTranscodeFlags(updateSettingsCmd, &useGPU, &gpuDir,
@@ -1398,6 +1407,7 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 type cobraMetarrArgs struct {
 	filenameReplaceSfx   []string
 	filenameReplacePfx   []string
+	filenameReplaceStr   []string
 	renameStyle          string
 	extraFFmpegArgs      string
 	filenameDateTag      string
@@ -1514,6 +1524,22 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.FilenameReplacePfx = valid
+			return nil
+		})
+	}
+
+	// Filename replace strings (e.g. 'hello' to 'goodbye')
+	if f.Changed(keys.MFilenameReplaceStrings) {
+		valid := c.filenameReplaceStr
+
+		if len(c.filenameReplaceStr) > 0 {
+			valid, err = validation.ValidateFilenameReplaceStrings(c.filenameReplaceStr)
+			if err != nil {
+				return nil, err
+			}
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.FilenameReplaceStr = valid
 			return nil
 		})
 	}

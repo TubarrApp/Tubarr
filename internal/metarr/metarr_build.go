@@ -79,6 +79,12 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.FilenameReplacePfx,
 		},
 		{
+			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.FilenameReplaceStr},
+			valType:     strSlice,
+			viperKey:    keys.MFilenameReplaceStrings,
+			cmdKey:      metkeys.FilenameReplaceStr,
+		},
+		{
 			metarrValue: metVals{f64: cu.ChanURLMetarrArgs.MaxCPU},
 			valType:     f64,
 			viperKey:    "",

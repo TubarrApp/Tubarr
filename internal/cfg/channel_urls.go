@@ -24,7 +24,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		maxFilesize, externalDownloader, externalDownloaderArgs                   string
 		dlFilters, metaOps, moveOps, filteredMetaOps                              []string
 		dlFilterFile, moveOpsFile, metaOpsFile, filteredmetaOpsFile               string
-		fileSfxReplace, filePfxReplace                                            []string
+		fileSfxReplace, filePfxReplace, fileStrReplace                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
@@ -119,6 +119,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
 				filenameReplaceSfx:   fileSfxReplace,
 				filenameReplacePfx:   filePfxReplace,
+				filenameReplaceStr:   fileStrReplace,
 				renameStyle:          renameStyle,
 				extraFFmpegArgs:      extraFFmpegArgs,
 				filenameDateTag:      filenameDateTag,
@@ -208,8 +209,8 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
 		&minFreeMem, &outDir, &renameStyle,
 		&metaOpsFile, &filteredmetaOpsFile, &urlOutDirs,
-		&fileSfxReplace, &filePfxReplace, &metaOps,
-		&filteredMetaOps)
+		&fileSfxReplace, &filePfxReplace, &fileStrReplace,
+		&metaOps, &filteredMetaOps)
 
 	// Transcoding
 	setTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuDir,

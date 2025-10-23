@@ -16,6 +16,7 @@ const (
 	FilenameDateTag    = "--filename-date-tag"
 	FilenameReplaceSfx = "--filename-replace-suffix"
 	FilenameReplacePfx = "--filename-replace-prefix"
+	FilenameReplaceStr = "--filename-replace-strings"
 	OutputDir          = "--output-directory"
 )
 
