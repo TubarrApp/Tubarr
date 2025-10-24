@@ -26,6 +26,8 @@ func ValidateMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Cha
 	if len(urlDirs) == 0 && defaultDir == "" {
 		return nil, nil
 	}
+	// Deduplicate
+	urlDirs = DeduplicateSliceEntries(urlDirs)
 
 	// Initialize map and fill from existing
 	outDirMap := make(map[string]string)
@@ -223,6 +225,10 @@ func ValidateNotificationStrings(notifications []string) ([]*models.Notification
 	if len(notifications) == 0 {
 		return nil, nil
 	}
+	// Deduplicate
+	notifications = DeduplicateSliceEntries(notifications)
+
+	// Proceed
 	notificationModels := make([]*models.Notification, 0, len(notifications))
 	for _, n := range notifications {
 		if !strings.ContainsRune(n, '|') {
@@ -330,7 +336,10 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
+	// Deduplicate
+	ops = DeduplicateSliceEntries(ops)
 
+	// Proceed
 	const (
 		formatErrorMsg = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omits:must' omits videos only when the metafile contains a date field"
 	)
@@ -385,7 +394,10 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
+	// Deduplicate
+	ops = DeduplicateSliceEntries(ops)
 
+	// Proceed
 	const (
 		moveOpFormatError string = "please enter move operations in the format 'field:value:output directory'.\n\n'title:frogs:/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
 	)
@@ -424,6 +436,10 @@ func ValidateFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps
 		return nil, nil
 	}
 
+	// Deduplicate
+	filteredMetaOps = DeduplicateSliceEntries(filteredMetaOps)
+
+	// Proceed
 	validFilteredMetaOps := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
 	for _, fmo := range filteredMetaOps {
 		if !strings.ContainsRune(fmo, '|') {

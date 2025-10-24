@@ -29,7 +29,12 @@ func ValidateFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 		return nil, nil
 	}
 	const dupMsg = "Duplicate filename operation %q, skipping"
+	const invalidArg = "Invalid filename operation %q (format should be: 'prefix:[COOL CATEGORY] ', or 'date-tag:prefix:ymd', etc.)"
 
+	// Deduplicate
+	filenameOps = DeduplicateSliceEntries(filenameOps)
+
+	// Proceed
 	valid := make([]models.FilenameOps, 0, len(filenameOps))
 	exists := make(map[string]bool, len(filenameOps))
 
@@ -41,12 +46,12 @@ func ValidateFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 		split := EscapedSplit(opPart, ':')
 
 		if len(split) < 2 || len(split) > 3 {
-			logging.E("Invalid filename operation %q", op)
+			logging.E(invalidArg, op)
 			continue
 		}
 
 		if !validFilenameActions[split[0]] {
-			logging.E("invalid filename operation %q", op)
+			logging.E(invalidArg, op)
 			continue
 		}
 
@@ -87,7 +92,7 @@ func ValidateFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 				key = newFilenameOp.OpType
 			}
 		default:
-			logging.E("invalid filename op %q", opPart)
+			logging.E(invalidArg, opPart)
 			continue
 		}
 
@@ -122,6 +127,10 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	}
 	const dupMsg = "Duplicate meta operation %q, skipping"
 
+	// Deduplicate
+	metaOps = DeduplicateSliceEntries(metaOps)
+
+	// Proceed
 	valid := make([]models.MetaOps, 0, len(metaOps))
 	exists := make(map[string]bool, len(metaOps))
 
@@ -205,48 +214,6 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	}
 	if len(valid) == 0 {
 		return nil, errors.New("no valid meta operations")
-	}
-	return valid, nil
-}
-
-// ValidateFilenameSuffixReplace checks if the input format for filename suffix replacement is valid.
-func ValidateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
-	valid := make([]string, 0, len(fileSfxReplace))
-
-	for _, pair := range fileSfxReplace {
-		parts := strings.Split(pair, ":")
-		if len(parts) < 2 {
-			return nil, errors.New("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
-		}
-		valid = append(valid, pair)
-	}
-	return valid, nil
-}
-
-// ValidateFilenamePrefixReplace checks if the input format for filename prefix replacement is valid.
-func ValidateFilenamePrefixReplace(filePfxReplace []string) ([]string, error) {
-	valid := make([]string, 0, len(filePfxReplace))
-
-	for _, pair := range filePfxReplace {
-		parts := strings.Split(pair, ":")
-		if len(parts) < 2 {
-			return nil, errors.New("invalid use of filename-replace-prefix, values must be written as (prefix:replacement)")
-		}
-		valid = append(valid, pair)
-	}
-	return valid, nil
-}
-
-// ValidateFilenameReplaceStrings checks if the input format for filename string replacement is valid.
-func ValidateFilenameReplaceStrings(fileStrReplace []string) ([]string, error) {
-	valid := make([]string, 0, len(fileStrReplace))
-
-	for _, pair := range fileStrReplace {
-		parts := strings.Split(pair, ":")
-		if len(parts) < 2 {
-			return nil, errors.New("invalid use of filename-replace-strings, values must be written as (find:replacement)")
-		}
-		valid = append(valid, pair)
 	}
 	return valid, nil
 }

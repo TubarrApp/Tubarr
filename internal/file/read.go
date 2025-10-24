@@ -35,7 +35,6 @@ func LoadConfigFile(file string) error {
 	if err := viper.ReadInConfig(); err != nil {
 		return err
 	}
-
 	return nil
 }
 

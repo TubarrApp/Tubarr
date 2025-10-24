@@ -639,7 +639,7 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 	urlMetarr.RenameStyle, c = mergeStringSettings(urlMetarr.RenameStyle, channelMetarr.RenameStyle)
 	changed = changed || c
 
-	urlMetarr.FilenameDateTag, c = mergeStringSettings(urlMetarr.FilenameDateTag, channelMetarr.FilenameDateTag)
+	urlMetarr.FilenameOps, c = mergeSliceSettings(urlMetarr.FilenameOps, channelMetarr.FilenameOps)
 	changed = changed || c
 
 	// Metarr metadata operations

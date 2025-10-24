@@ -94,17 +94,17 @@ type MetaOps struct {
 type MetarrArgs struct {
 	// Metarr file operations.
 	Ext                string        `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
-	FilenameOps        []FilenameOps `json:"metarr_filename_ops" mapstructure:"metarr-filename-ops"`
+	FilenameOps        []FilenameOps `json:"metarr_filename_ops"`
+	FilenameOpsFile    string        `json:"metarr_filename_ops_file" mapstructure:"metarr-filename-ops-file"`
 	FilenameReplaceSfx []string      `json:"metarr_filename_replace_suffix" mapstructure:"metarr-filename-replace-suffix"`
 	FilenameReplacePfx []string      `json:"metarr_filename_replace_prefix" mapstructure:"metarr-filename-replace-prefix"`
 	FilenameReplaceStr []string      `json:"metarr_filename_replace_strings" mapstructure:"metarr-filename-replace-strings"`
 	RenameStyle        string        `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
-	FilenameDateTag    string        `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
 
 	// Metarr metadata operations.
-	MetaOps             []MetaOps         `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`
+	MetaOps             []MetaOps         `json:"metarr_meta_ops"`
 	MetaOpsFile         string            `json:"metarr_meta_ops_file" mapstructure:"metarr-meta-ops-file"`
-	FilteredMetaOps     []FilteredMetaOps `json:"filtered_meta_ops" mapstructure:"metarr-filtered-meta-ops"`
+	FilteredMetaOps     []FilteredMetaOps `json:"filtered_meta_ops"`
 	FilteredMetaOpsFile string            `json:"filtered_meta_ops_file" mapstructure:"metarr-filtered-meta-ops-file"`
 
 	// Metarr output directories.

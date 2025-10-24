@@ -1089,7 +1089,8 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("Meta Operations File: %v\n", m.MetaOpsFile)
 	fmt.Printf("Filtered Meta Operations: %v\n", m.FilteredMetaOps)
 	fmt.Printf("Filtered Meta Operations File: %v\n", m.FilteredMetaOpsFile)
-	fmt.Printf("Filename Date Format: %s\n", m.FilenameDateTag)
+	fmt.Printf("Filename Operations: %s\n", m.FilenameOps)
+	fmt.Printf("Filename Operations File: %s\n", m.FilenameOpsFile)
 
 	// Extra arguments
 	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
@@ -1286,20 +1287,43 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 		c.ChanMetarrArgs.Ext = v
 	}
 
-	// Filename suffix replacements
-	if v, ok := getConfigValue[[]string](keys.MFilenameReplaceSuffix); ok {
-		c.ChanMetarrArgs.FilenameReplaceSfx, err = validation.ValidateFilenameSuffixReplace(v)
+	// Filename ops
+	if v, ok := getConfigValue[[]string](keys.MFilenameOps); ok {
+		c.ChanMetarrArgs.FilenameOps, err = validation.ValidateFilenameOps(v)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Filename prefix replacements
-	if v, ok := getConfigValue[[]string](keys.MFilenameReplacePrefix); ok {
-		c.ChanMetarrArgs.FilenameReplacePfx, err = validation.ValidateFilenamePrefixReplace(v)
+	// Filename ops file
+	if v, ok := getConfigValue[string](keys.MFilenameOpsFile); ok {
+		c.ChanMetarrArgs.FilenameOpsFile = v
+	}
+
+	// Meta ops
+	if v, ok := getConfigValue[[]string](keys.MMetaOps); ok {
+		c.ChanMetarrArgs.MetaOps, err = validation.ValidateMetaOps(v)
 		if err != nil {
 			return err
 		}
+	}
+
+	// Meta ops file
+	if v, ok := getConfigValue[string](keys.MMetaOpsFile); ok {
+		c.ChanMetarrArgs.MetaOpsFile = v
+	}
+
+	// Filtered meta ops
+	if v, ok := getConfigValue[[]string](keys.MFilteredMetaOps); ok {
+		c.ChanMetarrArgs.FilteredMetaOps, err = validation.ValidateFilteredMetaOps(v)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Meta ops file
+	if v, ok := getConfigValue[string](keys.MFilteredMetaOpsFile); ok {
+		c.ChanMetarrArgs.FilteredMetaOpsFile = v
 	}
 
 	// Rename style
@@ -1313,22 +1337,6 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 	// Extra FFmpeg arguments
 	if v, ok := getConfigValue[string](keys.MExtraFFmpegArgs); ok {
 		c.ChanMetarrArgs.ExtraFFmpegArgs = v
-	}
-
-	// Filename date tag
-	if v, ok := getConfigValue[string](keys.MFilenameDateTag); ok {
-		if ok := validation.ValidateDateFormat(v); !ok {
-			return fmt.Errorf("date format %q in config file %q is invalid", v, c.ChanSettings.ChannelConfigFile)
-		}
-		c.ChanMetarrArgs.FilenameDateTag = v
-	}
-
-	// Meta ops
-	if v, ok := getConfigValue[[]string](keys.MMetaOps); ok {
-		c.ChanMetarrArgs.MetaOps, err = validation.ValidateMetaOps(v)
-		if err != nil {
-			return err
-		}
 	}
 
 	// Default output directory
@@ -1541,7 +1549,6 @@ func getConfigValue[T any](key string) (T, bool) {
 			return val, true
 		}
 	}
-
 	return zero, false
 }
 

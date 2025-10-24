@@ -20,11 +20,10 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		vDir, jDir, outDir                                                        string
 		urlOutDirs                                                                []string
 		cookieSource                                                              string
-		minFreeMem, renameStyle, filenameDateTag, metarrExt                       string
+		minFreeMem, renameStyle, metarrExt                                        string
 		maxFilesize, externalDownloader, externalDownloaderArgs                   string
-		dlFilters, metaOps, moveOps, filteredMetaOps                              []string
+		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps                 []string
 		dlFilterFile, moveOpsFile, metaOpsFile, filteredmetaOpsFile               string
-		fileSfxReplace, filePfxReplace, fileStrReplace                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
@@ -117,12 +116,9 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Gather metarr update functions
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
-				filenameReplaceSfx:   fileSfxReplace,
-				filenameReplacePfx:   filePfxReplace,
-				filenameReplaceStr:   fileStrReplace,
+				filenameOps:          filenameOps,
 				renameStyle:          renameStyle,
 				extraFFmpegArgs:      extraFFmpegArgs,
-				filenameDateTag:      filenameDateTag,
 				metarrExt:            metarrExt,
 				metaOps:              metaOps,
 				outputDir:            outDir,
@@ -206,10 +202,9 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 	// Metarr
 	setMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,
-		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
-		&minFreeMem, &outDir, &renameStyle,
-		&metaOpsFile, &filteredmetaOpsFile, &urlOutDirs,
-		&fileSfxReplace, &filePfxReplace, &fileStrReplace,
+		&metarrExt, &extraFFmpegArgs, &minFreeMem,
+		&outDir, &renameStyle, &metaOpsFile,
+		&filteredmetaOpsFile, &urlOutDirs, &filenameOps,
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding

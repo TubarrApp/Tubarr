@@ -639,19 +639,19 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	var (
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
-		externalDownloader, externalDownloaderArgs, maxFilesize, filenameDateTag, renameStyle, minFreeMem, metarrExt string
-		urlOutDirs                                                                                      []string
-		username, password, loginURL                                                                    string
-		authDetails                                                                                     []string
-		notification                                                                                    []string
-		fromDate, toDate                                                                                string
-		dlFilters, metaOps, moveOps, filteredMetaOps, fileSfxReplace, filePfxReplace, fileStrReplace    []string
-		configFile, dlFilterFile, moveOpFile, metaOpsFile, filteredmetaOpsFile                          string
-		crawlFreq, concurrency, metarrConcurrency, retries                                              int
-		maxCPU                                                                                          float64
-		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
-		pause, ignoreRun, useGlobalCookies                                                              bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                        string
+		externalDownloader, externalDownloaderArgs, maxFilesize, renameStyle, minFreeMem, metarrExt string
+		urlOutDirs                                                                                                []string
+		username, password, loginURL                                                                              string
+		authDetails                                                                                               []string
+		notification                                                                                              []string
+		fromDate, toDate                                                                                          string
+		dlFilters, metaOps, filenameOps, moveOps, filteredMetaOps, fileSfxReplace, filePfxReplace, fileStrReplace []string
+		configFile, dlFilterFile, moveOpFile, metaOpsFile, filenameOpsFile, filteredmetaOpsFile                   string
+		crawlFreq, concurrency, metarrConcurrency, retries                                                        int
+		maxCPU                                                                                                    float64
+		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt           string
+		pause, ignoreRun, useGlobalCookies                                                                        bool
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                                  string
 	)
 
 	addCmd := &cobra.Command{
@@ -687,22 +687,22 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			}
 
 			// Validate move operation filters
-			moveOps, err := validation.ValidateMoveOps(moveOps)
+			moveOpsModels, err := validation.ValidateMoveOps(moveOps)
 			if err != nil {
 				return err
 			}
 
-			// Filename date tag
-			if filenameDateTag != "" {
-				if !validation.ValidateDateFormat(filenameDateTag) {
-					return errors.New("invalid Metarr filename date tag format")
+			// Meta operations
+			var metaOpsModels = []models.MetaOps{}
+			if len(metaOps) > 0 {
+				if metaOpsModels, err = validation.ValidateMetaOps(metaOps); err != nil {
+					return err
 				}
 			}
 
-			// Meta operations
-			var metaOpsModel = []models.MetaOps{}
-			if len(metaOps) > 0 {
-				if metaOpsModel, err = validation.ValidateMetaOps(metaOps); err != nil {
+			var filenameOpsModels = []models.FilenameOps{}
+			if len(filenameOps) > 0 {
+				if filenameOpsModels, err = validation.ValidateFilenameOps(filenameOps); err != nil {
 					return err
 				}
 			}
@@ -711,27 +711,6 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			var filteredMetaOpsModels = []models.FilteredMetaOps{}
 			if len(filteredMetaOps) > 0 {
 				if filteredMetaOpsModels, err = validation.ValidateFilteredMetaOps(filteredMetaOps); err != nil {
-					return err
-				}
-			}
-
-			// Filename suffix replace (e.g. '_1' to '')
-			if len(fileSfxReplace) > 0 {
-				if fileSfxReplace, err = validation.ValidateFilenameSuffixReplace(fileSfxReplace); err != nil {
-					return err
-				}
-			}
-
-			// Filename prefix replace (e.g. '_1' to '')
-			if len(filePfxReplace) > 0 {
-				if filePfxReplace, err = validation.ValidateFilenameSuffixReplace(filePfxReplace); err != nil {
-					return err
-				}
-			}
-
-			// Filename strings replace (e.g. 'hello' to 'goodbye')
-			if len(fileStrReplace) > 0 {
-				if fileStrReplace, err = validation.ValidateFilenameReplaceStrings(fileStrReplace); err != nil {
 					return err
 				}
 			}
@@ -851,7 +830,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 					FromDate:               fromDate,
 					JSONDir:                jDir,
 					MaxFilesize:            maxFilesize,
-					MoveOps:                moveOps,
+					MoveOps:                moveOpsModels,
 					MoveOpFile:             moveOpFile,
 					Paused:                 pause,
 					Retries:                retries,
@@ -866,11 +845,12 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				ChanMetarrArgs: &models.MetarrArgs{
 					Ext:                  metarrExt,
 					ExtraFFmpegArgs:      extraFFmpegArgs,
-					MetaOps:              metaOpsModel,
+					MetaOps:              metaOpsModels,
 					MetaOpsFile:          metaOpsFile,
+					FilenameOps:          filenameOpsModels,
+					FilenameOpsFile:      filenameOpsFile,
 					FilteredMetaOps:      filteredMetaOpsModels,
 					FilteredMetaOpsFile:  filteredmetaOpsFile,
-					FilenameDateTag:      filenameDateTag,
 					RenameStyle:          renameStyle,
 					FilenameReplaceSfx:   fileSfxReplace,
 					FilenameReplacePfx:   filePfxReplace,
@@ -952,11 +932,10 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	// Metarr
 	setMetarrFlags(addCmd, &maxCPU, &metarrConcurrency,
-		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
-		&minFreeMem, &outDir, &renameStyle,
-		&metaOpsFile, &filteredmetaOpsFile, &urlOutDirs,
-		&fileSfxReplace, &filePfxReplace, &fileStrReplace, &metaOps,
-		&filteredMetaOps)
+		&metarrExt, &extraFFmpegArgs, &minFreeMem,
+		&outDir, &renameStyle, &metaOpsFile,
+		&filteredmetaOpsFile, &urlOutDirs, &filenameOps,
+		&metaOps, &filteredMetaOps)
 
 	// Login credentials
 	setAuthFlags(addCmd, &username, &password, &loginURL, &authDetails)
@@ -1142,13 +1121,12 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		vDir, jDir, outDir                                                        string
 		urlOutDirs                                                                []string
 		name, cookieSource                                                        string
-		minFreeMem, renameStyle, filenameDateTag, metarrExt                       string
+		minFreeMem, renameStyle, metarrExt                                        string
 		maxFilesize, externalDownloader, externalDownloaderArgs                   string
 		username, password, loginURL                                              string
 		authDetails                                                               []string
-		dlFilters, metaOps, moveOps, filteredMetaOps                              []string
+		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps                 []string
 		configFile, dlFilterFile, moveOpsFile, metaOpsFile, filteredmetaOpsFile   string
-		fileSfxReplace, filePfxReplace, fileStrReplace                            []string
 		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
 		fromDate, toDate                                                          string
 		ytdlpOutExt                                                               string
@@ -1267,12 +1245,9 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Metarr arguments
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
-				filenameReplaceSfx:   fileSfxReplace,
-				filenameReplacePfx:   filePfxReplace,
-				filenameReplaceStr:   fileStrReplace,
+				filenameOps:          filenameOps,
 				renameStyle:          renameStyle,
 				extraFFmpegArgs:      extraFFmpegArgs,
-				filenameDateTag:      filenameDateTag,
 				metarrExt:            metarrExt,
 				metaOps:              metaOps,
 				metaOpsFile:          metaOpsFile,
@@ -1335,10 +1310,9 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 	// Metarr
 	setMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
-		&metarrExt, &extraFFmpegArgs, &filenameDateTag,
-		&minFreeMem, &outDir, &renameStyle,
-		&metaOpsFile, &filteredmetaOpsFile, &urlOutDirs,
-		&fileSfxReplace, &filePfxReplace, &fileStrReplace,
+		&metarrExt, &extraFFmpegArgs, &minFreeMem,
+		&outDir, &renameStyle, &metaOpsFile,
+		&filteredmetaOpsFile, &urlOutDirs, &filenameOps,
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding
@@ -1405,15 +1379,13 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 // ******************************** Private ********************************
 
 type cobraMetarrArgs struct {
-	filenameReplaceSfx   []string
-	filenameReplacePfx   []string
-	filenameReplaceStr   []string
 	renameStyle          string
 	extraFFmpegArgs      string
-	filenameDateTag      string
 	metarrExt            string
 	metaOps              []string
 	metaOpsFile          string
+	filenameOps          []string
+	filenameOpsFile      string
 	filteredMetaOps      []string
 	filteredMetaOpsFile  string
 	outputDir            string
@@ -1431,7 +1403,6 @@ type cobraMetarrArgs struct {
 
 // getMetarrArgFns gets and collects the Metarr argument functions for channel updates.
 func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
-
 	f := cmd.Flags()
 
 	// Min free memory
@@ -1483,63 +1454,18 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Filename date tag
-	if f.Changed(keys.MFilenameDateTag) {
-		if c.filenameDateTag != "" {
-			if !validation.ValidateDateFormat(c.filenameDateTag) {
-				return nil, errors.New("invalid Metarr filename date tag format")
-			}
-		}
-		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilenameDateTag = c.filenameDateTag
-			return nil
-		})
-	}
+	// Filename operations (e.g. 'prefix:[DOG COLLECTION] ')
+	if f.Changed(keys.MFilenameOps) {
+		valid := []models.FilenameOps{}
 
-	// Filename replace suffix (e.g. '_1' to '')
-	if f.Changed(keys.MFilenameReplaceSuffix) {
-		valid := c.filenameReplaceSfx
-
-		if len(c.filenameReplaceSfx) > 0 {
-			valid, err = validation.ValidateFilenameSuffixReplace(c.filenameReplaceSfx)
+		if len(c.filenameOps) > 0 {
+			valid, err = validation.ValidateFilenameOps(c.filenameOps)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilenameReplaceSfx = valid
-			return nil
-		})
-	}
-
-	// Filename replace prefix (e.g. '_1' to '')
-	if f.Changed(keys.MFilenameReplacePrefix) {
-		valid := c.filenameReplacePfx
-
-		if len(c.filenameReplacePfx) > 0 {
-			valid, err = validation.ValidateFilenamePrefixReplace(c.filenameReplacePfx)
-			if err != nil {
-				return nil, err
-			}
-		}
-		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilenameReplacePfx = valid
-			return nil
-		})
-	}
-
-	// Filename replace strings (e.g. 'hello' to 'goodbye')
-	if f.Changed(keys.MFilenameReplaceStrings) {
-		valid := c.filenameReplaceStr
-
-		if len(c.filenameReplaceStr) > 0 {
-			valid, err = validation.ValidateFilenameReplaceStrings(c.filenameReplaceStr)
-			if err != nil {
-				return nil, err
-			}
-		}
-		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilenameReplaceStr = valid
+			m.FilenameOps = valid
 			return nil
 		})
 	}
@@ -1593,6 +1519,29 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	if f.Changed(keys.MMetaOpsFile) {
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.MetaOpsFile = c.metaOpsFile
+			return nil
+		})
+	}
+
+	// Filename operations (e.g. 'prefix:[COOL CAT VIDEOS]')
+	if f.Changed(keys.MFilenameOps) {
+		valid := []models.FilenameOps{}
+
+		if len(c.filenameOps) > 0 {
+			valid, err = validation.ValidateFilenameOps(c.filenameOps)
+			if err != nil {
+				return nil, err
+			}
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.FilenameOps = valid
+			return nil
+		})
+	}
+
+	if f.Changed(keys.MFilenameOpsFile) {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.FilenameOpsFile = c.filenameOpsFile
 			return nil
 		})
 	}
@@ -1999,6 +1948,9 @@ func verifyChanRowUpdateValid(col, val string) error {
 //	'{"channel_url":"https://ch1.com","username":"user1","password":"pass1","login_url":"https://login1.com"}'
 func parseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[string]*models.ChannelAccessDetails, error) {
 	authMap := make(map[string]*models.ChannelAccessDetails, len(cURLs))
+
+	// Deduplicate
+	a = validation.DeduplicateSliceEntries(a)
 
 	// Handle delete all operation
 	if deleteAll {

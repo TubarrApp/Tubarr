@@ -42,7 +42,8 @@ const (
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 	// Load and merge meta ops: file ops override DB ops, then apply filtering
-	validOps := loadAndMergeMetaOps(v, cu, c, dirParser)
+	validMetaOps := loadAndMergeMetaOps(v, cu, c, dirParser)
+	validFilenameOps := loadAndMergeFilenameOps(v, cu, dirParser)
 
 	fields := []metCmdMapping{
 		// Metarr args:
@@ -59,28 +60,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.Ext,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.FilenameDateTag},
-			valType:     str,
-			viperKey:    keys.MFilenameDateTag,
-			cmdKey:      metkeys.FilenameDateTag,
-		},
-		{
-			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.FilenameReplaceSfx},
+			metarrValue: metVals{strSlice: validFilenameOps},
 			valType:     strSlice,
-			viperKey:    keys.MFilenameReplaceSuffix,
-			cmdKey:      metkeys.FilenameReplaceSfx,
-		},
-		{
-			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.FilenameReplacePfx},
-			valType:     strSlice,
-			viperKey:    keys.MFilenameReplacePrefix,
-			cmdKey:      metkeys.FilenameReplacePfx,
-		},
-		{
-			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.FilenameReplaceStr},
-			valType:     strSlice,
-			viperKey:    keys.MFilenameReplaceStrings,
-			cmdKey:      metkeys.FilenameReplaceStr,
+			viperKey:    keys.MFilenameOps,
+			cmdKey:      metkeys.FilenameOps,
 		},
 		{
 			metarrValue: metVals{f64: cu.ChanURLMetarrArgs.MaxCPU},
@@ -89,7 +72,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.MaxCPU,
 		},
 		{
-			metarrValue: metVals{strSlice: validOps},
+			metarrValue: metVals{strSlice: validMetaOps},
 			valType:     strSlice,
 			viperKey:    keys.MMetaOps,
 			cmdKey:      metkeys.MetaOps,
@@ -213,7 +196,7 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	fileMetaOps := loadMetaOpsFromFile(v, cu, dirParser)
 
 	// File ops override DB ops with same key
-	dbOps := filterConflictingOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
+	dbOps := filterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
 
 	// Combine and apply filtering
 	fileAndDBOps := append(fileMetaOps, dbOps...)
@@ -227,11 +210,29 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	}
 
 	// Convert to strings, filtering by URL and deduplicating
-	return convertToValidOpStrings(allOps)
+	return convertToValidMetaOpStrings(allOps)
 }
 
-// filterConflictingOps removes DB ops that conflict with file ops on the same field
-func filterConflictingOps(fileOps, dbOps []models.MetaOps) []models.MetaOps {
+// loadAndMergeFilenameOps loads and merges filename ops: file ops override DB ops
+func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) []string {
+	// Load file ops (highest priority)
+	fileFilenameOps := loadFilenameOpsFromFile(v, cu, dirParser)
+	// File ops override DB ops with same key
+	dbOps := filterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps)
+	// Combine
+	fileAndDBOps := append(fileFilenameOps, dbOps...)
+	var allOps = make([]models.FilenameOps, 0, len(fileAndDBOps))
+	for _, op := range fileAndDBOps {
+		if op.ChannelURL == "" || op.ChannelURL == cu.URL {
+			allOps = append(allOps, op)
+		}
+	}
+	// Convert to strings, filtering by URL and deduplicating
+	return convertToValidFilenameOpStrings(allOps)
+}
+
+// filterConflictingMetaOps removes DB ops that conflict with file ops on the same field
+func filterConflictingMetaOps(fileOps, dbOps []models.MetaOps) []models.MetaOps {
 	fileOpKeys := make(map[string]bool)
 
 	// Build conflict keys (field:optype only, not value [otherwise conflicting keys won't match])
@@ -247,6 +248,42 @@ func filterConflictingOps(fileOps, dbOps []models.MetaOps) []models.MetaOps {
 			result = append(result, op)
 		} else {
 			logging.D(2, "File meta op overrides DB op: %s", parsing.BuildMetaOpsKey(op))
+		}
+	}
+	return result
+}
+
+// filterConflictingFilenameOps removes DB ops that are fully identical to file ops
+func filterConflictingFilenameOps(fileOps, dbOps []models.FilenameOps) []models.FilenameOps {
+	fileOpKeys := make(map[string]bool)
+	// Build conflict keys (all fields to identify fully identical ops)
+	for _, op := range fileOps {
+		if !isNonConflictingOp(op.OpType) {
+			key := op.OpType + ":" + op.OpFindString + ":" + op.OpValue + ":" + op.OpLoc + ":" + op.DateFormat
+			fileOpKeys[key] = true
+		}
+	}
+	result := make([]models.FilenameOps, 0, len(dbOps))
+	for _, op := range dbOps {
+		key := op.OpType + ":" + op.OpFindString + ":" + op.OpValue + ":" + op.OpLoc + ":" + op.DateFormat
+		if !fileOpKeys[key] || isNonConflictingOp(op.OpType) {
+			result = append(result, op)
+		} else {
+			logging.D(2, "File filename op overrides DB op: %s", parsing.BuildFilenameOpsKey(op))
+		}
+	}
+	return result
+}
+
+// convertToValidFilenameOpStrings converts ops to deduplicated string slice for specific URL
+func convertToValidFilenameOpStrings(ops []models.FilenameOps) []string {
+	seen := make(map[string]bool, len(ops))
+	result := make([]string, 0, len(ops))
+	for _, op := range ops {
+		opStr := parsing.BuildFilenameOpsKey(op)
+		if !seen[opStr] {
+			seen[opStr] = true
+			result = append(result, opStr)
 		}
 	}
 	return result
@@ -305,8 +342,8 @@ func buildKeySet(ops []models.MetaOps, includeNonConflicting bool) map[string]bo
 	return keys
 }
 
-// convertToValidOpStrings converts ops to deduplicated string slice for specific URL
-func convertToValidOpStrings(ops []models.MetaOps) []string {
+// convertToValidMetaOpStrings converts ops to deduplicated string slice for specific URL
+func convertToValidMetaOpStrings(ops []models.MetaOps) []string {
 	seen := make(map[string]bool, len(ops))
 	result := make([]string, 0, len(ops))
 
@@ -471,6 +508,7 @@ func cleanCommaSliceValues(slice []string) []string {
 }
 
 // loadMetaOpsFromFile loads in meta operations from the given file.
+//
 // File ops take precedence and will replace any matching DB ops.
 func loadMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaOps {
 	if cu.ChanURLMetarrArgs.MetaOpsFile == "" {
@@ -498,5 +536,37 @@ func loadMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.Dir
 	}
 
 	logging.I("Loaded %d meta ops from file", len(validOps))
+	return validOps
+}
+
+// loadFilenameOpsFromFile loads in meta operations from the given file.
+//
+// File ops take precedence and will replace any matching DB ops.
+func loadFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilenameOps {
+	if cu.ChanURLMetarrArgs.FilenameOpsFile == "" {
+		return nil
+	}
+
+	filenameOpsFile := cu.ChanURLMetarrArgs.FilenameOpsFile
+	var err error
+	if filenameOpsFile, err = dp.ParseDirectory(filenameOpsFile, v, "filename ops"); err != nil {
+		logging.E("Failed to parse directory %q: %v", filenameOpsFile, err)
+		return nil
+	}
+
+	logging.I("Adding filename ops from file %q...", filenameOpsFile)
+	ops, err := file.ReadFileLines(filenameOpsFile)
+	if err != nil {
+		logging.E("Error loading filename ops from file %q: %v", filenameOpsFile, err)
+		return nil
+	}
+
+	validOps, err := validation.ValidateFilenameOps(ops)
+	if err != nil {
+		logging.E("Error validating filename ops from file %q: %v", filenameOpsFile, err)
+		return nil
+	}
+
+	logging.I("Loaded %d filename ops from file", len(validOps))
 	return validOps
 }

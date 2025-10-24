@@ -17,27 +17,9 @@ func initFileTransformers(rootCmd *cobra.Command) error {
 		return err
 	}
 
-	// Prefix files with date tag
-	rootCmd.PersistentFlags().String(keys.MFilenameDateTag, "", "Looks for dates in metadata to prefix the video with. (date:format [e.g. Ymd for yyyy-mm-dd])")
-	if err := viper.BindPFlag(keys.MFilenameDateTag, rootCmd.PersistentFlags().Lookup(keys.MFilenameDateTag)); err != nil {
-		return err
-	}
-
 	// Rename convention
 	rootCmd.PersistentFlags().StringP(keys.MRenameStyle, "r", "skip", "Rename flag (spaces, underscores, fixes-only, or skip)")
 	if err := viper.BindPFlag(keys.MRenameStyle, rootCmd.PersistentFlags().Lookup(keys.MRenameStyle)); err != nil {
-		return err
-	}
-
-	// Replace filename suffix
-	rootCmd.PersistentFlags().StringSlice(keys.MFilenameReplaceSuffix, nil, "Replaces a specified suffix on filenames. (suffix:replacement)")
-	if err := viper.BindPFlag(keys.MFilenameReplaceSuffix, rootCmd.PersistentFlags().Lookup(keys.MFilenameReplaceSuffix)); err != nil {
-		return err
-	}
-
-	// Replace filename suffix
-	rootCmd.PersistentFlags().StringSlice(keys.MFilenameReplacePrefix, nil, "Replaces a specified prefix on filenames. (prefix:replacement)")
-	if err := viper.BindPFlag(keys.MFilenameReplacePrefix, rootCmd.PersistentFlags().Lookup(keys.MFilenameReplacePrefix)); err != nil {
 		return err
 	}
 

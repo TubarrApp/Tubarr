@@ -55,3 +55,22 @@ func CheckForOpURL(op string) (chanURL string, ops string) {
 	}
 	return u, strings.Join(split[1:], "|")
 }
+
+// DeduplicateSliceEntries removes duplicate entries in slices.
+func DeduplicateSliceEntries(input []string) []string {
+	if len(input) == 0 {
+		return input
+	}
+
+	dedupedSlice := make([]string, 0, len(input))
+	dedupMap := make(map[string]bool, len(input))
+
+	for _, in := range input {
+		if dedupMap[in] {
+			logging.W("Removing duplicate of entry %q", in)
+		}
+		dedupMap[in] = true
+		dedupedSlice = append(dedupedSlice, in)
+	}
+	return dedupedSlice
+}

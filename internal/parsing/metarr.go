@@ -33,3 +33,34 @@ func BuildMetaOpsKeyWithChannel(mo models.MetaOps) string {
 	}
 	return key
 }
+
+// BuildFilenameOpsKey creates a unique key for filename operations
+func BuildFilenameOpsKey(fo models.FilenameOps) string {
+	var key string
+	switch fo.OpType {
+	case "date-tag", "delete-date-tag":
+		key = fo.OpType + ":" + fo.OpLoc + ":" + fo.DateFormat
+	case "replace", "trim-suffix", "trim-prefix":
+		key = fo.OpType + ":" + fo.OpFindString + ":" + fo.OpValue
+	default:
+		key = fo.OpType + ":" + fo.OpValue
+	}
+	return key
+}
+
+// BuildFilenameOpsKeyWithChannel creates a unique key for filename operations
+func BuildFilenameOpsKeyWithChannel(fo models.FilenameOps) string {
+	var key string
+	switch fo.OpType {
+	case "date-tag", "delete-date-tag":
+		key = fo.OpType + ":" + fo.OpLoc + ":" + fo.DateFormat
+	case "replace", "trim-suffix", "trim-prefix":
+		key = fo.OpType + ":" + fo.OpFindString + ":" + fo.OpValue
+	default:
+		key = fo.OpType + ":" + fo.OpValue
+	}
+	if fo.ChannelURL != "" {
+		key = fo.ChannelURL + "|" + key
+	}
+	return key
+}

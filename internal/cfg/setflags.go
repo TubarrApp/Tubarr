@@ -83,7 +83,7 @@ func setDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 
 // External programs
 // setMetarrFlags sets flags for interaction with the Metarr software.
-func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, filenameDateTag, minFreeMem, outDir, renameStyle, metaOpsFile, filteredmetaOpsFile *string, urlOutDirs, fileSfxReplace, filePfxReplace, fileStrReplace, metaOps, filteredMetaOps *[]string) {
+func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, minFreeMem, outDir, renameStyle, metaOpsFile, filteredmetaOpsFile *string, urlOutDirs, filenameOps, metaOps, filteredMetaOps *[]string) {
 	// Numbers
 	if maxCPU != nil {
 		cmd.Flags().Float64Var(maxCPU, keys.MMaxCPU, 0, "Max CPU usage for Metarr")
@@ -98,9 +98,6 @@ func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	}
 	if extraFFmpegargs != nil {
 		cmd.Flags().StringVar(extraFFmpegargs, keys.MExtraFFmpegArgs, "", "Arguments to add on to FFmpeg commands")
-	}
-	if filenameDateTag != nil {
-		cmd.Flags().StringVar(filenameDateTag, keys.MFilenameDateTag, "", "Prefix a filename with a particular date tag (ymd format where Y means yyyy and y means yy)")
 	}
 	if minFreeMem != nil {
 		cmd.Flags().StringVar(minFreeMem, keys.MMinFreeMem, "", "Min free mem for Metarr process")
@@ -119,14 +116,8 @@ func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	}
 
 	// Arrays
-	if fileSfxReplace != nil {
-		cmd.Flags().StringSliceVar(fileSfxReplace, keys.MFilenameReplaceSuffix, nil, "Replace a filename suffix element in Metarr")
-	}
-	if filePfxReplace != nil {
-		cmd.Flags().StringSliceVar(filePfxReplace, keys.MFilenameReplacePrefix, nil, "Replace a filename prefix element in Metarr")
-	}
-	if fileStrReplace != nil {
-		cmd.Flags().StringSliceVar(fileStrReplace, keys.MFilenameReplaceStrings, nil, "Replace instances of a string with a replacement in Metarr")
+	if filenameOps != nil {
+		cmd.Flags().StringSliceVar(filenameOps, keys.MFilenameOps, nil, "Filename operations for Metarr (e.g. 'prefix:[CATEGORY] ' or 'date-tag:prefix:ymd')")
 	}
 	if metaOps != nil {
 		cmd.Flags().StringSliceVar(metaOps, keys.MMetaOps, nil, "Meta operations to perform in Metarr")
