@@ -69,6 +69,16 @@ type MoveOps struct {
 	OutputDir  string `json:"move_op_output_dir"`
 }
 
+// FilenameOps are applied to fields by Metarr.
+type FilenameOps struct {
+	ChannelURL   string `json:"filename_op_channel_url"`
+	OpType       string `json:"filename_op_type"`
+	OpFindString string `json:"filename_op_find_string"`
+	OpValue      string `json:"filename_op_value"`
+	OpLoc        string `json:"filename_op_loc"`
+	DateFormat   string `json:"filename_op_date_format"`
+}
+
 // MetaOps are applied to fields by Metarr.
 type MetaOps struct {
 	ChannelURL   string `json:"meta_op_channel_url"`
@@ -83,12 +93,13 @@ type MetaOps struct {
 // MetarrArgs are the arguments used when calling the Metarr external program.
 type MetarrArgs struct {
 	// Metarr file operations.
-	Ext                string   `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
-	FilenameReplaceSfx []string `json:"metarr_filename_replace_suffix" mapstructure:"metarr-filename-replace-suffix"`
-	FilenameReplacePfx []string `json:"metarr_filename_replace_prefix" mapstructure:"metarr-filename-replace-prefix"`
-	FilenameReplaceStr []string `json:"metarr_filename_replace_strings" mapstructure:"metarr-filename-replace-strings"`
-	RenameStyle        string   `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
-	FilenameDateTag    string   `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
+	Ext                string        `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
+	FilenameOps        []FilenameOps `json:"metarr_filename_ops" mapstructure:"metarr-filename-ops"`
+	FilenameReplaceSfx []string      `json:"metarr_filename_replace_suffix" mapstructure:"metarr-filename-replace-suffix"`
+	FilenameReplacePfx []string      `json:"metarr_filename_replace_prefix" mapstructure:"metarr-filename-replace-prefix"`
+	FilenameReplaceStr []string      `json:"metarr_filename_replace_strings" mapstructure:"metarr-filename-replace-strings"`
+	RenameStyle        string        `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
+	FilenameDateTag    string        `json:"metarr_filename_date_prefix" mapstructure:"metarr-filename-date-prefix"`
 
 	// Metarr metadata operations.
 	MetaOps             []MetaOps         `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`

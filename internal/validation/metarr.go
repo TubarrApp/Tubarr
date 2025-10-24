@@ -11,6 +11,109 @@ import (
 	"tubarr/internal/utils/logging"
 )
 
+var validMetaActions = map[string]bool{
+	"append": true, "copy-to": true, "paste-from": true, "prefix": true,
+	"trim-prefix": true, "trim-suffix": true, "replace": true, "set": true,
+	"date-tag": true, "delete-date-tag": true,
+}
+
+var validFilenameActions = map[string]bool{
+	"append": true, "prefix": true, "trim-prefix": true, "trim-suffix": true,
+	"replace": true, "date-tag": true, "delete-date-tag": true,
+}
+
+// ValidateFilenameOps parses and validates filename transformation operations.
+func ValidateFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
+	if len(filenameOps) == 0 {
+		logging.D(4, "No filename operations passed in to verification")
+		return nil, nil
+	}
+	const dupMsg = "Duplicate filename operation %q, skipping"
+
+	valid := make([]models.FilenameOps, 0, len(filenameOps))
+	exists := make(map[string]bool, len(filenameOps))
+
+	logging.D(1, "Validating filename operations %v...", filenameOps)
+
+	// Check filename ops
+	for _, op := range filenameOps {
+		opURL, opPart := CheckForOpURL(op)
+		split := EscapedSplit(opPart, ':')
+
+		if len(split) < 2 || len(split) > 3 {
+			logging.E("Invalid filename operation %q", op)
+			continue
+		}
+
+		if !validFilenameActions[split[0]] {
+			logging.E("invalid filename operation %q", op)
+			continue
+		}
+
+		var newFilenameOp models.FilenameOps
+		var key string
+		switch len(split) {
+		case 2: // e.g. 'prefix:[DOG VIDEOS]'
+			newFilenameOp.OpType = split[0]  // e.g. 'append'
+			newFilenameOp.OpValue = split[1] // e.g. '(new)'
+
+			// Build uniqueness key
+			key = strings.Join([]string{newFilenameOp.OpType, newFilenameOp.OpValue}, ":")
+
+		case 3: // e.g. 'replace-suffix:_1:'
+			switch split[0] {
+			case "trim-suffix", "trim-prefix", "replace":
+				newFilenameOp.OpType = split[0]       // e.g. 'trim-suffix'
+				newFilenameOp.OpFindString = split[1] // e.g. '_1'
+				newFilenameOp.OpValue = split[2]      // e.g. ''
+
+				// Build uniqueness key
+				key = strings.Join([]string{newFilenameOp.OpType, newFilenameOp.OpFindString, newFilenameOp.OpValue}, ":")
+
+			case "date-tag", "delete-date-tag":
+				newFilenameOp.OpType = split[0]     // e.g. 'date-tag'
+				newFilenameOp.OpLoc = split[1]      // e.g. 'prefix'
+				newFilenameOp.DateFormat = split[2] // e.g. 'ymd'
+
+				if newFilenameOp.OpLoc != "prefix" && newFilenameOp.OpLoc != "suffix" {
+					logging.E("invalid date tag location %q, use prefix or suffix", newFilenameOp.OpLoc)
+					continue
+				}
+				if !ValidateDateFormat(newFilenameOp.DateFormat) {
+					logging.E("invalid date tag format %q", newFilenameOp.DateFormat)
+					continue
+				}
+				// Build uniqueness key
+				key = newFilenameOp.OpType
+			}
+		default:
+			logging.E("invalid filename op %q", opPart)
+			continue
+		}
+
+		// Completed switch, check if key exists (sets true on key if not)
+		if exists[key] {
+			logging.I(dupMsg, opPart)
+			continue
+		}
+		exists[key] = true
+
+		// Add channel URL is present
+		if opURL != "" {
+			newFilenameOp.ChannelURL = opURL
+		}
+
+		// Add successful filename operation
+		valid = append(valid, newFilenameOp)
+	}
+
+	// Check length of valid filename operations
+	if len(valid) == 0 {
+		return nil, errors.New("no valid filename operations")
+	}
+	return valid, nil
+}
+
 // ValidateMetaOps parses and validates meta transformation operations.
 func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	if len(metaOps) == 0 {
@@ -22,10 +125,6 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	valid := make([]models.MetaOps, 0, len(metaOps))
 	exists := make(map[string]bool, len(metaOps))
 
-	validActions := map[string]bool{
-		"append": true, "copy-to": true, "paste-from": true, "prefix": true,
-		"trim-prefix": true, "trim-suffix": true, "replace": true, "set": true,
-	}
 	logging.D(1, "Validating meta operations %v...", metaOps)
 
 	// Check meta ops
@@ -33,84 +132,76 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 		opURL, opPart := CheckForOpURL(op)
 		split := EscapedSplit(opPart, ':')
 
-		var newOp models.MetaOps
+		if len(split) < 3 || len(split) > 4 {
+			logging.E("Invalid meta operation %q", op)
+			continue
+		}
+
+		if !validMetaActions[split[1]] {
+			logging.E("invalid meta operation %q", split[1])
+			continue
+		}
+
+		var newMetaOp models.MetaOps
+		var key string
 		switch len(split) {
 		case 3: // e.g. 'director:set:Spielberg'
-
-			newOp.Field = split[0]   // e.g. 'director'
-			newOp.OpType = split[1]  // e.g. 'set'
-			newOp.OpValue = split[2] // e.g. 'Spielberg'
-
-			if !validActions[newOp.OpType] {
-				logging.E("invalid meta operation %q", newOp.OpType)
-				continue
-			}
+			newMetaOp.Field = split[0]   // e.g. 'director'
+			newMetaOp.OpType = split[1]  // e.g. 'set'
+			newMetaOp.OpValue = split[2] // e.g. 'Spielberg'
 
 			// Build uniqueness key
-			key := strings.Join([]string{newOp.Field, newOp.OpType, newOp.OpValue}, ":")
-			if exists[key] {
-				logging.I(dupMsg, opPart)
-				continue
-			}
-
-			exists[key] = true
-			if opURL != "" {
-				newOp.ChannelURL = opURL
-			}
-			valid = append(valid, newOp)
+			key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType, newMetaOp.OpValue}, ":")
 
 		case 4: // e.g. 'title:date-tag:suffix:ymd' or 'title:replace:old:new'
-			newOp.Field = split[0]
-			newOp.OpType = split[1]
+			newMetaOp.Field = split[0]
+			newMetaOp.OpType = split[1]
 
-			if !validActions[newOp.OpType] {
-				logging.E("invalid meta operation %q", newOp.OpType)
-				continue
-			}
+			switch newMetaOp.OpType {
+			case "date-tag", "delete-date-tag":
+				newMetaOp.OpLoc = split[2]
+				newMetaOp.DateFormat = split[3]
 
-			var key string
-			switch newOp.OpType {
-			case "date-tag":
-				newOp.OpLoc = split[2]
-				newOp.DateFormat = split[3]
-
-				if newOp.OpLoc != "prefix" && newOp.OpLoc != "suffix" {
-					logging.E("invalid date tag location %q, use prefix or suffix", newOp.OpLoc)
+				if newMetaOp.OpLoc != "prefix" && newMetaOp.OpLoc != "suffix" {
+					logging.E("invalid date tag location %q, use prefix or suffix", newMetaOp.OpLoc)
 					continue
 				}
-				if !ValidateDateFormat(newOp.DateFormat) {
-					logging.E("invalid date tag format %q", newOp.DateFormat)
+				if !ValidateDateFormat(newMetaOp.DateFormat) {
+					logging.E("invalid date tag format %q", newMetaOp.DateFormat)
 					continue
 				}
-
-				key = strings.Join([]string{newOp.Field, newOp.OpType}, ":")
+				// Build uniqueness key
+				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType}, ":")
 
 			case "replace":
-				newOp.OpFindString = split[2]
-				newOp.OpValue = split[3]
+				newMetaOp.OpFindString = split[2]
+				newMetaOp.OpValue = split[3]
 
-				key = strings.Join([]string{newOp.Field, newOp.OpType, newOp.OpFindString, newOp.OpValue}, ":")
+				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType, newMetaOp.OpFindString, newMetaOp.OpValue}, ":")
 
 			default:
-				logging.E("invalid 4-part meta op type %q", newOp.OpType)
+				logging.E("invalid 4-part meta op type %q", newMetaOp.OpType)
 				continue
 			}
-
-			if exists[key] {
-				logging.I(dupMsg, opPart)
-				continue
-			}
-			exists[key] = true
-
-			if opURL != "" {
-				newOp.ChannelURL = opURL
-			}
-			valid = append(valid, newOp)
-
 		default:
 			logging.E("invalid meta op %q", opPart)
 			continue
 		}
+
+		// Completed switch, check if key exists (sets true on key if not)
+		if exists[key] {
+			logging.I(dupMsg, opPart)
+			continue
+		}
+		exists[key] = true
+
+		// Add channel URL is present
+		if opURL != "" {
+			newMetaOp.ChannelURL = opURL
+		}
+
+		// Add successful meta operation
+		valid = append(valid, newMetaOp)
 	}
 	if len(valid) == 0 {
 		return nil, errors.New("no valid meta operations")
