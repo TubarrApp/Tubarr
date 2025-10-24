@@ -223,14 +223,11 @@ func ValidateNotificationStrings(notifications []string) ([]*models.Notification
 	if len(notifications) == 0 {
 		return nil, nil
 	}
-
 	notificationModels := make([]*models.Notification, 0, len(notifications))
 	for _, n := range notifications {
-
 		if !strings.ContainsRune(n, '|') {
 			return nil, fmt.Errorf("notification entry %q does not contain a '|' separator (should be in 'URL|friendly name' format", n)
 		}
-
 		entry := EscapedSplit(n, '|')
 
 		// Check entries for validity and fill field details
@@ -267,7 +264,6 @@ func ValidateNotificationStrings(notifications []string) ([]*models.Notification
 				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
 			}
 		}
-
 		// Use URL as name if name field is missing
 		if name == "" {
 			name = nURL
@@ -284,7 +280,6 @@ func ValidateNotificationStrings(notifications []string) ([]*models.Notification
 		notificationModels = append(notificationModels, &newNotificationModel)
 		logging.D(3, "Added notification model: %+v", newNotificationModel)
 	}
-
 	return notificationModels, nil
 }
 
@@ -382,7 +377,6 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 			ChannelURL: chanURL,
 		})
 	}
-
 	return filters, nil
 }
 
@@ -397,7 +391,6 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 	)
 
 	m := make([]models.MoveOps, 0, len(ops))
-
 	for _, op := range ops {
 
 		chanURL, op := CheckForOpURL(op)

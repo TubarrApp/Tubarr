@@ -1,3 +1,4 @@
+// Package main is the entrypoint of Tubarr.
 package main
 
 import (
@@ -16,16 +17,8 @@ import (
 	"tubarr/internal/utils/times"
 )
 
-// main is the main entrypoint of the program (duh!)
+// main is the main entrypoint of the program (duh!).
 func main() {
-	defer func() {
-		if r := recover(); r != nil {
-			logging.E("Panic recovered: %v", r)
-			benchmark.CloseBenchmarking()
-			panic(r) // Re-panic after cleanup
-		}
-	}()
-
 	startTime := time.Now()
 	store, progControl, err := initializeApplication()
 	if err != nil {
@@ -35,22 +28,38 @@ func main() {
 	logging.I("Tubarr (PID: %d) started at: %v", progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGSEGV)
-	defer cancel()
-	defer cleanup(progControl, startTime)
 
-	// Close benchmarking at the very end
-	defer benchmark.CloseBenchmarking()
+	// Cleanup runs on ALL exits (normal, panic, signal)
+	defer func() {
+		benchmark.CloseBenchmarking()
+		cleanup(progControl, startTime)
+	}()
 
-	// Start heatbeat
-	go startHeartbeat(ctx, progControl)
+	// Panic handler
+	defer func() {
+		if r := recover(); r != nil {
+			logging.E("Panic recovered: %v", r)
+			panic(r) // Re-panic to preserve stack trace
+		}
+	}()
 
-	// Cobra/Viper commands
+	// Start heartbeat with shutdown coordination
+	heartbeatDone := make(chan struct{})
+	go func() {
+		startHeartbeat(ctx, progControl)
+		close(heartbeatDone)
+	}()
+	defer func() {
+		cancel()
+		<-heartbeatDone
+	}()
+
+	// Initialize Viper/Cobra
 	if err := cfg.InitCommands(ctx, store); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
 	}
 
-	// Execute Cobra/Viper
 	if err := cfg.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
@@ -58,7 +67,6 @@ func main() {
 
 	// Check channels
 	if abstractions.GetBool(keys.CheckChannels) {
-		// Wait with countdown (or skip if -s flag is set)
 		if err := times.StartupWait(ctx); err != nil {
 			logging.E("Exiting before startup timer exited")
 			return

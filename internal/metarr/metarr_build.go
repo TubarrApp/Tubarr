@@ -45,12 +45,11 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	validOps := loadAndMergeMetaOps(v, cu, c, dirParser)
 
 	fields := []metCmdMapping{
-
 		// Metarr args:
 		{
 			metarrValue: metVals{i: cu.ChanURLMetarrArgs.Concurrency},
 			valType:     i,
-			viperKey:    "", // Don't use Tubarr concurrency key, Metarr has more potential resource constraints
+			viperKey:    "", // Don't use Tubarr concurrency key for Metarr.
 			cmdKey:      metkeys.Concurrency,
 		},
 		{
@@ -348,7 +347,6 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 		} else if f.viperKey != "" && abstractions.IsSet(f.viperKey) {
 			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(abstractions.GetStringSlice(f.viperKey))
 		}
-
 		// Set Meta Overwrite flag if meta-ops arguments exist
 		if f.cmdKey == metkeys.MetaOps {
 			elemCount := len(f.metarrValue.strSlice)
@@ -460,7 +458,6 @@ func cleanAndWrapCommaPaths(path string) string {
 
 		return b.String()
 	}
-
 	return path
 }
 

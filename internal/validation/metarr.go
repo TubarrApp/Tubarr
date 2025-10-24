@@ -122,13 +122,11 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 func ValidateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 	valid := make([]string, 0, len(fileSfxReplace))
 
-	lengthStrings := 0
 	for _, pair := range fileSfxReplace {
 		parts := strings.Split(pair, ":")
 		if len(parts) < 2 {
 			return nil, errors.New("invalid use of filename-replace-suffix, values must be written as (suffix:replacement)")
 		}
-		lengthStrings += len(parts[0]+parts[1]) + 1
 		valid = append(valid, pair)
 	}
 	return valid, nil
@@ -138,13 +136,11 @@ func ValidateFilenameSuffixReplace(fileSfxReplace []string) ([]string, error) {
 func ValidateFilenamePrefixReplace(filePfxReplace []string) ([]string, error) {
 	valid := make([]string, 0, len(filePfxReplace))
 
-	lengthStrings := 0
 	for _, pair := range filePfxReplace {
 		parts := strings.Split(pair, ":")
 		if len(parts) < 2 {
 			return nil, errors.New("invalid use of filename-replace-prefix, values must be written as (prefix:replacement)")
 		}
-		lengthStrings += len(parts[0]+parts[1]) + 1
 		valid = append(valid, pair)
 	}
 	return valid, nil
@@ -154,13 +150,11 @@ func ValidateFilenamePrefixReplace(filePfxReplace []string) ([]string, error) {
 func ValidateFilenameReplaceStrings(fileStrReplace []string) ([]string, error) {
 	valid := make([]string, 0, len(fileStrReplace))
 
-	lengthStrings := 0
 	for _, pair := range fileStrReplace {
 		parts := strings.Split(pair, ":")
 		if len(parts) < 2 {
 			return nil, errors.New("invalid use of filename-replace-strings, values must be written as (find:replacement)")
 		}
-		lengthStrings += len(parts[0]+parts[1]) + 1
 		valid = append(valid, pair)
 	}
 	return valid, nil
@@ -193,15 +187,19 @@ func ValidateDateFormat(dateFmt string) bool {
 
 // ValidateMinFreeMem flag verifies the format of the free memory flag.
 func ValidateMinFreeMem(minFreeMem string) error {
-	minFreeMem = strings.TrimSuffix(strings.ToUpper(minFreeMem), "B")
+	minFreeMem = strings.ToUpper(minFreeMem)
+	minFreeMem = strings.TrimSuffix(minFreeMem, "B")
+
 	switch {
-	case strings.HasSuffix(minFreeMem, "G"), strings.HasSuffix(minFreeMem, "M"), strings.HasSuffix(minFreeMem, "K"):
+	case strings.HasSuffix(minFreeMem, "G"),
+		strings.HasSuffix(minFreeMem, "M"),
+		strings.HasSuffix(minFreeMem, "K"):
 		if len(minFreeMem) < 2 {
 			return fmt.Errorf("invalid format for min free mem: %q", minFreeMem)
 		}
 	default:
 		if _, err := strconv.Atoi(minFreeMem); err != nil {
-			return fmt.Errorf("invalid min free memory argument %q for Metarr, should ", minFreeMem)
+			return fmt.Errorf("invalid min free memory argument %q for Metarr, should end in 'G', 'GB', 'M', 'MB', 'K' or 'KB'", minFreeMem)
 		}
 	}
 	return nil
@@ -287,11 +285,8 @@ func ValidateGPU(g, devDir string) (gpu, gpuDir string, err error) {
 
 	_, err = os.Stat(devDir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", "", fmt.Errorf("driver location %q does not appear to exist?", devDir)
-		}
+		return "", "", fmt.Errorf("cannot access driver location %q: %w", devDir, err)
 	}
-
 	return gpu, devDir, nil
 }
 
@@ -307,13 +302,13 @@ func ValidateTranscodeCodec(c string, accel string) (codec string, err error) {
 		return c, nil
 	case "avc", "x264":
 		return "h264", nil
-	case "h265":
+	case "h265", "x265":
 		return "hevc", nil
 	case "":
 		if accel == "" {
 			return "", nil
 		}
-		return "", fmt.Errorf("entered codec %q not supported with acceleration type %q. Tubarr supports h264 and HEVC (h265)", c, accel)
+		return "", fmt.Errorf("acceleration type %q requires a codec to be specified. Tubarr supports h264 and HEVC (h265)", accel)
 	default:
 		return "", fmt.Errorf("entered codec %q not supported. Tubarr supports h264 and HEVC (h265)", c)
 	}

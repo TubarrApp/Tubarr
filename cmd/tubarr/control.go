@@ -1,4 +1,3 @@
-// Package main is the entrypoint of Tubarr.
 package main
 
 import (

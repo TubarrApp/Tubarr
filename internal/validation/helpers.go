@@ -18,21 +18,17 @@ func EscapedSplit(s string, desiredSeparator rune) []string {
 			// Always take the next character literally
 			buf.WriteRune(r)
 			escaped = false
-
 		case r == '\\':
 			// Escape next character
 			escaped = true
-
 		case r == desiredSeparator:
 			// Separator
 			parts = append(parts, buf.String())
 			buf.Reset()
-
 		default:
 			buf.WriteRune(r)
 		}
 	}
-
 	if escaped {
 		// Trailing '\' treated as literal backslash
 		buf.WriteRune('\\')
@@ -40,7 +36,6 @@ func EscapedSplit(s string, desiredSeparator rune) []string {
 
 	// Add last segment
 	parts = append(parts, buf.String())
-
 	return parts
 }
 
@@ -51,7 +46,6 @@ func CheckForOpURL(op string) (chanURL string, ops string) {
 	if len(split) < 2 {
 		return "", op
 	}
-
 	// Parse URL
 	u := split[0]
 
@@ -59,6 +53,5 @@ func CheckForOpURL(op string) (chanURL string, ops string) {
 		logging.W("Invalid URL format grabbed as %q. Ignore this if the filter (%q) does not contain a channel URL (format is 'channel URL|filter:ops:go:here')", u, op)
 		return "", strings.Join(split[1:], "|")
 	}
-
 	return u, strings.Join(split[1:], "|")
 }
