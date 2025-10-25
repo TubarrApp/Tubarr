@@ -52,6 +52,13 @@ type FilteredMetaOps struct {
 	FiltersMatched bool
 }
 
+// FilteredFilenameOps allows file operation entry based on filter matching.
+type FilteredFilenameOps struct {
+	Filters        []DLFilters
+	FilenameOps    []FilenameOps
+	FiltersMatched bool
+}
+
 // DLFilters are used to filter in or out videos from download by metafields.
 type DLFilters struct {
 	ChannelURL string `json:"filter_url_specific"`
@@ -93,13 +100,12 @@ type MetaOps struct {
 // MetarrArgs are the arguments used when calling the Metarr external program.
 type MetarrArgs struct {
 	// Metarr file operations.
-	Ext                string        `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
-	FilenameOps        []FilenameOps `json:"metarr_filename_ops"`
-	FilenameOpsFile    string        `json:"metarr_filename_ops_file" mapstructure:"metarr-filename-ops-file"`
-	FilenameReplaceSfx []string      `json:"metarr_filename_replace_suffix" mapstructure:"metarr-filename-replace-suffix"`
-	FilenameReplacePfx []string      `json:"metarr_filename_replace_prefix" mapstructure:"metarr-filename-replace-prefix"`
-	FilenameReplaceStr []string      `json:"metarr_filename_replace_strings" mapstructure:"metarr-filename-replace-strings"`
-	RenameStyle        string        `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
+	OutputExt               string                `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
+	FilenameOps             []FilenameOps         `json:"metarr_filename_ops"`
+	FilenameOpsFile         string                `json:"metarr_filename_ops_file" mapstructure:"metarr-filename-ops-file"`
+	FilteredFilenameOps     []FilteredFilenameOps `json:"filtered_filename_ops"`
+	FilteredFilenameOpsFile string                `json:"filtered_filename_ops_file" mapstructure:"metarr-filtered-filename-ops-file"`
+	RenameStyle             string                `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
 
 	// Metarr metadata operations.
 	MetaOps             []MetaOps         `json:"metarr_meta_ops"`

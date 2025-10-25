@@ -83,7 +83,11 @@ func setDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 
 // External programs
 // setMetarrFlags sets flags for interaction with the Metarr software.
-func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, ext, extraFFmpegargs, minFreeMem, outDir, renameStyle, metaOpsFile, filteredmetaOpsFile *string, urlOutDirs, filenameOps, metaOps, filteredMetaOps *[]string) {
+func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
+	outputExt, extraFFmpegargs, minFreeMem, outDir, renameStyle, metaOpsFile,
+	filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile *string,
+	urlOutDirs, filenameOps, filteredFilenameOps, metaOps, filteredMetaOps *[]string) {
+
 	// Numbers
 	if maxCPU != nil {
 		cmd.Flags().Float64Var(maxCPU, keys.MMaxCPU, 0, "Max CPU usage for Metarr")
@@ -93,8 +97,8 @@ func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	}
 
 	// String
-	if ext != nil {
-		cmd.Flags().StringVar(ext, keys.MExt, "", "Output filetype for videos passed into Metarr")
+	if outputExt != nil {
+		cmd.Flags().StringVar(outputExt, keys.MOutputExt, "", "Output filetype for videos passed into Metarr")
 	}
 	if extraFFmpegargs != nil {
 		cmd.Flags().StringVar(extraFFmpegargs, keys.MExtraFFmpegArgs, "", "Arguments to add on to FFmpeg commands")
@@ -111,22 +115,31 @@ func setMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	if metaOpsFile != nil {
 		cmd.Flags().StringVar(metaOpsFile, keys.MMetaOpsFile, "", "File containing meta operations (one per line)")
 	}
-	if filteredmetaOpsFile != nil {
-		cmd.Flags().StringVar(filteredmetaOpsFile, keys.MFilteredMetaOpsFile, "", "File containing filtered meta operations (one per line, format: Filter Rules|Meta Ops)")
+	if filteredMetaOpsFile != nil {
+		cmd.Flags().StringVar(filteredMetaOpsFile, keys.MFilteredMetaOpsFile, "", "File containing filtered meta operations (one per line, format: Filter Rules|Meta Ops)")
+	}
+	if filenameOpsFile != nil {
+		cmd.Flags().StringVar(filenameOpsFile, keys.MFilenameOpsFile, "", "File containing filename operations (one per line)")
+	}
+	if filteredFilenameOpsFile != nil {
+		cmd.Flags().StringVar(filteredFilenameOpsFile, keys.MFilteredFilenameOpsFile, "", "File containing filtered filename operations (one per line, format: Filter Rules|Filename Ops)")
 	}
 
 	// Arrays
+	if urlOutDirs != nil {
+		cmd.Flags().StringSliceVar(urlOutDirs, keys.MURLOutputDirs, nil, "Metarr will move a channel URL's files to this location on completion (some {{}} templating commands available)")
+	}
 	if filenameOps != nil {
 		cmd.Flags().StringSliceVar(filenameOps, keys.MFilenameOps, nil, "Filename operations for Metarr (e.g. 'prefix:[CATEGORY] ' or 'date-tag:prefix:ymd')")
+	}
+	if filteredFilenameOps != nil {
+		cmd.Flags().StringSliceVar(filteredFilenameOps, keys.MFilteredFilenameOps, nil, "Filename operations to perform in Metarr, based on filters matched in metadata")
 	}
 	if metaOps != nil {
 		cmd.Flags().StringSliceVar(metaOps, keys.MMetaOps, nil, "Meta operations to perform in Metarr")
 	}
 	if filteredMetaOps != nil {
 		cmd.Flags().StringSliceVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operations to perform in Metarr, based on filters matched in metadata")
-	}
-	if urlOutDirs != nil {
-		cmd.Flags().StringSliceVar(urlOutDirs, keys.MURLOutputDirs, nil, "Metarr will move a channel URL's files to this location on completion (some {{}} templating commands available)")
 	}
 }
 

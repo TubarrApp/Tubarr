@@ -476,6 +476,52 @@ func ValidateFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps
 	return validFilteredMetaOps, nil
 }
 
+// ValidateFilteredFilenameOps validates that filter-based filename operations are valid.
+func ValidateFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFilenameOps, error) {
+	if len(filteredFilenameOps) == 0 {
+		return nil, nil
+	}
+
+	// Deduplicate
+	filteredFilenameOps = DeduplicateSliceEntries(filteredFilenameOps)
+
+	// Proceed
+	validFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
+	for _, fmo := range filteredFilenameOps {
+		if !strings.ContainsRune(fmo, '|') {
+			continue
+		}
+
+		split := EscapedSplit(fmo, '|')
+		if len(split) < 2 {
+			return nil, fmt.Errorf("invalid format for filtered meta operation (entered: %s). Please use 'Filter Rules|Meta Operations'", fmo)
+		}
+
+		filterRule := split[:1]
+		filenameRules := split[1:]
+
+		filterOps, err := ValidateFilterOps(filterRule)
+		if err != nil {
+			return nil, err
+		}
+
+		filenameOps, err := ValidateFilenameOps(filenameRules)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(filterOps) == 0 || len(filenameOps) == 0 {
+			continue
+		}
+
+		validFilteredFilenameOps = append(validFilteredFilenameOps, models.FilteredFilenameOps{
+			Filters:     filterOps,
+			FilenameOps: filenameOps,
+		})
+	}
+	return validFilteredFilenameOps, nil
+}
+
 // ValidateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
 func ValidateToFromDate(d string) (string, error) {
 	d = strings.ToLower(d)

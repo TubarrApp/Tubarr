@@ -1072,7 +1072,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
 	fmt.Printf("URL-Specific Output Directories: %v\n", m.URLOutputDirs)
-	fmt.Printf("Output Filetype: %s\n", m.Ext)
+	fmt.Printf("Output Filetype: %s\n", m.OutputExt)
 	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
 	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
 	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)
@@ -1082,15 +1082,14 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("Audio Codec: %s\n", m.TranscodeAudioCodec)
 	fmt.Printf("Transcode Quality: %s\n", m.TranscodeQuality)
 	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
-	fmt.Printf("Filename Suffix Replacements: %v\n", m.FilenameReplaceSfx)
-	fmt.Printf("Filename Prefix Replacements: %v\n", m.FilenameReplacePfx)
-	fmt.Printf("Filename String Replacements: %v\n", m.FilenameReplaceStr)
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
 	fmt.Printf("Meta Operations File: %v\n", m.MetaOpsFile)
 	fmt.Printf("Filtered Meta Operations: %v\n", m.FilteredMetaOps)
 	fmt.Printf("Filtered Meta Operations File: %v\n", m.FilteredMetaOpsFile)
 	fmt.Printf("Filename Operations: %s\n", m.FilenameOps)
 	fmt.Printf("Filename Operations File: %s\n", m.FilenameOpsFile)
+	fmt.Printf("Filtered Filename Operations: %v\n", m.FilteredFilenameOps)
+	fmt.Printf("Filtered Filename Operations File: %v\n", m.FilteredFilenameOpsFile)
 
 	// Extra arguments
 	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
@@ -1280,11 +1279,11 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 	)
 
 	// Metarr output extension
-	if v, ok := getConfigValue[string](keys.MExt); ok {
+	if v, ok := getConfigValue[string](keys.MOutputExt); ok {
 		if _, err := validation.ValidateOutputFiletype(c.ChanSettings.ChannelConfigFile); err != nil {
 			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ChanSettings.ChannelConfigFile)
 		}
-		c.ChanMetarrArgs.Ext = v
+		c.ChanMetarrArgs.OutputExt = v
 	}
 
 	// Filename ops

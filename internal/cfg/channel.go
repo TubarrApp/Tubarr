@@ -32,7 +32,6 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 			return errors.New("please specify a subcommand. Use --help to see available subcommands")
 		},
 	}
-
 	cs := s.ChannelStore()
 
 	// Channel commands
@@ -640,18 +639,21 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		urls []string
 		name, vDir, jDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, renameStyle, minFreeMem, metarrExt string
-		urlOutDirs                                                                                                []string
-		username, password, loginURL                                                                              string
-		authDetails                                                                                               []string
-		notification                                                                                              []string
-		fromDate, toDate                                                                                          string
-		dlFilters, metaOps, filenameOps, moveOps, filteredMetaOps, fileSfxReplace, filePfxReplace, fileStrReplace []string
-		configFile, dlFilterFile, moveOpFile, metaOpsFile, filenameOpsFile, filteredmetaOpsFile                   string
-		crawlFreq, concurrency, metarrConcurrency, retries                                                        int
-		maxCPU                                                                                                    float64
-		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt           string
-		pause, ignoreRun, useGlobalCookies                                                                        bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                                  string
+		urlOutDirs                   []string
+		username, password, loginURL string
+		authDetails                  []string
+		notification                 []string
+		fromDate, toDate             string
+
+		dlFilters, moveOps, metaOps, filenameOps, filteredMetaOps, filteredFilenameOps []string
+
+		configFile, dlFilterFile, moveOpFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
+
+		crawlFreq, concurrency, metarrConcurrency, retries                                              int
+		maxCPU                                                                                          float64
+		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
+		pause, ignoreRun, useGlobalCookies                                                              bool
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                        string
 	)
 
 	addCmd := &cobra.Command{
@@ -711,6 +713,14 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			var filteredMetaOpsModels = []models.FilteredMetaOps{}
 			if len(filteredMetaOps) > 0 {
 				if filteredMetaOpsModels, err = validation.ValidateFilteredMetaOps(filteredMetaOps); err != nil {
+					return err
+				}
+			}
+
+			// Filtered filename operations
+			var filteredFilenameOpsModels = []models.FilteredFilenameOps{}
+			if len(filteredFilenameOps) > 0 {
+				if filteredFilenameOpsModels, err = validation.ValidateFilteredFilenameOps(filteredFilenameOps); err != nil {
 					return err
 				}
 			}
@@ -843,18 +853,20 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				},
 
 				ChanMetarrArgs: &models.MetarrArgs{
-					Ext:                  metarrExt,
-					ExtraFFmpegArgs:      extraFFmpegArgs,
-					MetaOps:              metaOpsModels,
-					MetaOpsFile:          metaOpsFile,
-					FilenameOps:          filenameOpsModels,
-					FilenameOpsFile:      filenameOpsFile,
-					FilteredMetaOps:      filteredMetaOpsModels,
-					FilteredMetaOpsFile:  filteredmetaOpsFile,
+					OutputExt:       metarrExt,
+					ExtraFFmpegArgs: extraFFmpegArgs,
+
+					MetaOps:             metaOpsModels,
+					MetaOpsFile:         metaOpsFile,
+					FilteredMetaOps:     filteredMetaOpsModels,
+					FilteredMetaOpsFile: filteredMetaOpsFile,
+
+					FilenameOps:             filenameOpsModels,
+					FilenameOpsFile:         filenameOpsFile,
+					FilteredFilenameOps:     filteredFilenameOpsModels,
+					FilteredFilenameOpsFile: filteredFilenameOpsFile,
+
 					RenameStyle:          renameStyle,
-					FilenameReplaceSfx:   fileSfxReplace,
-					FilenameReplacePfx:   filePfxReplace,
-					FilenameReplaceStr:   fileStrReplace,
 					MaxCPU:               maxCPU,
 					MinFreeMem:           minFreeMem,
 					OutputDir:            outDir,
@@ -934,7 +946,8 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	setMetarrFlags(addCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
-		&filteredmetaOpsFile, &urlOutDirs, &filenameOps,
+		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
+		&urlOutDirs, &filenameOps, &filteredFilenameOps,
 		&metaOps, &filteredMetaOps)
 
 	// Login credentials
@@ -1115,23 +1128,23 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 // updateChannelSettingsCmd updates channel settings.
 func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		urls                                                                      []string
-		id, concurrency, crawlFreq, metarrConcurrency, retries                    int
-		maxCPU                                                                    float64
-		vDir, jDir, outDir                                                        string
-		urlOutDirs                                                                []string
-		name, cookieSource                                                        string
-		minFreeMem, renameStyle, metarrExt                                        string
-		maxFilesize, externalDownloader, externalDownloaderArgs                   string
-		username, password, loginURL                                              string
-		authDetails                                                               []string
-		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps                 []string
-		configFile, dlFilterFile, moveOpsFile, metaOpsFile, filteredmetaOpsFile   string
-		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
-		fromDate, toDate                                                          string
-		ytdlpOutExt                                                               string
-		useGlobalCookies, pause, deleteAuth                                       bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                  string
+		urls                                                                                                              []string
+		id, concurrency, crawlFreq, metarrConcurrency, retries                                                            int
+		maxCPU                                                                                                            float64
+		vDir, jDir, outDir                                                                                                string
+		urlOutDirs                                                                                                        []string
+		name, cookieSource                                                                                                string
+		minFreeMem, renameStyle, metarrExt                                                                                string
+		maxFilesize, externalDownloader, externalDownloaderArgs                                                           string
+		username, password, loginURL                                                                                      string
+		authDetails                                                                                                       []string
+		dlFilters, moveOps, metaOps, filteredMetaOps, filenameOps, filteredFilenameOps                                    []string
+		configFile, dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
+		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter                                         string
+		fromDate, toDate                                                                                                  string
+		ytdlpOutExt                                                                                                       string
+		useGlobalCookies, pause, deleteAuth                                                                               bool
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                                          string
 	)
 
 	updateSettingsCmd := &cobra.Command{
@@ -1245,14 +1258,20 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Metarr arguments
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
-				filenameOps:          filenameOps,
-				renameStyle:          renameStyle,
-				extraFFmpegArgs:      extraFFmpegArgs,
-				metarrExt:            metarrExt,
-				metaOps:              metaOps,
-				metaOpsFile:          metaOpsFile,
-				filteredMetaOps:      filteredMetaOps,
-				filteredMetaOpsFile:  filteredmetaOpsFile,
+				renameStyle:     renameStyle,
+				extraFFmpegArgs: extraFFmpegArgs,
+				metarrExt:       metarrExt,
+
+				metaOps:             metaOps,
+				metaOpsFile:         metaOpsFile,
+				filteredMetaOps:     filteredMetaOps,
+				filteredMetaOpsFile: filteredMetaOpsFile,
+
+				filenameOps:             filenameOps,
+				filenameOpsFile:         filenameOpsFile,
+				filteredFilenameOps:     filteredFilenameOps,
+				filteredFilenameOpsFile: filteredFilenameOpsFile,
+
 				outputDir:            outDir,
 				urlOutputDirs:        urlOutDirs,
 				concurrency:          metarrConcurrency,
@@ -1312,7 +1331,8 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	setMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
-		&filteredmetaOpsFile, &urlOutDirs, &filenameOps,
+		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
+		&urlOutDirs, &filenameOps, &filteredFilenameOps,
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding
@@ -1379,15 +1399,20 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 // ******************************** Private ********************************
 
 type cobraMetarrArgs struct {
-	renameStyle          string
-	extraFFmpegArgs      string
-	metarrExt            string
-	metaOps              []string
-	metaOpsFile          string
-	filenameOps          []string
-	filenameOpsFile      string
-	filteredMetaOps      []string
-	filteredMetaOpsFile  string
+	renameStyle     string
+	extraFFmpegArgs string
+	metarrExt       string
+
+	metaOps             []string
+	metaOpsFile         string
+	filteredMetaOps     []string
+	filteredMetaOpsFile string
+
+	filenameOps             []string
+	filenameOpsFile         string
+	filteredFilenameOps     []string
+	filteredFilenameOpsFile string
+
 	outputDir            string
 	urlOutputDirs        []string
 	concurrency          int
@@ -1419,7 +1444,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	// Metarr final video output extension (e.g. 'mp4')
-	if f.Changed(keys.MExt) {
+	if f.Changed(keys.MOutputExt) {
 		if c.metarrExt != "" {
 			_, err := validation.ValidateOutputFiletype(c.metarrExt)
 			if err != nil {
@@ -1428,7 +1453,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		}
 		c.metarrExt = strings.ToLower(c.metarrExt)
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.Ext = c.metarrExt
+			m.OutputExt = c.metarrExt
 			return nil
 		})
 	}
@@ -1466,6 +1491,36 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.FilenameOps = valid
+			return nil
+		})
+	}
+
+	if f.Changed(keys.MFilenameOpsFile) {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.FilenameOpsFile = c.filenameOpsFile
+			return nil
+		})
+	}
+
+	// Filtered filename operations
+	if f.Changed(keys.MFilteredFilenameOps) {
+		valid := []models.FilteredFilenameOps{}
+
+		if len(c.filteredFilenameOps) > 0 {
+			valid, err = validation.ValidateFilteredFilenameOps(c.filteredFilenameOps)
+			if err != nil {
+				return nil, err
+			}
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.FilteredFilenameOps = valid
+			return nil
+		})
+	}
+
+	if f.Changed(keys.MFilteredFilenameOpsFile) {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.FilteredFilenameOpsFile = c.filteredFilenameOpsFile
 			return nil
 		})
 	}
@@ -1523,7 +1578,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Filename operations (e.g. 'prefix:[COOL CAT VIDEOS]')
+	// Filename meta operations (e.g. 'prefix:[COOL CAT VIDEOS]')
 	if f.Changed(keys.MFilenameOps) {
 		valid := []models.FilenameOps{}
 

@@ -6,7 +6,7 @@ import "tubarr/internal/models"
 func BuildMetaOpsKey(mo models.MetaOps) string {
 	var key string
 	switch mo.OpType {
-	case "date-tag":
+	case "date-tag", "delete-date-tag":
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpLoc + ":" + mo.DateFormat
 	case "replace":
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpFindString + ":" + mo.OpValue
@@ -20,7 +20,7 @@ func BuildMetaOpsKey(mo models.MetaOps) string {
 func BuildMetaOpsKeyWithChannel(mo models.MetaOps) string {
 	var key string
 	switch mo.OpType {
-	case "date-tag":
+	case "date-tag", "delete-date-tag":
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpLoc + ":" + mo.DateFormat
 	case "replace":
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpFindString + ":" + mo.OpValue

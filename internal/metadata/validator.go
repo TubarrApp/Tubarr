@@ -15,7 +15,7 @@ import (
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
 //
 // Returns true if the video passes all filters and JSON validity checks.
-func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, err error) {
+func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
@@ -23,18 +23,18 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Apply filters
-	passedFilters, useFilteredMetaOps, err := handleFilters(v, cu, c, dirParser)
+	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
 	if err != nil {
 		logging.E("filter operation checks failed for %q: %v", v.URL, err)
 	}
 	if !jsonValid || !passedFilters {
-		return false, useFilteredMetaOps, nil
+		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
 	// Check move operations
 	v.MoveOpOutputDir = handleMoveOps(v, cu, dirParser)
 
-	return true, useFilteredMetaOps, nil
+	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
 // parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
@@ -92,7 +92,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 }
 
 // handleFilters uses user input filters to check if the video should be downloaded.
-func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, err error) {
+func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
 	// Check filtered meta ops
 	filteredMetaOps := make([]models.FilteredMetaOps, len(cu.ChanURLMetarrArgs.FilteredMetaOps))
 	copy(filteredMetaOps, cu.ChanURLMetarrArgs.FilteredMetaOps)
@@ -102,6 +102,16 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 
 	relevantFilteredMetaOps := getRelevantFilteredMetaOps(filteredMetaOps, cu.URL)
 	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, relevantFilteredMetaOps, c.Name)
+
+	// Check filtered filename ops
+	filteredFilenameOps := make([]models.FilteredFilenameOps, len(cu.ChanURLMetarrArgs.FilteredFilenameOps))
+	copy(filteredFilenameOps, cu.ChanURLMetarrArgs.FilteredFilenameOps)
+
+	filteredFilenameOpsFileFilters := loadFilteredFilenameOpsFromFile(v, cu, dirParser)
+	filteredFilenameOps = append(filteredFilenameOps, filteredFilenameOpsFileFilters...)
+
+	relevantFilteredFilenameOps := getRelevantFilteredFilenameOps(filteredFilenameOps, cu.URL)
+	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
 
 	// Check download filters
 	allFilters := make([]models.DLFilters, len(cu.ChanURLSettings.Filters))
@@ -113,20 +123,20 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	relevantFilters := getRelevantFilters(allFilters, cu.URL)
 
 	if !filterOpsFilter(v, relevantFilters, c.Name) {
-		return false, useFilteredMetaOps, nil
+		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
 	// Check upload date filter
 	passUploadDate, err := uploadDateFilter(v, cu, c.Name)
 	if err != nil {
-		return false, useFilteredMetaOps, err
+		return false, useFilteredMetaOps, useFilteredFilenameOps, err
 	}
 	if !passUploadDate {
-		return false, useFilteredMetaOps, nil
+		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
 	logging.S("Video %q for channel %q passed all filter checks", v.URL, c.Name)
-	return true, useFilteredMetaOps, nil
+	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
 // getRelevantFilters returns filters applicable to the given URL.
@@ -169,6 +179,27 @@ func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, curren
 		relevantFilteredMetaOps = append(relevantFilteredMetaOps, fmo)
 	}
 	return relevantFilteredMetaOps
+}
+
+// getRelevantFilteredFilenameOps returns filtered filename ops applicable to the given URL.
+func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps, currentURL string) []models.FilteredFilenameOps {
+	relevantFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
+	for _, ffo := range filteredFilenameOps {
+		relevantFilters := make([]models.DLFilters, 0, len(ffo.Filters))
+		for _, filter := range ffo.Filters {
+			// Include if no specific URL specified, or if it matches current URL
+			if filter.ChannelURL == "" ||
+				strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
+				relevantFilters = append(relevantFilters, filter)
+			} else {
+				logging.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
+					filter, filter.ChannelURL, currentURL)
+			}
+		}
+		ffo.Filters = relevantFilters
+		relevantFilteredFilenameOps = append(relevantFilteredFilenameOps, ffo)
+	}
+	return relevantFilteredFilenameOps
 }
 
 // handleMoveOps checks if Metarr should use an output directory based on existent metadata.

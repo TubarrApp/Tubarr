@@ -12,23 +12,23 @@ import (
 // updateChannelURLSettingsCmd updates settings for specific URL(s) within a channel.
 func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		channelName                                                               string
-		channelID                                                                 int
-		url                                                                       string
-		concurrency, crawlFreq, metarrConcurrency, retries                        int
-		maxCPU                                                                    float64
-		vDir, jDir, outDir                                                        string
-		urlOutDirs                                                                []string
-		cookieSource                                                              string
-		minFreeMem, renameStyle, metarrExt                                        string
-		maxFilesize, externalDownloader, externalDownloaderArgs                   string
-		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps                 []string
-		dlFilterFile, moveOpsFile, metaOpsFile, filteredmetaOpsFile               string
-		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter string
-		fromDate, toDate                                                          string
-		ytdlpOutExt                                                               string
-		useGlobalCookies, pause, resetSettings                                    bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                  string
+		channelName                                                                                           string
+		channelID                                                                                             int
+		url                                                                                                   string
+		concurrency, crawlFreq, metarrConcurrency, retries                                                    int
+		maxCPU                                                                                                float64
+		vDir, jDir, outDir                                                                                    string
+		urlOutDirs                                                                                            []string
+		cookieSource                                                                                          string
+		minFreeMem, renameStyle, metarrExt                                                                    string
+		maxFilesize, externalDownloader, externalDownloaderArgs                                               string
+		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps, filteredFilenameOps                        []string
+		dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
+		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter                             string
+		fromDate, toDate                                                                                      string
+		ytdlpOutExt                                                                                           string
+		useGlobalCookies, pause, resetSettings                                                                bool
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                              string
 	)
 
 	updateURLSettingsCmd := &cobra.Command{
@@ -116,11 +116,20 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Gather metarr update functions
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
-				filenameOps:          filenameOps,
-				renameStyle:          renameStyle,
-				extraFFmpegArgs:      extraFFmpegArgs,
-				metarrExt:            metarrExt,
-				metaOps:              metaOps,
+				renameStyle:     renameStyle,
+				extraFFmpegArgs: extraFFmpegArgs,
+				metarrExt:       metarrExt,
+
+				metaOps:             metaOps,
+				metaOpsFile:         metaOpsFile,
+				filteredMetaOps:     filteredMetaOps,
+				filteredMetaOpsFile: filteredMetaOpsFile,
+
+				filenameOps:             filenameOps,
+				filenameOpsFile:         filenameOpsFile,
+				filteredFilenameOps:     filteredFilenameOps,
+				filteredFilenameOpsFile: filteredFilenameOpsFile,
+
 				outputDir:            outDir,
 				urlOutputDirs:        urlOutDirs,
 				concurrency:          metarrConcurrency,
@@ -204,7 +213,8 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	setMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
-		&filteredmetaOpsFile, &urlOutDirs, &filenameOps,
+		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
+		&urlOutDirs, &filenameOps, &filteredFilenameOps,
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding

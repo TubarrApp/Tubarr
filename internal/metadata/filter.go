@@ -104,11 +104,56 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		result = append(result, fmo)
 	}
 
-	if logging.Level <= 3 {
-		logging.P("Filtered meta op results:")
+	if logging.Level >= 2 {
+		logging.P("Filtered meta op results for channel %q:", channelName)
 		for _, fmo := range result {
 			for _, mo := range fmo.MetaOps {
 				logging.P("%q [FILTERS MATCHED?: %v]", parsing.BuildMetaOpsKeyWithChannel(mo), fmo.FiltersMatched)
+			}
+		}
+	}
+	return result
+}
+
+// filteredFilenameOpsMatches checks which arguments match and returns the filename operations.
+func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filteredFilenameOps []models.FilteredFilenameOps, channelName string) []models.FilteredFilenameOps {
+	if len(filteredFilenameOps) == 0 {
+		return nil
+	}
+
+	result := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
+	dedupFilenameOpsMap := make(map[string]bool)
+
+	// Use buildKey for consistency
+	for _, fo := range cu.ChanURLMetarrArgs.FilenameOps {
+		dedupFilenameOpsMap[parsing.BuildFilenameOpsKeyWithChannel(fo)] = true
+	}
+
+	for _, ffo := range filteredFilenameOps {
+		// Check if filters match
+		filtersMatched := checkFiltersOnly(v, ffo.Filters)
+
+		// Deduplicate filename ops using buildKey
+		dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
+		for _, fo := range ffo.FilenameOps {
+			key := parsing.BuildFilenameOpsKeyWithChannel(fo)
+			if !dedupFilenameOpsMap[key] {
+				dedupFilenameOpsMap[key] = true
+				dedupFilenameOps = append(dedupFilenameOps, fo)
+			}
+		}
+
+		// Add to result, mark failures
+		ffo.FilenameOps = dedupFilenameOps
+		ffo.FiltersMatched = filtersMatched
+		result = append(result, ffo)
+	}
+
+	if logging.Level >= 2 {
+		logging.P("Filtered filename op results for channel %q:", channelName)
+		for _, ffo := range result {
+			for _, fo := range ffo.FilenameOps {
+				logging.P("%q [FILTERS MATCHED?: %v]", parsing.BuildFilenameOpsKeyWithChannel(fo), ffo.FiltersMatched)
 			}
 		}
 	}
@@ -357,6 +402,43 @@ func loadFilteredMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *par
 	}
 	if len(validFilters) > 0 {
 		logging.D(1, "Found following filters in file:\n\n%v", validFilters)
+	}
+
+	return validFilters
+}
+
+// loadFilteredFilenameOpsFromFile loads filtered filename operations from a file (one per line).
+func loadFilteredFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredFilenameOps {
+	var err error
+
+	if cu.ChanURLMetarrArgs.FilteredFilenameOpsFile == "" {
+		return nil
+	}
+
+	filterFile := cu.ChanURLMetarrArgs.FilteredFilenameOpsFile
+
+	if filterFile, err = dp.ParseDirectory(filterFile, v, "filtered-filename-ops"); err != nil {
+		logging.E("Failed to parse directory %q: %v", filterFile, err)
+		return nil
+	}
+
+	logging.I("Adding filtered filename ops from file %q...", filterFile)
+	filters, err := file.ReadFileLines(filterFile)
+	if err != nil {
+		logging.E("Error loading filtered filename ops from file %q: %v", filterFile, err)
+	}
+
+	if len(filters) == 0 {
+		logging.I("No valid filtered filename ops found in file. Format is one per line 'title:contains:dogs:must' (Only apply filename ops to videos with 'dogs' in the title)")
+		return nil
+	}
+
+	validFilters, err := validation.ValidateFilteredFilenameOps(filters)
+	if err != nil {
+		logging.E("Error loading filtered filename ops from file %v: %v", filterFile, err)
+	}
+	if len(validFilters) > 0 {
+		logging.D(1, "Found following filtered filename ops in file:\n\n%v", validFilters)
 	}
 
 	return validFilters

@@ -630,16 +630,16 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 
 	var c bool
 	// Metarr file operations
-	urlMetarr.Ext, c = mergeStringSettings(urlMetarr.Ext, channelMetarr.Ext)
-	changed = changed || c
-
-	urlMetarr.FilenameReplaceSfx, c = mergeSliceSettings(urlMetarr.FilenameReplaceSfx, channelMetarr.FilenameReplaceSfx)
+	urlMetarr.OutputExt, c = mergeStringSettings(urlMetarr.OutputExt, channelMetarr.OutputExt)
 	changed = changed || c
 
 	urlMetarr.RenameStyle, c = mergeStringSettings(urlMetarr.RenameStyle, channelMetarr.RenameStyle)
 	changed = changed || c
 
 	urlMetarr.FilenameOps, c = mergeSliceSettings(urlMetarr.FilenameOps, channelMetarr.FilenameOps)
+	changed = changed || c
+
+	urlMetarr.FilteredFilenameOps, c = mergeSliceSettings(urlMetarr.FilteredFilenameOps, channelMetarr.FilteredFilenameOps)
 	changed = changed || c
 
 	// Metarr metadata operations
