@@ -90,7 +90,7 @@ const (
 	MMetaOpsFile             string = "metarr-meta-ops-file"
 	MFilenameOps             string = "metarr-filename-ops"
 	MFilenameOpsFile         string = "metarr-filename-ops-file"
-	MFilteredFilenameOps     string = "metarr-filtered-filename-ops-file"
+	MFilteredFilenameOps     string = "metarr-filtered-filename-ops"
 	MFilteredFilenameOpsFile string = "metarr-filtered-filename-ops-file"
 	MFilteredMetaOps         string = "metarr-filtered-meta-ops"
 	MFilteredMetaOpsFile     string = "metarr-filtered-meta-ops-file"
