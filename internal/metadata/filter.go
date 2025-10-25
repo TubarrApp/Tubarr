@@ -124,14 +124,19 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 	result := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
 	dedupFilenameOpsMap := make(map[string]bool)
 
-	// Use buildKey for consistency
 	for _, fo := range cu.ChanURLMetarrArgs.FilenameOps {
 		dedupFilenameOpsMap[parsing.BuildFilenameOpsKeyWithChannel(fo)] = true
 	}
 
 	for _, ffo := range filteredFilenameOps {
+		// ADD THIS DEBUG LINE:
+		logging.D(1, "Checking filters for filtered filename ops. Filter count: %d", len(ffo.Filters))
+
 		// Check if filters match
 		filtersMatched := checkFiltersOnly(v, ffo.Filters)
+
+		// ADD THIS DEBUG LINE:
+		logging.D(1, "Filters matched result: %v", filtersMatched)
 
 		// Deduplicate filename ops using buildKey
 		dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))

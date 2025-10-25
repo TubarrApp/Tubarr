@@ -99,11 +99,14 @@ func InitProcess(
 		// Parse directories (templating options can include video elements)
 		video.ParsedJSONDir, video.ParsedVideoDir = parseVideoJSONDirs(video, cu, c, dirParser)
 
-		// Check for custom scraper needs, scrape if required
-		if err := executeCustomScraper(scrape, video); err != nil {
-			return nSucceeded, nDownloaded, err
+		// Use custom scraper if needed
+		if video.JSONPath, err = executeCustomScraper(scrape, video); err != nil {
+			logging.E("Custom scraper failed for %q: %v", video.URL, err)
+			errs = append(errs, err)
+			continue
 		}
 
+		// Skip already downloaded videos
 		if video.Finished {
 			logging.D(1, "Video in channel %q with URL %q is already marked as downloaded", c.Name, video.URL)
 			continue
@@ -143,9 +146,9 @@ func InitProcess(
 }
 
 // executeCustomScraper checks if a custom scraper should be used for this release.
-func executeCustomScraper(s *scraper.Scraper, v *models.Video) error {
+func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON string, err error) {
 	if v == nil || s == nil {
-		return fmt.Errorf("invalid nil parameter (video: %v, scraper: %v)", v == nil, s == nil)
+		return "", fmt.Errorf("invalid nil parameter (video: %v, scraper: %v)", v == nil, s == nil)
 	}
 
 	// Detect censored.tv links
@@ -156,11 +159,11 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video) error {
 			logging.I("Detected a censored.tv link. Using specialized scraper.")
 			err := s.ScrapeCensoredTVMetadata(v.URL, v.ParsedJSONDir, v)
 			if err != nil {
-				return fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
+				return "", fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
 			}
 		}
 	}
-	return nil
+	return v.JSONCustomFile, nil
 }
 
 // videoJob starts a worker's process for a video.
@@ -179,24 +182,18 @@ func videoJob(
 		return err
 	}
 
-	if v.JSONCustomFile != "" {
-		if _, err := vs.AddVideo(v, c.ID, cu.ID); err != nil {
-			return fmt.Errorf("error adding video with URL %s to database: %w", v.URL, err)
-		}
-	} else {
-		proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
-		if err != nil {
-			handleBotBlock(cs, c, cu, botBlockChannel)
-			return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
-		}
-		if !proceed {
-			logging.I("Skipping further processing for ignored video: %s", v.URL)
-			return nil
-		}
+	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
+	if err != nil {
+		handleBotBlock(cs, c, cu, botBlockChannel)
+		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
+	}
+	if !proceed {
+		logging.I("Skipping further processing for ignored video: %s", v.URL)
+		return nil
 	}
 
 	// Process video download phase
-	botBlockChannel, err := processVideo(procCtx, v, cu, c, dlTracker)
+	botBlockChannel, err = processVideo(procCtx, v, cu, c, dlTracker)
 	if err != nil {
 		handleBotBlock(cs, c, cu, botBlockChannel)
 		return fmt.Errorf("video processing error for video URL %q: %w", v.URL, err)
@@ -239,17 +236,21 @@ func processJSON(
 		return false, false, fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
 	}
 
-	// Download JSON
-	dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
-		MaxRetries:       3,
-		RetryMaxInterval: 5,
-	})
-	if err != nil {
-		return false, false, err
-	}
+	// ONLY download JSON if it's NOT a custom file (custom scraper already created it)
+	if v.JSONCustomFile == "" {
+		dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
+			MaxRetries:       3,
+			RetryMaxInterval: 5,
+		})
+		if err != nil {
+			return false, false, err
+		}
 
-	if botBlockChannel, err = dl.Execute(); err != nil {
-		return false, botBlockChannel, err
+		if botBlockChannel, err = dl.Execute(); err != nil {
+			return false, botBlockChannel, err
+		}
+	} else {
+		logging.D(1, "Skipping JSON download - using custom scraped file: %s", v.JSONCustomFile)
 	}
 
 	// Validate and filter (delegates to metadata package)

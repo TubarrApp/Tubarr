@@ -16,6 +16,7 @@ import (
 //
 // Returns true if the video passes all filters and JSON validity checks.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
+	logging.I("Validating and filtering JSON file %q...", v.JSONPath)
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
