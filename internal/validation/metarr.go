@@ -13,7 +13,7 @@ import (
 
 var validMetaActions = map[string]bool{
 	"append": true, "copy-to": true, "paste-from": true, "prefix": true,
-	"trim-prefix": true, "trim-suffix": true, "replace": true, "set": true,
+	"replace-prefix": true, "replace-suffix": true, "replace": true, "set": true,
 	"date-tag": true, "delete-date-tag": true,
 }
 
@@ -80,10 +80,18 @@ func ValidateFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 				newFilenameOp.OpLoc = split[1]      // e.g. 'prefix'
 				newFilenameOp.DateFormat = split[2] // e.g. 'ymd'
 
-				if newFilenameOp.OpLoc != "prefix" && newFilenameOp.OpLoc != "suffix" {
+				if newFilenameOp.OpType == "date-tag" &&
+					newFilenameOp.OpLoc != "prefix" && newFilenameOp.OpLoc != "suffix" {
 					logging.E("invalid date tag location %q, use prefix or suffix", newFilenameOp.OpLoc)
 					continue
 				}
+
+				if newFilenameOp.OpType == "delete-date-tag" &&
+					newFilenameOp.OpLoc != "prefix" && newFilenameOp.OpLoc != "suffix" && newFilenameOp.OpLoc != "all" {
+					logging.E("invalid date tag location %q, use prefix or suffix", newFilenameOp.OpLoc)
+					continue
+				}
+
 				if !ValidateDateFormat(newFilenameOp.DateFormat) {
 					logging.E("invalid date tag format %q", newFilenameOp.DateFormat)
 					continue
@@ -171,10 +179,18 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 				newMetaOp.OpLoc = split[2]
 				newMetaOp.DateFormat = split[3]
 
-				if newMetaOp.OpLoc != "prefix" && newMetaOp.OpLoc != "suffix" {
+				if newMetaOp.OpType == "date-tag" &&
+					newMetaOp.OpLoc != "prefix" && newMetaOp.OpLoc != "suffix" {
 					logging.E("invalid date tag location %q, use prefix or suffix", newMetaOp.OpLoc)
 					continue
 				}
+
+				if newMetaOp.OpType == "delete-date-tag" &&
+					newMetaOp.OpLoc != "prefix" && newMetaOp.OpLoc != "suffix" && newMetaOp.OpLoc != "all" {
+					logging.E("invalid date tag location %q, use prefix or suffix", newMetaOp.OpLoc)
+					continue
+				}
+
 				if !ValidateDateFormat(newMetaOp.DateFormat) {
 					logging.E("invalid date tag format %q", newMetaOp.DateFormat)
 					continue
