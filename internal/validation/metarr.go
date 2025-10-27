@@ -198,7 +198,7 @@ func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
 				// Build uniqueness key
 				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType}, ":")
 
-			case "replace":
+			case "replace", "replace-suffix", "replace-prefix":
 				newMetaOp.OpFindString = split[2]
 				newMetaOp.OpValue = split[3]
 
