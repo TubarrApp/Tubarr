@@ -18,7 +18,7 @@ var validMetaActions = map[string]bool{
 }
 
 var validFilenameActions = map[string]bool{
-	"append": true, "prefix": true, "trim-prefix": true, "trim-suffix": true,
+	"append": true, "prefix": true, "replace-prefix": true, "replace-suffix": true,
 	"replace": true, "date-tag": true, "delete-date-tag": true,
 }
 
@@ -67,8 +67,8 @@ func ValidateFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 
 		case 3: // e.g. 'replace-suffix:_1:'
 			switch split[0] {
-			case "trim-suffix", "trim-prefix", "replace":
-				newFilenameOp.OpType = split[0]       // e.g. 'trim-suffix'
+			case "replace-suffix", "replace-prefix", "replace":
+				newFilenameOp.OpType = split[0]       // e.g. 'replace-suffix'
 				newFilenameOp.OpFindString = split[1] // e.g. '_1'
 				newFilenameOp.OpValue = split[2]      // e.g. ''
 

@@ -40,7 +40,7 @@ func BuildFilenameOpsKey(fo models.FilenameOps) string {
 	switch fo.OpType {
 	case "date-tag", "delete-date-tag":
 		key = fo.OpType + ":" + fo.OpLoc + ":" + fo.DateFormat
-	case "replace", "trim-suffix", "trim-prefix":
+	case "replace", "replace-suffix", "replace-prefix":
 		key = fo.OpType + ":" + fo.OpFindString + ":" + fo.OpValue
 	default:
 		key = fo.OpType + ":" + fo.OpValue
@@ -54,7 +54,7 @@ func BuildFilenameOpsKeyWithChannel(fo models.FilenameOps) string {
 	switch fo.OpType {
 	case "date-tag", "delete-date-tag":
 		key = fo.OpType + ":" + fo.OpLoc + ":" + fo.DateFormat
-	case "replace", "trim-suffix", "trim-prefix":
+	case "replace", "replace-suffix", "replace-prefix":
 		key = fo.OpType + ":" + fo.OpFindString + ":" + fo.OpValue
 	default:
 		key = fo.OpType + ":" + fo.OpValue
