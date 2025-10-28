@@ -19,7 +19,7 @@ var validMetaActions = map[string]bool{
 
 var validFilenameActions = map[string]bool{
 	"append": true, "prefix": true, "replace-prefix": true, "replace-suffix": true,
-	"replace": true, "date-tag": true, "delete-date-tag": true,
+	"replace": true, "date-tag": true, "delete-date-tag": true, "set": true,
 }
 
 // ValidateFilenameOps parses and validates filename transformation operations.
