@@ -53,3 +53,36 @@ var BotTimeoutMap = map[string]float64{
 	"streamable.com":  180,
 	"imgur.com":       180,
 }
+
+// Constants for valid codecs and GPU types
+const (
+	// Video codecs
+	VCodecAV1   = "av1"
+	VCodecH264  = "h264"
+	VCodecHEVC  = "hevc"
+	VCodecMPEG2 = "mpeg2"
+	VCodecVP8   = "vp8"
+	VCodecVP9   = "vp9"
+
+	// Audio codecs
+	ACodecAAC    = "aac"
+	ACodecAC3    = "ac3"
+	ACodecALAC   = "alac"
+	ACodecDTS    = "dts"
+	ACodecEAC3   = "eac3"
+	ACodecFLAC   = "flac"
+	ACodecMP2    = "mp2"
+	ACodecMP3    = "mp3"
+	ACodecOpus   = "opus"
+	ACodecPCM    = "pcm"
+	ACodecTrueHD = "truehd"
+	ACodecVorbis = "vorbis"
+	ACodecWAV    = "wav"
+
+	// GPU types
+	AccelTypeAuto  = "auto"
+	AccelTypeAMF   = "amf"
+	AccelTypeIntel = "qsv"
+	AccelTypeNVENC = "nvenc"
+	AccelTypeVAAPI = "vaapi"
+)

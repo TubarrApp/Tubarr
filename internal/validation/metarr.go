@@ -319,72 +319,106 @@ func ValidatePurgeMetafiles(purgeType string) bool {
 	return false
 }
 
-// ValidateTranscodeAudioCodec verifies the audio codec to use for transcode/encode operations.
-func ValidateTranscodeAudioCodec(a string) (audioCodec string, err error) {
-	a = strings.ToLower(a)
-	switch a {
-	case "aac", "ac3", "alac", "copy", "eac3", "libmp3lame", "libopus", "libvorbis":
-		return a, nil
-	case "mp3":
-		return "libmp3lame", nil
-	case "opus":
-		return "libopus", nil
-	case "vorbis":
-		return "libvorbis", nil
-	case "":
-		return "", nil
-	default:
-		return "", fmt.Errorf("audio codec flag %q is not currently implemented in this program, aborting", a)
-	}
-}
-
-// ValidateGPU validates the user input GPU selection.
-func ValidateGPU(g, devDir string) (gpu, gpuDir string, err error) {
-	g = strings.ToLower(g)
+// ValidateGPU validates the GPU selection.
+func ValidateGPU(g, devDir string) (string, string, error) {
+	g = strings.ToLower(strings.TrimSpace(g))
 
 	switch g {
-	case "qsv", "intel":
-		gpu = "qsv"
-	case "amd", "radeon", "vaapi":
-		gpu = "vaapi"
-	case "nvidia", "cuda":
-		gpu = "cuda"
-	case "auto", "automatic", "automated":
-		return "auto", devDir, nil // Return early, no directory needed for auto
-	case "":
-		return "", "", nil // Return early, no HW acceleration required
+	case "", "none":
+		return "", "", nil
+	case consts.AccelTypeAuto, "automatic":
+		return consts.AccelTypeAuto, devDir, nil
+
+	case consts.AccelTypeAMF, "radeon", "amd":
+		g = consts.AccelTypeAMF
+
+	case consts.AccelTypeIntel, "intel":
+		g = consts.AccelTypeIntel
+
+	case consts.AccelTypeVAAPI:
+		g = consts.AccelTypeVAAPI
+
+	case consts.AccelTypeNVENC, "nvidia", "cuda":
+		g = consts.AccelTypeNVENC
 	default:
-		return "", devDir, fmt.Errorf("entered GPU %q not supported. Tubarr supports Auto, Intel, AMD, or Nvidia", g)
+		return "", "", fmt.Errorf("GPU %q not supported. Valid: auto, intel, amd, nvidia", g)
 	}
 
-	_, err = os.Stat(devDir)
-	if err != nil {
+	// Check device directory exists
+	if _, err := os.Stat(devDir); err != nil {
 		return "", "", fmt.Errorf("cannot access driver location %q: %w", devDir, err)
 	}
-	return gpu, devDir, nil
+
+	return g, devDir, nil
 }
 
-// ValidateTranscodeCodec validates the user input codec selection.
-func ValidateTranscodeCodec(c string, accel string) (codec string, err error) {
-	logging.D(3, "Checking codec %q with acceleration type %q...", c, accel)
+// ValidateTranscodeAudioCodec validates the audio codec to use.
+func ValidateTranscodeAudioCodec(a string) (string, error) {
+	a = strings.ToLower(strings.TrimSpace(a))
 
-	c = strings.ToLower(c)
+	switch a {
+	case "", "copy":
+		return "", nil
+	case consts.ACodecAAC, "aac-lc", "aaclc":
+		return consts.ACodecAAC, nil
+	case consts.ACodecALAC, "applelossless":
+		return consts.ACodecALAC, nil
+	case consts.ACodecAC3, "ac-3", "ac_3":
+		return consts.ACodecAC3, nil
+	case consts.ACodecEAC3, "dd+", "dolbydigitalplus", "e-ac3":
+		return consts.ACodecEAC3, nil
+	case consts.ACodecMP3, "libmp3lame", "mpg3":
+		return consts.ACodecMP3, nil
+	case consts.ACodecOpus, "opuscodec":
+		return consts.ACodecOpus, nil
+	case consts.ACodecVorbis, "ogg", "vorbiscodec":
+		return consts.ACodecVorbis, nil
+	case consts.ACodecDTS, "dts-hd", "dts-hdma", "dtscodec":
+		return consts.ACodecDTS, nil
+	case consts.ACodecFLAC, "flaccodec":
+		return consts.ACodecFLAC, nil
+	case consts.ACodecMP2, "mpa", "mp2codec":
+		return consts.ACodecMP2, nil
+	case consts.ACodecPCM, "pcm_s16le", "pcm_s24le":
+		return consts.ACodecPCM, nil
+	case consts.ACodecTrueHD, "truehdcodec":
+		return consts.ACodecTrueHD, nil
+	case consts.ACodecWAV, "wavcodec":
+		return consts.ACodecWAV, nil
+	default:
+		return "", fmt.Errorf(
+			"audio codec %q is not supported. Supported: AAC, ALAC, AC3, EAC3, MP3, Opus, Vorbis, DTS, FLAC, MP2, PCM, TrueHD, WAV", a)
+	}
+}
+
+// ValidateTranscodeCodec validates the video codec based on GPU acceleration.
+func ValidateTranscodeCodec(c, accel string) (string, error) {
+	c = strings.ToLower(strings.TrimSpace(c))
 	c = strings.ReplaceAll(c, ".", "")
+	c = strings.ReplaceAll(c, "-", "")
 
 	switch c {
-	case "h264", "hevc":
-		return c, nil
-	case "avc", "x264":
-		return "h264", nil
-	case "h265", "x265":
-		return "hevc", nil
-	case "":
-		if accel == "" {
+	case "", "auto":
+		if accel == "" || accel == consts.AccelTypeAuto {
 			return "", nil
 		}
-		return "", fmt.Errorf("acceleration type %q requires a codec to be specified. Tubarr supports h264 and HEVC (h265)", accel)
+		return "", fmt.Errorf(
+			"GPU acceleration %q requires a codec. Supported: h264, hevc", accel)
+	case consts.VCodecH264, "x264", "avc", "h.264":
+		return consts.VCodecH264, nil
+	case consts.VCodecHEVC, "h265", "x265", "h.265":
+		return consts.VCodecHEVC, nil
+	case consts.VCodecAV1, "aom", "libaom", "svtav1", "libsvtav1":
+		return consts.VCodecAV1, nil
+	case consts.VCodecMPEG2, "mpg2", "mpeg2video", "mp2":
+		return consts.VCodecMPEG2, nil
+	case consts.VCodecVP8, "libvpx", "vpx8":
+		return consts.VCodecVP8, nil
+	case consts.VCodecVP9, "libvpxvp9", "vpx9", "vp09":
+		return consts.VCodecVP9, nil
 	default:
-		return "", fmt.Errorf("entered codec %q not supported. Tubarr supports h264 and HEVC (h265)", c)
+		return "", fmt.Errorf(
+			"video codec %q is not supported. Supported: h264, hevc, av1, mpeg2, vp8, vp9", c)
 	}
 }
 

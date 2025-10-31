@@ -105,7 +105,7 @@ const (
 	MTranscodeAudioCodec     string = "metarr-transcode-audio-codec"
 	MTranscodeQuality        string = "metarr-transcode-quality"
 	MTranscodeVideoFilter    string = "metarr-transcode-video-filter"
-	MTranscodeVideoCodec     string = "metarr-transcode-codec"
+	MTranscodeVideoCodec     string = "metarr-transcode-video-codec"
 	MConcurrency             string = "metarr-concurrency"
 	MOutputDir               string = "metarr-default-output-dir"
 	MURLOutputDirs           string = "metarr-url-output-dirs"
