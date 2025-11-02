@@ -338,8 +338,8 @@ func ValidateGPU(g, devDir string) (string, string, error) {
 	case consts.AccelTypeVAAPI:
 		g = consts.AccelTypeVAAPI
 
-	case consts.AccelTypeNVENC, "nvidia", "cuda":
-		g = consts.AccelTypeNVENC
+	case consts.AccelTypeNvidia, "nvidia", "nvenc":
+		g = consts.AccelTypeNvidia
 	default:
 		return "", "", fmt.Errorf("GPU %q not supported. Valid: auto, intel, amd, nvidia", g)
 	}
@@ -426,29 +426,13 @@ func ValidateTranscodeCodec(c, accel string) (string, error) {
 func ValidateTranscodeQuality(q string) (quality string, err error) {
 	q = strings.ToLower(q)
 	q = strings.ReplaceAll(q, " ", "")
-
-	switch q {
-	case "p1", "p2", "p3", "p4", "p5", "p6", "p7":
-		logging.I("Got transcode quality profile %q", q)
-		return q, nil
-	}
-
-	qNum, err := strconv.Atoi(q)
+	qNum, err := strconv.ParseInt(q, 10, 64)
 	if err != nil {
-		return "", fmt.Errorf("input should be p1 to p7, validation of transcoder quality failed")
+		return "", fmt.Errorf("transcode quality input should be numerical")
 	}
+	qNum = min(max(qNum, 0), 51)
 
-	var qualProf string
-	switch {
-	case qNum < 0:
-		qualProf = "p1"
-	case qNum > 7:
-		qualProf = "p7"
-	default:
-		qualProf = "p" + strconv.Itoa(qNum)
-	}
-	logging.I("Got transcode quality profile %q", qualProf)
-	return qualProf, nil
+	return strconv.FormatInt(qNum, 10), nil
 }
 
 // ValidateTranscodeVideoFilter validates the transcode video filter preset.

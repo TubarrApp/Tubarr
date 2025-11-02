@@ -80,9 +80,9 @@ const (
 	ACodecWAV    = "wav"
 
 	// GPU types
-	AccelTypeAuto  = "auto"
-	AccelTypeAMF   = "amf"
-	AccelTypeIntel = "qsv"
-	AccelTypeNVENC = "nvenc"
-	AccelTypeVAAPI = "vaapi"
+	AccelTypeAuto   = "auto"
+	AccelTypeAMF    = "amf"
+	AccelTypeIntel  = "qsv"
+	AccelTypeNvidia = "cuda"
+	AccelTypeVAAPI  = "vaapi"
 )
