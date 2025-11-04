@@ -17,7 +17,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		url                                                                                                   string
 		concurrency, crawlFreq, metarrConcurrency, retries                                                    int
 		maxCPU                                                                                                float64
-		vDir, mDir, outDir                                                                                    string
+		vDir, jDir, outDir                                                                                    string
 		urlOutDirs                                                                                            []string
 		cookieSource                                                                                          string
 		minFreeMem, renameStyle, metarrExt                                                                    string
@@ -104,7 +104,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				retries:                retries,
 				toDate:                 toDate,
 				videoDir:               vDir,
-				metaDir:                mDir,
+				jsonDir:                jDir,
 				useGlobalCookies:       useGlobalCookies,
 				ytdlpOutputExt:         ytdlpOutExt,
 				extraYtdlpVideoArgs:    extraYTDLPVideoArgs,
@@ -196,7 +196,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	updateURLSettingsCmd.Flags().StringVar(&url, "url", "", "Specific URL to update (if not provided, updates all URLs in channel)")
 
 	// Files/dirs
-	setFileDirFlags(updateURLSettingsCmd, nil, &mDir, &vDir)
+	setFileDirFlags(updateURLSettingsCmd, nil, &jDir, &vDir)
 
 	// Program related
 	setProgramRelatedFlags(updateURLSettingsCmd, &concurrency, &crawlFreq,

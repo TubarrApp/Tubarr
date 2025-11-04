@@ -97,7 +97,7 @@ func InitProcess(
 		}
 
 		// Parse directories (templating options can include video elements)
-		video.ParsedMetaDir, video.ParsedVideoDir = parseVideoMetaDirs(video, cu, c, dirParser)
+		video.ParsedMetaDir, video.ParsedVideoDir = parseVideoJSONDirs(video, cu, c, dirParser)
 
 		// Use custom scraper if needed
 		if video.JSONPath, err = executeCustomScraper(scrape, video); err != nil {
@@ -302,8 +302,8 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 	return false, nil
 }
 
-// parseVideoMetaDirs parses video and JSON directories.
-func parseVideoMetaDirs(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (metaDir, videoDir string) {
+// parseVideoJSONDirs parses video and JSON directories.
+func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (metaDir, videoDir string) {
 	// Initialize dirParser if nil
 	if dirParser == nil {
 		dirParser = parsing.NewDirectoryParser(c)
@@ -315,15 +315,15 @@ func parseVideoMetaDirs(v *models.Video, cu *models.ChannelURL, c *models.Channe
 	)
 
 	// Return if no template directives
-	if !strings.Contains(cSettings.MetaDir, "{") && !strings.Contains(cSettings.VideoDir, "{") {
-		return cSettings.MetaDir, cSettings.VideoDir
+	if !strings.Contains(cSettings.JSONDir, "{") && !strings.Contains(cSettings.VideoDir, "{") {
+		return cSettings.JSONDir, cSettings.VideoDir
 	}
 
 	// Parse templates
-	metaDir, err = dirParser.ParseDirectory(cSettings.MetaDir, v, "JSON")
+	metaDir, err = dirParser.ParseDirectory(cSettings.JSONDir, v, "JSON")
 	if err != nil {
-		logging.W("Failed to parse JSON directory %q, using raw: %v", cSettings.MetaDir, err)
-		metaDir = cSettings.MetaDir
+		logging.W("Failed to parse JSON directory %q, using raw: %v", cSettings.JSONDir, err)
+		metaDir = cSettings.JSONDir
 	}
 
 	videoDir, err = dirParser.ParseDirectory(cSettings.VideoDir, v, "video")

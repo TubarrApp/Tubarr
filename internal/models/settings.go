@@ -33,7 +33,7 @@ type Settings struct {
 	ToDate     string      `json:"to_date" mapstructure:"to-date"`
 
 	// JSON and video directories.
-	MetaDir  string `json:"meta_directory" mapstructure:"meta-directory"`
+	JSONDir  string `json:"json_directory" mapstructure:"json-directory"`
 	VideoDir string `json:"video_directory" mapstructure:"video-directory"`
 
 	// Bot blocking elements.

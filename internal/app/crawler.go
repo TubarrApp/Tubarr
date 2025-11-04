@@ -278,7 +278,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 	if len(c.URLModels) == 0 {
 		return errors.New("no channel URLs")
 	}
-	if c.ChanSettings.VideoDir == "" || c.ChanSettings.MetaDir == "" {
+	if c.ChanSettings.VideoDir == "" || c.ChanSettings.JSONDir == "" {
 		return errors.New("output directories are blank")
 	}
 
