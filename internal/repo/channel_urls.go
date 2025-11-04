@@ -602,7 +602,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	changed = changed || c
 
 	// JSON and video directories
-	urlSettings.JSONDir, c = mergeStringSettings(urlSettings.JSONDir, channelSettings.JSONDir)
+	urlSettings.MetaDir, c = mergeStringSettings(urlSettings.MetaDir, channelSettings.MetaDir)
 	changed = changed || c
 
 	urlSettings.VideoDir, c = mergeStringSettings(urlSettings.VideoDir, channelSettings.VideoDir)

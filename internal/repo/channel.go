@@ -394,8 +394,8 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	// JSON dir
-	if c.ChanSettings.JSONDir == "" {
-		c.ChanSettings.JSONDir = c.ChanSettings.VideoDir
+	if c.ChanSettings.MetaDir == "" {
+		c.ChanSettings.MetaDir = c.ChanSettings.VideoDir
 	}
 
 	// Convert settings to JSON
@@ -1048,7 +1048,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	// Channel settings
 	fmt.Printf("\n%sChannel Settings:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Video Directory: %s\n", s.VideoDir)
-	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
+	fmt.Printf("Metadata Directory: %s\n", s.MetaDir)
 	fmt.Printf("Config File: %s\n", s.ChannelConfigFile)
 	fmt.Printf("Crawl Frequency: %d minutes\n", c.GetCrawlFreq())
 	fmt.Printf("Concurrency: %d\n", s.Concurrency)
@@ -1201,11 +1201,11 @@ func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error
 	}
 
 	// JSON directory
-	if v, ok := getConfigValue[string](keys.JSONDir); ok {
+	if v, ok := getConfigValue[string](keys.MetaDir); ok {
 		if _, err = validation.ValidateDirectory(v, false); err != nil {
 			return err
 		}
-		c.ChanSettings.JSONDir = v
+		c.ChanSettings.MetaDir = v
 	}
 
 	// Max filesize to download

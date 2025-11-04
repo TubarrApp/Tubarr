@@ -156,12 +156,12 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	argMap[metkeys.VideoFile] = cleanAndWrapCommaPaths(v.VideoPath)
 
 	if v.JSONCustomFile == "" {
-		argMap[metkeys.JSONFile] = cleanAndWrapCommaPaths(v.JSONPath)
+		argMap[metkeys.MetaFile] = cleanAndWrapCommaPaths(v.JSONPath)
 	} else {
-		argMap[metkeys.JSONFile] = cleanAndWrapCommaPaths(v.JSONCustomFile)
+		argMap[metkeys.MetaFile] = cleanAndWrapCommaPaths(v.JSONCustomFile)
 	}
 
-	logging.I("Making Metarr argument for video %q and JSON file %q.", argMap[metkeys.VideoFile], argMap[metkeys.JSONFile])
+	logging.I("Making Metarr argument for video %q and JSON file %q.", argMap[metkeys.VideoFile], argMap[metkeys.MetaFile])
 
 	// Final args
 	args := make([]string, 0, singlesLen+sliceLen)

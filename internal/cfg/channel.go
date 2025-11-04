@@ -637,7 +637,7 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
 		urls []string
-		name, vDir, jDir, outDir, cookieSource,
+		name, vDir, mDir, outDir, cookieSource,
 		externalDownloader, externalDownloaderArgs, maxFilesize, renameStyle, minFreeMem, metarrExt string
 		urlOutDirs                   []string
 		username, password, loginURL string
@@ -674,8 +674,8 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				return errors.New("new channels require a video directory, name, and at least one channel URL")
 			}
 
-			if jDir == "" {
-				jDir = vDir
+			if mDir == "" {
+				mDir = vDir
 			}
 
 			if _, err := validation.ValidateDirectory(vDir, true); err != nil {
@@ -838,7 +838,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 					Filters:                dlFilterModels,
 					FilterFile:             dlFilterFile,
 					FromDate:               fromDate,
-					JSONDir:                jDir,
+					MetaDir:                mDir,
 					MaxFilesize:            maxFilesize,
 					MoveOps:                moveOpsModels,
 					MoveOpFile:             moveOpFile,
@@ -929,7 +929,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	setPrimaryChannelFlags(addCmd, &name, &urls, nil)
 
 	// Files/dirs
-	setFileDirFlags(addCmd, &configFile, &jDir, &vDir)
+	setFileDirFlags(addCmd, &configFile, &mDir, &vDir)
 
 	// Program related
 	setProgramRelatedFlags(addCmd, &concurrency, &crawlFreq,
@@ -1735,7 +1735,7 @@ type chanSettings struct {
 	filters                []string
 	filterFile             string
 	fromDate               string
-	jsonDir                string
+	metaDir                string
 	maxFilesize            string
 	moveOps                []string
 	moveOpsFile            string
@@ -1851,20 +1851,20 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	}
 
 	// JSON directory
-	if f.Changed(keys.JSONDir) {
-		if c.jsonDir == "" {
+	if f.Changed(keys.MetaDir) {
+		if c.metaDir == "" {
 			if c.videoDir == "" {
 				return nil, fmt.Errorf("json directory cannot be empty. Attempted to default to video directory but video directory is also empty")
 			}
-			c.jsonDir = c.videoDir
+			c.metaDir = c.videoDir
 		}
 
-		if _, err = validation.ValidateDirectory(c.jsonDir, false); err != nil {
+		if _, err = validation.ValidateDirectory(c.metaDir, false); err != nil {
 			return nil, err
 		}
 
 		fns = append(fns, func(s *models.Settings) error {
-			s.JSONDir = c.jsonDir
+			s.MetaDir = c.metaDir
 			return nil
 		})
 	}

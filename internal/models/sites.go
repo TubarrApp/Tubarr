@@ -117,7 +117,7 @@ type Video struct {
 	ChannelURLID    int64          `db:"channel_url_id"`
 	ParsedVideoDir  string         `db:"-"`
 	VideoPath       string         `db:"video_path"`
-	ParsedJSONDir   string         `db:"-"`
+	ParsedMetaDir   string         `db:"-"`
 	JSONPath        string         `db:"json_path"`
 	Finished        bool           `db:"finished"`
 	JSONCustomFile  string         `db:"-"`

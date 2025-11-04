@@ -306,7 +306,6 @@ func ValidateOutputFiletype(o string) (dottedExt string, err error) {
 
 // ValidatePurgeMetafiles checks and sets the type of metafile purge to perform.
 func ValidatePurgeMetafiles(purgeType string) bool {
-
 	purgeType = strings.TrimSpace(purgeType)
 	purgeType = strings.ToLower(purgeType)
 	purgeType = strings.ReplaceAll(purgeType, ".", "")

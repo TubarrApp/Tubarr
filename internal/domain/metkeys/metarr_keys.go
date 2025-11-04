@@ -26,9 +26,9 @@ const (
 
 // JSON/Video files and directories.
 const (
-	JSONDirectory  = "--json-directory"
+	MetaDirectory  = "--meta-directory"
 	VideoDirectory = "--video-directory"
-	JSONFile       = "--json-file"
+	MetaFile       = "--meta-file"
 	VideoFile      = "--video-file"
 )
 

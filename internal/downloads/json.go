@@ -24,7 +24,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args = append(args,
 		command.SkipVideo,
 		command.WriteInfoJSON,
-		command.P, d.Video.ParsedJSONDir,
+		command.P, d.Video.ParsedMetaDir,
 		command.Output, command.FilenameSyntax)
 
 	// Cookie path
