@@ -26,6 +26,7 @@ require (
 	github.com/antchfx/xpath v1.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-sqlite/sqlite3 v0.0.0-20180313105335-53dd8e640ee7 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect

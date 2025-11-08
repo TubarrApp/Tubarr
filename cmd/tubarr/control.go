@@ -35,7 +35,7 @@ func cleanup(progControl *repo.ProgControl, startTime time.Time) {
 		}
 
 		if err := progControl.QuitTubarr(startTime); err != nil {
-			logging.E("!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes)")
+			logging.E("!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes) !!!")
 		}
 
 		if r != nil {

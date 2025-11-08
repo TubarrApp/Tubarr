@@ -319,7 +319,7 @@ func ValidatePurgeMetafiles(purgeType string) bool {
 }
 
 // ValidateGPU validates the GPU selection.
-func ValidateGPU(g, devDir string) (string, string, error) {
+func ValidateGPU(g, devDir string) (gpuType string, dir string, err error) {
 	g = strings.ToLower(strings.TrimSpace(g))
 
 	switch g {
