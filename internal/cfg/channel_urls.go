@@ -19,7 +19,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		maxCPU                                                                                                float64
 		vDir, jDir, outDir                                                                                    string
 		urlOutDirs                                                                                            []string
-		cookieSource                                                                                          string
+		cookiesFromBrowser                                                                                    string
 		minFreeMem, renameStyle, metarrExt                                                                    string
 		maxFilesize, externalDownloader, externalDownloaderArgs                                               string
 		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps, filteredFilenameOps                        []string
@@ -90,7 +90,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			// Gather settings update functions
 			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
 				concurrency:            concurrency,
-				cookieSource:           cookieSource,
+				cookiesFromBrowser:     cookiesFromBrowser,
 				crawlFreq:              crawlFreq,
 				externalDownloader:     externalDownloader,
 				externalDownloaderArgs: externalDownloaderArgs,
@@ -206,7 +206,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	// Download
 	setDownloadFlags(updateURLSettingsCmd, &retries, &useGlobalCookies,
 		&ytdlpOutExt, &fromDate, &toDate,
-		&cookieSource, &maxFilesize, &dlFilterFile,
+		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
 		&dlFilters)
 
 	// Metarr

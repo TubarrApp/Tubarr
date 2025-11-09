@@ -1,0 +1,634 @@
+<div
+  class="overflow-hidden rounded-2xl border border-gray-200 bg-white pt-4 dark:border-gray-800 dark:bg-white/[0.03]"
+>
+  <div class="mb-4 flex items-center justify-between px-6">
+    <div>
+      <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+        Recent Files
+      </h3>
+    </div>
+
+    <a
+      href="#"
+      class="inline-flex items-center gap-2 text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-500"
+    >
+      View All
+      <svg
+        class="fill-current"
+        width="20"
+        height="20"
+        viewBox="0 0 20 20"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M17.4175 9.9986C17.4178 10.1909 17.3446 10.3832 17.198 10.53L12.2013 15.5301C11.9085 15.8231 11.4337 15.8233 11.1407 15.5305C10.8477 15.2377 10.8475 14.7629 11.1403 14.4699L14.8604 10.7472L3.33301 10.7472C2.91879 10.7472 2.58301 10.4114 2.58301 9.99715C2.58301 9.58294 2.91879 9.24715 3.33301 9.24715L14.8549 9.24715L11.1403 5.53016C10.8475 5.23717 10.8477 4.7623 11.1407 4.4695C11.4336 4.1767 11.9085 4.17685 12.2013 4.46984L17.1588 9.43049C17.3173 9.568 17.4175 9.77087 17.4175 9.99715C17.4175 9.99763 17.4175 9.99812 17.4175 9.9986Z"
+          fill=""
+        />
+      </svg>
+    </a>
+  </div>
+
+  <div class="max-w-full overflow-x-auto">
+    <div class="min-w-[1026px]">
+      <!-- table header start -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-200 px-6 py-3 dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <p class="text-theme-sm font-medium text-gray-500 dark:text-gray-400">
+            File Name
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm font-medium text-gray-500 dark:text-gray-400">
+            Category
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm font-medium text-gray-500 dark:text-gray-400">
+            Size
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm font-medium text-gray-500 dark:text-gray-400">
+            Date Modified
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p
+            class="w-full text-center text-theme-sm font-medium text-gray-500 dark:text-gray-400"
+          >
+            Action
+          </p>
+        </div>
+      </div>
+      <!-- table header end -->
+
+      <!-- table body start -->
+      <!-- table item -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-100 px-6 py-[18px] dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <div
+            class="flex w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-400"
+          >
+            <div>
+              <img
+                src="./images/icons/file-video.svg"
+                alt="icon"
+                class="dark:hidden"
+              />
+              <img
+                src="./images/icons/file-video-dark.svg"
+                alt="icon"
+                class="hidden dark:block"
+              />
+            </div>
+
+            Video_947954.mp4
+          </div>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">Video</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">89 MB</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">
+            12 Jan, 2027
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <div class="flex w-full items-center justify-center gap-2">
+            <button
+              class="text-gray-500 hover:text-error-500 dark:text-gray-400 dark:hover:text-error-500"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M7.4163 3.79199C7.4163 2.54935 8.42366 1.54199 9.6663 1.54199H12.083C13.3256 1.54199 14.333 2.54935 14.333 3.79199V4.04199H16.5H17.5409C17.9551 4.04199 18.2909 4.37778 18.2909 4.79199C18.2909 5.20621 17.9551 5.54199 17.5409 5.54199H17.25V8.24687V13.2469V16.2087C17.25 17.4513 16.2427 18.4587 15 18.4587H6.75004C5.5074 18.4587 4.50004 17.4513 4.50004 16.2087V13.2469V8.24687V5.54199H4.20837C3.79416 5.54199 3.45837 5.20621 3.45837 4.79199C3.45837 4.37778 3.79416 4.04199 4.20837 4.04199H5.25004H7.4163V3.79199ZM15.75 13.2469V8.24687V5.54199H14.333H13.583H8.1663H7.4163H6.00004V8.24687V13.2469V16.2087C6.00004 16.6229 6.33583 16.9587 6.75004 16.9587H15C15.4143 16.9587 15.75 16.6229 15.75 16.2087V13.2469ZM8.9163 4.04199H12.833V3.79199C12.833 3.37778 12.4972 3.04199 12.083 3.04199H9.6663C9.25209 3.04199 8.9163 3.37778 8.9163 3.79199V4.04199ZM9.20837 8.00033C9.62259 8.00033 9.95837 8.33611 9.95837 8.75033V13.7503C9.95837 14.1645 9.62259 14.5003 9.20837 14.5003C8.79416 14.5003 8.45837 14.1645 8.45837 13.7503V8.75033C8.45837 8.33611 8.79416 8.00033 9.20837 8.00033ZM13.2917 8.75033C13.2917 8.33611 12.9559 8.00033 12.5417 8.00033C12.1275 8.00033 11.7917 8.33611 11.7917 8.75033V13.7503C11.7917 14.1645 12.1275 14.5003 12.5417 14.5003C12.9559 14.5003 13.2917 14.1645 13.2917 13.7503V8.75033Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+
+            <button
+              class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M10.8749 13.8619C8.10837 13.8619 5.74279 12.1372 4.79804 9.70241C5.74279 7.26761 8.10837 5.54297 10.8749 5.54297C13.6415 5.54297 16.0071 7.26762 16.9518 9.70243C16.0071 12.1372 13.6415 13.8619 10.8749 13.8619ZM10.8749 4.04297C7.35666 4.04297 4.36964 6.30917 3.29025 9.4593C3.23626 9.61687 3.23626 9.78794 3.29025 9.94552C4.36964 13.0957 7.35666 15.3619 10.8749 15.3619C14.3932 15.3619 17.3802 13.0957 18.4596 9.94555C18.5136 9.78797 18.5136 9.6169 18.4596 9.45932C17.3802 6.30919 14.3932 4.04297 10.8749 4.04297ZM10.8663 7.84413C9.84002 7.84413 9.00808 8.67606 9.00808 9.70231C9.00808 10.7286 9.84002 11.5605 10.8663 11.5605H10.8811C11.9074 11.5605 12.7393 10.7286 12.7393 9.70231C12.7393 8.67606 11.9074 7.84413 10.8811 7.84413H10.8663Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- table item -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-100 px-6 py-[18px] dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <div
+            class="flex w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-400"
+          >
+            <div>
+              <img
+                src="./images/icons/file-image.svg"
+                alt="icon"
+                class="dark:hidden"
+              />
+              <img
+                src="./images/icons/file-image-dark.svg"
+                alt="icon"
+                class="hidden dark:block"
+              />
+            </div>
+
+            Travel.jpeg
+          </div>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">Image</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">5 MB</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">
+            19 Feb, 2027
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <div class="flex w-full items-center justify-center gap-2">
+            <button
+              class="text-gray-500 hover:text-error-500 dark:text-gray-400 dark:hover:text-error-500"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M7.4163 3.79199C7.4163 2.54935 8.42366 1.54199 9.6663 1.54199H12.083C13.3256 1.54199 14.333 2.54935 14.333 3.79199V4.04199H16.5H17.5409C17.9551 4.04199 18.2909 4.37778 18.2909 4.79199C18.2909 5.20621 17.9551 5.54199 17.5409 5.54199H17.25V8.24687V13.2469V16.2087C17.25 17.4513 16.2427 18.4587 15 18.4587H6.75004C5.5074 18.4587 4.50004 17.4513 4.50004 16.2087V13.2469V8.24687V5.54199H4.20837C3.79416 5.54199 3.45837 5.20621 3.45837 4.79199C3.45837 4.37778 3.79416 4.04199 4.20837 4.04199H5.25004H7.4163V3.79199ZM15.75 13.2469V8.24687V5.54199H14.333H13.583H8.1663H7.4163H6.00004V8.24687V13.2469V16.2087C6.00004 16.6229 6.33583 16.9587 6.75004 16.9587H15C15.4143 16.9587 15.75 16.6229 15.75 16.2087V13.2469ZM8.9163 4.04199H12.833V3.79199C12.833 3.37778 12.4972 3.04199 12.083 3.04199H9.6663C9.25209 3.04199 8.9163 3.37778 8.9163 3.79199V4.04199ZM9.20837 8.00033C9.62259 8.00033 9.95837 8.33611 9.95837 8.75033V13.7503C9.95837 14.1645 9.62259 14.5003 9.20837 14.5003C8.79416 14.5003 8.45837 14.1645 8.45837 13.7503V8.75033C8.45837 8.33611 8.79416 8.00033 9.20837 8.00033ZM13.2917 8.75033C13.2917 8.33611 12.9559 8.00033 12.5417 8.00033C12.1275 8.00033 11.7917 8.33611 11.7917 8.75033V13.7503C11.7917 14.1645 12.1275 14.5003 12.5417 14.5003C12.9559 14.5003 13.2917 14.1645 13.2917 13.7503V8.75033Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+
+            <button
+              class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M10.8749 13.8619C8.10837 13.8619 5.74279 12.1372 4.79804 9.70241C5.74279 7.26761 8.10837 5.54297 10.8749 5.54297C13.6415 5.54297 16.0071 7.26762 16.9518 9.70243C16.0071 12.1372 13.6415 13.8619 10.8749 13.8619ZM10.8749 4.04297C7.35666 4.04297 4.36964 6.30917 3.29025 9.4593C3.23626 9.61687 3.23626 9.78794 3.29025 9.94552C4.36964 13.0957 7.35666 15.3619 10.8749 15.3619C14.3932 15.3619 17.3802 13.0957 18.4596 9.94555C18.5136 9.78797 18.5136 9.6169 18.4596 9.45932C17.3802 6.30919 14.3932 4.04297 10.8749 4.04297ZM10.8663 7.84413C9.84002 7.84413 9.00808 8.67606 9.00808 9.70231C9.00808 10.7286 9.84002 11.5605 10.8663 11.5605H10.8811C11.9074 11.5605 12.7393 10.7286 12.7393 9.70231C12.7393 8.67606 11.9074 7.84413 10.8811 7.84413H10.8663Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- table item -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-100 px-6 py-[18px] dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <div
+            class="flex w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-400"
+          >
+            <div>
+              <img
+                src="./images/icons/file-pdf.svg"
+                alt="icon"
+                class="dark:hidden"
+              />
+              <img
+                src="./images/icons/file-pdf-dark.svg"
+                alt="icon"
+                class="hidden dark:block"
+              />
+            </div>
+
+            Document.pdf
+          </div>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">Document</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">10 MB</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">
+            15 Mar, 2027
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <div class="flex w-full items-center justify-center gap-2">
+            <button
+              class="text-gray-500 hover:text-error-500 dark:text-gray-400 dark:hover:text-error-500"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M7.4163 3.79199C7.4163 2.54935 8.42366 1.54199 9.6663 1.54199H12.083C13.3256 1.54199 14.333 2.54935 14.333 3.79199V4.04199H16.5H17.5409C17.9551 4.04199 18.2909 4.37778 18.2909 4.79199C18.2909 5.20621 17.9551 5.54199 17.5409 5.54199H17.25V8.24687V13.2469V16.2087C17.25 17.4513 16.2427 18.4587 15 18.4587H6.75004C5.5074 18.4587 4.50004 17.4513 4.50004 16.2087V13.2469V8.24687V5.54199H4.20837C3.79416 5.54199 3.45837 5.20621 3.45837 4.79199C3.45837 4.37778 3.79416 4.04199 4.20837 4.04199H5.25004H7.4163V3.79199ZM15.75 13.2469V8.24687V5.54199H14.333H13.583H8.1663H7.4163H6.00004V8.24687V13.2469V16.2087C6.00004 16.6229 6.33583 16.9587 6.75004 16.9587H15C15.4143 16.9587 15.75 16.6229 15.75 16.2087V13.2469ZM8.9163 4.04199H12.833V3.79199C12.833 3.37778 12.4972 3.04199 12.083 3.04199H9.6663C9.25209 3.04199 8.9163 3.37778 8.9163 3.79199V4.04199ZM9.20837 8.00033C9.62259 8.00033 9.95837 8.33611 9.95837 8.75033V13.7503C9.95837 14.1645 9.62259 14.5003 9.20837 14.5003C8.79416 14.5003 8.45837 14.1645 8.45837 13.7503V8.75033C8.45837 8.33611 8.79416 8.00033 9.20837 8.00033ZM13.2917 8.75033C13.2917 8.33611 12.9559 8.00033 12.5417 8.00033C12.1275 8.00033 11.7917 8.33611 11.7917 8.75033V13.7503C11.7917 14.1645 12.1275 14.5003 12.5417 14.5003C12.9559 14.5003 13.2917 14.1645 13.2917 13.7503V8.75033Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+
+            <button
+              class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M10.8749 13.8619C8.10837 13.8619 5.74279 12.1372 4.79804 9.70241C5.74279 7.26761 8.10837 5.54297 10.8749 5.54297C13.6415 5.54297 16.0071 7.26762 16.9518 9.70243C16.0071 12.1372 13.6415 13.8619 10.8749 13.8619ZM10.8749 4.04297C7.35666 4.04297 4.36964 6.30917 3.29025 9.4593C3.23626 9.61687 3.23626 9.78794 3.29025 9.94552C4.36964 13.0957 7.35666 15.3619 10.8749 15.3619C14.3932 15.3619 17.3802 13.0957 18.4596 9.94555C18.5136 9.78797 18.5136 9.6169 18.4596 9.45932C17.3802 6.30919 14.3932 4.04297 10.8749 4.04297ZM10.8663 7.84413C9.84002 7.84413 9.00808 8.67606 9.00808 9.70231C9.00808 10.7286 9.84002 11.5605 10.8663 11.5605H10.8811C11.9074 11.5605 12.7393 10.7286 12.7393 9.70231C12.7393 8.67606 11.9074 7.84413 10.8811 7.84413H10.8663Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- table item -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-100 px-6 py-[18px] dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <div
+            class="flex w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-400"
+          >
+            <div>
+              <img
+                src="./images/icons/file-video.svg"
+                alt="icon"
+                class="dark:hidden"
+              />
+              <img
+                src="./images/icons/file-video-dark.svg"
+                alt="icon"
+                class="hidden dark:block"
+              />
+            </div>
+
+            Video_947954_028.mp4
+          </div>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">Video</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">489 MB</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">
+            29 Apr, 2027
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <div class="flex w-full items-center justify-center gap-2">
+            <button
+              class="text-gray-500 hover:text-error-500 dark:text-gray-400 dark:hover:text-error-500"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M7.4163 3.79199C7.4163 2.54935 8.42366 1.54199 9.6663 1.54199H12.083C13.3256 1.54199 14.333 2.54935 14.333 3.79199V4.04199H16.5H17.5409C17.9551 4.04199 18.2909 4.37778 18.2909 4.79199C18.2909 5.20621 17.9551 5.54199 17.5409 5.54199H17.25V8.24687V13.2469V16.2087C17.25 17.4513 16.2427 18.4587 15 18.4587H6.75004C5.5074 18.4587 4.50004 17.4513 4.50004 16.2087V13.2469V8.24687V5.54199H4.20837C3.79416 5.54199 3.45837 5.20621 3.45837 4.79199C3.45837 4.37778 3.79416 4.04199 4.20837 4.04199H5.25004H7.4163V3.79199ZM15.75 13.2469V8.24687V5.54199H14.333H13.583H8.1663H7.4163H6.00004V8.24687V13.2469V16.2087C6.00004 16.6229 6.33583 16.9587 6.75004 16.9587H15C15.4143 16.9587 15.75 16.6229 15.75 16.2087V13.2469ZM8.9163 4.04199H12.833V3.79199C12.833 3.37778 12.4972 3.04199 12.083 3.04199H9.6663C9.25209 3.04199 8.9163 3.37778 8.9163 3.79199V4.04199ZM9.20837 8.00033C9.62259 8.00033 9.95837 8.33611 9.95837 8.75033V13.7503C9.95837 14.1645 9.62259 14.5003 9.20837 14.5003C8.79416 14.5003 8.45837 14.1645 8.45837 13.7503V8.75033C8.45837 8.33611 8.79416 8.00033 9.20837 8.00033ZM13.2917 8.75033C13.2917 8.33611 12.9559 8.00033 12.5417 8.00033C12.1275 8.00033 11.7917 8.33611 11.7917 8.75033V13.7503C11.7917 14.1645 12.1275 14.5003 12.5417 14.5003C12.9559 14.5003 13.2917 14.1645 13.2917 13.7503V8.75033Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+
+            <button
+              class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M10.8749 13.8619C8.10837 13.8619 5.74279 12.1372 4.79804 9.70241C5.74279 7.26761 8.10837 5.54297 10.8749 5.54297C13.6415 5.54297 16.0071 7.26762 16.9518 9.70243C16.0071 12.1372 13.6415 13.8619 10.8749 13.8619ZM10.8749 4.04297C7.35666 4.04297 4.36964 6.30917 3.29025 9.4593C3.23626 9.61687 3.23626 9.78794 3.29025 9.94552C4.36964 13.0957 7.35666 15.3619 10.8749 15.3619C14.3932 15.3619 17.3802 13.0957 18.4596 9.94555C18.5136 9.78797 18.5136 9.6169 18.4596 9.45932C17.3802 6.30919 14.3932 4.04297 10.8749 4.04297ZM10.8663 7.84413C9.84002 7.84413 9.00808 8.67606 9.00808 9.70231C9.00808 10.7286 9.84002 11.5605 10.8663 11.5605H10.8811C11.9074 11.5605 12.7393 10.7286 12.7393 9.70231C12.7393 8.67606 11.9074 7.84413 10.8811 7.84413H10.8663Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- table item -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-100 px-6 py-[18px] dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <div
+            class="flex w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-400"
+          >
+            <div>
+              <img
+                src="./images/icons/file-image.svg"
+                alt="icon"
+                class="dark:hidden"
+              />
+              <img
+                src="./images/icons/file-image-dark.svg"
+                alt="icon"
+                class="hidden dark:block"
+              />
+            </div>
+
+            Mountain.png
+          </div>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">Image</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">8 MB</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">
+            20 May, 2027
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <div class="flex w-full items-center justify-center gap-2">
+            <button
+              class="text-gray-500 hover:text-error-500 dark:text-gray-400 dark:hover:text-error-500"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M7.4163 3.79199C7.4163 2.54935 8.42366 1.54199 9.6663 1.54199H12.083C13.3256 1.54199 14.333 2.54935 14.333 3.79199V4.04199H16.5H17.5409C17.9551 4.04199 18.2909 4.37778 18.2909 4.79199C18.2909 5.20621 17.9551 5.54199 17.5409 5.54199H17.25V8.24687V13.2469V16.2087C17.25 17.4513 16.2427 18.4587 15 18.4587H6.75004C5.5074 18.4587 4.50004 17.4513 4.50004 16.2087V13.2469V8.24687V5.54199H4.20837C3.79416 5.54199 3.45837 5.20621 3.45837 4.79199C3.45837 4.37778 3.79416 4.04199 4.20837 4.04199H5.25004H7.4163V3.79199ZM15.75 13.2469V8.24687V5.54199H14.333H13.583H8.1663H7.4163H6.00004V8.24687V13.2469V16.2087C6.00004 16.6229 6.33583 16.9587 6.75004 16.9587H15C15.4143 16.9587 15.75 16.6229 15.75 16.2087V13.2469ZM8.9163 4.04199H12.833V3.79199C12.833 3.37778 12.4972 3.04199 12.083 3.04199H9.6663C9.25209 3.04199 8.9163 3.37778 8.9163 3.79199V4.04199ZM9.20837 8.00033C9.62259 8.00033 9.95837 8.33611 9.95837 8.75033V13.7503C9.95837 14.1645 9.62259 14.5003 9.20837 14.5003C8.79416 14.5003 8.45837 14.1645 8.45837 13.7503V8.75033C8.45837 8.33611 8.79416 8.00033 9.20837 8.00033ZM13.2917 8.75033C13.2917 8.33611 12.9559 8.00033 12.5417 8.00033C12.1275 8.00033 11.7917 8.33611 11.7917 8.75033V13.7503C11.7917 14.1645 12.1275 14.5003 12.5417 14.5003C12.9559 14.5003 13.2917 14.1645 13.2917 13.7503V8.75033Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+
+            <button
+              class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M10.8749 13.8619C8.10837 13.8619 5.74279 12.1372 4.79804 9.70241C5.74279 7.26761 8.10837 5.54297 10.8749 5.54297C13.6415 5.54297 16.0071 7.26762 16.9518 9.70243C16.0071 12.1372 13.6415 13.8619 10.8749 13.8619ZM10.8749 4.04297C7.35666 4.04297 4.36964 6.30917 3.29025 9.4593C3.23626 9.61687 3.23626 9.78794 3.29025 9.94552C4.36964 13.0957 7.35666 15.3619 10.8749 15.3619C14.3932 15.3619 17.3802 13.0957 18.4596 9.94555C18.5136 9.78797 18.5136 9.6169 18.4596 9.45932C17.3802 6.30919 14.3932 4.04297 10.8749 4.04297ZM10.8663 7.84413C9.84002 7.84413 9.00808 8.67606 9.00808 9.70231C9.00808 10.7286 9.84002 11.5605 10.8663 11.5605H10.8811C11.9074 11.5605 12.7393 10.7286 12.7393 9.70231C12.7393 8.67606 11.9074 7.84413 10.8811 7.84413H10.8663Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- table item -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-100 px-6 py-[18px] dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <div
+            class="flex w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-400"
+          >
+            <div>
+              <img
+                src="./images/icons/file-pdf.svg"
+                alt="icon"
+                class="dark:hidden"
+              />
+              <img
+                src="./images/icons/file-pdf-dark.svg"
+                alt="icon"
+                class="hidden dark:block"
+              />
+            </div>
+
+            CV.pdf
+          </div>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">Document</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">12 MB</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">
+            17 Jun, 2027
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <div class="flex w-full items-center justify-center gap-2">
+            <button
+              class="text-gray-500 hover:text-error-500 dark:text-gray-400 dark:hover:text-error-500"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M7.4163 3.79199C7.4163 2.54935 8.42366 1.54199 9.6663 1.54199H12.083C13.3256 1.54199 14.333 2.54935 14.333 3.79199V4.04199H16.5H17.5409C17.9551 4.04199 18.2909 4.37778 18.2909 4.79199C18.2909 5.20621 17.9551 5.54199 17.5409 5.54199H17.25V8.24687V13.2469V16.2087C17.25 17.4513 16.2427 18.4587 15 18.4587H6.75004C5.5074 18.4587 4.50004 17.4513 4.50004 16.2087V13.2469V8.24687V5.54199H4.20837C3.79416 5.54199 3.45837 5.20621 3.45837 4.79199C3.45837 4.37778 3.79416 4.04199 4.20837 4.04199H5.25004H7.4163V3.79199ZM15.75 13.2469V8.24687V5.54199H14.333H13.583H8.1663H7.4163H6.00004V8.24687V13.2469V16.2087C6.00004 16.6229 6.33583 16.9587 6.75004 16.9587H15C15.4143 16.9587 15.75 16.6229 15.75 16.2087V13.2469ZM8.9163 4.04199H12.833V3.79199C12.833 3.37778 12.4972 3.04199 12.083 3.04199H9.6663C9.25209 3.04199 8.9163 3.37778 8.9163 3.79199V4.04199ZM9.20837 8.00033C9.62259 8.00033 9.95837 8.33611 9.95837 8.75033V13.7503C9.95837 14.1645 9.62259 14.5003 9.20837 14.5003C8.79416 14.5003 8.45837 14.1645 8.45837 13.7503V8.75033C8.45837 8.33611 8.79416 8.00033 9.20837 8.00033ZM13.2917 8.75033C13.2917 8.33611 12.9559 8.00033 12.5417 8.00033C12.1275 8.00033 11.7917 8.33611 11.7917 8.75033V13.7503C11.7917 14.1645 12.1275 14.5003 12.5417 14.5003C12.9559 14.5003 13.2917 14.1645 13.2917 13.7503V8.75033Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+
+            <button
+              class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M10.8749 13.8619C8.10837 13.8619 5.74279 12.1372 4.79804 9.70241C5.74279 7.26761 8.10837 5.54297 10.8749 5.54297C13.6415 5.54297 16.0071 7.26762 16.9518 9.70243C16.0071 12.1372 13.6415 13.8619 10.8749 13.8619ZM10.8749 4.04297C7.35666 4.04297 4.36964 6.30917 3.29025 9.4593C3.23626 9.61687 3.23626 9.78794 3.29025 9.94552C4.36964 13.0957 7.35666 15.3619 10.8749 15.3619C14.3932 15.3619 17.3802 13.0957 18.4596 9.94555C18.5136 9.78797 18.5136 9.6169 18.4596 9.45932C17.3802 6.30919 14.3932 4.04297 10.8749 4.04297ZM10.8663 7.84413C9.84002 7.84413 9.00808 8.67606 9.00808 9.70231C9.00808 10.7286 9.84002 11.5605 10.8663 11.5605H10.8811C11.9074 11.5605 12.7393 10.7286 12.7393 9.70231C12.7393 8.67606 11.9074 7.84413 10.8811 7.84413H10.8663Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- table item -->
+      <div
+        class="grid grid-cols-11 border-t border-gray-100 px-6 py-[18px] dark:border-gray-800"
+      >
+        <div class="col-span-3 flex items-center">
+          <div
+            class="flex w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-400"
+          >
+            <div>
+              <img
+                src="./images/icons/file-video.svg"
+                alt="icon"
+                class="dark:hidden"
+              />
+              <img
+                src="./images/icons/file-video-dark.svg"
+                alt="icon"
+                class="hidden dark:block"
+              />
+            </div>
+
+            Video_09783_882943.mp4
+          </div>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">Video</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">309 MB</p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <p class="text-theme-sm text-gray-700 dark:text-gray-400">
+            27 Jul, 2027
+          </p>
+        </div>
+        <div class="col-span-2 flex items-center">
+          <div class="flex w-full items-center justify-center gap-2">
+            <button
+              class="text-gray-500 hover:text-error-500 dark:text-gray-400 dark:hover:text-error-500"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M7.4163 3.79199C7.4163 2.54935 8.42366 1.54199 9.6663 1.54199H12.083C13.3256 1.54199 14.333 2.54935 14.333 3.79199V4.04199H16.5H17.5409C17.9551 4.04199 18.2909 4.37778 18.2909 4.79199C18.2909 5.20621 17.9551 5.54199 17.5409 5.54199H17.25V8.24687V13.2469V16.2087C17.25 17.4513 16.2427 18.4587 15 18.4587H6.75004C5.5074 18.4587 4.50004 17.4513 4.50004 16.2087V13.2469V8.24687V5.54199H4.20837C3.79416 5.54199 3.45837 5.20621 3.45837 4.79199C3.45837 4.37778 3.79416 4.04199 4.20837 4.04199H5.25004H7.4163V3.79199ZM15.75 13.2469V8.24687V5.54199H14.333H13.583H8.1663H7.4163H6.00004V8.24687V13.2469V16.2087C6.00004 16.6229 6.33583 16.9587 6.75004 16.9587H15C15.4143 16.9587 15.75 16.6229 15.75 16.2087V13.2469ZM8.9163 4.04199H12.833V3.79199C12.833 3.37778 12.4972 3.04199 12.083 3.04199H9.6663C9.25209 3.04199 8.9163 3.37778 8.9163 3.79199V4.04199ZM9.20837 8.00033C9.62259 8.00033 9.95837 8.33611 9.95837 8.75033V13.7503C9.95837 14.1645 9.62259 14.5003 9.20837 14.5003C8.79416 14.5003 8.45837 14.1645 8.45837 13.7503V8.75033C8.45837 8.33611 8.79416 8.00033 9.20837 8.00033ZM13.2917 8.75033C13.2917 8.33611 12.9559 8.00033 12.5417 8.00033C12.1275 8.00033 11.7917 8.33611 11.7917 8.75033V13.7503C11.7917 14.1645 12.1275 14.5003 12.5417 14.5003C12.9559 14.5003 13.2917 14.1645 13.2917 13.7503V8.75033Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+
+            <button
+              class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+            >
+              <svg
+                class="fill-current"
+                width="21"
+                height="20"
+                viewBox="0 0 21 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M10.8749 13.8619C8.10837 13.8619 5.74279 12.1372 4.79804 9.70241C5.74279 7.26761 8.10837 5.54297 10.8749 5.54297C13.6415 5.54297 16.0071 7.26762 16.9518 9.70243C16.0071 12.1372 13.6415 13.8619 10.8749 13.8619ZM10.8749 4.04297C7.35666 4.04297 4.36964 6.30917 3.29025 9.4593C3.23626 9.61687 3.23626 9.78794 3.29025 9.94552C4.36964 13.0957 7.35666 15.3619 10.8749 15.3619C14.3932 15.3619 17.3802 13.0957 18.4596 9.94555C18.5136 9.78797 18.5136 9.6169 18.4596 9.45932C17.3802 6.30919 14.3932 4.04297 10.8749 4.04297ZM10.8663 7.84413C9.84002 7.84413 9.00808 8.67606 9.00808 9.70231C9.00808 10.7286 9.84002 11.5605 10.8663 11.5605H10.8811C11.9074 11.5605 12.7393 10.7286 12.7393 9.70231C12.7393 8.67606 11.9074 7.84413 10.8811 7.84413H10.8663Z"
+                  fill=""
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- table body end -->
+    </div>
+  </div>
+</div>

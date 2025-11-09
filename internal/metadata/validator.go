@@ -4,9 +4,12 @@ package metadata
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/utils/logging"
@@ -61,34 +64,92 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	if len(m) == 0 {
 		return false, nil
 	}
-
 	v.MetadataMap = m
 
-	// Extract title from metadata
-	if title, ok := m["title"].(string); ok {
-		v.Title = title
-		logging.D(2, "Extracted title from metadata: %s", title)
-	} else {
-		logging.D(2, "No title found in metadata or invalid type")
-	}
-
-	// Extract upload date if available
-	if uploadDate, ok := m["upload_date"].(string); ok {
-		if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
-			v.UploadDate = t
-			logging.D(2, "Extracted upload date: %s", t.Format("2006-01-02"))
-		} else {
-			logging.D(2, "Failed to parse upload date %q: %v", uploadDate, err)
+	// Titles
+	for _, key := range []string{"fulltitle", "title", "full_title"} {
+		if titleVal, exists := m[key]; exists {
+			if title, ok := titleVal.(string); ok {
+				v.Title = title
+				logging.D(2, "Extracted title %q from metadata (Video URL: %q)", title, v.URL)
+				break
+			}
 		}
 	}
 
-	// Extract description
-	if description, ok := m["description"].(string); ok {
-		v.Description = description
-		logging.D(2, "Extracted description from metadata")
+	// Upload date
+	for _, key := range []string{"upload_date", "release_date", "originally_available_at", "date"} {
+		if uploadDateVal, exists := m[key]; exists {
+			if uploadDate, ok := uploadDateVal.(string); ok {
+				if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
+					v.UploadDate = t
+					logging.D(2, "Extracted upload date %q from metadata (Video URL: %q)", t.Format("2006-01-02"), v.URL)
+					break
+				} else {
+					logging.D(2, "Failed to parse upload date %q: %v", uploadDate, err)
+				}
+			}
+		}
 	}
 
-	logging.D(1, "Successfully validated and stored metadata for video: %s (Title: %s)", v.URL, v.Title)
+	// Description
+	for _, key := range []string{"description", "longdescription", "long_description", "summary", "synopsis"} {
+		if descriptionVal, exists := m[key]; exists {
+			if description, ok := descriptionVal.(string); ok {
+				v.Description = description
+				logging.D(2, "Extracted description %q from metadata (Video URL: %q)", description, v.URL)
+				break
+			}
+		}
+	}
+
+	// Thumbnails
+	if v.ThumbnailURL == "" {
+		if thumbnailVal, exists := m[consts.MetadataThumbnail]; exists {
+			if thumbnail, ok := thumbnailVal.(string); ok {
+				v.ThumbnailURL = thumbnail
+			}
+		}
+	}
+	if v.ThumbnailURL == "" {
+		if thumbsVal, exists := m["thumbnails"]; exists {
+			if thumbs, ok := thumbsVal.([]any); ok {
+				var best string
+				maxPref := math.MinInt
+				for _, t := range thumbs {
+					if thumbMap, ok := t.(map[string]any); ok {
+						urlStr, _ := thumbMap["url"].(string)
+						if urlStr == "" {
+							continue
+						}
+						// Highest-resolution or best preference
+						if pref, ok := thumbMap["preference"].(float64); ok {
+							if int(pref) > maxPref {
+								maxPref = int(pref)
+								best = urlStr
+							}
+						} else if best == "" {
+							// fallback if preference missing
+							best = urlStr
+						}
+					}
+				}
+				if best != "" {
+					v.ThumbnailURL = best
+					logging.D(2, "Selected thumbnail from array: %s", best)
+				}
+			}
+		}
+	}
+	if v.ThumbnailURL == "" {
+		path, err := os.Executable()
+		if err != nil {
+			logging.E("Could not retrieve executable path: %v", err)
+		}
+		v.ThumbnailURL = filepath.Join(path, "web/dist/assets/placeholder-video.png")
+	}
+
+	logging.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Title)
 	return true, nil
 }
 

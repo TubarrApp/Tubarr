@@ -48,11 +48,15 @@ func (d *Database) initTables() error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-
 	defer func() {
-		if err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("transaction rollback failed: %v", rollbackErr)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for table creation: %v", rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("transaction rollback failed after original error %v: %v", err, rbErr)
 			}
 		}
 	}()

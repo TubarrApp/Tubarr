@@ -551,7 +551,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	changed = changed || c
 
 	// Download-related operations
-	urlSettings.CookieSource, c = mergeStringSettings(urlSettings.CookieSource, channelSettings.CookieSource)
+	urlSettings.CookiesFromBrowser, c = mergeStringSettings(urlSettings.CookiesFromBrowser, channelSettings.CookiesFromBrowser)
 	changed = changed || c
 
 	urlSettings.CrawlFreq, c = mergeNumSettings(urlSettings.CrawlFreq, channelSettings.CrawlFreq, -1)

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>
+      Analytics Dashboard | TailAdmin - Tailwind CSS Admin Dashboard Template
+    </title>
+  </head>
+  <body
+    x-data="{ page: 'analytics', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+    x-init="
+         darkMode = JSON.parse(localStorage.getItem('darkMode'));
+         $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <!-- ===== Preloader Start ===== -->
+    <include src="./partials/preloader.html"></include>
+    <!-- ===== Preloader End ===== -->
+
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- ===== Sidebar Start ===== -->
+      <include src="./partials/sidebar.html"></include>
+      <!-- ===== Sidebar End ===== -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden"
+      >
+        <!-- Small Device Overlay Start -->
+        <include src="./partials/overlay.html" />
+        <!-- Small Device Overlay End -->
+
+        <!-- ===== Header Start ===== -->
+        <include src="./partials/header.html" />
+        <!-- ===== Header End ===== -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main>
+          <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <div class="grid grid-cols-12 gap-4 md:gap-6">
+              <div class="col-span-12">
+                <!-- Metric Group Two -->
+                <include src="./partials/metric-group/metric-group-02.html" />
+                <!-- Metric Group Two -->
+              </div>
+
+              <div class="col-span-12">
+                <!-- ====== Chart Four Start -->
+                <include src="./partials/chart/chart-04.html" />
+                <!-- ====== Chart Four End -->
+              </div>
+
+              <div class="col-span-12 xl:col-span-7">
+                <!-- ====== Top Card Group Start -->
+                <include src="./partials/top-card-group.html" />
+                <!-- ====== Top Card Group End -->
+              </div>
+
+              <div class="col-span-12 xl:col-span-5">
+                <!-- ====== Chart Five Start -->
+                <include src="./partials/chart/chart-05.html" />
+                <!-- ====== Chart Five End -->
+              </div>
+
+              <div class="col-span-12 xl:col-span-7">
+                <!-- ====== Chart Six Start -->
+                <include src="./partials/chart/chart-06.html" />
+                <!-- ====== Chart Six End -->
+              </div>
+
+              <div class="col-span-12 xl:col-span-5">
+                <!-- ====== Chart Seven Start -->
+                <include src="./partials/chart/chart-07.html" />
+                <!-- ====== Chart Seven End -->
+              </div>
+
+              <div class="col-span-12 xl:col-span-5">
+                <!-- ====== Map One Start -->
+                <include src="./partials/map-01.html" />
+                <!-- ====== Map One End -->
+              </div>
+
+              <div class="col-span-12 xl:col-span-7">
+                <!-- ====== Table Two Start -->
+                <include src="./partials/table/table-02.html" />
+                <!-- ====== Table Two End -->
+              </div>
+            </div>
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+  </body>
+</html>

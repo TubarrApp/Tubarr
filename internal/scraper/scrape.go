@@ -12,7 +12,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 	"tubarr/internal/abstractions"
@@ -46,7 +48,7 @@ func New() *Scraper {
 
 // GetExistingReleases returns releases already in the database.
 func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
-	existingURLs, err = cs.GetAlreadyDownloadedURLs(c)
+	existingURLs, err = cs.GetDownloadedOrIgnoredURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
@@ -286,6 +288,16 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 
 		v.DirectVideoURL = extractVideoURL(consts.HTMLCensoredVideoURL, doc)
 		metadata[consts.MetadataVideoURL] = v.DirectVideoURL
+
+		v.ThumbnailURL = extractVideoThumbnail(consts.HTMLCensoredThumbnail, doc)
+		metadata[consts.MetadataThumbnail] = v.ThumbnailURL
+		if v.ThumbnailURL == "" {
+			path, err := os.Executable()
+			if err != nil {
+				logging.E("Could not retrieve executable path: %v", err)
+			}
+			v.ThumbnailURL = filepath.Join(path, "web/dist/assets/placeholder-video.png")
+		}
 	})
 
 	// Visit the webpage
@@ -425,4 +437,24 @@ func extractVideoURL(findStr string, doc *goquery.Selection) string {
 		logging.D(1, "Video URL not found")
 	}
 	return videoURL
+}
+
+// extractVideoThumbnail extracts the thumbnail URL from the webpage.
+func extractVideoThumbnail(findStr string, doc *goquery.Selection) string {
+	elem := doc.Find(findStr).First()
+	if elem == nil {
+		return ""
+	}
+
+	// Try href first (for <a>), fallback to poster and src
+	if val, ok := elem.Attr("href"); ok && val != "" {
+		return val
+	}
+	if val, ok := elem.Attr("poster"); ok && val != "" {
+		return val
+	}
+	if val, ok := elem.Attr("src"); ok && val != "" {
+		return val
+	}
+	return ""
 }

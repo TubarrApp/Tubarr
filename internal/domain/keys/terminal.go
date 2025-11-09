@@ -44,7 +44,7 @@ const (
 const (
 	YtdlpOutputExt         string = "ytdlp-output-extension"
 	MaxFilesize            string = "max-filesize"
-	CookieSource           string = "cookie-source"
+	CookiesFromBrowser     string = "cookies-from-browser"
 	DLRetries              string = "dl-retries"
 	FromDate               string = "from-date"
 	Pause                  string = "pause-toggle"
@@ -117,4 +117,9 @@ const (
 const (
 	ExtraYTDLPVideoArgs = "extra-ytdlp-video-args" // applied only to video downloads
 	ExtraYTDLPMetaArgs  = "extra-ytdlp-meta-args"  // applies only to metadata downloads
+)
+
+// Web interface or terminal
+const (
+	RunWebInterface = "web"
 )

@@ -37,12 +37,15 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-
-	committed := false
 	defer func() {
-		if !committed {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("Error rolling back transaction: %v", rollbackErr)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -83,14 +86,18 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 				Columns(
 					consts.QVidChanID,
 					consts.QVidChanURLID,
+					consts.QVidThumbnailURL,
 					consts.QVidURL,
 					consts.QVidFinished,
+					consts.QVidIgnored,
 				).
 				Values(
 					channelID,
 					v.ChannelURLID,
+					v.ThumbnailURL,
 					v.URL,
 					v.Finished,
+					v.Ignored,
 				).
 				RunWith(tx)
 
@@ -124,7 +131,6 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 		errs = append(errs, fmt.Errorf("failed to commit transaction: %w", err))
 		return nil, errors.Join(errs...)
 	}
-	committed = true
 
 	return validVideos, errors.Join(errs...)
 }
@@ -156,11 +162,15 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	committed := false
 	defer func() {
-		if !committed {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("Error rolling back transaction for video %q: %v", v.URL, rollbackErr)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -172,10 +182,12 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		Columns(
 			consts.QVidChanID,
 			consts.QVidChanURLID,
+			consts.QVidThumbnailURL,
 			consts.QVidURL,
 			consts.QVidTitle,
 			consts.QVidDescription,
 			consts.QVidFinished,
+			consts.QVidIgnored,
 			consts.QVidUploadDate,
 			consts.QVidMetadata,
 			consts.QVidCreatedAt,
@@ -184,10 +196,12 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		Values(
 			channelID,
 			channelURLID,
+			v.ThumbnailURL,
 			v.URL,
 			v.Title,
 			v.Description,
 			v.Finished,
+			v.Ignored,
 			v.UploadDate,
 			metadataJSON,
 			now,
@@ -220,7 +234,6 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
-	committed = true
 
 	logging.D(1, "Inserted video %q with ID %d successfully", v.URL, videoID)
 	return videoID, nil
@@ -228,7 +241,6 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 
 // UpdateVideo updates the status of the video in the database.
 func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
-	var committed bool
 	tx, err := vs.DB.Begin()
 
 	if err != nil {
@@ -236,9 +248,14 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	}
 
 	defer func() {
-		if !committed {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("Error rolling back download status for video with URL %s: %v", v.URL, rollbackErr)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -251,11 +268,13 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	// Update videos table
 	videoQuery := squirrel.
 		Update(consts.DBVideos).
+		Set(consts.QVidThumbnailURL, v.ThumbnailURL).
 		Set(consts.QVidTitle, v.Title).
 		Set(consts.QVidDescription, v.Description).
 		Set(consts.QVidVideoPath, v.VideoPath).
 		Set(consts.QVidJSONPath, v.JSONPath).
 		Set(consts.QVidFinished, v.Finished).
+		Set(consts.QVidIgnored, v.Ignored).
 		Set(consts.QVidUploadDate, v.UploadDate).
 		Set(consts.QVidMetadata, metadataJSON).
 		Set(consts.QVidUpdatedAt, time.Now()).
@@ -294,7 +313,6 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
-	committed = true
 
 	logging.S("Updated video with URL: %s", v.URL)
 	return nil

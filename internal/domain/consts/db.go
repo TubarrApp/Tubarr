@@ -117,20 +117,22 @@ const (
 
 // Video database entry keys.
 const (
-	QVidID          = "id"
-	QVidChanID      = "channel_id"
-	QVidChanURLID   = "channel_url_id"
-	QVidFinished    = "finished"
-	QVidURL         = "url"
-	QVidTitle       = "title"
-	QVidDescription = "description"
-	QVidVideoPath   = "video_path"
-	QVidJSONPath    = "json_path"
-	QVidUploadDate  = "upload_date"
-	QVidMetadata    = "metadata"
-	QVidDLStatus    = "download_status"
-	QVidCreatedAt   = "created_at"
-	QVidUpdatedAt   = "updated_at"
+	QVidID           = "id"
+	QVidChanID       = "channel_id"
+	QVidChanURLID    = "channel_url_id"
+	QVidFinished     = "finished"
+	QVidIgnored      = "ignored"
+	QVidThumbnailURL = "thumbnail_url"
+	QVidURL          = "url"
+	QVidTitle        = "title"
+	QVidDescription  = "description"
+	QVidVideoPath    = "video_path"
+	QVidJSONPath     = "json_path"
+	QVidUploadDate   = "upload_date"
+	QVidMetadata     = "metadata"
+	QVidDLStatus     = "download_status"
+	QVidCreatedAt    = "created_at"
+	QVidUpdatedAt    = "updated_at"
 )
 
 // Downloads database entry keys.
@@ -166,4 +168,5 @@ const (
 	DLStatusDownloading DownloadStatus = "Downloading"
 	DLStatusCompleted   DownloadStatus = "Finished"
 	DLStatusFailed      DownloadStatus = "Failed"
+	DLStatusIgnored     DownloadStatus = "Ignored"
 )

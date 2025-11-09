@@ -77,6 +77,113 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 	return id, nil
 }
 
+// GetLatestDownloadedVideos returns the latest 'limit' downloaded videos.
+func (cs *ChannelStore) GetLatestDownloadedVideos(channel *models.Channel, limit int) ([]models.Video, error) {
+	var videos []models.Video
+
+	query := squirrel.
+		Select(
+			consts.QVidID,
+			consts.QVidChanID,
+			consts.QVidChanURLID,
+			consts.QVidThumbnailURL,
+			consts.QVidFinished,
+			consts.QVidURL,
+			consts.QVidTitle,
+			consts.QVidDescription,
+			consts.QVidVideoPath,
+			consts.QVidJSONPath,
+			consts.QVidUploadDate,
+			consts.QVidMetadata,
+			consts.QVidDLStatus,
+			consts.QVidCreatedAt,
+			consts.QVidUpdatedAt,
+		).
+		From(consts.DBVideos).
+		Where(squirrel.Eq{consts.QVidChanID: channel.ID}).
+		Where(squirrel.Eq{consts.QVidFinished: 1}).            // Only finished downloads
+		OrderBy(fmt.Sprintf("%s DESC", consts.QVidUpdatedAt)). // Most recent first
+		Limit(uint64(limit))
+
+	sqlPlaceholder, args, err := query.PlaceholderFormat(squirrel.Question).ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	rows, err := cs.DB.Query(sqlPlaceholder, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query videos: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var video models.Video
+		var thumbnailURL sql.NullString
+		var description sql.NullString
+		var videoPath sql.NullString
+		var jsonPath sql.NullString
+		var uploadDate sql.NullTime
+		var metadataStr sql.NullString
+		var channelURLID sql.NullInt64
+		var downloadStatusStr sql.NullString
+
+		err := rows.Scan(
+			&video.ID,
+			&video.ChannelID,
+			&channelURLID,
+			&thumbnailURL,
+			&video.Finished,
+			&video.URL,
+			&video.Title,
+			&description,
+			&videoPath,
+			&jsonPath,
+			&uploadDate,
+			&metadataStr,
+			&downloadStatusStr,
+			&video.CreatedAt,
+			&video.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan video row: %w", err)
+		}
+
+		// Unmarshal download status JSON
+		if downloadStatusStr.Valid && downloadStatusStr.String != "" {
+			if err := json.Unmarshal([]byte(downloadStatusStr.String), &video.DownloadStatus); err != nil {
+				logging.W("Failed to unmarshal download status for video %d: %v", video.ID, err)
+			}
+		}
+
+		// Handle nullable fields
+		if channelURLID.Valid {
+			video.ChannelURLID = channelURLID.Int64
+		}
+		if thumbnailURL.Valid {
+			video.ThumbnailURL = thumbnailURL.String
+		}
+		if description.Valid {
+			video.Description = description.String
+		}
+		if videoPath.Valid {
+			video.VideoPath = videoPath.String
+		}
+		if jsonPath.Valid {
+			video.JSONPath = jsonPath.String
+		}
+		if uploadDate.Valid {
+			video.UploadDate = uploadDate.Time
+		}
+		videos = append(videos, video)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return videos, nil
+}
+
 // GetAuth retrieves authentication details for a specific URL in a channel.
 func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password, loginURL string, err error) {
 	var u, p, l sql.NullString // Use sql.NullString to handle NULL values
@@ -322,9 +429,14 @@ func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.N
 		return err
 	}
 	defer func() {
-		if err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("Failed to abort transaction for channel ID: %d. Could not abort transacting notifications: %v: %v", channelID, notifications, err)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -418,9 +530,14 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 	// Ensure rollback on error
 	defer func() {
-		if err != nil {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("Failed to rollback transaction for channel %q: %v", c.Name, rollbackErr)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for channel %q: %v", c.Name, rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Rollback failed for channel %q (original error: %v): %v", c.Name, err, rbErr)
 			}
 		}
 	}()
@@ -979,8 +1096,8 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	return nil
 }
 
-// GetAlreadyDownloadedURLs loads already downloaded URLs from the database.
-func (cs *ChannelStore) GetAlreadyDownloadedURLs(c *models.Channel) (urls []string, err error) {
+// GetDownloadedOrIgnoredURLs loads already downloaded or ignored URLs from the database.
+func (cs *ChannelStore) GetDownloadedOrIgnoredURLs(c *models.Channel) (urls []string, err error) {
 	if c.ID == 0 {
 		return nil, errors.New("model entered has no ID")
 	}
@@ -990,7 +1107,10 @@ func (cs *ChannelStore) GetAlreadyDownloadedURLs(c *models.Channel) (urls []stri
 		From(consts.DBVideos).
 		Where(squirrel.And{
 			squirrel.Eq{consts.QVidChanID: c.ID},
-			squirrel.Eq{consts.QVidFinished: 1},
+			squirrel.Or{
+				squirrel.Eq{consts.QVidFinished: 1},
+				squirrel.Eq{consts.QVidIgnored: 1},
+			},
 		}).
 		RunWith(cs.DB)
 
@@ -1043,16 +1163,21 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("ID: %d\n", c.ID)
 	fmt.Printf("Name: %s\n", c.Name)
 	fmt.Printf("URLs: %+v\n", cURLs)
-	fmt.Printf("Paused: %v\n", s.Paused)
 
 	// Channel settings
+	if s == nil {
+		fmt.Printf("(Settings not configured)\n")
+		return
+	}
+	fmt.Printf("Paused: %v\n", s.Paused)
+
 	fmt.Printf("\n%sChannel Settings:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Video Directory: %s\n", s.VideoDir)
 	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
 	fmt.Printf("Config File: %s\n", s.ChannelConfigFile)
 	fmt.Printf("Crawl Frequency: %d minutes\n", c.GetCrawlFreq())
 	fmt.Printf("Concurrency: %d\n", s.Concurrency)
-	fmt.Printf("Cookie Source: %s\n", s.CookieSource)
+	fmt.Printf("Cookie Source: %s\n", s.CookiesFromBrowser)
 	fmt.Printf("Retries: %d\n", s.Retries)
 	fmt.Printf("External Downloader: %s\n", s.ExternalDownloader)
 	fmt.Printf("External Downloader Args: %s\n", s.ExternalDownloaderArgs)
@@ -1070,6 +1195,10 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 
 	// Metarr settings
 	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
+	if m == nil {
+		fmt.Printf("(Metarr arguments not configured)\n")
+		return
+	}
 	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
 	fmt.Printf("URL-Specific Output Directories: %v\n", m.URLOutputDirs)
 	fmt.Printf("Output Filetype: %s\n", m.OutputExt)
@@ -1161,8 +1290,8 @@ func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error
 	}
 
 	// Cookie source
-	if v, ok := getConfigValue[string](keys.CookieSource); ok {
-		c.ChanSettings.CookieSource = v // No check for this currently! (cookies-from-browser)
+	if v, ok := getConfigValue[string](keys.CookiesFromBrowser); ok {
+		c.ChanSettings.CookiesFromBrowser = v // No check for this currently! (cookies-from-browser)
 	}
 
 	// Crawl frequency

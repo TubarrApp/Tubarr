@@ -12,6 +12,7 @@ import (
 	"tubarr/internal/app"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/server"
 	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/utils/times"
@@ -25,7 +26,7 @@ func main() {
 		logging.E("error initializing Tubarr: %v", err)
 		return
 	}
-	logging.I("Tubarr (PID: %d) started at: %v", progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
+	logging.I("Tubarr (PID: %d) started at: %v\n", progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGSEGV)
 
@@ -64,16 +65,20 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return
 	}
+	// Start server or terminal version
+	if abstractions.IsSet(keys.RunWebInterface) {
+		server.StartServer(store)
+	} else {
+		// Check channels
+		if abstractions.GetBool(keys.CheckChannels) {
+			if err := times.StartupWait(ctx); err != nil {
+				logging.E("Exiting before startup timer exited")
+				return
+			}
 
-	// Check channels
-	if abstractions.GetBool(keys.CheckChannels) {
-		if err := times.StartupWait(ctx); err != nil {
-			logging.E("Exiting before startup timer exited")
-			return
-		}
-
-		if err := app.CheckChannels(ctx, store); err != nil {
-			logging.E("Encountered errors while checking channels: %v", err)
+			if err := app.CheckChannels(ctx, store); err != nil {
+				logging.E("Encountered errors while checking channels: %v", err)
+			}
 		}
 	}
 }

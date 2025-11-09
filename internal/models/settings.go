@@ -11,7 +11,7 @@ type Settings struct {
 	Concurrency       int    `json:"max_concurrency" mapstructure:"max-concurrency"`
 
 	// Download-related operations.
-	CookieSource           string `json:"cookie_source" mapstructure:"cookie-source"`
+	CookiesFromBrowser     string `json:"cookies_from_browser" mapstructure:"cookie-from-browser"`
 	CrawlFreq              int    `json:"crawl_freq" mapstructure:"crawl-freq"`
 	ExternalDownloader     string `json:"external_downloader" mapstructure:"external-downloader"`
 	ExternalDownloaderArgs string `json:"external_downloader_args" mapstructure:"external-downloader-args"`

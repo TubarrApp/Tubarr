@@ -40,12 +40,13 @@ type ChannelStore interface {
 
 	// 'Get' operations.
 	GetAllChannels() (channels []*models.Channel, hasRows bool, err error)
-	GetAlreadyDownloadedURLs(c *models.Channel) (urls []string, err error)
+	GetDownloadedOrIgnoredURLs(c *models.Channel) (urls []string, err error)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetChannelID(key, val string) (int64, error)
 	GetChannelModel(key, val string) (*models.Channel, bool, error)
 	GetChannelURLModel(channelID int64, urlStr string) (chanURL *models.ChannelURL, hasRows bool, err error)
 	GetChannelURLModels(c *models.Channel) ([]*models.ChannelURL, error)
+	GetLatestDownloadedVideos(channel *models.Channel, limit int) ([]models.Video, error)
 	GetNotifyURLs(id int64) ([]*models.Notification, error)
 
 	// Other channel database functions.

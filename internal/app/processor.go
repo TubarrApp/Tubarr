@@ -133,7 +133,7 @@ func InitProcess(
 
 	// Count videos that were actually downloaded (not skipped)
 	for _, video := range videos {
-		if video.Finished && !video.WasSkipped {
+		if video.Finished && !video.Ignored {
 			nDownloaded++
 		}
 	}
@@ -262,7 +262,7 @@ func processJSON(
 	cu.ChanURLMetarrArgs.FilteredFilenameOps = useFilteredFilenameOps
 
 	if !passedChecks {
-		v.MarkVideoAsSkipped()
+		v.MarkVideoAsIgnored()
 		if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
 			return false, false, fmt.Errorf("failed to update ignored video: %w", err)
 		}

@@ -80,7 +80,7 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 	if c.ChanSettings.UseGlobalCookies {
 		regCookies, err = cm.GetCookies(cu.URL)
 		if err != nil {
-			logging.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookieSource, err)
+			logging.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookiesFromBrowser, err)
 		}
 	}
 

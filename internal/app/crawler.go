@@ -428,7 +428,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 				logging.D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
 				continue
 			}
-			v.MarkVideoAsCompleted()
+			v.MarkVideoAsIgnored()
 		}
 
 		validVideos, err := s.VideoStore().AddVideos(videos, c.ID)

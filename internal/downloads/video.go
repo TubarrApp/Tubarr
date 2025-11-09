@@ -57,18 +57,18 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Cookie path
 	if d.ChannelURL.CookiePath == "" {
-		if d.ChannelURL.ChanURLSettings.CookieSource != "" {
-			args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookieSource)
+		if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
+			args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
 		}
 	} else {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
 
 	// Cookie source
-	if abstractions.IsSet(keys.CookieSource) {
-		browserCookieSource := abstractions.GetString(keys.CookieSource)
-		logging.I("Using cookies from browser %q", browserCookieSource)
-		args = append(args, command.CookiesFromBrowser, browserCookieSource)
+	if abstractions.IsSet(keys.CookiesFromBrowser) {
+		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
+		logging.I("Using cookies from browser %q", browserCookiesFromBrowser)
+		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)
 	} else {
 		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}

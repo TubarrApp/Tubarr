@@ -210,13 +210,7 @@ func ValidateViperFlags() error {
 
 // ValidateConcurrencyLimit checks and ensures correct concurrency limit input.
 func ValidateConcurrencyLimit(c int) int {
-	switch {
-	case c < 1:
-		c = 1
-	default:
-		fmt.Printf("Max concurrency: %d", c)
-	}
-
+	c = max(c, 1)
 	return c
 }
 
@@ -291,6 +285,9 @@ func ValidateNotificationStrings(notifications []string) ([]*models.Notification
 
 // ValidateYtdlpOutputExtension validates the merge-output-format compatibility of the inputted extension.
 func ValidateYtdlpOutputExtension(e string) error {
+	if e == "" {
+		return nil
+	}
 	e = strings.TrimPrefix(strings.ToLower(e), ".")
 	switch e {
 	case "avi", "flv", "mkv", "mov", "mp4", "webm":
@@ -302,10 +299,7 @@ func ValidateYtdlpOutputExtension(e string) error {
 
 // ValidateLoggingLevel checks and validates the debug level.
 func ValidateLoggingLevel() {
-	l := min(max(abstractions.GetInt(keys.DebugLevel), 0), 5)
-
-	logging.Level = l
-	fmt.Printf("Logging level: %d\n", logging.Level)
+	logging.Level = min(max(abstractions.GetInt(keys.DebugLevel), 0), 5)
 }
 
 // WarnMalformedKeys warns a user if a key in their config file is mixed casing.
@@ -319,6 +313,9 @@ func WarnMalformedKeys() {
 
 // ValidateMaxFilesize checks the max filesize setting.
 func ValidateMaxFilesize(m string) (string, error) {
+	if m == "" {
+		return m, nil
+	}
 	m = strings.ToUpper(m)
 	switch {
 	case strings.HasSuffix(m, "B"), strings.HasSuffix(m, "K"), strings.HasSuffix(m, "M"), strings.HasSuffix(m, "G"):
@@ -524,6 +521,10 @@ func ValidateFilteredFilenameOps(filteredFilenameOps []string) ([]models.Filtere
 
 // ValidateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
 func ValidateToFromDate(d string) (string, error) {
+	if d == "" {
+		return "", nil
+	}
+
 	d = strings.ToLower(d)
 	d = strings.ReplaceAll(d, "-", "")
 	d = strings.ReplaceAll(d, " ", "")

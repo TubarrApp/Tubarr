@@ -1,12 +1,17 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
+	"tubarr/internal/app"
+	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
@@ -22,10 +27,10 @@ func handleListChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !found {
-		http.Error(w, "channel not found", http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]any{})
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(channels)
 }
@@ -52,24 +57,90 @@ func handleGetChannel(w http.ResponseWriter, r *http.Request) {
 
 // handleCreateChannel creates a new channel entry.
 func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("name")
+	urls := strings.Fields(r.FormValue("urls"))
+	authDetails := strings.Fields(r.FormValue("auth_details"))
+	username := r.FormValue("username")
+	loginURL := r.FormValue("login_url")
+	password := r.FormValue("password")
 	now := time.Now()
+
+	// Parse and validate authentication details
+	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Add channel URLs
+	var chanURLs = make([]*models.ChannelURL, 0, len(urls))
+	for _, u := range urls {
+		if u != "" {
+			if _, err := url.Parse(u); err != nil {
+				http.Error(w, fmt.Sprintf("invalid channel URL %q: %v", u, err), http.StatusBadRequest)
+				return
+			}
+			var parsedUsername, parsedPassword, parsedLoginURL string
+			if _, exists := authMap[u]; exists {
+				parsedUsername = authMap[u].Username
+				parsedPassword = authMap[u].Password
+				parsedLoginURL = authMap[u].LoginURL
+			}
+
+			chanURLs = append(chanURLs, &models.ChannelURL{
+				URL:       u,
+				Username:  parsedUsername,
+				Password:  parsedPassword,
+				LoginURL:  parsedLoginURL,
+				LastScan:  now,
+				CreatedAt: now,
+				UpdatedAt: now,
+			})
+		}
+	}
 
 	// Create model
 	c := &models.Channel{
-		Name:         name,
-		ChanSettings: getSettingsStrings(w, r),
-		CreatedAt:    now,
-		LastScan:     now,
-		UpdatedAt:    now,
+		Name:      name,
+		URLModels: chanURLs,
+		CreatedAt: now,
+		LastScan:  now,
+		UpdatedAt: now,
 	}
+
+	// Get and validate settings
+	c.ChanSettings = getSettingsStrings(w, r)
+	if c.ChanSettings == nil {
+		c.ChanSettings = &models.Settings{}
+	}
+
 	c.ChanMetarrArgs = getMetarrArgsStrings(w, r, c)
+	if c.ChanMetarrArgs == nil {
+		c.ChanMetarrArgs = &models.MetarrArgs{}
+	}
 
 	// Add to database
-	if _, err := cs.AddChannel(c); err != nil {
+	if c.ID, err = cs.AddChannel(c); err != nil {
 		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), http.StatusInternalServerError)
 		return
 	}
+
+	// Ignore run if desired
+	ctx := context.Background()
+	if r.FormValue("ignore_run") == "true" {
+		log.Printf("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
+		if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+			http.Error(w, fmt.Sprintf("failed to run ignore crawl on channel %q: %v", name, err), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -100,14 +171,15 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	downloadedURLs, err := cs.GetAlreadyDownloadedURLs(c)
+	// Get video downloads with full metadata
+	videos, err := cs.GetLatestDownloadedVideos(c, 5)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("could not retrieve downloaded URLs for channel %q: %v", c.Name, err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(downloadedURLs[:10])
+	json.NewEncoder(w).Encode(videos)
 }
 
 // ----------------- Helpers ----------------------------------------------------------------------------------------
@@ -116,35 +188,45 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings {
 	// -- Initialize --
 	// Strings not needing validation
-	channelConfigFile := chi.URLParam(r, "channel_config_file")
-	cookieSource := chi.URLParam(r, "cookie_source")
-	externalDownloader := chi.URLParam(r, "external_downloader")
-	externalDownloaderArgs := chi.URLParam(r, "external_downloader_args")
-	extraYtdlpVideoArgs := chi.URLParam(r, "extra_ytdlp_video_args")
-	extraYtdlpMetaArgs := chi.URLParam(r, "extra_ytdlp_meta_args")
-	filterFile := chi.URLParam(r, "filter_file")
-	moveOpFile := chi.URLParam(r, "move_ops_file")
+	channelConfigFile := r.FormValue("channel_config_file")
+	cookiesFromBrowser := r.FormValue("cookies_from_browser")
+	externalDownloader := r.FormValue("external_downloader")
+	externalDownloaderArgs := r.FormValue("external_downloader_args")
+	extraYtdlpVideoArgs := r.FormValue("extra_ytdlp_video_args")
+	extraYtdlpMetaArgs := r.FormValue("extra_ytdlp_meta_args")
+	filterFile := r.FormValue("filter_file")
+	moveOpFile := r.FormValue("move_ops_file")
 
 	// Strings needing validation
-	maxFilesizeStr := chi.URLParam(r, "max_filesize")
-	ytdlpOutExt := chi.URLParam(r, "ytdlp_output_ext")
-	fromDateStr := chi.URLParam(r, "from_date")
-	toDateStr := chi.URLParam(r, "to_date")
+	jDir := r.FormValue("json_directory")
+	vDir := r.FormValue("video_directory")
+	maxFilesizeStr := r.FormValue("max_filesize")
+	ytdlpOutExt := r.FormValue("ytdlp_output_ext")
+	fromDateStr := r.FormValue("from_date")
+	toDateStr := r.FormValue("to_date")
 
 	// Integers
-	maxConcurrencyStr := chi.URLParam(r, "max_concurrency")
-	crawlFreqStr := chi.URLParam(r, "crawl_freq")
-	retriesStr := chi.URLParam(r, "download_retries")
+	maxConcurrencyStr := r.FormValue("max_concurrency")
+	crawlFreqStr := r.FormValue("crawl_freq")
+	retriesStr := r.FormValue("download_retries")
 
 	// Bools
-	useGlobalCookiesStr := chi.URLParam(r, "use_global_cookies")
+	useGlobalCookiesStr := r.FormValue("use_global_cookies")
 
 	// Models
-	filtersStr := chi.URLParam(r, "filters")
-	moveOpsStr := chi.URLParam(r, "move_ops")
+	filtersStr := r.FormValue("filters")
+	moveOpsStr := r.FormValue("move_ops")
 
 	// -- Validation --
 	// Strings
+	if _, err := validation.ValidateDirectory(vDir, true); err != nil {
+		http.Error(w, fmt.Sprintf("video directory %q is invalid: %v", vDir, err), http.StatusBadRequest)
+		return nil
+	}
+	if _, err := validation.ValidateDirectory(jDir, true); err != nil {
+		http.Error(w, fmt.Sprintf("JSON directory %q is invalid: %v", jDir, err), http.StatusBadRequest)
+		return nil
+	}
 	maxFilesize, err := validation.ValidateMaxFilesize(maxFilesizeStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("max filesize %q is invalid: %v", maxFilesizeStr, err), http.StatusBadRequest)
@@ -201,7 +283,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	return &models.Settings{
 		ChannelConfigFile:      channelConfigFile,
 		Concurrency:            maxConcurrency,
-		CookieSource:           cookieSource,
+		CookiesFromBrowser:     cookiesFromBrowser,
 		CrawlFreq:              crawlFreq,
 		ExternalDownloader:     externalDownloader,
 		ExternalDownloaderArgs: externalDownloaderArgs,
@@ -219,6 +301,9 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 
 		FromDate: fromDate,
 		ToDate:   toDate,
+
+		JSONDir:  jDir,
+		VideoDir: vDir,
 	}
 }
 
@@ -226,33 +311,33 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request, c *models.Channel) *models.MetarrArgs {
 	// -- Initialize --
 	// Strings not needing validation
-	outExt := chi.URLParam(r, "metarr_output_ext")
-	filenameOpsFile := chi.URLParam(r, "metarr_filename_ops_file")
-	filteredFilenameOpsFile := chi.URLParam(r, "filtered_filename_ops_file")
-	metaOpsFile := chi.URLParam(r, "metarr_meta_ops_file")
-	filteredMetaOpsFile := chi.URLParam(r, "filtered_meta_ops_file")
-	outputDirStr := chi.URLParam(r, "metarr_output_directory")
-	extraFFmpegArgs := chi.URLParam(r, "metarr_extra_ffmpeg_args")
+	outExt := r.FormValue("metarr_output_ext")
+	filenameOpsFile := r.FormValue("metarr_filename_ops_file")
+	filteredFilenameOpsFile := r.FormValue("filtered_filename_ops_file")
+	metaOpsFile := r.FormValue("metarr_meta_ops_file")
+	filteredMetaOpsFile := r.FormValue("filtered_meta_ops_file")
+	extraFFmpegArgs := r.FormValue("metarr_extra_ffmpeg_args")
 
 	// Strings requiring validation
-	renameStyle := chi.URLParam(r, "metarr_rename_style")
-	minFreeMem := chi.URLParam(r, "metarr_min_free_mem")
-	useGPUStr := chi.URLParam(r, "metarr_gpu")
-	gpuDirStr := chi.URLParam(r, "metarr_gpu_directory")
-	transcodeVideoFilterStr := chi.URLParam(r, "metarr_transcode_video_filter")
-	transcodeCodecStr := chi.URLParam(r, "metarr_transcode_codec")
-	transcodeAudioCodecStr := chi.URLParam(r, "metarr_transcode_audio_codec")
-	transcodeQualityStr := chi.URLParam(r, "metarr_transcode_quality")
+	renameStyle := r.FormValue("metarr_rename_style")
+	minFreeMem := r.FormValue("metarr_min_free_mem")
+	useGPUStr := r.FormValue("metarr_gpu")
+	gpuDirStr := r.FormValue("metarr_gpu_directory")
+	outputDir := r.FormValue("metarr_output_directory")
+	transcodeVideoFilterStr := r.FormValue("metarr_transcode_video_filter")
+	transcodeCodecStr := r.FormValue("metarr_transcode_codec")
+	transcodeAudioCodecStr := r.FormValue("metarr_transcode_audio_codec")
+	transcodeQualityStr := r.FormValue("metarr_transcode_quality")
 
 	// Ints
-	maxConcurrencyStr := chi.URLParam(r, "metarr_concurrency")
-	maxCPUStr := chi.URLParam(r, "metarr_max_cpu_usage")
+	maxConcurrencyStr := r.FormValue("metarr_concurrency")
+	maxCPUStr := r.FormValue("metarr_max_cpu_usage")
 
 	// Models
-	filenameOpsStr := chi.URLParam(r, "metarr_filename_ops")
-	filteredFilenameOpsStr := chi.URLParam(r, "filtered_filename_ops")
-	filteredMetaOpsStr := chi.URLParam(r, "filtered_meta_ops")
-	metaOpsStr := chi.URLParam(r, "metarr_meta_ops")
+	filenameOpsStr := r.FormValue("metarr_filename_ops")
+	filteredFilenameOpsStr := r.FormValue("filtered_filename_ops")
+	filteredMetaOpsStr := r.FormValue("filtered_meta_ops")
+	metaOpsStr := r.FormValue("metarr_meta_ops")
 
 	// -- Validation --
 	//Strings
@@ -289,9 +374,8 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request, c *models.Chan
 		http.Error(w, fmt.Sprintf("invalid transcode quality string %q: %v", transcodeQualityStr, err), http.StatusBadRequest)
 		return nil
 	}
-	outDirMap, err := validation.ValidateMetarrOutputDirs(outputDirStr, nil, c)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("cannot get output directories. Input string %q. Error: %v", outputDirStr, err), http.StatusBadRequest)
+	if _, err := validation.ValidateDirectory(outputDir, false); err != nil {
+		http.Error(w, fmt.Sprintf("cannot get output directories. Input string %q. Error: %v", outputDir, err), http.StatusBadRequest)
 		return nil
 	}
 
@@ -302,10 +386,14 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request, c *models.Chan
 		return nil
 	}
 	maxConcurrency = validation.ValidateConcurrencyLimit(maxConcurrency)
-	maxCPU, err := strconv.ParseFloat(maxCPUStr, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert max CPU limit string %q: %v", maxCPUStr, err), http.StatusBadRequest)
-		return nil
+
+	maxCPU := 100.00
+	if maxCPUStr != "" {
+		maxCPU, err = strconv.ParseFloat(maxCPUStr, 64)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to convert max CPU limit string %q: %v", maxCPUStr, err), http.StatusBadRequest)
+			return nil
+		}
 	}
 
 	// Models
@@ -341,8 +429,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request, c *models.Chan
 		MetaOpsFile:             metaOpsFile,
 		FilteredMetaOps:         filteredMetaOps,
 		FilteredMetaOpsFile:     filteredMetaOpsFile,
-		OutputDir:               outputDirStr,
-		OutputDirMap:            outDirMap,
+		OutputDir:               outputDir,
 		Concurrency:             maxConcurrency,
 		MaxCPU:                  maxCPU,
 		MinFreeMem:              minFreeMem,

@@ -240,7 +240,7 @@ func ValidateRenameFlag(flag string) error {
 	flag = strings.TrimSpace(strings.ToLower(flag))
 
 	switch flag {
-	case "spaces", "underscores", "fixes-only":
+	case "spaces", "underscores", "fixes-only", "skip", "":
 		return nil
 	default:
 		return errors.New("'spaces', 'underscores' or 'fixes-only' not selected for renaming style, skipping these modifications")
@@ -261,6 +261,9 @@ func ValidateDateFormat(dateFmt string) bool {
 
 // ValidateMinFreeMem flag verifies the format of the free memory flag.
 func ValidateMinFreeMem(minFreeMem string) error {
+	if minFreeMem == "" {
+		return nil
+	}
 	minFreeMem = strings.ToUpper(minFreeMem)
 	minFreeMem = strings.TrimSuffix(minFreeMem, "B")
 
@@ -423,6 +426,9 @@ func ValidateTranscodeCodec(c, accel string) (string, error) {
 
 // ValidateTranscodeQuality validates the transcode quality preset.
 func ValidateTranscodeQuality(q string) (quality string, err error) {
+	if q == "" {
+		return q, nil
+	}
 	q = strings.ToLower(q)
 	q = strings.ReplaceAll(q, " ", "")
 	qNum, err := strconv.ParseInt(q, 10, 64)

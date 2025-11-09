@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Add Channel | Tubarr</title>
+    <link rel="icon" href="favicon.ico">
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body
+    x-data="{ page: 'addChannel', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+    x-init="
+         darkMode = JSON.parse(localStorage.getItem('darkMode'));
+         $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <!-- ===== Preloader Start ===== -->
+    <div
+      x-show="loaded"
+      x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
+      class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black"
+    >
+      <div
+        class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"
+      ></div>
+    </div>
+    <!-- ===== Preloader End ===== -->
+
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- ===== Sidebar Start ===== -->
+      <aside
+        :class="sidebarToggle ? 'translate-x-0 xl:w-[90px]' : '-translate-x-full'"
+        class="sidebar fixed top-0 left-0 z-9999 flex h-screen w-[290px] flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 transition-all duration-300 xl:static xl:translate-x-0 dark:border-gray-800 dark:bg-black"
+        @click.outside="sidebarToggle = false"
+      >
+        <!-- SIDEBAR HEADER -->
+        <div
+          :class="sidebarToggle ? 'justify-center' : 'justify-between'"
+          class="sidebar-header flex items-center gap-2 pt-8 pb-7"
+        >
+          <a href="index.html">
+            <span class="logo" :class="sidebarToggle ? 'hidden' : ''">
+              <img class="dark:hidden" src="src/images/logo/logo.svg" alt="Logo" />
+              <img
+                class="hidden dark:block"
+                src="src/images/logo/logo-dark.svg"
+                alt="Logo"
+              />
+            </span>
+
+            <img
+              class="logo-icon"
+              :class="sidebarToggle ? 'xl:block' : 'hidden'"
+              src="src/images/logo/logo-icon.svg"
+              alt="Logo"
+            />
+          </a>
+        </div>
+        <!-- SIDEBAR HEADER -->
+
+        <div
+          class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear"
+        >
+          <!-- Sidebar Menu -->
+          <nav x-data="{selected: $persist('Channels')}">
+            <!-- Menu Group -->
+            <div>
+              <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
+                <span
+                  class="menu-group-title"
+                  :class="sidebarToggle ? 'xl:hidden' : ''"
+                >
+                  MENU
+                </span>
+
+                <svg
+                  :class="sidebarToggle ? 'xl:block hidden' : 'hidden'"
+                  class="menu-group-icon mx-auto fill-current"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M5.99915 10.2451C6.96564 10.2451 7.74915 11.0286 7.74915 11.9951V12.0051C7.74915 12.9716 6.96564 13.7551 5.99915 13.7551C5.03265 13.7551 4.24915 12.9716 4.24915 12.0051V11.9951C4.24915 11.0286 5.03265 10.2451 5.99915 10.2451ZM17.9991 10.2451C18.9656 10.2451 19.7491 11.0286 19.7491 11.9951V12.0051C19.7491 12.9716 18.9656 13.7551 17.9991 13.7551C17.0326 13.7551 16.2491 12.9716 16.2491 12.0051V11.9951C16.2491 11.0286 17.0326 10.2451 17.9991 10.2451ZM13.7491 11.9951C13.7491 11.0286 12.9656 10.2451 11.9991 10.2451C11.0326 10.2451 10.2491 11.0286 10.2491 11.9951V12.0051C10.2491 12.9716 11.0326 13.7551 11.9991 13.7551C12.9656 13.7551 13.7491 12.9716 13.7491 12.0051V11.9951Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </h3>
+
+              <ul class="mb-6 flex flex-col gap-1">
+                <!-- Menu Item Home -->
+                <li>
+                  <a
+                    href="index.html"
+                    @click="selected = 'Home'"
+                    class="menu-item group"
+                    :class="(selected === 'Home') || (page === 'home') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Home') || (page === 'home') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M5.5 3.25C4.25736 3.25 3.25 4.25736 3.25 5.5V8.99998C3.25 10.2426 4.25736 11.25 5.5 11.25H9C10.2426 11.25 11.25 10.2426 11.25 8.99998V5.5C11.25 4.25736 10.2426 3.25 9 3.25H5.5ZM4.75 5.5C4.75 5.08579 5.08579 4.75 5.5 4.75H9C9.41421 4.75 9.75 5.08579 9.75 5.5V8.99998C9.75 9.41419 9.41421 9.74998 9 9.74998H5.5C5.08579 9.74998 4.75 9.41419 4.75 8.99998V5.5ZM5.5 12.75C4.25736 12.75 3.25 13.7574 3.25 15V18.5C3.25 19.7426 4.25736 20.75 5.5 20.75H9C10.2426 20.75 11.25 19.7427 11.25 18.5V15C11.25 13.7574 10.2426 12.75 9 12.75H5.5ZM4.75 15C4.75 14.5858 5.08579 14.25 5.5 14.25H9C9.41421 14.25 9.75 14.5858 9.75 15V18.5C9.75 18.9142 9.41421 19.25 9 19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5V15ZM12.75 5.5C12.75 4.25736 13.7574 3.25 15 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V8.99998C20.75 10.2426 19.7426 11.25 18.5 11.25H15C13.7574 11.25 12.75 10.2426 12.75 8.99998V5.5ZM15 4.75C14.5858 4.75 14.25 5.08579 14.25 5.5V8.99998C14.25 9.41419 14.5858 9.74998 15 9.74998H18.5C18.9142 9.74998 19.25 9.41419 19.25 8.99998V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H15ZM15 12.75C13.7574 12.75 12.75 13.7574 12.75 15V18.5C12.75 19.7426 13.7574 20.75 15 20.75H18.5C19.7426 20.75 20.75 19.7427 20.75 18.5V15C20.75 13.7574 19.7426 12.75 18.5 12.75H15ZM14.25 15C14.25 14.5858 14.5858 14.25 15 14.25H18.5C18.9142 14.25 19.25 14.5858 19.25 15V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H15C14.5858 19.25 14.25 18.9142 14.25 18.5V15Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Home
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Home -->
+
+                <!-- Menu Item Channels -->
+                <li>
+                  <a
+                    href="#"
+                    @click.prevent="selected = (selected === 'Channels' ? '':'Channels')"
+                    class="menu-item group"
+                    :class=" (selected === 'Channels') || (page === 'addChannel' || page === 'listChannels') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Channels') || (page === 'addChannel' || page === 'listChannels') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M3.25 5.5C3.25 4.25736 4.25736 3.25 5.5 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V18.5C20.75 19.7426 19.7426 20.75 18.5 20.75H5.5C4.25736 20.75 3.25 19.7426 3.25 18.5V5.5ZM5.5 4.75C5.08579 4.75 4.75 5.08579 4.75 5.5V8.58325L19.25 8.58325V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H5.5ZM19.25 10.0833H15.416V13.9165H19.25V10.0833ZM13.916 10.0833L10.083 10.0833V13.9165L13.916 13.9165V10.0833ZM8.58301 10.0833H4.75V13.9165H8.58301V10.0833ZM4.75 18.5V15.4165H8.58301V19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5ZM10.083 19.25V15.4165L13.916 15.4165V19.25H10.083ZM15.416 19.25V15.4165H19.25V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H15.416Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Channels
+                    </span>
+
+                    <svg
+                      class="menu-item-arrow"
+                      :class="[(selected === 'Channels') ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'xl:hidden' : '' ]"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4.79175 7.39584L10.0001 12.6042L15.2084 7.39585"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </a>
+
+                  <!-- Dropdown Menu Start -->
+                  <div
+                    class="translate transform overflow-hidden"
+                    :class="(selected === 'Channels') ? 'block' :'hidden'"
+                  >
+                    <ul
+                      :class="sidebarToggle ? 'xl:hidden' : 'flex'"
+                      class="menu-dropdown mt-2 flex flex-col gap-1 pl-9"
+                    >
+                      <li>
+                        <a
+                          href="add-channel.html"
+                          class="menu-dropdown-item group"
+                          :class="page === 'addChannel' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'"
+                        >
+                          Add Channel
+                        </a>
+                      </li>
+                      <li>
+                        <a
+                          href="list-channels.html"
+                          class="menu-dropdown-item group"
+                          :class="page === 'listChannels' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'"
+                        >
+                          List Channels
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                  <!-- Dropdown Menu End -->
+                </li>
+                <!-- Menu Item Channels -->
+              </ul>
+            </div>
+          </nav>
+          <!-- Sidebar Menu -->
+        </div>
+      </aside>
+      <!-- ===== Sidebar End ===== -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto"
+      >
+        <!-- Small Device Overlay Start -->
+        <div
+          :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
+          class="fixed z-50 h-screen w-full bg-gray-900/50"
+        ></div>
+        <!-- Small Device Overlay End -->
+
+        <!-- ===== Header Start ===== -->
+        <header
+          x-data="{menuToggle: false}"
+          class="sticky top-0 z-99999 flex w-full border-gray-200 bg-white xl:border-b dark:border-gray-800 dark:bg-gray-900"
+        >
+          <div
+            class="flex grow flex-col items-center justify-between xl:flex-row xl:px-6"
+          >
+            <div
+              class="flex w-full items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:gap-4 lg:py-4 xl:justify-normal xl:border-b-0 xl:px-0 dark:border-gray-800"
+            >
+              <!-- Hamburger Toggle BTN -->
+              <button
+                :class="sidebarToggle ? 'xl:bg-transparent dark:xl:bg-transparent bg-gray-100 dark:bg-gray-800' : ''"
+                class="z-99999 flex h-10 w-10 items-center justify-center rounded-lg border-gray-200 text-gray-500 xl:h-11 xl:w-11 xl:border dark:border-gray-800 dark:text-gray-400"
+                @click.stop="sidebarToggle = !sidebarToggle"
+              >
+                <svg
+                  class="hidden fill-current xl:block"
+                  width="16"
+                  height="12"
+                  viewBox="0 0 16 12"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z"
+                    fill=""
+                  />
+                </svg>
+
+                <svg
+                  :class="sidebarToggle ? 'hidden' : 'block xl:hidden'"
+                  class="fill-current xl:hidden"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M3.25 6C3.25 5.58579 3.58579 5.25 4 5.25L20 5.25C20.4142 5.25 20.75 5.58579 20.75 6C20.75 6.41421 20.4142 6.75 20 6.75L4 6.75C3.58579 6.75 3.25 6.41422 3.25 6ZM3.25 18C3.25 17.5858 3.58579 17.25 4 17.25L20 17.25C20.4142 17.25 20.75 17.5858 20.75 18C20.75 18.4142 20.4142 18.75 20 18.75L4 18.75C3.58579 18.75 3.25 18.4142 3.25 18ZM4 11.25C3.58579 11.25 3.25 11.5858 3.25 12C3.25 12.4142 3.58579 12.75 4 12.75L12 12.75C12.4142 12.75 12.75 12.4142 12.75 12C12.75 11.5858 12.4142 11.25 12 11.25L4 11.25Z"
+                    fill=""
+                  />
+                </svg>
+
+                <!-- cross icon -->
+                <svg
+                  :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
+                  class="fill-current"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
+                    fill=""
+                  />
+                </svg>
+              </button>
+              <!-- Hamburger Toggle BTN -->
+
+              <a href="index.html" class="xl:hidden">
+                <img class="dark:hidden" src="src/images/logo/logo.svg" alt="Logo" />
+                <img
+                  class="hidden dark:block"
+                  src="src/images/logo/logo-dark.svg"
+                  alt="Logo"
+                />
+              </a>
+
+              <div class="hidden xl:block">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
+                  Add Channel
+                </h2>
+              </div>
+            </div>
+
+            <div
+              class="shadow-theme-md w-full items-center justify-between gap-4 px-5 py-4 xl:flex xl:justify-end xl:px-0 xl:shadow-none"
+            >
+              <div class="2xsm:gap-3 flex items-center gap-2">
+                <!-- Dark Mode Toggler -->
+                <button
+                  class="hover:text-dark-900 relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                  @click.prevent="darkMode = !darkMode"
+                >
+                  <svg
+                    class="hidden dark:block"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      clip-rule="evenodd"
+                      d="M9.99998 1.5415C10.4142 1.5415 10.75 1.87729 10.75 2.2915V3.5415C10.75 3.95572 10.4142 4.2915 9.99998 4.2915C9.58577 4.2915 9.24998 3.95572 9.24998 3.5415V2.2915C9.24998 1.87729 9.58577 1.5415 9.99998 1.5415ZM10.0009 6.79327C8.22978 6.79327 6.79402 8.22904 6.79402 10.0001C6.79402 11.7712 8.22978 13.207 10.0009 13.207C11.772 13.207 13.2078 11.7712 13.2078 10.0001C13.2078 8.22904 11.772 6.79327 10.0009 6.79327ZM5.29402 10.0001C5.29402 7.40061 7.40135 5.29327 10.0009 5.29327C12.6004 5.29327 14.7078 7.40061 14.7078 10.0001C14.7078 12.5997 12.6004 14.707 10.0009 14.707C7.40135 14.707 5.29402 12.5997 5.29402 10.0001ZM15.9813 5.08035C16.2742 4.78746 16.2742 4.31258 15.9813 4.01969C15.6884 3.7268 15.2135 3.7268 14.9207 4.01969L14.0368 4.90357C13.7439 5.19647 13.7439 5.67134 14.0368 5.96423C14.3297 6.25713 14.8045 6.25713 15.0974 5.96423L15.9813 5.08035ZM18.4577 10.0001C18.4577 10.4143 18.1219 10.7501 17.7077 10.7501H16.4577C16.0435 10.7501 15.7077 10.4143 15.7077 10.0001C15.7077 9.58592 16.0435 9.25013 16.4577 9.25013H17.7077C18.1219 9.25013 18.4577 9.58592 18.4577 10.0001ZM14.9207 15.9806C15.2135 16.2735 15.6884 16.2735 15.9813 15.9806C16.2742 15.6877 16.2742 15.2128 15.9813 14.9199L15.0974 14.036C14.8045 13.7431 14.3297 13.7431 14.0368 14.036C13.7439 14.3289 13.7439 14.8038 14.0368 15.0967L14.9207 15.9806ZM9.99998 15.7088C10.4142 15.7088 10.75 16.0445 10.75 16.4588V17.7088C10.75 18.123 10.4142 18.4588 9.99998 18.4588C9.58577 18.4588 9.24998 18.123 9.24998 17.7088V16.4588C9.24998 16.0445 9.58577 15.7088 9.99998 15.7088ZM5.96356 15.0972C6.25646 14.8043 6.25646 14.3295 5.96356 14.0366C5.67067 13.7437 5.1958 13.7437 4.9029 14.0366L4.01902 14.9204C3.72613 15.2133 3.72613 15.6882 4.01902 15.9811C4.31191 16.274 4.78679 16.274 5.07968 15.9811L5.96356 15.0972ZM4.29224 10.0001C4.29224 10.4143 3.95645 10.7501 3.54224 10.7501H2.29224C1.87802 10.7501 1.54224 10.4143 1.54224 10.0001C1.54224 9.58592 1.87802 9.25013 2.29224 9.25013H3.54224C3.95645 9.25013 4.29224 9.58592 4.29224 10.0001ZM4.9029 5.9637C5.1958 6.25659 5.67067 6.25659 5.96356 5.9637C6.25646 5.6708 6.25646 5.19593 5.96356 4.90303L5.07968 4.01915C4.78679 3.72626 4.31191 3.72626 4.01902 4.01915C3.72613 4.31204 3.72613 4.78692 4.01902 5.07981L4.9029 5.9637Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <svg
+                    class="dark:hidden"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M17.4547 11.97L18.1799 12.1611C18.265 11.8383 18.1265 11.4982 17.8401 11.3266C17.5538 11.1551 17.1885 11.1934 16.944 11.4207L17.4547 11.97ZM8.0306 2.5459L8.57989 3.05657C8.80718 2.81209 8.84554 2.44682 8.67398 2.16046C8.50243 1.8741 8.16227 1.73559 7.83948 1.82066L8.0306 2.5459ZM12.9154 13.0035C9.64678 13.0035 6.99707 10.3538 6.99707 7.08524H5.49707C5.49707 11.1823 8.81835 14.5035 12.9154 14.5035V13.0035ZM16.944 11.4207C15.8869 12.4035 14.4721 13.0035 12.9154 13.0035V14.5035C14.8657 14.5035 16.6418 13.7499 17.9654 12.5193L16.944 11.4207ZM16.7295 11.7789C15.9437 14.7607 13.2277 16.9586 10.0003 16.9586V18.4586C13.9257 18.4586 17.2249 15.7853 18.1799 12.1611L16.7295 11.7789ZM10.0003 16.9586C6.15734 16.9586 3.04199 13.8433 3.04199 10.0003H1.54199C1.54199 14.6717 5.32892 18.4586 10.0003 18.4586V16.9586ZM3.04199 10.0003C3.04199 6.77289 5.23988 4.05695 8.22173 3.27114L7.83948 1.82066C4.21532 2.77574 1.54199 6.07486 1.54199 10.0003H3.04199ZM6.99707 7.08524C6.99707 5.52854 7.5971 4.11366 8.57989 3.05657L7.48132 2.03522C6.25073 3.35885 5.49707 5.13487 5.49707 7.08524H6.99707Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+                <!-- Dark Mode Toggler -->
+              </div>
+            </div>
+          </div>
+        </header>
+        <!-- ===== Header End ===== -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main>
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+            <!-- Breadcrumb Start -->
+            <div x-data="{ pageName: `Add Channel`}">
+              <div class="flex flex-wrap items-center justify-between gap-3 pb-6">
+                <h2
+                  class="text-xl font-semibold text-gray-800 dark:text-white/90"
+                  x-text="pageName"
+                ></h2>
+                <nav>
+                  <ol class="flex items-center gap-1.5">
+                    <li>
+                      <a
+                        class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
+                        href="index.html"
+                      >
+                        Home
+                      </a>
+                    </li>
+                    <li>
+                      <span class="text-sm text-gray-500 dark:text-gray-400">/</span>
+                    </li>
+                    <li>
+                      <span class="text-sm text-gray-500 dark:text-gray-400">Add Channel</span>
+                    </li>
+                  </ol>
+                </nav>
+              </div>
+            </div>
+            <!-- Breadcrumb End -->
+
+            <!-- Form Start -->
+            <div
+              x-data="channelForm()"
+              class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+            >
+              <div class="px-5 py-4 sm:px-6 sm:py-5 border-b border-gray-200 dark:border-gray-800">
+                <h3 class="text-base font-medium text-gray-800 dark:text-white/90">
+                  Create New Channel
+                </h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Configure your channel settings, URLs, and processing options.
+                </p>
+              </div>
+
+              <form @submit.prevent="submitForm" class="p-5 sm:p-6 space-y-6">
+                <!-- Error Display -->
+                <div x-show="error" x-text="error" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+
+                <!-- Success Display -->
+                <div x-show="success" x-text="success" class="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"></div>
+
+                <!-- Basic Info -->
+                <div class="space-y-4">
+                  <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">Basic Information</h4>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Channel Name <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      x-model="formData.name"
+                      required
+                      placeholder="My Channel"
+                      class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                    />
+                  </div>
+                </div>
+
+                <!-- Channel URLs -->
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">Channel URLs</h4>
+                    <button
+                      type="button"
+                      @click="addURL"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                    >
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add URL
+                    </button>
+                  </div>
+
+                  <template x-for="(urlEntry, index) in formData.urls" :key="index">
+                    <div class="p-4 border border-gray-200 rounded-lg dark:border-gray-700 space-y-4">
+                      <div class="flex items-center justify-between">
+                        <h5 class="text-sm font-medium text-gray-700 dark:text-gray-300" x-text="'URL ' + (index + 1)"></h5>
+                        <button
+                          type="button"
+                          @click="removeURL(index)"
+                          x-show="formData.urls.length > 1"
+                          class="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          URL <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="url"
+                          x-model="urlEntry.url"
+                          required
+                          placeholder="https://example.com/channel"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <!-- Auth Details Toggle -->
+                      <div>
+                        <label class="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            x-model="urlEntry.hasAuth"
+                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-gray-300">Requires Authentication</span>
+                        </label>
+                      </div>
+
+                      <!-- Auth Fields (shown when hasAuth is true) -->
+                      <div x-show="urlEntry.hasAuth" class="space-y-3 pl-6 border-l-2 border-brand-500">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Username
+                          </label>
+                          <input
+                            type="text"
+                            x-model="urlEntry.username"
+                            placeholder="username"
+                            class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Password
+                          </label>
+                          <input
+                            type="password"
+                            x-model="urlEntry.password"
+                            placeholder="••••••••"
+                            class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Login URL
+                          </label>
+                          <input
+                            type="url"
+                            x-model="urlEntry.loginURL"
+                            placeholder="https://example.com/login"
+                            class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                          />
+                        </div>
+                      </div>
+
+                      <!-- Per-URL Settings Toggle -->
+                      <div>
+                        <label class="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            x-model="urlEntry.hasCustomSettings"
+                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-gray-300">Custom Settings for this URL</span>
+                        </label>
+                      </div>
+
+                      <!-- Custom Settings (shown when hasCustomSettings is true) -->
+                      <div x-show="urlEntry.hasCustomSettings" class="text-sm text-gray-500 dark:text-gray-400 italic">
+                        Per-URL custom settings coming soon. Use global channel settings for now.
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Tabs for Settings -->
+                <div x-data="{ activeTab: 'basic' }" class="space-y-4">
+                  <div class="border-b border-gray-200 dark:border-gray-700">
+                    <nav class="flex space-x-4">
+                      <button
+                        type="button"
+                        @click="activeTab = 'basic'"
+                        :class="activeTab === 'basic' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
+                        class="py-2 px-4 border-b-2 font-medium text-sm"
+                      >
+                        Basic Settings
+                      </button>
+                      <button
+                        type="button"
+                        @click="activeTab = 'advanced'"
+                        :class="activeTab === 'advanced' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
+                        class="py-2 px-4 border-b-2 font-medium text-sm"
+                      >
+                        Advanced Settings
+                      </button>
+                      <button
+                        type="button"
+                        @click="activeTab = 'metarr'"
+                        :class="activeTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
+                        class="py-2 px-4 border-b-2 font-medium text-sm"
+                      >
+                        Metarr Settings
+                      </button>
+                    </nav>
+                  </div>
+
+                  <!-- Basic Settings Tab -->
+                  <div x-show="activeTab === 'basic'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Video Directory <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.video_directory"
+                          required
+                          placeholder="/path/to/save/videos"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          JSON Directory <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.json_directory"
+                          required
+                          placeholder="/path/to/save/metadata"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max Concurrency
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.settings.max_concurrency"
+                          min="1"
+                          placeholder="3"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">WARNING: Higher concurrency can cause bot detection on some tube sites.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Crawl Frequency (minutes)
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.settings.crawl_freq"
+                          min="1"
+                          placeholder="30"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">WARNING: Higher frequency increases request rate to site.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Download Retries
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.settings.download_retries"
+                          min="0"
+                          placeholder="3"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max Filesize
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.max_filesize"
+                          placeholder="2GB"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Example: 100MB, 2GB, 500M</p>
+                      </div>
+                      <div>
+                        <label class="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            x-model="formData.ignore_run"
+                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-gray-300">Ignore All Videos to Date</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Advanced Settings Tab -->
+                  <div x-show="activeTab === 'advanced'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          YT-DLP Output Extension
+                        </label>
+                        <select
+                          x-model="formData.settings.ytdlp_output_ext"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="">Default</option>
+                          <option value="mp4">mp4</option>
+                          <option value="mkv">mkv</option>
+                          <option value="webm">webm</option>
+                          <option value="avi">avi</option>
+                          <option value="flv">flv</option>
+                          <option value="mov">mov</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Cookies From Browser
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.cookies_from_browser"
+                          placeholder="e.g. Firefox"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          External Downloader
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.external_downloader"
+                          placeholder="e.g. aria2c"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          External Downloader Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.external_downloader_args"
+                          placeholder="Additional arguments (e.g. '-x 16 -s 16' for aria2c)"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Extra YT-DLP Video Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.extra_ytdlp_video_args"
+                          placeholder="Additional yt-dlp arguments for video downloads"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Extra YT-DLP Meta Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.extra_ytdlp_meta_args"
+                          placeholder="Additional yt-dlp arguments for JSON metafile downloads"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            x-model="formData.settings.use_global_cookies"
+                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-gray-300">Use Global Cookies (find cookies from all browsers)</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Metarr Settings Tab -->
+                  <div x-show="activeTab === 'metarr'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Output Directory
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_output_directory"
+                          placeholder="/output/here/after/metarr"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Output Extension
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_output_ext"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="">Same as input</option>
+                          <option value="avi">avi</option>
+                          <option value="flv">flv</option>
+                          <option value="mkv">mkv</option>
+                          <option value="mov">mov</option>
+                          <option value="mp4">mp4</option>
+                          <option value="webm">webm</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Rename Style
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_rename_style"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="">Skip</option>
+                          <option value="spaces">Spaces</option>
+                          <option value="underscores">Underscores</option>
+                          <option value="fixes-only">Fixes Only</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Concurrency
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.metarr.metarr_concurrency"
+                          min="1"
+                          placeholder="5"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          GPU Acceleration
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_gpu"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="">None</option>
+                          <option value="auto">Auto</option>
+                          <option value="nvidia">NVIDIA</option>
+                          <option value="amd">AMD</option>
+                          <option value="intel">Intel</option>
+                          <option value="vaapi">VAAPI</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          GPU Directory
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_gpu_directory"
+                          placeholder="/dev/dri/renderD128"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Video Codec
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_transcode_codec"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="">Copy (no transcoding)</option>
+                          <option value="av1">AV1</option>
+                          <option value="h264">H.264</option>
+                          <option value="hevc">HEVC (H.265)</option>
+                          <option value="mpeg2">MPEG-2</option>
+                          <option value="vp8">VP8</option>
+                          <option value="vp9">VP9</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Audio Codec
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_transcode_audio_codec"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="">Copy (no transcoding)</option>
+                          <option value="aac">AAC</option>
+                          <option value="ac3">AC3</option>
+                          <option value="alac">ALAC</option>
+                          <option value="dts">DTS</option>
+                          <option value="eac3">EAC3</option>
+                          <option value="flac">FLAC</option>
+                          <option value="mp2">MP2</option>
+                          <option value="mp3">MP3</option>
+                          <option value="opus">Opus</option>
+                          <option value="pcm">PCM</option>
+                          <option value="truehd">TrueHD</option>
+                          <option value="vorbis">Vorbis</option>
+                          <option value="wav">WAV</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Transcode Quality (CRF)
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.metarr.metarr_transcode_quality"
+                          min="0"
+                          max="51"
+                          placeholder="23"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Lower = better quality, 18-28 recommended</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Min Free Memory
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_min_free_mem"
+                          placeholder="2GB"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max CPU Usage (%)
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.metarr.metarr_max_cpu_usage"
+                          min="0.00"
+                          max="101.00"
+                          placeholder="80.00"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Extra FFmpeg Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_extra_ffmpeg_args"
+                          placeholder="Additional FFmpeg arguments"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <a
+                    href="index.html"
+                    class="inline-flex items-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  >
+                    Cancel
+                  </a>
+                  <button
+                    type="submit"
+                    :disabled="submitting"
+                    class="inline-flex items-center px-4 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span x-show="!submitting">Create Channel</span>
+                    <span x-show="submitting">Creating...</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+            <!-- Form End -->
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+
+    <script defer src="bundle.js"></script>
+    <script>
+      function channelForm() {
+        return {
+          formData: {
+            name: '',
+            ignore_run: false,
+            urls: [
+              {
+                url: '',
+                hasAuth: false,
+                username: '',
+                password: '',
+                loginURL: '',
+                hasCustomSettings: false
+              }
+            ],
+            settings: {
+              video_directory: '',
+              json_directory: '',
+              max_concurrency: 1,
+              crawl_freq: 30,
+              download_retries: 3,
+              max_filesize: '',
+              ytdlp_output_ext: '',
+              cookies_from_browser: '',
+              external_downloader: '',
+              external_downloader_args: '',
+              extra_ytdlp_video_args: '',
+              extra_ytdlp_meta_args: '',
+              use_global_cookies: false,
+              channel_config_file: '',
+              filter_file: '',
+              move_ops_file: '',
+              filters: '',
+              move_ops: '',
+              from_date: '',
+              to_date: ''
+            },
+            metarr: {
+              metarr_output_directory: '',
+              metarr_output_ext: '',
+              metarr_rename_style: '',
+              metarr_concurrency: 3,
+              metarr_max_cpu_usage: '',
+              metarr_min_free_mem: '',
+              metarr_gpu: '',
+              metarr_gpu_directory: '',
+              metarr_transcode_codec: '',
+              metarr_transcode_audio_codec: '',
+              metarr_transcode_quality: '',
+              metarr_transcode_video_filter: '',
+              metarr_extra_ffmpeg_args: '',
+              metarr_filename_ops: '',
+              metarr_filename_ops_file: '',
+              filtered_filename_ops: '',
+              filtered_filename_ops_file: '',
+              metarr_meta_ops: '',
+              metarr_meta_ops_file: '',
+              filtered_meta_ops: '',
+              filtered_meta_ops_file: ''
+            }
+          },
+          error: '',
+          success: '',
+          submitting: false,
+
+          addURL() {
+            this.formData.urls.push({
+              url: '',
+              hasAuth: false,
+              username: '',
+              password: '',
+              loginURL: '',
+              hasCustomSettings: false
+            });
+          },
+
+          removeURL(index) {
+            if (this.formData.urls.length > 1) {
+              this.formData.urls.splice(index, 1);
+            }
+          },
+
+          async submitForm() {
+            this.error = '';
+            this.success = '';
+            this.submitting = true;
+
+            try {
+              // Build the request payload matching the backend handler expectations
+              const payload = {
+                name: this.formData.name,
+                urls: this.formData.urls.filter(u => u.url).map(u => u.url).join(' '),
+                auth_details: this.buildAuthDetails(),
+                ...this.formData.settings,
+                ...this.formData.metarr
+              };
+
+              // Add ignore_run if checked (backend expects "true" string or absence)
+              if (this.formData.ignore_run) {
+                payload.ignore_run = 'true';
+              }
+
+              // Convert boolean to string for use_global_cookies
+              if (this.formData.settings.use_global_cookies) {
+                payload.use_global_cookies = 'true';
+              } else {
+                delete payload.use_global_cookies; // Remove false value
+              }
+
+              const response = await fetch('/api/v1/channels/add', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams(payload)
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to create channel');
+              }
+
+              this.success = 'Channel created successfully!';
+
+              // Redirect after a short delay
+              setTimeout(() => {
+                window.location.href = 'list-channels.html';
+              }, 1500);
+
+            } catch (err) {
+              this.error = err.message || 'An error occurred while creating the channel';
+              console.error('Error creating channel:', err);
+            } finally {
+              this.submitting = false;
+            }
+          },
+
+          buildAuthDetails() {
+            // Build auth_details array based on URLs with authentication
+            const authEntries = [];
+            this.formData.urls.forEach(urlEntry => {
+              if (urlEntry.hasAuth && urlEntry.username && urlEntry.loginURL) {
+                authEntries.push(JSON.stringify({
+                  channel_url: urlEntry.url,
+                  username: urlEntry.username,
+                  password: urlEntry.password || '',
+                  login_url: urlEntry.loginURL
+                }));
+              }
+            });
+            return authEntries.join(' ');
+          }
+        };
+      }
+    </script>
+  </body>
+</html>

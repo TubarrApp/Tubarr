@@ -1,0 +1,182 @@
+<div
+  class="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]"
+>
+  <div class="mb-6 flex justify-between">
+    <div>
+      <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+        Activities
+      </h3>
+    </div>
+    <div x-data="{openDropDown: false}" class="relative h-fit">
+      <button
+        @click="openDropDown = !openDropDown"
+        :class="openDropDown ? 'text-gray-700 dark:text-white' : 'text-gray-400 hover:text-gray-700 dark:hover:text-white'"
+      >
+        <svg
+          class="fill-current"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M10.2441 6C10.2441 5.0335 11.0276 4.25 11.9941 4.25H12.0041C12.9706 4.25 13.7541 5.0335 13.7541 6C13.7541 6.9665 12.9706 7.75 12.0041 7.75H11.9941C11.0276 7.75 10.2441 6.9665 10.2441 6ZM10.2441 18C10.2441 17.0335 11.0276 16.25 11.9941 16.25H12.0041C12.9706 16.25 13.7541 17.0335 13.7541 18C13.7541 18.9665 12.9706 19.75 12.0041 19.75H11.9941C11.0276 19.75 10.2441 18.9665 10.2441 18ZM11.9941 10.25C11.0276 10.25 10.2441 11.0335 10.2441 12C10.2441 12.9665 11.0276 13.75 11.9941 13.75H12.0041C12.9706 13.75 13.7541 12.9665 13.7541 12C13.7541 11.0335 12.9706 10.25 12.0041 10.25H11.9941Z"
+            fill=""
+          />
+        </svg>
+      </button>
+      <div
+        x-show="openDropDown"
+        @click.outside="openDropDown = false"
+        class="shadow-theme-lg dark:bg-gray-dark absolute top-full right-0 z-40 w-40 space-y-1 rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-800"
+      >
+        <button
+          class="text-theme-xs flex w-full rounded-lg px-3 py-2 text-left font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+        >
+          View More
+        </button>
+        <button
+          class="text-theme-xs flex w-full rounded-lg px-3 py-2 text-left font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="relative">
+    <!-- Timeline line -->
+    <div
+      class="absolute top-6 bottom-10 left-5 w-px bg-gray-200 dark:bg-gray-800"
+    ></div>
+
+    <!-- Francisco Grbbs -->
+    <div class="relative mb-6 flex">
+      <div class="z-10 flex-shrink-0">
+        <img
+          src="./images/user/user-01.jpg"
+          alt="Francisco Grbbs"
+          class="size-10 rounded-full object-cover ring-4 ring-white dark:ring-gray-800"
+        />
+      </div>
+      <div class="ml-4">
+        <div class="mb-1 flex items-center gap-1">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M9 5.0625H14.0625L12.5827 8.35084C12.4506 8.64443 12.4506 8.98057 12.5827 9.27416L14.0625 12.5625H10.125C9.50368 12.5625 9 12.0588 9 11.4375V10.875M3.9375 10.875H9M3.9375 3.375H7.875C8.49632 3.375 9 3.87868 9 4.5V10.875M3.9375 15.9375V2.0625"
+              stroke="#12B76A"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <p class="text-theme-xs text-success-500 font-medium">New invoice</p>
+        </div>
+        <div class="flex items-baseline">
+          <h3
+            class="text-theme-sm font-medium text-gray-800 dark:text-white/90"
+          >
+            Francisco Grbbs
+          </h3>
+          <span
+            class="text-theme-sm ml-2 font-normal text-gray-500 dark:text-gray-400"
+            >created invoice</span
+          >
+        </div>
+        <p class="text-theme-sm font-normal text-gray-500 dark:text-gray-400">
+          PQ-4491C
+        </p>
+        <p class="text-theme-xs mt-1 text-gray-400">Just Now</p>
+      </div>
+    </div>
+
+    <!-- Courtney Henry -->
+    <div class="relative mb-6 flex">
+      <div class="z-10 flex-shrink-0">
+        <img
+          src="./images/user/user-03.jpg"
+          alt="Courtney Henry"
+          class="size-10 rounded-full object-cover ring-4 ring-white dark:ring-gray-800"
+        />
+      </div>
+      <div class="ml-4">
+        <div class="flex items-baseline">
+          <h3
+            class="text-theme-sm font-semibold text-gray-800 dark:text-white/90"
+          >
+            Courtney Henry
+          </h3>
+          <span class="ml-2 text-sm text-gray-500 dark:text-gray-400"
+            >created invoice</span
+          >
+        </div>
+        <p class="text-theme-sm font-normal text-gray-500 dark:text-gray-400">
+          HK-234G
+        </p>
+        <p class="text-theme-xs mt-1 text-gray-400">15 minutes ago</p>
+      </div>
+    </div>
+
+    <!-- Bessie Cooper -->
+    <div class="relative mb-6 flex">
+      <div class="z-10 flex-shrink-0">
+        <img
+          src="./images/user/user-04.jpg"
+          alt="Bessie Cooper"
+          class="size-10 rounded-full object-cover ring-4 ring-white dark:ring-gray-800"
+        />
+      </div>
+      <div class="ml-4">
+        <div class="flex items-baseline">
+          <h3
+            class="text-theme-sm font-semibold text-gray-800 dark:text-white/90"
+          >
+            Bessie Cooper
+          </h3>
+          <span class="text-theme-sm ml-2 text-gray-500 dark:text-gray-400"
+            >created invoice</span
+          >
+        </div>
+        <p class="text-theme-sm font-normal text-gray-500 dark:text-gray-400">
+          LH-2891C
+        </p>
+        <p class="text-theme-xs mt-1 text-gray-400">5 months ago</p>
+      </div>
+    </div>
+
+    <!-- Theresa Web -->
+    <div class="relative flex">
+      <div class="z-10 flex-shrink-0">
+        <img
+          src="./images/user/user-05.jpg"
+          alt="Theresa Web"
+          class="size-10 rounded-full object-cover ring-4 ring-white dark:ring-gray-800"
+        />
+      </div>
+      <div class="ml-4">
+        <div class="flex items-baseline">
+          <h3
+            class="text-theme-sm font-semibold text-gray-800 dark:text-white/90"
+          >
+            Theresa Web
+          </h3>
+          <span class="ml-2 text-sm text-gray-500 dark:text-gray-400"
+            >created invoice</span
+          >
+        </div>
+        <p class="text-theme-sm font-normal text-gray-500 dark:text-gray-400">
+          CK-125NH
+        </p>
+        <p class="text-theme-xs mt-1 text-gray-400">2 weeks ago</p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -31,15 +31,19 @@ func (ds *DownloadStore) GetDB() *sql.DB {
 
 // SetDownloadStatus updates the download status of a single video.
 func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
-	var committed bool
 	tx, err := ds.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if !committed {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("Error rolling back download status for video with URL %q: %v", v.URL, rollbackErr)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for video with URL %q: %v", v.URL, rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Error rolling back download status for video with URL %q (original error: %v): %v", v.URL, err, rbErr)
 			}
 		}
 	}()
@@ -60,47 +64,47 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	committed = true
 	return nil
 }
 
 // UpdateDownloadStatuses retrieves the download status of an array of videos and updates it in place.
 func (ds *DownloadStore) UpdateDownloadStatuses(ctx context.Context, updates []models.StatusUpdate) error {
-	var committed bool
 	tx, err := ds.DB.Begin()
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if !committed {
-			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logging.E("Failed to rollback transaction for updates: %+v: %v", updates, rollbackErr)
+		if p := recover(); p != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Panic rollback failed for updates: %+v: %v", updates, rbErr)
+			}
+			panic(p)
+		} else if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				logging.E("Failed to rollback transaction for updates: %+v (original error: %v): %v", updates, err, rbErr)
 			}
 		}
 	}()
 
-	// Build batch update query
-	query := squirrel.Update(consts.DBDownloads)
+	// Execute individual updates within the transaction
 	for _, update := range updates {
-
 		normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
 
-		query = query.
+		query := squirrel.Update(consts.DBDownloads).
 			Set(consts.QDLStatus, update.Status).
 			Set(consts.QDLPct, update.Percent).
 			Where(squirrel.Eq{consts.QDLVidID: update.VideoID}).
 			RunWith(tx)
-	}
 
-	if _, err := query.ExecContext(ctx); err != nil {
-		return fmt.Errorf("failed to update download statuses: %w", err)
+		if _, err := query.ExecContext(ctx); err != nil {
+			return fmt.Errorf("failed to update download status for video %q: %w", update.VideoURL, err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit status updates: %w", err)
 	}
 
-	committed = true
 	return nil
 }
 

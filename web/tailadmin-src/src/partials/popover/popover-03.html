@@ -1,0 +1,267 @@
+<div class="custom-scrollbar max-w-full sm:overflow-visible">
+  <div class="min-w-[750px] sm:min-w-[750px]">
+    <div
+      class="flex flex-col flex-wrap items-center gap-4 sm:flex-row sm:gap-5"
+    >
+      <!-- Popover Right New -->
+      <div class="sm:mb-15">
+        <div
+          x-data="{popover: false}"
+          @click.outside="popover = false"
+          class="group relative inline-block"
+        >
+          <button
+            @click.prevent="popover = !popover"
+            class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 inline-flex rounded-lg px-4 py-3 text-sm font-medium text-white"
+          >
+            Popover on Right
+          </button>
+          <div
+            :class="popover ? 'block' : 'hidden'"
+            class="absolute top-1/2 left-full z-20 ml-3 w-max max-w-[390px] -translate-y-1/2 rounded-xl bg-white drop-shadow-2xl group-hover:block dark:bg-[#1E2634]"
+          >
+            <!-- Arrow -->
+            <div
+              class="absolute top-1/2 -left-1.5 h-5 w-5 -translate-y-1/2 rotate-45 bg-white dark:bg-[#1E2634]"
+            ></div>
+            <!-- Popover Header -->
+            <div
+              class="relative z-20 rounded-t-xl border-b border-gray-200 bg-gray-100 px-5 py-3 dark:border-white/[0.03] dark:bg-[#252D3A]"
+            >
+              <h4
+                class="text-base font-semibold text-gray-800 dark:text-white/90"
+              >
+                Popover Title
+              </h4>
+            </div>
+
+            <!-- Popover Body -->
+            <div class="p-5">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Lorem ipsum dolor sit amet, consect adipiscing elit. Mauris
+                facilisis congue exclamate justo nec facilisis.
+              </p>
+              <a
+                href="#"
+                class="text-brand-500 hover:text-brand-600 mt-5 flex items-center gap-1 text-sm font-medium"
+              >
+                Learn More
+
+                <svg
+                  class="fill-current"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M14.0855 7.99888C14.0858 8.19107 14.0126 8.38334 13.8661 8.53001L9.86873 12.5301C9.57594 12.8231 9.10107 12.8233 8.80807 12.5305C8.51508 12.2377 8.51491 11.7629 8.8077 11.4699L11.5279 8.74772L2.66797 8.74772C2.25375 8.74772 1.91797 8.41194 1.91797 7.99772C1.91797 7.58351 2.25375 7.24772 2.66797 7.24772L11.5235 7.24772L8.80772 4.53016C8.51492 4.23718 8.51507 3.7623 8.80805 3.4695C9.10104 3.1767 9.57591 3.17685 9.86871 3.46984L13.8311 7.43478C13.9871 7.57222 14.0855 7.77348 14.0855 7.99772C14.0855 7.99811 14.0855 7.9985 14.0855 7.99888Z"
+                    fill=""
+                  />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Popover top new -->
+      <div class="sm:mb-15">
+        <div
+          x-data="{popover: false}"
+          @click.outside="popover = false"
+          class="group relative inline-block"
+        >
+          <button
+            @click.prevent="popover = !popover"
+            class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 inline-flex rounded-lg px-4 py-3 text-sm font-medium text-white"
+          >
+            Popover on Top
+          </button>
+          <div
+            :class="popover ? 'block' : 'hidden'"
+            class="shadow-theme-lg absolute bottom-full left-1/2 z-20 mb-3 w-max max-w-[390px] -translate-x-1/2 rounded-xl bg-white group-hover:block dark:bg-[#1E2634]"
+          >
+            <!-- Arrow -->
+            <div
+              class="absolute -bottom-1.5 left-1/2 h-5 w-5 -translate-x-1/2 rotate-45 bg-white dark:bg-[#1E2634]"
+            ></div>
+            <!-- Popover Header -->
+            <div
+              class="relative rounded-t-xl border-b border-gray-200 bg-gray-100 px-5 py-3 dark:border-white/[0.03] dark:bg-[#252D3A]"
+            >
+              <h4
+                class="text-base font-semibold text-gray-800 dark:text-white/90"
+              >
+                Popover Title
+              </h4>
+            </div>
+
+            <!-- Popover Body -->
+            <div class="p-5">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Lorem ipsum dolor sit amet, consect adipiscing elit. Mauris
+                facilisis congue exclamate justo nec facilisis.
+              </p>
+              <a
+                href="#"
+                class="text-brand-500 hover:text-brand-600 mt-5 flex items-center gap-1 text-sm font-medium"
+              >
+                Learn More
+
+                <svg
+                  class="fill-current"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M14.0855 7.99888C14.0858 8.19107 14.0126 8.38334 13.8661 8.53001L9.86873 12.5301C9.57594 12.8231 9.10107 12.8233 8.80807 12.5305C8.51508 12.2377 8.51491 11.7629 8.8077 11.4699L11.5279 8.74772L2.66797 8.74772C2.25375 8.74772 1.91797 8.41194 1.91797 7.99772C1.91797 7.58351 2.25375 7.24772 2.66797 7.24772L11.5235 7.24772L8.80772 4.53016C8.51492 4.23718 8.51507 3.7623 8.80805 3.4695C9.10104 3.1767 9.57591 3.17685 9.86871 3.46984L13.8311 7.43478C13.9871 7.57222 14.0855 7.77348 14.0855 7.99772C14.0855 7.99811 14.0855 7.9985 14.0855 7.99888Z"
+                    fill=""
+                  />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Popover Bottom New -->
+      <div class="sm:mb-15">
+        <div
+          x-data="{popover: false}"
+          @click.outside="popover = false"
+          class="group relative inline-block"
+        >
+          <button
+            @click.prevent="popover = !popover"
+            class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 inline-flex rounded-lg px-4 py-3 text-sm font-medium text-white"
+          >
+            Popover on Bottom
+          </button>
+          <div
+            :class="popover ? 'block' : 'hidden'"
+            class="shadow-theme-lg absolute top-full left-1/2 z-99999 mt-3 w-max max-w-[390px] -translate-x-1/2 rounded-xl bg-white group-hover:block dark:bg-[#1E2634]"
+          >
+            <!-- Popover Header -->
+            <div
+              class="relative rounded-t-xl border-b border-gray-200 bg-gray-100 px-5 py-3 dark:border-white/[0.03] dark:bg-[#252D3A]"
+            >
+              <!-- Arrow -->
+              <div
+                class="absolute -top-1.5 left-1/2 h-5 w-5 -translate-x-1/2 rotate-45 bg-gray-100 dark:bg-[#252D3A]"
+              ></div>
+              <h4
+                class="text-base font-semibold text-gray-800 dark:text-white/90"
+              >
+                Popover Title
+              </h4>
+            </div>
+
+            <!-- Popover Body -->
+            <div class="p-5">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Lorem ipsum dolor sit amet, consect adipiscing elit. Mauris
+                facilisis congue exclamate justo nec facilisis.
+              </p>
+              <a
+                href="#"
+                class="text-brand-500 hover:text-brand-600 mt-5 flex items-center gap-1 text-sm font-medium"
+              >
+                Learn More
+
+                <svg
+                  class="fill-current"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M14.0855 7.99888C14.0858 8.19107 14.0126 8.38334 13.8661 8.53001L9.86873 12.5301C9.57594 12.8231 9.10107 12.8233 8.80807 12.5305C8.51508 12.2377 8.51491 11.7629 8.8077 11.4699L11.5279 8.74772L2.66797 8.74772C2.25375 8.74772 1.91797 8.41194 1.91797 7.99772C1.91797 7.58351 2.25375 7.24772 2.66797 7.24772L11.5235 7.24772L8.80772 4.53016C8.51492 4.23718 8.51507 3.7623 8.80805 3.4695C9.10104 3.1767 9.57591 3.17685 9.86871 3.46984L13.8311 7.43478C13.9871 7.57222 14.0855 7.77348 14.0855 7.99772C14.0855 7.99811 14.0855 7.9985 14.0855 7.99888Z"
+                    fill=""
+                  />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Popover Left New -->
+      <div class="sm:mb-15">
+        <div
+          x-data="{popover: false}"
+          @click.outside="popover = false"
+          class="group relative inline-block"
+        >
+          <button
+            @click.prevent="popover = !popover"
+            class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 inline-flex rounded-lg px-4 py-3 text-sm font-medium text-white"
+          >
+            Popover on Left
+          </button>
+          <div
+            :class="popover ? 'block' : 'hidden'"
+            class="absolute top-1/2 right-full z-20 mr-3 w-max max-w-[390px] -translate-y-1/2 rounded-xl bg-white drop-shadow-2xl group-hover:block dark:bg-[#1E2634]"
+          >
+            <!-- Arrow -->
+            <div
+              class="absolute top-1/2 -right-1.5 h-5 w-5 -translate-y-1/2 rotate-45 bg-white dark:bg-[#1E2634]"
+            ></div>
+            <!-- Popover Header -->
+            <div
+              class="relative z-20 rounded-t-xl border-b border-gray-200 bg-gray-100 px-5 py-3 dark:border-white/[0.03] dark:bg-[#252D3A]"
+            >
+              <h4
+                class="text-base font-semibold text-gray-800 dark:text-white/90"
+              >
+                Popover Title
+              </h4>
+            </div>
+
+            <!-- Popover Body -->
+            <div class="p-5">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Lorem ipsum dolor sit amet, consect adipiscing elit. Mauris
+                facilisis congue exclamate justo nec facilisis.
+              </p>
+              <a
+                href="#"
+                class="text-brand-500 hover:text-brand-600 mt-5 flex items-center gap-1 text-sm font-medium"
+              >
+                Learn More
+
+                <svg
+                  class="fill-current"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M14.0855 7.99888C14.0858 8.19107 14.0126 8.38334 13.8661 8.53001L9.86873 12.5301C9.57594 12.8231 9.10107 12.8233 8.80807 12.5305C8.51508 12.2377 8.51491 11.7629 8.8077 11.4699L11.5279 8.74772L2.66797 8.74772C2.25375 8.74772 1.91797 8.41194 1.91797 7.99772C1.91797 7.58351 2.25375 7.24772 2.66797 7.24772L11.5235 7.24772L8.80772 4.53016C8.51492 4.23718 8.51507 3.7623 8.80805 3.4695C9.10104 3.1767 9.57591 3.17685 9.86871 3.46984L13.8311 7.43478C13.9871 7.57222 14.0855 7.77348 14.0855 7.99772C14.0855 7.99811 14.0855 7.9985 14.0855 7.99888Z"
+                    fill=""
+                  />
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

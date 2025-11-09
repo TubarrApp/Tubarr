@@ -42,7 +42,7 @@ func setAuthFlags(cmd *cobra.Command, username, password, loginURL *string, auth
 
 // Downloads:
 // setDownloadFlags sets flags related to download tasks.
-func setDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookieSource, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
+func setDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookiesFromBrowser, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
 
 	if fromDate != nil {
 		cmd.Flags().StringVar(fromDate, keys.FromDate, "", "Only grab videos uploaded on or after this date")
@@ -64,8 +64,8 @@ func setDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 		cmd.Flags().IntVar(retries, keys.DLRetries, 0, "Number of retries to attempt a download before failure")
 	}
 
-	if cookieSource != nil {
-		cmd.Flags().StringVar(cookieSource, keys.CookieSource, "", "Cookie source to use for downloading videos (e.g. firefox)")
+	if cookiesFromBrowser != nil {
+		cmd.Flags().StringVar(cookiesFromBrowser, keys.CookiesFromBrowser, "", "Cookie source to use for downloading videos (e.g. firefox)")
 	}
 
 	if maxFilesize != nil {

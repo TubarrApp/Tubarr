@@ -73,6 +73,15 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert "video_directory" to "video-directory"
 
+	// Web version vs. terminal version toggle
+	rootCmd.PersistentFlags().Bool(keys.RunWebInterface, false, "Run Tubarr as a web interface")
+	if err := viper.BindPFlag(keys.RunWebInterface, rootCmd.PersistentFlags().Lookup(keys.RunWebInterface)); err != nil {
+		return err
+	}
+	if viper.IsSet(keys.RunWebInterface) {
+		return nil
+	}
+
 	if err := initProgramFlags(rootCmd); err != nil {
 		return err
 	}

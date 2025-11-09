@@ -21,15 +21,15 @@ type Site struct {
 //
 // Contains ChannelURL models and top level configuration.
 type Channel struct {
-	ID                int64 `db:"id"`
-	URLModels         []*ChannelURL
-	Name              string      `db:"name"`
-	ChanSettings      *Settings   `json:"settings" db:"settings"`
-	ChanMetarrArgs    *MetarrArgs `json:"metarr" db:"metarr"`
-	UpdatedFromConfig bool
-	LastScan          time.Time `db:"last_scan"`
-	CreatedAt         time.Time `db:"created_at"`
-	UpdatedAt         time.Time `db:"updated_at"`
+	ID                int64         `json:"id" db:"id"`
+	URLModels         []*ChannelURL `json:"url_models"`
+	Name              string        `json:"name" db:"name"`
+	ChanSettings      *Settings     `json:"settings" db:"settings"`
+	ChanMetarrArgs    *MetarrArgs   `json:"metarr" db:"metarr"`
+	UpdatedFromConfig bool          `json:"updated_from_config"`
+	LastScan          time.Time     `json:"last_scan" db:"last_scan"`
+	CreatedAt         time.Time     `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time     `json:"updated_at" db:"updated_at"`
 }
 
 // GetCrawlFreq returns the program's crawl frequency (-1 is unset).
@@ -73,21 +73,21 @@ func (c *Channel) GetURLs() []string {
 //
 // Matches the order of the DB table, do not alter.
 type ChannelURL struct {
-	ID                int64  `db:"id"`
-	URL               string `db:"url"`
-	Videos            []*Video
-	Username          string         `db:"username"`
-	Password          string         `db:"-" json:"-"`
-	EncryptedPassword string         `db:"password"`
-	LoginURL          string         `db:"login_url"`
-	CookiePath        string         `db:"-" json:"-"`
-	Cookies           []*http.Cookie `db:"-" json:"-"`
-	IsManual          bool           `db:"is_manual"`
-	ChanURLSettings   *Settings      `json:"settings" db:"settings"`
-	ChanURLMetarrArgs *MetarrArgs    `json:"metarr" db:"metarr"`
-	LastScan          time.Time      `db:"last_scan"`
-	CreatedAt         time.Time      `db:"created_at"`
-	UpdatedAt         time.Time      `db:"updated_at"`
+	ID                int64          `json:"id" db:"id"`
+	URL               string         `json:"url" db:"url"`
+	Videos            []*Video       `json:"videos,omitempty"`
+	Username          string         `json:"username" db:"username"`
+	Password          string         `json:"-" db:"-"`
+	EncryptedPassword string         `json:"-" db:"password"`
+	LoginURL          string         `json:"login_url" db:"login_url"`
+	CookiePath        string         `json:"-" db:"-"`
+	Cookies           []*http.Cookie `json:"-" db:"-"`
+	IsManual          bool           `json:"is_manual" db:"is_manual"`
+	ChanURLSettings   *Settings      `json:"settings,omitempty" db:"settings"`
+	ChanURLMetarrArgs *MetarrArgs    `json:"metarr,omitempty" db:"metarr"`
+	LastScan          time.Time      `json:"last_scan" db:"last_scan"`
+	CreatedAt         time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at" db:"updated_at"`
 }
 
 // NeedsAuth checks if this channel URL has details for authorization.
@@ -112,35 +112,35 @@ func (cu *ChannelURL) ToChannelAccessDetails() *ChannelAccessDetails {
 //
 // Matches the order of the DB table, do not alter.
 type Video struct {
-	ID              int64
-	ChannelID       int64          `db:"channel_id"`
-	ChannelURLID    int64          `db:"channel_url_id"`
-	ParsedVideoDir  string         `db:"-"`
-	VideoPath       string         `db:"video_path"`
-	ParsedMetaDir   string         `db:"-"`
-	JSONPath        string         `db:"json_path"`
-	Finished        bool           `db:"finished"`
-	JSONCustomFile  string         `db:"-"`
-	URL             string         `db:"url"`
-	DirectVideoURL  string         `db:"-"`
-	Title           string         `db:"title"`
-	Description     string         `db:"description"`
-	UploadDate      time.Time      `db:"upload_date"`
-	MetadataMap     map[string]any `db:"-"`
+	ID              int64          `json:"id" db:"id"`
+	ChannelID       int64          `json:"channel_id" db:"channel_id"`
+	ChannelURLID    int64          `json:"channel_url_id" db:"channel_url_id"`
+	ThumbnailURL    string         `json:"thumbnail_url" db:"thumbnail"`
+	ParsedVideoDir  string         `json:"-" db:"-"`
+	VideoPath       string         `json:"video_path" db:"video_path"`
+	ParsedMetaDir   string         `json:"-" db:"-"`
+	JSONPath        string         `json:"json_path" db:"json_path"`
+	Finished        bool           `json:"finished" db:"finished"`
+	JSONCustomFile  string         `json:"-" db:"-"`
+	URL             string         `json:"url" db:"url"`
+	DirectVideoURL  string         `json:"-" db:"-"`
+	Title           string         `json:"title" db:"title"`
+	Description     string         `json:"description" db:"description"`
+	UploadDate      time.Time      `json:"upload_date" db:"upload_date"`
+	MetadataMap     map[string]any `json:"-" db:"-"`
 	DownloadStatus  DLStatus       `json:"download_status" db:"download_status"`
-	CreatedAt       time.Time      `db:"created_at"`
-	UpdatedAt       time.Time      `db:"updated_at"`
-	MoveOpOutputDir string         `db:"-"`
-	WasSkipped      bool
+	CreatedAt       time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at" db:"updated_at"`
+	MoveOpOutputDir string         `json:"-" db:"-"`
+	Ignored         bool           `json:"ignored" db:"ignored"`
 }
 
-// MarkVideoAsSkipped marks the video as completed and skipped.
-func (v *Video) MarkVideoAsSkipped() {
-	v.DownloadStatus.Status = consts.DLStatusCompleted
-	v.DownloadStatus.Pct = 100.0
+// MarkVideoAsIgnored marks the video as completed and ignored.
+func (v *Video) MarkVideoAsIgnored() {
+	v.DownloadStatus.Status = consts.DLStatusIgnored
+	v.DownloadStatus.Pct = 0.0
 	v.DownloadStatus.Error = nil
-	v.Finished = true
-	v.WasSkipped = true
+	v.Ignored = true
 }
 
 // MarkVideoAsCompleted marks the video with the finished status.
