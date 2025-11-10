@@ -258,8 +258,9 @@ func processJSON(
 	if err != nil {
 		return false, false, err
 	}
-	cu.ChanURLMetarrArgs.FilteredMetaOps = useFilteredMetaOps
-	cu.ChanURLMetarrArgs.FilteredFilenameOps = useFilteredFilenameOps
+	// Store filtered operations in the video (per-video, not shared)
+	v.FilteredMetaOps = useFilteredMetaOps
+	v.FilteredFilenameOps = useFilteredFilenameOps
 
 	if !passedChecks {
 		v.MarkVideoAsIgnored()

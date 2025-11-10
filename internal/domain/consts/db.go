@@ -131,6 +131,7 @@ const (
 	QVidUploadDate   = "upload_date"
 	QVidMetadata     = "metadata"
 	QVidDLStatus     = "download_status"
+	QVidDLPercentage = "download_pct"
 	QVidCreatedAt    = "created_at"
 	QVidUpdatedAt    = "updated_at"
 )

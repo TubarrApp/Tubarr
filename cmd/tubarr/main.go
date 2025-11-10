@@ -21,7 +21,7 @@ import (
 // main is the main entrypoint of the program (duh!).
 func main() {
 	startTime := time.Now()
-	store, progControl, err := initializeApplication()
+	store, database, progControl, err := initializeApplication()
 	if err != nil {
 		logging.E("error initializing Tubarr: %v", err)
 		return
@@ -67,7 +67,7 @@ func main() {
 	}
 	// Start server or terminal version
 	if abstractions.IsSet(keys.RunWebInterface) {
-		server.StartServer(store)
+		server.StartServer(store, database)
 	} else {
 		// Check channels
 		if abstractions.GetBool(keys.CheckChannels) {

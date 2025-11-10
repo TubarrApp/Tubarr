@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -67,86 +66,100 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	v.MetadataMap = m
 
 	// Titles
-	for _, key := range []string{"fulltitle", "title", "full_title"} {
-		if titleVal, exists := m[key]; exists {
-			if title, ok := titleVal.(string); ok {
-				v.Title = title
-				logging.D(2, "Extracted title %q from metadata (Video URL: %q)", title, v.URL)
-				break
+	if v.Title == "" {
+		for _, key := range []string{"fulltitle", "title", "full_title"} {
+			if titleVal, exists := m[key]; exists {
+				if title, ok := titleVal.(string); ok {
+					v.Title = title
+					logging.D(2, "Extracted title %q from metadata (Video URL: %q)", title, v.URL)
+					break
+				}
 			}
+		}
+		if v.Title == "" && v.URL != "" {
+			v.Title = v.URL
 		}
 	}
 
 	// Upload date
-	for _, key := range []string{"upload_date", "release_date", "originally_available_at", "date"} {
-		if uploadDateVal, exists := m[key]; exists {
-			if uploadDate, ok := uploadDateVal.(string); ok {
-				if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
-					v.UploadDate = t
-					logging.D(2, "Extracted upload date %q from metadata (Video URL: %q)", t.Format("2006-01-02"), v.URL)
-					break
-				} else {
-					logging.D(2, "Failed to parse upload date %q: %v", uploadDate, err)
+	if v.UploadDate.IsZero() {
+		for _, key := range []string{"upload_date", "release_date", "originally_available_at", "date"} {
+			if uploadDateVal, exists := m[key]; exists {
+				if uploadDate, ok := uploadDateVal.(string); ok {
+					if strings.Contains(uploadDate, "-") {
+						if t, err := time.Parse("2006-01-02", uploadDate); err == nil { // If error IS nil
+							v.UploadDate = t
+							if v.UploadDate.IsZero() {
+								logging.E("Failed to parse upload date %q: %v", uploadDate, err)
+							}
+							break
+						}
+					} else if !strings.Contains(uploadDate, "-") {
+						if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
+							v.UploadDate = t
+							if v.UploadDate.IsZero() {
+								logging.E("Failed to parse upload date %q: %v", uploadDate, err)
+							}
+							break
+						}
+					}
 				}
 			}
 		}
 	}
 
 	// Description
-	for _, key := range []string{"description", "longdescription", "long_description", "summary", "synopsis"} {
-		if descriptionVal, exists := m[key]; exists {
-			if description, ok := descriptionVal.(string); ok {
-				v.Description = description
-				logging.D(2, "Extracted description %q from metadata (Video URL: %q)", description, v.URL)
-				break
+	if v.Description == "" {
+		for _, key := range []string{"description", "longdescription", "long_description", "summary", "synopsis"} {
+			if descriptionVal, exists := m[key]; exists {
+				if description, ok := descriptionVal.(string); ok {
+					v.Description = description
+					logging.D(2, "Extracted description %q from metadata (Video URL: %q)", description, v.URL)
+					break
+				}
 			}
 		}
 	}
 
 	// Thumbnails
 	if v.ThumbnailURL == "" {
+		// Check directly
 		if thumbnailVal, exists := m[consts.MetadataThumbnail]; exists {
 			if thumbnail, ok := thumbnailVal.(string); ok {
 				v.ThumbnailURL = thumbnail
 			}
 		}
-	}
-	if v.ThumbnailURL == "" {
-		if thumbsVal, exists := m["thumbnails"]; exists {
-			if thumbs, ok := thumbsVal.([]any); ok {
-				var best string
-				maxPref := math.MinInt
-				for _, t := range thumbs {
-					if thumbMap, ok := t.(map[string]any); ok {
-						urlStr, _ := thumbMap["url"].(string)
-						if urlStr == "" {
-							continue
-						}
-						// Highest-resolution or best preference
-						if pref, ok := thumbMap["preference"].(float64); ok {
-							if int(pref) > maxPref {
-								maxPref = int(pref)
+		// Still empty, check arrays
+		if v.ThumbnailURL == "" {
+			if thumbsVal, exists := m["thumbnails"]; exists {
+				if thumbs, ok := thumbsVal.([]any); ok {
+					var best string
+					maxPref := math.MinInt
+					for _, t := range thumbs {
+						if thumbMap, ok := t.(map[string]any); ok {
+							urlStr, _ := thumbMap["url"].(string)
+							if urlStr == "" {
+								continue
+							}
+							// Highest-resolution or best preference
+							if pref, ok := thumbMap["preference"].(float64); ok {
+								if int(pref) > maxPref {
+									maxPref = int(pref)
+									best = urlStr
+								}
+							} else if best == "" {
+								// fallback if preference missing
 								best = urlStr
 							}
-						} else if best == "" {
-							// fallback if preference missing
-							best = urlStr
 						}
 					}
-				}
-				if best != "" {
-					v.ThumbnailURL = best
-					logging.D(2, "Selected thumbnail from array: %s", best)
+					if best != "" {
+						v.ThumbnailURL = best
+						logging.D(2, "Selected thumbnail from array: %s", best)
+					}
 				}
 			}
 		}
-	}
-	if v.ThumbnailURL == "" {
-		path, err := os.Executable()
-		if err != nil {
-			logging.E("Could not retrieve executable path: %v", err)
-		}
-		v.ThumbnailURL = filepath.Join(path, "web/dist/assets/placeholder-video.png")
 	}
 
 	logging.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Title)
@@ -176,7 +189,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
 
 	// Check download filters
-	allFilters := make([]models.DLFilters, len(cu.ChanURLSettings.Filters))
+	allFilters := make([]models.Filters, len(cu.ChanURLSettings.Filters))
 	copy(allFilters, cu.ChanURLSettings.Filters)
 
 	fileFilters := loadFilterOpsFromFile(v, cu, dirParser)
@@ -202,8 +215,8 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 }
 
 // getRelevantFilters returns filters applicable to the given URL.
-func getRelevantFilters(filters []models.DLFilters, currentURL string) []models.DLFilters {
-	relevant := make([]models.DLFilters, 0, len(filters))
+func getRelevantFilters(filters []models.Filters, currentURL string) []models.Filters {
+	relevant := make([]models.Filters, 0, len(filters))
 
 	for _, filter := range filters {
 		// Include if no specific URL specified, or if it matches current URL
@@ -224,7 +237,7 @@ func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, curren
 	relevantFilteredMetaOps := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
 
 	for _, fmo := range filteredMetaOps {
-		relevantFilters := make([]models.DLFilters, 0, len(fmo.Filters))
+		relevantFilters := make([]models.Filters, 0, len(fmo.Filters))
 
 		for _, filter := range fmo.Filters {
 			// Include if no specific URL specified, or if it matches current URL
@@ -247,7 +260,7 @@ func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, curren
 func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps, currentURL string) []models.FilteredFilenameOps {
 	relevantFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
 	for _, ffo := range filteredFilenameOps {
-		relevantFilters := make([]models.DLFilters, 0, len(ffo.Filters))
+		relevantFilters := make([]models.Filters, 0, len(ffo.Filters))
 		for _, filter := range ffo.Filters {
 			// Include if no specific URL specified, or if it matches current URL
 			if filter.ChannelURL == "" ||

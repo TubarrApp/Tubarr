@@ -23,8 +23,8 @@ func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.C
 	// Combine
 	fileAndDBOps := append(fileFilenameOps, nonConflictingDBOps...)
 
-	// Merge with filtered filename ops
-	mergedOps := applyFilteredFilenameOps(fileAndDBOps, cu.ChanURLMetarrArgs.FilteredFilenameOps, v.URL, c.Name)
+	// Merge with filtered filename ops (per-video, stored in Video struct)
+	mergedOps := applyFilteredFilenameOps(fileAndDBOps, v.FilteredFilenameOps, v.URL, c.Name)
 
 	// Omit operations with the wrong channel URL
 	channelMatchedOps := filterFilenameOpsByChannel(mergedOps, cu.URL)

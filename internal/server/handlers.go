@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
 	"github.com/go-chi/chi/v5"
@@ -21,7 +22,7 @@ import (
 
 // handleListChannels lists Tubarr channels.
 func handleListChannels(w http.ResponseWriter, r *http.Request) {
-	channels, found, err := cs.GetAllChannels()
+	channels, found, err := ss.cs.GetAllChannels()
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -39,7 +40,7 @@ func handleListChannels(w http.ResponseWriter, r *http.Request) {
 func handleGetChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	c, found, err := cs.GetChannelModel("id", id)
+	c, found, err := ss.cs.GetChannelModel("id", id)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -126,7 +127,7 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add to database
-	if c.ID, err = cs.AddChannel(c); err != nil {
+	if c.ID, err = ss.cs.AddChannel(c); err != nil {
 		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), http.StatusInternalServerError)
 		return
 	}
@@ -135,7 +136,7 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	if r.FormValue("ignore_run") == "true" {
 		log.Printf("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
-		if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
 			http.Error(w, fmt.Sprintf("failed to run ignore crawl on channel %q: %v", name, err), http.StatusInternalServerError)
 			return
 		}
@@ -154,14 +155,14 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 // handleDeleteChannel deletes a channel from Tubarr.
 func handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	cs.DeleteChannel(consts.QChanID, id)
+	ss.cs.DeleteChannel(consts.QChanID, id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleLatestDownloads retrieves the latest downloads for a given channel.
-func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
+// handleGetAllVideos retrieves all videos, ignored or finished, for a given channel.
+func handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	c, found, err := cs.GetChannelModel(consts.QChanID, id)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -172,7 +173,76 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get video downloads with full metadata
-	videos, err := cs.GetLatestDownloadedVideos(c, 5)
+	videos, _, err := ss.cs.GetDownloadedOrIgnoredVideos(c)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(videos)
+}
+
+// handleDeleteChannelVideos deletes given video entries from a channel.
+func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
+	// Get channel ID from URL path
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("could not parse channel ID %q: %v", idStr, err), http.StatusBadRequest)
+		return
+	}
+
+	// Read and parse body for DELETE requests
+	// DELETE requests need special handling for form data in the body
+	bodyBytes := make([]byte, r.ContentLength)
+	if _, err := r.Body.Read(bodyBytes); err != nil && err.Error() != "EOF" {
+		logging.E("Failed to read body: %v", err)
+		http.Error(w, "failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	// Parse the URL-encoded form data from body
+	values, err := url.ParseQuery(string(bodyBytes))
+	if err != nil {
+		logging.E("Failed to parse query: %v", err)
+		http.Error(w, "failed to parse form data", http.StatusBadRequest)
+		return
+	}
+
+	// Get video URLs from form array
+	urls := values["urls[]"]
+	logging.D(1, "Parsed form data: %+v", values)
+	logging.D(1, "Video URLs to delete: %v", urls)
+
+	if len(urls) == 0 {
+		http.Error(w, "no video URLs provided", http.StatusBadRequest)
+		return
+	}
+
+	if err := ss.cs.DeleteVideoURLs(id, urls); err != nil {
+		http.Error(w, fmt.Sprintf("failed to delete video URLs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleLatestDownloads retrieves the latest downloads for a given channel.
+func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
+	// Get video downloads with full metadata
+	videos, err := ss.getHomepageCarouselVideos(c, 10)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return

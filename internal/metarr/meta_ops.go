@@ -23,8 +23,8 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	// Combine
 	fileAndDBOps := append(fileMetaOps, nonConflictingDBOps...)
 
-	// Merge with filtered meta ops
-	mergedOps := applyFilteredMetaOps(fileAndDBOps, cu.ChanURLMetarrArgs.FilteredMetaOps, v.URL, c.Name)
+	// Merge with filtered meta ops (per-video, stored in Video struct)
+	mergedOps := applyFilteredMetaOps(fileAndDBOps, v.FilteredMetaOps, v.URL, c.Name)
 
 	// Omit operations with the wrong channel URL
 	channelMatchedOps := filterMetaOpsByChannel(mergedOps, cu.URL)

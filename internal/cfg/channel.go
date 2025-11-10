@@ -682,7 +682,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			}
 
 			// Validate filter operations
-			var dlFilterModels []models.DLFilters
+			var dlFilterModels []models.Filters
 			if dlFilterModels, err = validation.ValidateFilterOps(dlFilters); err != nil {
 				return err
 			}

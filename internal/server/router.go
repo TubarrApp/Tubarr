@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -18,22 +19,28 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-var (
+type serverStore struct {
 	s  contracts.Store
 	cs contracts.ChannelStore
 	ds contracts.DownloadStore
 	vs contracts.VideoStore
-)
+	db *sql.DB
+}
+
+var ss serverStore
 
 const TubarrPort = "8827"
 
 // NewRouter returns a http Handler.
-func NewRouter(store contracts.Store) http.Handler {
+func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 	// Inject stores
-	s = store
-	cs = s.ChannelStore()
-	ds = s.DownloadStore()
-	vs = s.VideoStore()
+	ss = serverStore{
+		s:  store,
+		cs: store.ChannelStore(),
+		ds: store.DownloadStore(),
+		vs: store.VideoStore(),
+		db: database,
+	}
 
 	// Initialize router
 	r := chi.NewRouter()
@@ -51,8 +58,10 @@ func NewRouter(store contracts.Store) http.Handler {
 			r.Post("/add", handleCreateChannel)
 			r.Get("/{id}", handleGetChannel)
 			r.Get("/{id}/downloads", handleLatestDownloads)
+			r.Get("/{id}/all-videos", handleGetAllVideos)
 			r.Put("/{id}/update", handleUpdateChannel)
 			r.Delete("/{id}/delete", handleDeleteChannel)
+			r.Delete("/{id}/delete-videos", handleDeleteChannelVideos)
 
 			// // Channel URLs
 			// r.Route("/{id}/urls", func(r chi.Router) {
@@ -80,8 +89,8 @@ func NewRouter(store contracts.Store) http.Handler {
 }
 
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
-func StartServer(s contracts.Store) {
-	r := NewRouter(s)
+func StartServer(s contracts.Store, db *sql.DB) {
+	r := NewRouter(s, db)
 	addr := ":" + TubarrPort
 
 	srv := &http.Server{

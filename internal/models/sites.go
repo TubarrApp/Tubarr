@@ -112,31 +112,36 @@ func (cu *ChannelURL) ToChannelAccessDetails() *ChannelAccessDetails {
 //
 // Matches the order of the DB table, do not alter.
 type Video struct {
-	ID              int64          `json:"id" db:"id"`
-	ChannelID       int64          `json:"channel_id" db:"channel_id"`
-	ChannelURLID    int64          `json:"channel_url_id" db:"channel_url_id"`
-	ThumbnailURL    string         `json:"thumbnail_url" db:"thumbnail"`
-	ParsedVideoDir  string         `json:"-" db:"-"`
-	VideoPath       string         `json:"video_path" db:"video_path"`
-	ParsedMetaDir   string         `json:"-" db:"-"`
-	JSONPath        string         `json:"json_path" db:"json_path"`
-	Finished        bool           `json:"finished" db:"finished"`
-	JSONCustomFile  string         `json:"-" db:"-"`
-	URL             string         `json:"url" db:"url"`
-	DirectVideoURL  string         `json:"-" db:"-"`
-	Title           string         `json:"title" db:"title"`
-	Description     string         `json:"description" db:"description"`
-	UploadDate      time.Time      `json:"upload_date" db:"upload_date"`
-	MetadataMap     map[string]any `json:"-" db:"-"`
-	DownloadStatus  DLStatus       `json:"download_status" db:"download_status"`
-	CreatedAt       time.Time      `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at" db:"updated_at"`
-	MoveOpOutputDir string         `json:"-" db:"-"`
-	Ignored         bool           `json:"ignored" db:"ignored"`
+	ID                     int64                 `json:"id" db:"id"`
+	ChannelID              int64                 `json:"channel_id" db:"channel_id"`
+	ChannelURLID           int64                 `json:"channel_url_id" db:"channel_url_id"`
+	ThumbnailURL           string                `json:"thumbnail_url" db:"thumbnail_url"`
+	ParsedVideoDir         string                `json:"-" db:"-"`
+	VideoPath              string                `json:"video_path" db:"video_path"`
+	ParsedMetaDir          string                `json:"-" db:"-"`
+	JSONPath               string                `json:"json_path" db:"json_path"`
+	Finished               bool                  `json:"finished" db:"finished"`
+	JSONCustomFile         string                `json:"-" db:"-"`
+	URL                    string                `json:"url" db:"url"`
+	DirectVideoURL         string                `json:"-" db:"-"`
+	Title                  string                `json:"title" db:"title"`
+	Description            string                `json:"description" db:"description"`
+	UploadDate             time.Time             `json:"upload_date" db:"upload_date"`
+	MetadataMap            map[string]any        `json:"-" db:"-"`
+	DownloadStatus         DLStatus              `json:"download_status" db:"download_status"`
+	CreatedAt              time.Time             `json:"created_at" db:"created_at"`
+	UpdatedAt              time.Time             `json:"updated_at" db:"updated_at"`
+	MoveOpOutputDir        string                `json:"-" db:"-"`
+	Ignored                bool                  `json:"ignored" db:"ignored"`
+	FilteredMetaOps        []FilteredMetaOps     `json:"-" db:"-"` // Per-video filtered meta operations
+	FilteredFilenameOps    []FilteredFilenameOps `json:"-" db:"-"` // Per-video filtered filename operations
 }
 
 // MarkVideoAsIgnored marks the video as completed and ignored.
 func (v *Video) MarkVideoAsIgnored() {
+	if v.Title == "" && v.URL != "" {
+		v.Title = v.URL
+	}
 	v.DownloadStatus.Status = consts.DLStatusIgnored
 	v.DownloadStatus.Pct = 0.0
 	v.DownloadStatus.Error = nil

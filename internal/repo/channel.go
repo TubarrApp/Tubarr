@@ -77,113 +77,6 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 	return id, nil
 }
 
-// GetLatestDownloadedVideos returns the latest 'limit' downloaded videos.
-func (cs *ChannelStore) GetLatestDownloadedVideos(channel *models.Channel, limit int) ([]models.Video, error) {
-	var videos []models.Video
-
-	query := squirrel.
-		Select(
-			consts.QVidID,
-			consts.QVidChanID,
-			consts.QVidChanURLID,
-			consts.QVidThumbnailURL,
-			consts.QVidFinished,
-			consts.QVidURL,
-			consts.QVidTitle,
-			consts.QVidDescription,
-			consts.QVidVideoPath,
-			consts.QVidJSONPath,
-			consts.QVidUploadDate,
-			consts.QVidMetadata,
-			consts.QVidDLStatus,
-			consts.QVidCreatedAt,
-			consts.QVidUpdatedAt,
-		).
-		From(consts.DBVideos).
-		Where(squirrel.Eq{consts.QVidChanID: channel.ID}).
-		Where(squirrel.Eq{consts.QVidFinished: 1}).            // Only finished downloads
-		OrderBy(fmt.Sprintf("%s DESC", consts.QVidUpdatedAt)). // Most recent first
-		Limit(uint64(limit))
-
-	sqlPlaceholder, args, err := query.PlaceholderFormat(squirrel.Question).ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build query: %w", err)
-	}
-
-	rows, err := cs.DB.Query(sqlPlaceholder, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query videos: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var video models.Video
-		var thumbnailURL sql.NullString
-		var description sql.NullString
-		var videoPath sql.NullString
-		var jsonPath sql.NullString
-		var uploadDate sql.NullTime
-		var metadataStr sql.NullString
-		var channelURLID sql.NullInt64
-		var downloadStatusStr sql.NullString
-
-		err := rows.Scan(
-			&video.ID,
-			&video.ChannelID,
-			&channelURLID,
-			&thumbnailURL,
-			&video.Finished,
-			&video.URL,
-			&video.Title,
-			&description,
-			&videoPath,
-			&jsonPath,
-			&uploadDate,
-			&metadataStr,
-			&downloadStatusStr,
-			&video.CreatedAt,
-			&video.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan video row: %w", err)
-		}
-
-		// Unmarshal download status JSON
-		if downloadStatusStr.Valid && downloadStatusStr.String != "" {
-			if err := json.Unmarshal([]byte(downloadStatusStr.String), &video.DownloadStatus); err != nil {
-				logging.W("Failed to unmarshal download status for video %d: %v", video.ID, err)
-			}
-		}
-
-		// Handle nullable fields
-		if channelURLID.Valid {
-			video.ChannelURLID = channelURLID.Int64
-		}
-		if thumbnailURL.Valid {
-			video.ThumbnailURL = thumbnailURL.String
-		}
-		if description.Valid {
-			video.Description = description.String
-		}
-		if videoPath.Valid {
-			video.VideoPath = videoPath.String
-		}
-		if jsonPath.Valid {
-			video.JSONPath = jsonPath.String
-		}
-		if uploadDate.Valid {
-			video.UploadDate = uploadDate.Time
-		}
-		videos = append(videos, video)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %w", err)
-	}
-
-	return videos, nil
-}
-
 // GetAuth retrieves authentication details for a specific URL in a channel.
 func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password, loginURL string, err error) {
 	var u, p, l sql.NullString // Use sql.NullString to handle NULL values
@@ -1096,8 +989,114 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	return nil
 }
 
-// GetDownloadedOrIgnoredURLs loads already downloaded or ignored URLs from the database.
-func (cs *ChannelStore) GetDownloadedOrIgnoredURLs(c *models.Channel) (urls []string, err error) {
+// GetDownloadedOrIgnoredVideos loads already downloaded or ignored videos from the database.
+func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos []*models.Video, hasRows bool, err error) {
+	if c.ID == 0 {
+		return nil, false, errors.New("model entered has no ID")
+	}
+
+	query := squirrel.
+		Select(
+			consts.QVidID,
+			consts.QVidChanID,
+			consts.QVidChanURLID,
+			consts.QVidThumbnailURL,
+			consts.QVidFinished,
+			consts.QVidIgnored,
+			consts.QVidURL,
+			consts.QVidTitle,
+			consts.QVidDescription,
+			consts.QVidUploadDate,
+			consts.QVidMetadata,
+			consts.QVidCreatedAt,
+			consts.QVidUpdatedAt,
+		).
+		From(consts.DBVideos).
+		Where(squirrel.And{
+			squirrel.Eq{consts.QVidChanID: c.ID},
+			squirrel.Or{
+				squirrel.Eq{consts.QVidFinished: 1},
+				squirrel.Eq{consts.QVidIgnored: 1},
+			},
+		}).
+		RunWith(cs.DB)
+
+	rows, err := query.Query()
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, true, fmt.Errorf("failed to query videos: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logging.E("Failed to close rows: %v", err)
+		}
+	}()
+
+	for rows.Next() {
+		var (
+			v            models.Video
+			url          sql.NullString
+			title        sql.NullString
+			thumbnailURL sql.NullString
+			description  sql.NullString
+			uploadDate   sql.NullTime
+			metadataStr  sql.NullString
+			channelURLID sql.NullInt64
+		)
+
+		if err := rows.Scan(
+			&v.ID,
+			&v.ChannelID,
+			&channelURLID,
+			&thumbnailURL,
+			&v.Finished,
+			&v.Ignored,
+			&url,
+			&title,
+			&description,
+			&uploadDate,
+			&metadataStr,
+			&v.CreatedAt,
+			&v.UpdatedAt,
+		); err != nil {
+			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
+		}
+
+		// Handle nullable fields
+		if channelURLID.Valid {
+			v.ChannelURLID = channelURLID.Int64
+		}
+		if url.Valid {
+			v.URL = url.String
+		}
+		if title.Valid {
+			v.Title = title.String
+		}
+		if thumbnailURL.Valid {
+			v.ThumbnailURL = thumbnailURL.String
+		}
+		if description.Valid {
+			v.Description = description.String
+		}
+		if uploadDate.Valid {
+			v.UploadDate = uploadDate.Time
+		}
+		if metadataStr.Valid && metadataStr.String != "" {
+			if err := json.Unmarshal([]byte(metadataStr.String), &v.MetadataMap); err != nil {
+				logging.W("Failed to unmarshal metadata for video %d: %v", v.ID, err)
+			}
+		}
+
+		videos = append(videos, &v)
+	}
+
+	logging.I("Found %d previously downloaded videos for channel %q", len(videos), c.Name)
+	return videos, true, nil
+}
+
+// GetDownloadedOrIgnoredVideoURLs loads already downloaded or ignored URLs from the database.
+func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls []string, err error) {
 	if c.ID == 0 {
 		return nil, errors.New("model entered has no ID")
 	}

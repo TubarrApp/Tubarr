@@ -15,7 +15,7 @@ import (
 )
 
 // filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
-func filterOpsFilter(v *models.Video, filters []models.DLFilters, channelName string) bool {
+func filterOpsFilter(v *models.Video, filters []models.Filters, channelName string) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
@@ -35,9 +35,9 @@ func filterOpsFilter(v *models.Video, filters []models.DLFilters, channelName st
 		var passed, failHard bool
 		switch filter.Value {
 		case "": // empty filter value
-			passed, failHard = checkFilterWithEmptyValue(filter, exists)
+			passed, failHard = checkFilterWithEmptyValue(filter, "Download Filters", v.URL, exists)
 		default: // non-empty filter value
-			passed, failHard = checkFilterWithValue(filter, strVal, filterVal) // Treats non-existent and empty metadata fields the same...
+			passed, failHard = checkFilterWithValue(filter, "Download Filters", v.URL, strVal, filterVal) // Treats non-existent and empty metadata fields the same...
 		}
 
 		if failHard {
@@ -86,7 +86,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 
 	for _, fmo := range filteredMetaOps {
 		// Check if filters match
-		filtersMatched := checkFiltersOnly(v, fmo.Filters)
+		filtersMatched := checkFiltersOnly(v, "Filtered Meta Ops", fmo.Filters)
 
 		// Deduplicate meta ops using buildKey
 		dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
@@ -133,7 +133,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		logging.D(1, "Checking filters for filtered filename ops. Filter count: %d", len(ffo.Filters))
 
 		// Check if filters match
-		filtersMatched := checkFiltersOnly(v, ffo.Filters)
+		filtersMatched := checkFiltersOnly(v, "Filtered Filename Ops", ffo.Filters)
 
 		// ADD THIS DEBUG LINE:
 		logging.D(1, "Filters matched result: %v", filtersMatched)
@@ -166,7 +166,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 }
 
 // checkFiltersOnly checks if filters match WITHOUT removing JSON files on failure.
-func checkFiltersOnly(v *models.Video, filters []models.DLFilters) bool {
+func checkFiltersOnly(v *models.Video, filterType string, filters []models.Filters) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
@@ -185,9 +185,9 @@ func checkFiltersOnly(v *models.Video, filters []models.DLFilters) bool {
 		var passed bool
 		switch filter.Value {
 		case "": // empty filter value
-			passed, _ = checkFilterWithEmptyValue(filter, exists)
+			passed, _ = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
 		default: // non-empty filter value
-			passed, _ = checkFilterWithValue(filter, strVal, filterVal)
+			passed, _ = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
 		}
 
 		if passed {
@@ -212,17 +212,17 @@ func checkFiltersOnly(v *models.Video, filters []models.DLFilters) bool {
 }
 
 // checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
-func checkFilterWithEmptyValue(filter models.DLFilters, exists bool) (passed, failHard bool) {
-	switch filter.Type {
+func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL string, exists bool) (passed, failHard bool) {
+	switch filter.ContainsOmits {
 	case consts.FilterContains:
 		if !exists {
-			logging.I("Filtering: field %q not found and must contain it", filter.Field)
+			logging.I("%s mismatch: Video %q does not contain desired field %q", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return true, false
 	case consts.FilterOmits:
 		if exists && filter.MustAny == "must" {
-			logging.I("Filtering: field %q exists but must omit it", filter.Field)
+			logging.I("%s mismatch: Video %q contains unwanted field %q", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return !exists, false
@@ -231,14 +231,14 @@ func checkFilterWithEmptyValue(filter models.DLFilters, exists bool) (passed, fa
 }
 
 // checkFilterWithValue checks a filter's value against its matching metadata field.
-func checkFilterWithValue(filter models.DLFilters, strVal, filterVal string) (passed, failHard bool) {
-	switch filter.Type {
+func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, filterVal string) (passed, failHard bool) {
+	switch filter.ContainsOmits {
 	case consts.FilterContains:
 		if strings.Contains(strVal, filterVal) {
 			return true, false
 		}
 		if filter.MustAny == "must" {
-			logging.I("Filtering out: does not contain %q in %q", filter.Value, filter.Field)
+			logging.I("%s mismatch: Video %q does not contain desired %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
 	case consts.FilterOmits:
@@ -246,7 +246,7 @@ func checkFilterWithValue(filter models.DLFilters, strVal, filterVal string) (pa
 			return true, false
 		}
 		if filter.MustAny == "must" {
-			logging.I("Filtering out: contains %q in %q", filter.Value, filter.Field)
+			logging.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
 	}
@@ -339,7 +339,7 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 }
 
 // loadFilterOpsFromFile loads filter operations from a file (one per line).
-func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.DLFilters {
+func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.Filters {
 	var err error
 
 	if cu.ChanURLSettings.FilterFile == "" {

@@ -12,9 +12,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 	"tubarr/internal/abstractions"
@@ -48,7 +46,7 @@ func New() *Scraper {
 
 // GetExistingReleases returns releases already in the database.
 func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
-	existingURLs, err = cs.GetDownloadedOrIgnoredURLs(c)
+	existingURLs, err = cs.GetDownloadedOrIgnoredVideoURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
@@ -284,20 +282,29 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 		v.Description = extractDescription(consts.HTMLCensoredDesc, doc)
 		metadata[consts.MetadataDesc] = v.Description
 
-		metadata[consts.MetadataDate] = extractDate(consts.HTMLCensoredDate, doc)
+		uploadDate := extractDate(consts.HTMLCensoredDate, doc)
+		if strings.Contains(uploadDate, "-") {
+			if t, err := time.Parse("2006-01-02", uploadDate); err == nil { // If error IS nil
+				v.UploadDate = t
+			}
+		} else if !strings.Contains(uploadDate, "-") {
+			if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
+				v.UploadDate = t
+			}
+		}
+		if v.UploadDate.IsZero() {
+			logging.E("Failed to custom scraped parse upload date %q: %v", uploadDate, err)
+		} else {
+			logging.I("Extracted upload date %q from metadata (Video URL: %q)", v.UploadDate.String(), v.URL)
+		}
+
+		metadata[consts.MetadataDate] = uploadDate
 
 		v.DirectVideoURL = extractVideoURL(consts.HTMLCensoredVideoURL, doc)
 		metadata[consts.MetadataVideoURL] = v.DirectVideoURL
 
 		v.ThumbnailURL = extractVideoThumbnail(consts.HTMLCensoredThumbnail, doc)
 		metadata[consts.MetadataThumbnail] = v.ThumbnailURL
-		if v.ThumbnailURL == "" {
-			path, err := os.Executable()
-			if err != nil {
-				logging.E("Could not retrieve executable path: %v", err)
-			}
-			v.ThumbnailURL = filepath.Join(path, "web/dist/assets/placeholder-video.png")
-		}
 	})
 
 	// Visit the webpage

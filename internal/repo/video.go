@@ -66,12 +66,16 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 		validVideos = append(validVideos, v)
 	}
 
+	now := time.Now()
+
 	for _, v := range validVideos {
 		videoID, exists := vs.videoExists(v, channelID)
 		if exists {
-			// Update finished status only
+			// Update finished and ignored status
 			updateQuery := squirrel.Update(consts.DBVideos).
 				Set(consts.QVidFinished, v.Finished).
+				Set(consts.QVidIgnored, v.Ignored).
+				Set(consts.QVidUpdatedAt, now).
 				Where(squirrel.Eq{consts.QVidChanID: channelID, consts.QVidURL: v.URL}).
 				RunWith(tx)
 
@@ -81,23 +85,42 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 			}
 			v.ID = videoID
 		} else {
-			// Insert new video
+			// Marshal metadata JSON
+			metadataJSON, err := marshalVideoMetadataJSON(v)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to marshal metadata for video %q: %w", v.URL, err))
+				continue
+			}
+
+			// Insert new video with all fields
 			insertQuery := squirrel.Insert(consts.DBVideos).
 				Columns(
 					consts.QVidChanID,
 					consts.QVidChanURLID,
 					consts.QVidThumbnailURL,
 					consts.QVidURL,
+					consts.QVidTitle,
+					consts.QVidDescription,
 					consts.QVidFinished,
 					consts.QVidIgnored,
+					consts.QVidUploadDate,
+					consts.QVidMetadata,
+					consts.QVidCreatedAt,
+					consts.QVidUpdatedAt,
 				).
 				Values(
 					channelID,
 					v.ChannelURLID,
 					v.ThumbnailURL,
 					v.URL,
+					v.Title,
+					v.Description,
 					v.Finished,
 					v.Ignored,
+					v.UploadDate,
+					metadataJSON,
+					now,
+					now,
 				).
 				RunWith(tx)
 

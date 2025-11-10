@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="256" viewBox="0 0 1024 256">
-  <g id="icon">
-    <rect x="0" y="0" width="256" height="256" rx="51.2" ry="51.2" fill="#FF0033"/>
-    <polygon points="71.68,71.68 71.68,184.32 209.408,128.0" fill="#FFFFFF"/>
-  </g>
-  <text x="312" y="179.2" font-family="system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif" font-size="158.72" fill="#000000" font-weight="600">Tubarr</text>
-</svg>

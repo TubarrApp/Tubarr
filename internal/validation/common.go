@@ -329,7 +329,7 @@ func ValidateMaxFilesize(m string) (string, error) {
 }
 
 // ValidateFilterOps verifies that the user inputted filters are valid.
-func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
+func ValidateFilterOps(ops []string) ([]models.Filters, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
@@ -341,8 +341,7 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 		formatErrorMsg = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omits:must' omits videos only when the metafile contains a date field"
 	)
 
-	var filters = make([]models.DLFilters, 0, len(ops))
-
+	var filters = make([]models.Filters, 0, len(ops))
 	for _, op := range ops {
 
 		// Extract optional channel URL and remaining filter string
@@ -375,12 +374,12 @@ func ValidateFilterOps(ops []string) ([]models.DLFilters, error) {
 		}
 
 		// Append filter
-		filters = append(filters, models.DLFilters{
-			Field:      field,
-			Type:       containsOmits,
-			Value:      value,
-			MustAny:    mustAny,
-			ChannelURL: chanURL,
+		filters = append(filters, models.Filters{
+			Field:         field,
+			ContainsOmits: containsOmits,
+			Value:         value,
+			MustAny:       mustAny,
+			ChannelURL:    chanURL,
 		})
 	}
 	return filters, nil

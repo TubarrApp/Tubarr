@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"strings"
@@ -11,7 +12,7 @@ import (
 )
 
 // initializeApplication sets up the application for the current run.
-func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, err error) {
+func initializeApplication() (store *repo.Store, db *sql.DB, progControl *repo.ProgControl, err error) {
 	// Setup files/dirs
 	if err = paths.InitProgFilesDirs(); err != nil {
 		fmt.Printf("Tubarr exiting with error: %v\n", err)
@@ -49,5 +50,5 @@ func initializeApplication() (store *repo.Store, progControl *repo.ProgControl, 
 		fmt.Printf("could not set up logging, proceeding without: %v", err)
 	}
 
-	return store, progControl, err
+	return store, database.DB, progControl, err
 }

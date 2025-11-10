@@ -25,12 +25,12 @@ type Settings struct {
 	ExtraYTDLPMetaArgs  string `json:"extra_ytdlp_meta_args" mapstructure:"extra-ytdlp-meta-args"`
 
 	// Metadata operations.
-	Filters    []DLFilters `json:"filters" mapstructure:"filters"`
-	FilterFile string      `json:"filter_file" mapstructure:"filter-file"`
-	MoveOps    []MoveOps   `json:"move_ops" mapstructure:"move-ops"`
-	MoveOpFile string      `json:"move_ops_file" mapstructure:"move-ops-file"`
-	FromDate   string      `json:"from_date" mapstructure:"from-date"`
-	ToDate     string      `json:"to_date" mapstructure:"to-date"`
+	Filters    []Filters `json:"filters" mapstructure:"filters"`
+	FilterFile string    `json:"filter_file" mapstructure:"filter-file"`
+	MoveOps    []MoveOps `json:"move_ops" mapstructure:"move-ops"`
+	MoveOpFile string    `json:"move_ops_file" mapstructure:"move-ops-file"`
+	FromDate   string    `json:"from_date" mapstructure:"from-date"`
+	ToDate     string    `json:"to_date" mapstructure:"to-date"`
 
 	// JSON and video directories.
 	JSONDir  string `json:"json_directory" mapstructure:"json-directory"`
@@ -47,25 +47,25 @@ type Settings struct {
 
 // FilteredMetaOps allows meta operation entry based on filter matching.
 type FilteredMetaOps struct {
-	Filters        []DLFilters
+	Filters        []Filters
 	MetaOps        []MetaOps
 	FiltersMatched bool
 }
 
 // FilteredFilenameOps allows file operation entry based on filter matching.
 type FilteredFilenameOps struct {
-	Filters        []DLFilters
+	Filters        []Filters
 	FilenameOps    []FilenameOps
 	FiltersMatched bool
 }
 
-// DLFilters are used to filter in or out videos from download by metafields.
-type DLFilters struct {
-	ChannelURL string `json:"filter_url_specific"`
-	Field      string `json:"filter_field"`
-	Type       string `json:"filter_type"`
-	Value      string `json:"filter_value"`
-	MustAny    string `json:"filter_must_any"`
+// Filters are used to filter in or out videos (download, or operations) by metafields.
+type Filters struct {
+	ChannelURL    string `json:"filter_url_specific"`
+	Field         string `json:"filter_field"`
+	ContainsOmits string `json:"filter_type"`
+	Value         string `json:"filter_value"`
+	MustAny       string `json:"filter_must_any"`
 }
 
 // MoveOps are used to set an output directory in Metarr based on matching metadata fields.
