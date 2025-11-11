@@ -52,7 +52,7 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 	query := squirrel.
 		Update(consts.DBDownloads).
 		Set(consts.QDLStatus, v.DownloadStatus.Status).
-		Set(consts.QDLPct, v.DownloadStatus.Pct).
+		Set(consts.QDLPct, v.DownloadStatus.Percent).
 		Set(consts.QDLUpdatedAt, time.Now()).
 		Where(squirrel.Eq{consts.QVidID: v.ID}).
 		RunWith(tx)
@@ -68,8 +68,8 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 	return nil
 }
 
-// UpdateDownloadStatuses retrieves the download status of an array of videos and updates it in place.
-func (ds *DownloadStore) UpdateDownloadStatuses(ctx context.Context, updates []models.StatusUpdate) error {
+// UpdateDownloadStatus retrieves the download status of a video and updates it in the database.
+func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models.StatusUpdate) error {
 	tx, err := ds.DB.Begin()
 	if err != nil {
 		return err
@@ -77,29 +77,27 @@ func (ds *DownloadStore) UpdateDownloadStatuses(ctx context.Context, updates []m
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for updates: %+v: %v", updates, rbErr)
+				logging.E("Panic rollback failed for updates: %+v: %v", update, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Failed to rollback transaction for updates: %+v (original error: %v): %v", updates, err, rbErr)
+				logging.E("Failed to rollback transaction for updates: %+v (original error: %v): %v", update, err, rbErr)
 			}
 		}
 	}()
 
 	// Execute individual updates within the transaction
-	for _, update := range updates {
-		normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
+	normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
 
-		query := squirrel.Update(consts.DBDownloads).
-			Set(consts.QDLStatus, update.Status).
-			Set(consts.QDLPct, update.Percent).
-			Where(squirrel.Eq{consts.QDLVidID: update.VideoID}).
-			RunWith(tx)
+	query := squirrel.Update(consts.DBDownloads).
+		Set(consts.QDLStatus, update.Status).
+		Set(consts.QDLPct, update.Percent).
+		Where(squirrel.Eq{consts.QDLVidID: update.VideoID}).
+		RunWith(tx)
 
-		if _, err := query.ExecContext(ctx); err != nil {
-			return fmt.Errorf("failed to update download status for video %q: %w", update.VideoURL, err)
-		}
+	if _, err := query.ExecContext(ctx); err != nil {
+		return fmt.Errorf("failed to update download status for video %q: %w", update.VideoURL, err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -117,7 +115,7 @@ func (ds *DownloadStore) GetDownloadStatus(v *models.Video) error {
 		Where(squirrel.Eq{consts.QDLVidID: v.ID}).
 		RunWith(ds.DB)
 
-	normalizeDownloadStatus(&v.DownloadStatus.Pct, &v.DownloadStatus.Status, v.ID)
+	normalizeDownloadStatus(&v.DownloadStatus.Percent, &v.DownloadStatus.Status, v.ID)
 	if err := query.QueryRow().Scan(&v); err != nil {
 		return fmt.Errorf("failed to query download statuses: %w", err)
 	}

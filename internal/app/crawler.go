@@ -226,7 +226,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			continue
 		}
 
-		// Get the ChannelURL model we stored earlier
+		// Get the ChannelURL model stored earlier
 		cu, exists := channelURLModels[channelURLID]
 		if !exists {
 			logging.E("Could not find ChannelURL model for ID %d", channelURLID)
@@ -528,7 +528,7 @@ func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *m
 	}
 
 	// Extract the eTLD+1 (effective top-level domain + 1 label)
-	// e.g., m.youtube.com -> youtube.com, www.bbc.co.uk -> bbc.co.uk
+	// e.g., m.google.com -> google.com, www.bbc.co.uk -> bbc.co.uk
 	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil
 		hostname = strings.ToLower(domain)
 	}

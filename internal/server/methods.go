@@ -5,17 +5,15 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 	"tubarr/internal/app"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
+	"tubarr/internal/state"
 	"tubarr/internal/utils/logging"
 
 	"github.com/Masterminds/squirrel"
 )
-
-var crawlLockMap sync.Map
 
 // startCrawlWatchdog constantly checks channels and runs crawls when they're due.
 //
@@ -66,34 +64,23 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 					c.Name, elapsed.Round(time.Second), interval)
 
 				if elapsed >= interval {
-
 					// -- Crawl launch in goroutine --
 					go func(ch *models.Channel) {
-						lockStateInterface, ok := crawlLockMap.Load(ch.Name)
-						if !ok {
-							crawlLockMap.Store(ch.Name, false)
-							if lockStateInterface, ok = crawlLockMap.Load(ch.Name); !ok {
-								logging.E("Failed to reload crawlLockMap state for channel %q after explicit setting to false", c.Name)
-								return
-							}
-						}
-						lockState, ok := lockStateInterface.(bool)
-						if !ok {
-							logging.E("Wrong type %T stored for channel %q lock state", lockState, ch.Name)
+						if state.CheckCrawlState(ch.Name) {
 							return
 						}
 
-						if !lockState {
-							crawlCtx, cancel := context.WithCancel(ctx)
-							defer cancel()
-							crawlLockMap.Store(ch.Name, true)
-							logging.I("Crawl watchdog: triggering scheduled crawl for channel %q", ch.Name)
-							if err := app.CrawlChannel(crawlCtx, ss.s, ss.cs, ch); err != nil {
-								logging.E("Crawl watchdog: error crawling channel %q: %v", ch.Name, err)
-							} else {
-								logging.S("Crawl watchdog: successfully completed crawl for channel %q", ch.Name)
-							}
-							crawlLockMap.Store(ch.Name, false)
+						state.LockCrawlState(ch.Name)
+						defer state.UnlockCrawlState(ch.Name)
+
+						crawlCtx, cancel := context.WithCancel(ctx)
+						defer cancel()
+
+						logging.I("Crawl watchdog: triggering scheduled crawl for channel %q", ch.Name)
+						if err := app.CrawlChannel(crawlCtx, ss.s, ss.cs, ch); err != nil {
+							logging.E("Crawl watchdog: error crawling channel %q: %v", ch.Name, err)
+						} else {
+							logging.S("Crawl watchdog: successfully completed crawl for channel %q", ch.Name)
 						}
 					}(c)
 				}
@@ -182,101 +169,53 @@ func (s *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) 
 	return videos, nil
 }
 
-// getActiveDownloads retrieves all currently downloading videos for a channel with their progress.
+// getActiveDownloads retrieves all currently downloading videos for a specific channel from the in-memory StatusUpdate map.
+//
+// This provides real-time updates without hitting the database on every poll.
 func (s *serverStore) getActiveDownloads(channel *models.Channel) ([]models.Video, error) {
-	const (
-		vDot = "v."
-		dDot = "d."
-	)
-	query := squirrel.
-		Select(
-			vDot+consts.QVidID,
-			vDot+consts.QVidChanID,
-			vDot+consts.QVidChanURLID,
-			vDot+consts.QVidThumbnailURL,
-			vDot+consts.QVidFinished,
-			vDot+consts.QVidURL,
-			vDot+consts.QVidTitle,
-			vDot+consts.QVidDescription,
-			vDot+consts.QVidUploadDate,
-			vDot+consts.QVidCreatedAt,
-			vDot+consts.QVidUpdatedAt,
-			dDot+consts.QDLStatus,
-			dDot+consts.QDLPct,
-		).
-		From(consts.DBVideos + " v").
-		InnerJoin(consts.DBDownloads + " d ON " + (vDot + consts.QVidID) + " = " + (dDot + consts.QDLVidID)).
-		Where(squirrel.Eq{(vDot + consts.QVidChanID): channel.ID}).
-		Where(squirrel.Or{
-			squirrel.Eq{(dDot + consts.QDLStatus): consts.DLStatusPending},
-			squirrel.Eq{(dDot + consts.QDLStatus): consts.DLStatusDownloading},
-		}).
-		OrderBy((dDot + consts.QDLCreatedAt) + " DESC")
-
-	sqlPlaceholder, args, err := query.PlaceholderFormat(squirrel.Question).ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build active downloads query: %w", err)
-	}
-
-	rows, err := s.db.Query(sqlPlaceholder, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query active downloads: %w", err)
-	}
-	defer rows.Close()
-
 	var videos []models.Video
-	for rows.Next() {
-		var video models.Video
-		var thumbnailURL sql.NullString
-		var description sql.NullString
-		var uploadDate sql.NullTime
-		var channelURLID sql.NullInt64
-		var dlStatus string
-		var dlPercentage float64
 
-		err := rows.Scan(
-			&video.ID,
-			&video.ChannelID,
-			&channelURLID,
-			&thumbnailURL,
-			&video.Finished,
-			&video.URL,
-			&video.Title,
-			&description,
-			&uploadDate,
-			&video.CreatedAt,
-			&video.UpdatedAt,
-			&dlStatus,
-			&dlPercentage,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan active download row: %w", err)
+	// Iterate through the in-memory StatusUpdate to find active downloads for this channel
+	state.StatusUpdate.Range(func(key, value any) bool {
+		videoID, ok := key.(int64)
+		if !ok {
+			logging.E("Dev Error: Invalid key type in StatusUpdate: %T", key)
+			return true // continue iteration
 		}
 
-		// Handle nullable fields
-		if channelURLID.Valid {
-			video.ChannelURLID = channelURLID.Int64
-		}
-		if thumbnailURL.Valid {
-			video.ThumbnailURL = thumbnailURL.String
-		}
-		if description.Valid {
-			video.Description = description.String
-		}
-		if uploadDate.Valid {
-			video.UploadDate = uploadDate.Time
+		statusUpdate, ok := value.(models.StatusUpdate)
+		if !ok {
+			logging.E("Dev Error: Invalid value type in StatusUpdate for video %d: %T", videoID, value)
+			return true // continue iteration
 		}
 
-		// Set download status
-		video.DownloadStatus.Status = consts.DownloadStatus(dlStatus)
-		video.DownloadStatus.Pct = dlPercentage
+		// Filter by channel ID directly from StatusUpdate
+		if statusUpdate.ChannelID != channel.ID {
+			return true
+		}
 
-		videos = append(videos, video)
-	}
+		// Only include Pending or Downloading statuses
+		if statusUpdate.Status == consts.DLStatusPending || statusUpdate.Status == consts.DLStatusDownloading {
+			// Build a Video model from the StatusUpdate
+			video := models.Video{
+				ID:           statusUpdate.VideoID,
+				Title:        statusUpdate.VideoTitle,
+				ChannelID:    statusUpdate.ChannelID,
+				ChannelURLID: statusUpdate.ChannelURLID,
+				URL:          statusUpdate.VideoURL,
+				DownloadStatus: models.DLStatus{
+					Status:  statusUpdate.Status,
+					Percent: statusUpdate.Percent,
+					Error:   statusUpdate.Error,
+				},
+			}
+			videos = append(videos, video)
+		}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating active download rows: %w", err)
-	}
+		return true // continue iteration
+	})
+
+	logging.D(1, "Found %d active downloads in memory for channel %d", len(videos), channel.ID)
 	return videos, nil
 }
 

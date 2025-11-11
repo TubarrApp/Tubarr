@@ -12,11 +12,11 @@ services:
       - "8827:8827"
     volumes:
       # Config directory (contains database, settings, etc.)
-      - ./tubarr-config:/config
+      - ./tubarr/config:/config
       # Downloaded videos
-      - ./tubarr-downloads:/downloads
+      - ./tubarr/downloads:/downloads
       # Metadata/JSON files
-      - ./tubarr-metadata:/metadata
+      - ./tubarr/metadata:/metadata
     environment:
       - TUBARR_HOME=/config
       - TZ=America/New_York  # Change to your timezone
@@ -30,14 +30,10 @@ services:
     #       cpus: '1.0'
     #       memory: 2G
     networks:
-      - tubarr-network
+      - host
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8827/"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 5s
-
-networks:
-  tubarr-network:
-    driver: bridge

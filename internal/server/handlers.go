@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
+	"tubarr/internal/state"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
@@ -79,6 +80,18 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse per-URL settings JSON if provided
+	urlSettingsMap := make(map[string]struct {
+		Settings *models.Settings   `json:"settings"`
+		Metarr   *models.MetarrArgs `json:"metarr"`
+	})
+	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
+		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsMap); err != nil {
+			http.Error(w, fmt.Sprintf("invalid url_settings JSON: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Add channel URLs
 	var chanURLs = make([]*models.ChannelURL, 0, len(urls))
 	for _, u := range urls {
@@ -94,7 +107,7 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 				parsedLoginURL = authMap[u].LoginURL
 			}
 
-			chanURLs = append(chanURLs, &models.ChannelURL{
+			chanURL := &models.ChannelURL{
 				URL:       u,
 				Username:  parsedUsername,
 				Password:  parsedPassword,
@@ -102,7 +115,15 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 				LastScan:  now,
 				CreatedAt: now,
 				UpdatedAt: now,
-			})
+			}
+
+			// Apply per-URL custom settings if they exist
+			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
+				chanURL.ChanURLSettings = urlSettings.Settings
+				chanURL.ChanURLMetarrArgs = urlSettings.Metarr
+			}
+
+			chanURLs = append(chanURLs, chanURL)
 		}
 	}
 
@@ -121,7 +142,7 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 		c.ChanSettings = &models.Settings{}
 	}
 
-	c.ChanMetarrArgs = getMetarrArgsStrings(w, r, c)
+	c.ChanMetarrArgs = getMetarrArgsStrings(w, r)
 	if c.ChanMetarrArgs == nil {
 		c.ChanMetarrArgs = &models.MetarrArgs{}
 	}
@@ -147,9 +168,228 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 
 // handleUpdateChannel updates parameters for a given channel.
 func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
+	// Get channel ID from URL
+	idStr := chi.URLParam(r, "id")
+	channelID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
+		return
+	}
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Get existing channel
+	existingChannel, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
+	// Update channel name if provided
+	name := r.FormValue("name")
+	if name != "" && name != existingChannel.Name {
+		if err := ss.cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
+			http.Error(w, fmt.Sprintf("failed to update channel name: %v", err), http.StatusInternalServerError)
+			return
+		}
+		existingChannel.Name = name
+	}
+
+	// Update channel settings
+	newSettings := getSettingsStrings(w, r)
+	if newSettings != nil {
+		_, err = ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+			*s = *newSettings
+			return nil
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to update channel settings: %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Update channel metarr args
+	newMetarr := getMetarrArgsStrings(w, r)
+	if newMetarr != nil {
+		_, err = ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
+			*m = *newMetarr
+			return nil
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to update channel metarr args: %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Handle URL updates
+	urls := strings.Fields(r.FormValue("urls"))
+	authDetails := strings.Fields(r.FormValue("auth_details"))
+	username := r.FormValue("username")
+	loginURL := r.FormValue("login_url")
+	password := r.FormValue("password")
+	now := time.Now()
+
+	// Parse authentication details
+	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parse per-URL settings JSON if provided
+	urlSettingsMap := make(map[string]struct {
+		Settings *models.Settings   `json:"settings"`
+		Metarr   *models.MetarrArgs `json:"metarr"`
+	})
+	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
+		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsMap); err != nil {
+			http.Error(w, fmt.Sprintf("invalid url_settings JSON: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Build map of existing URLs
+	existingURLMap := make(map[string]*models.ChannelURL)
+	for _, urlModel := range existingChannel.URLModels {
+		existingURLMap[urlModel.URL] = urlModel
+	}
+
+	// Build map of new URLs
+	newURLMap := make(map[string]bool)
+	for _, u := range urls {
+		if u != "" {
+			newURLMap[u] = true
+		}
+	}
+
+	// Delete URLs that are no longer in the list
+	for existingURL, urlModel := range existingURLMap {
+		if !newURLMap[existingURL] {
+			// URL was removed, delete it
+			if err := ss.cs.DeleteChannelURL(urlModel.ID); err != nil {
+				logging.E("Failed to delete channel URL %q: %v", existingURL, err)
+			}
+		}
+	}
+
+	// Add or update URLs
+	for _, u := range urls {
+		if u == "" {
+			continue
+		}
+
+		if _, err := url.Parse(u); err != nil {
+			http.Error(w, fmt.Sprintf("invalid channel URL %q: %v", u, err), http.StatusBadRequest)
+			return
+		}
+
+		var parsedUsername, parsedPassword, parsedLoginURL string
+		if _, exists := authMap[u]; exists {
+			parsedUsername = authMap[u].Username
+			parsedPassword = authMap[u].Password
+			parsedLoginURL = authMap[u].LoginURL
+		}
+
+		// Check if URL already exists
+		if existingURLModel, exists := existingURLMap[u]; exists {
+			// Update existing URL
+			existingURLModel.Username = parsedUsername
+			existingURLModel.Password = parsedPassword
+			existingURLModel.LoginURL = parsedLoginURL
+			existingURLModel.UpdatedAt = now
+
+			// Apply per-URL custom settings if they exist
+			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
+				existingURLModel.ChanURLSettings = urlSettings.Settings
+				existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
+			}
+
+			if err := ss.cs.UpdateChannelURLSettings(existingURLModel); err != nil {
+				http.Error(w, fmt.Sprintf("failed to update URL %q: %v", u, err), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			// Add new URL
+			chanURL := &models.ChannelURL{
+				URL:       u,
+				Username:  parsedUsername,
+				Password:  parsedPassword,
+				LoginURL:  parsedLoginURL,
+				LastScan:  now,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+
+			// Apply per-URL custom settings if they exist
+			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
+				chanURL.ChanURLSettings = urlSettings.Settings
+				chanURL.ChanURLMetarrArgs = urlSettings.Metarr
+			}
+
+			if _, err := ss.cs.AddChannelURL(channelID, chanURL, true); err != nil {
+				http.Error(w, fmt.Sprintf("failed to add URL %q: %v", u, err), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Channel updated successfully"))
+}
+
+// handleUpdateChannelURLSettings updates parameters for a given channel URL.
+func handleUpdateChannelURLSettings(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	cURLStr := chi.URLParam(r, "channel_url")
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
+		return
+	}
+
+	cURL, found, err := ss.cs.GetChannelURLModel(id, cURLStr)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel URL not found", http.StatusNotFound)
+		return
+	}
+
+	cURL.ChanURLSettings = getSettingsStrings(w, r)
+	cURL.ChanURLMetarrArgs = getMetarrArgsStrings(w, r)
+
+	if err := ss.cs.UpdateChannelURLSettings(cURL); err != nil {
+		http.Error(w, fmt.Sprintf("Could not update channel URL %q Metarr Arguments: %v", cURL.URL, err), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Updated channel URL in channel " + idStr))
+}
+
+// handleDeleteChannelURL deletes a URL for a given channel.
+func handleDeleteChannelURL(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Updated channel " + id))
+	w.Write([]byte("Updated channel URL " + id))
+}
+
+// handleAddChannelURL deletes a URL for a given channel.
+func handleAddChannelURL(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Added channel URL for channel " + id))
 }
 
 // handleDeleteChannel deletes a channel from Tubarr.
@@ -242,7 +482,7 @@ func handleGetDownloads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get active downloads with progress
+	// Get active downloads with progress (filtered by channel in memory, no DB query!)
 	videos, err := ss.getActiveDownloads(c)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve active downloads for channel %q: %v", c.Name, err), http.StatusInternalServerError)
@@ -301,23 +541,12 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lockStateInterface, ok := crawlLockMap.Load(c.Name)
-	if !ok {
-		crawlLockMap.Store(c.Name, false)
-		if lockStateInterface, ok = crawlLockMap.Load(c.Name); !ok {
-			http.Error(w, fmt.Sprintf("Failed to reload crawlLockMap state for channel %q after explicit setting to false", c.Name), http.StatusInternalServerError)
-			return
-		}
-	}
-	lockState, ok := lockStateInterface.(bool)
-	if !ok {
-		http.Error(w, fmt.Sprintf("Wrong type %T stored for channel %q lock state", lockState, c.Name), http.StatusInternalServerError)
-		return
-	}
-
 	// Start crawl in background
-	if !lockState {
+	if !state.CheckCrawlState(c.Name) {
+		state.LockCrawlState(c.Name)
 		go func() {
+			defer state.UnlockCrawlState(c.Name)
+
 			ctx := context.Background()
 			logging.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
 			if err := app.CrawlChannel(ctx, ss.s, ss.cs, c); err != nil {
@@ -331,7 +560,7 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"message": "Channel crawl started"}`))
 		return
 	}
-	w.WriteHeader(http.StatusAccepted)
+	w.WriteHeader(http.StatusAlreadyReported)
 	w.Write([]byte(`{"message": "Channel crawl already running for channel"}`))
 }
 
@@ -354,7 +583,6 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
 }
@@ -496,7 +724,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 }
 
 // getMetarrArgsStrings retrieves MetarrArgs model strings, converting where needed.
-func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request, c *models.Channel) *models.MetarrArgs {
+func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.MetarrArgs {
 	// -- Initialize --
 	// Strings not needing validation
 	outExt := r.FormValue("metarr_output_ext")

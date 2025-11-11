@@ -139,7 +139,8 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 		}
 
 		// Insert or update download status using SQLite UPSERT (INSERT ... ON CONFLICT)
-		// We use raw SQL because Squirrel doesn't support ON CONFLICT clause natively
+		//
+		// Squirrel doesn't support ON CONFLICT clause natively
 		sqlQuery := `
 			INSERT INTO ` + consts.DBDownloads + ` (` + consts.QDLVidID + `, ` + consts.QDLStatus + `, ` + consts.QDLPct + `, ` + consts.QDLCreatedAt + `, ` + consts.QDLUpdatedAt + `)
 			VALUES (?, ?, ?, ?, ?)
@@ -148,7 +149,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 				` + consts.QDLPct + ` = excluded.` + consts.QDLPct + `,
 				` + consts.QDLUpdatedAt + ` = excluded.` + consts.QDLUpdatedAt + `
 		`
-		if _, err := tx.Exec(sqlQuery, v.ID, v.DownloadStatus.Status, v.DownloadStatus.Pct, now, now); err != nil {
+		if _, err := tx.Exec(sqlQuery, v.ID, v.DownloadStatus.Status, v.DownloadStatus.Percent, now, now); err != nil {
 			errs = append(errs, fmt.Errorf("failed to insert/update download status for video %d: %w", v.ID, err))
 		}
 	}
@@ -248,11 +249,11 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	v.ID = videoID
 
 	// Insert into downloads table
-	logging.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Pct)
+	logging.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
 
 	dlSQL, dlArgs, err := squirrel.Insert(consts.DBDownloads).
 		Columns(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
-		Values(videoID, v.DownloadStatus.Status, v.DownloadStatus.Pct).
+		Values(videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent).
 		ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("failed to build download insert SQL: %w", err)
@@ -334,7 +335,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	dlQuery := squirrel.
 		Update(consts.DBDownloads).
 		Set(consts.QDLStatus, v.DownloadStatus.Status).
-		Set(consts.QDLPct, v.DownloadStatus.Pct).
+		Set(consts.QDLPct, v.DownloadStatus.Percent).
 		Where(squirrel.Eq{consts.QDLVidID: v.ID}).
 		RunWith(tx)
 

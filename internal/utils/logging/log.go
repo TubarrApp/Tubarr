@@ -29,27 +29,27 @@ var (
 )
 
 // LogBuilder wraps strings.Builder for logging with automatic pooling.
-type LogBuilder struct {
+type logBuilder struct {
 	*strings.Builder
 }
 
 var logBuilderPool = sync.Pool{
 	New: func() any {
-		return &LogBuilder{
+		return &logBuilder{
 			Builder: &strings.Builder{},
 		}
 	},
 }
 
 // getLogBuilder retrieves a builder from the pool.
-func getLogBuilder() *LogBuilder {
-	lb := logBuilderPool.Get().(*LogBuilder)
+func getLogBuilder() *logBuilder {
+	lb := logBuilderPool.Get().(*logBuilder)
 	lb.Reset()
 	return lb
 }
 
 // Release returns the builder to the pool.
-func (lb *LogBuilder) Release() {
+func (lb *logBuilder) Release() {
 	if lb == nil || lb.Builder == nil {
 		return
 	}

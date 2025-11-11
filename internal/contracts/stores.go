@@ -35,6 +35,7 @@ type ChannelStore interface {
 
 	// Delete operations.
 	DeleteChannel(key, val string) error
+	DeleteChannelURL(channelURLID int64) error
 	DeleteVideoURLs(channelID int64, urls []string) error
 	DeleteNotifyURLs(channelID int64, urls, names []string) error
 
@@ -60,7 +61,7 @@ type DownloadStore interface {
 
 	// Update operations.
 	SetDownloadStatus(v *models.Video) error
-	UpdateDownloadStatuses(ctx context.Context, updates []models.StatusUpdate) error
+	UpdateDownloadStatus(ctx context.Context, update models.StatusUpdate) error
 
 	// Cancel operations.
 	CancelDownload(videoID int64, videoURL string) bool

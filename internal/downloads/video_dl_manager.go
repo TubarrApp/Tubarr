@@ -98,7 +98,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 				}
 			} else {
 				d.Video.DownloadStatus.Status = consts.DLStatusCompleted
-				d.Video.DownloadStatus.Pct = 100.0
+				d.Video.DownloadStatus.Percent = 100.0
 				d.Video.DownloadStatus.Error = nil
 				d.Video.UpdatedAt = time.Now()
 
@@ -120,7 +120,7 @@ func (d *VideoDownload) videoDLAttempt() error {
 
 	// Set video "Pending" status
 	d.Video.DownloadStatus.Status = consts.DLStatusPending
-	d.Video.DownloadStatus.Pct = 0.0
+	d.Video.DownloadStatus.Percent = 0.0
 	d.DLTracker.sendUpdate(d.Video)
 
 	// Execute the video download

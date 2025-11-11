@@ -3,10 +3,10 @@ package downloads
 import (
 	"context"
 	"database/sql"
-	"time"
+	"errors"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
+	"tubarr/internal/state"
 	"tubarr/internal/utils/logging"
 )
 
@@ -49,67 +49,77 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 		return
 	}
 
-	t.updates <- models.StatusUpdate{
-		VideoID:  v.ID,
-		VideoURL: v.URL,
-		Status:   v.DownloadStatus.Status,
-		Percent:  v.DownloadStatus.Pct,
-		Error:    v.DownloadStatus.Error,
+	select {
+	case <-t.done:
+		logging.W("Attempted to send update after tracker stopped (Video %q)", v.URL)
+		return
+	default:
+		t.updates <- models.StatusUpdate{
+			VideoID:      v.ID,
+			VideoTitle:   v.Title,
+			ChannelID:    v.ChannelID,
+			ChannelURLID: v.ChannelURLID,
+			VideoURL:     v.URL,
+			Status:       v.DownloadStatus.Status,
+			Percent:      v.DownloadStatus.Percent,
+			Error:        v.DownloadStatus.Error,
+		}
 	}
 }
 
 // processUpdates processes download status updates.
 func (t *DownloadTracker) processUpdates(ctx context.Context) {
-	var lastUpdate models.StatusUpdate
 	for {
 		select {
 		case <-t.done:
-			if lastUpdate.VideoID != 0 {
-				t.flushUpdates(ctx, []models.StatusUpdate{lastUpdate})
-			}
+			state.StatusUpdate.Range(func(_, v any) bool {
+				update, ok := v.(models.StatusUpdate)
+				if ok {
+					if err := t.dlStore.UpdateDownloadStatus(ctx, update); err != nil {
+						logging.E("Failed to store final update for video %q: %v", update.VideoURL, err)
+					}
+				}
+				return true
+			})
 			return
 
 		case update := <-t.updates:
-			if update != lastUpdate {
-				if update.Percent > lastUpdate.Percent { // If percentage has increased, assume error cleared.
-					update.Error = nil
-				}
-				lastUpdate = update
+			logging.I("Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n",
+				update.VideoURL, update.Status, update.Percent, update.Error)
+			t.flushUpdates(ctx, update)
 
-				logging.I("Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n",
-					update.VideoURL, update.Status, update.Percent, update.Error)
-				t.flushUpdates(ctx, []models.StatusUpdate{update})
-			}
 		}
 	}
 }
 
 // flushUpdates flushes pending download status updates to the database.
-func (t *DownloadTracker) flushUpdates(ctx context.Context, updates []models.StatusUpdate) {
-	if len(updates) == 0 {
+func (t *DownloadTracker) flushUpdates(ctx context.Context, update models.StatusUpdate) {
+	lastUpdate, success := state.GetStatusUpdate(update)
+	if !success {
+		logging.E("Could not get download state for video %q", update.VideoURL)
+	}
+
+	// Normalize percentage
+	update.Percent = min(update.Percent, 100.0)
+
+	// Check if state is different
+	if update.Status == lastUpdate.Status &&
+		update.Percent == lastUpdate.Percent &&
+		errors.Is(update.Error, lastUpdate.Error) {
 		return
 	}
 
-	// Add context with timeout
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	// Retry logic for transient failures
-	backoff := consts.Interval100ms
-	maxRetries := 3
-
-	for attempt := range maxRetries {
-		if err := t.dlStore.UpdateDownloadStatuses(ctx, updates); err != nil {
-			if attempt == maxRetries-1 {
-				logging.E("Failed to update download statuses after %d attempts: %v", maxRetries, err)
-				return
-			}
-			logging.W("Retrying update after failure (attempt %d/%d): %v",
-				attempt+1, maxRetries, err)
-			time.Sleep(backoff * time.Duration(attempt+1))
-			continue
-		}
-		break
+	// If percentage has increased, assume error cleared.
+	if update.Percent > lastUpdate.Percent && lastUpdate.Error != nil {
+		update.Error = nil
 	}
-	logging.D(2, "Successfully flushed %d status updates", len(updates))
+
+	// Write to map and database.
+	state.SetStatusUpdate(update.VideoID, update)
+
+	if update.Percent == 100.0 || lastUpdate.Status != update.Status {
+		if err := t.dlStore.UpdateDownloadStatus(ctx, update); err != nil {
+			logging.E("Failed to store update for video %q in database", update.VideoURL)
+		}
+	}
 }

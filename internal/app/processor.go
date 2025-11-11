@@ -272,7 +272,7 @@ func processJSON(
 
 	// Will download this video (passed checks)
 	v.DownloadStatus.Status = consts.DLStatusPending
-	v.DownloadStatus.Pct = 0.0
+	v.DownloadStatus.Percent = 0.0
 	logging.D(1, "Setting video %q to Pending status before saving to DB", v.URL)
 
 	// Save video to database

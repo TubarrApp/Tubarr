@@ -359,6 +359,26 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chan
 	return cu, true, nil
 }
 
+// DeleteChannelURL deletes a channel URL from the database.
+func (cs *ChannelStore) DeleteChannelURL(channelURLID int64) error {
+	cuIDStr := strconv.FormatInt(channelURLID, 10)
+	if !cs.channelURLExists(consts.QChanURLID, cuIDStr) {
+		return fmt.Errorf("channel URL with ID %d does not exist in the database", channelURLID)
+	}
+
+	query := squirrel.
+		Delete(consts.DBChannelURLs).
+		Where(squirrel.Eq{consts.QChanURLID: channelURLID}).
+		RunWith(cs.DB)
+
+	if _, err := query.Exec(); err != nil {
+		return fmt.Errorf("failed to delete channel URL ID %d: %w", channelURLID, err)
+	}
+
+	logging.S("Deleted channel URL ID %d", channelURLID)
+	return nil
+}
+
 // DeleteChannelURLAuth strips a Channel URL of authentication details when decryption key is empty.
 func (cs *ChannelStore) DeleteChannelURLAuth(cu *models.ChannelURL) error {
 	cuIDStr := strconv.FormatInt(cu.ID, 10)

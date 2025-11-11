@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 	"tubarr/internal/abstractions"
@@ -17,20 +16,9 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/downloads/downloaders"
-	"tubarr/internal/models"
+	"tubarr/internal/state"
 	"tubarr/internal/utils/logging"
 )
-
-// VideoDownloadState represents the current state of a video's download.
-type VideoDownloadState struct {
-	TotalFrags     int
-	CompletedFrags int
-	URL            string
-	Percentage     float64
-	Status         consts.DownloadStatus
-}
-
-var states sync.Map
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
 func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
@@ -218,14 +206,14 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	// Wait for the command to finish
 	if err := cmd.Wait(); err != nil {
-		// If we already have a parse error, return that (more specific)
+		// Return parse error if present
 		if parseErr != nil {
 			return parseErr
 		}
 		return fmt.Errorf("yt-dlp failed: %w", err)
 	}
 
-	// If we have a filename, verify it
+	// Verify filename
 	if filename != "" {
 		// Ensure file is fully written
 		if err := d.waitForFile(d.Video.VideoPath, 10*time.Second); err != nil {
@@ -243,34 +231,21 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 	defer close(filenameChan)
 	defer close(errChan)
 
-	// Try to load existing state
-	val, ok := states.Load(d.Video.URL)
-	var state *VideoDownloadState
-	if ok {
-		state = val.(*VideoDownloadState)
-	} else {
-		state = &VideoDownloadState{
-			URL:        d.Video.URL,
-			Percentage: d.Video.DownloadStatus.Pct,
-			Status:     d.Video.DownloadStatus.Status,
-		}
-		states.Store(d.Video.URL, state)
+	// Check if video is already downloading
+	if state.VideoDownloadStatusExists(d.Video.ID) {
+		errChan <- fmt.Errorf("video with ID %d is already downloading (URL: %q)", d.Video.ID, d.Video.URL)
+		return
 	}
 
-	lastUpdate := models.StatusUpdate{
-		VideoID:  d.Video.ID,
-		VideoURL: d.Video.URL,
-		Status:   state.Status,
-		Percent:  state.Percentage,
-		Error:    nil,
-	}
+	// Save state to map (locks from other downloads until deletion from map)
+	state.SetVideoDownloadStatus(d.Video.ID, d.Video.DownloadStatus)
+	defer state.DeleteVideoDownloadStatus(d.Video.ID)
 
 	var (
 		totalItemsFound, totalDownloadedItems int
 		completed                             bool
 		errorLines                            []string
 	)
-
 	for line := range lineChan {
 		if line != "" {
 			logging.D(4, "Video %d download terminal output: %q", d.Video.ID, line)
@@ -292,29 +267,15 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		// Aria2 progress parsing
 		if d.DLTracker.downloader == command.DownloaderAria {
 			gotLine, itemsFound, downloadedItems, pct, status :=
-				downloaders.Aria2OutputParser(line, totalItemsFound, totalDownloadedItems, state.Percentage, state.Status)
+				downloaders.Aria2OutputParser(line, totalItemsFound, totalDownloadedItems, d.Video.DownloadStatus.Percent, d.Video.DownloadStatus.Status)
 
 			totalItemsFound = itemsFound
 			totalDownloadedItems = downloadedItems
 
 			if gotLine {
-				state.Percentage = pct
-				state.Status = status
-
-				newUpdate := models.StatusUpdate{
-					VideoID:  d.Video.ID,
-					VideoURL: d.Video.URL,
-					Status:   state.Status,
-					Percent:  state.Percentage,
-					Error:    d.Video.DownloadStatus.Error,
-				}
-
-				if newUpdate != lastUpdate {
-					d.Video.DownloadStatus.Status = newUpdate.Status
-					d.Video.DownloadStatus.Pct = newUpdate.Percent
-					d.DLTracker.sendUpdate(d.Video)
-					lastUpdate = newUpdate
-				}
+				d.Video.DownloadStatus.Status = status
+				d.Video.DownloadStatus.Percent = pct
+				d.DLTracker.sendUpdate(d.Video)
 			}
 		}
 
@@ -322,13 +283,11 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		if !completed && strings.HasPrefix(line, "/") {
 			ext := filepath.Ext(line)
 			for _, validExt := range consts.AllVidExtensions {
-				if ext == validExt {
-					// Update local state for tracking
-					state.Status = consts.DLStatusCompleted
-					state.Percentage = 100.0
-
-					// Safe delete
-					states.Delete(d.Video.URL)
+				if ext == validExt { // Download succeeded
+					// Set model to complete
+					d.Video.DownloadStatus.Status = consts.DLStatusCompleted
+					d.Video.DownloadStatus.Percent = 100.0
+					d.DLTracker.sendUpdate(d.Video)
 
 					filenameChan <- line
 					completed = true
@@ -338,7 +297,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		}
 	}
 
-	// If download wasn't completed and we collected errors, send them
+	// Send errors if download failed
 	if !completed && len(errorLines) > 0 {
 		// Limit to last 5 error lines to avoid overwhelming the error message
 		if len(errorLines) > 5 {

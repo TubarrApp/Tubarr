@@ -36,7 +36,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Update settings for URL(s) within a channel.",
 		Long:  "Update settings for a specific channel URL, or all URLs if --url is not specified. Use --reset-settings to clear URL-specific overrides and inherit from channel defaults.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Validate we have either channel name or ID
+			// Validate channel name or ID is present
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				return err

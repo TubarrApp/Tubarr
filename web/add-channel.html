@@ -539,78 +539,231 @@
                       </div>
 
                       <!-- Custom Settings (shown when hasCustomSettings is true) -->
-                      <div x-show="urlEntry.hasCustomSettings" class="mt-4 p-4 border border-gray-300 dark:border-gray-700 rounded-lg space-y-4 bg-gray-50 dark:bg-gray-800/50">
-                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Custom Settings for this URL</p>
-
-                        <!-- Custom Output Directory -->
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Custom Output Directory (Metarr)
-                          </label>
-                          <input
-                            type="text"
-                            x-model="urlEntry.customOutputDir"
-                            placeholder="/path/to/output/for/this/url"
-                            class="w-full h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:outline-hidden dark:border-gray-600 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                          />
-                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Videos from this URL will be output here after Metarr processing</p>
+                      <div x-show="urlEntry.hasCustomSettings" x-data="{ urlTab: 'overview' }" class="mt-4 p-4 border-2 border-brand-500 dark:border-brand-600 rounded-lg space-y-3 bg-blue-50 dark:bg-blue-900/20">
+                        <div class="flex items-center justify-between">
+                          <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">🔧 Per-URL Override Settings</p>
+                          <p class="text-xs text-gray-600 dark:text-gray-400">(Leave empty to use global)</p>
                         </div>
 
-                        <!-- Custom Filters -->
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Custom Filters
-                          </label>
-                          <textarea
-                            x-model="urlEntry.customFilters"
-                            rows="2"
-                            placeholder="title:contains:specific:must"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:outline-hidden dark:border-gray-600 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
-                          ></textarea>
-                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Filters specific to this URL (one per line)</p>
+                        <!-- Per-URL Tabs -->
+                        <div class="border-b border-gray-300 dark:border-gray-600">
+                          <nav class="flex flex-wrap gap-1">
+                            <button type="button" @click="urlTab = 'overview'" :class="urlTab === 'overview' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs font-medium rounded-t">Overview</button>
+                            <button type="button" @click="urlTab = 'basic'" :class="urlTab === 'basic' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Basic</button>
+                            <button type="button" @click="urlTab = 'advanced'" :class="urlTab === 'advanced' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Advanced</button>
+                            <button type="button" @click="urlTab = 'metarr'" :class="urlTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Metarr</button>
+                          </nav>
                         </div>
 
-                        <!-- Custom Move Operations -->
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Custom Move Operations
-                          </label>
-                          <textarea
-                            x-model="urlEntry.customMoveOps"
-                            rows="2"
-                            placeholder="title:keyword:/custom/path"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:outline-hidden dark:border-gray-600 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
-                          ></textarea>
-                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Move operations specific to this URL (one per line)</p>
+                        <!-- Overview Tab -->
+                        <div x-show="urlTab === 'overview'" class="text-xs text-gray-700 dark:text-gray-300 space-y-2">
+                          <p class="font-medium">This URL can override ANY global channel setting.</p>
+                          <ul class="list-disc list-inside space-y-1 ml-2">
+                            <li><strong>Basic:</strong> Directories, concurrency, retries, filesize, filters</li>
+                            <li><strong>Advanced:</strong> YT-DLP settings, external downloaders, move operations</li>
+                            <li><strong>Metarr:</strong> Output directory, transcoding, meta/filename operations</li>
+                          </ul>
+                          <p class="mt-2 text-brand-600 dark:text-brand-400">💡 Any field left empty will use the global channel setting.</p>
                         </div>
 
-                        <!-- Custom Meta Operations -->
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Custom Meta Operations
-                          </label>
-                          <textarea
-                            x-model="urlEntry.customMetaOps"
-                            rows="2"
-                            placeholder="artist:set:Custom Artist"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:outline-hidden dark:border-gray-600 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
-                          ></textarea>
-                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Metarr metadata operations for this URL (one per line)</p>
+                        <!-- Basic Tab for This URL -->
+                        <div x-show="urlTab === 'basic'" class="space-y-2">
+                          <div class="grid grid-cols-2 gap-2">
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Directory</label>
+                              <input type="text" x-model="urlEntry.custom.video_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">JSON Directory</label>
+                              <input type="text" x-model="urlEntry.custom.json_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Concurrency</label>
+                              <input type="number" x-model.number="urlEntry.custom.max_concurrency" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Crawl Frequency (min)</label>
+                              <input type="number" x-model.number="urlEntry.custom.crawl_freq" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Download Retries</label>
+                              <input type="number" x-model.number="urlEntry.custom.download_retries" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Filesize</label>
+                              <input type="text" x-model="urlEntry.custom.max_filesize" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">From Date</label>
+                              <input type="text" x-model="urlEntry.custom.from_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">To Date</label>
+                              <input type="text" x-model="urlEntry.custom.to_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div class="col-span-2">
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Channel Config File</label>
+                              <input type="text" x-model="urlEntry.custom.channel_config_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div class="col-span-2">
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filter File</label>
+                              <input type="text" x-model="urlEntry.custom.filter_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filters (one per line)</label>
+                            <textarea x-model="urlEntry.custom.filters" rows="3" placeholder="title:contains:keyword:must" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
                         </div>
 
-                        <!-- Custom Filename Operations -->
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Custom Filename Operations
-                          </label>
-                          <textarea
-                            x-model="urlEntry.customFilenameOps"
-                            rows="2"
-                            placeholder="prefix:[CUSTOM] "
-                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:outline-hidden dark:border-gray-600 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
-                          ></textarea>
-                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Metarr filename operations for this URL (one per line)</p>
+                        <!-- Advanced Tab for This URL -->
+                        <div x-show="urlTab === 'advanced'" class="space-y-2">
+                          <div class="grid grid-cols-2 gap-2">
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">YT-DLP Output Ext</label>
+                              <select x-model="urlEntry.custom.ytdlp_output_ext" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Use global</option>
+                                <option value="mp4">mp4</option>
+                                <option value="mkv">mkv</option>
+                                <option value="webm">webm</option>
+                                <option value="avi">avi</option>
+                                <option value="flv">flv</option>
+                                <option value="mov">mov</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Cookies From Browser</label>
+                              <input type="text" x-model="urlEntry.custom.cookies_from_browser" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader</label>
+                              <input type="text" x-model="urlEntry.custom.external_downloader" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader Args</label>
+                              <input type="text" x-model="urlEntry.custom.external_downloader_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Meta Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Move Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.move_ops_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Move Operations (one per line)</label>
+                            <textarea x-model="urlEntry.custom.move_ops" rows="2" placeholder="title:keyword:/path" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
                         </div>
+
+                        <!-- Metarr Tab for This URL -->
+                        <div x-show="urlTab === 'metarr'" class="space-y-2">
+                          <div class="grid grid-cols-2 gap-2">
+                            <div class="col-span-2">
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Directory</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_output_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
+                              <select x-model="urlEntry.custom.metarr_output_ext" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Use global</option>
+                                <option value="avi">avi</option>
+                                <option value="flv">flv</option>
+                                <option value="mkv">mkv</option>
+                                <option value="mov">mov</option>
+                                <option value="mp4">mp4</option>
+                                <option value="webm">webm</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Rename Style</label>
+                              <select x-model="urlEntry.custom.metarr_rename_style" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Use global</option>
+                                <option value="spaces">Spaces</option>
+                                <option value="underscores">Underscores</option>
+                                <option value="fixes-only">Fixes Only</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Concurrency</label>
+                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
+                              <input type="number" x-model.number="urlEntry.custom.metarr_max_cpu_usage" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Min Free Memory</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_min_free_mem" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_gpu" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Codec</label>
+                              <select x-model="urlEntry.custom.metarr_transcode_codec" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Use global</option>
+                                <option value="av1">AV1</option>
+                                <option value="h264">H.264</option>
+                                <option value="hevc">HEVC (H.265)</option>
+                                <option value="mpeg2">MPEG-2</option>
+                                <option value="vp8">VP8</option>
+                                <option value="vp9">VP9</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Audio Codec</label>
+                              <select x-model="urlEntry.custom.metarr_transcode_audio_codec" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Use global</option>
+                                <option value="aac">AAC</option>
+                                <option value="ac3">AC3</option>
+                                <option value="alac">ALAC</option>
+                                <option value="dts">DTS</option>
+                                <option value="eac3">EAC3</option>
+                                <option value="flac">FLAC</option>
+                                <option value="mp3">MP3</option>
+                                <option value="opus">Opus</option>
+                                <option value="vorbis">Vorbis</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
+                              <input type="number" x-model.number="urlEntry.custom.metarr_transcode_quality" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div class="col-span-2">
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Video Filter</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_transcode_video_filter" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                            <div class="col-span-2">
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_extra_ffmpeg_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            </div>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Meta Operations (one per line)</label>
+                            <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" placeholder="artist:set:Value" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filename Operations (one per line)</label>
+                            <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" placeholder="prefix:[PREFIX] " class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line)</label>
+                            <textarea x-model="urlEntry.custom.filtered_meta_ops" rows="2" placeholder="filter_rule|meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line)</label>
+                            <textarea x-model="urlEntry.custom.filtered_filename_ops" rows="2" placeholder="filter_rule|filename_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                        </div>
+
                       </div>
                     </div>
                   </template>
@@ -1277,7 +1430,7 @@
                         <textarea
                           x-model="formData.notifications"
                           rows="6"
-                          placeholder="http://plex:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex Library&#10;https://example.com/webhook|My Webhook&#10;https://youtube.com/@channel|http://notify.com/hook|YouTube Only"
+                          placeholder="http://plex:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex Library&#10;https://example.com/webhook|My Webhook&#10;https://tubesite.com/@channel|http://notify.com/hook|Tube Site Only"
                           class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
                         ></textarea>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -1333,11 +1486,46 @@
                 password: '',
                 loginURL: '',
                 hasCustomSettings: false,
-                customOutputDir: '',
-                customFilters: '',
-                customMoveOps: '',
-                customMetaOps: '',
-                customFilenameOps: ''
+                custom: {
+                  // Basic settings
+                  video_directory: '',
+                  json_directory: '',
+                  max_concurrency: null,
+                  crawl_freq: null,
+                  download_retries: null,
+                  max_filesize: '',
+                  from_date: '',
+                  to_date: '',
+                  channel_config_file: '',
+                  filter_file: '',
+                  filters: '',
+                  // Advanced settings
+                  ytdlp_output_ext: '',
+                  cookies_from_browser: '',
+                  external_downloader: '',
+                  external_downloader_args: '',
+                  extra_ytdlp_video_args: '',
+                  extra_ytdlp_meta_args: '',
+                  move_ops_file: '',
+                  move_ops: '',
+                  // Metarr settings
+                  metarr_output_directory: '',
+                  metarr_output_ext: '',
+                  metarr_rename_style: '',
+                  metarr_concurrency: null,
+                  metarr_max_cpu_usage: null,
+                  metarr_min_free_mem: '',
+                  metarr_gpu: '',
+                  metarr_transcode_codec: '',
+                  metarr_transcode_audio_codec: '',
+                  metarr_transcode_quality: null,
+                  metarr_transcode_video_filter: '',
+                  metarr_extra_ffmpeg_args: '',
+                  metarr_meta_ops: '',
+                  metarr_filename_ops: '',
+                  filtered_meta_ops: '',
+                  filtered_filename_ops: ''
+                }
               }
             ],
             settings: {
@@ -1398,11 +1586,43 @@
               password: '',
               loginURL: '',
               hasCustomSettings: false,
-              customOutputDir: '',
-              customFilters: '',
-              customMoveOps: '',
-              customMetaOps: '',
-              customFilenameOps: ''
+              custom: {
+                video_directory: '',
+                json_directory: '',
+                max_concurrency: null,
+                crawl_freq: null,
+                download_retries: null,
+                max_filesize: '',
+                from_date: '',
+                to_date: '',
+                channel_config_file: '',
+                filter_file: '',
+                filters: '',
+                ytdlp_output_ext: '',
+                cookies_from_browser: '',
+                external_downloader: '',
+                external_downloader_args: '',
+                extra_ytdlp_video_args: '',
+                extra_ytdlp_meta_args: '',
+                move_ops_file: '',
+                move_ops: '',
+                metarr_output_directory: '',
+                metarr_output_ext: '',
+                metarr_rename_style: '',
+                metarr_concurrency: null,
+                metarr_max_cpu_usage: null,
+                metarr_min_free_mem: '',
+                metarr_gpu: '',
+                metarr_transcode_codec: '',
+                metarr_transcode_audio_codec: '',
+                metarr_transcode_quality: null,
+                metarr_transcode_video_filter: '',
+                metarr_extra_ffmpeg_args: '',
+                metarr_meta_ops: '',
+                metarr_filename_ops: '',
+                filtered_meta_ops: '',
+                filtered_filename_ops: ''
+              }
             });
           },
 
@@ -1436,13 +1656,11 @@
                   .join(' ');
               }
 
-              // Build per-URL custom settings
-              const perURLData = this.buildPerURLSettings();
-              if (perURLData.filters) payload.filters = this.combineWithGlobal(payload.filters, perURLData.filters);
-              if (perURLData.move_ops) payload.move_ops = this.combineWithGlobal(payload.move_ops, perURLData.move_ops);
-              if (perURLData.metarr_meta_ops) payload.metarr_meta_ops = this.combineWithGlobal(payload.metarr_meta_ops, perURLData.metarr_meta_ops);
-              if (perURLData.metarr_filename_ops) payload.metarr_filename_ops = this.combineWithGlobal(payload.metarr_filename_ops, perURLData.metarr_filename_ops);
-              if (perURLData.url_output_dirs) payload.url_output_dirs = perURLData.url_output_dirs;
+              // Build per-URL custom settings as JSON object
+              const perURLSettings = this.buildPerURLSettingsJSON();
+              if (Object.keys(perURLSettings).length > 0) {
+                payload.url_settings = JSON.stringify(perURLSettings);
+              }
 
               // Convert textarea content (newlines) to space-separated for backend
               if (payload.filters && payload.filters.includes('\n')) {
@@ -1520,78 +1738,72 @@
             return authEntries.join(' ');
           },
 
-          buildPerURLSettings() {
-            // Build per-URL custom settings with channel URL prefix
-            const perURL = {
-              filters: [],
-              move_ops: [],
-              metarr_meta_ops: [],
-              metarr_filename_ops: [],
-              url_output_dirs: []
-            };
+          buildPerURLSettingsJSON() {
+            // Build per-URL custom settings as structured JSON
+            // Format: { "channel_url": { settings: {...}, metarr: {...} } }
+            const perURL = {};
 
             this.formData.urls.forEach(urlEntry => {
-              if (urlEntry.hasCustomSettings && urlEntry.url) {
+              if (urlEntry.hasCustomSettings && urlEntry.url && urlEntry.custom) {
                 const channelURL = urlEntry.url;
+                const settings = {};
+                const metarr = {};
 
-                // Custom filters with URL prefix
-                if (urlEntry.customFilters && urlEntry.customFilters.trim()) {
-                  const filters = urlEntry.customFilters.split('\n')
-                    .map(f => f.trim())
-                    .filter(f => f)
-                    .map(f => `${channelURL}|${f}`);
-                  perURL.filters.push(...filters);
-                }
+                // Process basic/advanced settings
+                const settingsFields = [
+                  'video_directory', 'json_directory', 'max_concurrency', 'crawl_freq',
+                  'download_retries', 'max_filesize', 'from_date', 'to_date',
+                  'channel_config_file', 'filter_file', 'filters',
+                  'ytdlp_output_ext', 'cookies_from_browser',
+                  'external_downloader', 'external_downloader_args',
+                  'extra_ytdlp_video_args', 'extra_ytdlp_meta_args',
+                  'move_ops_file', 'move_ops'
+                ];
 
-                // Custom move operations with URL prefix
-                if (urlEntry.customMoveOps && urlEntry.customMoveOps.trim()) {
-                  const moveOps = urlEntry.customMoveOps.split('\n')
-                    .map(m => m.trim())
-                    .filter(m => m)
-                    .map(m => `${channelURL}|${m}`);
-                  perURL.move_ops.push(...moveOps);
-                }
+                settingsFields.forEach(field => {
+                  const value = urlEntry.custom[field];
+                  if (value !== null && value !== undefined && value !== '') {
+                    // Convert newlines to space-separated for text areas
+                    if (typeof value === 'string' && value.includes('\n')) {
+                      settings[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
+                    } else {
+                      settings[field] = value;
+                    }
+                  }
+                });
 
-                // Custom meta operations with URL prefix
-                if (urlEntry.customMetaOps && urlEntry.customMetaOps.trim()) {
-                  const metaOps = urlEntry.customMetaOps.split('\n')
-                    .map(m => m.trim())
-                    .filter(m => m)
-                    .map(m => `${channelURL}|${m}`);
-                  perURL.metarr_meta_ops.push(...metaOps);
-                }
+                // Process metarr settings
+                const metarrFields = [
+                  'metarr_output_directory', 'metarr_output_ext', 'metarr_rename_style',
+                  'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
+                  'metarr_gpu', 'metarr_transcode_codec', 'metarr_transcode_audio_codec',
+                  'metarr_transcode_quality', 'metarr_transcode_video_filter',
+                  'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_filename_ops',
+                  'filtered_meta_ops', 'filtered_filename_ops'
+                ];
 
-                // Custom filename operations with URL prefix
-                if (urlEntry.customFilenameOps && urlEntry.customFilenameOps.trim()) {
-                  const filenameOps = urlEntry.customFilenameOps.split('\n')
-                    .map(f => f.trim())
-                    .filter(f => f)
-                    .map(f => `${channelURL}|${f}`);
-                  perURL.metarr_filename_ops.push(...filenameOps);
-                }
+                metarrFields.forEach(field => {
+                  const value = urlEntry.custom[field];
+                  if (value !== null && value !== undefined && value !== '') {
+                    // Convert newlines to space-separated for text areas
+                    if (typeof value === 'string' && value.includes('\n')) {
+                      metarr[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
+                    } else {
+                      metarr[field] = value;
+                    }
+                  }
+                });
 
-                // Custom output directory
-                if (urlEntry.customOutputDir && urlEntry.customOutputDir.trim()) {
-                  perURL.url_output_dirs.push(`${channelURL}|${urlEntry.customOutputDir.trim()}`);
+                // Only add if there are overrides
+                if (Object.keys(settings).length > 0 || Object.keys(metarr).length > 0) {
+                  perURL[channelURL] = {};
+                  if (Object.keys(settings).length > 0) perURL[channelURL].settings = settings;
+                  if (Object.keys(metarr).length > 0) perURL[channelURL].metarr = metarr;
                 }
               }
             });
 
-            // Convert arrays to space-separated strings
-            return {
-              filters: perURL.filters.length ? perURL.filters.join(' ') : null,
-              move_ops: perURL.move_ops.length ? perURL.move_ops.join(' ') : null,
-              metarr_meta_ops: perURL.metarr_meta_ops.length ? perURL.metarr_meta_ops.join(' ') : null,
-              metarr_filename_ops: perURL.metarr_filename_ops.length ? perURL.metarr_filename_ops.join(' ') : null,
-              url_output_dirs: perURL.url_output_dirs.length ? perURL.url_output_dirs.join(' ') : null
-            };
-          },
-
-          combineWithGlobal(global, perURL) {
-            // Combine global settings with per-URL settings
-            if (!global || !global.trim()) return perURL;
-            if (!perURL || !perURL.trim()) return global;
-            return `${global.trim()} ${perURL.trim()}`;
+            return perURL;
           }
         };
       }
