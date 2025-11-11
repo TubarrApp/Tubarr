@@ -61,11 +61,17 @@ type DownloadStore interface {
 	// Update operations.
 	SetDownloadStatus(v *models.Video) error
 	UpdateDownloadStatuses(ctx context.Context, updates []models.StatusUpdate) error
+
+	// Cancel operations.
+	CancelDownload(videoID int64, videoURL string) bool
 }
 
 // VideoStore allows access to video repo methods.
 type VideoStore interface {
 	GetDB() *sql.DB
+
+	// Get operations.
+	GetVideoURLByID(videoID int64) (videoURL string, err error)
 
 	// Add operations.
 	AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error)

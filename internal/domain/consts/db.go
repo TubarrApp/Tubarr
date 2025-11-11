@@ -170,4 +170,5 @@ const (
 	DLStatusCompleted   DownloadStatus = "Finished"
 	DLStatusFailed      DownloadStatus = "Failed"
 	DLStatusIgnored     DownloadStatus = "Ignored"
+	DLStatusCancelled   DownloadStatus = "Cancelled"
 )

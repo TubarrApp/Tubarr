@@ -73,9 +73,15 @@ func initMetaTransformers(rootCmd *cobra.Command) error {
 // Program
 // initProgramFlags initializes user flag settings related to the core program. E.g. logging level.
 func initProgramFlags(rootCmd *cobra.Command) error {
+	// Skip initial wait
+	rootCmd.PersistentFlags().BoolP(keys.SkipInitialWait, "s", false, "Skip the wait period usually applied before a crawl (helps avoid bot detection)")
+	if err := viper.BindPFlag(keys.SkipInitialWait, rootCmd.PersistentFlags().Lookup(keys.SkipInitialWait)); err != nil {
+		return err
+	}
+
 	// Skip wait
-	rootCmd.PersistentFlags().BoolP(keys.SkipWait, "s", false, "Skip the wait period usually applied before a crawl (helps avoid bot detection)")
-	if err := viper.BindPFlag(keys.SkipWait, rootCmd.PersistentFlags().Lookup(keys.SkipWait)); err != nil {
+	rootCmd.PersistentFlags().Bool(keys.SkipAllWaits, false, "Skip all wait periods usually applied before a crawl (helps avoid bot detection)")
+	if err := viper.BindPFlag(keys.SkipAllWaits, rootCmd.PersistentFlags().Lookup(keys.SkipAllWaits)); err != nil {
 		return err
 	}
 

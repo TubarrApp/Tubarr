@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+tubarr
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Config and data directories
+tubarr-config/
+tubarr-downloads/
+tubarr-metadata/
+
+# Temp files
+*.tmp
+*.log
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Documentation
+README.md
+LICENSE
+*.md
+docs/
+
+# Docker files (no need to copy these into the image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Generated files
+all_code.txt
+
+# OS files
+.DS_Store
+Thumbs.db

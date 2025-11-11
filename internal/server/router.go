@@ -57,11 +57,14 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 			r.Get("/all", handleListChannels)
 			r.Post("/add", handleCreateChannel)
 			r.Get("/{id}", handleGetChannel)
-			r.Get("/{id}/downloads", handleLatestDownloads)
+			r.Get("/{id}/downloads", handleGetDownloads)
+			r.Get("/{id}/latest-downloads", handleLatestDownloads)
 			r.Get("/{id}/all-videos", handleGetAllVideos)
 			r.Put("/{id}/update", handleUpdateChannel)
 			r.Delete("/{id}/delete", handleDeleteChannel)
 			r.Delete("/{id}/delete-videos", handleDeleteChannelVideos)
+			r.Delete("/{id}/cancel-download/{videoID}", handleCancelDownload)
+			r.Post("/{id}/crawl", handleCrawlChannel)
 
 			// // Channel URLs
 			// r.Route("/{id}/urls", func(r chi.Router) {
@@ -106,9 +109,14 @@ func StartServer(s contracts.Store, db *sql.DB) {
 	go func() {
 		logging.S("Tubarr web server running on http://localhost%s\n", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server failed: %v", err)
+			log.Printf("server failed: %v", err)
+			os.Exit(1)
 		}
 	}()
+
+	// Start crawl watchdog in background
+	watchdogCtx := context.Background()
+	go ss.startCrawlWatchdog(watchdogCtx, stop)
 
 	// Wait for interrupt signal
 	<-stop
@@ -120,7 +128,8 @@ func StartServer(s contracts.Store, db *sql.DB) {
 
 	// Attempt graceful shutdown
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("server forced to shutdown: %v", err)
+		log.Printf("server forced to shutdown: %v", err)
+		os.Exit(1)
 	}
 
 	logging.S("Server at http://localhost%s shut down successfully\n", addr)
@@ -130,13 +139,15 @@ func StartServer(s contracts.Store, db *sql.DB) {
 func StaticHandler() http.Handler {
 	exe, err := os.Executable()
 	if err != nil {
-		log.Fatalf("failed to get executable path, cannot locate web pages: %v", err)
+		log.Printf("failed to get executable path, cannot locate web pages: %v", err)
+		os.Exit(1)
 	}
 	baseDir := filepath.Dir(exe)
-	webRoot := filepath.Join(baseDir, "web", "dist")
+	webRoot := filepath.Join(baseDir, "web")
 
 	if _, err := os.Stat(webRoot); err != nil {
-		log.Fatalf("webpage root %q cannot be loaded: %v", webRoot, err)
+		log.Printf("webpage root %q cannot be loaded: %v", webRoot, err)
+		os.Exit(1)
 	}
 
 	fs := http.FileServer(http.Dir(webRoot))

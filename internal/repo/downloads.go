@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/downloads"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 
@@ -122,6 +123,11 @@ func (ds *DownloadStore) GetDownloadStatus(v *models.Video) error {
 	}
 
 	return nil
+}
+
+// CancelDownload cancels an active download by calling the downloads package.
+func (ds *DownloadStore) CancelDownload(videoID int64, videoURL string) bool {
+	return downloads.CancelDownloadByVideoID(videoID, videoURL)
 }
 
 // ******************************** Private ********************************

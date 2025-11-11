@@ -11,7 +11,7 @@ import (
 
 const (
 	tDir         = ".tubarr"
-	tFile        = "tubarr.db"
+	tDBFile      = "tubarr.db"
 	logFile      = "tubarr.log"
 	benchmarkDir = "benchmark"
 )
@@ -26,19 +26,21 @@ var (
 
 // InitProgFilesDirs initializes necessary program directories and filepaths.
 func InitProgFilesDirs() error {
-	dir, err := os.UserHomeDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return errors.New("failed to get home directory")
 	}
-	HomeTubarrDir = filepath.Join(dir, tDir)
+	HomeTubarrDir = filepath.Join(homeDir, tDir)
 	if _, err := os.Stat(HomeTubarrDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(HomeTubarrDir, consts.PermsHomeTubarrDir); err != nil {
 			return fmt.Errorf("failed to make directories: %w", err)
+		} else {
+			return fmt.Errorf("failed to stat home directory %q", HomeTubarrDir)
 		}
 	}
 
 	// Main files
-	DBFilePath = filepath.Join(HomeTubarrDir, tFile)
+	DBFilePath = filepath.Join(HomeTubarrDir, tDBFile)
 	LogFilePath = filepath.Join(HomeTubarrDir, logFile)
 
 	// Benchmark directory

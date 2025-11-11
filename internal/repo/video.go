@@ -138,14 +138,18 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 			v.ID = id
 		}
 
-		// Insert or update download status
-		dlQuery := squirrel.Insert(consts.DBDownloads).
-			Columns(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
-			Values(v.ID, v.DownloadStatus.Status, v.DownloadStatus.Pct).
-			RunWith(tx)
-
-		if _, err := dlQuery.Exec(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to insert download status for video %d: %w", v.ID, err))
+		// Insert or update download status using SQLite UPSERT (INSERT ... ON CONFLICT)
+		// We use raw SQL because Squirrel doesn't support ON CONFLICT clause natively
+		sqlQuery := `
+			INSERT INTO ` + consts.DBDownloads + ` (` + consts.QDLVidID + `, ` + consts.QDLStatus + `, ` + consts.QDLPct + `, ` + consts.QDLCreatedAt + `, ` + consts.QDLUpdatedAt + `)
+			VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT(` + consts.QDLVidID + `) DO UPDATE SET
+				` + consts.QDLStatus + ` = excluded.` + consts.QDLStatus + `,
+				` + consts.QDLPct + ` = excluded.` + consts.QDLPct + `,
+				` + consts.QDLUpdatedAt + ` = excluded.` + consts.QDLUpdatedAt + `
+		`
+		if _, err := tx.Exec(sqlQuery, v.ID, v.DownloadStatus.Status, v.DownloadStatus.Pct, now, now); err != nil {
+			errs = append(errs, fmt.Errorf("failed to insert/update download status for video %d: %w", v.ID, err))
 		}
 	}
 
@@ -244,12 +248,18 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	v.ID = videoID
 
 	// Insert into downloads table
-	dlQuery := squirrel.Insert(consts.DBDownloads).
+	logging.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Pct)
+
+	dlSQL, dlArgs, err := squirrel.Insert(consts.DBDownloads).
 		Columns(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
 		Values(videoID, v.DownloadStatus.Status, v.DownloadStatus.Pct).
-		RunWith(tx)
+		ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("failed to build download insert SQL: %w", err)
+	}
+	logging.D(1, "Download insert SQL: %s (args: %v)", dlSQL, dlArgs)
 
-	if _, err := dlQuery.Exec(); err != nil {
+	if _, err := tx.Exec(dlSQL, dlArgs...); err != nil {
 		return 0, fmt.Errorf("failed to insert download status for video %d: %w", videoID, err)
 	}
 
@@ -362,6 +372,21 @@ func (vs *VideoStore) DeleteVideo(videoURL string, channelID int64) error {
 		return err
 	}
 	return nil
+}
+
+// GetVideoURLByID returns a video's URL by its ID in the database.
+func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error) {
+	query := squirrel.
+		Select(consts.QVidURL).
+		From(consts.DBVideos).
+		Where(squirrel.Eq{consts.QVidID: videoID}).
+		RunWith(vs.DB)
+
+	if err = query.QueryRow().Scan(&videoURL); err != nil {
+		logging.I("Could not scan video URL from database for video ID: %d, URL: %q", videoID, videoURL)
+		return "", err
+	}
+	return videoURL, nil
 }
 
 // ******************************** Private ********************************

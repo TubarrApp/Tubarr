@@ -395,7 +395,6 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 	if c == nil {
 		return fmt.Errorf("channel cannot be nil")
 	}
-
 	cs := s.ChannelStore()
 
 	// Check if site is blocked or should be unlocked

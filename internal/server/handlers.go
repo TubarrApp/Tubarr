@@ -194,6 +194,7 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read and parse body for DELETE requests
+	//
 	// DELETE requests need special handling for form data in the body
 	bodyBytes := make([]byte, r.ContentLength)
 	if _, err := r.Body.Read(bodyBytes); err != nil && err.Error() != "EOF" {
@@ -228,6 +229,93 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// handleGetDownloads retrieves active downloads for a given channel.
+func handleGetDownloads(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
+	// Get active downloads with progress
+	videos, err := ss.getActiveDownloads(c)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("could not retrieve active downloads for channel %q: %v", c.Name, err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(videos)
+}
+
+// handleCancelDownload cancels an active download by video ID.
+func handleCancelDownload(w http.ResponseWriter, r *http.Request) {
+	videoIDStr := chi.URLParam(r, "videoID")
+	videoID, err := strconv.ParseInt(videoIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid video ID %q: %v", videoIDStr, err), http.StatusBadRequest)
+		return
+	}
+
+	// Update database status first
+	if err := ss.cancelDownload(videoID); err != nil {
+		http.Error(w, fmt.Sprintf("failed to cancel download: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Cancel the actual running download process
+	var videoURL string
+	if videoURL, err = ss.vs.GetVideoURLByID(videoID); err != nil {
+		logging.E("Could not get video URL for ID %d: %v", videoID, err)
+	}
+	cancelled := ss.ds.CancelDownload(videoID, videoURL)
+	if !cancelled {
+		logging.W("Download for video ID %d was marked as cancelled in DB but no active download process was found", videoID)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"message": "Download cancelled successfully"}`))
+}
+
+// handleCrawlChannel initiates a crawl for a specific channel.
+func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
+		return
+	}
+
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
+	// Start crawl in background
+	go func() {
+		ctx := context.Background()
+		logging.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
+		if err := app.CrawlChannel(ctx, ss.s, ss.cs, c); err != nil {
+			logging.E("Failed to crawl channel %q: %v", c.Name, err)
+		} else {
+			logging.S("Successfully completed crawl for channel %q", c.Name)
+		}
+	}()
+
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte(`{"message": "Channel crawl started"}`))
+}
+
 // handleLatestDownloads retrieves the latest downloads for a given channel.
 func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -250,6 +338,17 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(videos)
+}
+
+// handleSetLogLevel sets the logging level in the database.
+func handleSetLogLevel(w http.ResponseWriter, r *http.Request) {
+	levelStr := chi.URLParam(r, "logging_level")
+	level, err := strconv.Atoi(levelStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("could not set logging level using input %q: %v", levelStr, err), http.StatusBadRequest)
+		return
+	}
+	logging.Level = level
 }
 
 // ----------------- Helpers ----------------------------------------------------------------------------------------

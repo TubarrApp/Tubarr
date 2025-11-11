@@ -13,6 +13,9 @@ import (
 var ongoingDownloads sync.Map
 var avoidURLs sync.Map // Avoid attempting downloads for these URLs (e.g. when bot activity detection triggers)
 
+// activeDownloadContexts tracks cancellation functions for active downloads by video ID
+var activeDownloadContexts sync.Map // map[int64]context.CancelFunc
+
 // DownloadType represents the type of download operation.
 type DownloadType string
 
@@ -111,4 +114,28 @@ func (d *JSONDownload) cleanup() {
 		}
 		d.tempFile = ""
 	}
+}
+
+// RegisterDownloadContext registers a cancellation function for a video download.
+func RegisterDownloadContext(videoID int64, videoURL string, cancel context.CancelFunc) {
+	activeDownloadContexts.Store(videoID, cancel)
+	logging.D(2, "Registered cancellation context for video ID %d", videoID)
+}
+
+// UnregisterDownloadContext removes a video's cancellation function.
+func UnregisterDownloadContext(videoID int64, videoURL string) {
+	activeDownloadContexts.Delete(videoID)
+	logging.D(2, "Unregistered cancellation context for video ID %d", videoID)
+}
+
+// CancelDownloadByVideoID cancels an active download by video ID.
+func CancelDownloadByVideoID(videoID int64, videoURL string) bool {
+	if cancel, ok := activeDownloadContexts.Load(videoID); ok {
+		if cancelFunc, ok := cancel.(context.CancelFunc); ok {
+			logging.I("Cancelling download for video ID %d", videoID)
+			cancelFunc()
+			return true
+		}
+	}
+	return false
 }

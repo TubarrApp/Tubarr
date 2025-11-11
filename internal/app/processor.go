@@ -270,10 +270,16 @@ func processJSON(
 		return false, false, nil
 	}
 
+	// Will download this video (passed checks)
+	v.DownloadStatus.Status = consts.DLStatusPending
+	v.DownloadStatus.Pct = 0.0
+	logging.D(1, "Setting video %q to Pending status before saving to DB", v.URL)
+
 	// Save video to database
 	if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
 		return false, false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
+	logging.D(1, "Saved video %q (ID: %d) to DB with Pending status", v.URL, v.ID)
 
 	logging.S("Processed metadata for: %s", v.URL)
 	return true, false, nil
@@ -287,7 +293,15 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 
 	logging.I("Processing video download for URL: %s", v.URL)
 
-	dl, err := downloads.NewVideoDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
+	// Create cancellable context for this specific download
+	downloadCtx, cancel := context.WithCancel(procCtx)
+	defer cancel()
+
+	// Register the cancel function so it can be called from API
+	downloads.RegisterDownloadContext(v.ID, v.URL, cancel)
+	defer downloads.UnregisterDownloadContext(v.ID, v.URL)
+
+	dl, err := downloads.NewVideoDownload(downloadCtx, v, cu, c, dlTracker, &downloads.Options{
 		MaxRetries:       3,
 		RetryMaxInterval: 20,
 	})

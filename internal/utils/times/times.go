@@ -15,7 +15,7 @@ import (
 // StartupWait adds a 0–30 minute wait time with a visible countdown.
 // This is used to help avoid bot detection.
 func StartupWait(ctx context.Context) error {
-	if abstractions.GetBool(keys.SkipWait) {
+	if abstractions.GetBool(keys.SkipInitialWait) || abstractions.GetBool(keys.SkipAllWaits) {
 		logging.W("Skipping wait period, running Tubarr immediately. You may encounter bot detection on some platforms if requests come at predictable intervals.")
 		return nil
 	}
@@ -67,7 +67,7 @@ func StartupWait(ctx context.Context) error {
 
 // WaitTime adds a specified wait time.
 func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL string) error {
-	if abstractions.GetBool(keys.SkipWait) {
+	if abstractions.GetBool(keys.SkipAllWaits) {
 		if videoURL == "" {
 			logging.D(3, "Skipping wait time call for channel %q (video URL: %q)", channelName, videoURL)
 		} else {
