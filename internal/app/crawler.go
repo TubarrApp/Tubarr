@@ -111,7 +111,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 	}
 
 	// Add random sleep before processing (added bot detection)
-	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceDelay), c.Name, ""); err != nil {
+	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
 		return err
 	}
 
@@ -270,7 +270,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelSt
 	}
 
 	// Add random sleep before processing (added bot detection)
-	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceDelay), c.Name, ""); err != nil {
+	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
 		return err
 	}
 

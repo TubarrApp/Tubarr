@@ -8,8 +8,8 @@ const BotActivitySentinel = "detected bot activity"
 
 // Bot avoidance delays.
 const (
-	DefaultStartupStagger    = 30
-	DefaultBotAvoidanceDelay = 15
+	DefaultStartupStaggerMinutes = 30
+	DefaultBotAvoidanceSeconds   = 5
 )
 
 // Intervals.

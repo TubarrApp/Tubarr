@@ -257,13 +257,13 @@
                   </thead>
                   <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                     <template x-for="download in downloads" :key="download.id">
-                      <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <tr>
                         <!-- Video Info -->
                         <td class="px-6 py-4">
                           <div class="flex items-center gap-3">
                             <img x-show="download.thumbnail_url" :src="download.thumbnail_url" :alt="download.title" class="h-12 w-20 object-cover rounded" />
                             <div class="flex-1 min-w-0">
-                              <p class="text-sm font-medium text-gray-900 truncate dark:text-white" x-text="download.title || 'Unknown'"></p>
+                              <p class="text-sm font-medium text-gray-900 truncate dark:text-gray-100" x-text="download.title || 'Unknown'"></p>
                               <p class="text-sm text-gray-500 dark:text-gray-400 truncate" x-text="download.url"></p>
                             </div>
                           </div>

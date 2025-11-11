@@ -46,8 +46,8 @@ func handleGetChannel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	if !found || c == nil {
+		http.Error(w, "channel nil or not found", http.StatusNotFound)
 		return
 	}
 
@@ -188,7 +188,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
+	if !found || existingChannel == nil {
 		http.Error(w, "channel not found", http.StatusNotFound)
 		return
 	}
@@ -361,8 +361,8 @@ func handleUpdateChannelURLSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "channel URL not found", http.StatusNotFound)
+	if !found || cURL == nil {
+		http.Error(w, "channel URL nil or not found", http.StatusNotFound)
 		return
 	}
 
@@ -407,8 +407,8 @@ func handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	if !found || c == nil {
+		http.Error(w, "channel nil or not found", http.StatusNotFound)
 		return
 	}
 
@@ -477,8 +477,8 @@ func handleGetDownloads(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	if !found || c == nil {
+		http.Error(w, "channel nil or not found", http.StatusNotFound)
 		return
 	}
 
@@ -536,8 +536,8 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	if !found || c == nil {
+		http.Error(w, "channel nil or not found", http.StatusNotFound)
 		return
 	}
 
@@ -572,8 +572,8 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	if !found || c == nil {
+		http.Error(w, "channel nil or not found", http.StatusNotFound)
 		return
 	}
 

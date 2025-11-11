@@ -3,7 +3,6 @@ package state
 
 import (
 	"sync"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
 )
@@ -54,75 +53,57 @@ func SetStatusUpdate(videoID int64, update models.StatusUpdate) {
 	StatusUpdate.Store(videoID, update)
 }
 
-// ResetStatusUpdate resets download status model for the video.
-func ResetStatusUpdate(v *models.Video) {
-	StatusUpdate.Store(v.ID, models.StatusUpdate{
-		VideoID:      v.ID,
-		VideoTitle:   v.Title,
-		ChannelID:    v.ChannelID,
-		ChannelURLID: v.ChannelURLID,
-		VideoURL:     v.URL,
-		Status:       consts.DLStatusPending,
-		Percent:      0.0,
-		Error:        nil,
-	})
-}
-
 // GetStatusUpdate returns the current download status.
-func GetStatusUpdate(inputState models.StatusUpdate) (stateFromMap models.StatusUpdate, success bool) {
-	s, ok := StatusUpdate.Load(inputState.VideoID)
+func GetStatusUpdate(videoID int64) (stateFromMap models.StatusUpdate) {
+	s, ok := StatusUpdate.Load(videoID)
 	if !ok {
-		SetStatusUpdate(inputState.VideoID, inputState)
-		if s, ok = StatusUpdate.Load(inputState.VideoID); !ok {
-			logging.E("Could not load download status for %q from map", inputState.VideoURL)
-			return inputState, false
-		}
+		return models.StatusUpdate{}
 	}
 
 	currentState, ok := s.(models.StatusUpdate)
 	if !ok {
-		logging.E("Dev Error: Wrong type %T stored in StatusUpdate for video %q", s, inputState.VideoURL)
-		return inputState, false
+		logging.E("Dev Error: Wrong type %T stored in StatusUpdate for video ID %d", s, videoID)
+		return models.StatusUpdate{}
 	}
 
-	return currentState, true
+	return currentState
 }
 
 // --- Download Status --------------------------------------------------------------------------
 // State of current video download
-var VideoDownloadStatus sync.Map
+var ActiveVideoDownloadStatus sync.Map
 
-// SetVideoDownloadStatus updates the download state in the map.
-func SetVideoDownloadStatus(videoID int64, status models.DLStatus) {
-	VideoDownloadStatus.Store(videoID, status)
+// SetActiveVideoDownloadStatus updates the download state in the map.
+func SetActiveVideoDownloadStatus(videoID int64, status models.DLStatus) {
+	ActiveVideoDownloadStatus.Store(videoID, status)
 }
 
-// DeleteVideoDownloadStatus deletes the entry in the map for this video.
-func DeleteVideoDownloadStatus(videoID int64) {
-	VideoDownloadStatus.Delete(videoID)
+// DeleteActiveVideoDownloadStatus deletes the entry in the map for this video.
+func DeleteActiveVideoDownloadStatus(videoID int64) {
+	ActiveVideoDownloadStatus.Delete(videoID)
 }
 
-// // ResetVideoDownloadStatus resets download status model for the video.
-// func ResetVideoDownloadStatus(v *models.Video) {
-// 	VideoDownloadStatus.Store(v.ID, models.DLStatus{
+// // ResetActiveVideoDownloadStatus resets download status model for the video.
+// func ResetActiveVideoDownloadStatus(v *models.Video) {
+// 	ActiveVideoDownloadStatus.Store(v.ID, models.DLStatus{
 // 		Status:  v.DownloadStatus.Status,
 // 		Percent: v.DownloadStatus.Percent,
 // 		Error:   v.DownloadStatus.Error,
 // 	})
 // }
 
-// VideoDownloadStatusExists checks if the current video is already being downloaded.
-func VideoDownloadStatusExists(videoID int64) bool {
-	_, ok := VideoDownloadStatus.Load(videoID)
+// ActiveVideoDownloadStatusExists checks if the current video is already being downloaded.
+func ActiveVideoDownloadStatusExists(videoID int64) bool {
+	_, ok := ActiveVideoDownloadStatus.Load(videoID)
 	return ok
 }
 
-// // GetVideoDownloadStatus returns the current download status.
-// func GetVideoDownloadStatus(v *models.Video) (stateFromMap models.DLStatus) {
-// 	s, ok := VideoDownloadStatus.Load(v.ID)
+// // GetActiveVideoDownloadStatus returns the current download status.
+// func GetActiveVideoDownloadStatus(v *models.Video) (stateFromMap models.DLStatus) {
+// 	s, ok := ActiveVideoDownloadStatus.Load(v.ID)
 // 	if !ok {
 // 		ResetVideoDownloadStatus(v)
-// 		s, ok = VideoDownloadStatus.Load(v.ID)
+// 		s, ok = ActiveVideoDownloadStatus.Load(v.ID)
 // 		if !ok {
 // 			logging.E("Could not get download status from map")
 // 			return models.DLStatus{

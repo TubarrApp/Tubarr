@@ -94,10 +94,7 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 
 // flushUpdates flushes pending download status updates to the database.
 func (t *DownloadTracker) flushUpdates(ctx context.Context, update models.StatusUpdate) {
-	lastUpdate, success := state.GetStatusUpdate(update)
-	if !success {
-		logging.E("Could not get download state for video %q", update.VideoURL)
-	}
+	lastUpdate := state.GetStatusUpdate(update.VideoID)
 
 	// Normalize percentage
 	update.Percent = min(update.Percent, 100.0)

@@ -232,14 +232,14 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 	defer close(errChan)
 
 	// Check if video is already downloading
-	if state.VideoDownloadStatusExists(d.Video.ID) {
+	if state.ActiveVideoDownloadStatusExists(d.Video.ID) {
 		errChan <- fmt.Errorf("video with ID %d is already downloading (URL: %q)", d.Video.ID, d.Video.URL)
 		return
 	}
 
 	// Save state to map (locks from other downloads until deletion from map)
-	state.SetVideoDownloadStatus(d.Video.ID, d.Video.DownloadStatus)
-	defer state.DeleteVideoDownloadStatus(d.Video.ID)
+	state.SetActiveVideoDownloadStatus(d.Video.ID, d.Video.DownloadStatus)
+	defer state.DeleteActiveVideoDownloadStatus(d.Video.ID)
 
 	var (
 		totalItemsFound, totalDownloadedItems int
