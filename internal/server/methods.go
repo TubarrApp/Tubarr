@@ -15,11 +15,13 @@ import (
 	"github.com/Masterminds/squirrel"
 )
 
+var crawlLockMap sync.Map
+
 // startCrawlWatchdog constantly checks channels and runs crawls when they're due.
 //
 // This function blocks until the stop channel is signaled or context is cancelled.
 func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Signal) {
-	var crawlLockMap sync.Map
+
 	const timeBetweenCheck = (2 * time.Minute) + (30 * time.Second)
 
 	// Start ticker
@@ -71,7 +73,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						if !ok {
 							crawlLockMap.Store(ch.Name, false)
 							if lockStateInterface, ok = crawlLockMap.Load(ch.Name); !ok {
-								logging.E("Failed to reload crawlLockMap state after explicit setting to false")
+								logging.E("Failed to reload crawlLockMap state for channel %q after explicit setting to false", c.Name)
 								return
 							}
 						}

@@ -301,19 +301,38 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start crawl in background
-	go func() {
-		ctx := context.Background()
-		logging.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
-		if err := app.CrawlChannel(ctx, ss.s, ss.cs, c); err != nil {
-			logging.E("Failed to crawl channel %q: %v", c.Name, err)
-		} else {
-			logging.S("Successfully completed crawl for channel %q", c.Name)
+	lockStateInterface, ok := crawlLockMap.Load(c.Name)
+	if !ok {
+		crawlLockMap.Store(c.Name, false)
+		if lockStateInterface, ok = crawlLockMap.Load(c.Name); !ok {
+			http.Error(w, fmt.Sprintf("Failed to reload crawlLockMap state for channel %q after explicit setting to false", c.Name), http.StatusInternalServerError)
+			return
 		}
-	}()
+	}
+	lockState, ok := lockStateInterface.(bool)
+	if !ok {
+		http.Error(w, fmt.Sprintf("Wrong type %T stored for channel %q lock state", lockState, c.Name), http.StatusInternalServerError)
+		return
+	}
 
+	// Start crawl in background
+	if !lockState {
+		go func() {
+			ctx := context.Background()
+			logging.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
+			if err := app.CrawlChannel(ctx, ss.s, ss.cs, c); err != nil {
+				logging.E("Failed to crawl channel %q: %v", c.Name, err)
+			} else {
+				logging.S("Successfully completed crawl for channel %q", c.Name)
+			}
+		}()
+
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte(`{"message": "Channel crawl started"}`))
+		return
+	}
 	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte(`{"message": "Channel crawl started"}`))
+	w.Write([]byte(`{"message": "Channel crawl already running for channel"}`))
 }
 
 // handleLatestDownloads retrieves the latest downloads for a given channel.
