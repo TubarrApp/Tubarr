@@ -66,25 +66,26 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 
 				// Add jitter
 				if !abstractions.IsSet(keys.SkipAllWaits) {
-					jitterTime := 5
-
-					// Check URLs
-					for _, cURL := range c.URLModels {
-						u := strings.ToLower(cURL.URL)
-
-						switch {
-						case strings.Contains(u, "tube"), strings.Contains(u, "tok"),
-							strings.Contains(u, "gram"), strings.Contains(u, "book"), strings.Contains(u, "x."):
-							jitterTime = max(10, jitterTime)
-
-						case strings.Contains(u, "motion"), strings.Contains(u, "vime"),
-							strings.Contains(u, "bili"), strings.Contains(u, "ddit"):
-							jitterTime = max(8, jitterTime)
+					jitterInt := state.GetOrComputeJitter(c.ID, len(c.URLModels), func() int {
+						j := 5
+						for _, u := range c.URLModels {
+							url := strings.ToLower(u.URL)
+							switch {
+							case strings.Contains(url, "tube"), strings.Contains(url, "tok"),
+								strings.Contains(url, "gram"), strings.Contains(url, "book"), strings.Contains(url, "x."):
+								j = max(10, j)
+							case strings.Contains(url, "motion"), strings.Contains(url, "vime"),
+								strings.Contains(url, "bili"), strings.Contains(url, "ddit"):
+								j = max(8, j)
+							}
 						}
-					}
+						return j
+					})
 
-					jitter := times.RandomMinsDuration(jitterTime) // Probability, with re-rolls, expect ~half the time added
-					interval += jitter
+					if jitterInt > 0 {
+						jitter := times.RandomMinsDuration(jitterInt) // Probability, with re-rolls, expect ~half the time added
+						interval += jitter
+					}
 				}
 
 				logging.D(2, "Crawl watchdog: channel %q - last scan: %s ago, interval: %s",
@@ -203,7 +204,7 @@ func (s *serverStore) getActiveDownloads(channel *models.Channel) ([]models.Vide
 	var videos []models.Video
 
 	// Iterate through the in-memory StatusUpdate to find active downloads for this channel
-	state.StatusUpdate.Range(func(key, value any) bool {
+	state.StatusUpdateCache.Range(func(key, value any) bool {
 		videoID, ok := key.(int64)
 		if !ok {
 			logging.E("Dev Error: Invalid key type in StatusUpdate: %T", key)

@@ -72,7 +72,7 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 	for {
 		select {
 		case <-t.done:
-			state.StatusUpdate.Range(func(_, v any) bool {
+			state.StatusUpdateCache.Range(func(_, v any) bool {
 				update, ok := v.(models.StatusUpdate)
 				if ok {
 					if err := t.dlStore.UpdateDownloadStatus(ctx, update); err != nil {

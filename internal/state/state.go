@@ -9,29 +9,29 @@ import (
 
 // --- Crawl State --------------------------------------------------------------------------
 // Lock out of crawl function
-var CrawlState sync.Map
+var crawlState sync.Map
 
 const lockKeyCrawl = "crawl"
 
 // LockCrawlState locks the crawl function from use.
 func LockCrawlState(channelName string) {
 	key := channelName + lockKeyCrawl
-	CrawlState.Store(key, true)
+	crawlState.Store(key, true)
 }
 
 // UnlockCrawlState unlocks the crawl function.
 func UnlockCrawlState(channelName string) {
 	key := channelName + lockKeyCrawl
-	CrawlState.Store(key, false)
+	crawlState.Store(key, false)
 }
 
 // CrawlStateActive reports whether the crawl function is currently active.
 func CrawlStateActive(channelName string) bool {
 	key := channelName + lockKeyCrawl
 
-	s, ok := CrawlState.Load(key)
+	s, ok := crawlState.Load(key)
 	if !ok {
-		CrawlState.Store(key, false)
+		crawlState.Store(key, false)
 		return false
 	}
 
@@ -44,18 +44,42 @@ func CrawlStateActive(channelName string) bool {
 	return state
 }
 
+// ---- Jitter Times --------------------------------------------------------------------------
+// Cached jitter times per channel
+var watchdogJitter sync.Map
+
+type jitterCache struct {
+	jitter   int
+	urlCount int
+}
+
+// GetOrComputeJitter returns existing jitter or recalculates if URL count changed.
+func GetOrComputeJitter(channelID int64, chanURLCount int, compute func() int) int {
+	if val, ok := watchdogJitter.Load(channelID); ok {
+		if jc, ok := val.(jitterCache); ok {
+			if jc.urlCount == chanURLCount {
+				return jc.jitter
+			}
+		}
+	}
+	// Cache miss or URL count changed — recompute
+	j := compute()
+	watchdogJitter.Store(channelID, jitterCache{jitter: j, urlCount: chanURLCount})
+	return j
+}
+
 // --- Status Update --------------------------------------------------------------------------
 // State of current download
-var StatusUpdate sync.Map
+var StatusUpdateCache sync.Map
 
 // SetStatusUpdate updates the download state in the map.
 func SetStatusUpdate(videoID int64, update models.StatusUpdate) {
-	StatusUpdate.Store(videoID, update)
+	StatusUpdateCache.Store(videoID, update)
 }
 
 // GetStatusUpdate returns the current download status.
 func GetStatusUpdate(videoID int64) (stateFromMap models.StatusUpdate) {
-	s, ok := StatusUpdate.Load(videoID)
+	s, ok := StatusUpdateCache.Load(videoID)
 	if !ok {
 		return models.StatusUpdate{}
 	}
@@ -71,21 +95,21 @@ func GetStatusUpdate(videoID int64) (stateFromMap models.StatusUpdate) {
 
 // --- Download Status --------------------------------------------------------------------------
 // State of current video download
-var ActiveVideoDownloadStatus sync.Map
+var activeVideoDownloadStatus sync.Map
 
 // SetActiveVideoDownloadStatus updates the download state in the map.
 func SetActiveVideoDownloadStatus(videoID int64, status models.DLStatus) {
-	ActiveVideoDownloadStatus.Store(videoID, status)
+	activeVideoDownloadStatus.Store(videoID, status)
 }
 
 // DeleteActiveVideoDownloadStatus deletes the entry in the map for this video.
 func DeleteActiveVideoDownloadStatus(videoID int64) {
-	ActiveVideoDownloadStatus.Delete(videoID)
+	activeVideoDownloadStatus.Delete(videoID)
 }
 
 // // ResetActiveVideoDownloadStatus resets download status model for the video.
 // func ResetActiveVideoDownloadStatus(v *models.Video) {
-// 	ActiveVideoDownloadStatus.Store(v.ID, models.DLStatus{
+// 	activeVideoDownloadStatus.Store(v.ID, models.DLStatus{
 // 		Status:  v.DownloadStatus.Status,
 // 		Percent: v.DownloadStatus.Percent,
 // 		Error:   v.DownloadStatus.Error,
@@ -94,16 +118,16 @@ func DeleteActiveVideoDownloadStatus(videoID int64) {
 
 // ActiveVideoDownloadStatusExists checks if the current video is already being downloaded.
 func ActiveVideoDownloadStatusExists(videoID int64) bool {
-	_, ok := ActiveVideoDownloadStatus.Load(videoID)
+	_, ok := activeVideoDownloadStatus.Load(videoID)
 	return ok
 }
 
 // // GetActiveVideoDownloadStatus returns the current download status.
 // func GetActiveVideoDownloadStatus(v *models.Video) (stateFromMap models.DLStatus) {
-// 	s, ok := ActiveVideoDownloadStatus.Load(v.ID)
+// 	s, ok := activeVideoDownloadStatus.Load(v.ID)
 // 	if !ok {
 // 		ResetVideoDownloadStatus(v)
-// 		s, ok = ActiveVideoDownloadStatus.Load(v.ID)
+// 		s, ok = activeVideoDownloadStatus.Load(v.ID)
 // 		if !ok {
 // 			logging.E("Could not get download status from map")
 // 			return models.DLStatus{
