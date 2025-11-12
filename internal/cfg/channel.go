@@ -1442,6 +1442,15 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
+	// Max CPU usage
+	if f.Changed(keys.MMaxCPU) {
+		c.maxCPU = max(min(c.maxCPU, 100.0), 0)
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.MaxCPU = c.maxCPU
+			return nil
+		})
+	}
+
 	// Metarr final video output extension (e.g. 'mp4')
 	if f.Changed(keys.MOutputExt) {
 		if c.metarrExt != "" {
