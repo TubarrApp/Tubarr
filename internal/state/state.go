@@ -62,7 +62,7 @@ func GetOrComputeJitter(channelID int64, chanURLCount int, compute func() int) i
 			}
 		}
 	}
-	// Cache miss or URL count changed — recompute
+	// Recompute on cache miss or URL count changed
 	j := compute()
 	watchdogJitter.Store(channelID, jitterCache{jitter: j, urlCount: chanURLCount})
 	return j
