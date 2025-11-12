@@ -638,7 +638,7 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start crawl in background
-	if !state.CheckCrawlState(c.Name) {
+	if !state.CrawlStateActive(c.Name) {
 		state.LockCrawlState(c.Name)
 		go func() {
 			defer state.UnlockCrawlState(c.Name)
@@ -680,7 +680,7 @@ func handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start crawl in background
-	if !state.CheckCrawlState(c.Name) {
+	if !state.CrawlStateActive(c.Name) {
 		state.LockCrawlState(c.Name)
 		go func() {
 			defer state.UnlockCrawlState(c.Name)

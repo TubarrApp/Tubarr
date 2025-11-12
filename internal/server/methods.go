@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"time"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/app"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 	"tubarr/internal/state"
 	"tubarr/internal/utils/logging"
+	"tubarr/internal/utils/times"
 
 	"github.com/Masterminds/squirrel"
 )
@@ -60,13 +64,36 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 				elapsed := now.Sub(c.LastScan)
 				interval := time.Duration(c.ChanSettings.CrawlFreq) * time.Minute
 
+				// Add jitter
+				if !abstractions.IsSet(keys.SkipAllWaits) {
+					jitterTime := 5
+
+					// Check URLs
+					for _, cURL := range c.URLModels {
+						u := strings.ToLower(cURL.URL)
+
+						switch {
+						case strings.Contains(u, "tube"), strings.Contains(u, "tok"),
+							strings.Contains(u, "gram"), strings.Contains(u, "book"), strings.Contains(u, "x."):
+							jitterTime = max(10, jitterTime)
+
+						case strings.Contains(u, "motion"), strings.Contains(u, "vime"),
+							strings.Contains(u, "bili"), strings.Contains(u, "ddit"):
+							jitterTime = max(8, jitterTime)
+						}
+					}
+
+					jitter := times.RandomMinsDuration(jitterTime) // Probability, with re-rolls, expect ~half the time added
+					interval += jitter
+				}
+
 				logging.D(2, "Crawl watchdog: channel %q - last scan: %s ago, interval: %s",
 					c.Name, elapsed.Round(time.Second), interval)
 
 				if elapsed >= interval {
 					// -- Crawl launch in goroutine --
 					go func(ch *models.Channel) {
-						if state.CheckCrawlState(ch.Name) {
+						if state.CrawlStateActive(ch.Name) {
 							return
 						}
 

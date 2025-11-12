@@ -25,8 +25,8 @@ func UnlockCrawlState(channelName string) {
 	CrawlState.Store(key, false)
 }
 
-// CheckCrawlState reports whether the crawl function is currently active.
-func CheckCrawlState(channelName string) bool {
+// CrawlStateActive reports whether the crawl function is currently active.
+func CrawlStateActive(channelName string) bool {
 	key := channelName + lockKeyCrawl
 
 	s, ok := CrawlState.Load(key)
