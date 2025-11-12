@@ -1206,8 +1206,8 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)
 	fmt.Printf("HW Acceleration: %s\n", m.UseGPU)
 	fmt.Printf("HW Acceleration Directory: %s\n", m.GPUDir)
-	fmt.Printf("Video Codec: %s\n", m.TranscodeCodec)
-	fmt.Printf("Audio Codec: %s\n", m.TranscodeAudioCodec)
+	fmt.Printf("Video Codec: %v\n", m.TranscodeVideoCodecs)
+	fmt.Printf("Audio Codec: %v\n", m.TranscodeAudioCodecs)
 	fmt.Printf("Transcode Quality: %s\n", m.TranscodeQuality)
 	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
@@ -1403,7 +1403,6 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 
 	var (
 		gpuDirGot, gpuGot string
-		videoCodecGot     string
 	)
 
 	// Metarr output extension
@@ -1526,14 +1525,9 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 		}
 	}
 
-	// Metarr video codec
-	if v, ok := getConfigValue[string](keys.TranscodeCodec); ok {
-		videoCodecGot = v
-	}
-
 	// Metarr audio codec
-	if v, ok := getConfigValue[string](keys.TranscodeAudioCodec); ok {
-		if c.ChanMetarrArgs.TranscodeAudioCodec, err = validation.ValidateTranscodeAudioCodec(v); err != nil {
+	if v, ok := getConfigValue[[]string](keys.TranscodeAudioCodec); ok {
+		if c.ChanMetarrArgs.TranscodeAudioCodecs, err = validation.ValidateAudioTranscodeCodecSlice(v); err != nil {
 			return err
 		}
 	}
@@ -1554,8 +1548,11 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 	}
 
 	// Validate video codec against transcode GPU
-	if c.ChanMetarrArgs.TranscodeCodec, err = validation.ValidateTranscodeCodec(videoCodecGot, c.ChanMetarrArgs.UseGPU); err != nil {
-		return err
+	// Metarr video codec
+	if v, ok := getConfigValue[[]string](keys.TranscodeCodec); ok {
+		if c.ChanMetarrArgs.TranscodeVideoCodecs, err = validation.ValidateVideoTranscodeCodecSlice(v, c.ChanMetarrArgs.UseGPU); err != nil {
+			return err
+		}
 	}
 
 	return nil

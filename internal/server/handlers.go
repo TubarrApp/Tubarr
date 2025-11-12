@@ -879,8 +879,8 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	gpuDirStr := r.FormValue("metarr_gpu_directory")
 	outputDir := r.FormValue("metarr_output_directory")
 	transcodeVideoFilterStr := r.FormValue("metarr_transcode_video_filter")
-	transcodeCodecStr := r.FormValue("metarr_transcode_codec")
-	transcodeAudioCodecStr := r.FormValue("metarr_transcode_audio_codec")
+	transcodeCodecStr := r.FormValue("metarr_video_transcode_codecs")
+	transcodeAudioCodecStr := r.FormValue("metarr_transcode_audio_codecs")
 	transcodeQualityStr := r.FormValue("metarr_transcode_quality")
 
 	// Ints
@@ -913,14 +913,14 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid video filter string %q: %v", transcodeVideoFilterStr, err), http.StatusBadRequest)
 		return nil
 	}
-	transcodeCodec, err := validation.ValidateTranscodeCodec(transcodeCodecStr, useGPU)
+	transcodeVideoCodecs, err := validation.ValidateVideoTranscodeCodecSlice(splitNonEmptyLines(transcodeCodecStr), useGPU)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid video codec string %q: %v", transcodeCodecStr, err), http.StatusBadRequest)
 		return nil
 	}
-	transcodeAudioCodec, err := validation.ValidateTranscodeAudioCodec(transcodeAudioCodecStr)
+	transcodeAudioCodecs, err := validation.ValidateAudioTranscodeCodecSlice(splitNonEmptyLines(transcodeAudioCodecStr))
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid audio codec codec string %q: %v", transcodeAudioCodecStr, err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("invalid audio codec string %q: %v", transcodeAudioCodecStr, err), http.StatusBadRequest)
 		return nil
 	}
 	transcodeQuality, err := validation.ValidateTranscodeQuality(transcodeQualityStr)
@@ -990,8 +990,8 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		UseGPU:                  useGPU,
 		GPUDir:                  gpuDir,
 		TranscodeVideoFilter:    transcodeVideoFilter,
-		TranscodeCodec:          transcodeCodec,
-		TranscodeAudioCodec:     transcodeAudioCodec,
+		TranscodeVideoCodecs:    transcodeVideoCodecs,
+		TranscodeAudioCodecs:    transcodeAudioCodecs,
 		TranscodeQuality:        transcodeQuality,
 		ExtraFFmpegArgs:         extraFFmpegArgs,
 	}
@@ -1134,11 +1134,11 @@ func parseMetarrArgsFromMap(data map[string]any) *models.MetarrArgs {
 	if v, ok := data["metarr_transcode_video_filter"].(string); ok {
 		metarr.TranscodeVideoFilter = v
 	}
-	if v, ok := data["metarr_transcode_codec"].(string); ok {
-		metarr.TranscodeCodec = v
+	if v, ok := data["metarr_video_transcode_codecs"].([]string); ok {
+		metarr.TranscodeVideoCodecs = v
 	}
-	if v, ok := data["metarr_transcode_audio_codec"].(string); ok {
-		metarr.TranscodeAudioCodec = v
+	if v, ok := data["metarr_transcode_audio_codecs"].([]string); ok {
+		metarr.TranscodeAudioCodecs = v
 	}
 	if v, ok := data["metarr_transcode_quality"].(string); ok {
 		metarr.TranscodeQuality = v

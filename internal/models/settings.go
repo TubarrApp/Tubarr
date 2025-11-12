@@ -72,13 +72,13 @@ type MetarrArgs struct {
 	MinFreeMem  string  `json:"metarr_min_free_mem" mapstructure:"metarr-min-free-mem"`
 
 	// FFmpeg transcoding operations.
-	UseGPU               string `json:"metarr_gpu" mapstructure:"transcode-gpu"`
-	GPUDir               string `json:"metarr_gpu_directory" mapstructure:"transcode-gpu-directory"`
-	TranscodeVideoFilter string `json:"metarr_transcode_video_filter" mapstructure:"transcode-video-filter"`
-	TranscodeCodec       string `json:"metarr_transcode_codec" mapstructure:"transcode-codec"`
-	TranscodeAudioCodec  string `json:"metarr_transcode_audio_codec" mapstructure:"transcode-audio-codec"`
-	TranscodeQuality     string `json:"metarr_transcode_quality" mapstructure:"transcode-quality"`
-	ExtraFFmpegArgs      string `json:"metarr_extra_ffmpeg_args" mapstructure:"extra-ffmpeg-args"`
+	UseGPU               string   `json:"metarr_gpu" mapstructure:"transcode-gpu"`
+	GPUDir               string   `json:"metarr_gpu_directory" mapstructure:"transcode-gpu-directory"`
+	TranscodeVideoFilter string   `json:"metarr_transcode_video_filter" mapstructure:"transcode-video-filter"`
+	TranscodeVideoCodecs []string `json:"metarr_video_transcode_codecs" mapstructure:"transcode-video-codecs"`
+	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs" mapstructure:"transcode-audio-codecs"`
+	TranscodeQuality     string   `json:"metarr_transcode_quality" mapstructure:"transcode-quality"`
+	ExtraFFmpegArgs      string   `json:"metarr_extra_ffmpeg_args" mapstructure:"extra-ffmpeg-args"`
 }
 
 // ChannelAccessDetails holds details related to authentication and cookies.

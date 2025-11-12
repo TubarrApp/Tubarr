@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/consts"
@@ -352,8 +353,46 @@ func ValidateGPU(g, devDir string) (gpuType string, dir string, err error) {
 	return g, devDir, nil
 }
 
-// ValidateTranscodeAudioCodec validates the audio codec to use.
-func ValidateTranscodeAudioCodec(a string) (string, error) {
+// ValidateAudioTranscodeCodecSlice sets mappings for audio codec inputs.
+func ValidateAudioTranscodeCodecSlice(pairs []string) (validPairs []string, err error) {
+	// Deduplicate
+	dedupPairs := make([]string, 0, len(pairs))
+	for _, p := range pairs {
+		if p == "" {
+			continue
+		}
+		if !slices.Contains(dedupPairs, p) {
+			dedupPairs = append(dedupPairs, p)
+		}
+	}
+
+	// Iterate deduped pairs
+	for _, p := range dedupPairs {
+		split := strings.Split(p, ":")
+		if _, err := validateTranscodeAudioCodec(split[0]); err != nil {
+			return nil, err
+		}
+
+		// Singular value, apply to every entry
+		if len(split) < 2 {
+			validPairs = append(validPairs, p)
+			continue
+		}
+
+		// Multi value entry, apply specific output to specific input
+		output := split[1]
+		if _, err = validateTranscodeAudioCodec(output); err != nil {
+			return nil, err
+		}
+		validPairs = append(validPairs, p)
+	}
+
+	logging.D(1, "Got audio codec array: %v", validPairs)
+	return validPairs, nil
+}
+
+// validateTranscodeAudioCodec validates the audio codec to use.
+func validateTranscodeAudioCodec(a string) (string, error) {
 	a = strings.ToLower(strings.TrimSpace(a))
 	a = strings.ReplaceAll(a, ".", "")
 	a = strings.ReplaceAll(a, "-", "")
@@ -395,8 +434,47 @@ func ValidateTranscodeAudioCodec(a string) (string, error) {
 	return a, nil
 }
 
-// ValidateTranscodeCodec validates the video codec based on GPU acceleration.
-func ValidateTranscodeCodec(c, accel string) (string, error) {
+// ValidateVideoTranscodeCodecSlice validates the input video transcode slice.
+func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs []string, err error) {
+	// Deduplicate
+	dedupPairs := make([]string, 0, len(pairs))
+	for _, p := range pairs {
+		if p == "" {
+			continue
+		}
+		if !slices.Contains(dedupPairs, p) {
+			dedupPairs = append(dedupPairs, p)
+		}
+	}
+
+	// Iterate deduped pairs
+	for _, p := range dedupPairs {
+		split := strings.Split(p, ":")
+		if _, err := validateVideoTranscodeCodec(split[0], accel); err != nil {
+			return nil, err
+		}
+
+		// Singular value, apply to every entry
+		if len(split) < 2 {
+			validPairs = append(validPairs, p)
+			continue
+		}
+
+		// Multi value entry, apply specific output to specific input
+		output := split[1]
+		if _, err = validateVideoTranscodeCodec(output, accel); err != nil {
+			return nil, err
+		}
+
+		validPairs = append(validPairs, p)
+	}
+
+	logging.D(1, "Got video codec array: %v", validPairs)
+	return validPairs, nil
+}
+
+// validateTranscodeCodec validates the video codec based on GPU acceleration.
+func validateVideoTranscodeCodec(c, accel string) (string, error) {
 	c = strings.ToLower(strings.TrimSpace(c))
 	c = strings.ReplaceAll(c, ".", "")
 	c = strings.ReplaceAll(c, "-", "")

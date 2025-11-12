@@ -114,10 +114,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.GPUDir,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeCodec},
-			valType:     str,
+			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.TranscodeVideoCodecs},
+			valType:     strSlice,
 			viperKey:    "",
-			cmdKey:      metkeys.TranscodeCodec,
+			cmdKey:      metkeys.TranscodeVideoCodecs,
 		},
 		{
 			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeQuality},
@@ -126,10 +126,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.TranscodeQuality,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeAudioCodec},
-			valType:     str,
+			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.TranscodeAudioCodecs},
+			valType:     strSlice,
 			viperKey:    "",
-			cmdKey:      metkeys.TranscodeAudioCodec,
+			cmdKey:      metkeys.TranscodeAudioCodecs,
 		},
 		{
 			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeVideoFilter},

@@ -861,7 +861,7 @@
                           Video Codec
                         </label>
                         <select
-                          x-model="formData.metarr.metarr_transcode_codec"
+                          x-model="formData.metarr.metarr_video_transcode_codecs"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
                           <option value="">Copy (no transcoding)</option>
@@ -879,7 +879,7 @@
                           Audio Codec
                         </label>
                         <select
-                          x-model="formData.metarr.metarr_transcode_audio_codec"
+                          x-model="formData.metarr.metarr_transcode_audio_codecs"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
                           <option value="">Copy (no transcoding)</option>
@@ -1031,8 +1031,8 @@
               metarr_min_free_mem: '',
               metarr_gpu: '',
               metarr_gpu_directory: '',
-              metarr_transcode_codec: '',
-              metarr_transcode_audio_codec: '',
+              metarr_video_transcode_codecs: '',
+              metarr_transcode_audio_codecs: '',
               metarr_transcode_quality: '',
               metarr_transcode_video_filter: '',
               metarr_extra_ffmpeg_args: '',

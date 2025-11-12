@@ -548,12 +548,12 @@
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_gpu_directory || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Video Codec:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_transcode_codec || 'Copy'"></span>
+                              <span class="text-gray-500 dark:text-gray-400">Video Codecs:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_video_transcode_codecs) && channel.metarr.metarr_video_transcode_codecs.length > 0 ? channel.metarr.metarr_video_transcode_codecs.join(', ') : (channel.metarr?.metarr_video_transcode_codecs || 'Copy')"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Audio Codec:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_transcode_audio_codec || 'Copy'"></span>
+                              <span class="text-gray-500 dark:text-gray-400">Audio Codecs:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_transcode_audio_codecs) && channel.metarr.metarr_transcode_audio_codecs.length > 0 ? channel.metarr.metarr_transcode_audio_codecs.join(', ') : (channel.metarr?.metarr_transcode_audio_codecs || 'Copy')"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Transcode Quality (CRF):</span>

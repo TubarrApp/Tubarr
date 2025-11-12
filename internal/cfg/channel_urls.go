@@ -19,12 +19,13 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		maxCPU                                                                                                float64
 		vDir, jDir, outDir                                                                                    string
 		urlOutDirs                                                                                            []string
+		videoCodec, audioCodec                                                                                []string
 		cookiesFromBrowser                                                                                    string
 		minFreeMem, renameStyle, metarrExt                                                                    string
 		maxFilesize, externalDownloader, externalDownloaderArgs                                               string
 		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps, filteredFilenameOps                        []string
 		dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
-		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter                             string
+		useGPU, gpuDir, transcodeQuality, transcodeVideoFilter                                                string
 		fromDate, toDate                                                                                      string
 		ytdlpOutExt                                                                                           string
 		useGlobalCookies, pause, resetSettings                                                                bool
@@ -137,7 +138,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				minFreeMem:           minFreeMem,
 				useGPU:               useGPU,
 				gpuDir:               gpuDir,
-				transcodeCodec:       codec,
+				transcodeVideoCodec:  videoCodec,
 				transcodeAudioCodec:  audioCodec,
 				transcodeQuality:     transcodeQuality,
 				transcodeVideoFilter: transcodeVideoFilter,
@@ -219,8 +220,8 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 	// Transcoding
 	setTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuDir,
-		&transcodeVideoFilter, &codec, &audioCodec,
-		&transcodeQuality)
+		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
+		&audioCodec)
 
 	// Additional YTDLP args
 	setCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)

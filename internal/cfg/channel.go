@@ -642,17 +642,18 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		username, password, loginURL string
 		authDetails                  []string
 		notification                 []string
+		videoCodec, audioCodec       []string
 		fromDate, toDate             string
 
 		dlFilters, moveOps, metaOps, filenameOps, filteredMetaOps, filteredFilenameOps []string
 
 		configFile, dlFilterFile, moveOpFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
 
-		crawlFreq, concurrency, metarrConcurrency, retries                                              int
-		maxCPU                                                                                          float64
-		transcodeGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
-		pause, ignoreRun, useGlobalCookies                                                              bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                        string
+		crawlFreq, concurrency, metarrConcurrency, retries                           int
+		maxCPU                                                                       float64
+		transcodeGPU, gpuDir, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
+		pause, ignoreRun, useGlobalCookies                                           bool
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                     string
 	)
 
 	addCmd := &cobra.Command{
@@ -760,15 +761,15 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			}
 
 			// Video codec
-			if codec != "" {
-				if codec, err = validation.ValidateTranscodeCodec(codec, transcodeGPU); err != nil {
+			if len(videoCodec) != 0 {
+				if videoCodec, err = validation.ValidateVideoTranscodeCodecSlice(videoCodec, transcodeGPU); err != nil {
 					return err
 				}
 			}
 
 			// Audio codec
-			if audioCodec != "" {
-				if audioCodec, err = validation.ValidateTranscodeAudioCodec(audioCodec); err != nil {
+			if len(audioCodec) != 0 {
+				if audioCodec, err = validation.ValidateAudioTranscodeCodecSlice(audioCodec); err != nil {
 					return err
 				}
 			}
@@ -873,8 +874,8 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 					Concurrency:          metarrConcurrency,
 					UseGPU:               transcodeGPU,
 					GPUDir:               gpuDir,
-					TranscodeCodec:       codec,
-					TranscodeAudioCodec:  audioCodec,
+					TranscodeVideoCodecs: videoCodec,
+					TranscodeAudioCodecs: audioCodec,
 					TranscodeQuality:     transcodeQuality,
 					TranscodeVideoFilter: transcodeVideoFilter,
 				},
@@ -954,8 +955,8 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	// Transcoding
 	setTranscodeFlags(addCmd, &transcodeGPU, &gpuDir,
-		&transcodeVideoFilter, &codec, &audioCodec,
-		&transcodeQuality)
+		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
+		&audioCodec)
 
 	// YTDLPFlags
 	setCustomYDLPArgFlags(addCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
@@ -1128,6 +1129,7 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
 		urls                                                                                                              []string
+		videoCodec, audioCodec                                                                                            []string
 		id, concurrency, crawlFreq, metarrConcurrency, retries                                                            int
 		maxCPU                                                                                                            float64
 		vDir, jDir, outDir                                                                                                string
@@ -1139,7 +1141,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		authDetails                                                                                                       []string
 		dlFilters, moveOps, metaOps, filteredMetaOps, filenameOps, filteredFilenameOps                                    []string
 		configFile, dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
-		useGPU, gpuDir, codec, audioCodec, transcodeQuality, transcodeVideoFilter                                         string
+		useGPU, gpuDir, transcodeQuality, transcodeVideoFilter                                                            string
 		fromDate, toDate                                                                                                  string
 		ytdlpOutExt                                                                                                       string
 		useGlobalCookies, pause, deleteAuth                                                                               bool
@@ -1278,7 +1280,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				minFreeMem:           minFreeMem,
 				useGPU:               useGPU,
 				gpuDir:               gpuDir,
-				transcodeCodec:       codec,
+				transcodeVideoCodec:  videoCodec,
 				transcodeAudioCodec:  audioCodec,
 				transcodeQuality:     transcodeQuality,
 				transcodeVideoFilter: transcodeVideoFilter,
@@ -1336,8 +1338,8 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 	// Transcoding
 	setTranscodeFlags(updateSettingsCmd, &useGPU, &gpuDir,
-		&transcodeVideoFilter, &codec, &audioCodec,
-		&transcodeQuality)
+		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
+		&audioCodec)
 
 	// Auth
 	setAuthFlags(updateSettingsCmd, &username, &password,
@@ -1419,8 +1421,8 @@ type cobraMetarrArgs struct {
 	minFreeMem           string
 	useGPU               string
 	gpuDir               string
-	transcodeCodec       string
-	transcodeAudioCodec  string
+	transcodeVideoCodec  []string
+	transcodeAudioCodec  []string
 	transcodeQuality     string
 	transcodeVideoFilter string
 }
@@ -1669,16 +1671,16 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Video codec
 	if f.Changed(keys.TranscodeCodec) {
-		validTranscodeCodec := c.transcodeCodec
+		validTranscodeCodec := c.transcodeVideoCodec
 
-		if c.transcodeCodec != "" {
-			validTranscodeCodec, err = validation.ValidateTranscodeCodec(c.transcodeCodec, c.useGPU)
+		if len(c.transcodeVideoCodec) != 0 {
+			validTranscodeCodec, err = validation.ValidateVideoTranscodeCodecSlice(c.transcodeVideoCodec, c.useGPU)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.TranscodeCodec = validTranscodeCodec
+			m.TranscodeVideoCodecs = validTranscodeCodec
 			return nil
 		})
 	}
@@ -1687,14 +1689,14 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	if f.Changed(keys.TranscodeAudioCodec) {
 		validTranscodeAudioCodec := c.transcodeAudioCodec
 
-		if c.transcodeAudioCodec != "" {
-			validTranscodeAudioCodec, err = validation.ValidateTranscodeAudioCodec(c.transcodeAudioCodec)
+		if len(c.transcodeAudioCodec) != 0 {
+			validTranscodeAudioCodec, err = validation.ValidateAudioTranscodeCodecSlice(c.transcodeAudioCodec)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.TranscodeAudioCodec = validTranscodeAudioCodec
+			m.TranscodeAudioCodecs = validTranscodeAudioCodec
 			return nil
 		})
 	}

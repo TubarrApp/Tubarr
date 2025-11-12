@@ -707,31 +707,24 @@
                               <input type="text" x-model="urlEntry.custom.metarr_gpu" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Codec</label>
-                              <select x-model="urlEntry.custom.metarr_transcode_codec" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
-                                <option value="">Use global</option>
-                                <option value="av1">AV1</option>
-                                <option value="h264">H.264</option>
-                                <option value="hevc">HEVC (H.265)</option>
-                                <option value="mpeg2">MPEG-2</option>
-                                <option value="vp8">VP8</option>
-                                <option value="vp9">VP9</option>
-                              </select>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
+                              <textarea
+                                x-model="urlEntry.custom.metarr_video_transcode_codecs"
+                                placeholder="Use global (one per line, e.g. h264:hevc or av1)"
+                                rows="2"
+                                class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
+                              ></textarea>
+                              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., h264:hevc)</p>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Audio Codec</label>
-                              <select x-model="urlEntry.custom.metarr_transcode_audio_codec" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
-                                <option value="">Use global</option>
-                                <option value="aac">AAC</option>
-                                <option value="ac3">AC3</option>
-                                <option value="alac">ALAC</option>
-                                <option value="dts">DTS</option>
-                                <option value="eac3">EAC3</option>
-                                <option value="flac">FLAC</option>
-                                <option value="mp3">MP3</option>
-                                <option value="opus">Opus</option>
-                                <option value="vorbis">Vorbis</option>
-                              </select>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Audio Transcode Codecs</label>
+                              <textarea
+                                x-model="urlEntry.custom.metarr_transcode_audio_codecs"
+                                placeholder="Use global (one per line, e.g. aac or dts:ac3)"
+                                rows="2"
+                                class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
+                              ></textarea>
+                              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., dts:ac3)</p>
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
@@ -1186,45 +1179,34 @@
 
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Video Codec
+                          Video Transcode Codecs
                         </label>
-                        <select
-                          x-model="formData.metarr.metarr_transcode_codec"
-                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        >
-                          <option value="">Copy (no transcoding)</option>
-                          <option value="av1">AV1</option>
-                          <option value="h264">H.264</option>
-                          <option value="hevc">HEVC (H.265)</option>
-                          <option value="mpeg2">MPEG-2</option>
-                          <option value="vp8">VP8</option>
-                          <option value="vp9">VP9</option>
-                        </select>
+                        <textarea
+                          x-model="formData.metarr.metarr_video_transcode_codecs"
+                          placeholder="Leave empty for copy (no transcoding)"
+                          rows="3"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 font-mono"
+                        ></textarea>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          One per line. Examples: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">h264:hevc</code> (convert H.264 to HEVC),
+                          <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">av1</code> (transcode to AV1), or leave empty to copy.
+                        </p>
                       </div>
 
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Audio Codec
+                          Audio Transcode Codecs
                         </label>
-                        <select
-                          x-model="formData.metarr.metarr_transcode_audio_codec"
-                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        >
-                          <option value="">Copy (no transcoding)</option>
-                          <option value="aac">AAC</option>
-                          <option value="ac3">AC3</option>
-                          <option value="alac">ALAC</option>
-                          <option value="dts">DTS</option>
-                          <option value="eac3">EAC3</option>
-                          <option value="flac">FLAC</option>
-                          <option value="mp2">MP2</option>
-                          <option value="mp3">MP3</option>
-                          <option value="opus">Opus</option>
-                          <option value="pcm">PCM</option>
-                          <option value="truehd">TrueHD</option>
-                          <option value="vorbis">Vorbis</option>
-                          <option value="wav">WAV</option>
-                        </select>
+                        <textarea
+                          x-model="formData.metarr.metarr_transcode_audio_codecs"
+                          placeholder="Leave empty for copy (no transcoding)"
+                          rows="3"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 font-mono"
+                        ></textarea>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          One per line. Examples: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">dts:ac3</code> (convert DTS to AC3),
+                          <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">aac</code> (transcode to AAC), or leave empty to copy.
+                        </p>
                       </div>
 
                       <div>
@@ -1516,8 +1498,8 @@
                   metarr_max_cpu_usage: null,
                   metarr_min_free_mem: '',
                   metarr_gpu: '',
-                  metarr_transcode_codec: '',
-                  metarr_transcode_audio_codec: '',
+                  metarr_video_transcode_codecs: '',
+                  metarr_transcode_audio_codecs: '',
                   metarr_transcode_quality: null,
                   metarr_transcode_video_filter: '',
                   metarr_extra_ffmpeg_args: '',
@@ -1559,8 +1541,8 @@
               metarr_min_free_mem: '',
               metarr_gpu: '',
               metarr_gpu_directory: '',
-              metarr_transcode_codec: '',
-              metarr_transcode_audio_codec: '',
+              metarr_video_transcode_codecs: '',
+              metarr_transcode_audio_codecs: '',
               metarr_transcode_quality: '',
               metarr_transcode_video_filter: '',
               metarr_extra_ffmpeg_args: '',
@@ -1613,8 +1595,8 @@
                 metarr_max_cpu_usage: null,
                 metarr_min_free_mem: '',
                 metarr_gpu: '',
-                metarr_transcode_codec: '',
-                metarr_transcode_audio_codec: '',
+                metarr_video_transcode_codecs: '',
+                metarr_transcode_audio_codecs: '',
                 metarr_transcode_quality: null,
                 metarr_transcode_video_filter: '',
                 metarr_extra_ffmpeg_args: '',
@@ -1776,7 +1758,7 @@
                 const metarrFields = [
                   'metarr_output_directory', 'metarr_output_ext', 'metarr_rename_style',
                   'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
-                  'metarr_gpu', 'metarr_transcode_codec', 'metarr_transcode_audio_codec',
+                  'metarr_gpu', 'metarr_video_transcode_codecs', 'metarr_transcode_audio_codecs',
                   'metarr_transcode_quality', 'metarr_transcode_video_filter',
                   'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_filename_ops',
                   'filtered_meta_ops', 'filtered_filename_ops'

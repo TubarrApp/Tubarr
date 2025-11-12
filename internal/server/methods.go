@@ -86,13 +86,14 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						jitter := times.RandomMinsDuration(jitterInt) // Probability, with re-rolls, expect ~half the time added
 						interval += jitter
 					}
+
 				}
 
 				logging.D(2, "Crawl watchdog: channel %q - last scan: %s ago, interval: %s",
 					c.Name, elapsed.Round(time.Second), interval)
 
 				if elapsed >= interval {
-					// -- Crawl launch in goroutine --
+					// Crawl goroutine
 					go func(ch *models.Channel) {
 						if state.CrawlStateActive(ch.Name) {
 							return

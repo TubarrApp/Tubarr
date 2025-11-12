@@ -733,10 +733,10 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 	urlMetarr.TranscodeVideoFilter, c = mergeStringSettings(urlMetarr.TranscodeVideoFilter, channelMetarr.TranscodeVideoFilter)
 	changed = changed || c
 
-	urlMetarr.TranscodeCodec, c = mergeStringSettings(urlMetarr.TranscodeCodec, channelMetarr.TranscodeCodec)
+	urlMetarr.TranscodeVideoCodecs, c = mergeSliceSettings(urlMetarr.TranscodeVideoCodecs, channelMetarr.TranscodeVideoCodecs)
 	changed = changed || c
 
-	urlMetarr.TranscodeAudioCodec, c = mergeStringSettings(urlMetarr.TranscodeAudioCodec, channelMetarr.TranscodeAudioCodec)
+	urlMetarr.TranscodeAudioCodecs, c = mergeSliceSettings(urlMetarr.TranscodeAudioCodecs, channelMetarr.TranscodeAudioCodecs)
 	changed = changed || c
 
 	urlMetarr.TranscodeQuality, c = mergeStringSettings(urlMetarr.TranscodeQuality, channelMetarr.TranscodeQuality)

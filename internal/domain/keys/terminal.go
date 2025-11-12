@@ -34,8 +34,8 @@ const (
 const (
 	TranscodeGPU         string = "transcode-gpu"
 	TranscodeGPUDir      string = "transcode-gpu-directory"
-	TranscodeCodec       string = "transcode-codec"
-	TranscodeAudioCodec  string = "transcode-audio-codec"
+	TranscodeCodec       string = "transcode-video-codecs"
+	TranscodeAudioCodec  string = "transcode-audio-codecs"
 	TranscodeQuality     string = "transcode-quality"
 	TranscodeVideoFilter string = "transcode-video-filter"
 )
@@ -103,7 +103,7 @@ const (
 	MMetaOverwrite           string = "metarr-meta-overwrite"
 	MMetaPreserve            string = "metarr-meta-preserve"
 	MNoFileOverwrite         string = "metarr-no-file-overwrite"
-	MTranscodeAudioCodec     string = "metarr-transcode-audio-codec"
+	MTranscodeAudioCodec     string = "metarr-transcode-audio-codecs"
 	MTranscodeQuality        string = "metarr-transcode-quality"
 	MTranscodeVideoFilter    string = "metarr-transcode-video-filter"
 	MTranscodeVideoCodec     string = "metarr-transcode-video-codec"

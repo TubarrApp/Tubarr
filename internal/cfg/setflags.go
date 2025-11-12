@@ -151,7 +151,7 @@ func setNotifyFlags(cmd *cobra.Command, notification *[]string) {
 }
 
 // setTranscodeFlags sets flags related to video transcoding.
-func setTranscodeFlags(cmd *cobra.Command, gpu, gpuDir, videoFilter, codec, audioCodec, quality *string) {
+func setTranscodeFlags(cmd *cobra.Command, gpu, gpuDir, videoFilter, quality *string, videoCodec, audioCodec *[]string) {
 	if gpu != nil {
 		cmd.Flags().StringVar(gpu, keys.TranscodeGPU, "", "GPU for transcoding.")
 	}
@@ -164,16 +164,16 @@ func setTranscodeFlags(cmd *cobra.Command, gpu, gpuDir, videoFilter, codec, audi
 		cmd.Flags().StringVar(videoFilter, keys.TranscodeVideoFilter, "", "Video filter")
 	}
 
-	if audioCodec != nil {
-		cmd.Flags().StringVar(audioCodec, keys.TranscodeAudioCodec, "", "Codec for transcoding audio (e.g. 'aac' or 'copy').")
-	}
-
-	if codec != nil {
-		cmd.Flags().StringVar(codec, keys.TranscodeCodec, "", "Codec for transcoding (h264/hevc).")
-	}
-
 	if quality != nil {
 		cmd.Flags().StringVar(quality, keys.TranscodeQuality, "", "Transcode quality profile from p1 (worst) to p7 (best).")
+	}
+
+	if audioCodec != nil {
+		cmd.Flags().StringSliceVar(audioCodec, keys.TranscodeAudioCodec, nil, "Codec for transcoding audio (e.g. 'aac' or 'copy').")
+	}
+
+	if videoCodec != nil {
+		cmd.Flags().StringSliceVar(videoCodec, keys.TranscodeCodec, nil, "Codec for transcoding (h264/hevc).")
 	}
 }
 

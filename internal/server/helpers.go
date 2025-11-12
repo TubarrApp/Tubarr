@@ -29,11 +29,11 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	if mArgs.UseGPU != "" {
 		metarrMap["metarr_gpu"] = mArgs.UseGPU
 	}
-	if mArgs.TranscodeCodec != "" {
-		metarrMap["metarr_transcode_codec"] = mArgs.TranscodeCodec
+	if len(mArgs.TranscodeVideoCodecs) != 0 {
+		metarrMap["metarr_video_transcode_codecs"] = mArgs.TranscodeVideoCodecs
 	}
-	if mArgs.TranscodeAudioCodec != "" {
-		metarrMap["metarr_transcode_audio_codec"] = mArgs.TranscodeAudioCodec
+	if len(mArgs.TranscodeAudioCodecs) != 0 {
+		metarrMap["metarr_transcode_audio_codecs"] = mArgs.TranscodeAudioCodecs
 	}
 	if mArgs.TranscodeQuality != "" {
 		metarrMap["metarr_transcode_quality"] = mArgs.TranscodeQuality
