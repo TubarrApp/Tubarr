@@ -243,7 +243,7 @@ func ValidateRenameFlag(flag string) error {
 	case "spaces", "underscores", "fixes-only", "skip", "":
 		return nil
 	default:
-		return errors.New("'spaces', 'underscores' or 'fixes-only' not selected for renaming style, skipping these modifications")
+		return errors.New("'spaces', 'underscores', 'skip', or 'fixes-only' not selected for renaming style, skipping these modifications")
 	}
 }
 
@@ -325,30 +325,28 @@ func ValidatePurgeMetafiles(purgeType string) bool {
 func ValidateGPU(g, devDir string) (gpuType string, dir string, err error) {
 	g = strings.ToLower(strings.TrimSpace(g))
 
-	switch g {
-	case "", "none":
-		return "", "", nil
-	case consts.AccelTypeAuto, "automatic":
-		return consts.AccelTypeAuto, devDir, nil
-
-	case consts.AccelTypeAMF, "radeon", "amd":
-		g = consts.AccelTypeAMF
-
-	case consts.AccelTypeIntel, "intel":
-		g = consts.AccelTypeIntel
-
-	case consts.AccelTypeVAAPI:
-		g = consts.AccelTypeVAAPI
-
-	case consts.AccelTypeNvidia, "nvidia", "nvenc":
-		g = consts.AccelTypeNvidia
-	default:
-		return "", "", fmt.Errorf("GPU %q not supported. Valid: auto, intel, amd, nvidia", g)
+	// Alias lookup
+	if !consts.ValidGPUAccelTypes[g] {
+		switch g {
+		case "", "none":
+			return "", "", nil
+		case "automatic", "automate", "automated":
+			g = consts.AccelTypeAuto
+		case "radeon", "amd":
+			g = consts.AccelTypeAMF
+		case "intel":
+			g = consts.AccelTypeIntel
+		case "nvidia", "nvenc":
+			g = consts.AccelTypeNvidia
+		default:
+			return "", "", fmt.Errorf("GPU %q not supported. Valid: auto, intel, amd, nvidia", g)
+		}
 	}
-
 	// Check device directory exists
-	if _, err := os.Stat(devDir); err != nil {
-		return "", "", fmt.Errorf("cannot access driver location %q: %w", devDir, err)
+	if devDir != "" {
+		if _, err := os.Stat(devDir); err != nil {
+			return "", "", fmt.Errorf("cannot access driver location %q: %w", devDir, err)
+		}
 	}
 
 	return g, devDir, nil
@@ -357,40 +355,44 @@ func ValidateGPU(g, devDir string) (gpuType string, dir string, err error) {
 // ValidateTranscodeAudioCodec validates the audio codec to use.
 func ValidateTranscodeAudioCodec(a string) (string, error) {
 	a = strings.ToLower(strings.TrimSpace(a))
+	a = strings.ReplaceAll(a, ".", "")
+	a = strings.ReplaceAll(a, "-", "")
+	a = strings.ReplaceAll(a, "_", "")
 
-	switch a {
-	case "", "copy":
-		return "", nil
-	case consts.ACodecAAC, "aac-lc", "aaclc":
-		return consts.ACodecAAC, nil
-	case consts.ACodecALAC, "applelossless":
-		return consts.ACodecALAC, nil
-	case consts.ACodecAC3, "ac-3", "ac_3":
-		return consts.ACodecAC3, nil
-	case consts.ACodecEAC3, "dd+", "dolbydigitalplus", "e-ac3":
-		return consts.ACodecEAC3, nil
-	case consts.ACodecMP3, "libmp3lame", "mpg3":
-		return consts.ACodecMP3, nil
-	case consts.ACodecOpus, "opuscodec":
-		return consts.ACodecOpus, nil
-	case consts.ACodecVorbis, "ogg", "vorbiscodec":
-		return consts.ACodecVorbis, nil
-	case consts.ACodecDTS, "dts-hd", "dts-hdma", "dtscodec":
-		return consts.ACodecDTS, nil
-	case consts.ACodecFLAC, "flaccodec":
-		return consts.ACodecFLAC, nil
-	case consts.ACodecMP2, "mpa", "mp2codec":
-		return consts.ACodecMP2, nil
-	case consts.ACodecPCM, "pcm_s16le", "pcm_s24le":
-		return consts.ACodecPCM, nil
-	case consts.ACodecTrueHD, "truehdcodec":
-		return consts.ACodecTrueHD, nil
-	case consts.ACodecWAV, "wavcodec":
-		return consts.ACodecWAV, nil
-	default:
-		return "", fmt.Errorf(
-			"audio codec %q is not supported. Supported: AAC, ALAC, AC3, EAC3, MP3, Opus, Vorbis, DTS, FLAC, MP2, PCM, TrueHD, WAV", a)
+	if !consts.ValidAudioCodecs[a] {
+		switch a {
+		case "", "none", "auto", "automatic", "automated":
+			a = ""
+		case "aac", "aaclc", "m4a", "mp4a", "aaclowcomplexity":
+			a = consts.ACodecAAC
+		case "alac", "applelossless", "m4aalac":
+			a = consts.ACodecALAC
+		case "dca", "dts", "dtshd", "dtshdma", "dtsma", "dtsmahd", "dtscodec":
+			a = consts.ACodecDTS
+		case "ddplus", "dolbydigitalplus", "ac3e", "ec3", "eac3":
+			a = consts.ACodecEAC3
+		case "flac", "flaccodec", "fla", "losslessflac":
+			a = consts.ACodecFLAC
+		case "mp2", "mpa", "mpeg2audio", "mpeg2", "m2a", "mp2codec":
+			a = consts.ACodecMP2
+		case "mp3", "libmp3lame", "mpeg3", "mpeg3audio", "mpg3", "mp3codec":
+			a = consts.ACodecMP3
+		case "opus", "opuscodec", "oggopus", "webmopus":
+			a = consts.ACodecOpus
+		case "pcm", "wavpcm", "rawpcm", "pcm16", "pcms16le", "pcms24le", "pcmcodec":
+			a = consts.ACodecPCM
+		case "truehd", "dolbytruehd", "thd", "truehdcodec":
+			a = consts.ACodecTrueHD
+		case "vorbis", "oggvorbis", "webmvorbis", "vorbiscodec", "vorb":
+			a = consts.ACodecVorbis
+		case "wav", "wave", "waveform", "pcmwave", "wavcodec":
+			a = consts.ACodecWAV
+		default:
+			return "", fmt.Errorf(
+				"audio codec %q is not supported. Supported: %v", a, consts.ValidAudioCodecs)
+		}
 	}
+	return a, nil
 }
 
 // ValidateTranscodeCodec validates the video codec based on GPU acceleration.
@@ -398,30 +400,32 @@ func ValidateTranscodeCodec(c, accel string) (string, error) {
 	c = strings.ToLower(strings.TrimSpace(c))
 	c = strings.ReplaceAll(c, ".", "")
 	c = strings.ReplaceAll(c, "-", "")
+	c = strings.ReplaceAll(c, "_", "")
 
-	switch c {
-	case "", "auto":
-		if accel == "" || accel == consts.AccelTypeAuto {
-			return "", nil
+	if !consts.ValidVideoCodecs[c] {
+		switch c {
+		case "", "none", "auto", "automatic", "automated":
+			if accel == "" || accel == consts.AccelTypeAuto {
+				return "", nil
+			}
+			return "", fmt.Errorf("GPU acceleration %q requires a codec (entered %q)", accel, c)
+		case "aom", "libaom", "libaomav1", "av01", "svtav1", "libsvtav1":
+			c = consts.VCodecAV1
+		case "x264", "avc", "h264avc", "mpeg4avc", "h264mpeg4", "libx264":
+			c = consts.VCodecH264
+		case "x265", "h265", "hevc265", "libx265", "hevc":
+			c = consts.VCodecHEVC
+		case "mpg2", "mpeg2video", "mpeg2v", "mpg", "mpeg", "mpeg2":
+			c = consts.VCodecMPEG2
+		case "libvpx", "vp08", "vpx", "vpx8":
+			c = consts.VCodecVP8
+		case "libvpxvp9", "libvpx9", "vpx9", "vp09", "vpxvp9":
+			c = consts.VCodecVP9
+		default:
+			return "", fmt.Errorf("video codec %q is not supported. Supported: h264, hevc, av1, mpeg2, vp8, vp9", c)
 		}
-		return "", fmt.Errorf(
-			"GPU acceleration %q requires a codec. Supported: h264, hevc", accel)
-	case consts.VCodecH264, "x264", "avc", "h.264":
-		return consts.VCodecH264, nil
-	case consts.VCodecHEVC, "h265", "x265", "h.265":
-		return consts.VCodecHEVC, nil
-	case consts.VCodecAV1, "aom", "libaom", "svtav1", "libsvtav1":
-		return consts.VCodecAV1, nil
-	case consts.VCodecMPEG2, "mpg2", "mpeg2video", "mp2":
-		return consts.VCodecMPEG2, nil
-	case consts.VCodecVP8, "libvpx", "vpx8":
-		return consts.VCodecVP8, nil
-	case consts.VCodecVP9, "libvpxvp9", "vpx9", "vp09":
-		return consts.VCodecVP9, nil
-	default:
-		return "", fmt.Errorf(
-			"video codec %q is not supported. Supported: h264, hevc, av1, mpeg2, vp8, vp9", c)
 	}
+	return c, nil
 }
 
 // ValidateTranscodeQuality validates the transcode quality preset.
@@ -442,6 +446,6 @@ func ValidateTranscodeQuality(q string) (quality string, err error) {
 
 // ValidateTranscodeVideoFilter validates the transcode video filter preset.
 func ValidateTranscodeVideoFilter(q string) (vf string, err error) {
-	logging.D(1, "No checks in place for transcode video filter at present...")
+	logging.D(1, "No checks in place for transcode video filter...")
 	return q, nil
 }
