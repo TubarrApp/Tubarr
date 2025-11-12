@@ -37,7 +37,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 			return
 		case <-ticker.C:
 			// Reload channels from database to get updated LastScan times
-			freshChannels, hasRows, err := ss.s.ChannelStore().GetAllChannels()
+			freshChannels, hasRows, err := ss.s.ChannelStore().GetAllChannels(true)
 			if err != nil {
 				logging.E("Crawl watchdog: failed to reload channels: %v", err)
 				continue
@@ -77,7 +77,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						defer cancel()
 
 						logging.I("Crawl watchdog: triggering scheduled crawl for channel %q", ch.Name)
-						if err := app.CrawlChannel(crawlCtx, ss.s, ss.cs, ch); err != nil {
+						if err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {
 							logging.E("Crawl watchdog: error crawling channel %q: %v", ch.Name, err)
 						} else {
 							logging.S("Crawl watchdog: successfully completed crawl for channel %q", ch.Name)

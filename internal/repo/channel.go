@@ -200,7 +200,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	}
 
 	// Reload URL models
-	c.URLModels, err = cs.GetChannelURLModels(c)
+	c.URLModels, err = cs.GetChannelURLModels(c, true)
 	if err != nil {
 		return fmt.Errorf("failed to reload URL models after cascade: %w", err)
 	}
@@ -666,7 +666,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 }
 
 // GetChannelModel fills the channel model from the database.
-func (cs *ChannelStore) GetChannelModel(key, val string) (*models.Channel, bool, error) {
+func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent bool) (*models.Channel, bool, error) {
 	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
 		return nil, false, err
 	}
@@ -720,7 +720,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string) (*models.Channel, bool,
 		}
 	}
 
-	c.URLModels, err = cs.GetChannelURLModels(&c)
+	c.URLModels, err = cs.GetChannelURLModels(&c, mergeURLsWithParent)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to fetch URL models for channel: %w", err)
 	}
@@ -729,7 +729,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string) (*models.Channel, bool,
 }
 
 // GetAllChannels retrieves all channels in the database.
-func (cs *ChannelStore) GetAllChannels() (channels []*models.Channel, hasRows bool, err error) {
+func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error) {
 	query := squirrel.
 		Select(
 			consts.QChanID,
@@ -791,7 +791,7 @@ func (cs *ChannelStore) GetAllChannels() (channels []*models.Channel, hasRows bo
 		channelList = append(channelList, &c)
 	}
 
-	urlMap, err := cs.getChannelURLModelsMap(0)
+	urlMap, err := cs.getChannelURLModelsMap(0, true)
 	if err != nil {
 		return nil, true, err
 	}

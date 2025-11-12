@@ -43,7 +43,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Get channel model
-			c, hasRows, err := cs.GetChannelModel(key, val)
+			c, hasRows, err := cs.GetChannelModel(key, val, false)
 			if err != nil {
 				return err
 			}
@@ -56,7 +56,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			if url != "" {
 				// Update specific URL
-				cu, hasRows, err := cs.GetChannelURLModel(c.ID, url)
+				cu, hasRows, err := cs.GetChannelURLModel(c.ID, url, false)
 				if err != nil {
 					return err
 				}

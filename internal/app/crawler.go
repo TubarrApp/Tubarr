@@ -27,7 +27,7 @@ import (
 func CheckChannels(ctx context.Context, s contracts.Store) error {
 	// Grab all channels from database
 	cs := s.ChannelStore()
-	channels, hasRows, err := cs.GetAllChannels()
+	channels, hasRows, err := cs.GetAllChannels(true)
 	if !hasRows {
 		logging.I("No channels in database")
 	} else if err != nil {
@@ -82,7 +82,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 			}()
 
 			// Initiate crawl
-			if err := CrawlChannel(ctx, s, cs, c); err != nil {
+			if err := CrawlChannel(ctx, s, c); err != nil {
 				errChan <- err
 			}
 		}(c)
@@ -264,10 +264,11 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 }
 
 // CrawlChannel crawls a channel for new URLs.
-func CrawlChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel) (err error) {
+func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (err error) {
 	if c == nil {
 		return fmt.Errorf("channel cannot be nil")
 	}
+	cs := s.ChannelStore()
 
 	// Add random sleep before processing (added bot detection)
 	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
@@ -487,7 +488,7 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 
 	// If not found in memory, check database directly
 	// This handles cases where the channel was loaded before the manual entry was created
-	existingCU, hasRows, err := cs.GetChannelURLModel(c.ID, consts.ManualDownloadsCol)
+	existingCU, hasRows, err := cs.GetChannelURLModel(c.ID, consts.ManualDownloadsCol, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for existing manual downloads URL: %w", err)
 	}

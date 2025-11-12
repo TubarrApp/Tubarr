@@ -469,6 +469,20 @@
                         </svg>
                         <span x-text="crawling === channel.id ? 'Crawling...' : 'Crawl Now'"></span>
                       </button>
+                      <button
+                        @click="ignoreCrawlChannel(channel.id)"
+                        :disabled="ignoring === channel.id"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg x-show="ignoring !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <svg x-show="ignoring === channel.id" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span x-text="ignoring === channel.id ? 'Ignoring...' : 'Ignore to Date'"></span>
+                      </button>
                       <a
                         :href="'active-downloads.html?channel=' + channel.id"
                         class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
@@ -596,6 +610,7 @@
           loading: true,
           error: null,
           crawling: null,
+          ignoring: null,
 
           async loadChannels() {
             try {
@@ -726,6 +741,29 @@
               alert(`Failed to start crawl: ${err.message}`);
             } finally {
               this.crawling = null;
+            }
+          },
+
+          async ignoreCrawlChannel(channelId) {
+            if (this.ignoring) return;
+
+            this.ignoring = channelId;
+
+            try {
+              const response = await fetch(`/api/v1/channels/${channelId}/ignore-crawl`, {
+                method: 'POST'
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to ignore uploads to date');
+              }
+
+              const data = await response.json();
+              alert(data.message || 'All uploads to date have been ignored');
+            } catch (err) {
+              alert(`Failed to ignore uploads: ${err.message}`);
+            } finally {
+              this.ignoring = null;
             }
           }
         };

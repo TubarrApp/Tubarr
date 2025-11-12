@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -82,7 +83,7 @@ func filterConflictingFilenameOps(fileOps, dbOps []models.FilenameOps) []models.
 		if !fileOpKeys[op.OpType] || !isConflictingFilenameOp[op.OpType] {
 			result = append(result, op)
 		} else {
-			logging.D(2, "File filename op overrides DB op: %s", parsing.BuildFilenameOpsKey(op))
+			logging.D(2, "File filename op overrides DB op: %s", keys.BuildFilenameOpsKey(op))
 		}
 	}
 	return result
@@ -96,7 +97,7 @@ func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.Fil
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.FilenameOps, 0, len(ops))
 	for _, op := range ops {
-		key := parsing.BuildFilenameOpsKey(op)
+		key := keys.BuildFilenameOpsKey(op)
 		if !matchedFilteredKeys[key] {
 			logging.D(2, "Added filename operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -122,13 +123,13 @@ func extractMatchedFilteredFilenameOps(filteredOps []models.FilteredFilenameOps)
 
 // buildFilenameOpKeySet creates a set of keys from filename ops
 func buildFilenameOpKeySet(ops []models.FilenameOps, includeNonConflicting bool) map[string]bool {
-	keys := make(map[string]bool, len(ops))
+	filenameOpsKeys := make(map[string]bool, len(ops))
 	for _, op := range ops {
 		if includeNonConflicting || !isConflictingFilenameOp[op.OpType] {
-			keys[parsing.BuildFilenameOpsKey(op)] = true
+			filenameOpsKeys[keys.BuildFilenameOpsKey(op)] = true
 		}
 	}
-	return keys
+	return filenameOpsKeys
 }
 
 // filterFilenameOpsByChannel filters out meta operations not matching the current channel.
@@ -149,7 +150,7 @@ func getDedupedFilenameOpStrings(ops []models.FilenameOps) []string {
 
 	// Make deduplicated filename op slice
 	for _, op := range ops {
-		opStr := parsing.BuildFilenameOpsKey(op)
+		opStr := keys.BuildFilenameOpsKey(op)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)

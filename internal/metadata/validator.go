@@ -280,7 +280,7 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 // handleMoveOps checks if Metarr should use an output directory based on existent metadata.
 func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
 	// Work with a copy of database move ops
-	allMoveOps := make([]models.MoveOps, len(cu.ChanURLSettings.MoveOps))
+	allMoveOps := make([]models.MetaFilterMoveOps, len(cu.ChanURLSettings.MoveOps))
 	copy(allMoveOps, cu.ChanURLSettings.MoveOps)
 
 	// Add file-based move ops (ephemeral - re-read each time)
@@ -308,8 +308,8 @@ func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 }
 
 // getRelevantMoveOps returns move operations applicable to the given URL.
-func getRelevantMoveOps(moveOps []models.MoveOps, currentURL string) []models.MoveOps {
-	relevant := make([]models.MoveOps, 0, len(moveOps))
+func getRelevantMoveOps(moveOps []models.MetaFilterMoveOps, currentURL string) []models.MetaFilterMoveOps {
+	relevant := make([]models.MetaFilterMoveOps, 0, len(moveOps))
 
 	for _, op := range moveOps {
 		// Include if no specific URL specified, or if it matches current URL

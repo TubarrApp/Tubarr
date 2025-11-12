@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -81,7 +82,7 @@ func filterConflictingMetaOps(fileOps, dbOps []models.MetaOps) []models.MetaOps 
 		if !fileOpKeys[op.Field+":"+op.OpType] || isNonConflictingMetaOp[op.OpType] {
 			result = append(result, op)
 		} else {
-			logging.D(2, "File meta op overrides DB op: %s", parsing.BuildMetaOpsKey(op))
+			logging.D(2, "File meta op overrides DB op: %s", keys.BuildMetaOpsKey(op))
 		}
 	}
 	return result
@@ -95,7 +96,7 @@ func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMet
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.MetaOps, 0, len(ops))
 	for _, op := range ops {
-		key := parsing.BuildMetaOpsKey(op)
+		key := keys.BuildMetaOpsKey(op)
 		if !matchedFilteredKeys[key] {
 			logging.D(2, "Added operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -121,13 +122,13 @@ func extractMatchedFilteredMetaOps(filteredOps []models.FilteredMetaOps) []model
 
 // buildKeySet creates a set of keys from meta ops
 func buildMetaOpKeySet(ops []models.MetaOps, includeNonConflicting bool) map[string]bool {
-	keys := make(map[string]bool, len(ops))
+	metaOpsKeys := make(map[string]bool, len(ops))
 	for _, op := range ops {
 		if includeNonConflicting || !isNonConflictingMetaOp[op.OpType] {
-			keys[parsing.BuildMetaOpsKey(op)] = true
+			metaOpsKeys[keys.BuildMetaOpsKey(op)] = true
 		}
 	}
-	return keys
+	return metaOpsKeys
 }
 
 // filterMetaOpsByChannel filters out meta operations not matching the current channel.
@@ -147,7 +148,7 @@ func getDedupedMetaOpStrings(ops []models.MetaOps) []string {
 	result := make([]string, 0, len(ops))
 
 	for _, op := range ops {
-		opStr := parsing.BuildMetaOpsKey(op)
+		opStr := keys.BuildMetaOpsKey(op)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)

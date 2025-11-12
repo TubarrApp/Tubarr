@@ -443,7 +443,7 @@
                 </div>
 
                 <!-- Channel URLs -->
-                <div class="space-y-4">
+                <div class="space-y-4 mt-6">
                   <div class="flex items-center justify-between">
                     <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">Channel URLs</h4>
                     <button
@@ -466,7 +466,7 @@
                           type="button"
                           @click="removeURL(index)"
                           x-show="formData.urls.length > 1"
-                          class="text-red-500 hover:text-red-700 text-sm"
+                          class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm"
                         >
                           Remove
                         </button>
@@ -579,48 +579,48 @@
                           <div class="grid grid-cols-2 gap-2">
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Directory</label>
-                              <input type="text" x-model="urlEntry.custom.video_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.video_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">JSON Directory</label>
-                              <input type="text" x-model="urlEntry.custom.json_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.json_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Concurrency</label>
-                              <input type="number" x-model.number="urlEntry.custom.max_concurrency" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.max_concurrency" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Crawl Frequency (min)</label>
-                              <input type="number" x-model.number="urlEntry.custom.crawl_freq" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.crawl_freq" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Download Retries</label>
-                              <input type="number" x-model.number="urlEntry.custom.download_retries" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.download_retries" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Filesize</label>
-                              <input type="text" x-model="urlEntry.custom.max_filesize" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.max_filesize" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">From Date</label>
-                              <input type="text" x-model="urlEntry.custom.from_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.from_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">To Date</label>
-                              <input type="text" x-model="urlEntry.custom.to_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.to_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Channel Config File</label>
-                              <input type="text" x-model="urlEntry.custom.channel_config_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.channel_config_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filter File</label>
-                              <input type="text" x-model="urlEntry.custom.filter_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.filter_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filters (one per line)</label>
-                            <textarea x-model="urlEntry.custom.filters" rows="3" placeholder="title:contains:keyword:must" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.filters" rows="3" placeholder="title:contains:keyword:must" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                         </div>
 
@@ -641,32 +641,32 @@
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Cookies From Browser</label>
-                              <input type="text" x-model="urlEntry.custom.cookies_from_browser" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.cookies_from_browser" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader</label>
-                              <input type="text" x-model="urlEntry.custom.external_downloader" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.external_downloader" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader Args</label>
-                              <input type="text" x-model="urlEntry.custom.external_downloader_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.external_downloader_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Meta Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Move Operations File</label>
-                            <input type="text" x-model="urlEntry.custom.move_ops_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                            <input type="text" x-model="urlEntry.custom.move_ops_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Move Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.move_ops" rows="2" placeholder="title:keyword:/path" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.move_ops" rows="2" placeholder="title:keyword:/path" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                         </div>
 
@@ -675,7 +675,7 @@
                           <div class="grid grid-cols-2 gap-2">
                             <div class="col-span-2">
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Directory</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_output_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.metarr_output_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
@@ -700,19 +700,19 @@
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Concurrency</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_max_cpu_usage" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.metarr_max_cpu_usage" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Min Free Memory</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_min_free_mem" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.metarr_min_free_mem" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_gpu" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.metarr_gpu" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Codec</label>
@@ -743,32 +743,32 @@
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_transcode_quality" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.metarr_transcode_quality" placeholder="Global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Video Filter</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_transcode_video_filter" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.metarr_transcode_video_filter" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_extra_ffmpeg_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="text" x-model="urlEntry.custom.metarr_extra_ffmpeg_args" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Meta Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" placeholder="artist:set:Value" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" placeholder="artist:set:Value" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filename Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" placeholder="prefix:[PREFIX] " class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" placeholder="prefix:[PREFIX] " class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.filtered_meta_ops" rows="2" placeholder="filter_rule|meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.filtered_meta_ops" rows="2" placeholder="filter_rule|meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.filtered_filename_ops" rows="2" placeholder="filter_rule|filename_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.filtered_filename_ops" rows="2" placeholder="filter_rule|filename_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                         </div>
 
@@ -1480,7 +1480,6 @@
     <!-- ===== Page Wrapper End ===== -->
 
     <script defer src="bundle.js"></script>
-    <script defer src="bundle.js"></script>
     <script>
       function channelForm() {
         return {
@@ -1490,56 +1489,7 @@
             name: '',
             ignore_run: false,
             notifications: '',
-            urls: [
-              {
-                url: '',
-                hasAuth: false,
-                username: '',
-                password: '',
-                loginURL: '',
-                hasCustomSettings: false,
-                custom: {
-                  // Basic settings
-                  video_directory: '',
-                  json_directory: '',
-                  max_concurrency: null,
-                  crawl_freq: null,
-                  download_retries: null,
-                  max_filesize: '',
-                  from_date: '',
-                  to_date: '',
-                  channel_config_file: '',
-                  filter_file: '',
-                  filters: '',
-                  // Advanced settings
-                  ytdlp_output_ext: '',
-                  cookies_from_browser: '',
-                  external_downloader: '',
-                  external_downloader_args: '',
-                  extra_ytdlp_video_args: '',
-                  extra_ytdlp_meta_args: '',
-                  move_ops_file: '',
-                  move_ops: '',
-                  // Metarr settings
-                  metarr_output_directory: '',
-                  metarr_output_ext: '',
-                  metarr_rename_style: '',
-                  metarr_concurrency: null,
-                  metarr_max_cpu_usage: null,
-                  metarr_min_free_mem: '',
-                  metarr_gpu: '',
-                  metarr_transcode_codec: '',
-                  metarr_transcode_audio_codec: '',
-                  metarr_transcode_quality: null,
-                  metarr_transcode_video_filter: '',
-                  metarr_extra_ffmpeg_args: '',
-                  metarr_meta_ops: '',
-                  metarr_filename_ops: '',
-                  filtered_meta_ops: '',
-                  filtered_filename_ops: ''
-                }
-              }
-            ],
+            urls: [],
             settings: {
               video_directory: '',
               json_directory: '',
@@ -1673,14 +1623,7 @@
                     Object.keys(urlSettings.settings).forEach(key => {
                       const value = urlSettings.settings[key];
                       if (value !== null && value !== undefined) {
-                        // Convert space-separated strings to newline-separated for textareas
-                        if (typeof value === 'string' && (key === 'filters' || key === 'move_ops' || 
-                            key === 'metarr_meta_ops' || key === 'metarr_filename_ops' || 
-                            key === 'filtered_meta_ops' || key === 'filtered_filename_ops')) {
-                          urlEntry.custom[key] = value.split(' ').filter(v => v).join('\n');
-                        } else {
-                          urlEntry.custom[key] = value;
-                        }
+                        urlEntry.custom[key] = value;
                       }
                     });
                   }
@@ -1690,14 +1633,7 @@
                     Object.keys(urlSettings.metarr).forEach(key => {
                       const value = urlSettings.metarr[key];
                       if (value !== null && value !== undefined) {
-                        // Convert space-separated strings to newline-separated for textareas
-                        if (typeof value === 'string' && (key === 'metarr_meta_ops' || 
-                            key === 'metarr_filename_ops' || key === 'filtered_meta_ops' || 
-                            key === 'filtered_filename_ops')) {
-                          urlEntry.custom[key] = value.split(' ').filter(v => v).join('\n');
-                        } else {
-                          urlEntry.custom[key] = value;
-                        }
+                        urlEntry.custom[key] = value;
                       }
                     });
                   }
@@ -1712,10 +1648,7 @@
               Object.keys(data.settings).forEach(key => {
                 const value = data.settings[key];
                 if (value !== null && value !== undefined && this.formData.settings.hasOwnProperty(key)) {
-                  // Convert space-separated strings to newline-separated for textareas
-                  if (typeof value === 'string' && (key === 'filters' || key === 'move_ops')) {
-                    this.formData.settings[key] = value.split(' ').filter(v => v).join('\n');
-                  } else if (key === 'use_global_cookies') {
+                  if (key === 'use_global_cookies') {
                     this.formData.settings[key] = value === 'true' || value === true;
                   } else {
                     this.formData.settings[key] = value;
@@ -1729,14 +1662,7 @@
               Object.keys(data.metarr).forEach(key => {
                 const value = data.metarr[key];
                 if (value !== null && value !== undefined && this.formData.metarr.hasOwnProperty(key)) {
-                  // Convert space-separated strings to newline-separated for textareas
-                  if (typeof value === 'string' && (key === 'metarr_meta_ops' || 
-                      key === 'metarr_filename_ops' || key === 'filtered_meta_ops' || 
-                      key === 'filtered_filename_ops')) {
-                    this.formData.metarr[key] = value.split(' ').filter(v => v).join('\n');
-                  } else {
-                    this.formData.metarr[key] = value;
-                  }
+                  this.formData.metarr[key] = value;
                 }
               });
             }
@@ -1830,25 +1756,8 @@
                 payload.url_settings = JSON.stringify(perURLSettings);
               }
 
-              // Convert textarea content (newlines) to space-separated for backend
-              if (payload.filters && payload.filters.includes('\n')) {
-                payload.filters = payload.filters.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
-              if (payload.move_ops && payload.move_ops.includes('\n')) {
-                payload.move_ops = payload.move_ops.split('\n').map(m => m.trim()).filter(m => m).join(' ');
-              }
-              if (payload.metarr_meta_ops && payload.metarr_meta_ops.includes('\n')) {
-                payload.metarr_meta_ops = payload.metarr_meta_ops.split('\n').map(m => m.trim()).filter(m => m).join(' ');
-              }
-              if (payload.metarr_filename_ops && payload.metarr_filename_ops.includes('\n')) {
-                payload.metarr_filename_ops = payload.metarr_filename_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
-              if (payload.filtered_meta_ops && payload.filtered_meta_ops.includes('\n')) {
-                payload.filtered_meta_ops = payload.filtered_meta_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
-              if (payload.filtered_filename_ops && payload.filtered_filename_ops.includes('\n')) {
-                payload.filtered_filename_ops = payload.filtered_filename_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
+              // Backend expects newline-separated operations to preserve values with spaces
+              // No conversion needed - textareas already contain newline-separated values
 
               // Add ignore_run if checked (backend expects "true" string or absence)
               if (this.formData.ignore_run) {
@@ -1932,9 +1841,9 @@
                 settingsFields.forEach(field => {
                   const value = urlEntry.custom[field];
                   if (value !== null && value !== undefined && value !== '') {
-                    // Convert newlines to space-separated for text areas
+                    // Keep newlines for operations (filters, move_ops) to preserve values with spaces
                     if (typeof value === 'string' && value.includes('\n')) {
-                      settings[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
+                      settings[field] = value.split('\n').map(v => v.trim()).filter(v => v).join('\n');
                     } else {
                       settings[field] = value;
                     }
@@ -1954,9 +1863,9 @@
                 metarrFields.forEach(field => {
                   const value = urlEntry.custom[field];
                   if (value !== null && value !== undefined && value !== '') {
-                    // Convert newlines to space-separated for text areas
+                    // Keep newlines for operations to preserve values with spaces
                     if (typeof value === 'string' && value.includes('\n')) {
-                      metarr[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
+                      metarr[field] = value.split('\n').map(v => v.trim()).filter(v => v).join('\n');
                     } else {
                       metarr[field] = value;
                     }

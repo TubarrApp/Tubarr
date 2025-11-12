@@ -23,7 +23,7 @@ import (
 
 // handleListChannels lists Tubarr channels.
 func handleListChannels(w http.ResponseWriter, r *http.Request) {
-	channels, found, err := ss.cs.GetAllChannels()
+	channels, found, err := ss.cs.GetAllChannels(false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -41,7 +41,7 @@ func handleListChannels(w http.ResponseWriter, r *http.Request) {
 func handleGetChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	c, found, err := ss.cs.GetChannelModel("id", id)
+	c, found, err := ss.cs.GetChannelModel("id", id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -51,8 +51,64 @@ func handleGetChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build response with properly formatted data for the edit form
+	response := make(map[string]any)
+	response["id"] = c.ID
+	response["name"] = c.Name
+	response["urls"] = c.GetURLs()
+	response["last_scan"] = c.LastScan
+	response["created_at"] = c.CreatedAt
+	response["updated_at"] = c.UpdatedAt
+
+	// Convert global settings to map with string representations
+	if c.ChanSettings != nil {
+		settingsMap := settingsJSONMap(c.ChanSettings)
+		response["settings"] = settingsMap
+	}
+
+	// Convert global metarr args to map with string representations
+	if c.ChanMetarrArgs != nil {
+		metarrMap := metarrArgsJSONMap(c.ChanMetarrArgs)
+		response["metarr"] = metarrMap
+	}
+
+	// Build auth_details array
+	authDetails := make([]map[string]string, 0)
+	for _, urlModel := range c.URLModels {
+		if urlModel.Username != "" || urlModel.LoginURL != "" {
+			authDetails = append(authDetails, map[string]string{
+				"channel_url": urlModel.URL,
+				"username":    urlModel.Username,
+				"password":    urlModel.Password,
+				"login_url":   urlModel.LoginURL,
+			})
+		}
+	}
+	response["auth_details"] = authDetails
+
+	// Build url_settings map with per-URL custom settings and display strings
+	urlSettings := make(map[string]map[string]any)
+	for _, urlModel := range c.URLModels {
+		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil {
+			urlSettings[urlModel.URL] = make(map[string]any)
+
+			// Add settings with display strings
+			if urlModel.ChanURLSettings != nil {
+				settingsMap := settingsJSONMap(urlModel.ChanURLSettings)
+				urlSettings[urlModel.URL]["settings"] = settingsMap
+			}
+
+			// Add metarr with display strings
+			if urlModel.ChanURLMetarrArgs != nil {
+				metarrMap := metarrArgsJSONMap(urlModel.ChanURLMetarrArgs)
+				urlSettings[urlModel.URL]["metarr"] = metarrMap
+			}
+		}
+	}
+	response["url_settings"] = urlSettings
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(c); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "failed to encode JSON", http.StatusInternalServerError)
 	}
 }
@@ -81,15 +137,33 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse per-URL settings JSON if provided
-	urlSettingsMap := make(map[string]struct {
-		Settings *models.Settings   `json:"settings"`
-		Metarr   *models.MetarrArgs `json:"metarr"`
-	})
+	urlSettingsRaw := make(map[string]map[string]map[string]any)
 	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
-		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsMap); err != nil {
+		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsRaw); err != nil {
 			http.Error(w, fmt.Sprintf("invalid url_settings JSON: %v", err), http.StatusBadRequest)
 			return
 		}
+	}
+
+	// Parse the URL settings into proper structures
+	urlSettingsMap := make(map[string]struct {
+		Settings *models.Settings
+		Metarr   *models.MetarrArgs
+	})
+	for channelURL, settingsData := range urlSettingsRaw {
+		parsed := struct {
+			Settings *models.Settings
+			Metarr   *models.MetarrArgs
+		}{}
+
+		if settingsMap, hasSettings := settingsData["settings"]; hasSettings {
+			parsed.Settings = parseSettingsFromMap(settingsMap)
+		}
+		if metarrMap, hasMetarr := settingsData["metarr"]; hasMetarr {
+			parsed.Metarr = parseMetarrArgsFromMap(metarrMap)
+		}
+
+		urlSettingsMap[channelURL] = parsed
 	}
 
 	// Add channel URLs
@@ -183,7 +257,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get existing channel
-	existingChannel, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr)
+	existingChannel, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -245,15 +319,33 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse per-URL settings JSON if provided
-	urlSettingsMap := make(map[string]struct {
-		Settings *models.Settings   `json:"settings"`
-		Metarr   *models.MetarrArgs `json:"metarr"`
-	})
+	urlSettingsRaw := make(map[string]map[string]map[string]any)
 	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
-		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsMap); err != nil {
+		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsRaw); err != nil {
 			http.Error(w, fmt.Sprintf("invalid url_settings JSON: %v", err), http.StatusBadRequest)
 			return
 		}
+	}
+
+	// Parse the URL settings into proper structures
+	urlSettingsMap := make(map[string]struct {
+		Settings *models.Settings
+		Metarr   *models.MetarrArgs
+	})
+	for channelURL, settingsData := range urlSettingsRaw {
+		parsed := struct {
+			Settings *models.Settings
+			Metarr   *models.MetarrArgs
+		}{}
+
+		if settingsMap, hasSettings := settingsData["settings"]; hasSettings {
+			parsed.Settings = parseSettingsFromMap(settingsMap)
+		}
+		if metarrMap, hasMetarr := settingsData["metarr"]; hasMetarr {
+			parsed.Metarr = parseMetarrArgsFromMap(metarrMap)
+		}
+
+		urlSettingsMap[channelURL] = parsed
 	}
 
 	// Build map of existing URLs
@@ -306,10 +398,14 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 			existingURLModel.LoginURL = parsedLoginURL
 			existingURLModel.UpdatedAt = now
 
-			// Apply per-URL custom settings if they exist
+			// Apply per-URL custom settings if they exist, otherwise clear them
 			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
 				existingURLModel.ChanURLSettings = urlSettings.Settings
 				existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
+			} else {
+				// No custom settings for this URL - clear any existing ones
+				existingURLModel.ChanURLSettings = nil
+				existingURLModel.ChanURLMetarrArgs = nil
 			}
 
 			if err := ss.cs.UpdateChannelURLSettings(existingURLModel); err != nil {
@@ -356,7 +452,7 @@ func handleUpdateChannelURLSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cURL, found, err := ss.cs.GetChannelURLModel(id, cURLStr)
+	cURL, found, err := ss.cs.GetChannelURLModel(id, cURLStr, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -402,7 +498,7 @@ func handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
 // handleGetAllVideos retrieves all videos, ignored or finished, for a given channel.
 func handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -472,7 +568,7 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 // handleGetDownloads retrieves active downloads for a given channel.
 func handleGetDownloads(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -531,7 +627,7 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -549,7 +645,7 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 
 			ctx := context.Background()
 			logging.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
-			if err := app.CrawlChannel(ctx, ss.s, ss.cs, c); err != nil {
+			if err := app.CrawlChannel(ctx, ss.s, c); err != nil {
 				logging.E("Failed to crawl channel %q: %v", c.Name, err)
 			} else {
 				logging.S("Successfully completed crawl for channel %q", c.Name)
@@ -564,10 +660,52 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"message": "Channel crawl already running for channel"}`))
 }
 
+// handleIgnoreCrawlChannel initiates a crawl for a specific channel.
+func handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
+		return
+	}
+
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found || c == nil {
+		http.Error(w, "channel nil or not found", http.StatusNotFound)
+		return
+	}
+
+	// Start crawl in background
+	if !state.CheckCrawlState(c.Name) {
+		state.LockCrawlState(c.Name)
+		go func() {
+			defer state.UnlockCrawlState(c.Name)
+
+			ctx := context.Background()
+			logging.I("Starting ignore crawl for channel %q (ID: %d) via web request", c.Name, id)
+			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+				logging.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+			} else {
+				logging.S("Successfully completed ignore crawl for channel %q", c.Name)
+			}
+		}()
+
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte(`{"message": "Channel ignore crawl started"}`))
+		return
+	}
+	w.WriteHeader(http.StatusAlreadyReported)
+	w.Write([]byte(`{"message": "Channel ignore crawl already running for channel"}`))
+}
+
 // handleLatestDownloads retrieves the latest downloads for a given channel.
 func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -684,13 +822,13 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	// Bools
 	var useGlobalCookies bool = (useGlobalCookiesStr == "true")
 
-	// Model conversions
-	filters, err := validation.ValidateFilterOps(strings.Fields(filtersStr))
+	// Model conversions (newline-separated, not space-separated)
+	filters, err := validation.ValidateFilterOps(splitNonEmptyLines(filtersStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid download filters %q: %v", filtersStr, err), http.StatusBadRequest)
 		return nil
 	}
-	moveOps, err := validation.ValidateMoveOps(strings.Fields(moveOpsStr))
+	moveOps, err := validation.ValidateMoveOps(splitNonEmptyLines(moveOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid move ops %q: %v", moveOpsStr, err), http.StatusBadRequest)
 		return nil
@@ -812,23 +950,23 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		}
 	}
 
-	// Models
-	filenameOps, err := validation.ValidateFilenameOps(strings.Fields(filenameOpsStr))
+	// Models (newline-separated, not space-separated)
+	filenameOps, err := validation.ValidateFilenameOps(splitNonEmptyLines(filenameOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid filename ops %q: %v", filenameOpsStr, err), http.StatusBadRequest)
 		return nil
 	}
-	filteredFilenameOps, err := validation.ValidateFilteredFilenameOps(strings.Fields(filteredFilenameOpsStr))
+	filteredFilenameOps, err := validation.ValidateFilteredFilenameOps(splitNonEmptyLines(filteredFilenameOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid filtered filename ops %q: %v", filteredFilenameOpsStr, err), http.StatusBadRequest)
 		return nil
 	}
-	metaOps, err := validation.ValidateMetaOps(strings.Fields(metaOpsStr))
+	metaOps, err := validation.ValidateMetaOps(splitNonEmptyLines(metaOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid meta ops %q: %v", metaOpsStr, err), http.StatusBadRequest)
 		return nil
 	}
-	filteredMetaOps, err := validation.ValidateFilteredMetaOps(strings.Fields(filteredMetaOpsStr))
+	filteredMetaOps, err := validation.ValidateFilteredMetaOps(splitNonEmptyLines(filteredMetaOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid filtered meta ops %q: %v", filteredMetaOpsStr, err), http.StatusBadRequest)
 		return nil
@@ -857,4 +995,190 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		TranscodeQuality:        transcodeQuality,
 		ExtraFFmpegArgs:         extraFFmpegArgs,
 	}
+}
+
+// splitNonEmptyLines splits a string by newlines and filters out empty lines.
+func splitNonEmptyLines(s string) []string {
+	lines := strings.Split(s, "\n")
+	result := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			result = append(result, line)
+		}
+	}
+	return result
+}
+
+// parseSettingsFromMap parses Settings from a map[string]any (from JSON).
+// This is used when parsing per-URL settings from the frontend.
+func parseSettingsFromMap(data map[string]any) *models.Settings {
+	settings := &models.Settings{}
+
+	// Extract string fields
+	if v, ok := data["channel_config_file"].(string); ok {
+		settings.ChannelConfigFile = v
+	}
+	if v, ok := data["cookies_from_browser"].(string); ok {
+		settings.CookiesFromBrowser = v
+	}
+	if v, ok := data["external_downloader"].(string); ok {
+		settings.ExternalDownloader = v
+	}
+	if v, ok := data["external_downloader_args"].(string); ok {
+		settings.ExternalDownloaderArgs = v
+	}
+	if v, ok := data["extra_ytdlp_video_args"].(string); ok {
+		settings.ExtraYTDLPVideoArgs = v
+	}
+	if v, ok := data["extra_ytdlp_meta_args"].(string); ok {
+		settings.ExtraYTDLPMetaArgs = v
+	}
+	if v, ok := data["filter_file"].(string); ok {
+		settings.FilterFile = v
+	}
+	if v, ok := data["move_ops_file"].(string); ok {
+		settings.MoveOpFile = v
+	}
+	if v, ok := data["json_directory"].(string); ok {
+		settings.JSONDir = v
+	}
+	if v, ok := data["video_directory"].(string); ok {
+		settings.VideoDir = v
+	}
+	if v, ok := data["max_filesize"].(string); ok {
+		settings.MaxFilesize = v
+	}
+	if v, ok := data["ytdlp_output_ext"].(string); ok {
+		settings.YtdlpOutputExt = v
+	}
+	if v, ok := data["from_date"].(string); ok {
+		settings.FromDate = v
+	}
+	if v, ok := data["to_date"].(string); ok {
+		settings.ToDate = v
+	}
+
+	// Extract integer fields
+	if v, ok := data["max_concurrency"].(float64); ok {
+		settings.Concurrency = int(v)
+	}
+	if v, ok := data["crawl_freq"].(float64); ok {
+		settings.CrawlFreq = int(v)
+	}
+	if v, ok := data["download_retries"].(float64); ok {
+		settings.Retries = int(v)
+	}
+
+	// Extract boolean fields
+	if v, ok := data["use_global_cookies"].(bool); ok {
+		settings.UseGlobalCookies = v
+	}
+
+	// Parse model fields from strings (newline-separated, not space-separated)
+	if filtersStr, ok := data["filters"].(string); ok && filtersStr != "" {
+		lines := splitNonEmptyLines(filtersStr)
+		if filters, err := validation.ValidateFilterOps(lines); err == nil {
+			settings.Filters = filters
+		}
+	}
+	if moveOpsStr, ok := data["move_ops"].(string); ok && moveOpsStr != "" {
+		lines := splitNonEmptyLines(moveOpsStr)
+		if moveOps, err := validation.ValidateMoveOps(lines); err == nil {
+			settings.MoveOps = moveOps
+		}
+	}
+
+	return settings
+}
+
+// parseMetarrArgsFromMap parses MetarrArgs from a map[string]any (from JSON).
+// This is used when parsing per-URL metarr settings from the frontend.
+func parseMetarrArgsFromMap(data map[string]any) *models.MetarrArgs {
+	metarr := &models.MetarrArgs{}
+
+	// Extract string fields
+	if v, ok := data["metarr_output_ext"].(string); ok {
+		metarr.OutputExt = v
+	}
+	if v, ok := data["metarr_filename_ops_file"].(string); ok {
+		metarr.FilenameOpsFile = v
+	}
+	if v, ok := data["filtered_filename_ops_file"].(string); ok {
+		metarr.FilteredFilenameOpsFile = v
+	}
+	if v, ok := data["metarr_meta_ops_file"].(string); ok {
+		metarr.MetaOpsFile = v
+	}
+	if v, ok := data["filtered_meta_ops_file"].(string); ok {
+		metarr.FilteredMetaOpsFile = v
+	}
+	if v, ok := data["metarr_extra_ffmpeg_args"].(string); ok {
+		metarr.ExtraFFmpegArgs = v
+	}
+	if v, ok := data["metarr_rename_style"].(string); ok {
+		metarr.RenameStyle = v
+	}
+	if v, ok := data["metarr_min_free_mem"].(string); ok {
+		metarr.MinFreeMem = v
+	}
+	if v, ok := data["metarr_gpu"].(string); ok {
+		metarr.UseGPU = v
+	}
+	if v, ok := data["metarr_gpu_directory"].(string); ok {
+		metarr.GPUDir = v
+	}
+	if v, ok := data["metarr_output_directory"].(string); ok {
+		metarr.OutputDir = v
+	}
+	if v, ok := data["metarr_transcode_video_filter"].(string); ok {
+		metarr.TranscodeVideoFilter = v
+	}
+	if v, ok := data["metarr_transcode_codec"].(string); ok {
+		metarr.TranscodeCodec = v
+	}
+	if v, ok := data["metarr_transcode_audio_codec"].(string); ok {
+		metarr.TranscodeAudioCodec = v
+	}
+	if v, ok := data["metarr_transcode_quality"].(string); ok {
+		metarr.TranscodeQuality = v
+	}
+
+	// Extract integer fields
+	if v, ok := data["metarr_concurrency"].(float64); ok {
+		metarr.Concurrency = int(v)
+	}
+
+	// Extract float fields
+	if v, ok := data["metarr_max_cpu_usage"].(float64); ok {
+		metarr.MaxCPU = v
+	}
+
+	// Parse model fields from strings (newline-separated, not space-separated)
+	if filenameOpsStr, ok := data["metarr_filename_ops"].(string); ok && filenameOpsStr != "" {
+		lines := splitNonEmptyLines(filenameOpsStr)
+		if filenameOps, err := validation.ValidateFilenameOps(lines); err == nil {
+			metarr.FilenameOps = filenameOps
+		}
+	}
+	if filteredFilenameOpsStr, ok := data["filtered_filename_ops"].(string); ok && filteredFilenameOpsStr != "" {
+		lines := splitNonEmptyLines(filteredFilenameOpsStr)
+		if filteredFilenameOps, err := validation.ValidateFilteredFilenameOps(lines); err == nil {
+			metarr.FilteredFilenameOps = filteredFilenameOps
+		}
+	}
+	if metaOpsStr, ok := data["metarr_meta_ops"].(string); ok && metaOpsStr != "" {
+		lines := splitNonEmptyLines(metaOpsStr)
+		if metaOps, err := validation.ValidateMetaOps(lines); err == nil {
+			metarr.MetaOps = metaOps
+		}
+	}
+	if filteredMetaOpsStr, ok := data["filtered_meta_ops"].(string); ok && filteredMetaOpsStr != "" {
+		lines := splitNonEmptyLines(filteredMetaOpsStr)
+		if filteredMetaOps, err := validation.ValidateFilteredMetaOps(lines); err == nil {
+			metarr.FilteredMetaOps = filteredMetaOps
+		}
+	}
+
+	return metarr
 }

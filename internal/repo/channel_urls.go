@@ -125,7 +125,7 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 }
 
 // GetChannelURLModels fetches a filled list of ChannelURL models.
-func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.ChannelURL, error) {
+func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent bool) ([]*models.ChannelURL, error) {
 	urlQuery := squirrel.
 		Select(
 			consts.QChanURLID,
@@ -135,7 +135,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 			consts.QChanURLLoginURL,
 			consts.QChanURLIsManual,
 			consts.QChanURLSettings,
-			consts.QChanMetarr,
+			consts.QChanURLMetarr,
 			consts.QChanURLLastScan,
 			consts.QChanURLCreatedAt,
 			consts.QChanURLUpdatedAt,
@@ -210,28 +210,42 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 	// Apply fallback logic for nil settings
 	if len(urlModels) > 0 {
 		for _, cu := range urlModels {
-			if cu.ChanURLSettings == nil {
-				if c.ChanSettings != nil {
-					cu.ChanURLSettings = c.ChanSettings
+
+			// Merge settings with parent
+			if mergeWithParent {
+				// Settings
+				if cu.ChanURLSettings == nil {
+					if c.ChanSettings != nil {
+						cu.ChanURLSettings = c.ChanSettings
+					} else {
+						cu.ChanURLSettings = &models.Settings{}
+					}
 				} else {
-					cu.ChanURLSettings = &models.Settings{}
+					if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
+						logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+					}
 				}
-			} else {
-				if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-					logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+
+				// Metarr args
+				if cu.ChanURLMetarrArgs == nil {
+					if c.ChanMetarrArgs != nil {
+						cu.ChanURLMetarrArgs = c.ChanMetarrArgs
+					} else {
+						cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+					}
+				} else {
+					if changed := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); changed {
+						logging.D(1, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
+					}
 				}
 			}
 
+			// Initialize nil to empty
+			if cu.ChanURLSettings == nil {
+				cu.ChanURLSettings = &models.Settings{}
+			}
 			if cu.ChanURLMetarrArgs == nil {
-				if c.ChanMetarrArgs != nil {
-					cu.ChanURLMetarrArgs = c.ChanMetarrArgs
-				} else {
-					cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-				}
-			} else {
-				if changed := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); changed {
-					logging.D(1, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
-				}
+				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 			}
 		}
 	}
@@ -240,7 +254,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel) ([]*models.Channe
 }
 
 // GetChannelURLModel fetches a single ChannelURL model by channel ID and URL.
-func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chanURL *models.ChannelURL, hasRows bool, err error) {
+func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, mergeWithParent bool) (chanURL *models.ChannelURL, hasRows bool, err error) {
 	urlQuery := squirrel.
 		Select(
 			consts.QChanURLID,
@@ -250,7 +264,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chan
 			consts.QChanURLLoginURL,
 			consts.QChanURLIsManual,
 			consts.QChanURLSettings,
-			consts.QChanMetarr,
+			consts.QChanURLMetarr,
 			consts.QChanURLLastScan,
 			consts.QChanURLCreatedAt,
 			consts.QChanURLUpdatedAt,
@@ -316,44 +330,54 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string) (chan
 	}
 
 	// Apply fallback logic for empty settings
-	c, hasRows, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
-	if err != nil {
-		return nil, true, err
-	}
-	if !hasRows {
-		logging.D(2, "Channel with ID %d not found in database", channelID)
-	}
-
-	// Handle Settings
-	if cu.ChanURLSettings == nil {
-		// Struct-level inheritance: use entire channel settings
-		if c != nil && c.ChanSettings != nil {
-			cu.ChanURLSettings = c.ChanSettings
-		} else {
-			cu.ChanURLSettings = &models.Settings{}
+	if mergeWithParent {
+		c, hasRows, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10), mergeWithParent)
+		if err != nil {
+			return nil, true, err
 		}
-	} else {
-		// Field-level inheritance: merge empty fields from channel
-		if c != nil && c.ChanSettings != nil {
-			if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-				logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+		if !hasRows {
+			logging.D(2, "Channel with ID %d not found in database", channelID)
+		}
+
+		// Handle Settings
+		if cu.ChanURLSettings == nil {
+			// Struct-level inheritance: use entire channel settings
+			if c != nil && c.ChanSettings != nil {
+				cu.ChanURLSettings = c.ChanSettings
+			} else {
+				cu.ChanURLSettings = &models.Settings{}
+			}
+		} else {
+			// Field-level inheritance: merge empty fields from channel
+			if c != nil && c.ChanSettings != nil {
+				if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
+					logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+				}
+			}
+		}
+
+		// Handle MetarrArgs
+		if cu.ChanURLMetarrArgs == nil {
+			// Struct-level inheritance: use entire channel metarr args
+			if c != nil && c.ChanMetarrArgs != nil {
+				cu.ChanURLMetarrArgs = c.ChanMetarrArgs
+			} else {
+				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+			}
+		} else {
+			// Field-level inheritance: merge empty fields from channel
+			if c != nil && c.ChanMetarrArgs != nil {
+				mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
 			}
 		}
 	}
 
-	// Handle MetarrArgs
+	// Initialize nil to empty
 	if cu.ChanURLMetarrArgs == nil {
-		// Struct-level inheritance: use entire channel metarr args
-		if c != nil && c.ChanMetarrArgs != nil {
-			cu.ChanURLMetarrArgs = c.ChanMetarrArgs
-		} else {
-			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-		}
-	} else {
-		// Field-level inheritance: merge empty fields from channel
-		if c != nil && c.ChanMetarrArgs != nil {
-			mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
-		}
+		cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+	}
+	if cu.ChanURLSettings == nil {
+		cu.ChanURLSettings = &models.Settings{}
 	}
 
 	return cu, true, nil
@@ -428,7 +452,7 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 // getChannelURLModelsMap retrieves all ChannelURL rows for a given channel in a map by channel ID.
 //
 // If channelID == 0, it fetches URLs for all channels.
-func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.ChannelURL, error) {
+func (cs *ChannelStore) getChannelURLModelsMap(cID int64, mergeWithParent bool) (map[int64][]*models.ChannelURL, error) {
 	query := squirrel.
 		Select(
 			consts.QChanURLID,
@@ -517,33 +541,46 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64) (map[int64][]*models.C
 
 		// Load channel if not cached or different channel
 		if c == nil || c.ID != channelID {
-			c, _, err = cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10))
+			c, _, err = cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10), mergeWithParent)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		// Handle Settings (struct-level or field-level)
-		if cu.ChanURLSettings == nil {
-			if c != nil && c.ChanSettings != nil {
-				cu.ChanURLSettings = c.ChanSettings
-			} else {
-				cu.ChanURLSettings = &models.Settings{}
+		// Merge settings with parent
+		if mergeWithParent {
+			// Settings
+			if cu.ChanURLSettings == nil {
+				if c != nil && c.ChanSettings != nil {
+					cu.ChanURLSettings = c.ChanSettings
+				} else {
+					cu.ChanURLSettings = &models.Settings{}
+				}
+			} else if c != nil && c.ChanSettings != nil {
+				mergeSettings(cu.ChanURLSettings, c.ChanSettings)
 			}
-		} else if c != nil && c.ChanSettings != nil {
-			mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+
+			// Metarr Args
+			if cu.ChanURLMetarrArgs == nil {
+				if c != nil && c.ChanMetarrArgs != nil {
+					cu.ChanURLMetarrArgs = c.ChanMetarrArgs
+				} else {
+					cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+				}
+			} else if c != nil && c.ChanMetarrArgs != nil {
+				mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
+			}
+		}
+
+		// Initialize nil to empty
+		if cu.ChanURLSettings == nil {
+			cu.ChanURLSettings = &models.Settings{}
+		}
+		if cu.ChanURLMetarrArgs == nil {
+			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 		}
 
 		// Handle MetarrArgs (struct-level or field-level)
-		if cu.ChanURLMetarrArgs == nil {
-			if c != nil && c.ChanMetarrArgs != nil {
-				cu.ChanURLMetarrArgs = c.ChanMetarrArgs
-			} else {
-				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-			}
-		} else if c != nil && c.ChanMetarrArgs != nil {
-			mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
-		}
 
 		urlMap[channelID] = append(urlMap[channelID], cu)
 	}

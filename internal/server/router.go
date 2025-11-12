@@ -65,6 +65,7 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 			r.Delete("/{id}/delete-videos", handleDeleteChannelVideos)
 			r.Delete("/{id}/cancel-download/{videoID}", handleCancelDownload)
 			r.Post("/{id}/crawl", handleCrawlChannel)
+			r.Post("/{id}/ignore-crawl", handleIgnoreCrawlChannel)
 
 			// // Channel URLs
 			// r.Route("/{id}/urls", func(r chi.Router) {

@@ -25,12 +25,12 @@ type Settings struct {
 	ExtraYTDLPMetaArgs  string `json:"extra_ytdlp_meta_args" mapstructure:"extra-ytdlp-meta-args"`
 
 	// Metadata operations.
-	Filters    []Filters `json:"filters" mapstructure:"filters"`
-	FilterFile string    `json:"filter_file" mapstructure:"filter-file"`
-	MoveOps    []MoveOps `json:"move_ops" mapstructure:"move-ops"`
-	MoveOpFile string    `json:"move_ops_file" mapstructure:"move-ops-file"`
-	FromDate   string    `json:"from_date" mapstructure:"from-date"`
-	ToDate     string    `json:"to_date" mapstructure:"to-date"`
+	Filters    []Filters           `json:"filters" mapstructure:"filters"`
+	FilterFile string              `json:"filter_file" mapstructure:"filter-file"`
+	MoveOps    []MetaFilterMoveOps `json:"move_ops" mapstructure:"move-ops"`
+	MoveOpFile string              `json:"move_ops_file" mapstructure:"move-ops-file"`
+	FromDate   string              `json:"from_date" mapstructure:"from-date"`
+	ToDate     string              `json:"to_date" mapstructure:"to-date"`
 
 	// JSON and video directories.
 	JSONDir  string `json:"json_directory" mapstructure:"json-directory"`
@@ -43,58 +43,6 @@ type Settings struct {
 
 	// Channel toggles.
 	Paused bool `json:"paused" mapstructure:"pause"`
-}
-
-// FilteredMetaOps allows meta operation entry based on filter matching.
-type FilteredMetaOps struct {
-	Filters        []Filters
-	MetaOps        []MetaOps
-	FiltersMatched bool
-}
-
-// FilteredFilenameOps allows file operation entry based on filter matching.
-type FilteredFilenameOps struct {
-	Filters        []Filters
-	FilenameOps    []FilenameOps
-	FiltersMatched bool
-}
-
-// Filters are used to filter in or out videos (download, or operations) by metafields.
-type Filters struct {
-	ChannelURL    string `json:"filter_url_specific"`
-	Field         string `json:"filter_field"`
-	ContainsOmits string `json:"filter_type"`
-	Value         string `json:"filter_value"`
-	MustAny       string `json:"filter_must_any"`
-}
-
-// MoveOps are used to set an output directory in Metarr based on matching metadata fields.
-type MoveOps struct {
-	ChannelURL string `json:"move_url_specific"`
-	Field      string `json:"move_op_field"`
-	Value      string `json:"move_op_value"`
-	OutputDir  string `json:"move_op_output_dir"`
-}
-
-// FilenameOps are applied to fields by Metarr.
-type FilenameOps struct {
-	ChannelURL   string `json:"filename_op_channel_url"`
-	OpType       string `json:"filename_op_type"`
-	OpFindString string `json:"filename_op_find_string"`
-	OpValue      string `json:"filename_op_value"`
-	OpLoc        string `json:"filename_op_loc"`
-	DateFormat   string `json:"filename_op_date_format"`
-}
-
-// MetaOps are applied to fields by Metarr.
-type MetaOps struct {
-	ChannelURL   string `json:"meta_op_channel_url"`
-	Field        string `json:"meta_op_field"`
-	OpFindString string `json:"meta_op_find_string"`
-	OpType       string `json:"meta_op_type"`
-	OpValue      string `json:"meta_op_value"`
-	OpLoc        string `json:"meta_op_loc"`
-	DateFormat   string `json:"meta_op_date_format"`
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
@@ -141,4 +89,56 @@ type ChannelAccessDetails struct {
 	LoginURL,
 	ChannelURL,
 	CookiePath string
+}
+
+// FilteredMetaOps allows meta operation entry based on filter matching.
+type FilteredMetaOps struct {
+	Filters        []Filters
+	MetaOps        []MetaOps
+	FiltersMatched bool
+}
+
+// FilteredFilenameOps allows file operation entry based on filter matching.
+type FilteredFilenameOps struct {
+	Filters        []Filters
+	FilenameOps    []FilenameOps
+	FiltersMatched bool
+}
+
+// Filters are used to filter in or out videos (download, or operations) by metafields.
+type Filters struct {
+	ChannelURL    string `json:"filter_url_specific"`
+	Field         string `json:"filter_field"`
+	ContainsOmits string `json:"filter_type"`
+	Value         string `json:"filter_value"`
+	MustAny       string `json:"filter_must_any"`
+}
+
+// MetaFilterMoveOps are used to set an output directory in Metarr based on matching metadata fields.
+type MetaFilterMoveOps struct {
+	ChannelURL string `json:"move_url_specific"`
+	Field      string `json:"move_op_field"`
+	Value      string `json:"move_op_value"`
+	OutputDir  string `json:"move_op_output_dir"`
+}
+
+// FilenameOps are applied to fields by Metarr.
+type FilenameOps struct {
+	ChannelURL   string `json:"filename_op_channel_url"`
+	OpType       string `json:"filename_op_type"`
+	OpFindString string `json:"filename_op_find_string"`
+	OpValue      string `json:"filename_op_value"`
+	OpLoc        string `json:"filename_op_loc"`
+	DateFormat   string `json:"filename_op_date_format"`
+}
+
+// MetaOps are applied to fields by Metarr.
+type MetaOps struct {
+	ChannelURL   string `json:"meta_op_channel_url"`
+	Field        string `json:"meta_op_field"`
+	OpFindString string `json:"meta_op_find_string"`
+	OpType       string `json:"meta_op_type"`
+	OpValue      string `json:"meta_op_value"`
+	OpLoc        string `json:"meta_op_loc"`
+	DateFormat   string `json:"meta_op_date_format"`
 }

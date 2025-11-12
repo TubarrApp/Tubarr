@@ -386,7 +386,7 @@ func ValidateFilterOps(ops []string) ([]models.Filters, error) {
 }
 
 // ValidateMoveOps validates that the user's inputted move filter operations are valid.
-func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
+func ValidateMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
@@ -398,7 +398,7 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 		moveOpFormatError string = "please enter move operations in the format 'field:value:output directory'.\n\n'title:frogs:/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
 	)
 
-	m := make([]models.MoveOps, 0, len(ops))
+	m := make([]models.MetaFilterMoveOps, 0, len(ops))
 	for _, op := range ops {
 
 		chanURL, op := CheckForOpURL(op)
@@ -416,7 +416,7 @@ func ValidateMoveOps(ops []string) ([]models.MoveOps, error) {
 			return nil, err
 		}
 
-		m = append(m, models.MoveOps{
+		m = append(m, models.MetaFilterMoveOps{
 			Field:      field,
 			Value:      value,
 			OutputDir:  outputDir,
