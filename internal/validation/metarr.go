@@ -369,6 +369,10 @@ func ValidateAudioTranscodeCodecSlice(pairs []string) (validPairs []string, err 
 	// Iterate deduped pairs
 	for _, p := range dedupPairs {
 		split := strings.Split(p, ":")
+		if len(split) < 1 { // Impossible condition, added to silence nilaway
+			continue
+		}
+
 		if _, err := validateTranscodeAudioCodec(split[0]); err != nil {
 			return nil, err
 		}
@@ -450,6 +454,10 @@ func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs 
 	// Iterate deduped pairs
 	for _, p := range dedupPairs {
 		split := strings.Split(p, ":")
+		if len(split) < 1 { // Impossible condition, added to silence nilaway
+			continue
+		}
+
 		if _, err := validateVideoTranscodeCodec(split[0], accel); err != nil {
 			return nil, err
 		}

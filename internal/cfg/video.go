@@ -3,6 +3,7 @@ package cfg
 import (
 	"errors"
 	"strconv"
+	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/utils/logging"
@@ -72,7 +73,7 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 	}
 
 	// Primary channel elements
-	setPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
+	cmd.SetPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
 	delCmd.Flags().StringVar(&url, "delete-url", "", "Video URL")
 
 	return delCmd

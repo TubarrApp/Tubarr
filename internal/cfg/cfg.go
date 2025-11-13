@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/file"
@@ -82,16 +83,16 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 		return nil
 	}
 
-	if err := initProgramFlags(rootCmd); err != nil {
+	if err := cmd.InitProgramFlags(rootCmd); err != nil {
 		return err
 	}
-	if err := initFileTransformers(rootCmd); err != nil {
+	if err := cmd.InitFileTransformers(rootCmd); err != nil {
 		return err
 	}
-	if err := initMetaTransformers(rootCmd); err != nil {
+	if err := cmd.InitMetaTransformers(rootCmd); err != nil {
 		return err
 	}
-	if err := initVideoTransformers(rootCmd); err != nil {
+	if err := cmd.InitVideoTransformers(rootCmd); err != nil {
 		return err
 	}
 

@@ -12,11 +12,8 @@
     </title>
   <link rel="icon" href="/favicon.ico"><link href="style.css" rel="stylesheet"></head>
   <body
-    x-data="{ page: 'page503', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
-    x-init="
-         darkMode = JSON.parse(localStorage.getItem('darkMode'));
-         $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))"
-    :class="{'dark bg-gray-900': darkMode === true}"
+    x-data="{ page: 'page503', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+    class="dark bg-gray-900"
   >
     <!-- ===== Preloader Start ===== -->
     <div

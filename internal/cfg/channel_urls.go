@@ -2,6 +2,7 @@ package cfg
 
 import (
 	"fmt"
+	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/models"
 	"tubarr/internal/utils/logging"
@@ -197,21 +198,21 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	updateURLSettingsCmd.Flags().StringVar(&url, "url", "", "Specific URL to update (if not provided, updates all URLs in channel)")
 
 	// Files/dirs
-	setFileDirFlags(updateURLSettingsCmd, nil, &jDir, &vDir)
+	cmd.SetFileDirFlags(updateURLSettingsCmd, nil, &jDir, &vDir)
 
 	// Program related
-	setProgramRelatedFlags(updateURLSettingsCmd, &concurrency, &crawlFreq,
+	cmd.SetProgramRelatedFlags(updateURLSettingsCmd, &concurrency, &crawlFreq,
 		&externalDownloaderArgs, &externalDownloader, &moveOpsFile,
 		&moveOps, &pause)
 
 	// Download
-	setDownloadFlags(updateURLSettingsCmd, &retries, &useGlobalCookies,
+	cmd.SetDownloadFlags(updateURLSettingsCmd, &retries, &useGlobalCookies,
 		&ytdlpOutExt, &fromDate, &toDate,
 		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
 		&dlFilters)
 
 	// Metarr
-	setMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,
+	cmd.SetMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
 		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
@@ -219,12 +220,12 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding
-	setTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuDir,
+	cmd.SetTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuDir,
 		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
 		&audioCodec)
 
 	// Additional YTDLP args
-	setCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
+	cmd.SetCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
 
 	// Reset flag
 	updateURLSettingsCmd.Flags().BoolVar(&resetSettings, "clear-settings", false, "Clear all URL-specific settings and inherit from channel defaults")

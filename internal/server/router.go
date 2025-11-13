@@ -56,6 +56,7 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 		r.Route("/channels", func(r chi.Router) {
 			r.Get("/all", handleListChannels)
 			r.Post("/add", handleCreateChannel)
+			r.Post("/add-from-file", handleAddChannelFromFile)
 			r.Get("/{id}", handleGetChannel)
 			r.Get("/{id}/downloads", handleGetDownloads)
 			r.Get("/{id}/latest-downloads", handleLatestDownloads)

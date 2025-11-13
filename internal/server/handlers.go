@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,13 +14,218 @@ import (
 	"tubarr/internal/app"
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/file"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/state"
 	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/spf13/viper"
 )
+
+// handleAddChannelFromFile adds a new channel from a specified config file path using Viper.
+func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
+	var input models.ChannelInputPtrs
+
+	// Grab config file from form
+	addFromFile := r.FormValue("add_from_config_file")
+	if addFromFile == "" {
+		http.Error(w, "no config file entered, could not add new channel", http.StatusBadRequest)
+		return
+	}
+
+	// Load in config file
+	if err := file.LoadConfigFile(addFromFile); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Load viper variables into the struct
+	if err := parsing.LoadViperIntoStruct(&input); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	c, authMap := fillChannelFromConfigFile(w, input)
+	if c == nil {
+		return
+	}
+
+	channelID, err := ss.cs.AddChannel(c)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	c.ID = channelID
+
+	if len(authMap) > 0 {
+		if err := ss.cs.AddAuth(channelID, authMap); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	if input.Notification != nil && len(*input.Notification) != 0 {
+		v, err := validation.ValidateNotificationStrings(*input.Notification)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if err := ss.cs.AddNotifyURLs(channelID, v); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	ctx := context.Background()
+	if input.IgnoreRun != nil && *input.IgnoreRun {
+		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+			logging.E("Failed to complete ignore crawl run: %v", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name))
+}
+
+// handleAddChannelsFromDir adds new channel from all config files in the directory path using Viper.
+func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
+	// Grab config file from form
+	addFromDir := r.FormValue("add_from_config_dir")
+	if addFromDir == "" {
+		http.Error(w, "no config directory entered, could not add new channel", http.StatusBadRequest)
+		return
+	}
+
+	// Scan directory for config files
+	batchConfigFiles, err := file.ScanDirectoryForConfigFiles(addFromDir)
+	if err != nil {
+		http.Error(w, string(fmt.Appendf(nil, "failed to scan directory: %v", err)), http.StatusBadRequest)
+		return
+	}
+
+	if len(batchConfigFiles) == 0 {
+		w.WriteHeader(http.StatusOK)
+		w.Write(fmt.Appendf(nil, "No config files found in directory %q", addFromDir))
+		return
+	}
+
+	// Track results
+	var successes []string
+	var failures []struct {
+		file string
+		err  error
+	}
+
+	for _, batchConfigFile := range batchConfigFiles {
+		var input models.ChannelInputPtrs
+		v := viper.New()
+
+		// Load in config file
+		if err := file.LoadConfigFileLocal(batchConfigFile, v); err != nil {
+			failures = append(failures, struct {
+				file string
+				err  error
+			}{batchConfigFile, err})
+			continue
+		}
+
+		// Load viper variables into the struct
+		if err := parsing.LoadViperIntoStruct(&input); err != nil {
+			failures = append(failures, struct {
+				file string
+				err  error
+			}{batchConfigFile, err})
+			continue
+		}
+
+		c, authMap := fillChannelFromConfigFile(w, input)
+		if c == nil {
+			failures = append(failures, struct {
+				file string
+				err  error
+			}{batchConfigFile, errors.New("channel returned nil")})
+			continue
+		}
+
+		channelID, err := ss.cs.AddChannel(c)
+		if err != nil {
+			failures = append(failures, struct {
+				file string
+				err  error
+			}{batchConfigFile, err})
+			continue
+		}
+
+		c.ID = channelID
+
+		if len(authMap) > 0 {
+			if err := ss.cs.AddAuth(channelID, authMap); err != nil {
+				failures = append(failures, struct {
+					file string
+					err  error
+				}{batchConfigFile, err})
+				continue
+			}
+		}
+
+		if input.Notification != nil && len(*input.Notification) != 0 {
+			v, err := validation.ValidateNotificationStrings(*input.Notification)
+			if err != nil {
+				failures = append(failures, struct {
+					file string
+					err  error
+				}{batchConfigFile, err})
+				continue
+			}
+
+			if err := ss.cs.AddNotifyURLs(channelID, v); err != nil {
+				failures = append(failures, struct {
+					file string
+					err  error
+				}{batchConfigFile, err})
+				continue
+			}
+		}
+
+		ctx := context.Background()
+		if input.IgnoreRun != nil && *input.IgnoreRun {
+			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+				logging.E("Failed to complete ignore crawl run: %v", err)
+			}
+		}
+
+		// Track success
+		successes = append(successes, c.Name)
+	}
+
+	successLen := len(successes)
+	failLen := len(failures)
+
+	if successLen == 0 && failLen != 0 {
+		http.Error(w, fmt.Sprintf("failed to add any channels from directory %q: %+v", addFromDir, failures), http.StatusBadRequest)
+		return
+	}
+
+	// Build detailed response message
+	var responseMsg string
+	if failLen > 0 {
+		responseMsg = fmt.Sprintf("Processed %d config file(s) from directory %q:\n- Successfully added: %d channel(s)\n- Failed: %d channel(s)\n\nFailures:\n",
+			len(batchConfigFiles), addFromDir, successLen, failLen)
+		for _, failure := range failures {
+			responseMsg += fmt.Sprintf("  - %s: %v\n", failure.file, failure.err)
+		}
+	} else {
+		responseMsg = fmt.Sprintf("Successfully added %d channel(s) from directory %q", successLen, addFromDir)
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(responseMsg))
+}
 
 // handleListChannels lists Tubarr channels.
 func handleListChannels(w http.ResponseWriter, r *http.Request) {
@@ -238,6 +444,7 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+	w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name))
 }
 
 // handleUpdateChannel updates parameters for a given channel.

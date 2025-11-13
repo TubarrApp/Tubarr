@@ -4,6 +4,7 @@ package file
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"strings"
 	"tubarr/internal/contracts"
 	"tubarr/internal/models"
@@ -38,6 +39,19 @@ func LoadConfigFile(file string) error {
 	return nil
 }
 
+// LoadConfigFileLocal loads in the preset configuration file using a local Viper interface.
+func LoadConfigFileLocal(file string, v *viper.Viper) error {
+	if _, err := validation.ValidateFile(file, false); err != nil {
+		return err
+	}
+
+	v.SetConfigFile(file)
+	if err := v.ReadInConfig(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // ReadFileLines loads lines from a file (one per line, ignoring '#' comment lines).
 func ReadFileLines(path string) ([]string, error) {
 	file, err := os.Open(path)
@@ -66,4 +80,54 @@ func ReadFileLines(path string) ([]string, error) {
 	}
 
 	return f, nil
+}
+
+// ScanDirectoryForConfigFiles scans a directory for Viper-compatible config files.
+// Returns a slice of absolute paths to valid config files.
+func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
+	// Validate directory exists
+	dirInfo, err := os.Stat(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	if !dirInfo.IsDir() {
+		return nil, os.ErrInvalid
+	}
+
+	// Read directory contents
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Viper supported extensions
+	validExts := map[string]bool{
+		".yaml":       true,
+		".yml":        true,
+		".toml":       true,
+		".json":       true,
+		".hcl":        true,
+		".tfvars":     true,
+		".properties": true,
+		".props":      true,
+		".prop":       true,
+		".ini":        true,
+	}
+
+	var configFiles []string
+	for _, entry := range entries {
+		// Skip directories
+		if entry.IsDir() {
+			continue
+		}
+
+		// Check if file has valid extension
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if validExts[ext] {
+			fullPath := filepath.Join(dirPath, entry.Name())
+			configFiles = append(configFiles, fullPath)
+		}
+	}
+
+	return configFiles, nil
 }

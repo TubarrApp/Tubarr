@@ -1725,9 +1725,9 @@ pre[class*="language-"] {
   }
   .menu-item-arrow-active {
     rotate: 180deg;
-    stroke: var(--color-brand-500);
+    stroke: var(--color-gray-900);
     &:is(.dark *) {
-      stroke: var(--color-brand-400);
+      stroke: var(--color-white);
     }
   }
   .-rotate-45 {
@@ -2333,13 +2333,13 @@ pre[class*="language-"] {
     }
   }
   .menu-dropdown-item-active {
-    background-color: var(--color-brand-50);
-    color: var(--color-brand-500);
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-900);
     &:is(.dark *) {
-      background-color: color-mix(in oklab, var(--color-brand-500) 12%, transparent);
+      background-color: color-mix(in oklab, var(--color-white) 8%, transparent);
     }
     &:is(.dark *) {
-      color: var(--color-brand-400);
+      color: var(--color-white);
     }
   }
   .menu-dropdown-item-inactive {
@@ -2361,13 +2361,13 @@ pre[class*="language-"] {
     }
   }
   .menu-item-active {
-    background-color: var(--color-brand-50);
-    color: var(--color-brand-500);
+    background-color: var(--color-gray-100);
+    color: var(--color-gray-900);
     &:is(.dark *) {
-      background-color: color-mix(in oklab, var(--color-brand-500) 12%, transparent);
+      background-color: color-mix(in oklab, var(--color-white) 8%, transparent);
     }
     &:is(.dark *) {
-      color: var(--color-brand-400);
+      color: var(--color-white);
     }
   }
   .menu-dropdown-badge-inactive {
@@ -3079,9 +3079,9 @@ pre[class*="language-"] {
     }
   }
   .menu-item-icon-active {
-    color: var(--color-brand-500);
+    color: var(--color-gray-900);
     &:is(.dark *) {
-      color: var(--color-brand-400);
+      color: var(--color-white);
     }
   }
   .text-\[\#0086c9\] {
