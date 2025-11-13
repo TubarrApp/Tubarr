@@ -40,7 +40,7 @@ func LoadConfigFile(file string) error {
 }
 
 // LoadConfigFileLocal loads in the preset configuration file using a local Viper interface.
-func LoadConfigFileLocal(file string, v *viper.Viper) error {
+func LoadConfigFileLocal(v *viper.Viper, file string) error {
 	if _, err := validation.ValidateFile(file, false); err != nil {
 		return err
 	}

@@ -1190,7 +1190,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 				// Load config file into viper
 				v := viper.New()
-				if err := file.LoadConfigFileLocal(batchConfigFile, v); err != nil {
+				if err := file.LoadConfigFileLocal(v, batchConfigFile); err != nil {
 					failures = append(failures, struct {
 						file string
 						err  error

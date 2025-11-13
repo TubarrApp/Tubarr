@@ -248,3 +248,102 @@ func viperPtr[T any](key string) (*T, bool) {
 	}
 	return &val, true
 }
+
+// LoadViperIntoStructLocal loads values from a local Viper instance into a struct of variables.
+func LoadViperIntoStructLocal(v interface{ IsSet(string) bool; Get(string) interface{} }, ptr any) error {
+	val := reflect.ValueOf(ptr)
+	if val.Kind() != reflect.Pointer || val.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("expected pointer to struct")
+	}
+
+	val = val.Elem()
+	typ := val.Type()
+
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		tag := field.Tag.Get("viper")
+		if tag == "" {
+			continue
+		}
+
+		ft := field.Type
+		switch ft.Kind() {
+
+		case reflect.Pointer:
+			elem := ft.Elem()
+
+			switch elem.Kind() {
+			case reflect.String:
+				v, ok := viperPtrLocal[string](v, tag)
+				if ok {
+					val.Field(i).Set(reflect.ValueOf(v))
+				}
+			case reflect.Int:
+				v, ok := viperPtrLocal[int](v, tag)
+				if ok {
+					val.Field(i).Set(reflect.ValueOf(v))
+				}
+			case reflect.Float64:
+				v, ok := viperPtrLocal[float64](v, tag)
+				if ok {
+					val.Field(i).Set(reflect.ValueOf(v))
+				}
+			case reflect.Bool:
+				v, ok := viperPtrLocal[bool](v, tag)
+				if ok {
+					val.Field(i).Set(reflect.ValueOf(v))
+				}
+			case reflect.Slice:
+				sliceType := reflect.SliceOf(elem.Elem())
+				if sliceType == reflect.TypeOf([]string{}) {
+					v, ok := viperPtrLocal[[]string](v, tag)
+					if ok {
+						val.Field(i).Set(reflect.ValueOf(v))
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// viperPtrLocal returns a pointer to a value from a local viper instance if successful, or nil.
+// Supports both kebab-case and snake_case keys.
+func viperPtrLocal[T any](v interface{ IsSet(string) bool; Get(string) interface{} }, key string) (*T, bool) {
+	val, ok := getConfigValueLocal[T](v, key)
+	if !ok {
+		return nil, false
+	}
+	return &val, true
+}
+
+// getConfigValueLocal retrieves values from a local viper instance.
+// Supports both kebab-case and snake_case keys.
+func getConfigValueLocal[T any](v interface{ IsSet(string) bool; Get(string) interface{} }, key string) (T, bool) {
+	var zero T
+
+	// Try original key first
+	if v.IsSet(key) {
+		if val, ok := convertConfigValue[T](v.Get(key)); ok {
+			return val, true
+		}
+	}
+
+	// Try snake_case version
+	snakeKey := strings.ReplaceAll(key, "-", "_")
+	if snakeKey != key && v.IsSet(snakeKey) {
+		if val, ok := convertConfigValue[T](v.Get(snakeKey)); ok {
+			return val, true
+		}
+	}
+
+	// Try kebab-case version
+	kebabKey := strings.ReplaceAll(key, "_", "-")
+	if kebabKey != key && v.IsSet(kebabKey) {
+		if val, ok := convertConfigValue[T](v.Get(kebabKey)); ok {
+			return val, true
+		}
+	}
+	return zero, false
+}

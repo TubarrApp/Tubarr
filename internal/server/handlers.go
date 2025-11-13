@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -117,47 +116,49 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 	// Track results
 	var successes []string
 	var failures []struct {
-		file string
-		err  error
+		file   string
+		reason string
 	}
+
+	logging.I("Adding channels from config files %v", batchConfigFiles)
 
 	for _, batchConfigFile := range batchConfigFiles {
 		var input models.ChannelInputPtrs
 		v := viper.New()
 
 		// Load in config file
-		if err := file.LoadConfigFileLocal(batchConfigFile, v); err != nil {
+		if err := file.LoadConfigFileLocal(v, batchConfigFile); err != nil {
 			failures = append(failures, struct {
-				file string
-				err  error
-			}{batchConfigFile, err})
+				file   string
+				reason string
+			}{batchConfigFile, err.Error()})
 			continue
 		}
 
-		// Load viper variables into the struct
-		if err := parsing.LoadViperIntoStruct(&input); err != nil {
+		// Load viper variables into the struct from local instance
+		if err := parsing.LoadViperIntoStructLocal(v, &input); err != nil {
 			failures = append(failures, struct {
-				file string
-				err  error
-			}{batchConfigFile, err})
+				file   string
+				reason string
+			}{batchConfigFile, err.Error()})
 			continue
 		}
 
 		c, authMap := fillChannelFromConfigFile(w, input)
 		if c == nil {
 			failures = append(failures, struct {
-				file string
-				err  error
-			}{batchConfigFile, errors.New("channel returned nil")})
+				file   string
+				reason string
+			}{batchConfigFile, "channel returned nil"})
 			continue
 		}
 
 		channelID, err := ss.cs.AddChannel(c)
 		if err != nil {
 			failures = append(failures, struct {
-				file string
-				err  error
-			}{batchConfigFile, err})
+				file   string
+				reason string
+			}{batchConfigFile, err.Error()})
 			continue
 		}
 
@@ -166,9 +167,9 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 		if len(authMap) > 0 {
 			if err := ss.cs.AddAuth(channelID, authMap); err != nil {
 				failures = append(failures, struct {
-					file string
-					err  error
-				}{batchConfigFile, err})
+					file   string
+					reason string
+				}{batchConfigFile, err.Error()})
 				continue
 			}
 		}
@@ -177,17 +178,17 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 			v, err := validation.ValidateNotificationStrings(*input.Notification)
 			if err != nil {
 				failures = append(failures, struct {
-					file string
-					err  error
-				}{batchConfigFile, err})
+					file   string
+					reason string
+				}{batchConfigFile, err.Error()})
 				continue
 			}
 
 			if err := ss.cs.AddNotifyURLs(channelID, v); err != nil {
 				failures = append(failures, struct {
-					file string
-					err  error
-				}{batchConfigFile, err})
+					file   string
+					reason string
+				}{batchConfigFile, err.Error()})
 				continue
 			}
 		}
@@ -217,7 +218,7 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 		responseMsg = fmt.Sprintf("Processed %d config file(s) from directory %q:\n- Successfully added: %d channel(s)\n- Failed: %d channel(s)\n\nFailures:\n",
 			len(batchConfigFiles), addFromDir, successLen, failLen)
 		for _, failure := range failures {
-			responseMsg += fmt.Sprintf("  - %s: %v\n", failure.file, failure.err)
+			responseMsg += fmt.Sprintf("  - %s: %v\n", failure.file, failure.reason)
 		}
 	} else {
 		responseMsg = fmt.Sprintf("Successfully added %d channel(s) from directory %q", successLen, addFromDir)
