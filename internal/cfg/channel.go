@@ -61,10 +61,15 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 // addAuth adds authentication details to a channel.
 func addAuth(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		channelName                  string
-		username, password, loginURL string
-		authDetails                  []string
-		channelID                    int
+		// Channel identifiers
+		channelID   int
+		channelName string
+
+		// Authentication details
+		username    string
+		password    string
+		loginURL    string
+		authDetails []string
 	)
 
 	addAuthCmd := &cobra.Command{
@@ -130,9 +135,13 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 
 	var (
-		cFile, channelName string
-		channelID          int
-		urls               []string
+		// Channel identifiers
+		channelID   int
+		channelName string
+
+		// URLs and files
+		cFile string
+		urls  []string
 	)
 
 	deleteURLsCmd := &cobra.Command{
@@ -170,9 +179,13 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 // downloadVideoURLs downloads a list of URLs inputted by the user.
 func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		cFile, channelName string
-		channelID          int
-		urls               []string
+		// Channel identifiers
+		channelID   int
+		channelName string
+
+		// URLs and files
+		cFile string
+		urls  []string
 	)
 
 	manualURLCmd := &cobra.Command{
@@ -265,9 +278,13 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 // deleteNotifyURLs deletes notification URLs from a channel.
 func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		channelName             string
-		channelID               int
-		notifyURLs, notifyNames []string
+		// Channel identifiers
+		channelID   int
+		channelName string
+
+		// Notification details
+		notifyURLs  []string
+		notifyNames []string
 	)
 
 	deleteNotifyCmd := &cobra.Command{
@@ -318,8 +335,11 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 // addNotifyURLs adds a notification URL (can use to send requests to update Plex libraries on new video addition).
 func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		channelName  string
-		channelID    int
+		// Channel identifiers
+		channelID   int
+		channelName string
+
+		// Notification details
 		notification []string
 	)
 
@@ -379,8 +399,12 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 // addVideoURLToIgnore adds a user inputted URL to ignore from crawls.
 func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		name, ignoreURL string
-		id              int
+		// Channel identifiers
+		id   int
+		name string
+
+		// Ignore details
+		ignoreURL string
 	)
 
 	ignoreURLCmd := &cobra.Command{
@@ -430,8 +454,9 @@ func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 // ignoreCrawl crawls the current state of the channel page and adds the URLs as though they are already grabbed.
 func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		name string
+		// Channel identifiers
 		id   int
+		name string
 	)
 
 	ignoreCrawlCmd := &cobra.Command{
@@ -484,8 +509,9 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 // pauseChannelCmd pauses a channel from downloads in upcoming crawls.
 func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		name string
+		// Channel identifiers
 		id   int
+		name string
 	)
 
 	pauseCmd := &cobra.Command{
@@ -535,8 +561,9 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // unpauseChannelCmd unpauses a channel to allow for downloads in upcoming crawls.
 func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		name string
+		// Channel identifiers
 		id   int
+		name string
 	)
 
 	unPauseCmd := &cobra.Command{
@@ -584,8 +611,9 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // unblockChannelCmd unblocks channels which were locked (usually due to bot activity detection).
 func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		name string
+		// Channel identifiers
 		id   int
+		name string
 	)
 
 	unblockCmd := &cobra.Command{
@@ -635,39 +663,95 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // addChannelCmd adds a new channel into the database.
 func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		urls []string
-		name, vDir, jDir, outDir, cookiesFromBrowser,
-		externalDownloader, externalDownloaderArgs, maxFilesize, renameStyle, minFreeMem, metarrExt string
-		urlOutDirs                   []string
-		username, password, loginURL string
-		authDetails                  []string
-		notification                 []string
-		videoCodec, audioCodec       []string
-		fromDate, toDate             string
+		// Channel identifiers
+		name string
 
-		dlFilters, moveOps, metaOps, filenameOps, filteredMetaOps, filteredFilenameOps []string
+		// URLs
+		urls       []string
+		urlOutDirs []string
 
-		configFile, dlFilterFile, moveOpFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
+		// Directory paths
+		vDir   string
+		jDir   string
+		outDir string
+		gpuDir string
 
-		crawlFreq, concurrency, metarrConcurrency, retries                           int
-		maxCPU                                                                       float64
-		transcodeGPU, gpuDir, transcodeQuality, transcodeVideoFilter, ytdlpOutputExt string
-		pause, ignoreRun, useGlobalCookies                                           bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                     string
+		// Configuration files
+		configFile              string
+		addFromFile             string
+		dlFilterFile            string
+		moveOpFile              string
+		metaOpsFile             string
+		filteredMetaOpsFile     string
+		filenameOpsFile         string
+		filteredFilenameOpsFile string
+
+		// Authentication details
+		username    string
+		password    string
+		loginURL    string
+		authDetails []string
+
+		// Notification details
+		notification []string
+
+		// Download settings
+		cookiesFromBrowser     string
+		externalDownloader     string
+		externalDownloaderArgs string
+		maxFilesize            string
+		ytdlpOutputExt         string
+		fromDate               string
+		toDate                 string
+		useGlobalCookies       bool
+
+		// Filter and operation settings
+		dlFilters           []string
+		moveOps             []string
+		metaOps             []string
+		filenameOps         []string
+		filteredMetaOps     []string
+		filteredFilenameOps []string
+
+		// Metarr settings
+		metarrExt   string
+		renameStyle string
+		minFreeMem  string
+
+		// Transcoding settings
+		transcodeGPU         string
+		transcodeQuality     string
+		transcodeVideoFilter string
+		videoCodec           []string
+		audioCodec           []string
+
+		// Extra arguments
+		extraYTDLPVideoArgs string
+		extraYTDLPMetaArgs  string
+		extraFFmpegArgs     string
+
+		// Concurrency and performance settings
+		crawlFreq         int
+		concurrency       int
+		metarrConcurrency int
+		retries           int
+		maxCPU            float64
+
+		// Boolean flags
+		pause      bool
+		ignoreRun  bool
 	)
 
 	addCmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a channel.",
 		Long:  "Add channel adds a new channel to the database using inputted URLs, names, settings, etc.",
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			// Load in file if specified
+			return loadDefaultsFromConfig(cmd, addFromFile, configFile)
+		},
 		RunE: func(_ *cobra.Command, _ []string) error {
 			var err error
-			// Load in config file
-			if configFile != "" {
-				if err := file.LoadConfigFile(configFile); err != nil {
-					return err
-				}
-			}
 
 			// Got valid items?
 			if vDir == "" || len(urls) == 0 || name == "" {
@@ -967,6 +1051,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	// Pause or ignore run
 	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
 	addCmd.Flags().BoolVar(&ignoreRun, "ignore-run", false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
+	addCmd.Flags().StringVar(&addFromFile, "add-channel-from-file", "", "Add a channel using a prewritten file (.toml, .yaml, etc.).\nFile contents example:\n\nchannel-name: 'Cool Channel'\nchannel-urls:\n  - 'https://www.coolchannel.com/'\n")
 
 	return addCmd
 }
@@ -974,9 +1059,12 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 // deleteChannelCmd deletes a channel from the database.
 func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		urls []string
-		name string
+		// Channel identifiers
 		id   int
+		name string
+
+		// URLs
+		urls []string
 	)
 
 	delCmd := &cobra.Command{
@@ -1011,8 +1099,9 @@ func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // listAllChannel returns details about a single channel in the database.
 func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		name      string
+		// Channel identifiers
 		channelID int
+		name      string
 	)
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -1077,8 +1166,9 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 // crawlChannelCmd initiates a crawl of a given channel.
 func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		name string
+		// Channel identifiers
 		id   int
+		name string
 	)
 
 	crawlCmd := &cobra.Command{
@@ -1128,39 +1218,91 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 // updateChannelSettingsCmd updates channel settings.
 func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		urls                                                                                                              []string
-		videoCodec, audioCodec                                                                                            []string
-		id, concurrency, crawlFreq, metarrConcurrency, retries                                                            int
-		maxCPU                                                                                                            float64
-		vDir, jDir, outDir                                                                                                string
-		urlOutDirs                                                                                                        []string
-		name, cookiesFromBrowser                                                                                          string
-		minFreeMem, renameStyle, metarrExt                                                                                string
-		maxFilesize, externalDownloader, externalDownloaderArgs                                                           string
-		username, password, loginURL                                                                                      string
-		authDetails                                                                                                       []string
-		dlFilters, moveOps, metaOps, filteredMetaOps, filenameOps, filteredFilenameOps                                    []string
-		configFile, dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
-		useGPU, gpuDir, transcodeQuality, transcodeVideoFilter                                                            string
-		fromDate, toDate                                                                                                  string
-		ytdlpOutExt                                                                                                       string
-		useGlobalCookies, pause, deleteAuth                                                                               bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                                          string
+		// Channel identifiers
+		id   int
+		name string
+
+		// URLs
+		urls       []string
+		urlOutDirs []string
+
+		// Directory paths
+		vDir   string
+		jDir   string
+		outDir string
+		gpuDir string
+
+		// Configuration files
+		configFile              string
+		dlFilterFile            string
+		moveOpsFile             string
+		metaOpsFile             string
+		filteredMetaOpsFile     string
+		filenameOpsFile         string
+		filteredFilenameOpsFile string
+
+		// Authentication details
+		username    string
+		password    string
+		loginURL    string
+		authDetails []string
+
+		// Download settings
+		cookiesFromBrowser     string
+		externalDownloader     string
+		externalDownloaderArgs string
+		maxFilesize            string
+		ytdlpOutExt            string
+		fromDate               string
+		toDate                 string
+		useGlobalCookies       bool
+
+		// Filter and operation settings
+		dlFilters           []string
+		moveOps             []string
+		metaOps             []string
+		filenameOps         []string
+		filteredMetaOps     []string
+		filteredFilenameOps []string
+
+		// Metarr settings
+		metarrExt   string
+		renameStyle string
+		minFreeMem  string
+
+		// Transcoding settings
+		useGPU               string
+		transcodeQuality     string
+		transcodeVideoFilter string
+		videoCodec           []string
+		audioCodec           []string
+
+		// Extra arguments
+		extraYTDLPVideoArgs string
+		extraYTDLPMetaArgs  string
+		extraFFmpegArgs     string
+
+		// Concurrency and performance settings
+		concurrency       int
+		crawlFreq         int
+		metarrConcurrency int
+		retries           int
+		maxCPU            float64
+
+		// Boolean flags
+		pause      bool
+		deleteAuth bool
 	)
 
 	updateSettingsCmd := &cobra.Command{
 		Use:   "update-settings",
 		Short: "Update channel settings.",
 		Long:  "Update channel settings with various parameters, both for Tubarr itself and for external software like Metarr.",
+		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			// Load in file if specified
+			return loadDefaultsFromConfig(cmd, configFile, "")
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-
-			// Load in config
-			if configFile != "" {
-				if err := file.LoadConfigFile(configFile); err != nil {
-					return err
-				}
-			}
-
 			// Check key/val pair
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
@@ -1177,8 +1319,11 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Load config file location if existent and one wasn't hardcoded into terminal
-			if configFile == "" && c.ChanSettings.ChannelConfigFile != "" {
+			if !cmd.Flags().Changed(keys.ChannelConfigFile) && c.ChanSettings.ChannelConfigFile != "" {
 				if err := file.LoadConfigFile(c.ChanSettings.ChannelConfigFile); err != nil {
+					return err
+				}
+				if err := loadDefaultsFromConfig(cmd, c.ChanSettings.ChannelConfigFile, ""); err != nil {
 					return err
 				}
 			}
@@ -1357,8 +1502,13 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 // updateChannelValue provides a command allowing the alteration of a channel row.
 func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		col, newVal, name string
-		id                int
+		// Channel identifiers
+		id   int
+		name string
+
+		// Update details
+		col    string
+		newVal string
 	)
 
 	updateRowCmd := &cobra.Command{
