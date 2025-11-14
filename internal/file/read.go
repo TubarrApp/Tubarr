@@ -17,9 +17,9 @@ import (
 // UpdateFromConfigFile loads in config file data.
 func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
 
-	if c.ChanSettings.ChannelConfigFile != "" && !c.UpdatedFromConfig {
+	if c.ChanSettings.ConfigFile != "" && !c.UpdatedFromConfig {
 		if err := cs.UpdateChannelFromConfig(c); err != nil {
-			logging.E("failed to update from config file %q: %v", c.ChanSettings.ChannelConfigFile, err)
+			logging.E("failed to update from config file %q: %v", c.ChanSettings.ConfigFile, err)
 		}
 
 		c.UpdatedFromConfig = true

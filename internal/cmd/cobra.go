@@ -181,7 +181,7 @@ func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuDir, videoFilter, quality *st
 // SetFileDirFlags sets the primary video and JSON directories.
 func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) {
 	if configFile != nil {
-		cmd.Flags().StringVar(configFile, keys.ChannelConfigFile, "", "This is where the channel config file is stored (do not use templating). NOTE: Persists across runs! Channel will always load in this file if it's set!")
+		cmd.Flags().StringVar(configFile, keys.ConfigFile, "", "This is where the channel config file is stored (do not use templating). NOTE: Persists across runs! Channel will always load in this file if it's set!")
 	}
 	if videoDir != nil {
 		cmd.Flags().StringVar(videoDir, keys.VideoDir, "", "This is where videos will be saved (some {{}} templating commands available)")

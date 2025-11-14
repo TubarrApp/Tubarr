@@ -311,21 +311,30 @@ func WarnMalformedKeys() {
 	}
 }
 
-// ValidateMaxFilesize checks the max filesize setting.
-func ValidateMaxFilesize(m string) (string, error) {
-	if m == "" {
-		return m, nil
+// ValidateMaxFilesize checks that max filesize value is valid for yt-dlp.
+func ValidateMaxFilesize(input string) (string, error) {
+	if input == "" {
+		return "", nil
 	}
-	m = strings.ToUpper(m)
-	switch {
-	case strings.HasSuffix(m, "B"), strings.HasSuffix(m, "K"), strings.HasSuffix(m, "M"), strings.HasSuffix(m, "G"):
-		return strings.TrimSuffix(m, "B"), nil
-	default:
-		if _, err := strconv.Atoi(m); err != nil {
-			return "", err
+
+	s := strings.ToLower(strings.TrimSpace(input))
+	s = strings.TrimSuffix(s, "b")
+
+	// Handle K, M, G suffixes
+	if strings.HasSuffix(s, "k") || strings.HasSuffix(s, "m") || strings.HasSuffix(s, "g") {
+		n := s[:len(s)-1]
+		if _, err := strconv.Atoi(n); err != nil {
+			return "", fmt.Errorf("invalid size number: %s", s)
 		}
+		return s, nil
 	}
-	return m, nil
+
+	// Check raw integer is valid
+	if _, err := strconv.Atoi(s); err == nil {
+		return s, nil
+	}
+
+	return "", fmt.Errorf("invalid max filesize format: %s", input)
 }
 
 // ValidateFilterOps verifies that the user inputted filters are valid.

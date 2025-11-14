@@ -918,7 +918,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 				// Fill channel
 				ChanSettings: &models.Settings{
-					ChannelConfigFile:      configFile,
+					ConfigFile:             configFile,
 					Concurrency:            concurrency,
 					CookiesFromBrowser:     cookiesFromBrowser,
 					CrawlFreq:              crawlFreq,
@@ -1438,7 +1438,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					Name:      bv.name,
 
 					ChanSettings: &models.Settings{
-						ChannelConfigFile:      bv.channelConfigFile,
+						ConfigFile:             bv.channelConfigFile,
 						Concurrency:            bv.concurrency,
 						CookiesFromBrowser:     bv.cookiesFromBrowser,
 						CrawlFreq:              bv.crawlFreq,
@@ -1859,11 +1859,11 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Load config file location if existent and one wasn't hardcoded into terminal
-			if !cmd.Flags().Changed(keys.ChannelConfigFile) && c.ChanSettings.ChannelConfigFile != "" {
-				if err := file.LoadConfigFile(c.ChanSettings.ChannelConfigFile); err != nil {
+			if !cmd.Flags().Changed(keys.ConfigFile) && c.ChanSettings.ConfigFile != "" {
+				if err := file.LoadConfigFile(c.ChanSettings.ConfigFile); err != nil {
 					return err
 				}
-				if err := parsing.LoadDefaultsFromConfig(cmd, c.ChanSettings.ChannelConfigFile, ""); err != nil {
+				if err := parsing.LoadDefaultsFromConfig(cmd, c.ChanSettings.ConfigFile, ""); err != nil {
 					return err
 				}
 			}
@@ -2463,9 +2463,9 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	}
 
 	// Channel config file location
-	if f.Changed(keys.ChannelConfigFile) {
+	if f.Changed(keys.ConfigFile) {
 		fns = append(fns, func(s *models.Settings) error {
-			s.ChannelConfigFile = c.channelConfigFile
+			s.ConfigFile = c.channelConfigFile
 			return nil
 		})
 	}

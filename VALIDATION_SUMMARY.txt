@@ -1,0 +1,164 @@
+================================================================================
+TUBARR VALIDATION FUNCTIONS - COMPREHENSIVE SEARCH RESULTS
+================================================================================
+
+SEARCH COMPLETED: November 14, 2025
+
+Three detailed analysis documents have been created:
+
+1. VALIDATION_ANALYSIS.md
+   - Complete validation function inventory (30+ functions)
+   - Settings struct: 23 fields, 11 currently validated (48%)
+   - MetarrArgs struct: 23 fields, 16 currently validated (70%)
+   - Detailed validation status for every field
+   - Validation gaps and recommendations
+   - Validation patterns used throughout codebase
+
+2. VALIDATION_CODE_SNIPPETS.md
+   - Quick reference for all validators
+   - Code usage examples
+   - Supported formats and values
+   - Current vs Missing validation blocks
+   - Copy-paste ready code snippets
+   - Error handling patterns
+
+3. VALIDATION_QUICK_REFERENCE.md
+   - One-page quick lookup
+   - Fields that NEED validation (with solutions)
+   - What IS being validated
+   - Copy-paste code blocks for missing validators
+   - File locations and stats
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+TOTAL VALIDATION FUNCTIONS AVAILABLE: 30+
+- common.go: 15 functions
+- metarr.go: 14 functions  
+- db.go: 1 function
+- helpers.go: 3 helper functions
+
+VALIDATION COVERAGE:
+- Settings: 48% (11/23 fields)
+- MetarrArgs: 70% (16/23 fields)
+- Overall: 59% (27/46 fields)
+
+CRITICAL GAPS (8 Fields Missing Validation):
+1. Settings.ConfigFile - needs ValidateFile()
+2. Settings.FilterFile - needs ValidateFile()
+3. Settings.MoveOpFile - needs ValidateFile()
+4. MetarrArgs.OutputExt - needs ValidateOutputFiletype()
+5. MetarrArgs.FilenameOpsFile - needs ValidateFile()
+6. MetarrArgs.MetaOpsFile - needs ValidateFile()
+7. MetarrArgs.FilteredMetaOpsFile - needs ValidateFile()
+8. MetarrArgs.FilteredFilenameOpsFile - needs ValidateFile()
+
+ALSO MISSING:
+9. Settings.MaxFilesize - ValidateMaxFilesize() exists but not called!
+
+HIGH-PRIORITY FIXES:
+1. Add ValidateFile() for all *File fields
+2. Add ValidateMaxFilesize() in buildSettingsFromInput
+3. Add ValidateOutputFiletype() for MetarrArgs.OutputExt
+4. Use ValidateConcurrencyLimit() in buildMetarrArgsFromInput
+
+================================================================================
+WHERE VALIDATION HAPPENS
+================================================================================
+
+IN buildSettingsFromInput() - Lines 429-538:
+✅ FromDate, ToDate (ValidateToFromDate)
+✅ YTDLPOutputExt (ValidateYtdlpOutputExtension)
+✅ DLFilters (ValidateFilterOps)
+✅ MoveOps (ValidateMoveOps)
+
+IN buildMetarrArgsFromInput() - Lines 540-687:
+✅ RenameStyle (ValidateRenameFlag)
+✅ MinFreeMem (ValidateMinFreeMem)
+✅ TranscodeGPU (ValidateGPU)
+✅ VideoCodec (ValidateVideoTranscodeCodecSlice)
+✅ AudioCodec (ValidateAudioTranscodeCodecSlice)
+✅ TranscodeQuality (ValidateTranscodeQuality)
+✅ MetaOps (ValidateMetaOps)
+✅ FilenameOps (ValidateFilenameOps)
+✅ FilteredMetaOps (ValidateFilteredMetaOps)
+✅ FilteredFilenameOps (ValidateFilteredFilenameOps)
+✅ OutputDir (ValidateDirectory)
+
+IN fillChannelFromConfigFile() - Lines 14-292:
+Most comprehensive validation path - all operations validated here
+
+================================================================================
+FILE LOCATIONS
+================================================================================
+
+Validators:
+/home/calum/code/apps/Tubarr/internal/validation/
+  - common.go: Directory, File, Extension, Size, Date, Operation validation
+  - metarr.go: Filename/Meta operations, Transcoding, GPU, Codecs
+  - db.go: Database column validation
+  - helpers.go: Utility helpers
+
+Functions Needing Updates:
+/home/calum/code/apps/Tubarr/internal/server/helpers.go
+  - buildSettingsFromInput() at lines 429-538
+  - buildMetarrArgsFromInput() at lines 540-687
+
+Structs:
+/home/calum/code/apps/Tubarr/internal/models/
+  - settings.go: Settings, MetarrArgs structs
+  - vars.go: ChannelInputPtrs struct
+
+================================================================================
+VALIDATOR CATEGORIES
+================================================================================
+
+Path Validation (Directory & File):
+- ValidateDirectory(path, createIfNotFound) -> FileInfo, error
+- ValidateFile(path, createIfNotFound) -> FileInfo, error
+
+Extension Validation:
+- ValidateYtdlpOutputExtension(ext) -> error
+- ValidateOutputFiletype(ext) -> string, error
+
+Size/Format Validation:
+- ValidateMaxFilesize(input) -> string, error
+- ValidateMinFreeMem(minFreeMem) -> error
+
+Date Validation:
+- ValidateToFromDate(dateStr) -> string, error
+- ValidateDateFormat(format) -> bool
+
+Operation Validation:
+- ValidateFilterOps([]string) -> []Filters, error
+- ValidateMoveOps([]string) -> []MetaFilterMoveOps, error
+- ValidateFilenameOps([]string) -> []FilenameOps, error
+- ValidateMetaOps([]string) -> []MetaOps, error
+- ValidateFilteredMetaOps([]string) -> []FilteredMetaOps, error
+- ValidateFilteredFilenameOps([]string) -> []FilteredFilenameOps, error
+
+Transcoding Validation:
+- ValidateGPU(gpu, devDir) -> string, string, error
+- ValidateVideoTranscodeCodecSlice([]string, accel) -> []string, error
+- ValidateAudioTranscodeCodecSlice([]string) -> []string, error
+- ValidateTranscodeQuality(quality) -> string, error
+- ValidateTranscodeVideoFilter(filter) -> string, error
+
+Config Validation:
+- ValidateRenameFlag(flag) -> error
+- ValidateConcurrencyLimit(int) -> int
+- ValidateNotificationStrings([]string) -> []*Notification, error
+- ValidateMetarrOutputDirs(...) -> map[string]string, error
+
+================================================================================
+RECOMMENDED NEXT STEPS
+================================================================================
+
+1. Review VALIDATION_ANALYSIS.md for complete details
+2. Check VALIDATION_QUICK_REFERENCE.md for quick decisions
+3. Use code snippets from VALIDATION_CODE_SNIPPETS.md to add missing validation
+4. Priority: Fix the 8 critical gaps (file path validations)
+5. Consider error handling pattern: warnings for per-URL settings vs HTTP errors
+
+================================================================================

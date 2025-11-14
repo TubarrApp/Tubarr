@@ -601,7 +601,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 
 	var c bool
 	// Configuration fields
-	urlSettings.ChannelConfigFile, c = mergeStringSettings(urlSettings.ChannelConfigFile, channelSettings.ChannelConfigFile)
+	urlSettings.ConfigFile, c = mergeStringSettings(urlSettings.ConfigFile, channelSettings.ConfigFile)
 	changed = changed || c // True if "changed" OR "c" is true (once changed is true, it remains true throughout function)
 
 	urlSettings.Concurrency, c = mergeNumSettings(urlSettings.Concurrency, channelSettings.Concurrency, 0)

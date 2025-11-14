@@ -7,6 +7,8 @@ import (
 	"strings"
 	"tubarr/internal/abstractions"
 	"tubarr/internal/file"
+	"tubarr/internal/models"
+	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -80,6 +82,7 @@ func LoadDefaultsFromConfig(cmd *cobra.Command, primaryFile, secondaryFile strin
 }
 
 // GetConfigValue normalizes and retrieves values from the config file.
+//
 // Supports both kebab-case and snake_case keys.
 func GetConfigValue[T any](key string) (T, bool) {
 	var zero T
@@ -250,7 +253,10 @@ func viperPtr[T any](key string) (*T, bool) {
 }
 
 // LoadViperIntoStructLocal loads values from a local Viper instance into a struct of variables.
-func LoadViperIntoStructLocal(v interface{ IsSet(string) bool; Get(string) interface{} }, ptr any) error {
+func LoadViperIntoStructLocal(v interface {
+	IsSet(string) bool
+	Get(string) any
+}, ptr any) error {
 	val := reflect.ValueOf(ptr)
 	if val.Kind() != reflect.Pointer || val.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("expected pointer to struct")
@@ -309,8 +315,12 @@ func LoadViperIntoStructLocal(v interface{ IsSet(string) bool; Get(string) inter
 }
 
 // viperPtrLocal returns a pointer to a value from a local viper instance if successful, or nil.
+//
 // Supports both kebab-case and snake_case keys.
-func viperPtrLocal[T any](v interface{ IsSet(string) bool; Get(string) interface{} }, key string) (*T, bool) {
+func viperPtrLocal[T any](v interface {
+	IsSet(string) bool
+	Get(string) any
+}, key string) (*T, bool) {
 	val, ok := getConfigValueLocal[T](v, key)
 	if !ok {
 		return nil, false
@@ -319,8 +329,12 @@ func viperPtrLocal[T any](v interface{ IsSet(string) bool; Get(string) interface
 }
 
 // getConfigValueLocal retrieves values from a local viper instance.
+//
 // Supports both kebab-case and snake_case keys.
-func getConfigValueLocal[T any](v interface{ IsSet(string) bool; Get(string) interface{} }, key string) (T, bool) {
+func getConfigValueLocal[T any](v interface {
+	IsSet(string) bool
+	Get(string) any
+}, key string) (T, bool) {
 	var zero T
 
 	// Try original key first
@@ -346,4 +360,134 @@ func getConfigValueLocal[T any](v interface{ IsSet(string) bool; Get(string) int
 		}
 	}
 	return zero, false
+}
+
+// ParseURLSettingsFromViper extracts per-URL settings from the config file.
+//
+// Creates local Viper instances for each URL's settings to reuse validation logic.
+func ParseURLSettingsFromViper(v interface {
+	IsSet(string) bool
+	Get(string) any
+}) (map[string]*models.URLSettingsOverride, error) {
+	urlSettings := make(map[string]*models.URLSettingsOverride)
+
+	// Check if url-settings exists
+	if !v.IsSet("url-settings") && !v.IsSet("url_settings") {
+		logging.I("No url-settings found in config")
+		return urlSettings, nil
+	}
+
+	// Get the raw url-settings data
+	var urlSettingsRaw any
+	if v.IsSet("url-settings") {
+		urlSettingsRaw = v.Get("url-settings")
+	} else {
+		urlSettingsRaw = v.Get("url_settings")
+	}
+
+	// Cast to map
+	urlSettingsMap, ok := urlSettingsRaw.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("url-settings must be a map[string]any")
+	}
+
+	// Process each URL's settings
+	for channelURL, settingsData := range urlSettingsMap {
+
+		// Normalize URL to lowercase for case-insensitive matching
+		normalizedURL := strings.ToLower(channelURL)
+
+		override := &models.URLSettingsOverride{}
+		dataMap, ok := settingsData.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("settings for URL %q must be a map", channelURL)
+		}
+
+		// Handle "settings" section
+		if settingsRaw, hasSettings := dataMap["settings"]; hasSettings {
+			settingsMap, ok := settingsRaw.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("settings section for URL %q must be a map", channelURL)
+			}
+
+			// Create new Viper instance and load the settings map
+			settingsViper := &urlConfigSettingsParser{data: settingsMap}
+			settingsInput := &models.ChannelInputPtrs{}
+			if err := LoadViperIntoStructLocal(settingsViper, settingsInput); err != nil {
+				return nil, fmt.Errorf("failed to parse settings for URL %q: %w", channelURL, err)
+			}
+
+			override.Settings = settingsInput
+		}
+
+		// Handle "metarr" section
+		if metarrRaw, hasMetarr := dataMap["metarr"]; hasMetarr {
+			metarrMap, ok := metarrRaw.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("metarr section for URL %q must be a map", channelURL)
+			}
+
+			// Create new Viper instance and load the metarr map
+			metarrViper := &urlConfigSettingsParser{data: metarrMap}
+			metarrInput := &models.ChannelInputPtrs{}
+			if err := LoadViperIntoStructLocal(metarrViper, metarrInput); err != nil {
+				return nil, fmt.Errorf("failed to parse metarr for URL %q: %w", channelURL, err)
+			}
+
+			override.Metarr = metarrInput
+		}
+
+		urlSettings[normalizedURL] = override
+	}
+
+	return urlSettings, nil
+}
+
+// urlConfigSettingsParser wraps a map to implement the Viper-like interface.
+type urlConfigSettingsParser struct {
+	data map[string]any
+}
+
+// IsSet checks if the key exists in the data.
+func (u *urlConfigSettingsParser) IsSet(key string) bool {
+	if _, ok := u.data[key]; ok {
+		return true
+	}
+	// Try with underscore/hyphen variations
+	snakeKey := strings.ReplaceAll(key, "-", "_")
+	if snakeKey != key {
+		if _, ok := u.data[snakeKey]; ok {
+			return true
+		}
+	}
+	kebabKey := strings.ReplaceAll(key, "_", "-")
+	if kebabKey != key {
+		if _, ok := u.data[kebabKey]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// Get returns the key from the data.
+func (u *urlConfigSettingsParser) Get(key string) any {
+	// Try original key
+	if val, ok := u.data[key]; ok {
+		return val
+	}
+	// Try snake_case
+	snakeKey := strings.ReplaceAll(key, "-", "_")
+	if snakeKey != key {
+		if val, ok := u.data[snakeKey]; ok {
+			return val
+		}
+	}
+	// Try kebab-case
+	kebabKey := strings.ReplaceAll(key, "_", "-")
+	if kebabKey != key {
+		if val, ok := u.data[kebabKey]; ok {
+			return val
+		}
+	}
+	return nil
 }

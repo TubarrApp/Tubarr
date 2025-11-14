@@ -35,22 +35,38 @@ func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load in config file
-	if err := file.LoadConfigFile(addFromFile); err != nil {
+	// Use local viper instance for consistency with directory handler
+	v := viper.New()
+	if err := file.LoadConfigFileLocal(v, addFromFile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Load viper variables into the struct
-	if err := parsing.LoadViperIntoStruct(&input); err != nil {
+	// Load viper variables into the struct from local instance
+	if err := parsing.LoadViperIntoStructLocal(v, &input); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// Parse per-URL settings if present
+	urlSettings, err := parsing.ParseURLSettingsFromViper(v)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse url-settings: %v", err), http.StatusBadRequest)
+		return
+	}
+	input.URLSettings = urlSettings
 
 	c, authMap := fillChannelFromConfigFile(w, input)
 	if c == nil {
 		return
 	}
+
+	fmt.Println()
+	for _, u := range c.URLModels {
+		logging.I("Got channel URL output ext: %q", u.ChanURLMetarrArgs.OutputExt)
+		logging.I("Got max filesize: %q", u.ChanURLSettings.MaxFilesize)
+	}
+	fmt.Println()
 
 	channelID, err := ss.cs.AddChannel(c)
 	if err != nil {
@@ -143,6 +159,17 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 			}{batchConfigFile, err.Error()})
 			continue
 		}
+
+		// Parse per-URL settings if present
+		urlSettings, err := parsing.ParseURLSettingsFromViper(v)
+		if err != nil {
+			failures = append(failures, struct {
+				file   string
+				reason string
+			}{batchConfigFile, fmt.Sprintf("failed to parse url-settings: %v", err)})
+			continue
+		}
+		input.URLSettings = urlSettings
 
 		c, authMap := fillChannelFromConfigFile(w, input)
 		if c == nil {
@@ -364,10 +391,16 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 		}{}
 
 		if settingsMap, hasSettings := settingsData["settings"]; hasSettings {
-			parsed.Settings = parseSettingsFromMap(settingsMap)
+			if parsed.Settings, err = parseSettingsFromMap(settingsMap); err != nil {
+				http.Error(w, fmt.Sprintf("Invalid Settings for URL %q: %v", channelURL, err), http.StatusBadRequest)
+				return
+			}
 		}
 		if metarrMap, hasMetarr := settingsData["metarr"]; hasMetarr {
-			parsed.Metarr = parseMetarrArgsFromMap(metarrMap)
+			if parsed.Metarr, err = parseMetarrArgsFromMap(metarrMap); err != nil {
+				http.Error(w, fmt.Sprintf("Invalid Metarr Args for URL %q: %v", channelURL, err), http.StatusBadRequest)
+				return
+			}
 		}
 
 		urlSettingsMap[channelURL] = parsed
@@ -547,10 +580,16 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		}{}
 
 		if settingsMap, hasSettings := settingsData["settings"]; hasSettings {
-			parsed.Settings = parseSettingsFromMap(settingsMap)
+			if parsed.Settings, err = parseSettingsFromMap(settingsMap); err != nil {
+				http.Error(w, fmt.Sprintf("Invalid Settings for URL %q: %v", channelURL, err), http.StatusBadRequest)
+				return
+			}
 		}
 		if metarrMap, hasMetarr := settingsData["metarr"]; hasMetarr {
-			parsed.Metarr = parseMetarrArgsFromMap(metarrMap)
+			if parsed.Metarr, err = parseMetarrArgsFromMap(metarrMap); err != nil {
+				http.Error(w, fmt.Sprintf("Invalid Metarr Args for URL %q: %v", channelURL, err), http.StatusBadRequest)
+				return
+			}
 		}
 
 		urlSettingsMap[channelURL] = parsed
@@ -950,7 +989,7 @@ func handleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings {
 	// -- Initialize --
 	// Strings not needing validation
-	channelConfigFile := r.FormValue("channel_config_file")
+	channelConfigFile := r.FormValue("config_file")
 	cookiesFromBrowser := r.FormValue("cookies_from_browser")
 	externalDownloader := r.FormValue("external_downloader")
 	externalDownloaderArgs := r.FormValue("external_downloader_args")
@@ -1043,7 +1082,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	}
 
 	return &models.Settings{
-		ChannelConfigFile:      channelConfigFile,
+		ConfigFile:             channelConfigFile,
 		Concurrency:            maxConcurrency,
 		CookiesFromBrowser:     cookiesFromBrowser,
 		CrawlFreq:              crawlFreq,
@@ -1219,13 +1258,17 @@ func splitNonEmptyLines(s string) []string {
 }
 
 // parseSettingsFromMap parses Settings from a map[string]any (from JSON).
+//
 // This is used when parsing per-URL settings from the frontend.
-func parseSettingsFromMap(data map[string]any) *models.Settings {
+func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	settings := &models.Settings{}
 
 	// Extract string fields
-	if v, ok := data["channel_config_file"].(string); ok {
-		settings.ChannelConfigFile = v
+	if v, ok := data["config_file"].(string); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return nil, err
+		}
+		settings.ConfigFile = v
 	}
 	if v, ok := data["cookies_from_browser"].(string); ok {
 		settings.CookiesFromBrowser = v
@@ -1243,39 +1286,67 @@ func parseSettingsFromMap(data map[string]any) *models.Settings {
 		settings.ExtraYTDLPMetaArgs = v
 	}
 	if v, ok := data["filter_file"].(string); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return nil, err
+		}
 		settings.FilterFile = v
 	}
 	if v, ok := data["move_ops_file"].(string); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return nil, err
+		}
 		settings.MoveOpFile = v
 	}
 	if v, ok := data["json_directory"].(string); ok {
+		if _, err := validation.ValidateDirectory(v, true); err != nil {
+			return nil, err
+		}
 		settings.JSONDir = v
 	}
 	if v, ok := data["video_directory"].(string); ok {
+		if _, err := validation.ValidateDirectory(v, true); err != nil {
+			return nil, err
+		}
 		settings.VideoDir = v
 	}
 	if v, ok := data["max_filesize"].(string); ok {
-		settings.MaxFilesize = v
+		validFilesize, err := validation.ValidateMaxFilesize(v)
+		if err != nil {
+			return nil, err
+		}
+		settings.MaxFilesize = validFilesize
 	}
 	if v, ok := data["ytdlp_output_ext"].(string); ok {
+		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
+			return nil, err
+		}
 		settings.YtdlpOutputExt = v
 	}
 	if v, ok := data["from_date"].(string); ok {
-		settings.FromDate = v
+		validDate, err := validation.ValidateToFromDate(v)
+		if err != nil {
+			return nil, err
+		}
+		settings.FromDate = validDate
 	}
 	if v, ok := data["to_date"].(string); ok {
-		settings.ToDate = v
+		validDate, err := validation.ValidateToFromDate(v)
+		if err != nil {
+			return nil, err
+		}
+		settings.ToDate = validDate
 	}
 
 	// Extract integer fields
-	if v, ok := data["max_concurrency"].(float64); ok {
-		settings.Concurrency = int(v)
+	if v, ok := data["max_concurrency"].(int); ok {
+		valid := validation.ValidateConcurrencyLimit(v)
+		settings.Concurrency = valid
 	}
-	if v, ok := data["crawl_freq"].(float64); ok {
-		settings.CrawlFreq = int(v)
+	if v, ok := data["crawl_freq"].(int); ok {
+		settings.CrawlFreq = max(v, 0)
 	}
-	if v, ok := data["download_retries"].(float64); ok {
-		settings.Retries = int(v)
+	if v, ok := data["download_retries"].(int); ok {
+		settings.Retries = max(v, 0)
 	}
 
 	// Extract boolean fields
@@ -1286,23 +1357,27 @@ func parseSettingsFromMap(data map[string]any) *models.Settings {
 	// Parse model fields from strings (newline-separated, not space-separated)
 	if filtersStr, ok := data["filters"].(string); ok && filtersStr != "" {
 		lines := splitNonEmptyLines(filtersStr)
-		if filters, err := validation.ValidateFilterOps(lines); err == nil {
-			settings.Filters = filters
+		filters, err := validation.ValidateFilterOps(lines)
+		if err != nil {
+			return nil, err
 		}
+		settings.Filters = filters
 	}
 	if moveOpsStr, ok := data["move_ops"].(string); ok && moveOpsStr != "" {
 		lines := splitNonEmptyLines(moveOpsStr)
-		if moveOps, err := validation.ValidateMoveOps(lines); err == nil {
-			settings.MoveOps = moveOps
+		moveOps, err := validation.ValidateMoveOps(lines)
+		if err != nil {
+			return nil, err
 		}
+		settings.MoveOps = moveOps
 	}
 
-	return settings
+	return settings, nil
 }
 
 // parseMetarrArgsFromMap parses MetarrArgs from a map[string]any (from JSON).
 // This is used when parsing per-URL metarr settings from the frontend.
-func parseMetarrArgsFromMap(data map[string]any) *models.MetarrArgs {
+func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 	metarr := &models.MetarrArgs{}
 
 	// Extract string fields
@@ -1310,51 +1385,88 @@ func parseMetarrArgsFromMap(data map[string]any) *models.MetarrArgs {
 		metarr.OutputExt = v
 	}
 	if v, ok := data["metarr_filename_ops_file"].(string); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return nil, err
+		}
 		metarr.FilenameOpsFile = v
 	}
 	if v, ok := data["filtered_filename_ops_file"].(string); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return nil, err
+		}
 		metarr.FilteredFilenameOpsFile = v
 	}
 	if v, ok := data["metarr_meta_ops_file"].(string); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return nil, err
+		}
 		metarr.MetaOpsFile = v
 	}
 	if v, ok := data["filtered_meta_ops_file"].(string); ok {
+		if _, err := validation.ValidateFile(v, false); err != nil {
+			return nil, err
+		}
 		metarr.FilteredMetaOpsFile = v
 	}
 	if v, ok := data["metarr_extra_ffmpeg_args"].(string); ok {
 		metarr.ExtraFFmpegArgs = v
 	}
 	if v, ok := data["metarr_rename_style"].(string); ok {
+		if err := validation.ValidateRenameFlag(v); err != nil {
+			return nil, err
+		}
 		metarr.RenameStyle = v
 	}
 	if v, ok := data["metarr_min_free_mem"].(string); ok {
+		if err := validation.ValidateMinFreeMem(v); err != nil {
+			return nil, err
+		}
 		metarr.MinFreeMem = v
-	}
-	if v, ok := data["metarr_gpu"].(string); ok {
-		metarr.UseGPU = v
 	}
 	if v, ok := data["metarr_gpu_directory"].(string); ok {
 		metarr.GPUDir = v
 	}
+	if v, ok := data["metarr_gpu"].(string); ok {
+		validGPU, _, err := validation.ValidateGPU(v, metarr.GPUDir)
+		if err != nil {
+			return nil, err
+		}
+		metarr.UseGPU = validGPU
+	}
 	if v, ok := data["metarr_output_directory"].(string); ok {
+		if _, err := validation.ValidateDirectory(v, true); err != nil {
+			return nil, err
+		}
 		metarr.OutputDir = v
 	}
 	if v, ok := data["metarr_transcode_video_filter"].(string); ok {
 		metarr.TranscodeVideoFilter = v
 	}
 	if v, ok := data["metarr_video_transcode_codecs"].([]string); ok {
-		metarr.TranscodeVideoCodecs = v
+		validPairs, err := validation.ValidateVideoTranscodeCodecSlice(v, metarr.UseGPU)
+		if err != nil {
+			return nil, err
+		}
+		metarr.TranscodeVideoCodecs = validPairs
 	}
 	if v, ok := data["metarr_transcode_audio_codecs"].([]string); ok {
-		metarr.TranscodeAudioCodecs = v
+		validPairs, err := validation.ValidateAudioTranscodeCodecSlice(v)
+		if err != nil {
+			return nil, err
+		}
+		metarr.TranscodeAudioCodecs = validPairs
 	}
 	if v, ok := data["metarr_transcode_quality"].(string); ok {
-		metarr.TranscodeQuality = v
+		validQuality, err := validation.ValidateTranscodeQuality(v)
+		if err != nil {
+			return nil, err
+		}
+		metarr.TranscodeQuality = validQuality
 	}
 
 	// Extract integer fields
-	if v, ok := data["metarr_concurrency"].(float64); ok {
-		metarr.Concurrency = int(v)
+	if v, ok := data["metarr_concurrency"].(int); ok {
+		metarr.Concurrency = max(v, 0)
 	}
 
 	// Extract float fields
@@ -1365,28 +1477,36 @@ func parseMetarrArgsFromMap(data map[string]any) *models.MetarrArgs {
 	// Parse model fields from strings (newline-separated, not space-separated)
 	if filenameOpsStr, ok := data["metarr_filename_ops"].(string); ok && filenameOpsStr != "" {
 		lines := splitNonEmptyLines(filenameOpsStr)
-		if filenameOps, err := validation.ValidateFilenameOps(lines); err == nil {
-			metarr.FilenameOps = filenameOps
+		filenameOps, err := validation.ValidateFilenameOps(lines)
+		if err != nil {
+			return nil, err
 		}
+		metarr.FilenameOps = filenameOps
 	}
 	if filteredFilenameOpsStr, ok := data["filtered_filename_ops"].(string); ok && filteredFilenameOpsStr != "" {
 		lines := splitNonEmptyLines(filteredFilenameOpsStr)
-		if filteredFilenameOps, err := validation.ValidateFilteredFilenameOps(lines); err == nil {
-			metarr.FilteredFilenameOps = filteredFilenameOps
+		filteredFilenameOps, err := validation.ValidateFilteredFilenameOps(lines)
+		if err != nil {
+			return nil, err
 		}
+		metarr.FilteredFilenameOps = filteredFilenameOps
 	}
 	if metaOpsStr, ok := data["metarr_meta_ops"].(string); ok && metaOpsStr != "" {
 		lines := splitNonEmptyLines(metaOpsStr)
-		if metaOps, err := validation.ValidateMetaOps(lines); err == nil {
-			metarr.MetaOps = metaOps
+		metaOps, err := validation.ValidateMetaOps(lines)
+		if err != nil {
+			return nil, err
 		}
+		metarr.MetaOps = metaOps
 	}
 	if filteredMetaOpsStr, ok := data["filtered_meta_ops"].(string); ok && filteredMetaOpsStr != "" {
 		lines := splitNonEmptyLines(filteredMetaOpsStr)
-		if filteredMetaOps, err := validation.ValidateFilteredMetaOps(lines); err == nil {
-			metarr.FilteredMetaOps = filteredMetaOps
+		filteredMetaOps, err := validation.ValidateFilteredMetaOps(lines)
+		if err != nil {
+			return nil, err
 		}
+		metarr.FilteredMetaOps = filteredMetaOps
 	}
 
-	return metarr
+	return metarr, nil
 }

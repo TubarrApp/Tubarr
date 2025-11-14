@@ -36,8 +36,8 @@ var rootCmd = &cobra.Command{
 		}
 
 		// Setup channel flags from config file
-		if viper.IsSet(keys.ChannelConfigFile) {
-			configFile := viper.GetString(keys.ChannelConfigFile)
+		if viper.IsSet(keys.ConfigFile) {
+			configFile := viper.GetString(keys.ConfigFile)
 			cInfo, err := os.Stat(configFile)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed check for config file path: %v", err)

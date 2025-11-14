@@ -1,0 +1,44 @@
+# Main channel variables
+channel_name = "Cool Channel"
+channel_urls = ["https://www.tubesite.com/@CoolChannel"]
+video_directory = "/home/user/tubarr/{{channel_name}}"
+json_directory = "/home/user/tubarr/{{channel_name}}"
+
+# Tubarr crawling and downloading
+external_downloader = "aria2c"
+external_downloader_args = "-x 16 -s 16"
+concurrency = 3
+crawl_freq = 30
+
+# Metarr operations
+metarr_meta_ops = [
+  "title:date-tag:prefix:ymd",
+  "fulltitle:date-tag:prefix:ymd",
+  "all-credits:set:Cool Guy"
+]
+
+metarr_filename_ops = ["date-tag:prefix:ymd"]
+metarr_rename_style = "spaces"
+metarr_output_ext = "mp4"
+metarr_concurrency = 5
+metarr_default_output_dir = "/home/user/tubarr/{{channel_name}}/{{year}}"
+
+# Transcoding
+transcode_gpu = "auto"
+transcode_gpu_directory = "/dev/dri/renderD128"
+transcode_video_codecs = [
+  "h264:hevc",
+  "webm:h264"
+]
+transcode_audio_codecs = [
+  "aac:ac3",
+  "dts:eac3",
+  "flac:mp3"
+]
+
+# Notify services
+notify = ["https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh?X-Plex-Token=< YOUR PLEX TOKEN >|Plex"]
+
+# Ignore videos to date (only download new videos after now)
+ignore_run = true
+

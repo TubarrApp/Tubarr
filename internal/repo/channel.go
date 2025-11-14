@@ -136,7 +136,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return fmt.Errorf("dev error: channel sent in nil")
 	}
 
-	cfgFile := c.ChanSettings.ChannelConfigFile
+	cfgFile := c.ChanSettings.ConfigFile
 	if cfgFile == "" {
 		logging.D(2, "No config file path, nothing to apply")
 		return nil
@@ -482,6 +482,22 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
 		}
 
+		// Check if custom args exist
+		var (
+			customMetarrArgs []byte
+			customSettings   []byte
+		)
+		if !models.MetarrArgsAllZero(cu.ChanURLMetarrArgs) {
+			if customMetarrArgs, err = json.Marshal(cu.ChanURLMetarrArgs); err != nil {
+				return 0, fmt.Errorf("failed to marshal settings: %w", err)
+			}
+		}
+		if !models.SettingsAllZero(cu.ChanURLSettings) {
+			if customSettings, err = json.Marshal(cu.ChanURLSettings); err != nil {
+				return 0, fmt.Errorf("failed to marshal settings: %w", err)
+			}
+		}
+
 		urlQuery := squirrel.
 			Insert(consts.DBChannelURLs).
 			Columns(
@@ -491,6 +507,8 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 				consts.QChanURLPassword,
 				consts.QChanURLLoginURL,
 				consts.QChanURLIsManual,
+				consts.QChanURLMetarr,
+				consts.QChanURLSettings,
 				consts.QChanURLLastScan,
 				consts.QChanURLCreatedAt,
 				consts.QChanURLUpdatedAt,
@@ -502,6 +520,8 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 				cu.EncryptedPassword,
 				cu.LoginURL,
 				false, // Not a manual URL
+				customMetarrArgs,
+				customSettings,
 				now,
 				now,
 				now,
@@ -1172,7 +1192,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("\n%sChannel Settings:%s\n", consts.ColorCyan, consts.ColorReset)
 	fmt.Printf("Video Directory: %s\n", s.VideoDir)
 	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
-	fmt.Printf("Config File: %s\n", s.ChannelConfigFile)
+	fmt.Printf("Config File: %s\n", s.ConfigFile)
 	fmt.Printf("Crawl Frequency: %d minutes\n", c.GetCrawlFreq())
 	fmt.Printf("Concurrency: %d\n", s.Concurrency)
 	fmt.Printf("Cookie Source: %s\n", s.CookiesFromBrowser)
@@ -1262,6 +1282,16 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		fmt.Printf("[]\n")
 	}
 
+	fmt.Printf("\n%sURL Models:%s\n", consts.ColorCyan, consts.ColorReset)
+	for _, u := range c.URLModels {
+		if u == nil {
+			continue
+		}
+		fmt.Printf("%sURL %q%s\n", consts.ColorCyan, u.URL, consts.ColorReset)
+		fmt.Printf("\n%sSettings:%s %+v\n", consts.ColorCyan, consts.ColorReset, u.ChanURLSettings)
+		fmt.Printf("\n%sMetarr Args:%s %+v\n", consts.ColorCyan, consts.ColorReset, u.ChanURLMetarrArgs)
+	}
+
 	fmt.Println()
 }
 
@@ -1275,11 +1305,11 @@ func (cs *ChannelStore) applyConfigChannelSettings(c *models.Channel) (err error
 	}
 
 	// Channel config file location
-	if v, ok := parsing.GetConfigValue[string](keys.ChannelConfigFile); ok {
+	if v, ok := parsing.GetConfigValue[string](keys.ConfigFile); ok {
 		if _, err = validation.ValidateFile(v, false); err != nil {
 			return err
 		}
-		c.ChanSettings.ChannelConfigFile = v
+		c.ChanSettings.ConfigFile = v
 	}
 
 	// Concurrency limit
@@ -1406,8 +1436,8 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(c *models.Channel) (err
 
 	// Metarr output extension
 	if v, ok := parsing.GetConfigValue[string](keys.MOutputExt); ok {
-		if _, err := validation.ValidateOutputFiletype(c.ChanSettings.ChannelConfigFile); err != nil {
-			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ChanSettings.ChannelConfigFile)
+		if _, err := validation.ValidateOutputFiletype(c.ChanSettings.ConfigFile); err != nil {
+			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ChanSettings.ConfigFile)
 		}
 		c.ChanMetarrArgs.OutputExt = v
 	}

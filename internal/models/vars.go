@@ -14,7 +14,7 @@ type ChannelInputPtrs struct {
 	GPUDir   *string `viper:"transcode-gpu-directory"`
 
 	// Configuration files
-	ChannelConfigFile       *string `viper:"channel-config-file"`
+	ConfigFile              *string `viper:"config-file"`
 	DLFilterFile            *string `viper:"filter-ops-file"`
 	MoveOpFile              *string `viper:"move-ops-file"`
 	MetaOpsFile             *string `viper:"metarr-meta-ops-file"`
@@ -76,4 +76,13 @@ type ChannelInputPtrs struct {
 	// Boolean flags
 	Pause     *bool `viper:"pause-toggle"`
 	IgnoreRun *bool `viper:"ignore-run"`
+
+	// Per-URL settings overrides (no viper tag - handled manually)
+	URLSettings map[string]*URLSettingsOverride
+}
+
+// URLSettingsOverride contains per-URL setting overrides.
+type URLSettingsOverride struct {
+	Settings *ChannelInputPtrs
+	Metarr   *ChannelInputPtrs
 }
