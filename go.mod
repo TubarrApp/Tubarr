@@ -16,6 +16,8 @@ require (
 	golang.org/x/net v0.46.0
 )
 
+require gopkg.in/natefinch/lumberjack.v2 v2.2.1
+
 require (
 	github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a // indirect
 	github.com/Velocidex/ordereddict v0.0.0-20250626035939-2f7f022fc719 // indirect

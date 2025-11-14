@@ -4,13 +4,12 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/utils/logging"
@@ -68,22 +67,13 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 			r.Delete("/{id}/cancel-download/{videoID}", handleCancelDownload)
 			r.Post("/{id}/crawl", handleCrawlChannel)
 			r.Post("/{id}/ignore-crawl", handleIgnoreCrawlChannel)
-
-			// // Channel URLs
-			// r.Route("/{id}/urls", func(r chi.Router) {
-			// 	r.Get("/", handleListChannelURLs)
-			// 	r.Post("/", handleAddChannelURL)
-			// 	r.Get("/{urlID}", handleGetChannelURL)
-			// 	r.Put("/{urlID}", handleUpdateChannelURL)
-			// 	r.Delete("/{urlID}", handleDeleteChannelURL)
-			// })
 		})
 
-		// Downloads API
-		// r.Route("/downloads", func(r chi.Router) {
-		// 	r.Get("/latest", handleLatestDownloads)
-		// 	r.Delete("/{videoURLID}", handleDeleteVideoURL)
-		// })
+		// Logs API
+		r.Get("/logs", handleGetLogs)
+		r.Get("/logs/metarr", handleGetMetarrLogs)
+		r.Get("/logs/level", handleGetLogLevel)
+		r.Post("/logs/level/{level}", handleSetLogLevel)
 	})
 
 	// --- Static Frontend ---
@@ -95,7 +85,7 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 }
 
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
-func StartServer(s contracts.Store, db *sql.DB) {
+func StartServer(ctx context.Context, s contracts.Store, db *sql.DB) error {
 	r := NewRouter(s, db)
 	addr := ":" + TubarrPort
 
@@ -104,38 +94,45 @@ func StartServer(s contracts.Store, db *sql.DB) {
 		Handler: r,
 	}
 
-	// Channel to listen for interrupt signals
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
 	// Start server in a goroutine
+	serverErr := make(chan error, 1)
 	go func() {
 		logging.S("Tubarr web server running on http://localhost%s\n", addr)
+
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("server failed: %v", err)
-			os.Exit(1)
+			serverErr <- fmt.Errorf("server failed: %w", err)
+			return
 		}
+
+		serverErr <- nil
 	}()
 
-	// Start crawl watchdog in background
-	watchdogCtx := context.Background()
-	go ss.startCrawlWatchdog(watchdogCtx, stop)
+	// Start crawl watchdog in background (respects ctx cancellation)
+	go ss.startCrawlWatchdog(ctx, nil)
 
 	// Wait for interrupt signal
-	<-stop
-	logging.S("\nShutting down server...\n")
+	select {
+	case <-ctx.Done():
+		logging.S("Shutting down server (context cancelled)...")
+
+	case err := <-serverErr:
+		// server crashed
+		if err != nil {
+			return fmt.Errorf("server error: %w", err)
+		}
+	}
 
 	// Create shutdown context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	// Attempt graceful shutdown
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("server forced to shutdown: %v", err)
-		os.Exit(1)
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("server forced to shutdown: %v", err)
 	}
 
 	logging.S("Server at http://localhost%s shut down successfully\n", addr)
+	return nil
 }
 
 // StaticHandler handles serving of web pages.

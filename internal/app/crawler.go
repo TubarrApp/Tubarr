@@ -35,7 +35,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	}
 
 	var (
-		conc    = max(abstractions.GetInt(keys.Concurrency), 1)
+		conc    = max(abstractions.GetInt(keys.GlobalConcurrency), 1)
 		errChan = make(chan error, len(channels))
 		sem     = make(chan struct{}, conc)
 		wg      sync.WaitGroup
@@ -43,7 +43,6 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 
 	// Iterate over channels
 	for _, c := range channels {
-
 		// Load in config file
 		file.UpdateFromConfigFile(s.ChannelStore(), c)
 

@@ -89,6 +89,7 @@ const (
 const (
 	QChanID              = "id"
 	QChanName            = "name"
+	QChanConfigFile      = "config_file"
 	QChanConcurrency     = "concurrency"
 	QChanMetarrOutputDir = "metarr_output_directory"
 	QChanMetarrExt       = "metarr_ext"

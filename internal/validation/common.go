@@ -2,9 +2,7 @@
 package validation
 
 import (
-	"errors"
 	"fmt"
-	"maps"
 	"net/url"
 	"os"
 	"strconv"
@@ -21,84 +19,34 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ValidateMetarrOutputDirs validates the output directories for Metarr.
-func ValidateMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Channel) (map[string]string, error) {
-	if len(urlDirs) == 0 && defaultDir == "" {
-		return nil, nil
-	}
-	// Deduplicate
-	urlDirs = DeduplicateSliceEntries(urlDirs)
-
-	// Initialize map and fill from existing
-	outDirMap := make(map[string]string)
-	if c.ChanMetarrArgs.OutputDirMap != nil {
-		maps.Copy(outDirMap, c.ChanMetarrArgs.OutputDirMap)
+// ValidateMetarrOutputDirs validates Metarr output directory mappings.
+// This function validates the directory map structure and ensures all directories exist.
+func ValidateMetarrOutputDirs(outDirMap map[string]string) error {
+	if len(outDirMap) == 0 {
+		return nil
 	}
 
-	validatedDirs := make(map[string]bool, len(c.URLModels))
+	logging.D(1, "Validating %d Metarr output directories...", len(outDirMap))
 
-	// Parse and validate URL output directory pairs
-	for _, pair := range urlDirs {
-		url, dir, err := parseURLDirPair(pair)
-		if err != nil {
-			return nil, err
-		}
-
-		// Check if this URL exists in the channel
-		found := false
-		for _, cu := range c.URLModels {
-			if strings.EqualFold(strings.TrimSpace(cu.URL), strings.TrimSpace(url)) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return nil, fmt.Errorf("channel does not contain URL %q, provided in output directory mapping", url)
-		}
-
-		outDirMap[url] = dir
-	}
-
-	// Fill blank channel entries with channel default
-	for _, cu := range c.URLModels {
-		if outDirMap[cu.URL] == "" && defaultDir != "" {
-			outDirMap[cu.URL] = defaultDir
-		}
-	}
+	validatedDirs := make(map[string]bool, len(outDirMap))
 
 	// Validate directories
-	for _, dir := range outDirMap {
+	for urlStr, dir := range outDirMap {
+		// Validate URL format
+		if _, err := url.Parse(urlStr); err != nil {
+			return fmt.Errorf("output directory map has invalid URL %q: %w", urlStr, err)
+		}
+
+		// Validate directory exists (only check once per unique directory)
 		if !validatedDirs[dir] {
 			if _, err := ValidateDirectory(dir, false); err != nil {
-				return nil, err
+				return fmt.Errorf("output directory %q is invalid: %w", dir, err)
 			}
 			validatedDirs[dir] = true
 		}
 	}
 
-	logging.D(1, "Metarr output directories: %q", outDirMap)
-	return outDirMap, nil
-}
-
-// parseURLDirPair parses a 'url:output directory' pairing and validates the format.
-func parseURLDirPair(pair string) (u string, d string, err error) {
-	parts := strings.Split(pair, "|")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid URL|directory pair: %q", pair)
-	}
-
-	u = parts[0]
-	if _, err := url.ParseRequestURI(u); err != nil {
-		return "", "", fmt.Errorf("invalid URL format: %q", u)
-	}
-
-	d = parts[1]
-	if _, err := ValidateDirectory(d, false); err != nil {
-		return "", "", err
-	}
-
-	return parts[0], parts[1], nil
+	return nil
 }
 
 // ValidateDirectory validates that the directory exists, else creates it if desired.
@@ -180,20 +128,6 @@ func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {
-	// Output filetype
-	if abstractions.IsSet(keys.OutputFiletype) {
-		ext := strings.ToLower(abstractions.GetString(keys.OutputFiletype))
-
-		if ext != "" {
-			dottedExt, err := ValidateOutputFiletype(ext)
-			if err != nil {
-				return fmt.Errorf("invalid output filetype %q", ext)
-
-			}
-			abstractions.Set(keys.OutputFiletype, dottedExt)
-		}
-	}
-
 	// Meta purge
 	if abstractions.IsSet(keys.MMetaPurge) {
 		purge := abstractions.GetString(keys.MMetaPurge)
@@ -204,7 +138,7 @@ func ValidateViperFlags() error {
 
 	// Logging
 	ValidateLoggingLevel()
-	abstractions.Set(keys.Concurrency, ValidateConcurrencyLimit(abstractions.GetInt(keys.Concurrency)))
+	abstractions.Set(keys.GlobalConcurrency, ValidateConcurrencyLimit(abstractions.GetInt(keys.GlobalConcurrency)))
 	return nil
 }
 
@@ -214,73 +148,35 @@ func ValidateConcurrencyLimit(c int) int {
 	return c
 }
 
-// ValidateNotificationStrings verifies that the notification pairs entered are valid.
-func ValidateNotificationStrings(notifications []string) ([]*models.Notification, error) {
+// ValidateNotifications validates notification models.
+// This function only validates business rules on already-parsed models.
+// For parsing strings to models, use parsing.ParseNotifications.
+func ValidateNotifications(notifications []*models.Notification) error {
 	if len(notifications) == 0 {
-		return nil, nil
+		return nil
 	}
-	// Deduplicate
-	notifications = DeduplicateSliceEntries(notifications)
 
-	// Proceed
-	notificationModels := make([]*models.Notification, 0, len(notifications))
-	for _, n := range notifications {
-		if !strings.ContainsRune(n, '|') {
-			return nil, fmt.Errorf("notification entry %q does not contain a '|' separator (should be in 'URL|friendly name' format", n)
-		}
-		entry := EscapedSplit(n, '|')
+	logging.D(1, "Validating %d notifications...", len(notifications))
 
-		// Check entries for validity and fill field details
-		var chanURL, nURL, name string
-		switch {
-		case len(entry) > 3 || len(entry) < 2:
-			return nil, fmt.Errorf("malformed notification entry %q, should be in 'Channel URL|Notify URL|Friendly Name' or 'Notify URL|Friendly Name' format", n)
-
-			// 'Notify URL|Name'
-		case len(entry) == 2:
-			if entry[0] == "" {
-				return nil, fmt.Errorf("missing URL from notification entry %q, should be in 'Notify URL|Friendly Name' format", n)
-			}
-			nURL = entry[0]
-			name = entry[1]
-
-			if _, err := url.Parse(nURL); err != nil {
-				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
-			}
-
-			// 'Channel URL|Notify URL|Name'
-		case len(entry) == 3:
-			if entry[0] == "" || entry[1] == "" {
-				return nil, fmt.Errorf("missing channel URL or notification URL from notification entry %q, should be in 'Channel URL|Notify URL|Friendly Name' format", n)
-			}
-			chanURL = entry[0]
-			nURL = entry[1]
-			name = entry[2]
-
-			if _, err := url.Parse(chanURL); err != nil {
-				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
-			}
-			if _, err := url.Parse(nURL); err != nil {
-				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
-			}
-		}
-		// Use URL as name if name field is missing
-		if name == "" {
-			name = nURL
+	for i, n := range notifications {
+		// Validate notify URL is not empty
+		if n.NotifyURL == "" {
+			return fmt.Errorf("notification at position %d has empty notify URL", i)
 		}
 
-		// Create model
-		newNotificationModel := models.Notification{
-			ChannelURL: chanURL,
-			NotifyURL:  nURL,
-			Name:       name,
+		// Validate notify URL format
+		if _, err := url.Parse(n.NotifyURL); err != nil {
+			return fmt.Errorf("notification at position %d has invalid notify URL %q: %w", i, n.NotifyURL, err)
 		}
 
-		// Append to collection
-		notificationModels = append(notificationModels, &newNotificationModel)
-		logging.D(3, "Added notification model: %+v", newNotificationModel)
+		// Validate channel URL if present
+		if n.ChannelURL != "" {
+			if _, err := url.Parse(n.ChannelURL); err != nil {
+				return fmt.Errorf("notification at position %d has invalid channel URL %q: %w", i, n.ChannelURL, err)
+			}
+		}
 	}
-	return notificationModels, nil
+	return nil
 }
 
 // ValidateYtdlpOutputExtension validates the merge-output-format compatibility of the inputted extension.
@@ -337,194 +233,121 @@ func ValidateMaxFilesize(input string) (string, error) {
 	return "", fmt.Errorf("invalid max filesize format: %s", input)
 }
 
-// ValidateFilterOps verifies that the user inputted filters are valid.
-func ValidateFilterOps(ops []string) ([]models.Filters, error) {
-	if len(ops) == 0 {
-		return nil, nil
+// ValidateFilterOps validates filter operation models.
+// This function only validates business rules on already-parsed models.
+// For parsing strings to models, use parsing.ParseFilterOps.
+func ValidateFilterOps(filters []models.Filters) error {
+	if len(filters) == 0 {
+		return nil
 	}
-	// Deduplicate
-	ops = DeduplicateSliceEntries(ops)
 
-	// Proceed
-	const (
-		formatErrorMsg = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\ntitle:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n'date:omits:must' omits videos only when the metafile contains a date field"
-	)
+	logging.D(1, "Validating %d filter operations...", len(filters))
 
-	var filters = make([]models.Filters, 0, len(ops))
-	for _, op := range ops {
-
-		// Extract optional channel URL and remaining filter string
-		chanURL, op := CheckForOpURL(op)
-		split := EscapedSplit(op, ':')
-
-		if len(split) < 3 {
-			logging.E(formatErrorMsg)
-			return nil, errors.New("filter format error")
-		}
-
-		// Normalize values
-		field := strings.ToLower(strings.TrimSpace(split[0]))
-		containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
-		mustAny := strings.ToLower(strings.TrimSpace(split[len(split)-1]))
-		var value string
-		if len(split) == 4 {
-			value = strings.ToLower(split[2])
-		}
-
+	for i, filter := range filters {
 		// Validate contains/omits
-		if containsOmits != "contains" && containsOmits != "omits" {
-			logging.E(formatErrorMsg)
-			return nil, errors.New("please enter a filter type of either 'contains' or 'omits'")
+		if filter.ContainsOmits != "contains" && filter.ContainsOmits != "omits" {
+			return fmt.Errorf("filter at position %d has invalid type %q (must be 'contains' or 'omits')", i, filter.ContainsOmits)
 		}
 
 		// Validate must/any
-		if mustAny != "must" && mustAny != "any" {
-			return nil, errors.New("filter type must be set to 'must' or 'any'")
+		if filter.MustAny != "must" && filter.MustAny != "any" {
+			return fmt.Errorf("filter at position %d has invalid condition %q (must be 'must' or 'any')", i, filter.MustAny)
 		}
 
-		// Append filter
-		filters = append(filters, models.Filters{
-			Field:         field,
-			ContainsOmits: containsOmits,
-			Value:         value,
-			MustAny:       mustAny,
-			ChannelURL:    chanURL,
-		})
+		// Validate field is not empty
+		if filter.Field == "" {
+			return fmt.Errorf("filter at position %d has empty field", i)
+		}
 	}
-	return filters, nil
+	return nil
 }
 
-// ValidateMoveOps validates that the user's inputted move filter operations are valid.
-func ValidateMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
-	if len(ops) == 0 {
-		return nil, nil
+// ValidateMetaFilterMoveOps validates meta filter move operation models.
+// This function only validates business rules on already-parsed models.
+// For parsing strings to models, use parsing.ParseMetaFilterMoveOps.
+func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
+	if len(moveOps) == 0 {
+		return nil
 	}
-	// Deduplicate
-	ops = DeduplicateSliceEntries(ops)
 
-	// Proceed
-	const (
-		moveOpFormatError string = "please enter move operations in the format 'field:value:output directory'.\n\n'title:frogs:/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
-	)
+	logging.D(1, "Validating %d meta filter move operations...", len(moveOps))
 
-	m := make([]models.MetaFilterMoveOps, 0, len(ops))
-	for _, op := range ops {
-
-		chanURL, op := CheckForOpURL(op)
-		split := EscapedSplit(op, ':')
-
-		if len(split) != 3 {
-			return nil, errors.New(moveOpFormatError)
+	for i, op := range moveOps {
+		// Validate field is not empty
+		if op.Field == "" {
+			return fmt.Errorf("move operation at position %d has empty field", i)
 		}
 
-		field := strings.ToLower(strings.TrimSpace(split[0]))
-		value := strings.ToLower(split[1])
-		outputDir := strings.TrimSpace(strings.TrimSpace(split[2]))
-
-		if _, err := ValidateDirectory(outputDir, false); err != nil {
-			return nil, err
+		// Validate output directory exists
+		if _, err := ValidateDirectory(op.OutputDir, false); err != nil {
+			return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 		}
-
-		m = append(m, models.MetaFilterMoveOps{
-			Field:      field,
-			Value:      value,
-			OutputDir:  outputDir,
-			ChannelURL: chanURL,
-		})
 	}
-	return m, nil
+	return nil
 }
 
-// ValidateFilteredMetaOps validates that filter-based meta operations are valid.
-func ValidateFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, error) {
+// ValidateFilteredMetaOps validates filtered meta operation models.
+// This function only validates business rules on already-parsed models.
+// For parsing strings to models, use parsing.ParseFilteredMetaOps.
+func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
 	if len(filteredMetaOps) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	// Deduplicate
-	filteredMetaOps = DeduplicateSliceEntries(filteredMetaOps)
+	logging.D(1, "Validating %d filtered meta operations...", len(filteredMetaOps))
 
-	// Proceed
-	validFilteredMetaOps := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
-	for _, fmo := range filteredMetaOps {
-		if !strings.ContainsRune(fmo, '|') {
-			continue
+	for i, fmo := range filteredMetaOps {
+		// Validate filters
+		if err := ValidateFilterOps(fmo.Filters); err != nil {
+			return fmt.Errorf("filtered meta operation at position %d has invalid filters: %w", i, err)
 		}
 
-		split := EscapedSplit(fmo, '|')
-		if len(split) < 2 {
-			return nil, fmt.Errorf("invalid format for filtered meta operation (entered: %s). Please use 'Filter Rules|Meta Operations'", fmo)
+		// Validate meta operations
+		if err := ValidateMetaOps(fmo.MetaOps); err != nil {
+			return fmt.Errorf("filtered meta operation at position %d has invalid meta operations: %w", i, err)
 		}
 
-		filterRule := split[:1]
-		metaRules := split[1:]
-
-		filterOps, err := ValidateFilterOps(filterRule)
-		if err != nil {
-			return nil, err
+		// Ensure both filters and meta ops are present
+		if len(fmo.Filters) == 0 {
+			return fmt.Errorf("filtered meta operation at position %d has no filters", i)
 		}
-
-		metaOps, err := ValidateMetaOps(metaRules)
-		if err != nil {
-			return nil, err
+		if len(fmo.MetaOps) == 0 {
+			return fmt.Errorf("filtered meta operation at position %d has no meta operations", i)
 		}
-
-		if len(filterOps) == 0 || len(metaOps) == 0 {
-			continue
-		}
-
-		validFilteredMetaOps = append(validFilteredMetaOps, models.FilteredMetaOps{
-			Filters: filterOps,
-			MetaOps: metaOps,
-		})
 	}
-	return validFilteredMetaOps, nil
+	return nil
 }
 
-// ValidateFilteredFilenameOps validates that filter-based filename operations are valid.
-func ValidateFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFilenameOps, error) {
+// ValidateFilteredFilenameOps validates filtered filename operation models.
+// This function only validates business rules on already-parsed models.
+// For parsing strings to models, use parsing.ParseFilteredFilenameOps.
+func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps) error {
 	if len(filteredFilenameOps) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	// Deduplicate
-	filteredFilenameOps = DeduplicateSliceEntries(filteredFilenameOps)
+	logging.D(1, "Validating %d filtered filename operations...", len(filteredFilenameOps))
 
-	// Proceed
-	validFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
-	for _, fmo := range filteredFilenameOps {
-		if !strings.ContainsRune(fmo, '|') {
-			continue
+	for i, ffo := range filteredFilenameOps {
+		// Validate filters
+		if err := ValidateFilterOps(ffo.Filters); err != nil {
+			return fmt.Errorf("filtered filename operation at position %d has invalid filters: %w", i, err)
 		}
 
-		split := EscapedSplit(fmo, '|')
-		if len(split) < 2 {
-			return nil, fmt.Errorf("invalid format for filtered meta operation (entered: %s). Please use 'Filter Rules|Meta Operations'", fmo)
+		// Validate filename operations
+		if err := ValidateFilenameOps(ffo.FilenameOps); err != nil {
+			return fmt.Errorf("filtered filename operation at position %d has invalid filename operations: %w", i, err)
 		}
 
-		filterRule := split[:1]
-		filenameRules := split[1:]
-
-		filterOps, err := ValidateFilterOps(filterRule)
-		if err != nil {
-			return nil, err
+		// Ensure both filters and filename ops are present
+		if len(ffo.Filters) == 0 {
+			return fmt.Errorf("filtered filename operation at position %d has no filters", i)
 		}
-
-		filenameOps, err := ValidateFilenameOps(filenameRules)
-		if err != nil {
-			return nil, err
+		if len(ffo.FilenameOps) == 0 {
+			return fmt.Errorf("filtered filename operation at position %d has no filename operations", i)
 		}
-
-		if len(filterOps) == 0 || len(filenameOps) == 0 {
-			continue
-		}
-
-		validFilteredFilenameOps = append(validFilteredFilenameOps, models.FilteredFilenameOps{
-			Filters:     filterOps,
-			FilenameOps: filenameOps,
-		})
 	}
-	return validFilteredFilenameOps, nil
+	return nil
 }
 
 // ValidateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".

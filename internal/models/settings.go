@@ -7,8 +7,7 @@ import (
 // Settings are the primary settings for a channel, affecting videos belonging to it.
 type Settings struct {
 	// Configurations.
-	ConfigFile  string `json:"config_file" mapstructure:"config-file"`
-	Concurrency int    `json:"max_concurrency" mapstructure:"max-concurrency"`
+	Concurrency int `json:"max_concurrency" mapstructure:"concurrency"`
 
 	// Download-related operations.
 	CookiesFromBrowser     string `json:"cookies_from_browser" mapstructure:"cookie-from-browser"`
@@ -25,12 +24,12 @@ type Settings struct {
 	ExtraYTDLPMetaArgs  string `json:"extra_ytdlp_meta_args" mapstructure:"extra-ytdlp-meta-args"`
 
 	// Metadata operations.
-	Filters    []Filters           `json:"filters" mapstructure:"filters"`
-	FilterFile string              `json:"filter_file" mapstructure:"filter-file"`
-	MoveOps    []MetaFilterMoveOps `json:"move_ops" mapstructure:"move-ops"`
-	MoveOpFile string              `json:"move_ops_file" mapstructure:"move-ops-file"`
-	FromDate   string              `json:"from_date" mapstructure:"from-date"`
-	ToDate     string              `json:"to_date" mapstructure:"to-date"`
+	Filters              []Filters           `json:"filters" mapstructure:"filters"`
+	FilterFile           string              `json:"filter_file" mapstructure:"filter-file"`
+	MetaFilterMoveOps    []MetaFilterMoveOps `json:"move_ops" mapstructure:"move-ops"`
+	MetaFilterMoveOpFile string              `json:"move_ops_file" mapstructure:"move-ops-file"`
+	FromDate             string              `json:"from_date" mapstructure:"from-date"`
+	ToDate               string              `json:"to_date" mapstructure:"to-date"`
 
 	// JSON and video directories.
 	JSONDir  string `json:"json_directory" mapstructure:"json-directory"`
@@ -72,8 +71,8 @@ type MetarrArgs struct {
 	MinFreeMem  string  `json:"metarr_min_free_mem" mapstructure:"metarr-min-free-mem"`
 
 	// FFmpeg transcoding operations.
-	UseGPU               string   `json:"metarr_gpu" mapstructure:"transcode-gpu"`
 	GPUDir               string   `json:"metarr_gpu_directory" mapstructure:"transcode-gpu-directory"`
+	UseGPU               string   `json:"metarr_gpu" mapstructure:"transcode-gpu"`
 	TranscodeVideoFilter string   `json:"metarr_transcode_video_filter" mapstructure:"transcode-video-filter"`
 	TranscodeVideoCodecs []string `json:"metarr_video_transcode_codecs" mapstructure:"transcode-video-codecs"`
 	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs" mapstructure:"transcode-audio-codecs"`
@@ -143,342 +142,342 @@ type MetaOps struct {
 	DateFormat   string `json:"meta_op_date_format"`
 }
 
-// // ChildSettingsMatchParent checks if the child Settings are empty/mismatch the parent on each entry.
-// func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
-// 	if (parent == nil && child != nil) || (parent != nil && child == nil) {
-// 		return false
-// 	}
+// ChildSettingsMatchParent checks if the child Settings are empty/mismatch the parent on each entry.
+func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
+	if (parent == nil && child != nil) || (parent != nil && child == nil) {
+		return false
+	}
 
-// 	// Numeric comparisons
-// 	if child.Concurrency != 0 {
-// 		if parent.Concurrency != child.Concurrency {
-// 			return false
-// 		}
-// 	}
-// 	if child.CrawlFreq != 0 {
-// 		if parent.CrawlFreq != child.CrawlFreq {
-// 			return false
-// 		}
-// 	}
-// 	if child.Retries != 0 {
-// 		if parent.Retries != child.Retries {
-// 			return false
-// 		}
-// 	}
+	// Numeric comparisons
+	if child.Concurrency != 0 {
+		if parent.Concurrency != child.Concurrency {
+			return false
+		}
+	}
+	if child.CrawlFreq != 0 {
+		if parent.CrawlFreq != child.CrawlFreq {
+			return false
+		}
+	}
+	if child.Retries != 0 {
+		if parent.Retries != child.Retries {
+			return false
+		}
+	}
 
-// 	// String comparisons
-// 	if child.CookiesFromBrowser != "" {
-// 		if parent.CookiesFromBrowser != child.CookiesFromBrowser {
-// 			return false
-// 		}
-// 	}
-// 	if child.ExternalDownloader != "" {
-// 		if parent.ExternalDownloader != child.ExternalDownloader {
-// 			return false
-// 		}
-// 	}
-// 	if child.ExternalDownloaderArgs != "" {
-// 		if parent.ExternalDownloaderArgs != child.ExternalDownloaderArgs {
-// 			return false
-// 		}
-// 	}
-// 	if child.ExtraYTDLPMetaArgs != "" {
-// 		if parent.ExtraYTDLPMetaArgs != child.ExtraYTDLPMetaArgs {
-// 			return false
-// 		}
-// 	}
-// 	if child.ExtraYTDLPVideoArgs != "" {
-// 		if parent.ExtraYTDLPVideoArgs != child.ExtraYTDLPVideoArgs {
-// 			return false
-// 		}
-// 	}
-// 	if child.FilterFile != "" {
-// 		if parent.FilterFile != child.FilterFile {
-// 			return false
-// 		}
-// 	}
-// 	if child.FromDate != "" {
-// 		if parent.FromDate != child.FromDate {
-// 			return false
-// 		}
-// 	}
-// 	if child.JSONDir != "" {
-// 		if parent.JSONDir != child.JSONDir {
-// 			return false
-// 		}
-// 	}
-// 	if child.MaxFilesize != "" {
-// 		if parent.MaxFilesize != child.MaxFilesize {
-// 			return false
-// 		}
-// 	}
-// 	if child.MoveOpFile != "" {
-// 		if parent.MoveOpFile != child.MoveOpFile {
-// 			return false
-// 		}
-// 	}
-// 	if child.ToDate != "" {
-// 		if parent.ToDate != child.ToDate {
-// 			return false
-// 		}
-// 	}
-// 	if child.VideoDir != "" {
-// 		if parent.VideoDir != child.VideoDir {
-// 			return false
-// 		}
-// 	}
-// 	if child.YtdlpOutputExt != "" {
-// 		if parent.YtdlpOutputExt != child.YtdlpOutputExt {
-// 			return false
-// 		}
-// 	}
+	// String comparisons
+	if child.CookiesFromBrowser != "" {
+		if parent.CookiesFromBrowser != child.CookiesFromBrowser {
+			return false
+		}
+	}
+	if child.ExternalDownloader != "" {
+		if parent.ExternalDownloader != child.ExternalDownloader {
+			return false
+		}
+	}
+	if child.ExternalDownloaderArgs != "" {
+		if parent.ExternalDownloaderArgs != child.ExternalDownloaderArgs {
+			return false
+		}
+	}
+	if child.ExtraYTDLPMetaArgs != "" {
+		if parent.ExtraYTDLPMetaArgs != child.ExtraYTDLPMetaArgs {
+			return false
+		}
+	}
+	if child.ExtraYTDLPVideoArgs != "" {
+		if parent.ExtraYTDLPVideoArgs != child.ExtraYTDLPVideoArgs {
+			return false
+		}
+	}
+	if child.FilterFile != "" {
+		if parent.FilterFile != child.FilterFile {
+			return false
+		}
+	}
+	if child.FromDate != "" {
+		if parent.FromDate != child.FromDate {
+			return false
+		}
+	}
+	if child.JSONDir != "" {
+		if parent.JSONDir != child.JSONDir {
+			return false
+		}
+	}
+	if child.MaxFilesize != "" {
+		if parent.MaxFilesize != child.MaxFilesize {
+			return false
+		}
+	}
+	if child.MetaFilterMoveOpFile != "" {
+		if parent.MetaFilterMoveOpFile != child.MetaFilterMoveOpFile {
+			return false
+		}
+	}
+	if child.ToDate != "" {
+		if parent.ToDate != child.ToDate {
+			return false
+		}
+	}
+	if child.VideoDir != "" {
+		if parent.VideoDir != child.VideoDir {
+			return false
+		}
+	}
+	if child.YtdlpOutputExt != "" {
+		if parent.YtdlpOutputExt != child.YtdlpOutputExt {
+			return false
+		}
+	}
 
-// 	// Boolean comparisons
-// 	if child.UseGlobalCookies {
-// 		if parent.UseGlobalCookies != child.UseGlobalCookies {
-// 			return false
-// 		}
-// 	}
+	// Boolean comparisons
+	if child.UseGlobalCookies {
+		if parent.UseGlobalCookies != child.UseGlobalCookies {
+			return false
+		}
+	}
 
-// 	// Slice comparisons
-// 	if len(child.Filters) > 0 {
-// 		if len(parent.Filters) != len(child.Filters) {
-// 			return false
-// 		}
-// 		for _, parentf := range parent.Filters {
-// 			for _, childf := range child.Filters {
-// 				if parentf != childf {
-// 					return false
-// 				}
-// 			}
-// 		}
-// 	}
+	// Slice comparisons
+	if len(child.Filters) > 0 {
+		if len(parent.Filters) != len(child.Filters) {
+			return false
+		}
+		for _, parentf := range parent.Filters {
+			for _, childf := range child.Filters {
+				if parentf != childf {
+					return false
+				}
+			}
+		}
+	}
 
-// 	if len(child.MoveOps) > 0 {
-// 		if len(parent.MoveOps) != len(child.MoveOps) {
-// 			return false
-// 		}
-// 		for _, parentmo := range parent.MoveOps {
-// 			for _, childmo := range child.MoveOps {
-// 				if parentmo != childmo {
-// 					return false
-// 				}
-// 			}
-// 		}
-// 	}
+	if len(child.MetaFilterMoveOps) > 0 {
+		if len(parent.MetaFilterMoveOps) != len(child.MetaFilterMoveOps) {
+			return false
+		}
+		for _, parentmo := range parent.MetaFilterMoveOps {
+			for _, childmo := range child.MetaFilterMoveOps {
+				if parentmo != childmo {
+					return false
+				}
+			}
+		}
+	}
 
-// 	return true
-// }
+	return true
+}
 
-// // ChildMetarrArgsMatchParent checks if the child MetarrArgs are empty/mismatch the parent on each entry.
-// func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
-// 	if (parent == nil && child != nil) || (parent != nil && child == nil) {
-// 		return false
-// 	}
+// ChildMetarrArgsMatchParent checks if the child MetarrArgs are empty/mismatch the parent on each entry.
+func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
+	if (parent == nil && child != nil) || (parent != nil && child == nil) {
+		return false
+	}
 
-// 	// String comparisons
-// 	if child.OutputExt != "" {
-// 		if parent.OutputExt != child.OutputExt {
-// 			return false
-// 		}
-// 	}
-// 	if child.FilenameOpsFile != "" {
-// 		if parent.FilenameOpsFile != child.FilenameOpsFile {
-// 			return false
-// 		}
-// 	}
-// 	if child.FilteredFilenameOpsFile != "" {
-// 		if parent.FilteredFilenameOpsFile != child.FilteredFilenameOpsFile {
-// 			return false
-// 		}
-// 	}
-// 	if child.RenameStyle != "" {
-// 		if parent.RenameStyle != child.RenameStyle {
-// 			return false
-// 		}
-// 	}
-// 	if child.MetaOpsFile != "" {
-// 		if parent.MetaOpsFile != child.MetaOpsFile {
-// 			return false
-// 		}
-// 	}
-// 	if child.FilteredMetaOpsFile != "" {
-// 		if parent.FilteredMetaOpsFile != child.FilteredMetaOpsFile {
-// 			return false
-// 		}
-// 	}
-// 	if child.OutputDir != "" {
-// 		if parent.OutputDir != child.OutputDir {
-// 			return false
-// 		}
-// 	}
-// 	if child.MinFreeMem != "" {
-// 		if parent.MinFreeMem != child.MinFreeMem {
-// 			return false
-// 		}
-// 	}
-// 	if child.UseGPU != "" {
-// 		if parent.UseGPU != child.UseGPU {
-// 			return false
-// 		}
-// 	}
-// 	if child.GPUDir != "" {
-// 		if parent.GPUDir != child.GPUDir {
-// 			return false
-// 		}
-// 	}
-// 	if child.TranscodeVideoFilter != "" {
-// 		if parent.TranscodeVideoFilter != child.TranscodeVideoFilter {
-// 			return false
-// 		}
-// 	}
-// 	if child.TranscodeQuality != "" {
-// 		if parent.TranscodeQuality != child.TranscodeQuality {
-// 			return false
-// 		}
-// 	}
-// 	if child.ExtraFFmpegArgs != "" {
-// 		if parent.ExtraFFmpegArgs != child.ExtraFFmpegArgs {
-// 			return false
-// 		}
-// 	}
+	// String comparisons
+	if child.OutputExt != "" {
+		if parent.OutputExt != child.OutputExt {
+			return false
+		}
+	}
+	if child.FilenameOpsFile != "" {
+		if parent.FilenameOpsFile != child.FilenameOpsFile {
+			return false
+		}
+	}
+	if child.FilteredFilenameOpsFile != "" {
+		if parent.FilteredFilenameOpsFile != child.FilteredFilenameOpsFile {
+			return false
+		}
+	}
+	if child.RenameStyle != "" {
+		if parent.RenameStyle != child.RenameStyle {
+			return false
+		}
+	}
+	if child.MetaOpsFile != "" {
+		if parent.MetaOpsFile != child.MetaOpsFile {
+			return false
+		}
+	}
+	if child.FilteredMetaOpsFile != "" {
+		if parent.FilteredMetaOpsFile != child.FilteredMetaOpsFile {
+			return false
+		}
+	}
+	if child.OutputDir != "" {
+		if parent.OutputDir != child.OutputDir {
+			return false
+		}
+	}
+	if child.MinFreeMem != "" {
+		if parent.MinFreeMem != child.MinFreeMem {
+			return false
+		}
+	}
+	if child.UseGPU != "" {
+		if parent.UseGPU != child.UseGPU {
+			return false
+		}
+	}
+	if child.GPUDir != "" {
+		if parent.GPUDir != child.GPUDir {
+			return false
+		}
+	}
+	if child.TranscodeVideoFilter != "" {
+		if parent.TranscodeVideoFilter != child.TranscodeVideoFilter {
+			return false
+		}
+	}
+	if child.TranscodeQuality != "" {
+		if parent.TranscodeQuality != child.TranscodeQuality {
+			return false
+		}
+	}
+	if child.ExtraFFmpegArgs != "" {
+		if parent.ExtraFFmpegArgs != child.ExtraFFmpegArgs {
+			return false
+		}
+	}
 
-// 	// Numeric comparisons
-// 	if child.Concurrency != 0 {
-// 		if parent.Concurrency != child.Concurrency {
-// 			return false
-// 		}
-// 	}
-// 	if child.MaxCPU != 0 {
-// 		if parent.MaxCPU != child.MaxCPU {
-// 			return false
-// 		}
-// 	}
+	// Numeric comparisons
+	if child.Concurrency != 0 {
+		if parent.Concurrency != child.Concurrency {
+			return false
+		}
+	}
+	if child.MaxCPU != 0 {
+		if parent.MaxCPU != child.MaxCPU {
+			return false
+		}
+	}
 
-// 	// Slice comparisons
-// 	if len(child.FilenameOps) > 0 {
-// 		if len(parent.FilenameOps) != len(child.FilenameOps) {
-// 			return false
-// 		}
-// 		for i := range parent.FilenameOps {
-// 			if parent.FilenameOps[i] != child.FilenameOps[i] {
-// 				return false
-// 			}
-// 		}
-// 	}
+	// Slice comparisons
+	if len(child.FilenameOps) > 0 {
+		if len(parent.FilenameOps) != len(child.FilenameOps) {
+			return false
+		}
+		for i := range parent.FilenameOps {
+			if parent.FilenameOps[i] != child.FilenameOps[i] {
+				return false
+			}
+		}
+	}
 
-// 	if len(child.FilteredFilenameOps) > 0 {
-// 		if len(parent.FilteredFilenameOps) != len(child.FilteredFilenameOps) {
-// 			return false
-// 		}
-// 		for _, parentffo := range parent.FilteredFilenameOps {
-// 			for _, childffo := range child.FilteredFilenameOps {
-// 				if parentffo.FiltersMatched != childffo.FiltersMatched {
-// 					return false
-// 				}
-// 				for _, parentf := range parentffo.Filters {
-// 					for _, childf := range childffo.Filters {
-// 						if parentf != childf {
-// 							return false
-// 						}
-// 					}
-// 				}
-// 				for _, parentfo := range parentffo.FilenameOps {
-// 					for _, childfo := range childffo.FilenameOps {
-// 						if parentfo != childfo {
-// 							return false
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
+	if len(child.FilteredFilenameOps) > 0 {
+		if len(parent.FilteredFilenameOps) != len(child.FilteredFilenameOps) {
+			return false
+		}
+		for _, parentffo := range parent.FilteredFilenameOps {
+			for _, childffo := range child.FilteredFilenameOps {
+				if parentffo.FiltersMatched != childffo.FiltersMatched {
+					return false
+				}
+				for _, parentf := range parentffo.Filters {
+					for _, childf := range childffo.Filters {
+						if parentf != childf {
+							return false
+						}
+					}
+				}
+				for _, parentfo := range parentffo.FilenameOps {
+					for _, childfo := range childffo.FilenameOps {
+						if parentfo != childfo {
+							return false
+						}
+					}
+				}
+			}
+		}
+	}
 
-// 	if len(child.MetaOps) > 0 {
-// 		if len(parent.MetaOps) != len(child.MetaOps) {
-// 			return false
-// 		}
-// 		for i := range parent.MetaOps {
-// 			if parent.MetaOps[i] != child.MetaOps[i] {
-// 				return false
-// 			}
-// 		}
-// 	}
+	if len(child.MetaOps) > 0 {
+		if len(parent.MetaOps) != len(child.MetaOps) {
+			return false
+		}
+		for i := range parent.MetaOps {
+			if parent.MetaOps[i] != child.MetaOps[i] {
+				return false
+			}
+		}
+	}
 
-// 	if len(child.FilteredMetaOps) > 0 {
-// 		if len(parent.FilteredMetaOps) != len(child.FilteredMetaOps) {
-// 			return false
-// 		}
-// 		for _, parentfmo := range parent.FilteredMetaOps {
-// 			for _, childfmo := range child.FilteredMetaOps {
-// 				if parentfmo.FiltersMatched != childfmo.FiltersMatched {
-// 					return false
-// 				}
-// 				for _, parentf := range parentfmo.Filters {
-// 					for _, childf := range childfmo.Filters {
-// 						if parentf != childf {
-// 							return false
-// 						}
-// 					}
-// 				}
-// 				for _, parentmo := range parentfmo.MetaOps {
-// 					for _, childmo := range childfmo.MetaOps {
-// 						if parentmo != childmo {
-// 							return false
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
+	if len(child.FilteredMetaOps) > 0 {
+		if len(parent.FilteredMetaOps) != len(child.FilteredMetaOps) {
+			return false
+		}
+		for _, parentfmo := range parent.FilteredMetaOps {
+			for _, childfmo := range child.FilteredMetaOps {
+				if parentfmo.FiltersMatched != childfmo.FiltersMatched {
+					return false
+				}
+				for _, parentf := range parentfmo.Filters {
+					for _, childf := range childfmo.Filters {
+						if parentf != childf {
+							return false
+						}
+					}
+				}
+				for _, parentmo := range parentfmo.MetaOps {
+					for _, childmo := range childfmo.MetaOps {
+						if parentmo != childmo {
+							return false
+						}
+					}
+				}
+			}
+		}
+	}
 
-// 	if len(child.URLOutputDirs) > 0 {
-// 		if len(parent.URLOutputDirs) != len(child.URLOutputDirs) {
-// 			return false
-// 		}
-// 		for i := range parent.URLOutputDirs {
-// 			if parent.URLOutputDirs[i] != child.URLOutputDirs[i] {
-// 				return false
-// 			}
-// 		}
-// 	}
+	if len(child.URLOutputDirs) > 0 {
+		if len(parent.URLOutputDirs) != len(child.URLOutputDirs) {
+			return false
+		}
+		for i := range parent.URLOutputDirs {
+			if parent.URLOutputDirs[i] != child.URLOutputDirs[i] {
+				return false
+			}
+		}
+	}
 
-// 	if len(child.TranscodeVideoCodecs) > 0 {
-// 		if len(parent.TranscodeVideoCodecs) != len(child.TranscodeVideoCodecs) {
-// 			return false
-// 		}
-// 		for i := range parent.TranscodeVideoCodecs {
-// 			if parent.TranscodeVideoCodecs[i] != child.TranscodeVideoCodecs[i] {
-// 				return false
-// 			}
-// 		}
-// 	}
+	if len(child.TranscodeVideoCodecs) > 0 {
+		if len(parent.TranscodeVideoCodecs) != len(child.TranscodeVideoCodecs) {
+			return false
+		}
+		for i := range parent.TranscodeVideoCodecs {
+			if parent.TranscodeVideoCodecs[i] != child.TranscodeVideoCodecs[i] {
+				return false
+			}
+		}
+	}
 
-// 	if len(child.TranscodeAudioCodecs) > 0 {
-// 		if len(parent.TranscodeAudioCodecs) != len(child.TranscodeAudioCodecs) {
-// 			return false
-// 		}
-// 		for i := range parent.TranscodeAudioCodecs {
-// 			if parent.TranscodeAudioCodecs[i] != child.TranscodeAudioCodecs[i] {
-// 				return false
-// 			}
-// 		}
-// 	}
+	if len(child.TranscodeAudioCodecs) > 0 {
+		if len(parent.TranscodeAudioCodecs) != len(child.TranscodeAudioCodecs) {
+			return false
+		}
+		for i := range parent.TranscodeAudioCodecs {
+			if parent.TranscodeAudioCodecs[i] != child.TranscodeAudioCodecs[i] {
+				return false
+			}
+		}
+	}
 
-// 	// Map comparison
-// 	if len(child.OutputDirMap) > 0 {
-// 		if len(parent.OutputDirMap) != len(child.OutputDirMap) {
-// 			return false
-// 		}
-// 		for key, val := range parent.OutputDirMap {
-// 			if childVal, ok := child.OutputDirMap[key]; !ok || val != childVal {
-// 				return false
-// 			}
-// 		}
-// 	}
+	// Map comparison
+	if len(child.OutputDirMap) > 0 {
+		if len(parent.OutputDirMap) != len(child.OutputDirMap) {
+			return false
+		}
+		for key, val := range parent.OutputDirMap {
+			if childVal, ok := child.OutputDirMap[key]; !ok || val != childVal {
+				return false
+			}
+		}
+	}
 
-// 	return true
-// }
+	return true
+}
 
 // MetarrArgsAllZero checks if every Metarr Args field is its zero value.
 func MetarrArgsAllZero(m *MetarrArgs) bool {
@@ -575,9 +574,6 @@ func SettingsAllZero(s *Settings) bool {
 	}
 
 	// Configurations.
-	if s.ConfigFile != "" {
-		return false
-	}
 	if s.Concurrency != 0 {
 		return false
 	}
@@ -623,10 +619,10 @@ func SettingsAllZero(s *Settings) bool {
 	if s.FilterFile != "" {
 		return false
 	}
-	if len(s.MoveOps) > 0 {
+	if len(s.MetaFilterMoveOps) > 0 {
 		return false
 	}
-	if s.MoveOpFile != "" {
+	if s.MetaFilterMoveOpFile != "" {
 		return false
 	}
 	if s.FromDate != "" {

@@ -46,7 +46,7 @@ func StartupWait(ctx context.Context) error {
 				m := int(remaining.Minutes())
 				s := int(remaining.Seconds()) % 60
 				fmt.Print(consts.ClearLine)
-				fmt.Printf("\r%s %dm%ds", consts.TimeRemainingMsg, m, s)
+				logging.P("\r%s %dm%ds", consts.TimeRemainingMsg, m, s)
 			case <-ctx.Done():
 				fmt.Print(consts.ClearLine)
 				return

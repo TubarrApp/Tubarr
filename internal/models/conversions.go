@@ -1,6 +1,6 @@
 package models
 
-import "fmt"
+import "tubarr/internal/utils/logging"
 
 // ------ Filters -----------------------------------------------------------------
 // FiltersArrayToSlice converts filter models back into slice form.
@@ -88,32 +88,13 @@ func FilenameOpsArrayToSlice(foModels []FilenameOps) []string {
 	filenameOps := make([]string, 0, len(foModels))
 
 	for _, f := range foModels {
-		var op string
-		// Add channel URL if present
-		if f.ChannelURL != "" {
-			op = f.ChannelURL + "|"
-		}
-
-		// Reconstruct operations
-		switch f.OpType {
-		case "date-tag", "delete-date-tag":
-			op += f.OpType + ":" + f.OpLoc + ":" + f.DateFormat
-
-		case "replace", "replace-suffix", "replace-prefix":
-			op += f.OpType + ":" + f.OpFindString + ":" + f.OpValue
-
-		default:
-			op += f.OpType + ":" + f.OpValue
-		}
-
-		// Append
-		filenameOps = append(filenameOps, op)
+		filenameOps = append(filenameOps, FilenameOpToString(f))
 	}
 	return filenameOps
 }
 
-// FilenameOpToSlice converts a filename ops model back to a string.
-func FilenameOpToSlice(f FilenameOps) string {
+// FilenameOpToString converts a filename ops model back to a string.
+func FilenameOpToString(f FilenameOps) string {
 	var op string
 	// Add channel URL if present
 	if f.ChannelURL != "" {
@@ -136,8 +117,17 @@ func FilenameOpToSlice(f FilenameOps) string {
 }
 
 // ------ Meta Filter Move Ops -----------------------------------------------------------------
-// MetaFilterMoveOpsToSlice converts meta filter move ops back to slice.
-func MetaFilterMoveOpsToSlice(m MetaFilterMoveOps) string {
+// MetaFilterMoveOpsArrayToSlice converts meta filter move ops back to slice.
+func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
+	out := make([]string, 0, len(mf))
+	for _, m := range mf {
+		out = append(out, MetaFilterMoveOpsToString(m))
+	}
+	return out
+}
+
+// MetaFilterMoveOpsToString converts meta filter move ops back to slice.
+func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
 	var op string
 	// Add channel URL if present
 	if m.ChannelURL != "" {
@@ -158,7 +148,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	metaOpStrings := MetaOpsArrayToSlice(f.MetaOps)
 
 	if len(filterStrings) != len(metaOpStrings) {
-		fmt.Printf("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
+		logging.P("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
 		return []string{}
 	}
 
@@ -177,7 +167,7 @@ func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	filenameOpStrings := FilenameOpsArrayToSlice(f.FilenameOps)
 
 	if len(filterStrings) != len(filenameOpStrings) {
-		fmt.Printf("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))
+		logging.P("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))
 		return []string{}
 	}
 

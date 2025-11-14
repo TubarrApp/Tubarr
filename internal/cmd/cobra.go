@@ -194,9 +194,8 @@ func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) 
 // Program
 // SetProgramRelatedFlags sets flags for the Tubarr instance.
 func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd, moveOpsFile *string, moveOps *[]string, pause *bool) {
-
 	if concurrency != nil {
-		cmd.Flags().IntVarP(concurrency, keys.Concurrency, "l", 0, "Maximum concurrent videos to download/process for this instance")
+		cmd.Flags().IntVar(concurrency, keys.ChanOrURLConcurrencyLimit, 0, "Maximum concurrent videos to download/process for this Tubarr instance")
 	}
 
 	if crawlFreq != nil {

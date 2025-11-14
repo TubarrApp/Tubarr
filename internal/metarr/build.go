@@ -240,8 +240,12 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 		err   error
 	)
 
-	if mArgs.OutputDirMap, err = validation.ValidateMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, c); err != nil {
+	// Parse and validate output directory mappings
+	if mArgs.OutputDirMap, err = parsing.ParseMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, c); err != nil {
 		logging.E("Could not parse output directory map: %v", err)
+	}
+	if err := validation.ValidateMetarrOutputDirs(mArgs.OutputDirMap); err != nil {
+		logging.E("Invalid output directory map: %v", err)
 	}
 
 	switch {

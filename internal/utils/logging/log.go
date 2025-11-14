@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/domain/regex"
 
 	"github.com/rs/zerolog"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Global logging variables.
@@ -94,17 +95,13 @@ func init() {
 
 // SetupLogging sets up logging for the application.
 func SetupLogging(targetDir string) error {
-	logfile, err := os.OpenFile(
-		filepath.Join(targetDir, tubarrLogFile),
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
-		consts.PermsLogFile,
-	)
-	if err != nil {
-		return err
-	}
+	fileLogger = zerolog.New(&lumberjack.Logger{
+		Filename:   filepath.Join(targetDir, tubarrLogFile),
+		MaxSize:    1,
+		MaxBackups: 5,
+		LocalTime:  true,
+	}).With().Timestamp().Logger()
 
-	// File logger using zerolog's efficient JSON logging
-	fileLogger = zerolog.New(logfile).With().Timestamp().Logger()
 	Loggable = true
 
 	b := getLogBuilder()
@@ -117,7 +114,7 @@ func SetupLogging(targetDir string) error {
 
 	startMsg := b.String()
 	writeToConsole(startMsg)
-	fileLogger.Info().Msg(regex.AnsiEscapeCompile().ReplaceAllString(startMsg, ""))
+	fileLogger.Log().Msg(regex.AnsiEscapeCompile().ReplaceAllString(startMsg, ""))
 
 	return nil
 }
@@ -226,8 +223,10 @@ func getZerologEvent(level logType) *zerolog.Event {
 		return fileLogger.Warn()
 	case logDebug:
 		return fileLogger.Debug()
-	default:
+	case logInfo:
 		return fileLogger.Info()
+	default:
+		return fileLogger.Log()
 	}
 }
 

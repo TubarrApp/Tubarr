@@ -359,15 +359,22 @@ func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.D
 		return nil
 	}
 
-	validFilters, err := validation.ValidateFilterOps(filters)
+	// Parse filters from strings
+	parsedFilters, err := parsing.ParseFilterOps(filters)
 	if err != nil {
-		logging.E("Error loading filters from file %v: %v", filterFile, err)
-	}
-	if len(validFilters) > 0 {
-		logging.D(1, "Found following filters in file:\n\n%v", validFilters)
+		logging.E("Error parsing filters from file %v: %v", filterFile, err)
+		return nil
 	}
 
-	return validFilters
+	// Validate the parsed filters
+	if err := validation.ValidateFilterOps(parsedFilters); err != nil {
+		logging.E("Error validating filters from file %v: %v", filterFile, err)
+	}
+	if len(parsedFilters) > 0 {
+		logging.D(1, "Found following filters in file:\n\n%v", parsedFilters)
+	}
+
+	return parsedFilters
 }
 
 // loadFilteredMetaOpsFromFile loads filter operations from a file (one per line).
@@ -396,15 +403,22 @@ func loadFilteredMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *par
 		return nil
 	}
 
-	validFilters, err := validation.ValidateFilteredMetaOps(filters)
+	// Parse filtered meta ops from strings
+	parsedFilters, err := parsing.ParseFilteredMetaOps(filters)
 	if err != nil {
-		logging.E("Error loading filters from file %v: %v", filterFile, err)
-	}
-	if len(validFilters) > 0 {
-		logging.D(1, "Found following filters in file:\n\n%v", validFilters)
+		logging.E("Error parsing filtered meta ops from file %v: %v", filterFile, err)
+		return nil
 	}
 
-	return validFilters
+	// Validate the parsed ops
+	if err := validation.ValidateFilteredMetaOps(parsedFilters); err != nil {
+		logging.E("Error validating filtered meta ops from file %v: %v", filterFile, err)
+	}
+	if len(parsedFilters) > 0 {
+		logging.D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
+	}
+
+	return parsedFilters
 }
 
 // loadFilteredFilenameOpsFromFile loads filtered filename operations from a file (one per line).
@@ -433,26 +447,33 @@ func loadFilteredFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp 
 		return nil
 	}
 
-	validFilters, err := validation.ValidateFilteredFilenameOps(filters)
+	// Parse filtered filename ops from strings
+	parsedFilters, err := parsing.ParseFilteredFilenameOps(filters)
 	if err != nil {
-		logging.E("Error loading filtered filename ops from file %v: %v", filterFile, err)
-	}
-	if len(validFilters) > 0 {
-		logging.D(1, "Found following filtered filename ops in file:\n\n%v", validFilters)
+		logging.E("Error parsing filtered filename ops from file %v: %v", filterFile, err)
+		return nil
 	}
 
-	return validFilters
+	// Validate the parsed ops
+	if err := validation.ValidateFilteredFilenameOps(parsedFilters); err != nil {
+		logging.E("Error validating filtered filename ops from file %v: %v", filterFile, err)
+	}
+	if len(parsedFilters) > 0 {
+		logging.D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
+	}
+
+	return parsedFilters
 }
 
 // loadMoveOpsFromFile loads move operations from a file (one per line).
 func loadMoveOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaFilterMoveOps {
 	var err error
 
-	if cu.ChanURLSettings.MoveOpFile == "" {
+	if cu.ChanURLSettings.MetaFilterMoveOpFile == "" {
 		return nil
 	}
 
-	moveOpFile := cu.ChanURLSettings.MoveOpFile
+	moveOpFile := cu.ChanURLSettings.MetaFilterMoveOpFile
 
 	if moveOpFile, err = dp.ParseDirectory(moveOpFile, v, "move-ops"); err != nil {
 		logging.E("Failed to parse directory %q: %v", moveOpFile, err)
@@ -467,17 +488,25 @@ func loadMoveOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.Dir
 
 	if len(moves) == 0 {
 		logging.I("No valid filter move operations found in file. Format is one per line 'title:dogs:/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs)")
+		return nil
 	}
 
-	validMoves, err := validation.ValidateMoveOps(moves)
+	// Parse meta filter move ops from strings
+	parsedMoves, err := parsing.ParseMetaFilterMoveOps(moves)
 	if err != nil {
-		logging.E("Error loading filter move operations from file %q: %v", moveOpFile, err)
-	}
-	if len(validMoves) > 0 {
-		logging.D(1, "Found following filter move operations in file:\n\n%v", validMoves)
+		logging.E("Error parsing filter move operations from file %q: %v", moveOpFile, err)
+		return nil
 	}
 
-	return validMoves
+	// Validate the parsed ops
+	if err := validation.ValidateMetaFilterMoveOps(parsedMoves); err != nil {
+		logging.E("Error validating filter move operations from file %q: %v", moveOpFile, err)
+	}
+	if len(parsedMoves) > 0 {
+		logging.D(1, "Found following filter move operations in file:\n\n%v", parsedMoves)
+	}
+
+	return parsedMoves
 }
 
 // removeUnwantedJSON removes filtered out JSON files.

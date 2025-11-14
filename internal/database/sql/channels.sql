@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS channels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
+    config_file TEXT,
     settings JSON,
     metarr JSON,
     last_scan TIMESTAMP,

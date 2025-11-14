@@ -56,14 +56,21 @@ func loadFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing
 		return nil
 	}
 
-	validOps, err := validation.ValidateFilenameOps(ops)
+	// Parse filename operations from strings
+	parsedOps, err := parsing.ParseFilenameOps(ops)
 	if err != nil {
+		logging.E("Error parsing filename ops from file %q: %v", filenameOpsFile, err)
+		return nil
+	}
+
+	// Validate the parsed operations
+	if err := validation.ValidateFilenameOps(parsedOps); err != nil {
 		logging.E("Error validating filename ops from file %q: %v", filenameOpsFile, err)
 		return nil
 	}
 
-	logging.I("Loaded %d filename ops from file", len(validOps))
-	return validOps
+	logging.I("Loaded %d filename ops from file", len(parsedOps))
+	return parsedOps
 }
 
 // filterConflictingFilenameOps removes DB ops that are fully identical to file ops

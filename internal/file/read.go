@@ -17,9 +17,9 @@ import (
 // UpdateFromConfigFile loads in config file data.
 func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
 
-	if c.ChanSettings.ConfigFile != "" && !c.UpdatedFromConfig {
+	if c.ConfigFile != "" && !c.UpdatedFromConfig {
 		if err := cs.UpdateChannelFromConfig(c); err != nil {
-			logging.E("failed to update from config file %q: %v", c.ChanSettings.ConfigFile, err)
+			logging.E("failed to update from config file %q: %v", c.ConfigFile, err)
 		}
 
 		c.UpdatedFromConfig = true
@@ -27,20 +27,7 @@ func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
 }
 
 // LoadConfigFile loads in the preset configuration file.
-func LoadConfigFile(file string) error {
-	if _, err := validation.ValidateFile(file, false); err != nil {
-		return err
-	}
-
-	viper.SetConfigFile(file)
-	if err := viper.ReadInConfig(); err != nil {
-		return err
-	}
-	return nil
-}
-
-// LoadConfigFileLocal loads in the preset configuration file using a local Viper interface.
-func LoadConfigFileLocal(v *viper.Viper, file string) error {
+func LoadConfigFile(v *viper.Viper, file string) error {
 	if _, err := validation.ValidateFile(file, false); err != nil {
 		return err
 	}

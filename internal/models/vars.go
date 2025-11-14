@@ -2,10 +2,10 @@ package models
 
 // ChannelInputPtrs contains pointers to variables used for adding channels.
 type ChannelInputPtrs struct {
-
 	// Channel identifiers
-	Name *string   `viper:"channel-name"`
-	URLs *[]string `viper:"channel-urls"`
+	Name              *string   `viper:"channel-name"`
+	URLs              *[]string `viper:"channel-urls"`
+	ChannelConfigFile *string   `viper:"channel-config-file"`
 
 	// Directory paths
 	VideoDir *string `viper:"video-directory"`
@@ -14,7 +14,6 @@ type ChannelInputPtrs struct {
 	GPUDir   *string `viper:"transcode-gpu-directory"`
 
 	// Configuration files
-	ConfigFile              *string `viper:"config-file"`
 	DLFilterFile            *string `viper:"filter-ops-file"`
 	MoveOpFile              *string `viper:"move-ops-file"`
 	MetaOpsFile             *string `viper:"metarr-meta-ops-file"`
@@ -48,6 +47,7 @@ type ChannelInputPtrs struct {
 	FilenameOps         *[]string `viper:"metarr-filename-ops"`
 	FilteredMetaOps     *[]string `viper:"metarr-filtered-meta-ops"`
 	FilteredFilenameOps *[]string `viper:"metarr-filtered-filename-ops"`
+	URLOutputDirs       *[]string `viper:"metarr-url-output-dirs"`
 
 	// Metarr settings
 	MetarrExt   *string `viper:"metarr-output-ext"`

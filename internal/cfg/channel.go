@@ -374,8 +374,8 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("could not get valid ID (got %d) for channel name %q", id, channelName)
 			}
 
-			// Validate and add notification URLs
-			validPairs, err := validation.ValidateNotificationStrings(notification)
+			// Parse notification URLs
+			validPairs, err := parsing.ParseNotifications(notification)
 			if err != nil {
 				return err
 			}
@@ -668,83 +668,11 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // addChannelCmd adds a new channel into the database.
 func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		// Channel identifiers
-		name string
-
-		// URLs
-		urls       []string
-		urlOutDirs []string
-
-		// Directory paths
-		vDir   string
-		jDir   string
-		outDir string
-		gpuDir string
-
-		// Configuration files
-		configFile              string
-		addFromFile             string
-		dlFilterFile            string
-		moveOpFile              string
-		metaOpsFile             string
-		filteredMetaOpsFile     string
-		filenameOpsFile         string
-		filteredFilenameOpsFile string
-
-		// Authentication details
-		username    string
-		password    string
-		loginURL    string
-		authDetails []string
-
-		// Notification details
-		notification []string
-
-		// Download settings
-		cookiesFromBrowser     string
-		externalDownloader     string
-		externalDownloaderArgs string
-		maxFilesize            string
-		ytdlpOutputExt         string
-		fromDate               string
-		toDate                 string
-		useGlobalCookies       bool
-
-		// Filter and operation settings
-		dlFilters           []string
-		moveOps             []string
-		metaOps             []string
-		filenameOps         []string
-		filteredMetaOps     []string
-		filteredFilenameOps []string
-
-		// Metarr settings
-		metarrExt   string
-		renameStyle string
-		minFreeMem  string
-
-		// Transcoding settings
-		transcodeGPU         string
-		transcodeQuality     string
-		transcodeVideoFilter string
-		videoCodec           []string
-		audioCodec           []string
-
-		// Extra arguments
-		extraYTDLPVideoArgs string
-		extraYTDLPMetaArgs  string
-		extraFFmpegArgs     string
-
-		// Concurrency and performance settings
-		crawlFreq         int
-		concurrency       int
-		metarrConcurrency int
-		retries           int
-		maxCPU            float64
-
-		// Boolean flags
-		pause     bool
-		ignoreRun bool
+		input       models.ChannelInputPtrs
+		flags       models.ChannelFlagValues
+		addFromFile string
+		configFile  string
+		fileToUse   string
 	)
 
 	addCmd := &cobra.Command{
@@ -752,234 +680,43 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		Short: "Add a channel.",
 		Long:  "Add channel adds a new channel to the database using inputted URLs, names, settings, etc.",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			// Load in file if specified
-			return parsing.LoadDefaultsFromConfig(cmd, addFromFile, configFile)
+			if addFromFile != "" {
+				fileToUse = addFromFile
+			}
+			if configFile != "" {
+				fileToUse = configFile
+			}
+			if fileToUse == "" {
+				mergeFlagsIntoInput(cmd, &flags, &input)
+				return nil
+			}
+
+			v := viper.New()
+			file.LoadConfigFile(v, fileToUse)
+
+			if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
+				return err
+			}
+
+			urlSettings, err := parsing.ParseURLSettingsFromViper(v)
+			if err != nil {
+				return err
+			}
+			input.URLSettings = urlSettings
+
+			mergeFlagsIntoInput(cmd, &flags, &input)
+			return nil
 		},
 		RunE: func(_ *cobra.Command, _ []string) error {
-			var err error
-
-			// Got valid items?
-			if vDir == "" || len(urls) == 0 || name == "" {
-				return errors.New("new channels require a video directory, name, and at least one channel URL")
-			}
-
-			if jDir == "" {
-				jDir = vDir
-			}
-
-			if _, err := validation.ValidateDirectory(vDir, true); err != nil {
-				return err
-			}
-
-			// Validate filter operations
-			var dlFilterModels []models.Filters
-			if dlFilterModels, err = validation.ValidateFilterOps(dlFilters); err != nil {
-				return err
-			}
-
-			// Validate move operation filters
-			moveOpsModels, err := validation.ValidateMoveOps(moveOps)
+			c, authMap, err := parsing.BuildChannelFromInput(input)
 			if err != nil {
 				return err
 			}
 
-			// Meta operations
-			var metaOpsModels = []models.MetaOps{}
-			if len(metaOps) > 0 {
-				if metaOpsModels, err = validation.ValidateMetaOps(metaOps); err != nil {
-					return err
-				}
-			}
-
-			var filenameOpsModels = []models.FilenameOps{}
-			if len(filenameOps) > 0 {
-				if filenameOpsModels, err = validation.ValidateFilenameOps(filenameOps); err != nil {
-					return err
-				}
-			}
-
-			// Filtered meta operations
-			var filteredMetaOpsModels = []models.FilteredMetaOps{}
-			if len(filteredMetaOps) > 0 {
-				if filteredMetaOpsModels, err = validation.ValidateFilteredMetaOps(filteredMetaOps); err != nil {
-					return err
-				}
-			}
-
-			// Filtered filename operations
-			var filteredFilenameOpsModels = []models.FilteredFilenameOps{}
-			if len(filteredFilenameOps) > 0 {
-				if filteredFilenameOpsModels, err = validation.ValidateFilteredFilenameOps(filteredFilenameOps); err != nil {
-					return err
-				}
-			}
-
-			// Rename style
-			if renameStyle != "" {
-				if err := validation.ValidateRenameFlag(renameStyle); err != nil {
-					return err
-				}
-			}
-
-			// Min free memory
-			if minFreeMem != "" {
-				if err := validation.ValidateMinFreeMem(minFreeMem); err != nil {
-					return err
-				}
-			}
-
-			// From date
-			if fromDate != "" {
-				if fromDate, err = validation.ValidateToFromDate(fromDate); err != nil {
-					return err
-				}
-			}
-
-			// To date
-			if toDate != "" {
-				if toDate, err = validation.ValidateToFromDate(toDate); err != nil {
-					return err
-				}
-			}
-
-			// HW Acceleration GPU
-			if transcodeGPU != "" {
-				if transcodeGPU, gpuDir, err = validation.ValidateGPU(transcodeGPU, gpuDir); err != nil {
-					return err
-				}
-			}
-
-			// Video codec
-			if len(videoCodec) != 0 {
-				if videoCodec, err = validation.ValidateVideoTranscodeCodecSlice(videoCodec, transcodeGPU); err != nil {
-					return err
-				}
-			}
-
-			// Audio codec
-			if len(audioCodec) != 0 {
-				if audioCodec, err = validation.ValidateAudioTranscodeCodecSlice(audioCodec); err != nil {
-					return err
-				}
-			}
-
-			// Transcode quality
-			if transcodeQuality != "" {
-				if transcodeQuality, err = validation.ValidateTranscodeQuality(transcodeQuality); err != nil {
-					return err
-				}
-			}
-
-			// YTDLP output extension ('merge-output-format')
-			if ytdlpOutputExt != "" {
-				ytdlpOutputExt = strings.ToLower(ytdlpOutputExt)
-				if err = validation.ValidateYtdlpOutputExtension(ytdlpOutputExt); err != nil {
-					return err
-				}
-			}
-
-			// Parse and validate authentication details
-			authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
-			if err != nil {
-				return err
-			}
-
-			now := time.Now()
-			var chanURLs []*models.ChannelURL
-			for _, u := range urls {
-				if u != "" {
-
-					// Fill auth details if existent
-					var parsedUsername, parsedPassword, parsedLoginURL string
-					if _, exists := authMap[u]; exists {
-						parsedUsername = authMap[u].Username
-						parsedPassword = authMap[u].Password
-						parsedLoginURL = authMap[u].LoginURL
-					}
-
-					// Create channel model
-					newChanURL := &models.ChannelURL{
-						URL:       u,
-						Username:  parsedUsername,
-						Password:  parsedPassword,
-						LoginURL:  parsedLoginURL,
-						LastScan:  now,
-						CreatedAt: now,
-						UpdatedAt: now,
-					}
-					chanURLs = append(chanURLs, newChanURL)
-				}
-			}
-
-			// Initialize channel
-			c := &models.Channel{
-				URLModels: chanURLs,
-				Name:      name,
-
-				// Fill channel
-				ChanSettings: &models.Settings{
-					ConfigFile:             configFile,
-					Concurrency:            concurrency,
-					CookiesFromBrowser:     cookiesFromBrowser,
-					CrawlFreq:              crawlFreq,
-					ExternalDownloader:     externalDownloader,
-					ExternalDownloaderArgs: externalDownloaderArgs,
-					Filters:                dlFilterModels,
-					FilterFile:             dlFilterFile,
-					FromDate:               fromDate,
-					JSONDir:                jDir,
-					MaxFilesize:            maxFilesize,
-					MoveOps:                moveOpsModels,
-					MoveOpFile:             moveOpFile,
-					Paused:                 pause,
-					Retries:                retries,
-					ToDate:                 toDate,
-					UseGlobalCookies:       useGlobalCookies,
-					VideoDir:               vDir,
-					YtdlpOutputExt:         ytdlpOutputExt,
-					ExtraYTDLPVideoArgs:    extraYTDLPVideoArgs,
-					ExtraYTDLPMetaArgs:     extraYTDLPMetaArgs,
-				},
-
-				ChanMetarrArgs: &models.MetarrArgs{
-					OutputExt:       metarrExt,
-					ExtraFFmpegArgs: extraFFmpegArgs,
-
-					MetaOps:             metaOpsModels,
-					MetaOpsFile:         metaOpsFile,
-					FilteredMetaOps:     filteredMetaOpsModels,
-					FilteredMetaOpsFile: filteredMetaOpsFile,
-
-					FilenameOps:             filenameOpsModels,
-					FilenameOpsFile:         filenameOpsFile,
-					FilteredFilenameOps:     filteredFilenameOpsModels,
-					FilteredFilenameOpsFile: filteredFilenameOpsFile,
-
-					RenameStyle:          renameStyle,
-					MaxCPU:               maxCPU,
-					MinFreeMem:           minFreeMem,
-					OutputDir:            outDir,
-					URLOutputDirs:        urlOutDirs,
-					Concurrency:          metarrConcurrency,
-					UseGPU:               transcodeGPU,
-					GPUDir:               gpuDir,
-					TranscodeVideoCodecs: videoCodec,
-					TranscodeAudioCodecs: audioCodec,
-					TranscodeQuality:     transcodeQuality,
-					TranscodeVideoFilter: transcodeVideoFilter,
-				},
-
-				LastScan:  now,
-				CreatedAt: now,
-				UpdatedAt: now,
-			}
-
-			// Add channel to database and retrieve ID
 			channelID, err := cs.AddChannel(c)
 			if err != nil {
 				return err
 			}
-			// Set the ID on the model
 			c.ID = channelID
 
 			if len(authMap) > 0 {
@@ -988,9 +725,8 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				}
 			}
 
-			// Validate notification URLs
-			if len(notification) != 0 {
-				validPairs, err := validation.ValidateNotificationStrings(notification)
+			if input.Notification != nil && len(*input.Notification) != 0 {
+				validPairs, err := parsing.ParseNotifications(*input.Notification)
 				if err != nil {
 					return err
 				}
@@ -1000,62 +736,50 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				}
 			}
 
-			// Should perform an ignore run?
-			if ignoreRun {
+			if input.IgnoreRun != nil && *input.IgnoreRun {
 				logging.I("Running an 'ignore crawl'...")
 				if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
 					logging.E("Failed to complete ignore crawl run: %v", err)
 				}
 			}
 
-			// Success
-			logging.S("Completed addition of channel %q to Tubarr", name)
+			logging.S("Completed addition of channel %q to Tubarr", c.Name)
 			return nil
 		},
 	}
 
-	// Primary channel elements
-	cmd.SetPrimaryChannelFlags(addCmd, &name, &urls, nil)
+	cmd.SetPrimaryChannelFlags(addCmd, &flags.Name, &flags.URLs, nil)
 
-	// Files/dirs
-	cmd.SetFileDirFlags(addCmd, &configFile, &jDir, &vDir)
+	cmd.SetFileDirFlags(addCmd, &configFile, &flags.JSONDir, &flags.VideoDir)
 
-	// Program related
-	cmd.SetProgramRelatedFlags(addCmd, &concurrency, &crawlFreq,
-		&externalDownloaderArgs, &externalDownloader,
-		&moveOpFile, &moveOps, &pause)
+	cmd.SetProgramRelatedFlags(addCmd, &flags.Concurrency, &flags.CrawlFreq,
+		&flags.ExternalDownloaderArgs, &flags.ExternalDownloader,
+		&flags.MoveOpFile, &flags.MoveOps, &flags.Pause)
 
-	// Download
-	cmd.SetDownloadFlags(addCmd, &retries, &useGlobalCookies,
-		&ytdlpOutputExt, &fromDate, &toDate,
-		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
-		&dlFilters)
+	cmd.SetDownloadFlags(addCmd, &flags.Retries, &flags.UseGlobalCookies,
+		&flags.YTDLPOutputExt, &flags.FromDate, &flags.ToDate,
+		&flags.CookiesFromBrowser, &flags.MaxFilesize, &flags.DLFilterFile,
+		&flags.DLFilters)
 
-	// Metarr
-	cmd.SetMetarrFlags(addCmd, &maxCPU, &metarrConcurrency,
-		&metarrExt, &extraFFmpegArgs, &minFreeMem,
-		&outDir, &renameStyle, &metaOpsFile,
-		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
-		&urlOutDirs, &filenameOps, &filteredFilenameOps,
-		&metaOps, &filteredMetaOps)
+	cmd.SetMetarrFlags(addCmd, &flags.MaxCPU, &flags.MetarrConcurrency,
+		&flags.MetarrExt, &flags.ExtraFFmpegArgs, &flags.MinFreeMem,
+		&flags.OutDir, &flags.RenameStyle, &flags.MetaOpsFile,
+		&flags.FilteredMetaOpsFile, &flags.FilenameOpsFile, &flags.FilteredFilenameOpsFile,
+		&flags.URLOutputDirs, &flags.FilenameOps, &flags.FilteredFilenameOps,
+		&flags.MetaOps, &flags.FilteredMetaOps)
 
-	// Login credentials
-	cmd.SetAuthFlags(addCmd, &username, &password, &loginURL, &authDetails)
+	cmd.SetAuthFlags(addCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	// Transcoding
-	cmd.SetTranscodeFlags(addCmd, &transcodeGPU, &gpuDir,
-		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
-		&audioCodec)
+	cmd.SetTranscodeFlags(addCmd, &flags.TranscodeGPU, &flags.GPUDir,
+		&flags.TranscodeVideoFilter, &flags.TranscodeQuality, &flags.VideoCodec,
+		&flags.AudioCodec)
 
-	// YTDLPFlags
-	cmd.SetCustomYDLPArgFlags(addCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
+	cmd.SetCustomYDLPArgFlags(addCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
 
-	// Notification URL
-	cmd.SetNotifyFlags(addCmd, &notification)
+	cmd.SetNotifyFlags(addCmd, &flags.Notification)
 
-	// Pause or ignore run
-	addCmd.Flags().BoolVar(&pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
-	addCmd.Flags().BoolVar(&ignoreRun, "ignore-run", false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
+	addCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
+	addCmd.Flags().BoolVar(&flags.IgnoreRun, keys.IgnoreRun, false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
 	addCmd.Flags().StringVar(&addFromFile, "add-channel-from-file", "", "Add a channel using a prewritten file (.toml, .yaml, etc.).\nFile contents example:\n\nchannel-name: 'Cool Channel'\nchannel-urls:\n  - 'https://www.coolchannel.com/'\n")
 
 	return addCmd
@@ -1063,143 +787,55 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 // addBatchChannelsCmd adds multiple channels from config files in a directory.
 func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
-	type batchVars struct {
-		// Directory containing config files
+	var (
 		configDirectory string
-
-		// Channel identifiers
-		name string
-
-		// URLs
-		urls       []string
-		urlOutDirs []string
-
-		// Directory paths
-		vDir   string
-		jDir   string
-		outDir string
-		gpuDir string
-
-		// Configuration files
-		channelConfigFile       string
-		dlFilterFile            string
-		moveOpFile              string
-		metaOpsFile             string
-		filteredMetaOpsFile     string
-		filenameOpsFile         string
-		filteredFilenameOpsFile string
-
-		// Authentication details
-		username    string
-		password    string
-		loginURL    string
-		authDetails []string
-
-		// Notification details
-		notification []string
-
-		// Download settings
-		cookiesFromBrowser     string
-		externalDownloader     string
-		externalDownloaderArgs string
-		maxFilesize            string
-		ytdlpOutputExt         string
-		fromDate               string
-		toDate                 string
-		useGlobalCookies       bool
-
-		// Filter and operation settings
-		dlFilters           []string
-		moveOps             []string
-		metaOps             []string
-		filenameOps         []string
-		filteredMetaOps     []string
-		filteredFilenameOps []string
-
-		// Metarr settings
-		metarrExt   string
-		renameStyle string
-		minFreeMem  string
-
-		// Transcoding settings
-		transcodeGPU         string
-		transcodeQuality     string
-		transcodeVideoFilter string
-		videoCodec           []string
-		audioCodec           []string
-
-		// Extra arguments
-		extraYTDLPVideoArgs string
-		extraYTDLPMetaArgs  string
-		extraFFmpegArgs     string
-
-		// Concurrency and performance settings
-		crawlFreq         int
-		concurrency       int
-		metarrConcurrency int
-		retries           int
-		maxCPU            float64
-
-		// Boolean flags
-		pause     bool
-		ignoreRun bool
-	}
-
-	var bv batchVars
+		input           models.ChannelInputPtrs
+		flags           models.ChannelFlagValues
+	)
 
 	batchCmd := &cobra.Command{
 		Use:   "add-batch",
 		Short: "Add multiple channels from a directory.",
 		Long:  "Add multiple channels by reading all Viper-compatible config files (.yaml, .yml, .toml, .json, etc.) from a directory.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if bv.configDirectory == "" {
-				return errors.New("must specify a directory path with --from-directory")
+			if configDirectory == "" {
+				return errors.New("must specify a directory path containing config files")
 			}
 
-			// Scan directory for config files
-			batchConfigFiles, err := file.ScanDirectoryForConfigFiles(bv.configDirectory)
+			batchConfigFiles, err := file.ScanDirectoryForConfigFiles(configDirectory)
 			if err != nil {
 				return fmt.Errorf("failed to scan directory: %w", err)
 			}
 
 			if len(batchConfigFiles) == 0 {
-				logging.I("No config files found in directory %q", bv.configDirectory)
+				logging.I("No config files found in directory %q", configDirectory)
 				return nil
 			}
 
-			logging.I("Found %d config file(s) in directory %q", len(batchConfigFiles), bv.configDirectory)
+			logging.I("Found %d config file(s) in directory %q", len(batchConfigFiles), configDirectory)
 
-			// Track results
 			var successes []string
 			var failures []struct {
 				file string
 				err  error
 			}
 
-			// Process each config file
 			for _, batchConfigFile := range batchConfigFiles {
 				logging.I("Processing config file: %s", batchConfigFile)
 
-				// Reset all flag variables to their zero values before processing each config file
-				bv = batchVars{}
+				input = models.ChannelInputPtrs{}
+				flags = models.ChannelFlagValues{}
 
-				// Reset flag Changed status so loadDefaultsFromConfig will apply new values
 				cmd.Flags().VisitAll(func(f *pflag.Flag) {
 					f.Changed = false
 				})
 
-				// Load config file into viper
 				v := viper.New()
-				if err := file.LoadConfigFileLocal(v, batchConfigFile); err != nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, fmt.Errorf("failed to load config: %w", err)})
-					continue
+				if err := file.LoadConfigFile(v, batchConfigFile); err != nil {
+					return err
 				}
 
-				// Apply defaults from config to command flags
-				if err := parsing.LoadDefaultsFromConfig(cmd, batchConfigFile, ""); err != nil {
+				if err := resetCobraFlagsAndLoadViper(cmd, v); err != nil {
 					failures = append(failures, struct {
 						file string
 						err  error
@@ -1207,294 +843,22 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					continue
 				}
 
-				// Validate required fields
-				if bv.vDir == "" || len(bv.urls) == 0 || bv.name == "" {
+				mergeFlagsIntoInput(cmd, &flags, &input)
+
+				urlSettings, err := parsing.ParseURLSettingsFromViper(v)
+				if err == nil {
+					input.URLSettings = urlSettings
+				}
+
+				c, authMap, err := parsing.BuildChannelFromInput(input)
+				if err != nil || c == nil {
 					failures = append(failures, struct {
 						file string
 						err  error
-					}{batchConfigFile, errors.New("config must specify channel-name, channel-urls, and video-directory")})
+					}{batchConfigFile, err})
 					continue
 				}
 
-				if bv.jDir == "" {
-					bv.jDir = bv.vDir
-				}
-
-				if _, err := validation.ValidateDirectory(bv.vDir, true); err != nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, fmt.Errorf("invalid video directory: %w", err)})
-					continue
-				}
-
-				// Validate filter operations
-				var dlFilterModels []models.Filters
-				if dlFilterModels, err = validation.ValidateFilterOps(bv.dlFilters); err != nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, fmt.Errorf("invalid filter operations: %w", err)})
-					continue
-				}
-
-				// Validate move operation filters
-				moveOpsModels, err := validation.ValidateMoveOps(bv.moveOps)
-				if err != nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, fmt.Errorf("invalid move operations: %w", err)})
-					continue
-				}
-
-				// Meta operations
-				var metaOpsModels = []models.MetaOps{}
-				if len(bv.metaOps) > 0 {
-					if metaOpsModels, err = validation.ValidateMetaOps(bv.metaOps); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid meta operations: %w", err)})
-						continue
-					}
-				}
-
-				// Filtered meta operations
-				var filteredMetaOpsModels = []models.FilteredMetaOps{}
-				if len(bv.filteredMetaOps) > 0 {
-					if filteredMetaOpsModels, err = validation.ValidateFilteredMetaOps(bv.filteredMetaOps); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid filtered meta operations: %w", err)})
-						continue
-					}
-				}
-
-				// Filename operations
-				var filenameOpsModels = []models.FilenameOps{}
-				if len(bv.filenameOps) > 0 {
-					if filenameOpsModels, err = validation.ValidateFilenameOps(bv.filenameOps); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid filename operations: %w", err)})
-						continue
-					}
-				}
-
-				// Filtered filename operations
-				var filteredFilenameOpsModels = []models.FilteredFilenameOps{}
-				if len(bv.filteredFilenameOps) > 0 {
-					if filteredFilenameOpsModels, err = validation.ValidateFilteredFilenameOps(bv.filteredFilenameOps); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid filtered filename operations: %w", err)})
-						continue
-					}
-				}
-
-				// Rename style
-				if bv.renameStyle != "" {
-					if err := validation.ValidateRenameFlag(bv.renameStyle); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid rename style: %w", err)})
-						continue
-					}
-				}
-
-				// Min free memory
-				if bv.minFreeMem != "" {
-					if err := validation.ValidateMinFreeMem(bv.minFreeMem); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid min free memory: %w", err)})
-						continue
-					}
-				}
-
-				// From date
-				if bv.fromDate != "" {
-					if bv.fromDate, err = validation.ValidateToFromDate(bv.fromDate); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid from-date: %w", err)})
-						continue
-					}
-				}
-
-				// To date
-				if bv.toDate != "" {
-					if bv.toDate, err = validation.ValidateToFromDate(bv.toDate); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid to-date: %w", err)})
-						continue
-					}
-				}
-
-				// HW Acceleration GPU
-				if bv.transcodeGPU != "" {
-					if bv.transcodeGPU, bv.gpuDir, err = validation.ValidateGPU(bv.transcodeGPU, bv.gpuDir); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid GPU settings: %w", err)})
-						continue
-					}
-				}
-
-				// Video codec
-				if len(bv.videoCodec) != 0 {
-					if bv.videoCodec, err = validation.ValidateVideoTranscodeCodecSlice(bv.videoCodec, bv.transcodeGPU); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid video codec: %w", err)})
-						continue
-					}
-				}
-
-				// Audio codec
-				if len(bv.audioCodec) != 0 {
-					if bv.audioCodec, err = validation.ValidateAudioTranscodeCodecSlice(bv.audioCodec); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid audio codec: %w", err)})
-						continue
-					}
-				}
-
-				// Transcode quality
-				if bv.transcodeQuality != "" {
-					if bv.transcodeQuality, err = validation.ValidateTranscodeQuality(bv.transcodeQuality); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid transcode quality: %w", err)})
-						continue
-					}
-				}
-
-				// YTDLP output extension
-				if bv.ytdlpOutputExt != "" {
-					bv.ytdlpOutputExt = strings.ToLower(bv.ytdlpOutputExt)
-					if err = validation.ValidateYtdlpOutputExtension(bv.ytdlpOutputExt); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid ytdlp output extension: %w", err)})
-						continue
-					}
-				}
-
-				// Parse and validate authentication details
-				authMap, err := auth.ParseAuthDetails(bv.username, bv.password, bv.loginURL, bv.authDetails, bv.urls, false)
-				if err != nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, fmt.Errorf("invalid authentication details: %w", err)})
-					continue
-				}
-
-				now := time.Now()
-				var chanURLs []*models.ChannelURL
-				for _, u := range bv.urls {
-					if u != "" {
-						// Fill auth details if existent
-						var parsedUsername, parsedPassword, parsedLoginURL string
-						if _, exists := authMap[u]; exists {
-							parsedUsername = authMap[u].Username
-							parsedPassword = authMap[u].Password
-							parsedLoginURL = authMap[u].LoginURL
-						}
-
-						// Create channel model
-						newChanURL := &models.ChannelURL{
-							URL:       u,
-							Username:  parsedUsername,
-							Password:  parsedPassword,
-							LoginURL:  parsedLoginURL,
-							LastScan:  now,
-							CreatedAt: now,
-							UpdatedAt: now,
-						}
-						chanURLs = append(chanURLs, newChanURL)
-					}
-				}
-
-				// Initialize channel
-				c := &models.Channel{
-					URLModels: chanURLs,
-					Name:      bv.name,
-
-					ChanSettings: &models.Settings{
-						ConfigFile:             bv.channelConfigFile,
-						Concurrency:            bv.concurrency,
-						CookiesFromBrowser:     bv.cookiesFromBrowser,
-						CrawlFreq:              bv.crawlFreq,
-						ExternalDownloader:     bv.externalDownloader,
-						ExternalDownloaderArgs: bv.externalDownloaderArgs,
-						Filters:                dlFilterModels,
-						FilterFile:             bv.dlFilterFile,
-						FromDate:               bv.fromDate,
-						JSONDir:                bv.jDir,
-						MaxFilesize:            bv.maxFilesize,
-						MoveOps:                moveOpsModels,
-						MoveOpFile:             bv.moveOpFile,
-						Paused:                 bv.pause,
-						Retries:                bv.retries,
-						ToDate:                 bv.toDate,
-						UseGlobalCookies:       bv.useGlobalCookies,
-						VideoDir:               bv.vDir,
-						YtdlpOutputExt:         bv.ytdlpOutputExt,
-						ExtraYTDLPVideoArgs:    bv.extraYTDLPVideoArgs,
-						ExtraYTDLPMetaArgs:     bv.extraYTDLPMetaArgs,
-					},
-
-					ChanMetarrArgs: &models.MetarrArgs{
-						OutputExt:       bv.metarrExt,
-						ExtraFFmpegArgs: bv.extraFFmpegArgs,
-
-						MetaOps:             metaOpsModels,
-						MetaOpsFile:         bv.metaOpsFile,
-						FilteredMetaOps:     filteredMetaOpsModels,
-						FilteredMetaOpsFile: bv.filteredMetaOpsFile,
-
-						FilenameOps:             filenameOpsModels,
-						FilenameOpsFile:         bv.filenameOpsFile,
-						FilteredFilenameOps:     filteredFilenameOpsModels,
-						FilteredFilenameOpsFile: bv.filteredFilenameOpsFile,
-
-						RenameStyle:          bv.renameStyle,
-						MaxCPU:               bv.maxCPU,
-						MinFreeMem:           bv.minFreeMem,
-						OutputDir:            bv.outDir,
-						URLOutputDirs:        bv.urlOutDirs,
-						Concurrency:          bv.metarrConcurrency,
-						UseGPU:               bv.transcodeGPU,
-						GPUDir:               bv.gpuDir,
-						TranscodeVideoCodecs: bv.videoCodec,
-						TranscodeAudioCodecs: bv.audioCodec,
-						TranscodeQuality:     bv.transcodeQuality,
-						TranscodeVideoFilter: bv.transcodeVideoFilter,
-					},
-
-					LastScan:  now,
-					CreatedAt: now,
-					UpdatedAt: now,
-				}
-
-				// Add channel to database and retrieve ID
 				channelID, err := cs.AddChannel(c)
 				if err != nil {
 					failures = append(failures, struct {
@@ -1503,7 +867,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					}{batchConfigFile, fmt.Errorf("failed to add channel to database: %w", err)})
 					continue
 				}
-				// Set the ID on the model
+
 				c.ID = channelID
 
 				if len(authMap) > 0 {
@@ -1516,9 +880,8 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					}
 				}
 
-				// Validate notification URLs
-				if len(bv.notification) != 0 {
-					validPairs, err := validation.ValidateNotificationStrings(bv.notification)
+				if input.Notification != nil && len(*input.Notification) != 0 {
+					validPairs, err := parsing.ParseNotifications(*input.Notification)
 					if err != nil {
 						failures = append(failures, struct {
 							file string
@@ -1536,20 +899,17 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					}
 				}
 
-				// Should perform an ignore run?
-				if bv.ignoreRun {
-					logging.I("Running an 'ignore crawl' for channel %q...", bv.name)
+				if input.IgnoreRun != nil && *input.IgnoreRun {
+					logging.I("Running an 'ignore crawl' for channel %q...", c.Name)
 					if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
-						logging.E("Failed to complete ignore crawl run for %q: %v", bv.name, err)
+						logging.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
 					}
 				}
 
-				// Success for this file
 				successes = append(successes, batchConfigFile)
-				logging.S("Successfully added channel %q from config file: %s", bv.name, batchConfigFile)
+				logging.S("Successfully added channel %q from config file: %s", c.Name, batchConfigFile)
 			}
 
-			// Print summary
 			logging.I("====== Batch Add Summary ======\n")
 			logging.S("Successfully added %d channel(s)", len(successes))
 			if len(failures) > 0 {
@@ -1563,35 +923,33 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 		},
 	}
 
-	// Add flags that are needed for the command to work
-	batchCmd.Flags().StringVar(&bv.configDirectory, "add-from-directory", "", "Directory containing channel config files (.yaml, .yml, .toml, .json, etc.)")
+	batchCmd.Flags().StringVar(&configDirectory, "add-from-directory", "", "Directory containing channel config files (.yaml, .yml, .toml, .json, etc.)")
 
-	// Add all the same flags as the regular add command so they can be parsed from config files
-	cmd.SetPrimaryChannelFlags(batchCmd, &bv.name, &bv.urls, nil)
-	cmd.SetFileDirFlags(batchCmd, &bv.channelConfigFile, &bv.jDir, &bv.vDir)
+	cmd.SetPrimaryChannelFlags(batchCmd, &flags.Name, &flags.URLs, nil)
+	cmd.SetFileDirFlags(batchCmd, &flags.ChannelConfigFile, &flags.JSONDir, &flags.VideoDir)
 
-	cmd.SetProgramRelatedFlags(batchCmd, &bv.concurrency, &bv.crawlFreq, &bv.externalDownloaderArgs,
-		&bv.externalDownloader, &bv.moveOpFile, &bv.moveOps, &bv.pause)
+	cmd.SetProgramRelatedFlags(batchCmd, &flags.Concurrency, &flags.CrawlFreq, &flags.ExternalDownloaderArgs,
+		&flags.ExternalDownloader, &flags.MoveOpFile, &flags.MoveOps, &flags.Pause)
 
-	cmd.SetDownloadFlags(batchCmd, &bv.retries, &bv.useGlobalCookies, &bv.ytdlpOutputExt,
-		&bv.fromDate, &bv.toDate, &bv.cookiesFromBrowser, &bv.maxFilesize,
-		&bv.dlFilterFile, &bv.dlFilters)
+	cmd.SetDownloadFlags(batchCmd, &flags.Retries, &flags.UseGlobalCookies, &flags.YTDLPOutputExt,
+		&flags.FromDate, &flags.ToDate, &flags.CookiesFromBrowser, &flags.MaxFilesize,
+		&flags.DLFilterFile, &flags.DLFilters)
 
-	cmd.SetMetarrFlags(batchCmd, &bv.maxCPU, &bv.metarrConcurrency, &bv.metarrExt,
-		&bv.extraFFmpegArgs, &bv.minFreeMem, &bv.outDir, &bv.renameStyle,
-		&bv.metaOpsFile, &bv.filteredMetaOpsFile, &bv.filenameOpsFile, &bv.filteredFilenameOpsFile,
-		&bv.urlOutDirs, &bv.filenameOps, &bv.filteredFilenameOps, &bv.metaOps, &bv.filteredMetaOps)
+	cmd.SetMetarrFlags(batchCmd, &flags.MaxCPU, &flags.MetarrConcurrency, &flags.MetarrExt,
+		&flags.ExtraFFmpegArgs, &flags.MinFreeMem, &flags.OutDir, &flags.RenameStyle,
+		&flags.MetaOpsFile, &flags.FilteredMetaOpsFile, &flags.FilenameOpsFile, &flags.FilteredFilenameOpsFile,
+		&flags.URLOutputDirs, &flags.FilenameOps, &flags.FilteredFilenameOps, &flags.MetaOps, &flags.FilteredMetaOps)
 
-	cmd.SetAuthFlags(batchCmd, &bv.username, &bv.password, &bv.loginURL, &bv.authDetails)
+	cmd.SetAuthFlags(batchCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	cmd.SetTranscodeFlags(batchCmd, &bv.transcodeGPU, &bv.gpuDir, &bv.transcodeVideoFilter,
-		&bv.transcodeQuality, &bv.videoCodec, &bv.audioCodec)
+	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.GPUDir, &flags.TranscodeVideoFilter,
+		&flags.TranscodeQuality, &flags.VideoCodec, &flags.AudioCodec)
 
-	cmd.SetCustomYDLPArgFlags(batchCmd, &bv.extraYTDLPVideoArgs, &bv.extraYTDLPMetaArgs)
-	cmd.SetNotifyFlags(batchCmd, &bv.notification)
+	cmd.SetCustomYDLPArgFlags(batchCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
+	cmd.SetNotifyFlags(batchCmd, &flags.Notification)
 
-	batchCmd.Flags().BoolVar(&bv.pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
-	batchCmd.Flags().BoolVar(&bv.ignoreRun, "ignore-run", false, "Run an 'ignore crawl' for each channel so only new videos are downloaded")
+	batchCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
+	batchCmd.Flags().BoolVar(&flags.IgnoreRun, keys.IgnoreRun, false, "Run an 'ignore crawl' for each channel so only new videos are downloaded")
 
 	return batchCmd
 }
@@ -1759,8 +1117,9 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
 		// Channel identifiers
-		id   int
-		name string
+		id      int
+		name    string
+		newName string
 
 		// URLs
 		urls       []string
@@ -1835,12 +1194,19 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	)
 
 	updateSettingsCmd := &cobra.Command{
-		Use:   "update-settings",
+		Use:   "update-channel",
 		Short: "Update channel settings.",
 		Long:  "Update channel settings with various parameters, both for Tubarr itself and for external software like Metarr.",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Load in file if specified
-			return parsing.LoadDefaultsFromConfig(cmd, configFile, "")
+			v := viper.New()
+			if configFile != "" {
+				if err := file.LoadConfigFile(v, configFile); err != nil {
+					return err
+				}
+			}
+
+			return resetCobraFlagsAndLoadViper(cmd, v)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Check key/val pair
@@ -1859,13 +1225,31 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Load config file location if existent and one wasn't hardcoded into terminal
-			if !cmd.Flags().Changed(keys.ConfigFile) && c.ChanSettings.ConfigFile != "" {
-				if err := file.LoadConfigFile(c.ChanSettings.ConfigFile); err != nil {
+			//
+			// Do not load again if hardcoded configFile is the same as the channel model's config file.
+			if (!cmd.Flags().Changed(keys.ConfigFile) || configFile == "") && c.ConfigFile != "" && c.ConfigFile != configFile {
+				fileToUse := ""
+				if configFile != "" {
+					fileToUse = configFile
+				}
+				if c.ConfigFile != "" {
+					fileToUse = c.ConfigFile
+				}
+
+				v := viper.New()
+				if fileToUse != "" {
+					if err := file.LoadConfigFile(v, fileToUse); err != nil {
+						return err
+					}
+				}
+				if err := resetCobraFlagsAndLoadViper(cmd, v); err != nil {
 					return err
 				}
-				if err := parsing.LoadDefaultsFromConfig(cmd, c.ChanSettings.ConfigFile, ""); err != nil {
-					return err
-				}
+			}
+
+			// Change name
+			if newName != "" && newName != c.Name {
+				cs.UpdateChannelValue(key, val, consts.QChanName, newName)
 			}
 
 			// Check if the user got auth details from flags
@@ -1901,7 +1285,6 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Gather channel settings
 			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
-				channelConfigFile:      configFile,
 				concurrency:            concurrency,
 				cookiesFromBrowser:     cookiesFromBrowser,
 				crawlFreq:              crawlFreq,
@@ -1911,8 +1294,8 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				filterFile:             dlFilterFile,
 				fromDate:               fromDate,
 				maxFilesize:            maxFilesize,
-				moveOps:                moveOps,
-				moveOpsFile:            moveOpsFile,
+				metaFilterMoveOps:      moveOps,
+				metaFilterMoveOpsFile:  moveOpsFile,
 				paused:                 pause,
 				retries:                retries,
 				toDate:                 toDate,
@@ -2034,6 +1417,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	// YTDLPFlags
 	cmd.SetCustomYDLPArgFlags(updateSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
 
+	updateSettingsCmd.Flags().StringVar(&newName, "change-name-to", "", "Change the channel name to this value")
 	updateSettingsCmd.Flags().BoolVar(&deleteAuth, "delete-auth", false, "Clear all authentication details for this channel and its URLs")
 
 	return updateSettingsCmd
@@ -2082,8 +1466,8 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 	// Primary channel elements
 	cmd.SetPrimaryChannelFlags(updateRowCmd, &name, nil, &id)
 
-	updateRowCmd.Flags().StringVarP(&col, "column-name", "c", "", "The name of the column in the table (e.g. video_directory)")
-	updateRowCmd.Flags().StringVarP(&newVal, "value", "v", "", "The value to set in the column (e.g. /my-directory)")
+	updateRowCmd.Flags().StringVar(&col, "column-name", "", "The name of the column in the table (e.g. video_directory)")
+	updateRowCmd.Flags().StringVar(&newVal, "set-value", "", "The value to set in the column (e.g. /my-directory)")
 	return updateRowCmd
 }
 
@@ -2146,7 +1530,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	// Metarr final video output extension (e.g. 'mp4')
 	if f.Changed(keys.MOutputExt) {
 		if c.metarrExt != "" {
-			_, err := validation.ValidateOutputFiletype(c.metarrExt)
+			_, err := validation.ValidateMetarrOutputExt(c.metarrExt)
 			if err != nil {
 				return nil, err
 			}
@@ -2181,16 +1565,16 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Filename operations (e.g. 'prefix:[DOG COLLECTION] ')
 	if f.Changed(keys.MFilenameOps) {
-		valid := []models.FilenameOps{}
+		parsed := []models.FilenameOps{}
 
 		if len(c.filenameOps) > 0 {
-			valid, err = validation.ValidateFilenameOps(c.filenameOps)
+			parsed, err = parsing.ParseFilenameOps(c.filenameOps)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilenameOps = valid
+			m.FilenameOps = parsed
 			return nil
 		})
 	}
@@ -2204,16 +1588,16 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Filtered filename operations
 	if f.Changed(keys.MFilteredFilenameOps) {
-		valid := []models.FilteredFilenameOps{}
+		parsed := []models.FilteredFilenameOps{}
 
 		if len(c.filteredFilenameOps) > 0 {
-			valid, err = validation.ValidateFilteredFilenameOps(c.filteredFilenameOps)
+			parsed, err = parsing.ParseFilteredFilenameOps(c.filteredFilenameOps)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilteredFilenameOps = valid
+			m.FilteredFilenameOps = parsed
 			return nil
 		})
 	}
@@ -2257,16 +1641,16 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Meta operations (e.g. 'all-credits:set:author')
 	if f.Changed(keys.MMetaOps) {
-		valid := []models.MetaOps{}
+		parsed := []models.MetaOps{}
 
 		if len(c.metaOps) > 0 {
-			valid, err = validation.ValidateMetaOps(c.metaOps)
+			parsed, err = parsing.ParseMetaOps(c.metaOps)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.MetaOps = valid
+			m.MetaOps = parsed
 			return nil
 		})
 	}
@@ -2280,16 +1664,16 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Filename meta operations (e.g. 'prefix:[COOL CAT VIDEOS]')
 	if f.Changed(keys.MFilenameOps) {
-		valid := []models.FilenameOps{}
+		parsed := []models.FilenameOps{}
 
 		if len(c.filenameOps) > 0 {
-			valid, err = validation.ValidateFilenameOps(c.filenameOps)
+			parsed, err = parsing.ParseFilenameOps(c.filenameOps)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilenameOps = valid
+			m.FilenameOps = parsed
 			return nil
 		})
 	}
@@ -2303,16 +1687,16 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Filtered meta operations (e.g. 'title:contains:dog|title:prefix:[DOG VIDEOS]')
 	if f.Changed(keys.MFilteredMetaOps) {
-		valid := []models.FilteredMetaOps{}
+		parsed := []models.FilteredMetaOps{}
 
 		if len(c.filteredMetaOps) > 0 {
-			valid, err = validation.ValidateFilteredMetaOps(c.filteredMetaOps)
+			parsed, err = parsing.ParseFilteredMetaOps(c.filteredMetaOps)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.FilteredMetaOps = valid
+			m.FilteredMetaOps = parsed
 			return nil
 		})
 	}
@@ -2426,7 +1810,6 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 }
 
 type chanSettings struct {
-	channelConfigFile      string
 	concurrency            int
 	cookiesFromBrowser     string
 	crawlFreq              int
@@ -2437,8 +1820,8 @@ type chanSettings struct {
 	fromDate               string
 	jsonDir                string
 	maxFilesize            string
-	moveOps                []string
-	moveOpsFile            string
+	metaFilterMoveOps      []string
+	metaFilterMoveOpsFile  string
 	paused                 bool
 	retries                int
 	toDate                 string
@@ -2451,21 +1834,12 @@ type chanSettings struct {
 
 // getSettingsArgsFns creates the functions to send in to update the database with new values.
 func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models.Settings) error, err error) {
-
 	f := cmd.Flags()
 
 	// Concurrency
-	if f.Changed(keys.Concurrency) {
+	if f.Changed(keys.ChanOrURLConcurrencyLimit) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.Concurrency = max(c.concurrency, 1)
-			return nil
-		})
-	}
-
-	// Channel config file location
-	if f.Changed(keys.ConfigFile) {
-		fns = append(fns, func(s *models.Settings) error {
-			s.ConfigFile = c.channelConfigFile
 			return nil
 		})
 	}
@@ -2512,7 +1886,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Filter ops ('field:contains:frogs:must')
 	if f.Changed(keys.FilterOpsInput) {
-		dlFilters, err := validation.ValidateFilterOps(c.filters)
+		dlFilters, err := parsing.ParseFilterOps(c.filters)
 		if err != nil {
 			return nil, err
 		}
@@ -2524,12 +1898,12 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Move ops ('field:value:output directory')
 	if f.Changed(keys.MoveOps) {
-		moveOperations, err := validation.ValidateMoveOps(c.moveOps)
+		moveOperations, err := parsing.ParseMetaFilterMoveOps(c.metaFilterMoveOps)
 		if err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(s *models.Settings) error {
-			s.MoveOps = moveOperations
+			s.MetaFilterMoveOps = moveOperations
 			return nil
 		})
 	}

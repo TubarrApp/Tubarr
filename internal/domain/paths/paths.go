@@ -18,6 +18,7 @@ const (
 
 // File and directory path strings.
 var (
+	UserHomeDir   string
 	HomeTubarrDir string
 	DBFilePath    string
 	LogFilePath   string
@@ -26,11 +27,11 @@ var (
 
 // InitProgFilesDirs initializes necessary program directories and filepaths.
 func InitProgFilesDirs() error {
-	homeDir, err := os.UserHomeDir()
+	UserHomeDir, err := os.UserHomeDir()
 	if err != nil {
 		return errors.New("failed to get home directory")
 	}
-	HomeTubarrDir = filepath.Join(homeDir, tDir)
+	HomeTubarrDir = filepath.Join(UserHomeDir, tDir)
 	if _, err := os.Stat(HomeTubarrDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(HomeTubarrDir, consts.PermsHomeTubarrDir); err != nil {
 			return fmt.Errorf("failed to make directories: %w", err)

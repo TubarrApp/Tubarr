@@ -10,7 +10,6 @@ import (
 // Transformers
 // InitFileTransformers initializes user flag settings for transformations applying to all files.
 func InitFileTransformers(rootCmd *cobra.Command) error {
-
 	// Prefix file with metafield
 	rootCmd.PersistentFlags().StringSlice(keys.MFilenamePfx, nil, "Adds a specified metatag's value onto the start of the filename")
 	if err := viper.BindPFlag(keys.MFilenamePfx, rootCmd.PersistentFlags().Lookup(keys.MFilenamePfx)); err != nil {
@@ -34,7 +33,6 @@ func InitFileTransformers(rootCmd *cobra.Command) error {
 
 // InitVideoTransformers initializes user flag settings for transformation of video files.
 func InitVideoTransformers(rootCmd *cobra.Command) error {
-
 	// Output extension type
 	rootCmd.PersistentFlags().String(keys.OutputFiletype, "", "File extension to output files as (mp4 works best for most media servers)")
 	if err := viper.BindPFlag(keys.OutputFiletype, rootCmd.PersistentFlags().Lookup(keys.OutputFiletype)); err != nil {
@@ -45,7 +43,6 @@ func InitVideoTransformers(rootCmd *cobra.Command) error {
 
 // InitMetaTransformers initializes user flag settings for manipulation of metadata.
 func InitMetaTransformers(rootCmd *cobra.Command) error {
-
 	// Metadata transformations
 	rootCmd.PersistentFlags().StringSlice(keys.MMetaOps, nil, "Metadata operations (field:operation:value) - e.g. title:set:New Title, description:prefix:Draft-, tags:append:newtag")
 	if err := viper.BindPFlag(keys.MMetaOps, rootCmd.PersistentFlags().Lookup(keys.MMetaOps)); err != nil {
@@ -88,6 +85,12 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 	// Output benchmarking files
 	rootCmd.PersistentFlags().Bool(keys.Benchmarking, false, "Benchmarks the program")
 	if err := viper.BindPFlag(keys.Benchmarking, rootCmd.PersistentFlags().Lookup(keys.Benchmarking)); err != nil {
+		return err
+	}
+
+	// Global Concurrency
+	rootCmd.PersistentFlags().StringP(keys.GlobalConcurrency, "c", "", "Concurrency for this instance of Tubarr")
+	if err := viper.BindPFlag(keys.GlobalConcurrency, rootCmd.PersistentFlags().Lookup(keys.GlobalConcurrency)); err != nil {
 		return err
 	}
 

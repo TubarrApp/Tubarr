@@ -50,7 +50,8 @@ var rootCmd = &cobra.Command{
 			}
 			if configFile != "" {
 				// load and normalize keys from any Viper-supported config file
-				if err := file.LoadConfigFile(configFile); err != nil {
+				v := viper.New()
+				if err := file.LoadConfigFile(v, configFile); err != nil {
 					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
 					os.Exit(1)
 				}
@@ -62,7 +63,7 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 		if len(args) == 0 {
-			viper.Set(keys.CheckChannels, true)
+			viper.Set(keys.TerminalRunDefaultBehavior, true)
 		}
 		viper.Set("execute", true)
 		return nil

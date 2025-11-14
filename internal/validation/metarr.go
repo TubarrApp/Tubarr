@@ -23,216 +23,89 @@ var validFilenameActions = map[string]bool{
 	"replace": true, "date-tag": true, "delete-date-tag": true, "set": true,
 }
 
-// ValidateFilenameOps parses and validates filename transformation operations.
-func ValidateFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
+// ValidateFilenameOps validates filename transformation operation models.
+func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
 	if len(filenameOps) == 0 {
-		logging.D(4, "No filename operations passed in to verification")
-		return nil, nil
+		logging.D(4, "No filename operations to validate")
+		return nil
 	}
-	const dupMsg = "Duplicate filename operation %q, skipping"
-	const invalidArg = "Invalid filename operation %q (format should be: 'prefix:[COOL CATEGORY] ', or 'date-tag:prefix:ymd', etc.)"
 
-	// Deduplicate
-	filenameOps = DeduplicateSliceEntries(filenameOps)
+	logging.D(1, "Validating %d filename operations...", len(filenameOps))
 
-	// Proceed
-	valid := make([]models.FilenameOps, 0, len(filenameOps))
-	exists := make(map[string]bool, len(filenameOps))
-
-	logging.D(1, "Validating filename operations %v...", filenameOps)
-
-	// Check filename ops
-	for _, op := range filenameOps {
-		opURL, opPart := CheckForOpURL(op)
-		split := EscapedSplit(opPart, ':')
-
-		if len(split) < 2 || len(split) > 3 {
-			logging.E(invalidArg, op)
-			continue
+	// Validate each filename operation
+	for i, op := range filenameOps {
+		// Validate operation type is valid
+		if !validFilenameActions[op.OpType] {
+			return fmt.Errorf("invalid filename operation type %q at position %d (valid: append, prefix, replace-prefix, replace-suffix, replace, date-tag, delete-date-tag, set)", op.OpType, i)
 		}
 
-		if !validFilenameActions[split[0]] {
-			logging.E(invalidArg, op)
-			continue
-		}
-
-		var newFilenameOp models.FilenameOps
-		var key string
-		switch len(split) {
-		case 2: // e.g. 'prefix:[DOG VIDEOS]'
-			newFilenameOp.OpType = split[0]  // e.g. 'append'
-			newFilenameOp.OpValue = split[1] // e.g. '(new)'
-
-			// Build uniqueness key
-			key = strings.Join([]string{newFilenameOp.OpType, newFilenameOp.OpValue}, ":")
-
-		case 3: // e.g. 'replace-suffix:_1:'
-			switch split[0] {
-			case "replace-suffix", "replace-prefix", "replace":
-				newFilenameOp.OpType = split[0]       // e.g. 'replace-suffix'
-				newFilenameOp.OpFindString = split[1] // e.g. '_1'
-				newFilenameOp.OpValue = split[2]      // e.g. ''
-
-				// Build uniqueness key
-				key = strings.Join([]string{newFilenameOp.OpType, newFilenameOp.OpFindString, newFilenameOp.OpValue}, ":")
-
-			case "date-tag", "delete-date-tag":
-				newFilenameOp.OpType = split[0]     // e.g. 'date-tag'
-				newFilenameOp.OpLoc = split[1]      // e.g. 'prefix'
-				newFilenameOp.DateFormat = split[2] // e.g. 'ymd'
-
-				if newFilenameOp.OpType == "date-tag" &&
-					newFilenameOp.OpLoc != "prefix" && newFilenameOp.OpLoc != "suffix" {
-					logging.E("invalid date tag location %q, use prefix or suffix", newFilenameOp.OpLoc)
-					continue
-				}
-
-				if newFilenameOp.OpType == "delete-date-tag" &&
-					newFilenameOp.OpLoc != "prefix" && newFilenameOp.OpLoc != "suffix" && newFilenameOp.OpLoc != "all" {
-					logging.E("invalid date tag location %q, use prefix or suffix", newFilenameOp.OpLoc)
-					continue
-				}
-
-				if !ValidateDateFormat(newFilenameOp.DateFormat) {
-					logging.E("invalid date tag format %q", newFilenameOp.DateFormat)
-					continue
-				}
-				// Build uniqueness key
-				key = newFilenameOp.OpType
+		// Validate date-tag operations
+		if op.OpType == "date-tag" {
+			if op.OpLoc != "prefix" && op.OpLoc != "suffix" {
+				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
 			}
-		default:
-			logging.E(invalidArg, opPart)
-			continue
+			if !ValidateDateFormat(op.DateFormat) {
+				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
+			}
 		}
 
-		// Completed switch, check if key exists (sets true on key if not)
-		if exists[key] {
-			logging.I(dupMsg, opPart)
-			continue
+		// Validate delete-date-tag operations
+		if op.OpType == "delete-date-tag" {
+			if op.OpLoc != "prefix" && op.OpLoc != "suffix" && op.OpLoc != "all" {
+				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
+			}
+			if !ValidateDateFormat(op.DateFormat) {
+				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
+			}
 		}
-		exists[key] = true
-
-		// Add channel URL is present
-		if opURL != "" {
-			newFilenameOp.ChannelURL = opURL
-		}
-
-		// Add successful filename operation
-		valid = append(valid, newFilenameOp)
 	}
 
-	// Check length of valid filename operations
-	if len(valid) == 0 {
-		return nil, errors.New("no valid filename operations")
-	}
-	return valid, nil
+	return nil
 }
 
-// ValidateMetaOps parses and validates meta transformation operations.
-func ValidateMetaOps(metaOps []string) ([]models.MetaOps, error) {
+// ValidateMetaOps validates meta transformation operation models.
+func ValidateMetaOps(metaOps []models.MetaOps) error {
 	if len(metaOps) == 0 {
-		logging.D(4, "No meta operations passed in to verification")
-		return nil, nil
+		logging.D(4, "No meta operations to validate")
+		return nil
 	}
-	const dupMsg = "Duplicate meta operation %q, skipping"
 
-	// Deduplicate
-	metaOps = DeduplicateSliceEntries(metaOps)
+	logging.D(1, "Validating %d meta operations...", len(metaOps))
 
-	// Proceed
-	valid := make([]models.MetaOps, 0, len(metaOps))
-	exists := make(map[string]bool, len(metaOps))
-
-	logging.D(1, "Validating meta operations %v...", metaOps)
-
-	// Check meta ops
-	for _, op := range metaOps {
-		opURL, opPart := CheckForOpURL(op)
-		split := EscapedSplit(opPart, ':')
-
-		if len(split) < 3 || len(split) > 4 {
-			logging.E("Invalid meta operation %q", op)
-			continue
+	// Validate each meta operation
+	for i, op := range metaOps {
+		// Validate operation type is valid
+		if !validMetaActions[op.OpType] {
+			return fmt.Errorf("invalid meta operation type %q at position %d (valid: append, copy-to, paste-from, prefix, replace-prefix, replace-suffix, replace, set, date-tag, delete-date-tag)", op.OpType, i)
 		}
 
-		if !validMetaActions[split[1]] {
-			logging.E("invalid meta operation %q", split[1])
-			continue
-		}
-
-		var newMetaOp models.MetaOps
-		var key string
-		switch len(split) {
-		case 3: // e.g. 'director:set:Spielberg'
-			newMetaOp.Field = split[0]   // e.g. 'director'
-			newMetaOp.OpType = split[1]  // e.g. 'set'
-			newMetaOp.OpValue = split[2] // e.g. 'Spielberg'
-
-			// Build uniqueness key
-			key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType, newMetaOp.OpValue}, ":")
-
-		case 4: // e.g. 'title:date-tag:suffix:ymd' or 'title:replace:old:new'
-			newMetaOp.Field = split[0]
-			newMetaOp.OpType = split[1]
-
-			switch newMetaOp.OpType {
-			case "date-tag", "delete-date-tag":
-				newMetaOp.OpLoc = split[2]
-				newMetaOp.DateFormat = split[3]
-
-				if newMetaOp.OpType == "date-tag" &&
-					newMetaOp.OpLoc != "prefix" && newMetaOp.OpLoc != "suffix" {
-					logging.E("invalid date tag location %q, use prefix or suffix", newMetaOp.OpLoc)
-					continue
-				}
-
-				if newMetaOp.OpType == "delete-date-tag" &&
-					newMetaOp.OpLoc != "prefix" && newMetaOp.OpLoc != "suffix" && newMetaOp.OpLoc != "all" {
-					logging.E("invalid date tag location %q, use prefix or suffix", newMetaOp.OpLoc)
-					continue
-				}
-
-				if !ValidateDateFormat(newMetaOp.DateFormat) {
-					logging.E("invalid date tag format %q", newMetaOp.DateFormat)
-					continue
-				}
-				// Build uniqueness key
-				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType}, ":")
-
-			case "replace", "replace-suffix", "replace-prefix":
-				newMetaOp.OpFindString = split[2]
-				newMetaOp.OpValue = split[3]
-
-				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType, newMetaOp.OpFindString, newMetaOp.OpValue}, ":")
-
-			default:
-				logging.E("invalid 4-part meta op type %q", newMetaOp.OpType)
-				continue
+		// Validate date-tag operations
+		if op.OpType == "date-tag" {
+			if op.OpLoc != "prefix" && op.OpLoc != "suffix" {
+				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
 			}
-		default:
-			logging.E("invalid meta op %q", opPart)
-			continue
+			if !ValidateDateFormat(op.DateFormat) {
+				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
+			}
 		}
 
-		// Completed switch, check if key exists (sets true on key if not)
-		if exists[key] {
-			logging.I(dupMsg, opPart)
-			continue
-		}
-		exists[key] = true
-
-		// Add channel URL is present
-		if opURL != "" {
-			newMetaOp.ChannelURL = opURL
+		// Validate delete-date-tag operations
+		if op.OpType == "delete-date-tag" {
+			if op.OpLoc != "prefix" && op.OpLoc != "suffix" && op.OpLoc != "all" {
+				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
+			}
+			if !ValidateDateFormat(op.DateFormat) {
+				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
+			}
 		}
 
-		// Add successful meta operation
-		valid = append(valid, newMetaOp)
+		// Validate field is not empty for all operations
+		if op.Field == "" {
+			return fmt.Errorf("meta operation at position %d has empty field", i)
+		}
 	}
-	if len(valid) == 0 {
-		return nil, errors.New("no valid meta operations")
-	}
-	return valid, nil
+
+	return nil
 }
 
 // ValidateRenameFlag validates the rename style to apply.
@@ -283,11 +156,14 @@ func ValidateMinFreeMem(minFreeMem string) error {
 	return nil
 }
 
-// ValidateOutputFiletype verifies the output filetype is valid for FFmpeg.
-func ValidateOutputFiletype(o string) (dottedExt string, err error) {
+// ValidateMetarrOutputExt verifies the output filetype is valid for FFmpeg.
+func ValidateMetarrOutputExt(o string) (dottedExt string, err error) {
 	o = strings.ToLower(strings.TrimSpace(o))
+	if !strings.HasPrefix(o, ".") {
+		o = "." + o
+	}
 
-	fmt.Printf("Output filetype: %s\n", o)
+	logging.D(4, "Checking Metarr output filetype: %q", o)
 
 	valid := false
 	for _, ext := range consts.AllVidExtensions {
@@ -299,10 +175,6 @@ func ValidateOutputFiletype(o string) (dottedExt string, err error) {
 	}
 
 	if valid {
-		logging.I("Outputting files as %s", o)
-		if !strings.HasPrefix(o, ".") {
-			o = "." + o
-		}
 		return o, nil
 	}
 	return "", fmt.Errorf("output filetype %q is not supported", o)
@@ -316,7 +188,7 @@ func ValidatePurgeMetafiles(purgeType string) bool {
 
 	switch purgeType {
 	case "all", "json", "nfo":
-		fmt.Printf("Purge metafiles post-Metarr: %s\n", purgeType)
+		logging.P("Purge metafiles post-Metarr: %s\n", purgeType)
 		return true
 	}
 	return false

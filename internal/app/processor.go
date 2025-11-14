@@ -157,8 +157,7 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON strin
 			logging.I("Using regular scraper for censored.tv ...")
 		} else {
 			logging.I("Detected a censored.tv link. Using specialized scraper.")
-			err := s.ScrapeCensoredTVMetadata(v.URL, v.ParsedMetaDir, v)
-			if err != nil {
+			if err := s.ScrapeCensoredTVMetadata(v.URL, v.ParsedMetaDir, v); err != nil {
 				return "", fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
 			}
 		}
@@ -318,7 +317,7 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 }
 
 // parseVideoJSONDirs parses video and JSON directories.
-func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (metaDir, videoDir string) {
+func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (jsonDir, videoDir string) {
 	// Initialize dirParser if nil
 	if dirParser == nil {
 		dirParser = parsing.NewDirectoryParser(c)
@@ -328,6 +327,7 @@ func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, c *models.Channe
 		cSettings = cu.ChanURLSettings
 		err       error
 	)
+	logging.I("Parsing directories for channel %q (Video Dir: %q, JSON Dir: %q)", c.Name, cSettings.VideoDir, cSettings.JSONDir)
 
 	// Return if no template directives
 	if !strings.Contains(cSettings.JSONDir, "{") && !strings.Contains(cSettings.VideoDir, "{") {
@@ -335,10 +335,10 @@ func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, c *models.Channe
 	}
 
 	// Parse templates
-	metaDir, err = dirParser.ParseDirectory(cSettings.JSONDir, v, "JSON")
+	jsonDir, err = dirParser.ParseDirectory(cSettings.JSONDir, v, "JSON")
 	if err != nil {
 		logging.W("Failed to parse JSON directory %q, using raw: %v", cSettings.JSONDir, err)
-		metaDir = cSettings.JSONDir
+		jsonDir = cSettings.JSONDir
 	}
 
 	videoDir, err = dirParser.ParseDirectory(cSettings.VideoDir, v, "video")
@@ -347,7 +347,8 @@ func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, c *models.Channe
 		videoDir = cSettings.VideoDir
 	}
 
-	return metaDir, videoDir
+	logging.I("Retrieved parsed directories for channel %q (Video Dir: %q, JSON Dir: %q)", c.Name, cSettings.VideoDir, cSettings.JSONDir)
+	return jsonDir, videoDir
 }
 
 // handleBotBlock handles cases where the program has been detected as a bot.

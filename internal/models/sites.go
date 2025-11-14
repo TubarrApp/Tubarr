@@ -24,6 +24,7 @@ type Channel struct {
 	ID                int64         `json:"id" db:"id"`
 	URLModels         []*ChannelURL `json:"url_models"`
 	Name              string        `json:"name" db:"name"`
+	ConfigFile        string        `json:"channel_config_file" mapstructure:"channel-config-file"`
 	ChanSettings      *Settings     `json:"settings" db:"settings"`
 	ChanMetarrArgs    *MetarrArgs   `json:"metarr" db:"metarr"`
 	UpdatedFromConfig bool          `json:"updated_from_config"`

@@ -42,28 +42,30 @@ const (
 
 // Downloading
 const (
-	YtdlpOutputExt         string = "ytdlp-output-extension"
-	MaxFilesize            string = "max-filesize"
-	CookiesFromBrowser     string = "cookies-from-browser"
-	DLRetries              string = "dl-retries"
-	FromDate               string = "from-date"
-	Pause                  string = "pause-toggle"
-	ToDate                 string = "to-date"
-	UseGlobalCookies       string = "use-global-cookies"
-	ExternalDownloader     string = "external-downloader"
-	ExternalDownloaderArgs string = "external-downloader-args"
+	ChanOrURLConcurrencyLimit string = "concurrency"
+	YtdlpOutputExt            string = "ytdlp-output-extension"
+	MaxFilesize               string = "max-filesize"
+	CookiesFromBrowser        string = "cookies-from-browser"
+	DLRetries                 string = "dl-retries"
+	FromDate                  string = "from-date"
+	Pause                     string = "pause-toggle"
+	IgnoreRun                 string = "ignore-run"
+	ToDate                    string = "to-date"
+	UseGlobalCookies          string = "use-global-cookies"
+	ExternalDownloader        string = "external-downloader"
+	ExternalDownloaderArgs    string = "external-downloader-args"
 )
 
 // Program inputs
 const (
-	ConcurrencyLimitInput string = "concurrency-limit"
-	MoveOnComplete        string = "move-on-complete"
-	URLFile               string = "url-file"
-	URLAdd                string = "add-url"
-	URLs                  string = "urls"
-	Benchmarking          string = "benchmark"
-	SkipInitialWait       string = "skip-initial-wait"
-	SkipAllWaits          string = "skip-all-waits"
+	GlobalConcurrency string = "global-concurrency"
+	MoveOnComplete    string = "move-on-complete"
+	URLFile           string = "url-file"
+	URLAdd            string = "add-url"
+	URLs              string = "urls"
+	Benchmarking      string = "benchmark"
+	SkipInitialWait   string = "skip-initial-wait"
+	SkipAllWaits      string = "skip-all-waits"
 )
 
 // Settings

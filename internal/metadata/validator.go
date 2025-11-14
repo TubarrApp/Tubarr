@@ -280,8 +280,8 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 // handleMoveOps checks if Metarr should use an output directory based on existent metadata.
 func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
 	// Work with a copy of database move ops
-	allMoveOps := make([]models.MetaFilterMoveOps, len(cu.ChanURLSettings.MoveOps))
-	copy(allMoveOps, cu.ChanURLSettings.MoveOps)
+	allMoveOps := make([]models.MetaFilterMoveOps, len(cu.ChanURLSettings.MetaFilterMoveOps))
+	copy(allMoveOps, cu.ChanURLSettings.MetaFilterMoveOps)
 
 	// Add file-based move ops (ephemeral - re-read each time)
 	fileMoveOps := loadMoveOpsFromFile(v, cu, dirParser)

@@ -4,21 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 	"tubarr/internal/app"
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/state"
 	"tubarr/internal/utils/logging"
-	"tubarr/internal/validation"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/spf13/viper"
@@ -37,13 +40,13 @@ func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 
 	// Use local viper instance for consistency with directory handler
 	v := viper.New()
-	if err := file.LoadConfigFileLocal(v, addFromFile); err != nil {
+	if err := file.LoadConfigFile(v, addFromFile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Load viper variables into the struct from local instance
-	if err := parsing.LoadViperIntoStructLocal(v, &input); err != nil {
+	if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -84,7 +87,7 @@ func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if input.Notification != nil && len(*input.Notification) != 0 {
-		v, err := validation.ValidateNotificationStrings(*input.Notification)
+		v, err := parsing.ParseNotifications(*input.Notification)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -143,7 +146,7 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 		v := viper.New()
 
 		// Load in config file
-		if err := file.LoadConfigFileLocal(v, batchConfigFile); err != nil {
+		if err := file.LoadConfigFile(v, batchConfigFile); err != nil {
 			failures = append(failures, struct {
 				file   string
 				reason string
@@ -152,7 +155,7 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Load viper variables into the struct from local instance
-		if err := parsing.LoadViperIntoStructLocal(v, &input); err != nil {
+		if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
 			failures = append(failures, struct {
 				file   string
 				reason string
@@ -202,7 +205,7 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if input.Notification != nil && len(*input.Notification) != 0 {
-			v, err := validation.ValidateNotificationStrings(*input.Notification)
+			v, err := parsing.ParseNotifications(*input.Notification)
 			if err != nil {
 				failures = append(failures, struct {
 					file   string
@@ -974,539 +977,79 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 
 // handleSetLogLevel sets the logging level in the database.
 func handleSetLogLevel(w http.ResponseWriter, r *http.Request) {
-	levelStr := chi.URLParam(r, "logging_level")
+	levelStr := chi.URLParam(r, "level")
 	level, err := strconv.Atoi(levelStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not set logging level using input %q: %v", levelStr, err), http.StatusBadRequest)
 		return
 	}
 	logging.Level = level
+	w.WriteHeader(http.StatusOK)
+	w.Write(fmt.Appendf(nil, "Logging level set to %d", level))
 }
 
-// ----------------- Helpers ----------------------------------------------------------------------------------------
+// handleGetLogLevel retrieves the current logging level.
+func handleGetLogLevel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"level": logging.Level})
+}
 
-// getSettingsStrings retrieves Settings model strings, converting where needed.
-func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings {
-	// -- Initialize --
-	// Strings not needing validation
-	channelConfigFile := r.FormValue("config_file")
-	cookiesFromBrowser := r.FormValue("cookies_from_browser")
-	externalDownloader := r.FormValue("external_downloader")
-	externalDownloaderArgs := r.FormValue("external_downloader_args")
-	extraYtdlpVideoArgs := r.FormValue("extra_ytdlp_video_args")
-	extraYtdlpMetaArgs := r.FormValue("extra_ytdlp_meta_args")
-	filterFile := r.FormValue("filter_file")
-	moveOpFile := r.FormValue("move_ops_file")
-
-	// Strings needing validation
-	jDir := r.FormValue("json_directory")
-	vDir := r.FormValue("video_directory")
-	maxFilesizeStr := r.FormValue("max_filesize")
-	ytdlpOutExt := r.FormValue("ytdlp_output_ext")
-	fromDateStr := r.FormValue("from_date")
-	toDateStr := r.FormValue("to_date")
-
-	// Integers
-	maxConcurrencyStr := r.FormValue("max_concurrency")
-	crawlFreqStr := r.FormValue("crawl_freq")
-	retriesStr := r.FormValue("download_retries")
-
-	// Bools
-	useGlobalCookiesStr := r.FormValue("use_global_cookies")
-
-	// Models
-	filtersStr := r.FormValue("filters")
-	moveOpsStr := r.FormValue("move_ops")
-
-	// -- Validation --
-	// Strings
-	if _, err := validation.ValidateDirectory(vDir, true); err != nil {
-		http.Error(w, fmt.Sprintf("video directory %q is invalid: %v", vDir, err), http.StatusBadRequest)
-		return nil
+// handleGetLogs serves the log file contents.
+func handleGetLogs(w http.ResponseWriter, r *http.Request) {
+	// Get log file path from abstractions
+	logFilePath := paths.LogFilePath
+	if logFilePath == "" {
+		http.Error(w, "log file path not configured", http.StatusInternalServerError)
+		return
 	}
-	if _, err := validation.ValidateDirectory(jDir, true); err != nil {
-		http.Error(w, fmt.Sprintf("JSON directory %q is invalid: %v", jDir, err), http.StatusBadRequest)
-		return nil
-	}
-	maxFilesize, err := validation.ValidateMaxFilesize(maxFilesizeStr)
+
+	// Open and read the log file
+	file, err := os.Open(logFilePath)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("max filesize %q is invalid: %v", maxFilesizeStr, err), http.StatusBadRequest)
-		return nil
+		if os.IsNotExist(err) {
+			http.Error(w, "log file not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, fmt.Sprintf("failed to open log file: %v", err), http.StatusInternalServerError)
+		return
 	}
-	if err := validation.ValidateYtdlpOutputExtension(ytdlpOutExt); err != nil {
-		http.Error(w, fmt.Sprintf("invalid YTDLP output extension %q: %v", ytdlpOutExt, err), http.StatusBadRequest)
-		return nil
-	}
-	toDate, err := validation.ValidateToFromDate(toDateStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert to date string %q: %v", toDateStr, err), http.StatusBadRequest)
-		return nil
-	}
-	fromDate, err := validation.ValidateToFromDate(fromDateStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert from date string %q: %v", fromDateStr, err), http.StatusBadRequest)
-		return nil
-	}
+	defer file.Close()
 
-	// Integers
-	maxConcurrency, err := strconv.Atoi(maxConcurrencyStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
-		return nil
-	}
-	maxConcurrency = validation.ValidateConcurrencyLimit(maxConcurrency)
-	crawlFreq, err := strconv.Atoi(crawlFreqStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert crawl frequency string %q: %v", crawlFreqStr, err), http.StatusBadRequest)
-		return nil
-	}
-	retries, err := strconv.Atoi(retriesStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert retries string %q: %v", retriesStr, err), http.StatusBadRequest)
-		return nil
-	}
+	// Set content type as plain text
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	// Bools
-	var useGlobalCookies bool = (useGlobalCookiesStr == "true")
-
-	// Model conversions (newline-separated, not space-separated)
-	filters, err := validation.ValidateFilterOps(splitNonEmptyLines(filtersStr))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid download filters %q: %v", filtersStr, err), http.StatusBadRequest)
-		return nil
-	}
-	moveOps, err := validation.ValidateMoveOps(splitNonEmptyLines(moveOpsStr))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid move ops %q: %v", moveOpsStr, err), http.StatusBadRequest)
-		return nil
-	}
-
-	return &models.Settings{
-		ConfigFile:             channelConfigFile,
-		Concurrency:            maxConcurrency,
-		CookiesFromBrowser:     cookiesFromBrowser,
-		CrawlFreq:              crawlFreq,
-		ExternalDownloader:     externalDownloader,
-		ExternalDownloaderArgs: externalDownloaderArgs,
-		MaxFilesize:            maxFilesize,
-		Retries:                retries,
-		UseGlobalCookies:       useGlobalCookies,
-		YtdlpOutputExt:         ytdlpOutExt,
-		ExtraYTDLPVideoArgs:    extraYtdlpVideoArgs,
-		ExtraYTDLPMetaArgs:     extraYtdlpMetaArgs,
-
-		Filters:    filters,
-		FilterFile: filterFile,
-		MoveOps:    moveOps,
-		MoveOpFile: moveOpFile,
-
-		FromDate: fromDate,
-		ToDate:   toDate,
-
-		JSONDir:  jDir,
-		VideoDir: vDir,
+	// Copy file contents to response
+	if _, err := io.Copy(w, file); err != nil {
+		logging.E("Failed to send log file: %v", err)
 	}
 }
 
-// getMetarrArgsStrings retrieves MetarrArgs model strings, converting where needed.
-func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.MetarrArgs {
-	// -- Initialize --
-	// Strings not needing validation
-	outExt := r.FormValue("metarr_output_ext")
-	filenameOpsFile := r.FormValue("metarr_filename_ops_file")
-	filteredFilenameOpsFile := r.FormValue("filtered_filename_ops_file")
-	metaOpsFile := r.FormValue("metarr_meta_ops_file")
-	filteredMetaOpsFile := r.FormValue("filtered_meta_ops_file")
-	extraFFmpegArgs := r.FormValue("metarr_extra_ffmpeg_args")
+// handleGetMetarrLogs serves the Metarr log file contents from ~/.metarr/metarr.log
+func handleGetMetarrLogs(w http.ResponseWriter, r *http.Request) {
+	// Construct path to Metarr log file
+	const (
+		metarrDir = ".metarr"
+		metarrLog = "metarr.log"
+	)
+	metarrLogPath := filepath.Join(paths.UserHomeDir, metarrDir, metarrLog)
 
-	// Strings requiring validation
-	renameStyle := r.FormValue("metarr_rename_style")
-	minFreeMem := r.FormValue("metarr_min_free_mem")
-	useGPUStr := r.FormValue("metarr_gpu")
-	gpuDirStr := r.FormValue("metarr_gpu_directory")
-	outputDir := r.FormValue("metarr_output_directory")
-	transcodeVideoFilterStr := r.FormValue("metarr_transcode_video_filter")
-	transcodeCodecStr := r.FormValue("metarr_video_transcode_codecs")
-	transcodeAudioCodecStr := r.FormValue("metarr_transcode_audio_codecs")
-	transcodeQualityStr := r.FormValue("metarr_transcode_quality")
-
-	// Ints
-	maxConcurrencyStr := r.FormValue("metarr_concurrency")
-	maxCPUStr := r.FormValue("metarr_max_cpu_usage")
-
-	// Models
-	filenameOpsStr := r.FormValue("metarr_filename_ops")
-	filteredFilenameOpsStr := r.FormValue("filtered_filename_ops")
-	filteredMetaOpsStr := r.FormValue("filtered_meta_ops")
-	metaOpsStr := r.FormValue("metarr_meta_ops")
-
-	// -- Validation --
-	//Strings
-	if err := validation.ValidateRenameFlag(renameStyle); err != nil {
-		http.Error(w, fmt.Sprintf("invalid rename style %q: %v", renameStyle, err), http.StatusBadRequest)
-		return nil
-	}
-	if err := validation.ValidateMinFreeMem(minFreeMem); err != nil {
-		http.Error(w, fmt.Sprintf("invalid min free mem %q: %v", minFreeMem, err), http.StatusBadRequest)
-		return nil
-	}
-	useGPU, gpuDir, err := validation.ValidateGPU(useGPUStr, gpuDirStr)
+	// Open and read the log file
+	file, err := os.Open(metarrLogPath)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid GPU type or device directory (%q : %q): %v", useGPUStr, gpuDirStr, err), http.StatusBadRequest)
-		return nil
+		if os.IsNotExist(err) {
+			http.Error(w, "Metarr log file not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, fmt.Sprintf("failed to open Metarr log file: %v", err), http.StatusInternalServerError)
+		return
 	}
-	transcodeVideoFilter, err := validation.ValidateTranscodeVideoFilter(transcodeVideoFilterStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid video filter string %q: %v", transcodeVideoFilterStr, err), http.StatusBadRequest)
-		return nil
-	}
-	transcodeVideoCodecs, err := validation.ValidateVideoTranscodeCodecSlice(splitNonEmptyLines(transcodeCodecStr), useGPU)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid video codec string %q: %v", transcodeCodecStr, err), http.StatusBadRequest)
-		return nil
-	}
-	transcodeAudioCodecs, err := validation.ValidateAudioTranscodeCodecSlice(splitNonEmptyLines(transcodeAudioCodecStr))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid audio codec string %q: %v", transcodeAudioCodecStr, err), http.StatusBadRequest)
-		return nil
-	}
-	transcodeQuality, err := validation.ValidateTranscodeQuality(transcodeQualityStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid transcode quality string %q: %v", transcodeQualityStr, err), http.StatusBadRequest)
-		return nil
-	}
-	if _, err := validation.ValidateDirectory(outputDir, false); err != nil {
-		http.Error(w, fmt.Sprintf("cannot get output directories. Input string %q. Error: %v", outputDir, err), http.StatusBadRequest)
-		return nil
-	}
+	defer file.Close()
 
-	// Integers & Floats
-	maxConcurrency, err := strconv.Atoi(maxConcurrencyStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
-		return nil
-	}
-	maxConcurrency = validation.ValidateConcurrencyLimit(maxConcurrency)
+	// Set content type as plain text
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	maxCPU := 100.00
-	if maxCPUStr != "" {
-		maxCPU, err = strconv.ParseFloat(maxCPUStr, 64)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to convert max CPU limit string %q: %v", maxCPUStr, err), http.StatusBadRequest)
-			return nil
-		}
+	// Copy file contents to response
+	if _, err := io.Copy(w, file); err != nil {
+		logging.E("Failed to send Metarr log file: %v", err)
 	}
-
-	// Models (newline-separated, not space-separated)
-	filenameOps, err := validation.ValidateFilenameOps(splitNonEmptyLines(filenameOpsStr))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid filename ops %q: %v", filenameOpsStr, err), http.StatusBadRequest)
-		return nil
-	}
-	filteredFilenameOps, err := validation.ValidateFilteredFilenameOps(splitNonEmptyLines(filteredFilenameOpsStr))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid filtered filename ops %q: %v", filteredFilenameOpsStr, err), http.StatusBadRequest)
-		return nil
-	}
-	metaOps, err := validation.ValidateMetaOps(splitNonEmptyLines(metaOpsStr))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid meta ops %q: %v", metaOpsStr, err), http.StatusBadRequest)
-		return nil
-	}
-	filteredMetaOps, err := validation.ValidateFilteredMetaOps(splitNonEmptyLines(filteredMetaOpsStr))
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid filtered meta ops %q: %v", filteredMetaOpsStr, err), http.StatusBadRequest)
-		return nil
-	}
-
-	return &models.MetarrArgs{
-		OutputExt:               outExt,
-		FilenameOps:             filenameOps,
-		FilenameOpsFile:         filenameOpsFile,
-		FilteredFilenameOps:     filteredFilenameOps,
-		FilteredFilenameOpsFile: filteredFilenameOpsFile,
-		RenameStyle:             renameStyle,
-		MetaOps:                 metaOps,
-		MetaOpsFile:             metaOpsFile,
-		FilteredMetaOps:         filteredMetaOps,
-		FilteredMetaOpsFile:     filteredMetaOpsFile,
-		OutputDir:               outputDir,
-		Concurrency:             maxConcurrency,
-		MaxCPU:                  maxCPU,
-		MinFreeMem:              minFreeMem,
-		UseGPU:                  useGPU,
-		GPUDir:                  gpuDir,
-		TranscodeVideoFilter:    transcodeVideoFilter,
-		TranscodeVideoCodecs:    transcodeVideoCodecs,
-		TranscodeAudioCodecs:    transcodeAudioCodecs,
-		TranscodeQuality:        transcodeQuality,
-		ExtraFFmpegArgs:         extraFFmpegArgs,
-	}
-}
-
-// splitNonEmptyLines splits a string by newlines and filters out empty lines.
-func splitNonEmptyLines(s string) []string {
-	lines := strings.Split(s, "\n")
-	result := make([]string, 0, len(lines))
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			result = append(result, line)
-		}
-	}
-	return result
-}
-
-// parseSettingsFromMap parses Settings from a map[string]any (from JSON).
-//
-// This is used when parsing per-URL settings from the frontend.
-func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
-	settings := &models.Settings{}
-
-	// Extract string fields
-	if v, ok := data["config_file"].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
-			return nil, err
-		}
-		settings.ConfigFile = v
-	}
-	if v, ok := data["cookies_from_browser"].(string); ok {
-		settings.CookiesFromBrowser = v
-	}
-	if v, ok := data["external_downloader"].(string); ok {
-		settings.ExternalDownloader = v
-	}
-	if v, ok := data["external_downloader_args"].(string); ok {
-		settings.ExternalDownloaderArgs = v
-	}
-	if v, ok := data["extra_ytdlp_video_args"].(string); ok {
-		settings.ExtraYTDLPVideoArgs = v
-	}
-	if v, ok := data["extra_ytdlp_meta_args"].(string); ok {
-		settings.ExtraYTDLPMetaArgs = v
-	}
-	if v, ok := data["filter_file"].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
-			return nil, err
-		}
-		settings.FilterFile = v
-	}
-	if v, ok := data["move_ops_file"].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
-			return nil, err
-		}
-		settings.MoveOpFile = v
-	}
-	if v, ok := data["json_directory"].(string); ok {
-		if _, err := validation.ValidateDirectory(v, true); err != nil {
-			return nil, err
-		}
-		settings.JSONDir = v
-	}
-	if v, ok := data["video_directory"].(string); ok {
-		if _, err := validation.ValidateDirectory(v, true); err != nil {
-			return nil, err
-		}
-		settings.VideoDir = v
-	}
-	if v, ok := data["max_filesize"].(string); ok {
-		validFilesize, err := validation.ValidateMaxFilesize(v)
-		if err != nil {
-			return nil, err
-		}
-		settings.MaxFilesize = validFilesize
-	}
-	if v, ok := data["ytdlp_output_ext"].(string); ok {
-		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
-			return nil, err
-		}
-		settings.YtdlpOutputExt = v
-	}
-	if v, ok := data["from_date"].(string); ok {
-		validDate, err := validation.ValidateToFromDate(v)
-		if err != nil {
-			return nil, err
-		}
-		settings.FromDate = validDate
-	}
-	if v, ok := data["to_date"].(string); ok {
-		validDate, err := validation.ValidateToFromDate(v)
-		if err != nil {
-			return nil, err
-		}
-		settings.ToDate = validDate
-	}
-
-	// Extract integer fields
-	if v, ok := data["max_concurrency"].(int); ok {
-		valid := validation.ValidateConcurrencyLimit(v)
-		settings.Concurrency = valid
-	}
-	if v, ok := data["crawl_freq"].(int); ok {
-		settings.CrawlFreq = max(v, 0)
-	}
-	if v, ok := data["download_retries"].(int); ok {
-		settings.Retries = max(v, 0)
-	}
-
-	// Extract boolean fields
-	if v, ok := data["use_global_cookies"].(bool); ok {
-		settings.UseGlobalCookies = v
-	}
-
-	// Parse model fields from strings (newline-separated, not space-separated)
-	if filtersStr, ok := data["filters"].(string); ok && filtersStr != "" {
-		lines := splitNonEmptyLines(filtersStr)
-		filters, err := validation.ValidateFilterOps(lines)
-		if err != nil {
-			return nil, err
-		}
-		settings.Filters = filters
-	}
-	if moveOpsStr, ok := data["move_ops"].(string); ok && moveOpsStr != "" {
-		lines := splitNonEmptyLines(moveOpsStr)
-		moveOps, err := validation.ValidateMoveOps(lines)
-		if err != nil {
-			return nil, err
-		}
-		settings.MoveOps = moveOps
-	}
-
-	return settings, nil
-}
-
-// parseMetarrArgsFromMap parses MetarrArgs from a map[string]any (from JSON).
-// This is used when parsing per-URL metarr settings from the frontend.
-func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
-	metarr := &models.MetarrArgs{}
-
-	// Extract string fields
-	if v, ok := data["metarr_output_ext"].(string); ok {
-		metarr.OutputExt = v
-	}
-	if v, ok := data["metarr_filename_ops_file"].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
-			return nil, err
-		}
-		metarr.FilenameOpsFile = v
-	}
-	if v, ok := data["filtered_filename_ops_file"].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
-			return nil, err
-		}
-		metarr.FilteredFilenameOpsFile = v
-	}
-	if v, ok := data["metarr_meta_ops_file"].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
-			return nil, err
-		}
-		metarr.MetaOpsFile = v
-	}
-	if v, ok := data["filtered_meta_ops_file"].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
-			return nil, err
-		}
-		metarr.FilteredMetaOpsFile = v
-	}
-	if v, ok := data["metarr_extra_ffmpeg_args"].(string); ok {
-		metarr.ExtraFFmpegArgs = v
-	}
-	if v, ok := data["metarr_rename_style"].(string); ok {
-		if err := validation.ValidateRenameFlag(v); err != nil {
-			return nil, err
-		}
-		metarr.RenameStyle = v
-	}
-	if v, ok := data["metarr_min_free_mem"].(string); ok {
-		if err := validation.ValidateMinFreeMem(v); err != nil {
-			return nil, err
-		}
-		metarr.MinFreeMem = v
-	}
-	if v, ok := data["metarr_gpu_directory"].(string); ok {
-		metarr.GPUDir = v
-	}
-	if v, ok := data["metarr_gpu"].(string); ok {
-		validGPU, _, err := validation.ValidateGPU(v, metarr.GPUDir)
-		if err != nil {
-			return nil, err
-		}
-		metarr.UseGPU = validGPU
-	}
-	if v, ok := data["metarr_output_directory"].(string); ok {
-		if _, err := validation.ValidateDirectory(v, true); err != nil {
-			return nil, err
-		}
-		metarr.OutputDir = v
-	}
-	if v, ok := data["metarr_transcode_video_filter"].(string); ok {
-		metarr.TranscodeVideoFilter = v
-	}
-	if v, ok := data["metarr_video_transcode_codecs"].([]string); ok {
-		validPairs, err := validation.ValidateVideoTranscodeCodecSlice(v, metarr.UseGPU)
-		if err != nil {
-			return nil, err
-		}
-		metarr.TranscodeVideoCodecs = validPairs
-	}
-	if v, ok := data["metarr_transcode_audio_codecs"].([]string); ok {
-		validPairs, err := validation.ValidateAudioTranscodeCodecSlice(v)
-		if err != nil {
-			return nil, err
-		}
-		metarr.TranscodeAudioCodecs = validPairs
-	}
-	if v, ok := data["metarr_transcode_quality"].(string); ok {
-		validQuality, err := validation.ValidateTranscodeQuality(v)
-		if err != nil {
-			return nil, err
-		}
-		metarr.TranscodeQuality = validQuality
-	}
-
-	// Extract integer fields
-	if v, ok := data["metarr_concurrency"].(int); ok {
-		metarr.Concurrency = max(v, 0)
-	}
-
-	// Extract float fields
-	if v, ok := data["metarr_max_cpu_usage"].(float64); ok {
-		metarr.MaxCPU = v
-	}
-
-	// Parse model fields from strings (newline-separated, not space-separated)
-	if filenameOpsStr, ok := data["metarr_filename_ops"].(string); ok && filenameOpsStr != "" {
-		lines := splitNonEmptyLines(filenameOpsStr)
-		filenameOps, err := validation.ValidateFilenameOps(lines)
-		if err != nil {
-			return nil, err
-		}
-		metarr.FilenameOps = filenameOps
-	}
-	if filteredFilenameOpsStr, ok := data["filtered_filename_ops"].(string); ok && filteredFilenameOpsStr != "" {
-		lines := splitNonEmptyLines(filteredFilenameOpsStr)
-		filteredFilenameOps, err := validation.ValidateFilteredFilenameOps(lines)
-		if err != nil {
-			return nil, err
-		}
-		metarr.FilteredFilenameOps = filteredFilenameOps
-	}
-	if metaOpsStr, ok := data["metarr_meta_ops"].(string); ok && metaOpsStr != "" {
-		lines := splitNonEmptyLines(metaOpsStr)
-		metaOps, err := validation.ValidateMetaOps(lines)
-		if err != nil {
-			return nil, err
-		}
-		metarr.MetaOps = metaOps
-	}
-	if filteredMetaOpsStr, ok := data["filtered_meta_ops"].(string); ok && filteredMetaOpsStr != "" {
-		lines := splitNonEmptyLines(filteredMetaOpsStr)
-		filteredMetaOps, err := validation.ValidateFilteredMetaOps(lines)
-		if err != nil {
-			return nil, err
-		}
-		metarr.FilteredMetaOps = filteredMetaOps
-	}
-
-	return metarr, nil
 }

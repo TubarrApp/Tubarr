@@ -601,9 +601,6 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 
 	var c bool
 	// Configuration fields
-	urlSettings.ConfigFile, c = mergeStringSettings(urlSettings.ConfigFile, channelSettings.ConfigFile)
-	changed = changed || c // True if "changed" OR "c" is true (once changed is true, it remains true throughout function)
-
 	urlSettings.Concurrency, c = mergeNumSettings(urlSettings.Concurrency, channelSettings.Concurrency, 0)
 	changed = changed || c
 
@@ -646,10 +643,10 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.FilterFile, c = mergeStringSettings(urlSettings.FilterFile, channelSettings.FilterFile)
 	changed = changed || c
 
-	urlSettings.MoveOps, c = mergeSliceSettings(urlSettings.MoveOps, channelSettings.MoveOps)
+	urlSettings.MetaFilterMoveOps, c = mergeSliceSettings(urlSettings.MetaFilterMoveOps, channelSettings.MetaFilterMoveOps)
 	changed = changed || c
 
-	urlSettings.MoveOpFile, c = mergeStringSettings(urlSettings.MoveOpFile, channelSettings.MoveOpFile)
+	urlSettings.MetaFilterMoveOpFile, c = mergeStringSettings(urlSettings.MetaFilterMoveOpFile, channelSettings.MetaFilterMoveOpFile)
 	changed = changed || c
 
 	urlSettings.FromDate, c = mergeStringSettings(urlSettings.FromDate, channelSettings.FromDate)
@@ -669,7 +666,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.Paused, c = mergeBoolSettings(urlSettings.Paused, channelSettings.Paused)
 	changed = changed || c
 
-	// Note: BotBlocked fields are runtime state, not cascaded
+	// Note: BotBlocked fields are per-URL, not cascaded
 	return changed
 }
 

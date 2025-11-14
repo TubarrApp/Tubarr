@@ -56,14 +56,21 @@ func loadMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.Dir
 		return nil
 	}
 
-	validOps, err := validation.ValidateMetaOps(ops)
+	// Parse meta operations from strings
+	parsedOps, err := parsing.ParseMetaOps(ops)
 	if err != nil {
+		logging.E("Error parsing meta ops from file %q: %v", metaOpsFile, err)
+		return nil
+	}
+
+	// Validate the parsed operations
+	if err := validation.ValidateMetaOps(parsedOps); err != nil {
 		logging.E("Error validating meta ops from file %q: %v", metaOpsFile, err)
 		return nil
 	}
 
-	logging.I("Loaded %d meta ops from file", len(validOps))
-	return validOps
+	logging.I("Loaded %d meta ops from file", len(parsedOps))
+	return parsedOps
 }
 
 // filterConflictingMetaOps removes DB ops that conflict with file ops on the same field
