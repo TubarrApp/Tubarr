@@ -806,7 +806,7 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := ss.cs.DeleteVideoURLs(id, urls); err != nil {
+	if err := ss.cs.DeleteVideosByURLs(id, urls); err != nil {
 		http.Error(w, fmt.Sprintf("failed to delete video URLs: %v", err), http.StatusInternalServerError)
 		return
 	}

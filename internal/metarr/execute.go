@@ -20,14 +20,14 @@ func InitMetarr(procCtx context.Context, v *models.Video, cu *models.ChannelURL,
 
 	cmd := exec.CommandContext(procCtx, "metarr", args...)
 
-	if err := runMetarr(cmd); err != nil {
+	if err := runMetarr(cmd, v); err != nil {
 		return err
 	}
 	return nil
 }
 
-// RunMetarr runs a Metarr command with a built argument list
-func runMetarr(cmd *exec.Cmd) error {
+// runMetarr runs a Metarr command with a built argument list
+func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	var err error
 	if cmd.String() == "" {
 		return errors.New("command string is empty")
@@ -35,12 +35,15 @@ func runMetarr(cmd *exec.Cmd) error {
 	logging.I("Running Metarr command:\n\n%s\n", cmd.String())
 
 	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 
-	if err = cmd.Run(); err != nil {
+	metarrStdout, err := cmd.Output()
+	if err != nil {
 		logging.E("Encountered error running command %q: %v", cmd.String(), err)
 		return err
 	}
+
+	// Retrieve filenames
+	v.StoreFilenamesFromMetarr(string(metarrStdout))
 	return nil
 }

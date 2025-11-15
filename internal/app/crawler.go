@@ -193,7 +193,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 
 		// Check if already downloaded
 		if _, exists := existingVideoURLsMap[actualVideoURL]; exists {
-			return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-video-urls' first if you wish to re-download it", actualVideoURL)
+			return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-videos' first if you wish to re-download it", actualVideoURL)
 		}
 
 		// Store the model for later use

@@ -29,7 +29,7 @@ func main() {
 		progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
 
 	// create cancellable context for shutdown
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 
 	// heartbeat shutdown channel
 	heartbeatDone := make(chan struct{})

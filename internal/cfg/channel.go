@@ -150,7 +150,7 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 	)
 
 	deleteURLsCmd := &cobra.Command{
-		Use:   "delete-video-urls",
+		Use:   "delete-videos",
 		Short: "Remove video URLs from the database.",
 		Long:  "If using a file, the file should contain one URL per line.",
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -168,7 +168,7 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			if err := cs.DeleteVideoURLs(chanID, urls); err != nil {
+			if err := cs.DeleteVideosByURLs(chanID, urls); err != nil {
 				return err
 			}
 			return nil

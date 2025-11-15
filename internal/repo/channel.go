@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -109,14 +110,71 @@ func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password
 	return u.String, decryptedPassword, l.String, nil
 }
 
-// DeleteVideoURLs deletes a URL from the downloaded database list.
-func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
-
+// DeleteVideosByURLs deletes a URL from the downloaded database list.
+func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error {
 	if !cs.channelExistsID(channelID) {
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
-	query := squirrel.
+	fetchQuery := squirrel.
+		Select(
+			consts.QVidURL,
+			consts.QVidVideoPath,
+			consts.QVidJSONPath,
+		).
+		From(consts.DBVideos).
+		Where(squirrel.Eq{
+			consts.QVidChanID: channelID,
+			consts.QVidURL:    urls,
+		}).
+		RunWith(cs.DB)
+
+	// Execute query to get rows
+	rows, err := fetchQuery.Query()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve videos: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logging.E("Failed to close rows for delete video request in channel with ID %d", channelID)
+		}
+	}()
+
+	// Temp variable holder for file delete iteration
+	type vPaths struct {
+		url   sql.NullString
+		vPath sql.NullString
+		jPath sql.NullString
+	}
+
+	// File deletion iterator
+	for rows.Next() {
+		var tmp vPaths
+
+		if err := rows.Scan(&tmp.url, &tmp.vPath, &tmp.jPath); err != nil {
+			return fmt.Errorf("failed to scan video paths for URL %q in channel %d: %w", tmp.url.String, channelID, err)
+		}
+
+		tmpURL := tmp.url.String
+		if tmp.vPath.Valid {
+			if tmp.vPath.String != "" {
+				if err := os.Remove(tmp.vPath.String); err != nil {
+					logging.W("URL %q: Could not delete video file at path %q: %v", tmpURL, tmp.vPath, err)
+				}
+			}
+		}
+
+		if tmp.jPath.Valid {
+			if tmp.jPath.String != "" {
+				if err := os.Remove(tmp.jPath.String); err != nil {
+					logging.W("URL %q: Could not delete JSON file at path %q: %v", tmpURL, tmp.jPath, err)
+				}
+			}
+		}
+	}
+
+	// Remove videos from database
+	deleteQuery := squirrel.
 		Delete(consts.DBVideos).
 		Where(squirrel.Eq{
 			consts.QVidChanID: channelID,
@@ -124,10 +182,11 @@ func (cs *ChannelStore) DeleteVideoURLs(channelID int64, urls []string) error {
 		}).
 		RunWith(cs.DB)
 
-	if _, err := query.Exec(); err != nil {
+	if _, err := deleteQuery.Exec(); err != nil {
 		return err
 	}
-	logging.S("Deleted URLs %q for channel with ID '%d'", urls, channelID)
+
+	logging.S("Channel ID %d: Deleted videos for URLs %v", channelID, urls)
 	return nil
 }
 

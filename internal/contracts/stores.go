@@ -36,7 +36,7 @@ type ChannelStore interface {
 	// Delete operations.
 	DeleteChannel(key, val string) error
 	DeleteChannelURL(channelURLID int64) error
-	DeleteVideoURLs(channelID int64, urls []string) error
+	DeleteVideosByURLs(channelID int64, urls []string) error
 	DeleteNotifyURLs(channelID int64, urls, names []string) error
 
 	// 'Get' operations.
