@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -994,23 +993,23 @@ func handleGetLogLevel(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int{"level": logging.Level})
 }
 
-// handleGetLogs serves the log file contents.
-func handleGetLogs(w http.ResponseWriter, r *http.Request) {
+// handleGetTubarrLogs serves the log file contents.
+func handleGetTubarrLogs(w http.ResponseWriter, r *http.Request) {
 	// Get log file path from abstractions
-	logFilePath := paths.LogFilePath
-	if logFilePath == "" {
-		http.Error(w, "log file path not configured", http.StatusInternalServerError)
+	tubarrLogFilePath := paths.TubarrLogFilePath
+	if tubarrLogFilePath == "" {
+		http.Error(w, "tubarr log file path not configured", http.StatusInternalServerError)
 		return
 	}
 
 	// Open and read the log file
-	file, err := os.Open(logFilePath)
+	file, err := os.Open(tubarrLogFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			http.Error(w, "log file not found", http.StatusNotFound)
+			http.Error(w, "tubarr log file not found", http.StatusNotFound)
 			return
 		}
-		http.Error(w, fmt.Sprintf("failed to open log file: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("failed to open tubarr log file: %v", err), http.StatusInternalServerError)
 		return
 	}
 	defer file.Close()
@@ -1020,24 +1019,23 @@ func handleGetLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Copy file contents to response
 	if _, err := io.Copy(w, file); err != nil {
-		logging.E("Failed to send log file: %v", err)
+		logging.E("Failed to send tubarr log file: %v", err)
 	}
 }
 
-// handleGetMetarrLogs serves the Metarr log file contents from ~/.metarr/metarr.log
+// handleGetMetarrLogs serves the Metarr log file contents from ~/.metarr/metarr.log.
 func handleGetMetarrLogs(w http.ResponseWriter, r *http.Request) {
-	// Construct path to Metarr log file
-	const (
-		metarrDir = ".metarr"
-		metarrLog = "metarr.log"
-	)
-	metarrLogPath := filepath.Join(paths.UserHomeDir, metarrDir, metarrLog)
+	metarrLogPath := paths.MetarrLogFilePath
+	if metarrLogPath == "" {
+		http.Error(w, "metarr log file path not configured", http.StatusInternalServerError)
+		return
+	}
 
 	// Open and read the log file
 	file, err := os.Open(metarrLogPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			http.Error(w, "Metarr log file not found", http.StatusNotFound)
+			http.Error(w, "metarr log file not found", http.StatusNotFound)
 			return
 		}
 		http.Error(w, fmt.Sprintf("failed to open Metarr log file: %v", err), http.StatusInternalServerError)

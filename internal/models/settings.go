@@ -115,10 +115,10 @@ type Filters struct {
 
 // MetaFilterMoveOps are used to set an output directory in Metarr based on matching metadata fields.
 type MetaFilterMoveOps struct {
-	ChannelURL string `json:"move_url_specific"`
-	Field      string `json:"move_op_field"`
-	Value      string `json:"move_op_value"`
-	OutputDir  string `json:"move_op_output_dir"`
+	ChannelURL    string `json:"move_url_specific"`
+	Field         string `json:"move_op_field"`
+	ContainsValue string `json:"move_op_value"`
+	OutputDir     string `json:"move_op_output_dir"`
 }
 
 // FilenameOps are applied to fields by Metarr.

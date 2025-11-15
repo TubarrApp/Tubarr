@@ -6,23 +6,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 )
 
 const (
-	tDir         = ".tubarr"
-	tDBFile      = "tubarr.db"
-	logFile      = "tubarr.log"
-	benchmarkDir = "benchmark"
+	mDir          = ".metarr"
+	tDir          = ".tubarr"
+	tDBFile       = "tubarr.db"
+	tubarrLogFile = "tubarr.log"
+	metarrLogFile = "metarr.log"
+	benchmarkDir  = "benchmark"
 )
 
 // File and directory path strings.
 var (
-	UserHomeDir   string
-	HomeTubarrDir string
-	DBFilePath    string
-	LogFilePath   string
-	BenchmarkDir  string
+	HomeMetarrDir     string
+	HomeTubarrDir     string
+	DBFilePath        string
+	TubarrLogFilePath string
+	MetarrLogFilePath string
+	BenchmarkDir      string
 )
 
 // InitProgFilesDirs initializes necessary program directories and filepaths.
@@ -31,24 +36,35 @@ func InitProgFilesDirs() error {
 	if err != nil {
 		return errors.New("failed to get home directory")
 	}
+
+	// Home Tubarr dir ~/.tubarr
 	HomeTubarrDir = filepath.Join(UserHomeDir, tDir)
 	if _, err := os.Stat(HomeTubarrDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(HomeTubarrDir, consts.PermsHomeTubarrDir); err != nil {
+		if err := os.MkdirAll(HomeTubarrDir, consts.PermsHomeProgDir); err != nil {
 			return fmt.Errorf("failed to make directories: %w", err)
-		} else {
-			return fmt.Errorf("failed to stat home directory %q", HomeTubarrDir)
+		}
+	}
+
+	// Home Metarr dir ~/.metarr
+	HomeMetarrDir = filepath.Join(UserHomeDir, mDir)
+	if _, err := os.Stat(HomeMetarrDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(HomeMetarrDir, consts.PermsHomeProgDir); err != nil {
+			return fmt.Errorf("failed to make directories: %w", err)
 		}
 	}
 
 	// Main files
 	DBFilePath = filepath.Join(HomeTubarrDir, tDBFile)
-	LogFilePath = filepath.Join(HomeTubarrDir, logFile)
+	TubarrLogFilePath = filepath.Join(HomeTubarrDir, tubarrLogFile)
+	MetarrLogFilePath = filepath.Join(HomeMetarrDir, metarrLogFile)
 
 	// Benchmark directory
-	BenchmarkDir = filepath.Join(HomeTubarrDir, benchmarkDir)
-	if _, err := os.Stat(BenchmarkDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(BenchmarkDir, consts.PermsGenericDir); err != nil {
-			return fmt.Errorf("failed to make benchmark directory: %w", err)
+	if abstractions.GetBool(keys.Benchmarking) {
+		BenchmarkDir = filepath.Join(HomeTubarrDir, benchmarkDir)
+		if _, err := os.Stat(BenchmarkDir); os.IsNotExist(err) {
+			if err := os.MkdirAll(BenchmarkDir, consts.PermsGenericDir); err != nil {
+				return fmt.Errorf("failed to make benchmark directory: %w", err)
+			}
 		}
 	}
 	return nil

@@ -11,16 +11,21 @@ func FiltersArrayToSlice(fModels []Filters) []string {
 	filters := make([]string, 0, len(fModels))
 
 	for _, f := range fModels {
-		var op string
-		// Add channel URL if present
-		if f.ChannelURL != "" {
-			op = f.ChannelURL + "|"
-		}
-
-		op += f.Field + ":" + f.ContainsOmits + ":" + f.Value + ":" + f.MustAny
-		filters = append(filters, op)
+		filters = append(filters, FiltersToString(f))
 	}
 	return filters
+}
+
+// FiltersToString converts a filter model back into string form.
+func FiltersToString(f Filters) string {
+	var op string
+	// Add channel URL if present
+	if f.ChannelURL != "" {
+		op = f.ChannelURL + "|"
+	}
+	// Reconstruct operation
+	op += f.Field + ":" + f.ContainsOmits + ":" + f.Value + ":" + f.MustAny
+	return op
 }
 
 // ------ Meta Ops -----------------------------------------------------------------
@@ -32,38 +37,18 @@ func MetaOpsArrayToSlice(moModels []MetaOps) []string {
 	metaOps := make([]string, 0, len(moModels))
 
 	for _, m := range moModels {
-		var op string
-		// Add channel URL if present
-		if m.ChannelURL != "" {
-			op = m.ChannelURL + "|"
-		}
-
-		// Reconstruct operations
-		switch m.OpType {
-		case "date-tag", "delete-date-tag":
-			op += m.Field + ":" + m.OpType + ":" + m.OpLoc + ":" + m.DateFormat
-
-		case "replace", "replace-suffix", "replace-prefix":
-			op += m.Field + ":" + m.OpType + ":" + m.OpFindString + ":" + m.OpValue
-
-		default:
-			op += m.Field + ":" + m.OpType + ":" + m.OpValue
-		}
-
-		// Append
-		metaOps = append(metaOps, op)
+		metaOps = append(metaOps, MetaOpToString(m))
 	}
 	return metaOps
 }
 
-// MetaOpToSlice converts a meta ops model back to a string.
-func MetaOpToSlice(m MetaOps) string {
+// MetaOpToString converts a meta ops model back to a string.
+func MetaOpToString(m MetaOps) string {
 	var op string
 	// Add channel URL if present
 	if m.ChannelURL != "" {
 		op = m.ChannelURL + "|"
 	}
-
 	// Reconstruct operations
 	switch m.OpType {
 	case "date-tag", "delete-date-tag":
@@ -75,7 +60,6 @@ func MetaOpToSlice(m MetaOps) string {
 	default:
 		op += m.Field + ":" + m.OpType + ":" + m.OpValue
 	}
-
 	return op
 }
 
@@ -94,13 +78,16 @@ func FilenameOpsArrayToSlice(foModels []FilenameOps) []string {
 }
 
 // FilenameOpToString converts a filename ops model back to a string.
+//
+// date-tag:prefix:ymd
+// replace:_:
+// prefix:[Video]
 func FilenameOpToString(f FilenameOps) string {
 	var op string
 	// Add channel URL if present
 	if f.ChannelURL != "" {
 		op = f.ChannelURL + "|"
 	}
-
 	// Reconstruct operations
 	switch f.OpType {
 	case "date-tag", "delete-date-tag":
@@ -112,7 +99,6 @@ func FilenameOpToString(f FilenameOps) string {
 	default:
 		op += f.OpType + ":" + f.OpValue
 	}
-
 	return op
 }
 
@@ -127,15 +113,15 @@ func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 }
 
 // MetaFilterMoveOpsToString converts meta filter move ops back to slice.
+//
+// url|title:dog:/dogs
 func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
 	var op string
 	// Add channel URL if present
 	if m.ChannelURL != "" {
 		op = m.ChannelURL + "|"
 	}
-
-	op += m.Field + ":" + m.Value + ":" + m.OutputDir
-
+	op += m.Field + ":" + m.ContainsValue + ":" + m.OutputDir
 	return op
 }
 
@@ -148,7 +134,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	metaOpStrings := MetaOpsArrayToSlice(f.MetaOps)
 
 	if len(filterStrings) != len(metaOpStrings) {
-		logging.P("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
+		logging.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
 		return []string{}
 	}
 
@@ -167,7 +153,7 @@ func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	filenameOpStrings := FilenameOpsArrayToSlice(f.FilenameOps)
 
 	if len(filterStrings) != len(filenameOpStrings) {
-		logging.P("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))
+		logging.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))
 		return []string{}
 	}
 

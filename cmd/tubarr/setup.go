@@ -19,7 +19,7 @@ func initializeApplication() (store *repo.Store, db *sql.DB, progControl *repo.P
 	}
 
 	logging.P("\nMain Tubarr file/dir locations:\n\nDatabase: %s\nLog file: %s\n\n",
-		paths.DBFilePath, paths.LogFilePath)
+		paths.DBFilePath, paths.TubarrLogFilePath)
 
 	// Database & stores
 	database, err := database.InitDB()

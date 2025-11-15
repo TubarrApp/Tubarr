@@ -70,7 +70,7 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 		})
 
 		// Logs API
-		r.Get("/logs", handleGetLogs)
+		r.Get("/logs", handleGetTubarrLogs)
 		r.Get("/logs/metarr", handleGetMetarrLogs)
 		r.Get("/logs/level", handleGetLogLevel)
 		r.Post("/logs/level/{level}", handleSetLogLevel)

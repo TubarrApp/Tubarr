@@ -329,10 +329,10 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 		outputDir := strings.TrimSpace(strings.TrimSpace(split[2]))
 
 		m = append(m, models.MetaFilterMoveOps{
-			Field:      field,
-			Value:      value,
-			OutputDir:  outputDir,
-			ChannelURL: chanURL,
+			Field:         field,
+			ContainsValue: value,
+			OutputDir:     outputDir,
+			ChannelURL:    chanURL,
 		})
 	}
 	return m, nil

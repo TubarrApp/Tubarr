@@ -20,6 +20,7 @@ import (
 )
 
 // ValidateMetarrOutputDirs validates Metarr output directory mappings.
+//
 // This function validates the directory map structure and ensures all directories exist.
 func ValidateMetarrOutputDirs(outDirMap map[string]string) error {
 	if len(outDirMap) == 0 {
@@ -99,7 +100,22 @@ func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 
 // ValidateFile validates that the file exists, else creates it if desired.
 func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
+	possibleTemplate := strings.Contains(f, "{{") && strings.Contains(f, "}}")
 	logging.D(3, "Statting file %q...", f)
+
+	// Handle templated directories
+	if possibleTemplate {
+		if !checkTemplateTags(f) {
+			t := make([]string, 0, len(templates.TemplateMap))
+			for k := range templates.TemplateMap {
+				t = append(t, k)
+			}
+			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
+		}
+		logging.D(3, "Directory %q appears to contain templating elements, will not stat", f)
+		return nil, nil // templates are valid, no need to stat
+	}
+
 	fileInfo, err := os.Stat(f)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -149,8 +165,6 @@ func ValidateConcurrencyLimit(c int) int {
 }
 
 // ValidateNotifications validates notification models.
-// This function only validates business rules on already-parsed models.
-// For parsing strings to models, use parsing.ParseNotifications.
 func ValidateNotifications(notifications []*models.Notification) error {
 	if len(notifications) == 0 {
 		return nil
@@ -234,8 +248,6 @@ func ValidateMaxFilesize(input string) (string, error) {
 }
 
 // ValidateFilterOps validates filter operation models.
-// This function only validates business rules on already-parsed models.
-// For parsing strings to models, use parsing.ParseFilterOps.
 func ValidateFilterOps(filters []models.Filters) error {
 	if len(filters) == 0 {
 		return nil
@@ -263,13 +275,10 @@ func ValidateFilterOps(filters []models.Filters) error {
 }
 
 // ValidateMetaFilterMoveOps validates meta filter move operation models.
-// This function only validates business rules on already-parsed models.
-// For parsing strings to models, use parsing.ParseMetaFilterMoveOps.
 func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 	if len(moveOps) == 0 {
 		return nil
 	}
-
 	logging.D(1, "Validating %d meta filter move operations...", len(moveOps))
 
 	for i, op := range moveOps {
@@ -287,8 +296,6 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 }
 
 // ValidateFilteredMetaOps validates filtered meta operation models.
-// This function only validates business rules on already-parsed models.
-// For parsing strings to models, use parsing.ParseFilteredMetaOps.
 func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
 	if len(filteredMetaOps) == 0 {
 		return nil
@@ -319,8 +326,6 @@ func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
 }
 
 // ValidateFilteredFilenameOps validates filtered filename operation models.
-// This function only validates business rules on already-parsed models.
-// For parsing strings to models, use parsing.ParseFilteredFilenameOps.
 func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps) error {
 	if len(filteredFilenameOps) == 0 {
 		return nil

@@ -259,6 +259,7 @@ func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, curren
 // getRelevantFilteredFilenameOps returns filtered filename ops applicable to the given URL.
 func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps, currentURL string) []models.FilteredFilenameOps {
 	relevantFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
+
 	for _, ffo := range filteredFilenameOps {
 		relevantFilters := make([]models.Filters, 0, len(ffo.Filters))
 		for _, filter := range ffo.Filters {
@@ -296,9 +297,9 @@ func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 			// Convert any type to string
 			val := fmt.Sprint(raw)
 
-			if strings.Contains(strings.ToLower(val), strings.ToLower(op.Value)) {
+			if strings.Contains(strings.ToLower(val), strings.ToLower(op.ContainsValue)) {
 				logging.I("Move op matched: Field %q contains the value %q. Output directory retrieved as %q",
-					op.Field, op.Value, op.OutputDir)
+					op.Field, op.ContainsValue, op.OutputDir)
 				return op.OutputDir
 			}
 		}
