@@ -3,13 +3,15 @@ package validation_test
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
 )
 
-// TestValidateMetarrOutputDirs checks if the function correctly identifies valid directories in a map of URLs ---------------------
+// TestValidateMetarrOutputDirs -------------------------------------------------------------------------------------------
 func TestValidateMetarrOutputDirs(t *testing.T) {
 	// Test 1: Empty map → no error
 	if err := validation.ValidateMetarrOutputDirs(nil); err != nil {
@@ -295,7 +297,7 @@ func TestValidateMaxFilesize(t *testing.T) {
 	}
 }
 
-// Notifications -----------------------------------------------------------------------------------------------
+// TestValidateNotifications -----------------------------------------------------------------------------------------------
 func TestValidateNotifications(t *testing.T) {
 	// ---- SHOULD PASS ----
 	var valid = []*models.Notification{
@@ -355,7 +357,7 @@ func TestValidateNotifications(t *testing.T) {
 	}
 }
 
-// YTDLP Output Extension ------------------------------------------------------------------------------------
+// TestValidateYtdlpOutputExtension ------------------------------------------------------------------------------------
 func TestValidateYtdlpOutputExtension(t *testing.T) {
 	var validExts = []string{
 		"mp4",
@@ -533,4 +535,365 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 	if !strings.Contains(err.Error(), "invalid directory") && !strings.Contains(err.Error(), "does not exist") {
 		t.Fatalf("unexpected error message: %v", err)
 	}
+}
+
+// TestValidateFilteredMetaOps ----------------------------------------------------------------------------------------
+func TestValidateFilteredMetaOps_EmptySliceOK(t *testing.T) {
+	if err := validation.ValidateFilteredMetaOps(nil); err != nil {
+		t.Fatalf("expected nil error for empty slice, got %v", err)
+	}
+}
+
+func TestValidateFilteredMetaOps_Valid(t *testing.T) {
+	filters := []models.Filters{
+		{
+			Field:         "title",
+			ContainsOmits: "contains",
+			MustAny:       "must",
+			Value:         "foo",
+		},
+	}
+	metaOps := []models.MetaOps{
+		{
+			Field:  "title",
+			OpType: "replace",
+		},
+	}
+
+	input := []models.FilteredMetaOps{
+		{
+			Filters: filters,
+			MetaOps: metaOps,
+		},
+	}
+
+	if err := validation.ValidateFilteredMetaOps(input); err != nil {
+		t.Fatalf("expected valid filtered meta ops, got %v", err)
+	}
+}
+
+func TestValidateFilteredMetaOps_InvalidFilters(t *testing.T) {
+	// invalid filter: bad ContainsOmits
+	filters := []models.Filters{
+		{
+			Field:         "title",
+			ContainsOmits: "bad",
+			MustAny:       "must",
+		},
+	}
+	metaOps := []models.MetaOps{
+		{
+			Field:  "title",
+			OpType: "replace",
+		},
+	}
+
+	input := []models.FilteredMetaOps{
+		{
+			Filters: filters,
+			MetaOps: metaOps,
+		},
+	}
+
+	err := validation.ValidateFilteredMetaOps(input)
+	if err == nil {
+		t.Fatalf("expected error for invalid filters")
+	}
+	if !strings.Contains(err.Error(), "invalid filters") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestValidateFilteredMetaOps_NoFilters(t *testing.T) {
+	metaOps := []models.MetaOps{
+		{
+			Field:  "title",
+			OpType: "replace",
+		},
+	}
+
+	input := []models.FilteredMetaOps{
+		{
+			Filters: nil,
+			MetaOps: metaOps,
+		},
+	}
+
+	err := validation.ValidateFilteredMetaOps(input)
+	if err == nil {
+		t.Fatalf("expected error for no filters")
+	}
+	if !strings.Contains(err.Error(), "has no filters") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestValidateFilteredMetaOps_NoMetaOps(t *testing.T) {
+	filters := []models.Filters{
+		{
+			Field:         "title",
+			ContainsOmits: "contains",
+			MustAny:       "must",
+		},
+	}
+
+	input := []models.FilteredMetaOps{
+		{
+			Filters: filters,
+			MetaOps: nil,
+		},
+	}
+
+	err := validation.ValidateFilteredMetaOps(input)
+	if err == nil {
+		t.Fatalf("expected error for no meta operations")
+	}
+	if !strings.Contains(err.Error(), "has no meta operations") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+// TestValidateFilteredFilenameOps -----------------------------------------------------------------------------------------------
+func TestValidateFilteredFilenameOps_EmptySliceOK(t *testing.T) {
+	if err := validation.ValidateFilteredFilenameOps(nil); err != nil {
+		t.Fatalf("expected nil error for empty slice, got %v", err)
+	}
+}
+
+func TestValidateFilteredFilenameOps_Valid(t *testing.T) {
+	filters := []models.Filters{
+		{
+			Field:         "title",
+			ContainsOmits: "contains",
+			MustAny:       "must",
+			Value:         "foo",
+		},
+	}
+	filenameOps := []models.FilenameOps{
+		{
+			OpType: "replace",
+		},
+	}
+
+	input := []models.FilteredFilenameOps{
+		{
+			Filters:     filters,
+			FilenameOps: filenameOps,
+		},
+	}
+
+	if err := validation.ValidateFilteredFilenameOps(input); err != nil {
+		t.Fatalf("expected valid filtered filename ops, got %v", err)
+	}
+}
+
+func TestValidateFilteredFilenameOps_InvalidFilters(t *testing.T) {
+	filters := []models.Filters{
+		{
+			Field:         "title",
+			ContainsOmits: "bad",
+			MustAny:       "must",
+		},
+	}
+	filenameOps := []models.FilenameOps{
+		{
+			OpType: "replace",
+		},
+	}
+
+	input := []models.FilteredFilenameOps{
+		{
+			Filters:     filters,
+			FilenameOps: filenameOps,
+		},
+	}
+
+	err := validation.ValidateFilteredFilenameOps(input)
+	if err == nil {
+		t.Fatalf("expected error for invalid filters")
+	}
+	if !strings.Contains(err.Error(), "invalid filters") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestValidateFilteredFilenameOps_NoFilters(t *testing.T) {
+	filenameOps := []models.FilenameOps{
+		{
+			OpType: "replace",
+		},
+	}
+
+	input := []models.FilteredFilenameOps{
+		{
+			Filters:     nil,
+			FilenameOps: filenameOps,
+		},
+	}
+
+	err := validation.ValidateFilteredFilenameOps(input)
+	if err == nil {
+		t.Fatalf("expected error for no filters")
+	}
+	if !strings.Contains(err.Error(), "has no filters") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestValidateFilteredFilenameOps_NoFilenameOps(t *testing.T) {
+	filters := []models.Filters{
+		{
+			Field:         "title",
+			ContainsOmits: "contains",
+			MustAny:       "must",
+		},
+	}
+
+	input := []models.FilteredFilenameOps{
+		{
+			Filters:     filters,
+			FilenameOps: nil,
+		},
+	}
+
+	err := validation.ValidateFilteredFilenameOps(input)
+	if err == nil {
+		t.Fatalf("expected error for no filename operations")
+	}
+	if !strings.Contains(err.Error(), "has no filename operations") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+// TestValidateToFromDate -----------------------------------------------------------------------------------------------------
+func TestValidateToFromDate_EmptyOK(t *testing.T) {
+	got, err := validation.ValidateToFromDate("")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if got != "" {
+		t.Fatalf("expected empty string, got %q", got)
+	}
+}
+
+func TestValidateToFromDate_Today(t *testing.T) {
+	got, err := validation.ValidateToFromDate("today")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := time.Now().Format("20060102")
+	if got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
+}
+
+func TestValidateToFromDate_TodayCaseInsensitive(t *testing.T) {
+	got, err := validation.ValidateToFromDate("ToDaY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 8 {
+		t.Fatalf("expected 8-char date, got %q", got)
+	}
+}
+
+func TestValidateToFromDate_RawYYYYMMDD(t *testing.T) {
+	got, err := validation.ValidateToFromDate("20241231")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "20241231" {
+		t.Fatalf("expected 20241231, got %q", got)
+	}
+}
+
+func TestValidateToFromDate_WithMarkers(t *testing.T) {
+	got, err := validation.ValidateToFromDate("2025y12m31d")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "20251231" {
+		t.Fatalf("expected 20251231, got %q", got)
+	}
+}
+
+func TestValidateToFromDate_NoYearDefaultsToCurrent(t *testing.T) {
+	year := time.Now().Year()
+	got, err := validation.ValidateToFromDate("12m31d")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expectedPrefix := strconv.Itoa(year)
+	if !strings.HasPrefix(got, expectedPrefix) {
+		t.Fatalf("expected year prefix %q, got %q", expectedPrefix, got)
+	}
+	if !strings.HasSuffix(got, "1231") {
+		t.Fatalf("expected month/day 1231, got %q", got)
+	}
+}
+
+func TestValidateToFromDate_SingleDigitMonthDayPadded(t *testing.T) {
+	got, err := validation.ValidateToFromDate("2025y6m3d")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "20250603" {
+		t.Fatalf("expected 20250603, got %q", got)
+	}
+}
+
+func TestValidateToFromDate_InvalidFormat(t *testing.T) {
+	in := "nonsense"
+	d, err := validation.ValidateToFromDate(in)
+	if err == nil {
+		t.Fatalf("expected error for invalid format")
+	}
+	if !strings.Contains(err.Error(), "invalid date format") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+
+	t.Logf("Got date %q back from input %q", d, in)
+}
+
+func TestValidateToFromDate_InvalidMonth(t *testing.T) {
+	// becomes "20251301" after cleaning; regex should parse and range check
+	in := "2025-13-01"
+	d, err := validation.ValidateToFromDate(in)
+	if err == nil {
+		t.Fatalf("expected error for invalid month")
+	}
+	if !strings.Contains(err.Error(), "invalid month") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+
+	t.Logf("Got date %q back from input %q", d, in)
+}
+
+func TestValidateToFromDate_InvalidDay(t *testing.T) {
+	// 32 > 31
+	in := "2025y12m32d"
+	d, err := validation.ValidateToFromDate(in)
+	if err == nil {
+		t.Fatalf("expected error for invalid day")
+	}
+	if !strings.Contains(err.Error(), "invalid day") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+
+	t.Logf("Got date %q back from input %q", d, in)
+}
+
+func TestValidateToFromDate_InvalidYear(t *testing.T) {
+	in := "0999y12m31d"
+	d, err := validation.ValidateToFromDate(in)
+	if err == nil {
+		t.Fatalf("expected error for invalid year")
+	}
+	if !strings.Contains(err.Error(), "invalid year") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+
+	t.Logf("Got date %q back from input %q", d, in)
 }

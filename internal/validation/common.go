@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/regex"
@@ -144,7 +143,14 @@ func ValidateYtdlpOutputExtension(e string) error {
 	e = strings.TrimPrefix(e, ".")
 	e = strings.ToLower(e)
 
-	if !slices.Contains(consts.SupportedYtdlpOutput, e) {
+	if !slices.Contains([]string{
+		"avi",
+		"flv",
+		"mkv",
+		"mov",
+		"mp4",
+		"webm",
+	}, e) {
 		return fmt.Errorf("output extension %v is invalid or not supported", e)
 	}
 

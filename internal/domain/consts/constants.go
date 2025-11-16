@@ -21,8 +21,6 @@ var AllVidExtensions = []string{".3gp", ".avi", ".f4v", ".flv", ".m4v", ".mkv",
 	".mov", ".mp4", ".mpeg", ".mpg", ".ogm", ".ogv",
 	".ts", ".vob", ".webm", ".wmv"}
 
-var SupportedYtdlpOutput = []string{"avi", "flv", "mkv", "mov", "mp4", "webm"}
-
 // Op types
 const (
 	FilterContains = "contains"

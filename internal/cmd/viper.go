@@ -101,7 +101,7 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 	}
 
 	// Debug level
-	rootCmd.PersistentFlags().Int(keys.DebugLevel, 0, "Debugging level (0 - 5)")
+	rootCmd.PersistentFlags().Int(keys.DebugLevel, -1, "Debugging level (0 - 5)")
 	if err := viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel)); err != nil {
 		return err
 	}

@@ -71,6 +71,7 @@ func ReadFileLines(path string) ([]string, error) {
 }
 
 // ScanDirectoryForConfigFiles scans a directory for Viper-compatible config files.
+//
 // Returns a slice of absolute paths to valid config files.
 func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 	// Validate directory exists
@@ -120,7 +121,7 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 	return configFiles, nil
 }
 
-// Load in Metarr logs
+// LoadMetarrLogs loads in Metarr logs to a [][]byte.
 func LoadMetarrLogs() [][]byte {
 	f, err := os.Open(paths.MetarrLogFilePath)
 	if err != nil {

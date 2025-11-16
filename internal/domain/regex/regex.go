@@ -10,7 +10,7 @@ const (
 	ariaItemCountStr = `Downloading\s+(\d+)\s+item`
 	ariaProgressStr  = `\((\d+(?:\.\d+)?)%\)`
 	dlPercentStr     = `\[download\]\s+(\d+\.?\d*)%`
-	yearFragmentsStr = `(?:(\d{4})y)?(?:(\d{1,2})m)?(?:(\d{1,2})d)?`
+	yearFragmentsStr = `^(\d{4})?y?(\d{1,2})?m?(\d{1,2})?d?$`
 )
 
 // Regex expressions, compiled once.
