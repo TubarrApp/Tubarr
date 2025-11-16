@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 )
 
 // Store holds the database variable and sub-stores like ChannelStore etc.
@@ -68,14 +68,14 @@ func makeSettingsMetarrArgsCopy(settings *models.Settings, metarrArgs *models.Me
 	if settings != nil {
 		settingsCopy, err = json.Marshal(settings)
 		if err != nil {
-			logging.E("Failed to make copy of Settings JSON for %q: %v", objectName, err)
+			logger.Pl.E("Failed to make copy of Settings JSON for %q: %v", objectName, err)
 		}
 	}
 
 	if metarrArgs != nil {
 		metarrArgsCopy, err = json.Marshal(metarrArgs)
 		if err != nil {
-			logging.E("Failed to make copy of MetarrArgs JSON for %q: %v", objectName, err)
+			logger.Pl.E("Failed to make copy of MetarrArgs JSON for %q: %v", objectName, err)
 		}
 	}
 

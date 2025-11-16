@@ -6,8 +6,8 @@ import (
 	"maps"
 	"net/url"
 	"strings"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 )
 
@@ -16,7 +16,7 @@ import (
 // Format: "prefix:[COOL CATEGORY] " or "date-tag:prefix:ymd"
 func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 	if len(filenameOps) == 0 {
-		logging.D(4, "No filename operations to parse")
+		logger.Pl.D(4, "No filename operations to parse")
 		return nil, nil
 	}
 
@@ -26,14 +26,14 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 	valid := make([]models.FilenameOps, 0, len(filenameOps))
 	exists := make(map[string]bool, len(filenameOps))
 
-	logging.D(1, "Parsing filename operations %v...", filenameOps)
+	logger.Pl.D(1, "Parsing filename operations %v...", filenameOps)
 
 	for _, op := range filenameOps {
 		opURL, opPart := validation.CheckForOpURL(op)
 		split := validation.EscapedSplit(opPart, ':')
 
 		if len(split) < 2 || len(split) > 3 {
-			logging.E("Invalid filename operation %q (format should be: 'prefix:[COOL CATEGORY] ', or 'date-tag:prefix:ymd', etc.)", op)
+			logger.Pl.E("Invalid filename operation %q (format should be: 'prefix:[COOL CATEGORY] ', or 'date-tag:prefix:ymd', etc.)", op)
 			continue
 		}
 
@@ -63,18 +63,18 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 				key = newFilenameOp.OpType
 
 			default:
-				logging.E("Invalid filename operation type %q", split[0])
+				logger.Pl.E("Invalid filename operation type %q", split[0])
 				continue
 			}
 
 		default:
-			logging.E("Invalid filename operation %q", opPart)
+			logger.Pl.E("Invalid filename operation %q", opPart)
 			continue
 		}
 
 		// Check if key exists (skip duplicates)
 		if exists[key] {
-			logging.I("Duplicate filename operation %q, skipping", opPart)
+			logger.Pl.I("Duplicate filename operation %q, skipping", opPart)
 			continue
 		}
 		exists[key] = true
@@ -100,7 +100,7 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 // Format: "director:set:Spielberg" or "title:date-tag:suffix:ymd"
 func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	if len(metaOps) == 0 {
-		logging.D(4, "No meta operations to parse")
+		logger.Pl.D(4, "No meta operations to parse")
 		return nil, nil
 	}
 
@@ -110,14 +110,14 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	valid := make([]models.MetaOps, 0, len(metaOps))
 	exists := make(map[string]bool, len(metaOps))
 
-	logging.D(1, "Parsing meta operations %v...", metaOps)
+	logger.Pl.D(1, "Parsing meta operations %v...", metaOps)
 
 	for _, op := range metaOps {
 		opURL, opPart := validation.CheckForOpURL(op)
 		split := validation.EscapedSplit(opPart, ':')
 
 		if len(split) < 3 || len(split) > 4 {
-			logging.E("Invalid meta operation %q", op)
+			logger.Pl.E("Invalid meta operation %q", op)
 			continue
 		}
 
@@ -149,18 +149,18 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType, newMetaOp.OpFindString, newMetaOp.OpValue}, ":")
 
 			default:
-				logging.E("Invalid 4-part meta op type %q", newMetaOp.OpType)
+				logger.Pl.E("Invalid 4-part meta op type %q", newMetaOp.OpType)
 				continue
 			}
 
 		default:
-			logging.E("Invalid meta op %q", opPart)
+			logger.Pl.E("Invalid meta op %q", opPart)
 			continue
 		}
 
 		// Check if key exists (skip duplicates)
 		if exists[key] {
-			logging.I("Duplicate meta operation %q, skipping", opPart)
+			logger.Pl.I("Duplicate meta operation %q, skipping", opPart)
 			continue
 		}
 		exists[key] = true
@@ -203,7 +203,7 @@ func ParseFilterOps(ops []string) ([]models.Filters, error) {
 		split := validation.EscapedSplit(op, ':')
 
 		if len(split) < 3 {
-			logging.E(formatErrorMsg)
+			logger.Pl.E(formatErrorMsg)
 			return nil, errors.New("filter format error")
 		}
 
@@ -296,7 +296,7 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 
 		// Append to collection
 		notificationModels = append(notificationModels, &newNotificationModel)
-		logging.D(3, "Added notification model: %+v", newNotificationModel)
+		logger.Pl.D(3, "Added notification model: %+v", newNotificationModel)
 	}
 	return notificationModels, nil
 }
@@ -481,7 +481,7 @@ func ParseMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Channe
 		}
 	}
 
-	logging.D(1, "Metarr output directories: %q", outDirMap)
+	logger.Pl.D(1, "Metarr output directories: %q", outDirMap)
 	return outDirMap, nil
 }
 

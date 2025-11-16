@@ -6,13 +6,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 type metCmdMapping struct {
@@ -161,7 +162,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		argMap[metkeys.MetaFile] = cleanAndWrapCommaPaths(v.JSONCustomFile)
 	}
 
-	logging.I("Making Metarr argument for video %q and JSON file %q.", argMap[metkeys.VideoFile], argMap[metkeys.MetaFile])
+	logger.Pl.I("Making Metarr argument for video %q and JSON file %q.", argMap[metkeys.VideoFile], argMap[metkeys.MetaFile])
 
 	// Final args
 	args := make([]string, 0, singlesLen+sliceLen)
@@ -225,7 +226,7 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 			}
 
 			if elemCount > 0 {
-				logging.I("User set meta ops, will set meta overwrite key...")
+				logger.Pl.I("User set meta ops, will set meta overwrite key...")
 				return true
 			}
 		}
@@ -242,10 +243,10 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 
 	// Parse and validate output directory mappings
 	if mArgs.OutputDirMap, err = parsing.ParseMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, c); err != nil {
-		logging.E("Could not parse output directory map: %v", err)
+		logger.Pl.E("Could not parse output directory map: %v", err)
 	}
 	if err := validation.ValidateMetarrOutputDirs(mArgs.OutputDirMap); err != nil {
-		logging.E("Invalid output directory map: %v", err)
+		logger.Pl.E("Invalid output directory map: %v", err)
 	}
 
 	switch {
@@ -255,7 +256,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 
 		parsed, err := dirParser.ParseDirectory(d, v, "Metarr video")
 		if err != nil {
-			logging.E("Failed to parse directory %q for video with URL %q: %v", d, v.URL, err)
+			logger.Pl.E("Failed to parse directory %q for video with URL %q: %v", d, v.URL, err)
 			break
 		}
 
@@ -266,7 +267,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 	case v.MoveOpOutputDir != "":
 		parsed, err := dirParser.ParseDirectory(v.MoveOpOutputDir, v, "Metarr video")
 		if err != nil {
-			logging.E("Failed to parse directory %q for video with URL %q: %v", v.MoveOpOutputDir, v.URL, err)
+			logger.Pl.E("Failed to parse directory %q for video with URL %q: %v", v.MoveOpOutputDir, v.URL, err)
 			break
 		}
 		return parsed
@@ -275,7 +276,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 	case mArgs.OutputDirMap[cu.URL] != "":
 		parsed, err := dirParser.ParseDirectory(mArgs.OutputDirMap[cu.URL], v, "Metarr video")
 		if err != nil {
-			logging.E("Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDirMap[cu.URL], v.URL, err)
+			logger.Pl.E("Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDirMap[cu.URL], v.URL, err)
 			break
 		}
 		return parsed
@@ -284,7 +285,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 	case mArgs.OutputDir != "":
 		parsed, err := dirParser.ParseDirectory(mArgs.OutputDir, v, "Metarr video")
 		if err != nil {
-			logging.E("Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDir, v.URL, err)
+			logger.Pl.E("Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDir, v.URL, err)
 			break
 		}
 		return parsed
@@ -316,7 +317,7 @@ func cleanAndWrapCommaPaths(path string) string {
 		if strings.ContainsRune(path, '"') {
 			escaped := strings.ReplaceAll(path, `"`, `\"`)
 			if err := os.Rename(path, escaped); err != nil {
-				logging.E("Failed to escape quotes in filename %q: %v", path, err)
+				logger.Pl.E("Failed to escape quotes in filename %q: %v", path, err)
 			} else {
 				path = escaped
 			}

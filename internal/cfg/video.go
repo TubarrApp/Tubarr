@@ -6,7 +6,7 @@ import (
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 
 	"github.com/spf13/cobra"
 )
@@ -67,7 +67,7 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 			if err := vs.DeleteVideo(url, cID); err != nil {
 				return err
 			}
-			logging.S("Successfully deleted video with URL %q", url)
+			logger.Pl.S("Successfully deleted video with URL %q", url)
 			return nil
 		},
 	}

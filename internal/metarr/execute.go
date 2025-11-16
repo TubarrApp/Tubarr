@@ -5,16 +5,17 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 )
 
 // InitMetarr begins processing with Metarr
 func InitMetarr(procCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) error {
 	args := makeMetarrCommand(v, cu, c, dirParser)
 	if len(args) == 0 {
-		logging.I("No Metarr arguments built, returning...")
+		logger.Pl.I("No Metarr arguments built, returning...")
 		return nil
 	}
 
@@ -32,16 +33,19 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	if cmd.String() == "" {
 		return errors.New("command string is empty")
 	}
-	logging.I("Running Metarr command:\n\n%s\n", cmd.String())
+	logger.Pl.I("Running Metarr command:\n\n%s\n", cmd.String())
 
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
 	metarrStdout, err := cmd.Output()
 	if err != nil {
-		logging.E("Encountered error running command %q: %v", cmd.String(), err)
+		logger.Pl.E("Encountered error running command %q: %v", cmd.String(), err)
 		return err
 	}
+
+	// Set Metarr finished (handler will reload file)
+	vars.MetarrFinished = true
 
 	// Retrieve filenames
 	v.StoreFilenamesFromMetarr(string(metarrStdout))

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -97,7 +97,7 @@ func StartServer(ctx context.Context, s contracts.Store, db *sql.DB) error {
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		logging.S("Tubarr web server running on http://localhost%s\n", addr)
+		logger.Pl.S("Tubarr web server running on http://localhost%s\n", addr)
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErr <- fmt.Errorf("server failed: %w", err)
@@ -113,7 +113,7 @@ func StartServer(ctx context.Context, s contracts.Store, db *sql.DB) error {
 	// Wait for interrupt signal
 	select {
 	case <-ctx.Done():
-		logging.S("Shutting down server (context cancelled)...")
+		logger.Pl.S("Shutting down server (context cancelled)...")
 
 	case err := <-serverErr:
 		// server crashed
@@ -131,7 +131,7 @@ func StartServer(ctx context.Context, s contracts.Store, db *sql.DB) error {
 		return fmt.Errorf("server forced to shutdown: %v", err)
 	}
 
-	logging.S("Server at http://localhost%s shut down successfully\n", addr)
+	logger.Pl.S("Server at http://localhost%s shut down successfully\n", addr)
 	return nil
 }
 

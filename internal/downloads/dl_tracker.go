@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/state"
-	"tubarr/internal/utils/logging"
 )
 
 // DownloadTracker is the model holding data related to download tracking.
@@ -45,13 +45,13 @@ func (t *DownloadTracker) Stop() {
 // sendUpdate constructs the update and sends it into the processing channel.
 func (t *DownloadTracker) sendUpdate(v *models.Video) {
 	if v == nil || v.URL == "" {
-		logging.E("Invalid video struct before status update: %+v", v)
+		logger.Pl.E("Invalid video struct before status update: %+v", v)
 		return
 	}
 
 	select {
 	case <-t.done:
-		logging.W("Attempted to send update after tracker stopped (Video %q)", v.URL)
+		logger.Pl.W("Attempted to send update after tracker stopped (Video %q)", v.URL)
 		return
 	default:
 		t.updates <- models.StatusUpdate{
@@ -76,7 +76,7 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 				update, ok := v.(models.StatusUpdate)
 				if ok {
 					if err := t.dlStore.UpdateDownloadStatus(ctx, update); err != nil {
-						logging.E("Failed to store final update for video %q: %v", update.VideoURL, err)
+						logger.Pl.E("Failed to store final update for video %q: %v", update.VideoURL, err)
 					}
 				}
 				return true
@@ -84,7 +84,7 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 			return
 
 		case update := <-t.updates:
-			logging.I("Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n",
+			logger.Pl.I("Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n",
 				update.VideoURL, update.Status, update.Percent, update.Error)
 			t.flushUpdates(ctx, update)
 
@@ -116,7 +116,7 @@ func (t *DownloadTracker) flushUpdates(ctx context.Context, update models.Status
 
 	if update.Percent == 100.0 || lastUpdate.Status != update.Status {
 		if err := t.dlStore.UpdateDownloadStatus(ctx, update); err != nil {
-			logging.E("Failed to store update for video %q in database", update.VideoURL)
+			logger.Pl.E("Failed to store update for video %q in database", update.VideoURL)
 		}
 	}
 }

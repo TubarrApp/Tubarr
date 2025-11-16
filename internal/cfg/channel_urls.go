@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 
 	"github.com/spf13/cobra"
 )
@@ -66,11 +66,11 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					return fmt.Errorf("URL %q not found for channel %q", url, c.Name)
 				}
 				urlsToUpdate = append(urlsToUpdate, cu)
-				logging.I("Updating settings for URL: %s", url)
+				logger.Pl.I("Updating settings for URL: %s", url)
 			} else {
 				// Update all URLs
 				urlsToUpdate = c.URLModels
-				logging.I("Updating settings for %d URL(s) in channel %q", len(urlsToUpdate), c.Name)
+				logger.Pl.I("Updating settings for %d URL(s) in channel %q", len(urlsToUpdate), c.Name)
 			}
 
 			// If reset flag is set, clear settings to inherit from channel
@@ -80,11 +80,11 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					cu.ChanURLMetarrArgs = nil
 
 					if err := cs.UpdateChannelURLSettings(cu); err != nil {
-						logging.E("Failed to reset settings for URL %s: %v", cu.URL, err)
+						logger.Pl.E("Failed to reset settings for URL %s: %v", cu.URL, err)
 						continue
 					}
 
-					logging.S("Reset settings for URL %q - will now inherit from channel defaults", cu.URL)
+					logger.Pl.S("Reset settings for URL %q - will now inherit from channel defaults", cu.URL)
 				}
 				return nil
 			}
@@ -179,15 +179,15 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 				// Save to database
 				if err := cs.UpdateChannelURLSettings(cu); err != nil {
-					logging.E("Failed to update URL %s: %v", cu.URL, err)
+					logger.Pl.E("Failed to update URL %s: %v", cu.URL, err)
 					continue
 				}
 
-				logging.D(1, "Updated settings for URL: %s", cu.URL)
+				logger.Pl.D(1, "Updated settings for URL: %s", cu.URL)
 				updatedCount++
 			}
 
-			logging.S("Successfully updated settings for %d URL(s) in channel %q", updatedCount, c.Name)
+			logger.Pl.S("Successfully updated settings for %d URL(s) in channel %q", updatedCount, c.Name)
 			return nil
 		},
 	}

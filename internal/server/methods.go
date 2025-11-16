@@ -7,14 +7,15 @@ import (
 	"os"
 	"strings"
 	"time"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/app"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/state"
-	"tubarr/internal/utils/logging"
-	"tubarr/internal/utils/times"
+	"tubarr/internal/times"
+
+	"github.com/TubarrApp/gocommon/abstractions"
 
 	"github.com/Masterminds/squirrel"
 )
@@ -29,34 +30,34 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 	// Start ticker
 	ticker := time.NewTicker(timeBetweenCheck) // check every minute
 	defer ticker.Stop()
-	logging.I("Crawl watchdog started, checking every %s", timeBetweenCheck.String())
+	logger.Pl.I("Crawl watchdog started, checking every %s", timeBetweenCheck.String())
 
 	for {
 		select {
 		case <-stop:
-			logging.I("Crawl watchdog received stop signal, shutting down...")
+			logger.Pl.I("Crawl watchdog received stop signal, shutting down...")
 			return
 		case <-ctx.Done():
-			logging.I("Crawl watchdog context cancelled, shutting down...")
+			logger.Pl.I("Crawl watchdog context cancelled, shutting down...")
 			return
 		case <-ticker.C:
 			// Reload channels from database to get updated LastScan times
 			freshChannels, hasRows, err := ss.s.ChannelStore().GetAllChannels(true)
 			if err != nil {
-				logging.E("Crawl watchdog: failed to reload channels: %v", err)
+				logger.Pl.E("Crawl watchdog: failed to reload channels: %v", err)
 				continue
 			}
 			if !hasRows || len(freshChannels) == 0 {
-				logging.D(2, "Crawl watchdog: no channels found in database")
+				logger.Pl.D(2, "Crawl watchdog: no channels found in database")
 				continue
 			}
 
-			logging.D(2, "Crawl watchdog: checking %d channel(s) for scheduled crawls", len(freshChannels))
+			logger.Pl.D(2, "Crawl watchdog: checking %d channel(s) for scheduled crawls", len(freshChannels))
 			now := time.Now()
 			for _, c := range freshChannels {
 				// Skip paused channels
 				if c.ChanSettings.Paused {
-					logging.D(2, "Crawl watchdog: channel %q is paused, skipping", c.Name)
+					logger.Pl.D(2, "Crawl watchdog: channel %q is paused, skipping", c.Name)
 					continue
 				}
 
@@ -89,7 +90,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 
 				}
 
-				logging.D(2, "Crawl watchdog: channel %q - last scan: %s ago, interval: %s",
+				logger.Pl.D(2, "Crawl watchdog: channel %q - last scan: %s ago, interval: %s",
 					c.Name, elapsed.Round(time.Second), interval)
 
 				if elapsed >= interval {
@@ -105,11 +106,11 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						crawlCtx, cancel := context.WithCancel(ctx)
 						defer cancel()
 
-						logging.I("Crawl watchdog: triggering scheduled crawl for channel %q", ch.Name)
+						logger.Pl.I("Crawl watchdog: triggering scheduled crawl for channel %q", ch.Name)
 						if err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {
-							logging.E("Crawl watchdog: error crawling channel %q: %v", ch.Name, err)
+							logger.Pl.E("Crawl watchdog: error crawling channel %q: %v", ch.Name, err)
 						} else {
-							logging.S("Crawl watchdog: successfully completed crawl for channel %q", ch.Name)
+							logger.Pl.S("Crawl watchdog: successfully completed crawl for channel %q", ch.Name)
 						}
 					}(c)
 				}
@@ -208,13 +209,13 @@ func (s *serverStore) getActiveDownloads(channel *models.Channel) ([]models.Vide
 	state.StatusUpdateCache.Range(func(key, value any) bool {
 		videoID, ok := key.(int64)
 		if !ok {
-			logging.E("Dev Error: Invalid key type in StatusUpdate: %T", key)
+			logger.Pl.E("Dev Error: Invalid key type in StatusUpdate: %T", key)
 			return true // continue iteration
 		}
 
 		statusUpdate, ok := value.(models.StatusUpdate)
 		if !ok {
-			logging.E("Dev Error: Invalid value type in StatusUpdate for video %d: %T", videoID, value)
+			logger.Pl.E("Dev Error: Invalid value type in StatusUpdate for video %d: %T", videoID, value)
 			return true // continue iteration
 		}
 
@@ -244,7 +245,7 @@ func (s *serverStore) getActiveDownloads(channel *models.Channel) ([]models.Vide
 		return true // continue iteration
 	})
 
-	logging.D(1, "Found %d active downloads in memory for channel %d", len(videos), channel.ID)
+	logger.Pl.D(1, "Found %d active downloads in memory for channel %d", len(videos), channel.ID)
 	return videos, nil
 }
 

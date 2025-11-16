@@ -1,6 +1,10 @@
 package consts
 
-import "time"
+import (
+	"time"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
+)
 
 // BotActivitySentinel is a sentinel included by the dev in errors for functions to find when
 // an error has determined that a domain has blocked crawling due to detecting bot activity.
@@ -19,5 +23,5 @@ const (
 
 // Program messages.
 const (
-	TimeRemainingMsg = ColorCyan + "Time remaining:" + ColorReset
+	TimeRemainingMsg = sharedconsts.ColorCyan + "Time remaining:" + sharedconsts.ColorReset
 )

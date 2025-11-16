@@ -3,8 +3,8 @@ package state
 
 import (
 	"sync"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 )
 
 // --- Crawl State --------------------------------------------------------------------------
@@ -37,7 +37,7 @@ func CrawlStateActive(channelName string) bool {
 
 	state, ok := s.(bool)
 	if !ok {
-		logging.E("Dev Error: Wrong type %T stored in CrawlState for key %q", s, key)
+		logger.Pl.E("Dev Error: Wrong type %T stored in CrawlState for key %q", s, key)
 		return false
 	}
 
@@ -86,7 +86,7 @@ func GetStatusUpdate(videoID int64) (stateFromMap models.StatusUpdate) {
 
 	currentState, ok := s.(models.StatusUpdate)
 	if !ok {
-		logging.E("Dev Error: Wrong type %T stored in StatusUpdate for video ID %d", s, videoID)
+		logger.Pl.E("Dev Error: Wrong type %T stored in StatusUpdate for video ID %d", s, videoID)
 		return models.StatusUpdate{}
 	}
 
@@ -129,7 +129,7 @@ func ActiveVideoDownloadStatusExists(videoID int64) bool {
 // 		ResetVideoDownloadStatus(v)
 // 		s, ok = activeVideoDownloadStatus.Load(v.ID)
 // 		if !ok {
-// 			logging.E("Could not get download status from map")
+// 			logger.Pl.E("Could not get download status from map")
 // 			return models.DLStatus{
 // 				Status:  consts.DLStatusFailed,
 // 				Percent: 0.0,
@@ -140,7 +140,7 @@ func ActiveVideoDownloadStatusExists(videoID int64) bool {
 
 // 	currentState, ok := s.(models.DLStatus)
 // 	if !ok {
-// 		logging.E("Dev Error: Wrong type %T stored in StatusUpdate for video %q", s, v.URL)
+// 		logger.Pl.E("Dev Error: Wrong type %T stored in StatusUpdate for video %q", s, v.URL)
 // 		return models.DLStatus{
 // 			Status:  consts.DLStatusFailed,
 // 			Percent: 0.0,

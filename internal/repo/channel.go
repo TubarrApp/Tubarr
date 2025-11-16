@@ -15,14 +15,17 @@ import (
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/viper"
 )
 
@@ -96,7 +99,7 @@ func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password
 		RunWith(cs.DB)
 
 	if err = query.QueryRow().Scan(&u, &p, &l); err != nil {
-		logging.I("No auth details found in database for channel ID: %d, URL: %s", channelID, url)
+		logger.Pl.I("No auth details found in database for channel ID: %d, URL: %s", channelID, url)
 		return "", "", "", err
 	}
 
@@ -136,7 +139,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows for delete video request in channel with ID %d", channelID)
+			logger.Pl.E("Failed to close rows for delete video request in channel with ID %d", channelID)
 		}
 	}()
 
@@ -159,7 +162,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		if tmp.vPath.Valid {
 			if tmp.vPath.String != "" {
 				if err := os.Remove(tmp.vPath.String); err != nil {
-					logging.W("URL %q: Could not delete video file at path %q: %v", tmpURL, tmp.vPath, err)
+					logger.Pl.W("URL %q: Could not delete video file at path %q: %v", tmpURL, tmp.vPath, err)
 				}
 			}
 		}
@@ -167,7 +170,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		if tmp.jPath.Valid {
 			if tmp.jPath.String != "" {
 				if err := os.Remove(tmp.jPath.String); err != nil {
-					logging.W("URL %q: Could not delete JSON file at path %q: %v", tmpURL, tmp.jPath, err)
+					logger.Pl.W("URL %q: Could not delete JSON file at path %q: %v", tmpURL, tmp.jPath, err)
 				}
 			}
 		}
@@ -186,7 +189,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		return err
 	}
 
-	logging.S("Channel ID %d: Deleted videos for URLs %v", channelID, urls)
+	logger.Pl.S("Channel ID %d: Deleted videos for URLs %v", channelID, urls)
 	return nil
 }
 
@@ -198,11 +201,11 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 
 	cfgFile := c.ConfigFile
 	if cfgFile == "" {
-		logging.D(2, "No config file path, nothing to apply")
+		logger.Pl.D(2, "No config file path, nothing to apply")
 		return nil
 	}
 
-	logging.I("Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
+	logger.Pl.I("Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
 	if _, err := validation.ValidateFile(cfgFile, false); err != nil {
 		return err
 	}
@@ -231,7 +234,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	// Return early if unchanged
 	if bytes.Equal(settingsBeforeJSON, settingsAfterJSON) &&
 		bytes.Equal(metarrBeforeJSON, metarrAfterJSON) {
-		logging.D(1, "No changes to channel from config file.")
+		logger.Pl.D(1, "No changes to channel from config file.")
 		return nil
 	}
 
@@ -265,7 +268,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return fmt.Errorf("failed to reload URL models after cascade: %w", err)
 	}
 
-	logging.S("Updated channel %q from config file", c.Name)
+	logger.Pl.S("Updated channel %q from config file", c.Name)
 	return nil
 }
 
@@ -285,7 +288,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
-	logging.S("Added URL %q to ignore list for channel with ID '%d'", ignoreURL, channelID)
+	logger.Pl.S("Added URL %q to ignore list for channel with ID '%d'", ignoreURL, channelID)
 	return nil
 }
 
@@ -309,7 +312,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows for notify URLs in channel with ID %d", id)
+			logger.Pl.E("Failed to close rows for notify URLs in channel with ID %d", id)
 		}
 	}()
 
@@ -364,13 +367,13 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 
 	switch {
 	case len(urls) > 0 && len(names) == 0:
-		logging.S("Deleted notify URLs %v for channel with ID '%d'.", urls, channelID)
+		logger.Pl.S("Deleted notify URLs %v for channel with ID '%d'.", urls, channelID)
 	case len(urls) == 0 && len(names) > 0:
-		logging.S("Deleted notify URLs with friendly names %v for channel with ID '%d'.", names, channelID)
+		logger.Pl.S("Deleted notify URLs with friendly names %v for channel with ID '%d'.", names, channelID)
 	case len(urls) > 0 && len(names) > 0:
-		logging.S("Deleted notify URLs: %v and notify URLs with friendly names %v for channel with ID '%d'.", urls, names, channelID)
+		logger.Pl.S("Deleted notify URLs: %v and notify URLs with friendly names %v for channel with ID '%d'.", urls, names, channelID)
 	default:
-		logging.S("No notify URLs to delete.")
+		logger.Pl.S("No notify URLs to delete.")
 	}
 	return nil
 }
@@ -384,12 +387,12 @@ func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.N
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
+				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -413,7 +416,7 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 	}
 
 	if authDetails == nil {
-		logging.D(1, "No authorization details to add for channel with ID %d", chanID)
+		logger.Pl.D(1, "No authorization details to add for channel with ID %d", chanID)
 		return nil
 	}
 
@@ -440,7 +443,7 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 		if _, err := query.Exec(); err != nil {
 			return err
 		}
-		logging.S("Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
+		logger.Pl.S("Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
 	}
 	return nil
 }
@@ -493,12 +496,12 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for channel %q: %v", c.Name, rbErr)
+				logger.Pl.E("Panic rollback failed for channel %q: %v", c.Name, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Rollback failed for channel %q (original error: %v): %v", c.Name, err, rbErr)
+				logger.Pl.E("Rollback failed for channel %q (original error: %v): %v", c.Name, err, rbErr)
 			}
 		}
 	}()
@@ -539,9 +542,9 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	// Insert URLs into the channel_urls table
-	logging.D(1, "Inserting %d channel URLs for channel ID %d", len(c.URLModels), id)
+	logger.Pl.D(1, "Inserting %d channel URLs for channel ID %d", len(c.URLModels), id)
 	for i, cu := range c.URLModels {
-		logging.D(1, "Inserting URL %d: %q", i+1, cu.URL)
+		logger.Pl.D(1, "Inserting URL %d: %q", i+1, cu.URL)
 
 		// Validate URL format
 		if _, urlErr := url.ParseRequestURI(cu.URL); urlErr != nil {
@@ -610,7 +613,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		}
 		cu.ID = urlID
 
-		logging.D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
+		logger.Pl.D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
 	}
 
 	// Commit transaction
@@ -619,7 +622,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	cURLs := c.GetURLs()
-	logging.S("Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
+	logger.Pl.S("Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
 		id, c.Name, cURLs, c.ChanSettings.CrawlFreq, c.ChanSettings.Filters, c.ChanSettings, c.ChanMetarrArgs)
 
 	return id, nil
@@ -664,7 +667,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 	}
 
 	// BLOCKED LOGIC:
-	logging.W("Channel %q is currently blocked by %v", c.Name, c.ChanSettings.BotBlockedHostnames)
+	logger.Pl.W("Channel %q is currently blocked by %v", c.Name, c.ChanSettings.BotBlockedHostnames)
 
 	if len(c.ChanSettings.BotBlockedHostnames) == 0 {
 		return false, nil // Invalid state, keep blocked
@@ -692,14 +695,14 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 		if !exists || blockedTime.IsZero() {
 			// No timestamp found for this hostname, keep it blocked
 			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
-			logging.W("No timestamp found for hostname %q, keeping blocked", hostname)
+			logger.Pl.W("No timestamp found for hostname %q, keeping blocked", hostname)
 			continue
 		}
 
 		minutesSinceBlock := time.Since(blockedTime).Minutes()
 		if minutesSinceBlock >= timeoutMinutes {
 			// This hostname's timeout has expired
-			logging.S("Unlocking hostname %q for channel %d (%s) after timeout", hostname, c.ID, c.Name)
+			logger.Pl.S("Unlocking hostname %q for channel %d (%s) after timeout", hostname, c.ID, c.Name)
 			anyUnlocked = true
 			// Remove from timestamps map
 			delete(c.ChanSettings.BotBlockedTimestamps, hostname)
@@ -713,7 +716,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 			unlockTime := blockedAt.Add(timeout)
 			remainingDuration := time.Until(unlockTime)
 
-			logging.W("%v remaining before channel unlocks for domain %q (Blocked on: %v)",
+			logger.Pl.W("%v remaining before channel unlocks for domain %q (Blocked on: %v)",
 				remainingDuration.Round(time.Second),
 				hostname,
 				blockedAt.Local().Format("Mon, Jan 2 2006, 15:04:05 MST"))
@@ -745,12 +748,12 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 
 	// Return true only if ALL hostnames are now unlocked
 	if len(stillBlockedHostnames) == 0 {
-		logging.S("Channel %d (%s) fully unlocked - all hostnames cleared", c.ID, c.Name)
+		logger.Pl.S("Channel %d (%s) fully unlocked - all hostnames cleared", c.ID, c.Name)
 		return true, nil
 	}
 
 	// Still some blocked hostnames remaining
-	logging.W("Unlock channel %q manually for hostnames %v with:\n\ntubarr channel unblock -n %q\n",
+	logger.Pl.W("Unlock channel %q manually for hostnames %v with:\n\ntubarr channel unblock -n %q\n",
 		c.Name, stillBlockedHostnames, c.Name)
 	return false, nil
 }
@@ -854,7 +857,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows: %v", err)
+			logger.Pl.E("Failed to close rows: %v", err)
 		}
 	}()
 
@@ -972,7 +975,7 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 	}
 
 	// Print the updated settings
-	logging.S("Updated MetarrArgs: %s", string(updatedArgs))
+	logger.Pl.S("Updated MetarrArgs: %s", string(updatedArgs))
 
 	// Update the database with the new settings
 	updateQuery := squirrel.
@@ -1032,7 +1035,7 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 	}
 
 	// Print the updated settings
-	logging.S("Updated ChannelSettings: %s", string(updatedSettings))
+	logger.Pl.S("Updated ChannelSettings: %s", string(updatedSettings))
 
 	// Update the database with the new settings
 	updateQuery := squirrel.
@@ -1069,9 +1072,9 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 	if logging.Level > 1 {
 		sqlStr, args, err := query.ToSql()
 		if err != nil {
-			logging.W("Cannot print SQL string for update query in channel with %s %q: %v", key, val, err)
+			logger.Pl.W("Cannot print SQL string for update query in channel with %s %q: %v", key, val, err)
 		} else {
-			logging.P("Executing SQL: %s with args: %v\n", sqlStr, args)
+			logger.Pl.P("Executing SQL: %s with args: %v\n", sqlStr, args)
 		}
 	}
 
@@ -1091,7 +1094,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 		return fmt.Errorf("update failed: no rows affected")
 	}
 
-	logging.S("Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
+	logger.Pl.S("Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
 	return nil
 }
 
@@ -1119,7 +1122,7 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 		return fmt.Errorf("no channel found with ID %d", channelID)
 	}
 
-	logging.D(1, "Updated last scan time for channel ID %d", channelID)
+	logger.Pl.D(1, "Updated last scan time for channel ID %d", channelID)
 	return nil
 }
 
@@ -1163,7 +1166,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows: %v", err)
+			logger.Pl.E("Failed to close rows: %v", err)
 		}
 	}()
 
@@ -1218,14 +1221,14 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		}
 		if metadataStr.Valid && metadataStr.String != "" {
 			if err := json.Unmarshal([]byte(metadataStr.String), &v.MetadataMap); err != nil {
-				logging.W("Failed to unmarshal metadata for video %d: %v", v.ID, err)
+				logger.Pl.W("Failed to unmarshal metadata for video %d: %v", v.ID, err)
 			}
 		}
 
 		videos = append(videos, &v)
 	}
 
-	logging.I("Found %d previously downloaded videos for channel %q", len(videos), c.Name)
+	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(videos), c.Name)
 	return videos, true, nil
 }
 
@@ -1253,7 +1256,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows for channel %v: %v", c.Name, err)
+			logger.Pl.E("Failed to close rows for channel %v: %v", c.Name, err)
 		}
 	}()
 
@@ -1263,14 +1266,14 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 		urls = append(urls, url)
-		logging.D(2, "Found downloaded video: %s", url)
+		logger.Pl.D(2, "Found downloaded video: %s", url)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("row iteration error: %w", err)
 	}
 
-	logging.I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
+	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
 	return urls, nil
 }
 
@@ -1278,13 +1281,13 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	notifyURLs, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {
-		logging.E("Unable to fetch notification URLs for channel %q: %v", c.Name, err)
+		logger.Pl.E("Unable to fetch notification URLs for channel %q: %v", c.Name, err)
 	}
 
 	s := c.ChanSettings
 	m := c.ChanMetarrArgs
 
-	fmt.Printf("\n%s[ Channel: %q ]%s\n", consts.ColorGreen, c.Name, consts.ColorReset)
+	fmt.Printf("\n%s[ Channel: %q ]%s\n", sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 
 	cURLs := c.GetURLs()
 	cURLs = slices.DeleteFunc(cURLs, func(url string) bool {
@@ -1292,7 +1295,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	})
 
 	// Channel basic info
-	fmt.Printf("\n%sBasic Info:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("\n%sBasic Info:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	fmt.Printf("ID: %d\n", c.ID)
 	fmt.Printf("Name: %s\n", c.Name)
 	fmt.Printf("Config File: %s\n", c.ConfigFile)
@@ -1300,16 +1303,16 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 
 	// Channel settings
 	if s == nil {
-		logging.P("(Settings not configured)\n")
+		logger.Pl.P("(Settings not configured)\n")
 		return
 	}
 	fmt.Printf("Paused: %v\n", s.Paused)
 
-	fmt.Printf("\n%sChannel Settings:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("\n%sChannel Settings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	displaySettingsStruct(c.ChanSettings)
 
 	// Metarr settings
-	fmt.Printf("\n%sMetarr Settings:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("\n%sMetarr Settings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	if m == nil {
 		fmt.Printf("(Metarr arguments not configured)\n")
 		return
@@ -1325,10 +1328,10 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		}
 		nURLs = append(nURLs, newNUrl)
 	}
-	fmt.Printf("\n%sNotify URLs:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("\n%sNotify URLs:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	fmt.Printf("Notification URLs: %v\n", nURLs)
 
-	fmt.Printf("\n%sAuthentication:%s\n", consts.ColorCyan, consts.ColorReset)
+	fmt.Printf("\n%sAuthentication:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 
 	// Auth details
 	gotAuthModels := false
@@ -1337,7 +1340,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		if cu.Password == "" && cu.EncryptedPassword != "" {
 			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
 			if err != nil {
-				logging.W("Failed to decrypt password (encrypted: %s) for channel %q", cu.EncryptedPassword, c.Name)
+				logger.Pl.W("Failed to decrypt password (encrypted: %s) for channel %q", cu.EncryptedPassword, c.Name)
 			}
 		}
 
@@ -1357,17 +1360,17 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		fmt.Printf("[]\n")
 	}
 
-	fmt.Printf("\n%s[ URL Models in Channel: %q ]%s\n", consts.ColorYellow, c.Name, consts.ColorReset)
+	fmt.Printf("\n%s[ URL Models in Channel: %q ]%s\n", sharedconsts.ColorYellow, c.Name, sharedconsts.ColorReset)
 	for _, u := range c.URLModels {
 		if u == nil {
 			continue
 		}
-		fmt.Printf("%sURL %q%s\n", consts.ColorCyan, u.URL, consts.ColorReset)
+		fmt.Printf("%sURL %q%s\n", sharedconsts.ColorCyan, u.URL, sharedconsts.ColorReset)
 
-		fmt.Printf("\n%sSettings:%s\n", consts.ColorCyan, consts.ColorReset)
+		fmt.Printf("\n%sSettings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 		displaySettingsStruct(u.ChanURLSettings)
 
-		fmt.Printf("\n%sMetarr Args:%s\n", consts.ColorCyan, consts.ColorReset)
+		fmt.Printf("\n%sMetarr Args:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 		displayMetarrArgsStruct(u.ChanURLMetarrArgs)
 	}
 
@@ -1441,7 +1444,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Concurrency limit
 	if v, ok := parsing.GetConfigValue[int](vip, keys.ChanOrURLConcurrencyLimit); ok {
-		c.ChanSettings.Concurrency = validation.ValidateConcurrencyLimit(v)
+		c.ChanSettings.Concurrency = sharedvalidation.ValidateConcurrencyLimit(v)
 	}
 
 	// Cookie source
@@ -1645,7 +1648,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 			if len(split) == 2 && split[1] != "" {
 				valid = append(valid, d)
 			} else {
-				logging.W("Removed invalid per-URL output directory pair %q", d)
+				logger.Pl.W("Removed invalid per-URL output directory pair %q", d)
 			}
 		}
 
@@ -1658,7 +1661,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Metarr concurrency
 	if v, ok := parsing.GetConfigValue[int](vip, keys.MConcurrency); ok {
-		c.ChanMetarrArgs.Concurrency = validation.ValidateConcurrencyLimit(v)
+		c.ChanMetarrArgs.Concurrency = sharedvalidation.ValidateConcurrencyLimit(v)
 	}
 
 	// Metarr max CPU
@@ -1696,7 +1699,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Metarr transcode quality
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MTranscodeQuality); ok {
-		if c.ChanMetarrArgs.TranscodeQuality, err = validation.ValidateTranscodeQuality(v); err != nil {
+		if c.ChanMetarrArgs.TranscodeQuality, err = sharedvalidation.ValidateTranscodeQuality(v); err != nil {
 			return err
 		}
 	}
@@ -1762,14 +1765,14 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 		return err
 	}
 
-	logging.S("Added notification URL %q to channel with ID: %d", notifyURL, id)
+	logger.Pl.S("Added notification URL %q to channel with ID: %d", notifyURL, id)
 	return nil
 }
 
 // channelExists returns true if the channel exists in the database.
 func (cs *ChannelStore) channelExists(key, val string) bool {
 	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
-		logging.E("Error validating column key/value pair, channel cannot exist in database: %v")
+		logger.Pl.E("Error validating column key/value pair, channel cannot exist in database: %v")
 		return false
 	}
 
@@ -1781,7 +1784,7 @@ func (cs *ChannelStore) channelExists(key, val string) bool {
 		RunWith(cs.DB)
 
 	if err := query.QueryRow().Scan(&count); err != nil {
-		logging.E("failed to check if channel exists with key=%s val=%s: %v", key, val, err)
+		logger.Pl.E("failed to check if channel exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}
 	return count > 0
@@ -1799,7 +1802,7 @@ func (cs ChannelStore) channelExistsID(id int64) bool {
 	if err := query.QueryRow().Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return false
 	} else if err != nil {
-		logging.E("Failed to check if channel with ID %d exists", id)
+		logger.Pl.E("Failed to check if channel with ID %d exists", id)
 		return exists
 	}
 	return exists

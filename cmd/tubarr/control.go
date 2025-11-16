@@ -4,8 +4,11 @@ import (
 	"context"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/repo"
-	"tubarr/internal/utils/logging"
+
+	"github.com/TubarrApp/gocommon/benchmark"
 )
 
 // startHeartbeat starts the program heartbeat.
@@ -20,7 +23,7 @@ func startHeartbeat(ctx context.Context, progControl *repo.ProgControl) {
 			return
 		case <-ticker.C:
 			if err := progControl.UpdateHeartbeat(); err != nil {
-				logging.E("Failed to update heartbeat for process ID %d: %v", progControl.ProcessID, err)
+				logger.Pl.E("Failed to update heartbeat for process ID %d: %v", progControl.ProcessID, err)
 			}
 		}
 	}
@@ -31,11 +34,13 @@ func cleanup(progControl *repo.ProgControl, startTime time.Time) {
 	defer func() {
 		r := recover() // grab panic condition
 		if r != nil {
-			logging.E("Panic occurred: %v", r)
+			logger.Pl.E("Panic occurred: %v", r)
 		}
 
+		benchmark.CloseBenchFiles(logger.Pl, vars.BenchmarkFiles, "", nil)
+
 		if err := progControl.QuitTubarr(startTime); err != nil {
-			logging.E("!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes) !!!")
+			logger.Pl.E("!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes) !!!")
 		}
 
 		if r != nil {

@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
 	"github.com/spf13/viper"
@@ -19,7 +20,7 @@ func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
 
 	if c.ConfigFile != "" && !c.UpdatedFromConfig {
 		if err := cs.UpdateChannelFromConfig(c); err != nil {
-			logging.E("failed to update from config file %q: %v", c.ConfigFile, err)
+			logger.Pl.E("failed to update from config file %q: %v", c.ConfigFile, err)
 		}
 
 		c.UpdatedFromConfig = true
@@ -47,7 +48,7 @@ func ReadFileLines(path string) ([]string, error) {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E("failed to close file %v due to error: %v", path, err)
+			logger.Pl.E("failed to close file %v due to error: %v", path, err)
 		}
 	}()
 
@@ -117,4 +118,32 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 	}
 
 	return configFiles, nil
+}
+
+// Load in Metarr logs
+func LoadMetarrLogs() [][]byte {
+	f, err := os.Open(paths.MetarrLogFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		logger.Pl.E("Failed to open Metarr log file at %q: %v", paths.MetarrLogFilePath, err)
+		return nil
+	}
+	defer f.Close()
+
+	var lines [][]byte
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		raw := scanner.Bytes()
+		line := make([]byte, len(raw)+1)
+		copy(line, raw)
+		line[len(raw)] = '\n'
+		lines = append(lines, line)
+	}
+
+	return lines
 }

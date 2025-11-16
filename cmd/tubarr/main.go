@@ -3,29 +3,67 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/app"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/paths"
+	"tubarr/internal/domain/vars"
+	"tubarr/internal/file"
 	"tubarr/internal/server"
-	"tubarr/internal/utils/logging"
-	"tubarr/internal/utils/times"
+	"tubarr/internal/times"
+
+	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/logging"
 )
+
+// init runs before the program begins.
+func init() {
+	if err := paths.InitProgFilesDirs(); err != nil {
+		fmt.Printf("Tubarr exiting with error: %v\n", err)
+		return
+	}
+}
 
 // main is the main entrypoint of the program (duh!).
 func main() {
 	startTime := time.Now()
+
+	fmt.Printf("\nMain Tubarr file/dir locations:\n\nDatabase: %s\nLog file: %s\n\n",
+		paths.DBFilePath, paths.TubarrLogFilePath)
+
+	// Setup Tubarr logging
+	logConfig := logging.LoggingConfig{
+		LogFilePath: paths.TubarrLogFilePath,
+		MaxSizeMB:   1,
+		MaxBackups:  3,
+		Console:     os.Stdout,
+		Program:     "Tubarr",
+	}
+
+	pl, err := logging.SetupLogging(logConfig)
+	if err != nil {
+		fmt.Printf("Tubarr exiting with error: %v\n", err)
+		return
+	}
+	logger.Pl = pl
+
+	// Initialize application (DB, stores, etc)
 	store, database, progControl, err := initializeApplication()
 	if err != nil {
-		logging.E("error initializing Tubarr: %v", err)
+		logger.Pl.E("error initializing Tubarr: %v", err)
 		return
 	}
 
-	logging.I("Tubarr (PID: %d) started at: %v",
+	// Load in Metarr logs
+	vars.MetarrLogs = file.LoadMetarrLogs()
+
+	logger.Pl.I("Tubarr (PID: %d) started at: %v",
 		progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
 
 	// create cancellable context for shutdown
@@ -42,7 +80,7 @@ func main() {
 
 	// ---- INIT COMMANDS ----
 	if err := cfg.InitCommands(ctx, store); err != nil {
-		logging.E("Error: %v", err)
+		logger.Pl.E("Error: %v", err)
 		cancel()
 		<-heartbeatDone
 		cleanup(progControl, startTime)
@@ -74,6 +112,6 @@ func main() {
 	cleanup(progControl, startTime)
 
 	if runErr != nil {
-		logging.E("Error: %v", runErr)
+		logger.Pl.E("Error: %v", runErr)
 	}
 }

@@ -8,20 +8,20 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 	"tubarr/internal/app"
 	"tubarr/internal/auth"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/paths"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/state"
-	"tubarr/internal/utils/logging"
 
+	"github.com/TubarrApp/gocommon/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/spf13/viper"
 )
@@ -65,8 +65,8 @@ func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println()
 	for _, u := range c.URLModels {
-		logging.I("Got channel URL output ext: %q", u.ChanURLMetarrArgs.OutputExt)
-		logging.I("Got max filesize: %q", u.ChanURLSettings.MaxFilesize)
+		logger.Pl.I("Got channel URL output ext: %q", u.ChanURLMetarrArgs.OutputExt)
+		logger.Pl.I("Got max filesize: %q", u.ChanURLSettings.MaxFilesize)
 	}
 	fmt.Println()
 
@@ -101,7 +101,7 @@ func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	if input.IgnoreRun != nil && *input.IgnoreRun {
 		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-			logging.E("Failed to complete ignore crawl run: %v", err)
+			logger.Pl.E("Failed to complete ignore crawl run: %v", err)
 		}
 	}
 
@@ -138,7 +138,7 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 		reason string
 	}
 
-	logging.I("Adding channels from config files %v", batchConfigFiles)
+	logger.Pl.I("Adding channels from config files %v", batchConfigFiles)
 
 	for _, batchConfigFile := range batchConfigFiles {
 		var input models.ChannelInputPtrs
@@ -225,7 +225,7 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 		ctx := context.Background()
 		if input.IgnoreRun != nil && *input.IgnoreRun {
 			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-				logging.E("Failed to complete ignore crawl run: %v", err)
+				logger.Pl.E("Failed to complete ignore crawl run: %v", err)
 			}
 		}
 
@@ -616,7 +616,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		if !newURLMap[existingURL] {
 			// URL was removed, delete it
 			if err := ss.cs.DeleteChannelURL(urlModel.ID); err != nil {
-				logging.E("Failed to delete channel URL %q: %v", existingURL, err)
+				logger.Pl.E("Failed to delete channel URL %q: %v", existingURL, err)
 			}
 		}
 	}
@@ -783,7 +783,7 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 	// DELETE requests need special handling for form data in the body
 	bodyBytes := make([]byte, r.ContentLength)
 	if _, err := r.Body.Read(bodyBytes); err != nil && err.Error() != "EOF" {
-		logging.E("Failed to read body: %v", err)
+		logger.Pl.E("Failed to read body: %v", err)
 		http.Error(w, "failed to read request body", http.StatusBadRequest)
 		return
 	}
@@ -791,15 +791,15 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 	// Parse the URL-encoded form data from body
 	values, err := url.ParseQuery(string(bodyBytes))
 	if err != nil {
-		logging.E("Failed to parse query: %v", err)
+		logger.Pl.E("Failed to parse query: %v", err)
 		http.Error(w, "failed to parse form data", http.StatusBadRequest)
 		return
 	}
 
 	// Get video URLs from form array
 	urls := values["urls[]"]
-	logging.D(1, "Parsed form data: %+v", values)
-	logging.D(1, "Video URLs to delete: %v", urls)
+	logger.Pl.D(1, "Parsed form data: %+v", values)
+	logger.Pl.D(1, "Video URLs to delete: %v", urls)
 
 	if len(urls) == 0 {
 		http.Error(w, "no video URLs provided", http.StatusBadRequest)
@@ -856,11 +856,11 @@ func handleCancelDownload(w http.ResponseWriter, r *http.Request) {
 	// Cancel the actual running download process
 	var videoURL string
 	if videoURL, err = ss.vs.GetVideoURLByID(videoID); err != nil {
-		logging.E("Could not get video URL for ID %d: %v", videoID, err)
+		logger.Pl.E("Could not get video URL for ID %d: %v", videoID, err)
 	}
 	cancelled := ss.ds.CancelDownload(videoID, videoURL)
 	if !cancelled {
-		logging.W("Download for video ID %d was marked as cancelled in DB but no active download process was found", videoID)
+		logger.Pl.W("Download for video ID %d was marked as cancelled in DB but no active download process was found", videoID)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -876,7 +876,7 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -893,11 +893,11 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 			defer state.UnlockCrawlState(c.Name)
 
 			ctx := context.Background()
-			logging.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
+			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
 			if err := app.CrawlChannel(ctx, ss.s, c); err != nil {
-				logging.E("Failed to crawl channel %q: %v", c.Name, err)
+				logger.Pl.E("Failed to crawl channel %q: %v", c.Name, err)
 			} else {
-				logging.S("Successfully completed crawl for channel %q", c.Name)
+				logger.Pl.S("Successfully completed crawl for channel %q", c.Name)
 			}
 		}()
 
@@ -935,11 +935,11 @@ func handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
 			defer state.UnlockCrawlState(c.Name)
 
 			ctx := context.Background()
-			logging.I("Starting ignore crawl for channel %q (ID: %d) via web request", c.Name, id)
+			logger.Pl.I("Starting ignore crawl for channel %q (ID: %d) via web request", c.Name, id)
 			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-				logging.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+				logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
 			} else {
-				logging.S("Successfully completed ignore crawl for channel %q", c.Name)
+				logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 			}
 		}()
 
@@ -993,61 +993,43 @@ func handleGetLogLevel(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]int{"level": logging.Level})
 }
 
-// handleGetTubarrLogs serves the log file contents.
+// handleGetTubarrLogs serves the log entries from memory.
 func handleGetTubarrLogs(w http.ResponseWriter, r *http.Request) {
-	// Get log file path from abstractions
-	tubarrLogFilePath := paths.TubarrLogFilePath
-	if tubarrLogFilePath == "" {
-		http.Error(w, "tubarr log file path not configured", http.StatusInternalServerError)
+	logs := logging.GetRecentLogsForProgram("Tubarr")
+	if logs == nil {
+		http.Error(w, "tubarr logger not initialized", http.StatusNotFound)
 		return
 	}
 
-	// Open and read the log file
-	file, err := os.Open(tubarrLogFilePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			http.Error(w, "tubarr log file not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, fmt.Sprintf("failed to open tubarr log file: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-
-	// Set content type as plain text
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	// Copy file contents to response
-	if _, err := io.Copy(w, file); err != nil {
-		logging.E("Failed to send tubarr log file: %v", err)
+	for _, line := range logs {
+		if len(line) == 0 {
+			continue
+		}
+		w.Write(line)
 	}
 }
 
-// handleGetMetarrLogs serves the Metarr log file contents from ~/.metarr/metarr.log.
+// handleGetMetarrLogs serves the Metarr log entries from memory.
 func handleGetMetarrLogs(w http.ResponseWriter, r *http.Request) {
-	metarrLogPath := paths.MetarrLogFilePath
-	if metarrLogPath == "" {
-		http.Error(w, "metarr log file path not configured", http.StatusInternalServerError)
-		return
-	}
-
-	// Open and read the log file
-	file, err := os.Open(metarrLogPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			http.Error(w, "metarr log file not found", http.StatusNotFound)
-			return
-		}
-		http.Error(w, fmt.Sprintf("failed to open Metarr log file: %v", err), http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-
-	// Set content type as plain text
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	// Copy file contents to response
-	if _, err := io.Copy(w, file); err != nil {
-		logging.E("Failed to send Metarr log file: %v", err)
+	// Reload file after Metarr exits
+	if vars.MetarrFinished {
+		vars.MetarrLogs = file.LoadMetarrLogs()
+		vars.MetarrFinished = false
+	}
+
+	// Print file logs first (only once per Tubarr startup)
+	for _, line := range vars.MetarrLogs {
+		w.Write(line)
+	}
+
+	// Try to append live RAM logs if Metarr is running
+	resp, err := http.Get("http://127.0.0.1:6387/logs")
+	if err == nil {
+		defer resp.Body.Close()
+		io.Copy(w, resp.Body)
 	}
 }

@@ -9,14 +9,16 @@ require (
 	github.com/browserutils/kooky v0.2.2
 	github.com/gocolly/colly v1.2.0
 	github.com/mattn/go-sqlite3 v1.14.32
-	github.com/rs/zerolog v1.34.0
+	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
 	golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
 	golang.org/x/net v0.46.0
 )
 
-require gopkg.in/natefinch/lumberjack.v2 v2.2.1
+require gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+
+require github.com/TubarrApp/gocommon v0.0.0-20251116142337-ac4b531798f7
 
 require (
 	github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a // indirect

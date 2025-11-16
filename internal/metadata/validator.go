@@ -9,26 +9,26 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 )
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
 //
 // Returns true if the video passes all filters and JSON validity checks.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	logging.I("Validating and filtering JSON file %q...", v.JSONPath)
+	logger.Pl.I("Validating and filtering JSON file %q...", v.JSONPath)
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
-		logging.E("JSON parsing/storage failed for %q: %v", v.URL, err)
+		logger.Pl.E("JSON parsing/storage failed for %q: %v", v.URL, err)
 	}
 
 	// Apply filters
 	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
 	if err != nil {
-		logging.E("filter operation checks failed for %q: %v", v.URL, err)
+		logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
 	}
 	if !jsonValid || !passedFilters {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
@@ -48,11 +48,11 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			logging.E("Failed to close file at %q", v.JSONPath)
+			logger.Pl.E("Failed to close file at %q", v.JSONPath)
 		}
 	}()
 
-	logging.D(1, "About to decode JSON to metamap")
+	logger.Pl.D(1, "About to decode JSON to metamap")
 
 	m := make(map[string]any)
 	decoder := json.NewDecoder(f)
@@ -71,7 +71,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 			if titleVal, exists := m[key]; exists {
 				if title, ok := titleVal.(string); ok {
 					v.Title = title
-					logging.D(2, "Extracted title %q from metadata (Video URL: %q)", title, v.URL)
+					logger.Pl.D(2, "Extracted title %q from metadata (Video URL: %q)", title, v.URL)
 					break
 				}
 			}
@@ -90,7 +90,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 						if t, err := time.Parse("2006-01-02", uploadDate); err == nil { // If error IS nil
 							v.UploadDate = t
 							if v.UploadDate.IsZero() {
-								logging.E("Failed to parse upload date %q: %v", uploadDate, err)
+								logger.Pl.E("Failed to parse upload date %q: %v", uploadDate, err)
 							}
 							break
 						}
@@ -98,7 +98,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 						if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
 							v.UploadDate = t
 							if v.UploadDate.IsZero() {
-								logging.E("Failed to parse upload date %q: %v", uploadDate, err)
+								logger.Pl.E("Failed to parse upload date %q: %v", uploadDate, err)
 							}
 							break
 						}
@@ -114,7 +114,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 			if descriptionVal, exists := m[key]; exists {
 				if description, ok := descriptionVal.(string); ok {
 					v.Description = description
-					logging.D(2, "Extracted description %q from metadata (Video URL: %q)", description, v.URL)
+					logger.Pl.D(2, "Extracted description %q from metadata (Video URL: %q)", description, v.URL)
 					break
 				}
 			}
@@ -155,14 +155,14 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 					}
 					if best != "" {
 						v.ThumbnailURL = best
-						logging.D(2, "Selected thumbnail from array: %s", best)
+						logger.Pl.D(2, "Selected thumbnail from array: %s", best)
 					}
 				}
 			}
 		}
 	}
 
-	logging.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Title)
+	logger.Pl.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Title)
 	return true, nil
 }
 
@@ -210,7 +210,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
-	logging.S("Video %q for channel %q passed all filter checks", v.URL, c.Name)
+	logger.Pl.S("Video %q for channel %q passed all filter checks", v.URL, c.Name)
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
@@ -224,7 +224,7 @@ func getRelevantFilters(filters []models.Filters, currentURL string) []models.Fi
 			strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
 			relevant = append(relevant, filter)
 		} else {
-			logging.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
+			logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
 				filter, filter.ChannelURL, currentURL)
 		}
 	}
@@ -245,7 +245,7 @@ func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, curren
 				strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
 				relevantFilters = append(relevantFilters, filter)
 			} else {
-				logging.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
+				logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
 					filter, filter.ChannelURL, currentURL)
 			}
 		}
@@ -268,7 +268,7 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 				strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
 				relevantFilters = append(relevantFilters, filter)
 			} else {
-				logging.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
+				logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
 					filter, filter.ChannelURL, currentURL)
 			}
 		}
@@ -298,7 +298,7 @@ func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 			val := fmt.Sprint(raw)
 
 			if strings.Contains(strings.ToLower(val), strings.ToLower(op.ContainsValue)) {
-				logging.I("Move op matched: Field %q contains the value %q. Output directory retrieved as %q",
+				logger.Pl.I("Move op matched: Field %q contains the value %q. Output directory retrieved as %q",
 					op.Field, op.ContainsValue, op.OutputDir)
 				return op.OutputDir
 			}
@@ -318,7 +318,7 @@ func getRelevantMoveOps(moveOps []models.MetaFilterMoveOps, currentURL string) [
 			strings.EqualFold(strings.TrimSpace(op.ChannelURL), strings.TrimSpace(currentURL)) {
 			relevant = append(relevant, op)
 		} else {
-			logging.D(2, "Skipping move op for different URL: %q != %q", op.ChannelURL, currentURL)
+			logger.Pl.D(2, "Skipping move op for different URL: %q != %q", op.ChannelURL, currentURL)
 		}
 	}
 

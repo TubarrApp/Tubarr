@@ -2,10 +2,10 @@ package metarr
 
 import (
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 )
 
@@ -45,31 +45,31 @@ func loadFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing
 	filenameOpsFile := cu.ChanURLMetarrArgs.FilenameOpsFile
 	var err error
 	if filenameOpsFile, err = dp.ParseDirectory(filenameOpsFile, v, "filename ops"); err != nil {
-		logging.E("Failed to parse directory %q: %v", filenameOpsFile, err)
+		logger.Pl.E("Failed to parse directory %q: %v", filenameOpsFile, err)
 		return nil
 	}
 
-	logging.I("Adding filename ops from file %q...", filenameOpsFile)
+	logger.Pl.I("Adding filename ops from file %q...", filenameOpsFile)
 	ops, err := file.ReadFileLines(filenameOpsFile)
 	if err != nil {
-		logging.E("Error loading filename ops from file %q: %v", filenameOpsFile, err)
+		logger.Pl.E("Error loading filename ops from file %q: %v", filenameOpsFile, err)
 		return nil
 	}
 
 	// Parse filename operations from strings
 	parsedOps, err := parsing.ParseFilenameOps(ops)
 	if err != nil {
-		logging.E("Error parsing filename ops from file %q: %v", filenameOpsFile, err)
+		logger.Pl.E("Error parsing filename ops from file %q: %v", filenameOpsFile, err)
 		return nil
 	}
 
 	// Validate the parsed operations
 	if err := validation.ValidateFilenameOps(parsedOps); err != nil {
-		logging.E("Error validating filename ops from file %q: %v", filenameOpsFile, err)
+		logger.Pl.E("Error validating filename ops from file %q: %v", filenameOpsFile, err)
 		return nil
 	}
 
-	logging.I("Loaded %d filename ops from file", len(parsedOps))
+	logger.Pl.I("Loaded %d filename ops from file", len(parsedOps))
 	return parsedOps
 }
 
@@ -90,7 +90,7 @@ func filterConflictingFilenameOps(fileOps, dbOps []models.FilenameOps) []models.
 		if !fileOpKeys[op.OpType] || !isConflictingFilenameOp[op.OpType] {
 			result = append(result, op)
 		} else {
-			logging.D(2, "File filename op overrides DB op: %s", keys.BuildFilenameOpsKey(op))
+			logger.Pl.D(2, "File filename op overrides DB op: %s", keys.BuildFilenameOpsKey(op))
 		}
 	}
 	return result
@@ -106,7 +106,7 @@ func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.Fil
 	for _, op := range ops {
 		key := keys.BuildFilenameOpsKey(op)
 		if !matchedFilteredKeys[key] {
-			logging.D(2, "Added filename operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
+			logger.Pl.D(2, "Added filename operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
 		}
 	}

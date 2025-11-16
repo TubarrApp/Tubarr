@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/auth"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // BuildChannelFromInput builds a Channel model from the unified ChannelInputPtrs struct.
@@ -107,7 +109,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	}
 
 	if input.MinFreeMem != nil && *input.MinFreeMem != "" {
-		if err := validation.ValidateMinFreeMem(*input.MinFreeMem); err != nil {
+		if _, err := sharedvalidation.ValidateMinFreeMem(*input.MinFreeMem); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -154,7 +156,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	}
 
 	if input.TranscodeQuality != nil && *input.TranscodeQuality != "" {
-		q, err := validation.ValidateTranscodeQuality(*input.TranscodeQuality)
+		q, err := sharedvalidation.ValidateTranscodeQuality(*input.TranscodeQuality)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -494,7 +496,7 @@ func ParseURLSettingsFromViper(v interface {
 
 	// Check if url-settings exists
 	if !v.IsSet("url-settings") && !v.IsSet("url_settings") {
-		logging.I("No url-settings found in config")
+		logger.Pl.I("No url-settings found in config")
 		return urlSettings, nil
 	}
 
@@ -540,7 +542,7 @@ func ParseURLSettingsFromViper(v interface {
 
 			override.Settings = settingsInput
 		} else {
-			logging.D(1, "No settings section found in %+v", settingsMap)
+			logger.Pl.D(1, "No settings section found in %+v", settingsMap)
 		}
 
 		// Handle "metarr" section
@@ -559,7 +561,7 @@ func ParseURLSettingsFromViper(v interface {
 
 			override.Metarr = metarrInput
 		} else {
-			logging.D(1, "No Metarr section found in %+v", metarrMap)
+			logger.Pl.D(1, "No Metarr section found in %+v", metarrMap)
 		}
 
 		urlSettings[normalizedURL] = override
@@ -692,7 +694,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Validate and set Concurrency if provided
 	if input.Concurrency != nil {
-		settings.Concurrency = validation.ValidateConcurrencyLimit(*input.Concurrency)
+		settings.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*input.Concurrency)
 	}
 
 	// Set CrawlFreq (no validation available)
@@ -815,7 +817,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Only set float64 fields if explicitly provided
 	if input.MaxCPU != nil {
-		metarr.MaxCPU = min(max(*input.MaxCPU, 0.0), 100.0)
+		metarr.MaxCPU = sharedvalidation.ValidateMaxCPU(*input.MaxCPU)
 	}
 
 	// Validate and set rename style if provided
@@ -828,7 +830,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Validate and set min free mem if provided
 	if input.MinFreeMem != nil {
-		if err := validation.ValidateMinFreeMem(*input.MinFreeMem); err != nil {
+		if _, err := sharedvalidation.ValidateMinFreeMem(*input.MinFreeMem); err != nil {
 			return nil, fmt.Errorf("failed to validate min free mem for per-URL settings: %w", err)
 		}
 		metarr.MinFreeMem = *input.MinFreeMem
@@ -855,7 +857,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Validate and set audio codecs if provided
 	if input.AudioCodec != nil {
-		logging.I("Found audio codecs in per-URL override: %v", *input.AudioCodec)
+		logger.Pl.I("Found audio codecs in per-URL override: %v", *input.AudioCodec)
 		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.AudioCodec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate audio codecs for per-URL settings: %w", err)
@@ -865,7 +867,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Validate and set transcode quality if provided
 	if input.TranscodeQuality != nil {
-		q, err := validation.ValidateTranscodeQuality(*input.TranscodeQuality)
+		q, err := sharedvalidation.ValidateTranscodeQuality(*input.TranscodeQuality)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate transcode quality for per-URL settings: %w", err)
 		}

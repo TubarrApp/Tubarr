@@ -10,15 +10,17 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
-	"tubarr/internal/utils/logging"
-	"tubarr/internal/utils/times"
+	"tubarr/internal/times"
+
+	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 
 	"golang.org/x/net/publicsuffix"
 )
@@ -29,7 +31,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	cs := s.ChannelStore()
 	channels, hasRows, err := cs.GetAllChannels(true)
 	if !hasRows {
-		logging.I("No channels in database")
+		logger.Pl.I("No channels in database")
 	} else if err != nil {
 		return err
 	}
@@ -48,7 +50,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 
 		// Ignore channel if paused
 		if c.ChanSettings.Paused {
-			logging.I("Channel with name %q is paused, skipping checks.", c.Name)
+			logger.Pl.I("Channel with name %q is paused, skipping checks.", c.Name)
 			continue
 		}
 
@@ -56,7 +58,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 		crawlFreq := c.GetCrawlFreq()
 		timeSinceLastScan := time.Since(c.LastScan)
 
-		logging.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
+		logger.Pl.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
 			c.Name,
 			timeSinceLastScan.Round(time.Second),
 			crawlFreq)
@@ -65,7 +67,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 			crawlFreqDuration := time.Duration(crawlFreq) * time.Minute
 			if timeSinceLastScan < crawlFreqDuration {
 				remainingTime := crawlFreqDuration - timeSinceLastScan
-				logging.P("Next check in: %s", remainingTime.Round(time.Second))
+				logger.Pl.P("Next check in: %s", remainingTime.Round(time.Second))
 				fmt.Println()
 				continue
 			}
@@ -119,7 +121,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 	if c.IsBlocked() {
 		unlocked, err = cs.CheckOrUnlockChannel(c)
 		if err != nil {
-			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			logger.Pl.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
 
@@ -178,7 +180,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		if !unlocked {
 			parsed, err := url.Parse(targetChannelURLModel.URL)
 			if err != nil {
-				logging.W("Unable to parse %q, skipping...", targetChannelURLModel.URL)
+				logger.Pl.W("Unable to parse %q, skipping...", targetChannelURLModel.URL)
 				continue
 			}
 			hostname := parsed.Hostname()
@@ -228,7 +230,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		// Get the ChannelURL model stored earlier
 		cu, exists := channelURLModels[channelURLID]
 		if !exists {
-			logging.E("Could not find ChannelURL model for ID %d", channelURLID)
+			logger.Pl.E("Could not find ChannelURL model for ID %d", channelURLID)
 			continue
 		}
 
@@ -283,13 +285,13 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	}
 
 	fmt.Println()
-	logging.I("%sINITIALIZING CRAWL:%s Channel %q:\n", consts.ColorGreen, consts.ColorReset, c.Name)
+	logger.Pl.I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
 
 	// Check if site is blocked or should be unlocked, and filter URLs if needed
 	if c.IsBlocked() {
 		unlocked, err := cs.CheckOrUnlockChannel(c)
 		if err != nil {
-			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			logger.Pl.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
 
@@ -298,7 +300,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 			allowedURLModels, hasAllowed := filterBlockedURLs(c)
 
 			if !hasAllowed {
-				logging.D(1, "All URLs for channel %q are blocked by hostname(s) %v, skipping crawl", c.Name, c.ChanSettings.BotBlockedHostnames)
+				logger.Pl.D(1, "All URLs for channel %q are blocked by hostname(s) %v, skipping crawl", c.Name, c.ChanSettings.BotBlockedHostnames)
 				return nil
 			}
 
@@ -315,7 +317,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	}
 
 	if len(videos) == 0 {
-		logging.I("No new releases for channel %q", c.Name)
+		logger.Pl.I("No new releases for channel %q", c.Name)
 		if err := cs.UpdateLastScan(c.ID); err != nil {
 			return fmt.Errorf("failed to update last scan time: %w", err)
 		}
@@ -348,7 +350,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 			continue
 		}
 
-		logging.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
+		logger.Pl.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 
 		// Process video batch
 		succeeded, downloaded, procErr := InitProcess(ctx, s, c, cu, vRequests, scrape)
@@ -357,7 +359,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 		if succeeded != 0 {
 			nSucceeded += succeeded
 			if downloaded > 0 {
-				logging.S("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", downloaded, cu.URL, consts.ColorGreen, c.Name, consts.ColorReset)
+				logger.Pl.S("Successfully downloaded %d video(s) for URL %q %s(Channel: %s)%s", downloaded, cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 				channelURLsGotNew = append(channelURLsGotNew, cu.URL)
 				nDownloaded += downloaded
 			}
@@ -401,7 +403,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 	if c.IsBlocked() {
 		unlocked, err := cs.CheckOrUnlockChannel(c)
 		if err != nil {
-			logging.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
+			logger.Pl.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
 
@@ -424,7 +426,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 	if len(videos) > 0 {
 		for _, v := range videos {
 			if v.URL == "" {
-				logging.D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
+				logger.Pl.D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
 				continue
 			}
 			v.MarkVideoAsIgnored()
@@ -432,14 +434,14 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 		validVideos, err := s.VideoStore().AddVideos(videos, c.ID)
 		if err != nil {
-			logging.E("Encountered the following errors adding videos for channel %q: %v", c.Name, err)
+			logger.Pl.E("Encountered the following errors adding videos for channel %q: %v", c.Name, err)
 
 			if len(validVideos) == 0 {
 				return fmt.Errorf("no videos were successfully added to the ignore list for channel with ID %d", c.ID)
 			}
 		}
 
-		logging.S("Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
+		logger.Pl.S("Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
 	}
 	return nil
 }
@@ -455,7 +457,7 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 
 		parsed, err := url.Parse(cu.URL)
 		if err != nil {
-			logging.W("Unable to parse %q, skipping...", cu.URL)
+			logger.Pl.W("Unable to parse %q, skipping...", cu.URL)
 			continue
 		}
 
@@ -465,7 +467,7 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 		}
 
 		if slices.Contains(c.ChanSettings.BotBlockedHostnames, hostname) {
-			logging.D(1, "Skipping URL %q for channel %q. (Blocked by %q)", cu.URL, c.Name, hostname)
+			logger.Pl.D(1, "Skipping URL %q for channel %q. (Blocked by %q)", cu.URL, c.Name, hostname)
 			continue
 		}
 
@@ -523,7 +525,7 @@ func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *m
 	parsedCURL, err := url.Parse(cu.URL)
 	hostname := parsedCURL.Hostname()
 	if err != nil {
-		logging.E("Could not parse %q, will use full domain", cu.URL)
+		logger.Pl.E("Could not parse %q, will use full domain", cu.URL)
 		hostname = cu.URL
 	}
 
@@ -553,7 +555,7 @@ func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *m
 		return fmt.Errorf("failed to block channel %q due to bot detection: %w", c.Name, err)
 	}
 
-	logging.W("Blocked channel %q due to bot detection on hostname %q", c.Name, hostname)
+	logger.Pl.W("Blocked channel %q due to bot detection on hostname %q", c.Name, hostname)
 	return nil
 }
 

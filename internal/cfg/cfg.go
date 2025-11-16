@@ -9,10 +9,13 @@ import (
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/paths"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
-	"tubarr/internal/utils/benchmark"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/benchmark"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -28,7 +31,7 @@ var rootCmd = &cobra.Command{
 		// Setup benchmarking if flag is set
 		if viper.GetBool(keys.Benchmarking) {
 			var err error
-			benchmark.BenchmarkFiles, err = benchmark.SetupBenchmarking()
+			vars.BenchmarkFiles, err = benchmark.SetupBenchmarking(logger.Pl, paths.BenchmarkDir)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to setup benchmarking: %v\n", err)
 				return

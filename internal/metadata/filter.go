@@ -8,11 +8,13 @@ import (
 	"strings"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/logging"
 )
 
 // filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
@@ -43,9 +45,9 @@ func filterOpsFilter(v *models.Video, filters []models.Filters, channelName stri
 
 		if failHard {
 			if err := removeUnwantedJSON(v.JSONPath); err != nil {
-				logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+				logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 			}
-			logging.I("Video %q failed hard on filter %v for channel %q", v.URL, filter, channelName)
+			logger.Pl.I("Video %q failed hard on filter %v for channel %q", v.URL, filter, channelName)
 			return false
 		}
 
@@ -56,7 +58,7 @@ func filterOpsFilter(v *models.Video, filters []models.Filters, channelName stri
 			case "any":
 				anyPassed++
 			}
-			logging.S("Video %q passed filter %v for channel %q", v.URL, filter, channelName)
+			logger.Pl.S("Video %q passed filter %v for channel %q", v.URL, filter, channelName)
 		}
 	}
 
@@ -106,10 +108,10 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 	}
 
 	if logging.Level >= 2 {
-		logging.P("Filtered meta op results for channel %q:", channelName)
+		logger.Pl.P("Filtered meta op results for channel %q:", channelName)
 		for _, fmo := range result {
 			for _, mo := range fmo.MetaOps {
-				logging.P("%q [FILTERS MATCHED?: %v]", keys.BuildMetaOpsKeyWithChannel(mo), fmo.FiltersMatched)
+				logger.Pl.P("%q [FILTERS MATCHED?: %v]", keys.BuildMetaOpsKeyWithChannel(mo), fmo.FiltersMatched)
 			}
 		}
 	}
@@ -150,10 +152,10 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 	}
 
 	if logging.Level >= 2 {
-		logging.P("Filtered filename op results for channel %q:", channelName)
+		logger.Pl.P("Filtered filename op results for channel %q:", channelName)
 		for _, ffo := range result {
 			for _, fo := range ffo.FilenameOps {
-				logging.P("%q [FILTERS MATCHED?: %v]", keys.BuildFilenameOpsKeyWithChannel(fo), ffo.FiltersMatched)
+				logger.Pl.P("%q [FILTERS MATCHED?: %v]", keys.BuildFilenameOpsKeyWithChannel(fo), ffo.FiltersMatched)
 			}
 		}
 	}
@@ -211,13 +213,13 @@ func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL strin
 	switch filter.ContainsOmits {
 	case consts.FilterContains:
 		if !exists {
-			logging.I("%s mismatch: Video %q does not contain desired field %q", filterType, videoURL, filter.Field)
+			logger.Pl.I("%s mismatch: Video %q does not contain desired field %q", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return true, false
 	case consts.FilterOmits:
 		if exists && filter.MustAny == "must" {
-			logging.I("%s mismatch: Video %q contains unwanted field %q", filterType, videoURL, filter.Field)
+			logger.Pl.I("%s mismatch: Video %q contains unwanted field %q", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return !exists, false
@@ -233,7 +235,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			return true, false
 		}
 		if filter.MustAny == "must" {
-			logging.I("%s mismatch: Video %q does not contain desired %q in %q", filterType, videoURL, filter.Value, filter.Field)
+			logger.Pl.I("%s mismatch: Video %q does not contain desired %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
 	case consts.FilterOmits:
@@ -241,7 +243,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			return true, false
 		}
 		if filter.MustAny == "must" {
-			logging.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
+			logger.Pl.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
 	}
@@ -251,7 +253,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 // uploadDateFilter filters a video based on its upload date.
 func uploadDateFilter(v *models.Video, cu *models.ChannelURL, channelName string) (passed bool, err error) {
 	if v.UploadDate.IsZero() {
-		logging.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
+		logger.Pl.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
 		return true, nil
 	}
 
@@ -288,21 +290,21 @@ func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum i
 	fromDate, err := strconv.Atoi(cu.ChanURLSettings.FromDate)
 	if err != nil {
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
 		return false, fmt.Errorf("invalid 'from date' format: %w", err)
 	}
 
 	if uploadDateNum < fromDate {
-		logging.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.FromDate)
+		logger.Pl.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.FromDate)
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
-		logging.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, fromDate, uploadDateNum)
+		logger.Pl.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, fromDate, uploadDateNum)
 		return false, nil
 	}
 
-	logging.S("Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
+	logger.Pl.S("Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
 	return true, nil
 }
 
@@ -315,21 +317,21 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 	toDate, err := strconv.Atoi(cu.ChanURLSettings.ToDate)
 	if err != nil {
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
 		return false, fmt.Errorf("invalid 'to date' format: %w", err)
 	}
 
 	if uploadDateNum > toDate {
-		logging.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.ToDate)
+		logger.Pl.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.ToDate)
 		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logging.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
+			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
 		}
-		logging.I("Video %q failed 'To Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, toDate, uploadDateNum)
+		logger.Pl.I("Video %q failed 'To Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, toDate, uploadDateNum)
 		return false, nil
 	}
 
-	logging.S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
+	logger.Pl.S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
 	return true, nil
 }
 
@@ -344,34 +346,34 @@ func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.D
 	filterFile := cu.ChanURLSettings.FilterFile
 
 	if filterFile, err = dp.ParseDirectory(filterFile, v, "filter-ops"); err != nil {
-		logging.E("Failed to parse directory %q: %v", filterFile, err)
+		logger.Pl.E("Failed to parse directory %q: %v", filterFile, err)
 		return nil
 	}
 
-	logging.I("Adding filters from file %q...", filterFile)
+	logger.Pl.I("Adding filters from file %q...", filterFile)
 	filters, err := file.ReadFileLines(filterFile)
 	if err != nil {
-		logging.E("Error loading filters from file %q: %v", filterFile, err)
+		logger.Pl.E("Error loading filters from file %q: %v", filterFile, err)
 	}
 
 	if len(filters) == 0 {
-		logging.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
+		logger.Pl.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
 		return nil
 	}
 
 	// Parse filters from strings
 	parsedFilters, err := parsing.ParseFilterOps(filters)
 	if err != nil {
-		logging.E("Error parsing filters from file %v: %v", filterFile, err)
+		logger.Pl.E("Error parsing filters from file %v: %v", filterFile, err)
 		return nil
 	}
 
 	// Validate the parsed filters
 	if err := validation.ValidateFilterOps(parsedFilters); err != nil {
-		logging.E("Error validating filters from file %v: %v", filterFile, err)
+		logger.Pl.E("Error validating filters from file %v: %v", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		logging.D(1, "Found following filters in file:\n\n%v", parsedFilters)
+		logger.Pl.D(1, "Found following filters in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters
@@ -388,34 +390,34 @@ func loadFilteredMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *par
 	filterFile := cu.ChanURLMetarrArgs.FilteredMetaOpsFile
 
 	if filterFile, err = dp.ParseDirectory(filterFile, v, "filtered-meta-ops"); err != nil {
-		logging.E("Failed to parse directory %q: %v", filterFile, err)
+		logger.Pl.E("Failed to parse directory %q: %v", filterFile, err)
 		return nil
 	}
 
-	logging.I("Adding filtered meta ops from file %q...", filterFile)
+	logger.Pl.I("Adding filtered meta ops from file %q...", filterFile)
 	filters, err := file.ReadFileLines(filterFile)
 	if err != nil {
-		logging.E("Error loading filters from file %q: %v", filterFile, err)
+		logger.Pl.E("Error loading filters from file %q: %v", filterFile, err)
 	}
 
 	if len(filters) == 0 {
-		logging.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
+		logger.Pl.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
 		return nil
 	}
 
 	// Parse filtered meta ops from strings
 	parsedFilters, err := parsing.ParseFilteredMetaOps(filters)
 	if err != nil {
-		logging.E("Error parsing filtered meta ops from file %v: %v", filterFile, err)
+		logger.Pl.E("Error parsing filtered meta ops from file %v: %v", filterFile, err)
 		return nil
 	}
 
 	// Validate the parsed ops
 	if err := validation.ValidateFilteredMetaOps(parsedFilters); err != nil {
-		logging.E("Error validating filtered meta ops from file %v: %v", filterFile, err)
+		logger.Pl.E("Error validating filtered meta ops from file %v: %v", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		logging.D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
+		logger.Pl.D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters
@@ -432,34 +434,34 @@ func loadFilteredFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp 
 	filterFile := cu.ChanURLMetarrArgs.FilteredFilenameOpsFile
 
 	if filterFile, err = dp.ParseDirectory(filterFile, v, "filtered-filename-ops"); err != nil {
-		logging.E("Failed to parse directory %q: %v", filterFile, err)
+		logger.Pl.E("Failed to parse directory %q: %v", filterFile, err)
 		return nil
 	}
 
-	logging.I("Adding filtered filename ops from file %q...", filterFile)
+	logger.Pl.I("Adding filtered filename ops from file %q...", filterFile)
 	filters, err := file.ReadFileLines(filterFile)
 	if err != nil {
-		logging.E("Error loading filtered filename ops from file %q: %v", filterFile, err)
+		logger.Pl.E("Error loading filtered filename ops from file %q: %v", filterFile, err)
 	}
 
 	if len(filters) == 0 {
-		logging.I("No valid filtered filename ops found in file. Format is one per line 'title:contains:dogs:must' (Only apply filename ops to videos with 'dogs' in the title)")
+		logger.Pl.I("No valid filtered filename ops found in file. Format is one per line 'title:contains:dogs:must' (Only apply filename ops to videos with 'dogs' in the title)")
 		return nil
 	}
 
 	// Parse filtered filename ops from strings
 	parsedFilters, err := parsing.ParseFilteredFilenameOps(filters)
 	if err != nil {
-		logging.E("Error parsing filtered filename ops from file %v: %v", filterFile, err)
+		logger.Pl.E("Error parsing filtered filename ops from file %v: %v", filterFile, err)
 		return nil
 	}
 
 	// Validate the parsed ops
 	if err := validation.ValidateFilteredFilenameOps(parsedFilters); err != nil {
-		logging.E("Error validating filtered filename ops from file %v: %v", filterFile, err)
+		logger.Pl.E("Error validating filtered filename ops from file %v: %v", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		logging.D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
+		logger.Pl.D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters
@@ -476,34 +478,34 @@ func loadMoveOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.Dir
 	moveOpFile := cu.ChanURLSettings.MetaFilterMoveOpFile
 
 	if moveOpFile, err = dp.ParseDirectory(moveOpFile, v, "move-ops"); err != nil {
-		logging.E("Failed to parse directory %q: %v", moveOpFile, err)
+		logger.Pl.E("Failed to parse directory %q: %v", moveOpFile, err)
 		return nil
 	}
 
-	logging.I("Adding filter move operations from file %q...", moveOpFile)
+	logger.Pl.I("Adding filter move operations from file %q...", moveOpFile)
 	moves, err := file.ReadFileLines(moveOpFile)
 	if err != nil {
-		logging.E("Error loading filter move operations from file %q: %v", moveOpFile, err)
+		logger.Pl.E("Error loading filter move operations from file %q: %v", moveOpFile, err)
 	}
 
 	if len(moves) == 0 {
-		logging.I("No valid filter move operations found in file. Format is one per line 'title:dogs:/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs)")
+		logger.Pl.I("No valid filter move operations found in file. Format is one per line 'title:dogs:/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs)")
 		return nil
 	}
 
 	// Parse meta filter move ops from strings
 	parsedMoves, err := parsing.ParseMetaFilterMoveOps(moves)
 	if err != nil {
-		logging.E("Error parsing filter move operations from file %q: %v", moveOpFile, err)
+		logger.Pl.E("Error parsing filter move operations from file %q: %v", moveOpFile, err)
 		return nil
 	}
 
 	// Validate the parsed ops
 	if err := validation.ValidateMetaFilterMoveOps(parsedMoves); err != nil {
-		logging.E("Error validating filter move operations from file %q: %v", moveOpFile, err)
+		logger.Pl.E("Error validating filter move operations from file %q: %v", moveOpFile, err)
 	}
 	if len(parsedMoves) > 0 {
-		logging.D(1, "Found following filter move operations in file:\n\n%v", parsedMoves)
+		logger.Pl.D(1, "Found following filter move operations in file:\n\n%v", parsedMoves)
 	}
 
 	return parsedMoves
@@ -536,6 +538,6 @@ func removeUnwantedJSON(path string) error {
 		return err
 	}
 
-	logging.S("Removed unwanted JSON file %q", path)
+	logger.Pl.S("Removed unwanted JSON file %q", path)
 	return nil
 }

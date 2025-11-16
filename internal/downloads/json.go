@@ -6,11 +6,12 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
@@ -39,10 +40,10 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	// Cookie source
 	if abstractions.IsSet(keys.CookiesFromBrowser) {
 		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
-		logging.I("Using cookies from browser %q", browserCookiesFromBrowser)
+		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
 		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)
 	} else {
-		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
+		logger.Pl.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 
 	// Max filesize specified
@@ -115,7 +116,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	logging.I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
+	logger.Pl.I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("yt-dlp error for %s: %w\nStderr: %s", d.Video.URL, err, stderr.String())
@@ -124,20 +125,20 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	// Find the line containing the JSON path
 	outputLines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
 	if len(outputLines) == 0 {
-		logging.D(1, "Full stdout: %s", stdout.String())
-		logging.D(1, "Full stderr: %s", stderr.String())
+		logger.Pl.D(1, "Full stdout: %s", stdout.String())
+		logger.Pl.D(1, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("no output lines found for %s", d.Video.URL)
 	}
 
 	var jsonPath string
 
 	fileLine := outputLines[len(outputLines)-1]
-	logging.D(1, "File line captured as: %v", fileLine)
+	logger.Pl.D(1, "File line captured as: %v", fileLine)
 
 	_, jsonPath, found := strings.Cut(fileLine, ": ")
 	if !found || jsonPath == "" {
-		logging.D(1, "Full stdout: %s", stdout.String())
-		logging.D(1, "Full stderr: %s", stderr.String())
+		logger.Pl.D(1, "Full stdout: %s", stdout.String())
+		logger.Pl.D(1, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("could not find JSON file path in output for %s", d.Video.URL)
 	}
 
@@ -148,6 +149,6 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 		return err
 	}
 
-	logging.I("Successfully saved JSON file to %q", d.Video.JSONPath)
+	logger.Pl.I("Successfully saved JSON file to %q", d.Video.JSONPath)
 	return nil
 }

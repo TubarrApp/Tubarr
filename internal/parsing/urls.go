@@ -41,7 +41,7 @@ package parsing
 // 	defer func() {
 // 		if err := f.Close(); err != nil {
 // 			errMsg := err.Error()
-// 			logging.E("Failed to close file %q: %s", up.Filepath, errMsg)
+// 			logger.Pl.E("Failed to close file %q: %s", up.Filepath, errMsg)
 // 		}
 // 	}()
 
@@ -56,7 +56,7 @@ package parsing
 
 // 		parsedURL, err := url.Parse(u)
 // 		if err != nil {
-// 			logging.E("URL %q is invalid: %v", u, err)
+// 			logger.Pl.E("URL %q is invalid: %v", u, err)
 // 			continue
 // 		}
 // 		urls[parsedURL.String()] = struct{}{}

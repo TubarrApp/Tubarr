@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 
 	"github.com/browserutils/kooky"
 	// Use all browsers for Kooky:
@@ -41,7 +41,7 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 	if cu.IsManual || cu.ID == 0 {
 		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
 		if err != nil {
-			logging.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
+			logger.Pl.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
 		}
 	}
 
@@ -72,7 +72,7 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 			return nil, "", ctx.Err()
 		}
 		if err != nil {
-			logging.E("Failed to get auth cookies for %q: %v", cu.URL, err)
+			logger.Pl.E("Failed to get auth cookies for %q: %v", cu.URL, err)
 		}
 	}
 
@@ -80,7 +80,7 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 	if c.ChanSettings.UseGlobalCookies {
 		regCookies, err = cm.GetCookies(cu.URL)
 		if err != nil {
-			logging.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookiesFromBrowser, err)
+			logger.Pl.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookiesFromBrowser, err)
 		}
 	}
 
@@ -88,7 +88,7 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 	cookies = mergeCookies(authCookies, regCookies)
 
 	for i := range cookies {
-		logging.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
+		logger.Pl.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
 	}
 
 	// Save cookies to file
@@ -160,9 +160,9 @@ func (cm *CookieManager) loadCookiesForDomain(domain string) []*http.Cookie {
 		for _, d := range domainsToTry {
 			kookieCookies, err := store.ReadCookies(kooky.Valid, kooky.Domain(d))
 			if err != nil {
-				logging.D(4, "Failed reading cookies from %s for domain %s: %v", browserName, d, err)
+				logger.Pl.D(4, "Failed reading cookies from %s for domain %s: %v", browserName, d, err)
 				if !os.IsNotExist(err) {
-					logging.D(2, "Failed reading cookies from %s for domain %s: %v", browserName, d, err)
+					logger.Pl.D(2, "Failed reading cookies from %s for domain %s: %v", browserName, d, err)
 				}
 				continue
 			}
@@ -180,14 +180,14 @@ func (cm *CookieManager) loadCookiesForDomain(domain string) []*http.Cookie {
 			}
 
 			if cookiesFound > 0 {
-				logging.I("Found %d cookies from %s for domain %s", cookiesFound, browserName, d)
+				logger.Pl.I("Found %d cookies from %s for domain %s", cookiesFound, browserName, d)
 			}
 		}
 	}
 
-	logging.I("Checked browsers: %v", attempted)
+	logger.Pl.I("Checked browsers: %v", attempted)
 	if len(cookies) == 0 {
-		logging.I("No cookies found for %s", domain)
+		logger.Pl.I("No cookies found for %s", domain)
 	}
 
 	return cookies
@@ -225,7 +225,7 @@ func generateCookieFilePath(channelName, videoURL string) string {
 // saveCookiesToFile saves the cookies to a file in Netscape format.
 func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) error {
 	if len(cookies) == 0 {
-		logging.D(2, "No cookies to write, skipping cookie file creation for login URL %q and generated path %q", loginURL, cookieFilePath)
+		logger.Pl.D(2, "No cookies to write, skipping cookie file creation for login URL %q and generated path %q", loginURL, cookieFilePath)
 		return nil
 	}
 
@@ -235,7 +235,7 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E("failed to close file %q due to error: %v", cookieFilePath, err)
+			logger.Pl.E("failed to close file %q due to error: %v", cookieFilePath, err)
 		}
 	}()
 
@@ -246,7 +246,7 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 	}
 
 	// Log the cookies for debugging
-	logging.D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
+	logger.Pl.D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
 
 	for _, cookie := range cookies {
 		domain := cookie.Domain
@@ -323,7 +323,7 @@ func tryLoadCachedCookies(key string) ([]*http.Cookie, bool) {
 	}
 
 	if len(cookies) == 0 {
-		logging.W("Found cached auth for %q but cookie slice is empty", key)
+		logger.Pl.W("Found cached auth for %q but cookie slice is empty", key)
 	}
 
 	return cookies, true

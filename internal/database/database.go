@@ -4,8 +4,8 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
-	"tubarr/internal/utils/logging"
 
 	// Package sqlite3 provides interface to SQLite3 databases.
 	_ "github.com/mattn/go-sqlite3"
@@ -64,12 +64,12 @@ func (d *Database) initTables() error {
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for table creation: %v", rbErr)
+				logger.Pl.E("Panic rollback failed for table creation: %v", rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("transaction rollback failed after original error %v: %v", err, rbErr)
+				logger.Pl.E("transaction rollback failed after original error %v: %v", err, rbErr)
 			}
 		}
 	}()

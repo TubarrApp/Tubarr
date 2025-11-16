@@ -2,10 +2,10 @@ package metarr
 
 import (
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 )
 
@@ -45,31 +45,31 @@ func loadMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.Dir
 	metaOpsFile := cu.ChanURLMetarrArgs.MetaOpsFile
 	var err error
 	if metaOpsFile, err = dp.ParseDirectory(metaOpsFile, v, "meta ops"); err != nil {
-		logging.E("Failed to parse directory %q: %v", metaOpsFile, err)
+		logger.Pl.E("Failed to parse directory %q: %v", metaOpsFile, err)
 		return nil
 	}
 
-	logging.I("Adding meta ops from file %q...", metaOpsFile)
+	logger.Pl.I("Adding meta ops from file %q...", metaOpsFile)
 	ops, err := file.ReadFileLines(metaOpsFile)
 	if err != nil {
-		logging.E("Error loading meta ops from file %q: %v", metaOpsFile, err)
+		logger.Pl.E("Error loading meta ops from file %q: %v", metaOpsFile, err)
 		return nil
 	}
 
 	// Parse meta operations from strings
 	parsedOps, err := parsing.ParseMetaOps(ops)
 	if err != nil {
-		logging.E("Error parsing meta ops from file %q: %v", metaOpsFile, err)
+		logger.Pl.E("Error parsing meta ops from file %q: %v", metaOpsFile, err)
 		return nil
 	}
 
 	// Validate the parsed operations
 	if err := validation.ValidateMetaOps(parsedOps); err != nil {
-		logging.E("Error validating meta ops from file %q: %v", metaOpsFile, err)
+		logger.Pl.E("Error validating meta ops from file %q: %v", metaOpsFile, err)
 		return nil
 	}
 
-	logging.I("Loaded %d meta ops from file", len(parsedOps))
+	logger.Pl.I("Loaded %d meta ops from file", len(parsedOps))
 	return parsedOps
 }
 
@@ -89,7 +89,7 @@ func filterConflictingMetaOps(fileOps, dbOps []models.MetaOps) []models.MetaOps 
 		if !fileOpKeys[op.Field+":"+op.OpType] || isNonConflictingMetaOp[op.OpType] {
 			result = append(result, op)
 		} else {
-			logging.D(2, "File meta op overrides DB op: %s", keys.BuildMetaOpsKey(op))
+			logger.Pl.D(2, "File meta op overrides DB op: %s", keys.BuildMetaOpsKey(op))
 		}
 	}
 	return result
@@ -105,7 +105,7 @@ func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMet
 	for _, op := range ops {
 		key := keys.BuildMetaOpsKey(op)
 		if !matchedFilteredKeys[key] {
-			logging.D(2, "Added operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
+			logger.Pl.D(2, "Added operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
 		}
 	}

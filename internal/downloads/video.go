@@ -11,13 +11,14 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/state"
-	"tubarr/internal/utils/logging"
+
+	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
@@ -55,10 +56,10 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Cookie source
 	if abstractions.IsSet(keys.CookiesFromBrowser) {
 		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
-		logging.I("Using cookies from browser %q", browserCookiesFromBrowser)
+		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
 		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)
 	} else {
-		logging.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
+		logger.Pl.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
 
 	// Max filesize specified
@@ -151,7 +152,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	filenameChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 
-	logging.I("Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
+	logger.Pl.I("Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
@@ -164,7 +165,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 			select {
 			case lineChan <- scanner.Text():
 			case <-d.Context.Done():
-				logging.W("Download cancelled: %v", d.Context.Err())
+				logger.Pl.W("Download cancelled: %v", d.Context.Err())
 				return
 			}
 		}
@@ -179,13 +180,13 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	select {
 	case <-d.Context.Done():
-		logging.W("Download cancelled: %v", d.Context.Err())
+		logger.Pl.W("Download cancelled: %v", d.Context.Err())
 
 		// End the command
 		if err := cmd.Cancel(); err != nil {
 			if cmd.Process != nil {
 				if err = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
-					logging.E("Failed to kill process %v: %v", cmd.Process.Pid, err)
+					logger.Pl.E("Failed to kill process %v: %v", cmd.Process.Pid, err)
 				}
 			}
 		}
@@ -248,7 +249,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 	)
 	for line := range lineChan {
 		if line != "" {
-			logging.D(4, "Video %d download terminal output: %q", d.Video.ID, line)
+			logger.Pl.D(4, "Video %d download terminal output: %q", d.Video.ID, line)
 		}
 
 		// Collect error messages

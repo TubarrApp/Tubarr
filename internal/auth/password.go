@@ -12,8 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"tubarr/internal/domain/consts"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 const asterisks = "********"
@@ -131,11 +132,11 @@ func (pm *PasswordManager) ensureAESKey(homeDir string) (hashed []byte, err erro
 		}
 
 		keyStr := base64.StdEncoding.EncodeToString(key)
-		if err := os.WriteFile(pm.aesFilepath, []byte(keyStr), consts.PermsPrivateFile); err != nil {
+		if err := os.WriteFile(pm.aesFilepath, []byte(keyStr), sharedconsts.PermsPrivateFile); err != nil {
 			return nil, fmt.Errorf("failed to write encryption key: %w", err)
 		}
 
-		logging.S("Generated new encryption key at: %s", pm.aesFilepath)
+		logger.Pl.S("Generated new encryption key at: %s", pm.aesFilepath)
 		return key, nil
 
 	} else if err != nil { // Some other error checking the file

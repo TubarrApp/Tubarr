@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"sync"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 )
 
 var ongoingDownloads sync.Map
@@ -71,7 +71,7 @@ func (d *VideoDownload) cleanup() {
 	// Clean up temp file if exists
 	if d.tempFile != "" {
 		if err := os.Remove(d.tempFile); err != nil && !os.IsNotExist(err) {
-			logging.W("Failed to remove temp file %s: %v", d.tempFile, err)
+			logger.Pl.W("Failed to remove temp file %s: %v", d.tempFile, err)
 		}
 		d.tempFile = ""
 	}
@@ -110,7 +110,7 @@ func (d *JSONDownload) cleanup() {
 	// Clean up temp file if exists
 	if d.tempFile != "" {
 		if err := os.Remove(d.tempFile); err != nil && !os.IsNotExist(err) {
-			logging.W("Failed to remove temp file %s: %v", d.tempFile, err)
+			logger.Pl.W("Failed to remove temp file %s: %v", d.tempFile, err)
 		}
 		d.tempFile = ""
 	}
@@ -119,20 +119,20 @@ func (d *JSONDownload) cleanup() {
 // RegisterDownloadContext registers a cancellation function for a video download.
 func RegisterDownloadContext(videoID int64, videoURL string, cancel context.CancelFunc) {
 	activeDownloadContexts.Store(videoID, cancel)
-	logging.D(2, "Registered cancellation context for video ID %d", videoID)
+	logger.Pl.D(2, "Registered cancellation context for video ID %d", videoID)
 }
 
 // UnregisterDownloadContext removes a video's cancellation function.
 func UnregisterDownloadContext(videoID int64, videoURL string) {
 	activeDownloadContexts.Delete(videoID)
-	logging.D(2, "Unregistered cancellation context for video ID %d", videoID)
+	logger.Pl.D(2, "Unregistered cancellation context for video ID %d", videoID)
 }
 
 // CancelDownloadByVideoID cancels an active download by video ID.
 func CancelDownloadByVideoID(videoID int64, videoURL string) bool {
 	if cancel, ok := activeDownloadContexts.Load(videoID); ok {
 		if cancelFunc, ok := cancel.(context.CancelFunc); ok {
-			logging.I("Cancelling download for video ID %d", videoID)
+			logger.Pl.I("Cancelling download for video ID %d", videoID)
 			cancelFunc()
 			return true
 		}

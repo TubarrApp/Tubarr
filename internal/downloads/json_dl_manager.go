@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
-	"tubarr/internal/utils/times"
+	"tubarr/internal/times"
 )
 
 // NewJSONDownload creates a download operation with specified options.
@@ -17,7 +17,7 @@ func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *m
 		return nil, errors.New("video cannot be nil")
 	}
 
-	logging.D(1, "JSON download called with video URL: %q", video.URL)
+	logger.Pl.D(1, "JSON download called with video URL: %q", video.URL)
 
 	dl := &JSONDownload{
 		Video:      video,
@@ -43,7 +43,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 	}
 
 	if _, exists := ongoingDownloads.LoadOrStore(d.Video.URL, struct{}{}); exists {
-		logging.I("Skipping duplicate download for: %s", d.Video.URL)
+		logger.Pl.I("Skipping duplicate download for: %s", d.Video.URL)
 		return false, nil
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
@@ -53,12 +53,12 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 
 	var lastErr error
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
-		logging.I("Starting JSON download attempt %d/%d for URL: %s",
+		logger.Pl.I("Starting JSON download attempt %d/%d for URL: %s",
 			attempt, d.Options.MaxRetries, d.Video.URL)
 
 		select {
 		case <-d.Context.Done():
-			logging.W("Download cancelled: %v", d.Context.Err())
+			logger.Pl.W("Download cancelled: %v", d.Context.Err())
 			return false, d.cancelJSONDownload()
 		default:
 			if err := d.jsonDLAttempt(); err != nil {
@@ -74,15 +74,15 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 
 				// Other errors - continue with retry logic
 				lastErr = err
-				logging.E("Download attempt %d failed: %v", attempt, err)
+				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
 
 				if attempt < d.Options.MaxRetries {
 					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
-					logging.I("Waiting %d seconds before retrying JSON download for %q...", d.Video.URL)
+					logger.Pl.I("Waiting %d seconds before retrying JSON download for %q...", d.Video.URL)
 
 					select {
 					case <-d.Context.Done():
-						logging.W("Download cancelled: %v", d.Context.Err())
+						logger.Pl.W("Download cancelled: %v", d.Context.Err())
 						return false, d.cancelJSONDownload()
 					case <-time.After(randWait):
 						continue
@@ -92,7 +92,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 				// Success
 				d.Video.UpdatedAt = time.Now()
 
-				logging.S("Successfully completed JSON download for URL: %s", d.Video.URL)
+				logger.Pl.S("Successfully completed JSON download for URL: %s", d.Video.URL)
 				return false, nil
 			}
 		}

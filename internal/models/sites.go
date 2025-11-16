@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 )
 
 // Site is not yet implemented.
@@ -145,27 +145,37 @@ type Video struct {
 func (v *Video) StoreFilenamesFromMetarr(cmdOut string) {
 	lines := strings.Split(cmdOut, "\n")
 	if len(lines) < 2 {
-		logging.E("Metarr did not return expected lines for video %q. Got: %v", v.URL, lines)
+		logger.Pl.E("Metarr did not return expected lines for video %q. Got: %v", v.URL, lines)
 		return
 	}
 
-	mVPath := strings.TrimPrefix(lines[0], "final video path: ")
-	if mVPath != "" {
-		if _, err := os.Stat(mVPath); err != nil {
-			logging.E("Got invalid video path %q from Metarr: %v", mVPath, err)
+	// Find lines
+	for _, l := range lines {
+		if l == "" {
+			continue
 		}
-		v.VideoPath = mVPath
-	}
 
-	mJPath := strings.TrimPrefix(lines[1], "final json path: ")
-	if mJPath != "" {
-		if _, err := os.Stat(mJPath); err != nil {
-			logging.E("Got invalid JSON path %q from Metarr: %v", mJPath, err)
+		if after, ok := strings.CutPrefix(l, "final video path: "); ok {
+			mVPath := after
+			if mVPath != "" {
+				if _, err := os.Stat(mVPath); err != nil {
+					logger.Pl.E("Got invalid video path %q from Metarr: %v", mVPath, err)
+				}
+				v.VideoPath = mVPath
+			}
 		}
-		v.JSONPath = mJPath
-	}
 
-	logging.S("Video %q got filenames from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.VideoPath, v.JSONPath)
+		if after, ok := strings.CutPrefix(l, "final json path: "); ok {
+			mJPath := after
+			if mJPath != "" {
+				if _, err := os.Stat(mJPath); err != nil {
+					logger.Pl.E("Got invalid JSON path %q from Metarr: %v", mJPath, err)
+				}
+				v.JSONPath = mJPath
+			}
+		}
+	}
+	logger.Pl.S("Video %q got filenames from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.VideoPath, v.JSONPath)
 }
 
 // MarkVideoAsIgnored marks the video as completed and ignored.

@@ -10,9 +10,10 @@ import (
 	"strings"
 	"sync"
 	"tubarr/internal/auth"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 
+	"github.com/TubarrApp/gocommon/logging"
 	"golang.org/x/net/html"
 	"golang.org/x/net/publicsuffix"
 )
@@ -52,7 +53,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 		return nil, err
 	}
 	client := &http.Client{Jar: jar}
-	logging.I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, auth.StarPassword(a.Password))
+	logger.Pl.I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, auth.StarPassword(a.Password))
 
 	// 'GET' the login page to get a fresh token
 	req, err := http.NewRequestWithContext(ctx, "GET", a.LoginURL, nil)
@@ -69,7 +70,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	defer func() {
 		if getResp != nil && getResp.Body != nil {
 			if err := getResp.Body.Close(); err != nil {
-				logging.E("failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
+				logger.Pl.E("failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
 			}
 		}
 	}()
@@ -78,7 +79,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	if err != nil {
 		return nil, err
 	}
-	logging.D(4, "Got login page body %s", string(body))
+	logger.Pl.D(4, "Got login page body %s", string(body))
 
 	// Parse the login page to find any hidden token fields
 	token := parseToken(string(body))
@@ -91,7 +92,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	if token != "" {
 		data.Set("_token", token)
 	}
-	logging.D(1, "Sending token %q", data.Get("_token"))
+	logger.Pl.D(1, "Sending token %q", data.Get("_token"))
 
 	// 'POST' auth details to the login form
 	req, err = http.NewRequestWithContext(ctx, "POST", a.LoginURL, strings.NewReader(data.Encode()))
@@ -110,7 +111,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	defer func() {
 		if postResp != nil && postResp.Body != nil {
 			if err := postResp.Body.Close(); err != nil {
-				logging.E("failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
+				logger.Pl.E("failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
 			}
 		}
 	}()
@@ -118,7 +119,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	// Log the cookies for debugging
 	if logging.Level > 1 {
 		for _, cookie := range postResp.Cookies() {
-			logging.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
+			logger.Pl.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
 		}
 	}
 

@@ -3,6 +3,8 @@ package validation
 import (
 	"fmt"
 	"tubarr/internal/models"
+
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // ValidateSettingsModel validates correct Settings values.
@@ -127,7 +129,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	m.MaxCPU = max(m.MaxCPU, 0)
+	m.MaxCPU = sharedvalidation.ValidateMaxCPU(m.MaxCPU)
 
 	if m.MetaOps != nil {
 		if err := ValidateMetaOps(m.MetaOps); err != nil {
@@ -142,7 +144,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 	}
 
 	if m.MinFreeMem != "" {
-		if err := ValidateMinFreeMem(m.MinFreeMem); err != nil {
+		if _, err := sharedvalidation.ValidateMinFreeMem(m.MinFreeMem); err != nil {
 			return fmt.Errorf("invalid minimum free memory in Metarr settings: %v", m.MinFreeMem)
 		}
 	}

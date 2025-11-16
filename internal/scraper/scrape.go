@@ -15,15 +15,17 @@ import (
 	"os/exec"
 	"strings"
 	"time"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
+
+	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
@@ -56,7 +58,7 @@ func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Chann
 		existingMap[url] = struct{}{}
 	}
 
-	logging.D(2, "Loaded %d existing downloaded video URLs for channel %q", len(existingMap), c.Name)
+	logger.Pl.D(2, "Loaded %d existing downloaded video URLs for channel %q", len(existingMap), c.Name)
 	return existingMap, existingURLs, nil
 }
 
@@ -78,7 +80,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		if cu.IsManual {
 			continue
 		}
-		logging.D(1, "Processing channel URL %q", cu.URL)
+		logger.Pl.D(1, "Processing channel URL %q", cu.URL)
 
 		// Get access details once per ChannelURL - delegated to CookieManager
 		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelCookies(ctx, cs, c, cu)
@@ -108,12 +110,12 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 	// Print summary
 	if len(newRequests) > 0 {
-		logging.I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
+		logger.Pl.I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
 		for i, v := range newRequests {
 			if v == nil {
 				continue
 			}
-			logging.P("%s#%d%s - %q", consts.ColorBlue, i+1, consts.ColorReset, v.URL)
+			logger.Pl.P("%s#%d%s - %q", sharedconsts.ColorBlue, i+1, sharedconsts.ColorReset, v.URL)
 			if i >= consts.MaxDisplayedVideos {
 				break
 			}
@@ -152,7 +154,7 @@ func (s *Scraper) newEpisodeURLs(
 	for domain, p := range patterns {
 		if strings.Contains(channelURL, domain) {
 			pattern = p
-			logging.I("Detected %s link", p.name)
+			logger.Pl.I("Detected %s link", p.name)
 			customDom = true
 			break
 		}
@@ -193,7 +195,7 @@ func (s *Scraper) newEpisodeURLs(
 	newURLs := ignoreDownloadedURLs(episodeURLs, existingURLs)
 
 	if len(newURLs) == 0 {
-		logging.I("No new videos at %s", channelURL)
+		logger.Pl.I("No new videos at %s", channelURL)
 		return nil, nil
 	}
 	return newURLs, nil
@@ -237,14 +239,14 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	args = append(args, channelURL)
 	cmd := exec.CommandContext(ctx, command.YTDLP, args...)
 
-	logging.I("Executing YTDLP playlist fetch command for channel %q URL %q:\n\n%s\n", channelName, channelURL, cmd.String())
+	logger.Pl.I("Executing YTDLP playlist fetch command for channel %q URL %q:\n\n%s\n", channelName, channelURL, cmd.String())
 
 	j, err := cmd.Output()
 	if err != nil {
 		return uniqueEpisodeURLs, fmt.Errorf("yt-dlp command failed: %w", err)
 	}
 
-	logging.D(5, "Retrieved command output from YTDLP for channel %q:\n\n%s", channelURL, string(j))
+	logger.Pl.D(5, "Retrieved command output from YTDLP for channel %q:\n\n%s", channelURL, string(j))
 
 	var result ytDlpOutput
 	if err := json.Unmarshal(j, &result); err != nil {
@@ -253,7 +255,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 
 	for _, entry := range result.Entries {
 		uniqueEpisodeURLs[entry.URL] = struct{}{}
-		logging.D(5, "Added entry for channel %q: %q", channelURL, entry)
+		logger.Pl.D(5, "Added entry for channel %q: %q", channelURL, entry)
 	}
 
 	return uniqueEpisodeURLs, nil
@@ -270,7 +272,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 	// Metadata to populate
 	metadata := make(map[string]any)
 
-	logging.I("Scraping %q for metadata...", urlStr)
+	logger.Pl.I("Scraping %q for metadata...", urlStr)
 
 	collector.OnHTML("html", func(container *colly.HTMLElement) {
 		doc := container.DOM
@@ -293,9 +295,9 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 			}
 		}
 		if v.UploadDate.IsZero() {
-			logging.E("Failed to custom scraped parse upload date %q: %v", uploadDate, err)
+			logger.Pl.E("Failed to custom scraped parse upload date %q: %v", uploadDate, err)
 		} else {
-			logging.I("Extracted upload date %q from metadata (Video URL: %q)", v.UploadDate.String(), v.URL)
+			logger.Pl.I("Extracted upload date %q from metadata (Video URL: %q)", v.UploadDate.String(), v.URL)
 		}
 
 		metadata[consts.MetadataDate] = uploadDate
@@ -315,7 +317,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 
 	// Validate required fields
 	if v.Title == "" || v.DirectVideoURL == "" {
-		logging.D(1, "Scraped metadata: %+v", metadata)
+		logger.Pl.D(1, "Scraped metadata: %+v", metadata)
 		return fmt.Errorf("missing required metadata fields (title: %q, video URL: %q)", v.Title, v.DirectVideoURL)
 	}
 
@@ -325,7 +327,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}
 
-	logging.S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
+	logger.Pl.S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
 	return nil
 }
 
@@ -346,7 +348,7 @@ func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, 
 	if cookies := cm.GetCachedAuthCookies(parsedURL.Host); cookies != nil {
 		jar.SetCookies(parsedURL, cookies)
 	} else {
-		logging.W("no authentication cookies available for %q", parsedURL.Host)
+		logger.Pl.W("no authentication cookies available for %q", parsedURL.Host)
 	}
 
 	// Create a Colly collector with the custom HTTP client
@@ -376,9 +378,9 @@ func sanitizeFilename(name string) string {
 func extractTitle(findStr string, doc *goquery.Selection) string {
 	title := strings.TrimSpace(doc.Find(findStr).Text())
 	if title != "" {
-		logging.D(2, "Scraped title: %s", title)
+		logger.Pl.D(2, "Scraped title: %s", title)
 	} else {
-		logging.D(1, "Title not found")
+		logger.Pl.D(1, "Title not found")
 	}
 	return title
 }
@@ -387,7 +389,7 @@ func extractTitle(findStr string, doc *goquery.Selection) string {
 func extractDescription(findStr string, doc *goquery.Selection) string {
 	description, err := doc.Find(findStr).Html()
 	if err != nil {
-		logging.E("Failed to grab description: %v", err.Error())
+		logger.Pl.E("Failed to grab description: %v", err.Error())
 		return ""
 	}
 
@@ -408,9 +410,9 @@ func extractDescription(findStr string, doc *goquery.Selection) string {
 	description = html.UnescapeString(description)
 
 	if description != "" {
-		logging.D(2, "Scraped description: %s", description)
+		logger.Pl.D(2, "Scraped description: %s", description)
 	} else {
-		logging.D(1, "Description not found")
+		logger.Pl.D(1, "Description not found")
 	}
 
 	return description
@@ -426,11 +428,11 @@ func extractDate(findStr string, doc *goquery.Selection) string {
 	if date != "" {
 		parsedDate, err = parsing.ParseWordDate(date)
 		if err != nil {
-			logging.E(err.Error())
+			logger.Pl.E(err.Error())
 		}
-		logging.D(2, "Scraped release date: %s", date)
+		logger.Pl.D(2, "Scraped release date: %s", date)
 	} else {
-		logging.D(1, "Release date not found")
+		logger.Pl.D(1, "Release date not found")
 	}
 	return strings.TrimSpace(parsedDate)
 }
@@ -439,9 +441,9 @@ func extractDate(findStr string, doc *goquery.Selection) string {
 func extractVideoURL(findStr string, doc *goquery.Selection) string {
 	videoURL, ok := doc.Find(findStr).Attr("href")
 	if ok {
-		logging.D(2, "Scraped video URL: %s", videoURL)
+		logger.Pl.D(2, "Scraped video URL: %s", videoURL)
 	} else {
-		logging.D(1, "Video URL not found")
+		logger.Pl.D(1, "Video URL not found")
 	}
 	return videoURL
 }

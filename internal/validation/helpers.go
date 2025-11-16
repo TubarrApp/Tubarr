@@ -3,7 +3,7 @@ package validation
 import (
 	"net/url"
 	"strings"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 )
 
 // EscapedSplit allows users to escape separator characters without messing up 'strings.Split' logic.
@@ -50,7 +50,7 @@ func CheckForOpURL(op string) (chanURL string, ops string) {
 	u := split[0]
 
 	if _, err := url.ParseRequestURI(u); err != nil {
-		logging.W("Invalid URL format grabbed as %q. Ignore this if the filter (%q) does not contain a channel URL (format is 'channel URL|filter:ops:go:here')", u, op)
+		logger.Pl.W("Invalid URL format grabbed as %q. Ignore this if the filter (%q) does not contain a channel URL (format is 'channel URL|filter:ops:go:here')", u, op)
 		return "", strings.Join(split[1:], "|")
 	}
 	return u, strings.Join(split[1:], "|")
@@ -67,7 +67,7 @@ func DeduplicateSliceEntries(input []string) []string {
 
 	for _, in := range input {
 		if dedupMap[in] {
-			logging.W("Removing duplicate of entry %q", in)
+			logger.Pl.W("Removing duplicate of entry %q", in)
 		}
 		dedupMap[in] = true
 		dedupedSlice = append(dedupedSlice, in)

@@ -8,6 +8,8 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 func fillChannelFromConfigFile(w http.ResponseWriter, input models.ChannelInputPtrs) (*models.Channel, map[string]*models.ChannelAccessDetails) {
@@ -227,7 +229,7 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 
 	// Extract integer fields
 	if v, ok := data["max_concurrency"].(int); ok {
-		valid := validation.ValidateConcurrencyLimit(v)
+		valid := sharedvalidation.ValidateConcurrencyLimit(v)
 		settings.Concurrency = valid
 	}
 	if v, ok := data["crawl_freq"].(int); ok {
@@ -307,7 +309,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.RenameStyle = v
 	}
 	if v, ok := data["metarr_min_free_mem"].(string); ok {
-		if err := validation.ValidateMinFreeMem(v); err != nil {
+		if _, err := sharedvalidation.ValidateMinFreeMem(v); err != nil {
 			return nil, err
 		}
 		metarr.MinFreeMem = v
@@ -346,7 +348,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.TranscodeAudioCodecs = validPairs
 	}
 	if v, ok := data["metarr_transcode_quality"].(string); ok {
-		validQuality, err := validation.ValidateTranscodeQuality(v)
+		validQuality, err := sharedvalidation.ValidateTranscodeQuality(v)
 		if err != nil {
 			return nil, err
 		}
@@ -468,7 +470,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 		http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
 		return nil
 	}
-	maxConcurrency = validation.ValidateConcurrencyLimit(maxConcurrency)
+	maxConcurrency = sharedvalidation.ValidateConcurrencyLimit(maxConcurrency)
 	crawlFreq, err := strconv.Atoi(crawlFreqStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to convert crawl frequency string %q: %v", crawlFreqStr, err), http.StatusBadRequest)
@@ -559,7 +561,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid rename style %q: %v", renameStyle, err), http.StatusBadRequest)
 		return nil
 	}
-	if err := validation.ValidateMinFreeMem(minFreeMem); err != nil {
+	if _, err := sharedvalidation.ValidateMinFreeMem(minFreeMem); err != nil {
 		http.Error(w, fmt.Sprintf("invalid min free mem %q: %v", minFreeMem, err), http.StatusBadRequest)
 		return nil
 	}
@@ -583,7 +585,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid audio codec string %q: %v", transcodeAudioCodecStr, err), http.StatusBadRequest)
 		return nil
 	}
-	transcodeQuality, err := validation.ValidateTranscodeQuality(transcodeQualityStr)
+	transcodeQuality, err := sharedvalidation.ValidateTranscodeQuality(transcodeQualityStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid transcode quality string %q: %v", transcodeQualityStr, err), http.StatusBadRequest)
 		return nil
@@ -599,7 +601,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
 		return nil
 	}
-	maxConcurrency = validation.ValidateConcurrencyLimit(maxConcurrency)
+	maxConcurrency = sharedvalidation.ValidateConcurrencyLimit(maxConcurrency)
 
 	maxCPU := 100.00
 	if maxCPUStr != "" {

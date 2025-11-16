@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
-	"tubarr/internal/utils/times"
+	"tubarr/internal/times"
 )
 
 // NewVideoDownload creates a download operation with specified options.
@@ -42,7 +42,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	}
 
 	if _, exists := ongoingDownloads.LoadOrStore(d.Video.URL, struct{}{}); exists {
-		logging.I("Skipping duplicate download for: %s", d.Video.URL)
+		logger.Pl.I("Skipping duplicate download for: %s", d.Video.URL)
 		return false, nil
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
@@ -58,12 +58,12 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 		}
 
 		// Continue to attempt download
-		logging.I("Starting video download attempt %d/%d for URL: %s",
+		logger.Pl.I("Starting video download attempt %d/%d for URL: %s",
 			attempt, d.Options.MaxRetries, d.Video.URL)
 
 		select {
 		case <-d.Context.Done():
-			logging.W("Download cancelled: %v", d.Context.Err())
+			logger.Pl.W("Download cancelled: %v", d.Context.Err())
 			return false, d.cancelVideoDownload()
 		default:
 			if err := d.videoDLAttempt(); err != nil {
@@ -79,18 +79,18 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 
 				// Other errors - continue retry logic
 				lastErr = err
-				logging.E("Download attempt %d failed: %v", attempt, err)
+				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
 				d.Video.DownloadStatus.Status = consts.DLStatusFailed
 				d.Video.DownloadStatus.Error = err
 				d.DLTracker.sendUpdate(d.Video)
 
 				if attempt < d.Options.MaxRetries {
 					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
-					logging.I("Waiting %d seconds before retrying video download for %q...", d.Video.URL)
+					logger.Pl.I("Waiting %d seconds before retrying video download for %q...", d.Video.URL)
 
 					select {
 					case <-d.Context.Done():
-						logging.W("Download cancelled: %v", d.Context.Err())
+						logger.Pl.W("Download cancelled: %v", d.Context.Err())
 						return false, d.cancelVideoDownload()
 					case <-time.After(randWait):
 						continue
@@ -103,7 +103,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 				d.Video.UpdatedAt = time.Now()
 
 				d.DLTracker.sendUpdate(d.Video)
-				logging.S("Successfully completed video download for URL: %s", d.Video.URL)
+				logger.Pl.S("Successfully completed video download for URL: %s", d.Video.URL)
 
 				return false, nil
 			}

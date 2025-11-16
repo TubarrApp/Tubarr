@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 )
 
@@ -25,7 +25,7 @@ func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, 
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logging.E("failed to close file %v due to error: %v", filePath, err)
+			logger.Pl.E("failed to close file %v due to error: %v", filePath, err)
 		}
 	}()
 

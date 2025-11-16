@@ -14,12 +14,13 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -127,7 +128,7 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Channel with %s %q set authentication details", key, val)
+			logger.Pl.S("Channel with %s %q set authentication details", key, val)
 			return nil
 		},
 	}
@@ -260,7 +261,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			}
 
 			cURLs := c.GetURLs()
-			logging.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
+			logger.Pl.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Download URLs - errors already logged, DON'T print here
 			if err := app.DownloadVideosToChannel(ctx, s, cs, c, videoURLs); err != nil {
@@ -268,7 +269,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			}
 
 			// Success
-			logging.S("Completed crawl for channel with %s %q", key, val)
+			logger.Pl.S("Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -324,7 +325,7 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Deleted notify URLs for channel with %s %q: %v", key, val, notifyURLs)
+			logger.Pl.S("Deleted notify URLs for channel with %s %q: %v", key, val, notifyURLs)
 			return nil
 		},
 	}
@@ -389,7 +390,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			for _, vp := range validPairs {
 				pairSlice = append(pairSlice, (vp.ChannelURL + "|" + vp.NotifyURL + "|" + vp.Name))
 			}
-			logging.S("Added notify URLs for channel with %s %q: %v", key, val, pairSlice)
+			logger.Pl.S("Added notify URLs for channel with %s %q: %v", key, val, pairSlice)
 			return nil
 		},
 	}
@@ -444,7 +445,7 @@ func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Ignoring URL %q for channel with %s %q", ignoreURL, key, val)
+			logger.Pl.S("Ignoring URL %q for channel with %s %q", ignoreURL, key, val)
 			return nil
 		},
 	}
@@ -492,7 +493,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			}
 
 			cURLs := c.GetURLs()
-			logging.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
+			logger.Pl.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Run an ignore crawl
 			if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
@@ -500,7 +501,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			}
 
 			// Success
-			logging.S("Completed ignore crawl for channel with %s %q", key, val)
+			logger.Pl.S("Completed ignore crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -552,7 +553,7 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Paused channel %q", c.Name)
+			logger.Pl.S("Paused channel %q", c.Name)
 			return nil
 		},
 	}
@@ -602,7 +603,7 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Unpaused channel %q", c.Name)
+			logger.Pl.S("Unpaused channel %q", c.Name)
 			return nil
 		},
 	}
@@ -654,7 +655,7 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Unblocked channel %q", c.Name)
+			logger.Pl.S("Unblocked channel %q", c.Name)
 			return nil
 		},
 	}
@@ -737,13 +738,13 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			}
 
 			if input.IgnoreRun != nil && *input.IgnoreRun {
-				logging.I("Running an 'ignore crawl'...")
+				logger.Pl.I("Running an 'ignore crawl'...")
 				if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
-					logging.E("Failed to complete ignore crawl run: %v", err)
+					logger.Pl.E("Failed to complete ignore crawl run: %v", err)
 				}
 			}
 
-			logging.S("Completed addition of channel %q to Tubarr", c.Name)
+			logger.Pl.S("Completed addition of channel %q to Tubarr", c.Name)
 			return nil
 		},
 	}
@@ -808,11 +809,11 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 			}
 
 			if len(batchConfigFiles) == 0 {
-				logging.I("No config files found in directory %q", configDirectory)
+				logger.Pl.I("No config files found in directory %q", configDirectory)
 				return nil
 			}
 
-			logging.I("Found %d config file(s) in directory %q", len(batchConfigFiles), configDirectory)
+			logger.Pl.I("Found %d config file(s) in directory %q", len(batchConfigFiles), configDirectory)
 
 			var successes []string
 			var failures []struct {
@@ -821,7 +822,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 			}
 
 			for _, batchConfigFile := range batchConfigFiles {
-				logging.I("Processing config file: %s", batchConfigFile)
+				logger.Pl.I("Processing config file: %s", batchConfigFile)
 
 				input = models.ChannelInputPtrs{}
 				flags = models.ChannelFlagValues{}
@@ -900,22 +901,22 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 				}
 
 				if input.IgnoreRun != nil && *input.IgnoreRun {
-					logging.I("Running an 'ignore crawl' for channel %q...", c.Name)
+					logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
 					if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
-						logging.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
+						logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
 					}
 				}
 
 				successes = append(successes, batchConfigFile)
-				logging.S("Successfully added channel %q from config file: %s", c.Name, batchConfigFile)
+				logger.Pl.S("Successfully added channel %q from config file: %s", c.Name, batchConfigFile)
 			}
 
-			logging.I("====== Batch Add Summary ======\n")
-			logging.S("Successfully added %d channel(s)", len(successes))
+			logger.Pl.I("====== Batch Add Summary ======\n")
+			logger.Pl.S("Successfully added %d channel(s)", len(successes))
 			if len(failures) > 0 {
-				logging.E("Failed to add %d channel(s):", len(failures))
+				logger.Pl.E("Failed to add %d channel(s):", len(failures))
 				for _, f := range failures {
-					logging.E("  - %s: %v", f.file, f.err)
+					logger.Pl.E("  - %s: %v", f.file, f.err)
 				}
 			}
 
@@ -983,7 +984,7 @@ func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Successfully deleted channel with %s %q", key, val)
+			logger.Pl.S("Successfully deleted channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -1016,7 +1017,7 @@ func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			// Fetch channel model
 			c, hasRows, err := cs.GetChannelModel(key, val, false)
 			if !hasRows {
-				logging.I("Entry for channel with %s %q does not exist in the database", key, val)
+				logger.Pl.I("Entry for channel with %s %q does not exist in the database", key, val)
 				return nil
 			}
 			if err != nil {
@@ -1044,7 +1045,7 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 			// Fetch channels from database
 			chans, hasRows, err := cs.GetAllChannels(false)
 			if !hasRows {
-				logging.I("No entries in the database")
+				logger.Pl.I("No entries in the database")
 				return nil
 			}
 			if err != nil {
@@ -1103,7 +1104,7 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 			}
 
 			// Success
-			logging.S("Completed crawl for channel with %s %q", key, val)
+			logger.Pl.S("Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -1374,7 +1375,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Completed update for channel with %s %q", key, val)
+			logger.Pl.S("Completed update for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -1458,7 +1459,7 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success
-			logging.S("Updated channel column: %q → %q", col, newVal)
+			logger.Pl.S("Updated channel column: %q → %q", col, newVal)
 			return nil
 		},
 	}
@@ -1508,7 +1509,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	// Min free memory
 	if f.Changed(keys.MMinFreeMem) {
 		if c.minFreeMem != "" {
-			if err := validation.ValidateMinFreeMem(c.minFreeMem); err != nil {
+			if _, err := sharedvalidation.ValidateMinFreeMem(c.minFreeMem); err != nil {
 				return nil, err
 			}
 		}
@@ -1520,7 +1521,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Max CPU usage
 	if f.Changed(keys.MMaxCPU) {
-		c.maxCPU = max(min(c.maxCPU, 100.0), 0)
+		c.maxCPU = sharedvalidation.ValidateMaxCPU(c.maxCPU)
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.MaxCPU = c.maxCPU
 			return nil
@@ -1780,7 +1781,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		validTranscodeQuality := c.transcodeQuality
 
 		if c.transcodeQuality != "" {
-			validTranscodeQuality, err = validation.ValidateTranscodeQuality(c.transcodeQuality)
+			validTranscodeQuality, err = sharedvalidation.ValidateTranscodeQuality(c.transcodeQuality)
 			if err != nil {
 				return nil, err
 			}

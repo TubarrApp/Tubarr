@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 )
 
 // verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
@@ -80,7 +80,7 @@ func checkBotDetection(uri string, inputErr error) error {
 
 		siteHost, err := url.Parse(uri) // Avoid using the 'ChannelURL' URL, which can be the manual download value
 		if err != nil {
-			logging.E("Failed to parse URL %q after bot detection", uri)
+			logger.Pl.E("Failed to parse URL %q after bot detection", uri)
 		}
 
 		avoidURLs.Store(siteHost.Hostname(), true)
@@ -95,7 +95,7 @@ func checkIfAvoidURL(uri string) error {
 
 	parsedURL, err := url.Parse(uri)
 	if err != nil {
-		logging.E("Could not parse URL %q, will check against full URL instead")
+		logger.Pl.E("Could not parse URL %q, will check against full URL instead")
 		siteHost = uri
 	} else {
 		siteHost = parsedURL.Hostname()

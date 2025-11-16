@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 )
 
 // IsPrivateNetwork returns true if the URL is detected as a LAN network.
@@ -85,7 +85,7 @@ func IsPrivateNetworkFallback(h string) bool {
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil || n < 0 || n > 255 {
-				logging.E("Malformed IP string %q", h)
+				logger.Pl.E("Malformed IP string %q", h)
 				return false
 			}
 			octets[i] = n
@@ -100,7 +100,7 @@ func IsPrivateNetworkFallback(h string) bool {
 		}
 	}
 
-	logging.E("Failed to resolve hostname %q", h)
+	logger.Pl.E("Failed to resolve hostname %q", h)
 	return false
 }
 
@@ -134,10 +134,10 @@ func IsPrivateIP(ip, h string) bool {
 	}
 
 	if isPrivate {
-		logging.I("Host %q resolved to private IP address %q.", h, ip)
+		logger.Pl.I("Host %q resolved to private IP address %q.", h, ip)
 		return true
 	}
 
-	logging.I("Host %q resolved to public IP address %q.", h, ip)
+	logger.Pl.I("Host %q resolved to public IP address %q.", h, ip)
 	return false
 }

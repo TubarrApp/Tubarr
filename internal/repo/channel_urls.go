@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 
 	"github.com/Masterminds/squirrel"
 	"golang.org/x/exp/constraints"
@@ -85,7 +85,7 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
 
-	logging.D(1, "Added channel URL %q (ID: %d, is_manual: %v) to channel ID %d", cu.URL, id, isManual, channelID)
+	logger.Pl.D(1, "Added channel URL %q (ID: %d, is_manual: %v) to channel ID %d", cu.URL, id, isManual, channelID)
 	return id, nil
 }
 
@@ -120,7 +120,7 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 		return err
 	}
 
-	logging.S("Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
+	logger.Pl.S("Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
 	return nil
 }
 
@@ -150,7 +150,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows: %v", err)
+			logger.Pl.E("Failed to close rows: %v", err)
 		}
 	}()
 
@@ -222,7 +222,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 					}
 				} else {
 					if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-						logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+						logger.Pl.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
 					}
 				}
 
@@ -235,7 +235,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 					}
 				} else {
 					if changed := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); changed {
-						logging.D(1, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
+						logger.Pl.D(1, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
 					}
 				}
 			}
@@ -336,7 +336,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, merge
 			return nil, true, err
 		}
 		if !hasRows {
-			logging.D(2, "Channel with ID %d not found in database", channelID)
+			logger.Pl.D(2, "Channel with ID %d not found in database", channelID)
 		}
 
 		// Handle Settings
@@ -351,7 +351,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, merge
 			// Field-level inheritance: merge empty fields from channel
 			if c != nil && c.ChanSettings != nil {
 				if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-					logging.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+					logger.Pl.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
 				}
 			}
 		}
@@ -399,7 +399,7 @@ func (cs *ChannelStore) DeleteChannelURL(channelURLID int64) error {
 		return fmt.Errorf("failed to delete channel URL ID %d: %w", channelURLID, err)
 	}
 
-	logging.S("Deleted channel URL ID %d", channelURLID)
+	logger.Pl.S("Deleted channel URL ID %d", channelURLID)
 	return nil
 }
 
@@ -427,7 +427,7 @@ func (cs *ChannelStore) DeleteChannelURLAuth(cu *models.ChannelURL) error {
 		return fmt.Errorf("failed to delete auth details for channel URL ID %d: %w", cu.ID, err)
 	}
 
-	logging.S("Deleted authentication details for channel URL ID %d (%s)", cu.ID, cu.URL)
+	logger.Pl.S("Deleted authentication details for channel URL ID %d (%s)", cu.ID, cu.URL)
 	return nil
 }
 
@@ -443,7 +443,7 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 		RunWith(cs.DB)
 
 	if err := query.QueryRow().Scan(&count); err != nil {
-		logging.E("failed to check if channel URL exists with key=%s val=%s: %v", key, val, err)
+		logger.Pl.E("failed to check if channel URL exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}
 	return count > 0
@@ -480,7 +480,7 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64, mergeWithParent bool) 
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logging.E("Failed to close rows: %v", err)
+			logger.Pl.E("Failed to close rows: %v", err)
 		}
 	}()
 
@@ -592,7 +592,7 @@ func (cs *ChannelStore) getChannelURLModelsMap(cID int64, mergeWithParent bool) 
 // Returns true if any changes were made.
 func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool) {
 	if urlSettings == nil {
-		logging.E("Dev Error: mergeSettings called with nil urlSettings - this should never happen")
+		logger.Pl.E("Dev Error: mergeSettings called with nil urlSettings - this should never happen")
 		return false
 	}
 	if channelSettings == nil {
@@ -675,7 +675,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 // Returns true if any changes were made.
 func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool) {
 	if urlMetarr == nil {
-		logging.E("Dev Error: mergeMetarrArgs called with nil urlMetarr - this should never happen")
+		logger.Pl.E("Dev Error: mergeMetarrArgs called with nil urlMetarr - this should never happen")
 		return false
 	}
 	if channelMetarr == nil {

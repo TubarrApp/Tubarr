@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 	"tubarr/internal/validation"
 )
 
@@ -34,13 +34,13 @@ func ParseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[st
 				LoginURL: "",
 			}
 		}
-		logging.I("Deleted authentication details for channel URLs: %v", cURLs)
+		logger.Pl.I("Deleted authentication details for channel URLs: %v", cURLs)
 		return authMap, nil
 	}
 
 	// Check if there are any auth details to process
 	if len(a) == 0 && (u == "" || l == "") {
-		logging.D(3, "No authorization details to parse...")
+		logger.Pl.D(3, "No authorization details to parse...")
 		return authMap, nil
 	}
 

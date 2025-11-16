@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 
 	"github.com/Masterminds/squirrel"
 )
@@ -39,12 +39,12 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for video with URL %q: %v", v.URL, rbErr)
+				logger.Pl.E("Panic rollback failed for video with URL %q: %v", v.URL, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Error rolling back download status for video with URL %q (original error: %v): %v", v.URL, err, rbErr)
+				logger.Pl.E("Error rolling back download status for video with URL %q (original error: %v): %v", v.URL, err, rbErr)
 			}
 		}
 	}()
@@ -77,12 +77,12 @@ func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for updates: %+v: %v", update, rbErr)
+				logger.Pl.E("Panic rollback failed for updates: %+v: %v", update, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Failed to rollback transaction for updates: %+v (original error: %v): %v", update, err, rbErr)
+				logger.Pl.E("Failed to rollback transaction for updates: %+v (original error: %v): %v", update, err, rbErr)
 			}
 		}
 	}()
@@ -137,7 +137,7 @@ func normalizeDownloadStatus(pctPtr *float64, statusPtr *consts.DownloadStatus, 
 		status consts.DownloadStatus
 	)
 	if pctPtr == nil || statusPtr == nil {
-		logging.E("Status or percentage passed into function as 'nil' for video with ID %d", videoID)
+		logger.Pl.E("Status or percentage passed into function as 'nil' for video with ID %d", videoID)
 		return
 	}
 

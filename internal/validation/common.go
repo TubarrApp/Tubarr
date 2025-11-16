@@ -5,18 +5,20 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/regex"
 	"tubarr/internal/domain/templates"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 
-	"github.com/spf13/viper"
+	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // ValidateMetarrOutputDirs validates Metarr output directory mappings.
@@ -27,7 +29,7 @@ func ValidateMetarrOutputDirs(outDirMap map[string]string) error {
 		return nil
 	}
 
-	logging.D(1, "Validating %d Metarr output directories...", len(outDirMap))
+	logger.Pl.D(1, "Validating %d Metarr output directories...", len(outDirMap))
 
 	validatedDirs := make(map[string]bool, len(outDirMap))
 
@@ -53,7 +55,7 @@ func ValidateMetarrOutputDirs(outDirMap map[string]string) error {
 // ValidateDirectory validates that the directory exists, else creates it if desired.
 func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 	possibleTemplate := strings.Contains(dir, "{{") && strings.Contains(dir, "}}")
-	logging.D(3, "Statting directory %q. Templating detected? %v...", dir, possibleTemplate)
+	logger.Pl.D(3, "Statting directory %q. Templating detected? %v...", dir, possibleTemplate)
 
 	// Handle templated directories
 	if possibleTemplate {
@@ -64,44 +66,17 @@ func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 			}
 			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
 		}
-		logging.D(3, "Directory %q appears to contain templating elements, will not stat", dir)
+		logger.Pl.D(3, "Directory %q appears to contain templating elements, will not stat", dir)
 		return nil, nil // templates are valid, no need to stat
 	}
 
-	// Check directory existence
-	dirInfo, err := os.Stat(dir)
-	switch {
-	case err == nil: // If err IS nil
-
-		if !dirInfo.IsDir() {
-			return dirInfo, fmt.Errorf("path %q is a file, not a directory", dir)
-		}
-		return dirInfo, nil
-
-	case os.IsNotExist(err):
-		// path does not exist
-		if createIfNotFound {
-			logging.D(3, "Directory %q does not exist, creating it...", dir)
-			if err := os.MkdirAll(dir, consts.PermsGenericDir); err != nil {
-				return nil, fmt.Errorf("directory %q does not exist and failed to create: %w", dir, err)
-			}
-			if dirInfo, err = os.Stat(dir); err != nil { // re-stat to get correct FileInfo
-				return dirInfo, fmt.Errorf("failed to stat %q", dir)
-			}
-			return dirInfo, nil
-		}
-		return nil, fmt.Errorf("directory %q does not exist", dir)
-
-	default:
-		// other error
-		return nil, fmt.Errorf("failed to stat directory %q: %w", dir, err)
-	}
+	return sharedvalidation.ValidateDirectory(dir, createIfNotFound)
 }
 
 // ValidateFile validates that the file exists, else creates it if desired.
 func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 	possibleTemplate := strings.Contains(f, "{{") && strings.Contains(f, "}}")
-	logging.D(3, "Statting file %q...", f)
+	logger.Pl.D(3, "Statting file %q...", f)
 
 	// Handle templated directories
 	if possibleTemplate {
@@ -112,34 +87,11 @@ func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 			}
 			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
 		}
-		logging.D(3, "Directory %q appears to contain templating elements, will not stat", f)
+		logger.Pl.D(3, "Directory %q appears to contain templating elements, will not stat", f)
 		return nil, nil // templates are valid, no need to stat
 	}
 
-	fileInfo, err := os.Stat(f)
-	if err != nil {
-		if os.IsNotExist(err) {
-			switch {
-			case createIfNotFound:
-				logging.D(3, "File %q does not exist, creating it...", f)
-				if _, err := os.Create(f); err != nil {
-					return fileInfo, fmt.Errorf("file %q does not exist and Tubarr failed to create it: %w", f, err)
-				}
-			default:
-				return fileInfo, fmt.Errorf("file %q does not exist: %w", f, err)
-			}
-		} else {
-			return fileInfo, fmt.Errorf("failed to stat file %q: %w", f, err)
-		}
-	}
-
-	if fileInfo != nil {
-		if fileInfo.IsDir() {
-			return fileInfo, fmt.Errorf("file entered %q is a directory", f)
-		}
-	}
-
-	return fileInfo, nil
+	return sharedvalidation.ValidateFile(f, createIfNotFound)
 }
 
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
@@ -154,14 +106,8 @@ func ValidateViperFlags() error {
 
 	// Logging
 	ValidateLoggingLevel()
-	abstractions.Set(keys.GlobalConcurrency, ValidateConcurrencyLimit(abstractions.GetInt(keys.GlobalConcurrency)))
+	abstractions.Set(keys.GlobalConcurrency, sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.GlobalConcurrency)))
 	return nil
-}
-
-// ValidateConcurrencyLimit checks and ensures correct concurrency limit input.
-func ValidateConcurrencyLimit(c int) int {
-	c = max(c, 1)
-	return c
 }
 
 // ValidateNotifications validates notification models.
@@ -170,7 +116,7 @@ func ValidateNotifications(notifications []*models.Notification) error {
 		return nil
 	}
 
-	logging.D(1, "Validating %d notifications...", len(notifications))
+	logger.Pl.D(1, "Validating %d notifications...", len(notifications))
 
 	for i, n := range notifications {
 		// Validate notify URL is not empty
@@ -180,14 +126,10 @@ func ValidateNotifications(notifications []*models.Notification) error {
 
 		// Validate notify URL format
 		if _, err := url.Parse(n.NotifyURL); err != nil {
-			return fmt.Errorf("notification at position %d has invalid notify URL %q: %w", i, n.NotifyURL, err)
-		}
-
-		// Validate channel URL if present
-		if n.ChannelURL != "" {
-			if _, err := url.Parse(n.ChannelURL); err != nil {
-				return fmt.Errorf("notification at position %d has invalid channel URL %q: %w", i, n.ChannelURL, err)
+			if u, err := url.Parse(n.NotifyURL); err != nil {
+				return fmt.Errorf("notify URL %q is not valid", u)
 			}
+			return fmt.Errorf("notification at position %d has invalid notify URL %q: %w", i, n.NotifyURL, err)
 		}
 	}
 	return nil
@@ -198,27 +140,20 @@ func ValidateYtdlpOutputExtension(e string) error {
 	if e == "" {
 		return nil
 	}
-	e = strings.TrimPrefix(strings.ToLower(e), ".")
-	switch e {
-	case "avi", "flv", "mkv", "mov", "mp4", "webm":
-		return nil
-	default:
+	e = strings.TrimSpace(e)
+	e = strings.TrimPrefix(e, ".")
+	e = strings.ToLower(e)
+
+	if !slices.Contains(consts.SupportedYtdlpOutput, e) {
 		return fmt.Errorf("output extension %v is invalid or not supported", e)
 	}
+
+	return nil
 }
 
 // ValidateLoggingLevel checks and validates the debug level.
 func ValidateLoggingLevel() {
-	logging.Level = min(max(abstractions.GetInt(keys.DebugLevel), 0), 5)
-}
-
-// WarnMalformedKeys warns a user if a key in their config file is mixed casing.
-func WarnMalformedKeys() {
-	for _, key := range viper.AllKeys() {
-		if strings.Contains(key, "-") && strings.Contains(key, "_") {
-			logging.W("Config key %q mixes dashes and underscores - use either kebab-case or snake_case consistently", key)
-		}
-	}
+	logging.Level = min(max(abstractions.GetInt(keys.DebugLevel), -1), 5)
 }
 
 // ValidateMaxFilesize checks that max filesize value is valid for yt-dlp.
@@ -253,7 +188,7 @@ func ValidateFilterOps(filters []models.Filters) error {
 		return nil
 	}
 
-	logging.D(1, "Validating %d filter operations...", len(filters))
+	logger.Pl.D(1, "Validating %d filter operations...", len(filters))
 
 	for i, filter := range filters {
 		// Validate contains/omits
@@ -279,12 +214,18 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 	if len(moveOps) == 0 {
 		return nil
 	}
-	logging.D(1, "Validating %d meta filter move operations...", len(moveOps))
+	logger.Pl.D(1, "Validating %d meta filter move operations...", len(moveOps))
 
 	for i, op := range moveOps {
 		// Validate field is not empty
 		if op.Field == "" {
 			return fmt.Errorf("move operation at position %d has empty field", i)
+		}
+
+		if op.OutputDir != "" {
+			if _, err := ValidateDirectory(op.OutputDir, false); err != nil {
+				return err
+			}
 		}
 
 		// Validate output directory exists
@@ -301,7 +242,7 @@ func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
 		return nil
 	}
 
-	logging.D(1, "Validating %d filtered meta operations...", len(filteredMetaOps))
+	logger.Pl.D(1, "Validating %d filtered meta operations...", len(filteredMetaOps))
 
 	for i, fmo := range filteredMetaOps {
 		// Validate filters
@@ -331,7 +272,7 @@ func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOp
 		return nil
 	}
 
-	logging.D(1, "Validating %d filtered filename operations...", len(filteredFilenameOps))
+	logger.Pl.D(1, "Validating %d filtered filename operations...", len(filteredFilenameOps))
 
 	for i, ffo := range filteredFilenameOps {
 		// Validate filters
@@ -433,7 +374,7 @@ func ValidateToFromDate(d string) (string, error) {
 	}
 
 	output := year + month + day
-	logging.D(1, "Made from/to date %q", output)
+	logger.Pl.D(1, "Made from/to date %q", output)
 
 	return output, nil
 }

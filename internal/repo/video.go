@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 
 	"github.com/Masterminds/squirrel"
 )
@@ -40,12 +40,12 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
+				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -171,7 +171,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 
 	// Check if video already exists
 	if id, exists := vs.videoExists(v, channelID); exists {
-		logging.D(1, "Video %q already exists in the database with ID %d", v.URL, id)
+		logger.Pl.D(1, "Video %q already exists in the database with ID %d", v.URL, id)
 		if err := vs.UpdateVideo(v, channelID); err != nil {
 			return id, fmt.Errorf("failed to update existing video: %w", err)
 		}
@@ -193,12 +193,12 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
+				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -249,7 +249,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	v.ID = videoID
 
 	// Insert into downloads table
-	logging.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
+	logger.Pl.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
 
 	dlSQL, dlArgs, err := squirrel.Insert(consts.DBDownloads).
 		Columns(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
@@ -258,7 +258,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	if err != nil {
 		return 0, fmt.Errorf("failed to build download insert SQL: %w", err)
 	}
-	logging.D(1, "Download insert SQL: %s (args: %v)", dlSQL, dlArgs)
+	logger.Pl.D(1, "Download insert SQL: %s (args: %v)", dlSQL, dlArgs)
 
 	if _, err := tx.Exec(dlSQL, dlArgs...); err != nil {
 		return 0, fmt.Errorf("failed to insert download status for video %d: %w", videoID, err)
@@ -269,7 +269,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		return 0, fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
 
-	logging.D(1, "Inserted video %q with ID %d successfully", v.URL, videoID)
+	logger.Pl.D(1, "Inserted video %q with ID %d successfully", v.URL, videoID)
 	return videoID, nil
 }
 
@@ -284,12 +284,12 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
+				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
 			}
 			panic(p)
 		} else if err != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
-				logging.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
+				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
 	}()
@@ -348,7 +348,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		return fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
 
-	logging.S("Updated video with URL: %s", v.URL)
+	logger.Pl.S("Updated video with URL: %s", v.URL)
 	return nil
 }
 
@@ -384,7 +384,7 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 		RunWith(vs.DB)
 
 	if err = query.QueryRow().Scan(&videoURL); err != nil {
-		logging.I("Could not scan video URL from database for video ID: %d, URL: %q", videoID, videoURL)
+		logger.Pl.I("Could not scan video URL from database for video ID: %d, URL: %q", videoID, videoURL)
 		return "", err
 	}
 	return videoURL, nil
@@ -408,10 +408,10 @@ func (vs *VideoStore) videoExists(v *models.Video, channelID int64) (int64, bool
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, false
 	} else if err != nil {
-		logging.E("Error checking if video exists: %v", err)
+		logger.Pl.E("Error checking if video exists: %v", err)
 		return 0, false
 	}
 
-	logging.D(1, "Video with URL %q already exists in the database with ID %d", v.URL, v.ID)
+	logger.Pl.D(1, "Video with URL %q already exists in the database with ID %d", v.URL, v.ID)
 	return id, true
 }

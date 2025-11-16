@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/templates"
 	"tubarr/internal/models"
-	"tubarr/internal/utils/logging"
 )
 
 const (
@@ -54,7 +54,7 @@ func (dp *DirectoryParser) ParseDirectory(dir string, v *models.Video, fileType 
 		}
 	}
 
-	logging.I("Parsed %s file output directory for video %q as %q", fileType, v.URL, parsed)
+	logger.Pl.I("Parsed %s file output directory for video %q as %q", fileType, v.URL, parsed)
 	return parsed, nil
 }
 

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/utils/logging"
+	"tubarr/internal/domain/logger"
 
 	"github.com/Masterminds/squirrel"
 )
@@ -47,7 +47,7 @@ func (pc *ProgControl) StartTubarr() (pid int, err error) {
 	pid = os.Getpid()
 	host, err := os.Hostname()
 	if err != nil {
-		logging.E("Failed to get device hostname: %v", err)
+		logger.Pl.E("Failed to get device hostname: %v", err)
 	}
 
 	now := time.Now()
@@ -80,7 +80,7 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 	now := time.Now()
 	host, err := os.Hostname()
 	if err != nil {
-		logging.E("Failed to get device hostname: %v", err)
+		logger.Pl.E("Failed to get device hostname: %v", err)
 	}
 
 	query := squirrel.
@@ -95,7 +95,7 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 	if _, err := query.Exec(); err != nil {
 		return err
 	}
-	logging.I("Tubarr finished: %v\n\nTime elapsed: %.2f seconds\n",
+	logger.Pl.I("Tubarr finished: %v\n\nTime elapsed: %.2f seconds\n",
 		now.Local().Format("2006-01-02 15:04:05.00 MST"),
 		now.Sub(startTime).Seconds())
 	return nil
@@ -166,7 +166,7 @@ func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 
 	if time.Since(lastHeartbeat) > 2*time.Minute {
 
-		logging.I("Detected stale process, resetting state...")
+		logger.Pl.I("Detected stale process, resetting state...")
 
 		resetQuery := squirrel.
 			Update(consts.DBProgram).

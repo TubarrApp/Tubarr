@@ -1,6 +1,6 @@
 package models
 
-import "tubarr/internal/utils/logging"
+import "tubarr/internal/domain/logger"
 
 // ------ Filters -----------------------------------------------------------------
 // FiltersArrayToSlice converts filter models back into slice form.
@@ -134,7 +134,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	metaOpStrings := MetaOpsArrayToSlice(f.MetaOps)
 
 	if len(filterStrings) != len(metaOpStrings) {
-		logging.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
+		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
 		return []string{}
 	}
 
@@ -153,7 +153,7 @@ func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	filenameOpStrings := FilenameOpsArrayToSlice(f.FilenameOps)
 
 	if len(filterStrings) != len(filenameOpStrings) {
-		logging.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))
+		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))
 		return []string{}
 	}
 
