@@ -27,7 +27,7 @@ import (
 )
 
 // handleAddChannelFromFile adds a new channel from a specified config file path using Viper.
-func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 	var input models.ChannelInputPtrs
 
 	// Grab config file from form
@@ -98,19 +98,21 @@ func handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ctx := context.Background()
 	if input.IgnoreRun != nil && *input.IgnoreRun {
-		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+		//nolint:contextcheck
+		if err := app.CrawlChannelIgnore(ss.ctx, ss.s, c); err != nil {
 			logger.Pl.E("Failed to complete ignore crawl run: %v", err)
 		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name))
+	if _, err := w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
 // handleAddChannelsFromDir adds new channel from all config files in the directory path using Viper.
-func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 	// Grab config file from form
 	addFromDir := r.FormValue("add_from_config_dir")
 	if addFromDir == "" {
@@ -127,16 +129,18 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 
 	if len(batchConfigFiles) == 0 {
 		w.WriteHeader(http.StatusOK)
-		w.Write(fmt.Appendf(nil, "No config files found in directory %q", addFromDir))
+		if _, err := w.Write(fmt.Appendf(nil, "No config files found in directory %q", addFromDir)); err != nil {
+			logger.Pl.E("Failed to write response message: %v", err)
+		}
 		return
 	}
 
 	// Track results
-	var successes []string
-	var failures []struct {
+	successes := make([]string, 0, len(batchConfigFiles))
+	failures := make([]struct {
 		file   string
 		reason string
-	}
+	}, 0, len(batchConfigFiles))
 
 	logger.Pl.I("Adding channels from config files %v", batchConfigFiles)
 
@@ -222,9 +226,9 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		ctx := context.Background()
 		if input.IgnoreRun != nil && *input.IgnoreRun {
-			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+			//nolint:contextcheck
+			if err := app.CrawlChannelIgnore(ss.ctx, ss.s, c); err != nil {
 				logger.Pl.E("Failed to complete ignore crawl run: %v", err)
 			}
 		}
@@ -254,11 +258,13 @@ func handleAddChannelsFromDir(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(responseMsg))
+	if _, err := w.Write([]byte(responseMsg)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
 // handleListChannels lists Tubarr channels.
-func handleListChannels(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleListChannels(w http.ResponseWriter, _ *http.Request) {
 	channels, found, err := ss.cs.GetAllChannels(false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -266,15 +272,19 @@ func handleListChannels(w http.ResponseWriter, r *http.Request) {
 	}
 	if !found {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]any{})
+		if err := json.NewEncoder(w).Encode([]any{}); err != nil {
+			logger.Pl.E("Failed to encode blank 'any' array: %v", err)
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(channels)
+	if err := json.NewEncoder(w).Encode(channels); err != nil {
+		logger.Pl.E("Failed to encode channels: %v", err)
+	}
 }
 
 // handleGetChannel returns the data for a specific channel.
-func handleGetChannel(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	c, found, err := ss.cs.GetChannelModel("id", id, false)
@@ -350,7 +360,7 @@ func handleGetChannel(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateChannel creates a new channel entry.
-func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 	// Parse form data
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
@@ -463,29 +473,31 @@ func handleCreateChannel(w http.ResponseWriter, r *http.Request) {
 		c.ChanMetarrArgs = &models.MetarrArgs{}
 	}
 
-	// Add to database
+	// Add to database.
 	if c.ID, err = ss.cs.AddChannel(c); err != nil {
 		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), http.StatusInternalServerError)
 		return
 	}
 
 	// Ignore run if desired
-	ctx := context.Background()
 	if r.FormValue("ignore_run") == "true" {
 		log.Printf("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
-		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+		//nolint:contextcheck
+		if err := app.CrawlChannelIgnore(ss.ctx, ss.s, c); err != nil {
 			http.Error(w, fmt.Sprintf("failed to run ignore crawl on channel %q: %v", name, err), http.StatusInternalServerError)
 			return
 		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name))
+	if _, err := w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
 // handleUpdateChannel updates parameters for a given channel.
-func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
-	// Get channel ID from URL
+func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
+	// Get channel ID from URL.
 	idStr := chi.URLParam(r, "id")
 	channelID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -493,13 +505,13 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse form data
+	// Parse form data.
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	// Get existing channel
+	// Get existing channel.
 	existingChannel, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -510,7 +522,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update channel name if provided
+	// Update channel name if provided.
 	name := r.FormValue("name")
 	if name != "" && name != existingChannel.Name {
 		if err := ss.cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
@@ -520,7 +532,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		existingChannel.Name = name
 	}
 
-	// Update channel settings
+	// Update channel settings.
 	newSettings := getSettingsStrings(w, r)
 	if newSettings != nil {
 		_, err = ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
@@ -533,7 +545,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Update channel metarr args
+	// Update channel metarr args.
 	newMetarr := getMetarrArgsStrings(w, r)
 	if newMetarr != nil {
 		_, err = ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
@@ -546,7 +558,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Handle URL updates
+	// Handle URL updates.
 	urls := strings.Fields(r.FormValue("urls"))
 	authDetails := strings.Fields(r.FormValue("auth_details"))
 	username := r.FormValue("username")
@@ -554,14 +566,14 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	now := time.Now()
 
-	// Parse authentication details
+	// Parse authentication details.
 	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	// Parse per-URL settings JSON if provided
+	// Parse per-URL settings JSON if provided.
 	urlSettingsRaw := make(map[string]map[string]map[string]any)
 	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
 		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsRaw); err != nil {
@@ -570,7 +582,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse the URL settings into proper structures
+	// Parse the URL settings into proper structures.
 	urlSettingsMap := make(map[string]struct {
 		Settings *models.Settings
 		Metarr   *models.MetarrArgs
@@ -597,13 +609,13 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		urlSettingsMap[channelURL] = parsed
 	}
 
-	// Build map of existing URLs
+	// Build map of existing URLs.
 	existingURLMap := make(map[string]*models.ChannelURL)
 	for _, urlModel := range existingChannel.URLModels {
 		existingURLMap[urlModel.URL] = urlModel
 	}
 
-	// Build map of new URLs
+	// Build map of new URLs.
 	newURLMap := make(map[string]bool)
 	for _, u := range urls {
 		if u != "" {
@@ -611,17 +623,17 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Delete URLs that are no longer in the list
+	// Delete URLs that are no longer in the list.
 	for existingURL, urlModel := range existingURLMap {
 		if !newURLMap[existingURL] {
-			// URL was removed, delete it
+			// URL was removed, delete it.
 			if err := ss.cs.DeleteChannelURL(urlModel.ID); err != nil {
 				logger.Pl.E("Failed to delete channel URL %q: %v", existingURL, err)
 			}
 		}
 	}
 
-	// Add or update URLs
+	// Add or update URLs.
 	for _, u := range urls {
 		if u == "" {
 			continue
@@ -639,20 +651,20 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 			parsedLoginURL = authMap[u].LoginURL
 		}
 
-		// Check if URL already exists
+		// Check if URL already exists.
 		if existingURLModel, exists := existingURLMap[u]; exists {
-			// Update existing URL
+			// Update existing URL.
 			existingURLModel.Username = parsedUsername
 			existingURLModel.Password = parsedPassword
 			existingURLModel.LoginURL = parsedLoginURL
 			existingURLModel.UpdatedAt = now
 
-			// Apply per-URL custom settings if they exist, otherwise clear them
+			// Apply per-URL custom settings if they exist, otherwise clear them.
 			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
 				existingURLModel.ChanURLSettings = urlSettings.Settings
 				existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
 			} else {
-				// No custom settings for this URL - clear any existing ones
+				// No custom settings for this URL - clear any existing ones.
 				existingURLModel.ChanURLSettings = nil
 				existingURLModel.ChanURLMetarrArgs = nil
 			}
@@ -662,7 +674,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else {
-			// Add new URL
+			// Add new URL.
 			chanURL := &models.ChannelURL{
 				URL:       u,
 				Username:  parsedUsername,
@@ -673,7 +685,7 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 				UpdatedAt: now,
 			}
 
-			// Apply per-URL custom settings if they exist
+			// Apply per-URL custom settings if they exist.
 			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
 				chanURL.ChanURLSettings = urlSettings.Settings
 				chanURL.ChanURLMetarrArgs = urlSettings.Metarr
@@ -687,65 +699,69 @@ func handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Channel updated successfully"))
+	if _, err := w.Write([]byte("Channel updated successfully")); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
-// handleUpdateChannelURLSettings updates parameters for a given channel URL.
-func handleUpdateChannelURLSettings(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	cURLStr := chi.URLParam(r, "channel_url")
+// // handleUpdateChannelURLSettings updates parameters for a given channel URL.
+// func (ss *serverStore) handleUpdateChannelURLSettings(w http.ResponseWriter, r *http.Request) {
+// 	idStr := chi.URLParam(r, "id")
+// 	cURLStr := chi.URLParam(r, "channel_url")
 
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
-		return
-	}
+// 	id, err := strconv.ParseInt(idStr, 10, 64)
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("Invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
+// 		return
+// 	}
 
-	cURL, found, err := ss.cs.GetChannelURLModel(id, cURLStr, false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || cURL == nil {
-		http.Error(w, "channel URL nil or not found", http.StatusNotFound)
-		return
-	}
+// 	cURL, found, err := ss.cs.GetChannelURLModel(id, cURLStr, false)
+// 	if err != nil {
+// 		http.Error(w, "internal server error", http.StatusInternalServerError)
+// 		return
+// 	}
+// 	if !found || cURL == nil {
+// 		http.Error(w, "channel URL nil or not found", http.StatusNotFound)
+// 		return
+// 	}
 
-	cURL.ChanURLSettings = getSettingsStrings(w, r)
-	cURL.ChanURLMetarrArgs = getMetarrArgsStrings(w, r)
+// 	cURL.ChanURLSettings = getSettingsStrings(w, r)
+// 	cURL.ChanURLMetarrArgs = getMetarrArgsStrings(w, r)
 
-	if err := ss.cs.UpdateChannelURLSettings(cURL); err != nil {
-		http.Error(w, fmt.Sprintf("Could not update channel URL %q Metarr Arguments: %v", cURL.URL, err), http.StatusBadRequest)
-		return
-	}
+// 	if err := ss.cs.UpdateChannelURLSettings(cURL); err != nil {
+// 		http.Error(w, fmt.Sprintf("Could not update channel URL %q Metarr Arguments: %v", cURL.URL, err), http.StatusBadRequest)
+// 		return
+// 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Updated channel URL in channel " + idStr))
-}
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write([]byte("Updated channel URL in channel " + idStr))
+// }
 
-// handleDeleteChannelURL deletes a URL for a given channel.
-func handleDeleteChannelURL(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Updated channel URL " + id))
-}
+// // handleDeleteChannelURL deletes a URL for a given channel.
+// func handleDeleteChannelURL(w http.ResponseWriter, r *http.Request) {
+// 	id := chi.URLParam(r, "id")
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write([]byte("Updated channel URL " + id))
+// }
 
-// handleAddChannelURL deletes a URL for a given channel.
-func handleAddChannelURL(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Added channel URL for channel " + id))
-}
+// // handleAddChannelURL deletes a URL for a given channel.
+// func handleAddChannelURL(w http.ResponseWriter, r *http.Request) {
+// 	id := chi.URLParam(r, "id")
+// 	w.WriteHeader(http.StatusOK)
+// 	w.Write([]byte("Added channel URL for channel " + id))
+// }
 
 // handleDeleteChannel deletes a channel from Tubarr.
-func handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	ss.cs.DeleteChannel(consts.QChanID, id)
+	if err := ss.cs.DeleteChannel(consts.QChanID, id); err != nil {
+		logger.Pl.E("Failed to delete channel %d: %v", id, err)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleGetAllVideos retrieves all videos, ignored or finished, for a given channel.
-func handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
@@ -757,7 +773,7 @@ func handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get video downloads with full metadata
+	// Get video downloads with full metadata.
 	videos, _, err := ss.cs.GetDownloadedOrIgnoredVideos(c)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
@@ -765,11 +781,13 @@ func handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(videos)
+	if err := json.NewEncoder(w).Encode(videos); err != nil {
+		logger.Pl.E("Failed to encode videos: %v", err)
+	}
 }
 
 // handleDeleteChannelVideos deletes given video entries from a channel.
-func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 	// Get channel ID from URL path
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -778,9 +796,9 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read and parse body for DELETE requests
+	// Read and parse body for DELETE requests.
 	//
-	// DELETE requests need special handling for form data in the body
+	// DELETE requests need special handling for form data in the body.
 	bodyBytes := make([]byte, r.ContentLength)
 	if _, err := r.Body.Read(bodyBytes); err != nil && err.Error() != "EOF" {
 		logger.Pl.E("Failed to read body: %v", err)
@@ -788,7 +806,7 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the URL-encoded form data from body
+	// Parse the URL-encoded form data from body.
 	values, err := url.ParseQuery(string(bodyBytes))
 	if err != nil {
 		logger.Pl.E("Failed to parse query: %v", err)
@@ -796,7 +814,7 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get video URLs from form array
+	// Get video URLs from form array.
 	urls := values["urls[]"]
 	logger.Pl.D(1, "Parsed form data: %+v", values)
 	logger.Pl.D(1, "Video URLs to delete: %v", urls)
@@ -815,7 +833,7 @@ func handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetDownloads retrieves active downloads for a given channel.
-func handleGetDownloads(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
@@ -827,19 +845,16 @@ func handleGetDownloads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get active downloads with progress (filtered by channel in memory, no DB query!)
-	videos, err := ss.getActiveDownloads(c)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("could not retrieve active downloads for channel %q: %v", c.Name, err), http.StatusInternalServerError)
-		return
-	}
-
+	// Get active downloads with progress (filtered by channel in memory).
+	videos := ss.getActiveDownloads(c)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(videos)
+	if err := json.NewEncoder(w).Encode(videos); err != nil {
+		logger.Pl.E("Could not encode videos to JSON: %v", err)
+	}
 }
 
 // handleCancelDownload cancels an active download by video ID.
-func handleCancelDownload(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Request) {
 	videoIDStr := chi.URLParam(r, "videoID")
 	videoID, err := strconv.ParseInt(videoIDStr, 10, 64)
 	if err != nil {
@@ -847,13 +862,13 @@ func handleCancelDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update database status first
+	// Update database status first.
 	if err := ss.cancelDownload(videoID); err != nil {
 		http.Error(w, fmt.Sprintf("failed to cancel download: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Cancel the actual running download process
+	// Cancel the actual running download process.
 	var videoURL string
 	if videoURL, err = ss.vs.GetVideoURLByID(videoID); err != nil {
 		logger.Pl.E("Could not get video URL for ID %d: %v", videoID, err)
@@ -864,11 +879,13 @@ func handleCancelDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message": "Download cancelled successfully"}`))
+	if _, err := w.Write([]byte(`{"message": "Download cancelled successfully"}`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
 // handleCrawlChannel initiates a crawl for a specific channel.
-func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -886,31 +903,36 @@ func handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start crawl in background
+	// Start crawl in background.
 	if !state.CrawlStateActive(c.Name) {
 		state.LockCrawlState(c.Name)
-		go func() {
-			defer state.UnlockCrawlState(c.Name)
 
-			ctx := context.Background()
+		//nolint:contextcheck
+		go func(ctx context.Context) {
+			defer state.UnlockCrawlState(c.Name)
 			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
+
 			if err := app.CrawlChannel(ctx, ss.s, c); err != nil {
 				logger.Pl.E("Failed to crawl channel %q: %v", c.Name, err)
 			} else {
 				logger.Pl.S("Successfully completed crawl for channel %q", c.Name)
 			}
-		}()
+		}(ss.ctx)
 
 		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte(`{"message": "Channel crawl started"}`))
+		if _, err := w.Write([]byte(`{"message": "Channel crawl started"}`)); err != nil {
+			logger.Pl.E("Failed to write response message: %v", err)
+		}
 		return
 	}
 	w.WriteHeader(http.StatusAlreadyReported)
-	w.Write([]byte(`{"message": "Channel crawl already running for channel"}`))
+	if _, err := w.Write([]byte(`{"message": "Channel crawl already running for channel"}`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
 // handleIgnoreCrawlChannel initiates a crawl for a specific channel.
-func handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -928,31 +950,36 @@ func handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start crawl in background
+	// Start crawl in background.
 	if !state.CrawlStateActive(c.Name) {
 		state.LockCrawlState(c.Name)
-		go func() {
-			defer state.UnlockCrawlState(c.Name)
 
-			ctx := context.Background()
+		//nolint:contextcheck
+		go func(ctx context.Context) {
+			defer state.UnlockCrawlState(c.Name)
 			logger.Pl.I("Starting ignore crawl for channel %q (ID: %d) via web request", c.Name, id)
+
 			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
 				logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
 			} else {
 				logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 			}
-		}()
+		}(ss.ctx)
 
 		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte(`{"message": "Channel ignore crawl started"}`))
+		if _, err := w.Write([]byte(`{"message": "Channel ignore crawl started"}`)); err != nil {
+			logger.Pl.E("Failed to write response message: %v", err)
+		}
 		return
 	}
 	w.WriteHeader(http.StatusAlreadyReported)
-	w.Write([]byte(`{"message": "Channel ignore crawl already running for channel"}`))
+	if _, err := w.Write([]byte(`{"message": "Channel ignore crawl already running for channel"}`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
 // handleLatestDownloads retrieves the latest downloads for a given channel.
-func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
@@ -964,18 +991,20 @@ func handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get video downloads with full metadata
+	// Get video downloads with full metadata.
 	videos, err := ss.getHomepageCarouselVideos(c, 10)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(videos)
+	if err := json.NewEncoder(w).Encode(videos); err != nil {
+		logger.Pl.E("Could not encode videos to JSON: %v", err)
+	}
 }
 
 // handleSetLogLevel sets the logging level in the database.
-func handleSetLogLevel(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 	levelStr := chi.URLParam(r, "level")
 	level, err := strconv.Atoi(levelStr)
 	if err != nil {
@@ -984,17 +1013,21 @@ func handleSetLogLevel(w http.ResponseWriter, r *http.Request) {
 	}
 	logging.Level = level
 	w.WriteHeader(http.StatusOK)
-	w.Write(fmt.Appendf(nil, "Logging level set to %d", level))
+	if _, err := w.Write(fmt.Appendf(nil, "Logging level set to %d", level)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
 }
 
 // handleGetLogLevel retrieves the current logging level.
-func handleGetLogLevel(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleGetLogLevel(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"level": logging.Level})
+	if err := json.NewEncoder(w).Encode(map[string]int{"level": logging.Level}); err != nil {
+		logger.Pl.E("Could not encode log level to JSON: %v", err)
+	}
 }
 
 // handleGetTubarrLogs serves the log entries from memory.
-func handleGetTubarrLogs(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleGetTubarrLogs(w http.ResponseWriter, _ *http.Request) {
 	logs := logging.GetRecentLogsForProgram("Tubarr")
 	if logs == nil {
 		http.Error(w, "tubarr logger not initialized", http.StatusNotFound)
@@ -1007,29 +1040,42 @@ func handleGetTubarrLogs(w http.ResponseWriter, r *http.Request) {
 		if len(line) == 0 {
 			continue
 		}
-		w.Write(line)
+		if _, err := w.Write(line); err != nil {
+			logger.Pl.E("Failed to write Tubarr log line %q: %v", line, err)
+		}
 	}
 }
 
 // handleGetMetarrLogs serves the Metarr log entries from memory.
-func handleGetMetarrLogs(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	// Reload file after Metarr exits
+	// Reload file after Metarr exits.
 	if vars.MetarrFinished {
 		vars.MetarrLogs = file.LoadMetarrLogs()
 		vars.MetarrFinished = false
 	}
 
-	// Print file logs first (only once per Tubarr startup)
+	// Print file logs first (only once per Tubarr startup).
 	for _, line := range vars.MetarrLogs {
-		w.Write(line)
+		if _, err := w.Write(line); err != nil {
+			logger.Pl.E("Failed to write Metarr log line %q: %v", line, err)
+		}
 	}
 
-	// Try to append live RAM logs if Metarr is running
+	// Try to append live RAM logs if Metarr is running.
 	resp, err := http.Get("http://127.0.0.1:6387/logs")
-	if err == nil {
-		defer resp.Body.Close()
-		io.Copy(w, resp.Body)
+	if err == nil { // if err IS nil
+		if resp != nil {
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					logger.Pl.E("Failed to close response body for Metarr log fetch: %v", err)
+				}
+			}()
+
+			if _, err := io.Copy(w, resp.Body); err != nil {
+				logger.Pl.E("Failed to close response body for Metarr log fetch: %v", err)
+			}
+		}
 	}
 }

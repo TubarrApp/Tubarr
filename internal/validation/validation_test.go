@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
 )
@@ -114,8 +115,12 @@ func TestValidateDirectory_CreateIfMissing(t *testing.T) {
 	missing := tmp + "/new"
 	invalidName := tmp + "/bad\x00name"
 	t.Cleanup(func() {
-		os.Remove(missing)
-		os.Remove(invalidName)
+		if err := os.Remove(missing); err != nil {
+			t.Fatalf("Could not remove %q: %v", missing, err)
+		}
+		if err := os.Remove(invalidName); err != nil {
+			t.Fatalf("Could not remove %q: %v", invalidName, err)
+		}
 	})
 
 	// Missing, create it
@@ -187,7 +192,9 @@ func TestValidateFile_ExistingFile(t *testing.T) {
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "x.txt")
 	t.Cleanup(func() {
-		os.Remove(f)
+		if err := os.Remove(f); err != nil {
+			t.Fatalf("Could not remove %q: %v", f, err)
+		}
 	})
 
 	if err := os.WriteFile(f, []byte("hello"), 0644); err != nil {
@@ -208,8 +215,12 @@ func TestValidateFile_CreateIfMissing(t *testing.T) {
 	valid := tmp + "newfile.txt"
 	invalid := tmp + "\x00"
 	t.Cleanup(func() {
-		os.Remove(valid)
-		os.Remove(invalid)
+		if err := os.Remove(valid); err != nil {
+			logger.Pl.E("Could not remove file %q: %v", valid, err)
+		}
+		if err := os.Remove(invalid); err != nil {
+			logger.Pl.E("Could not remove file %q: %v", invalid, err)
+		}
 	})
 
 	// Valid filename
@@ -542,7 +553,9 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 	tmp := t.TempDir()
 	missingDir := filepath.Join(tmp, "fake_dir")
 	t.Cleanup(func() {
-		os.RemoveAll(missingDir)
+		if err := os.RemoveAll(missingDir); err != nil {
+			t.Fatalf("Could not remove %q: %v", missingDir, err)
+		}
 	})
 
 	moveOps := []models.MetaFilterMoveOps{

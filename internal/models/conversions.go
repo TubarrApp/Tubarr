@@ -3,6 +3,7 @@ package models
 import "tubarr/internal/domain/logger"
 
 // ------ Filters -----------------------------------------------------------------
+
 // FiltersArrayToSlice converts filter models back into slice form.
 func FiltersArrayToSlice(fModels []Filters) []string {
 	if len(fModels) == 0 {
@@ -29,6 +30,7 @@ func FiltersToString(f Filters) string {
 }
 
 // ------ Meta Ops -----------------------------------------------------------------
+
 // MetaOpsArrayToSlice converts meta ops models back into slice form.
 func MetaOpsArrayToSlice(moModels []MetaOps) []string {
 	if len(moModels) == 0 {
@@ -64,6 +66,7 @@ func MetaOpToString(m MetaOps) string {
 }
 
 // ------ Filename Ops -----------------------------------------------------------------
+
 // FilenameOpsArrayToSlice converts filename ops models back into slice form.
 func FilenameOpsArrayToSlice(foModels []FilenameOps) []string {
 	if len(foModels) == 0 {
@@ -103,6 +106,7 @@ func FilenameOpToString(f FilenameOps) string {
 }
 
 // ------ Meta Filter Move Ops -----------------------------------------------------------------
+
 // MetaFilterMoveOpsArrayToSlice converts meta filter move ops back to slice.
 func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 	out := make([]string, 0, len(mf))
@@ -126,6 +130,7 @@ func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
 }
 
 // ------ Filtered Meta Ops -----------------------------------------------------------------
+
 // FilteredMetaOpsToSlice converts filtered meta ops back to slice.
 func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	slice := make([]string, 0, len(f.Filters))
@@ -145,6 +150,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 }
 
 // ------ Filtered Filename Ops -----------------------------------------------------------------
+
 // FilteredFilenameOpsToSlice converts filtered filename ops back to slice.
 func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	slice := make([]string, 0, len(f.Filters))

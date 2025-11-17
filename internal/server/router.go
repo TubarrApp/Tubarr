@@ -18,29 +18,22 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
+// serverStore holds the database, stores, and contexts for the server.
 type serverStore struct {
-	s  contracts.Store
-	cs contracts.ChannelStore
-	ds contracts.DownloadStore
-	vs contracts.VideoStore
-	db *sql.DB
+	s      contracts.Store
+	cs     contracts.ChannelStore
+	ds     contracts.DownloadStore
+	vs     contracts.VideoStore
+	db     *sql.DB
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
-var ss serverStore
-
-const TubarrPort = "8827"
+// tubarrPort
+const tubarrPort = "8827"
 
 // NewRouter returns a http Handler.
-func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
-	// Inject stores
-	ss = serverStore{
-		s:  store,
-		cs: store.ChannelStore(),
-		ds: store.DownloadStore(),
-		vs: store.VideoStore(),
-		db: database,
-	}
-
+func NewRouter(ss serverStore) http.Handler {
 	// Initialize router
 	r := chi.NewRouter()
 
@@ -53,27 +46,27 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		// Channels API
 		r.Route("/channels", func(r chi.Router) {
-			r.Get("/all", handleListChannels)
-			r.Post("/add", handleCreateChannel)
-			r.Post("/add-from-file", handleAddChannelFromFile)
-			r.Post("/add-from-directory", handleAddChannelsFromDir)
-			r.Get("/{id}", handleGetChannel)
-			r.Get("/{id}/downloads", handleGetDownloads)
-			r.Get("/{id}/latest-downloads", handleLatestDownloads)
-			r.Get("/{id}/all-videos", handleGetAllVideos)
-			r.Put("/{id}/update", handleUpdateChannel)
-			r.Delete("/{id}/delete", handleDeleteChannel)
-			r.Delete("/{id}/delete-videos", handleDeleteChannelVideos)
-			r.Delete("/{id}/cancel-download/{videoID}", handleCancelDownload)
-			r.Post("/{id}/crawl", handleCrawlChannel)
-			r.Post("/{id}/ignore-crawl", handleIgnoreCrawlChannel)
+			r.Get("/all", ss.handleListChannels)
+			r.Post("/add", ss.handleCreateChannel)
+			r.Post("/add-from-file", ss.handleAddChannelFromFile)
+			r.Post("/add-from-directory", ss.handleAddChannelsFromDir)
+			r.Get("/{id}", ss.handleGetChannel)
+			r.Get("/{id}/downloads", ss.handleGetDownloads)
+			r.Get("/{id}/latest-downloads", ss.handleLatestDownloads)
+			r.Get("/{id}/all-videos", ss.handleGetAllVideos)
+			r.Put("/{id}/update", ss.handleUpdateChannel)
+			r.Delete("/{id}/delete", ss.handleDeleteChannel)
+			r.Delete("/{id}/delete-videos", ss.handleDeleteChannelVideos)
+			r.Delete("/{id}/cancel-download/{videoID}", ss.handleCancelDownload)
+			r.Post("/{id}/crawl", ss.handleCrawlChannel)
+			r.Post("/{id}/ignore-crawl", ss.handleIgnoreCrawlChannel)
 		})
 
 		// Logs API
-		r.Get("/logs", handleGetTubarrLogs)
-		r.Get("/logs/metarr", handleGetMetarrLogs)
-		r.Get("/logs/level", handleGetLogLevel)
-		r.Post("/logs/level/{level}", handleSetLogLevel)
+		r.Get("/logs", ss.handleGetTubarrLogs)
+		r.Get("/logs/metarr", ss.handleGetMetarrLogs)
+		r.Get("/logs/level", ss.handleGetLogLevel)
+		r.Post("/logs/level/{level}", ss.handleSetLogLevel)
 	})
 
 	// --- Static Frontend ---
@@ -85,9 +78,19 @@ func NewRouter(store contracts.Store, database *sql.DB) http.Handler {
 }
 
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
-func StartServer(ctx context.Context, s contracts.Store, db *sql.DB) error {
-	r := NewRouter(s, db)
-	addr := ":" + TubarrPort
+func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, database *sql.DB) error {
+	ss := serverStore{
+		s:      store,
+		cs:     store.ChannelStore(),
+		ds:     store.DownloadStore(),
+		vs:     store.VideoStore(),
+		db:     database,
+		ctx:    inputCtx,
+		cancel: inputCtxCancel,
+	}
+
+	r := NewRouter(ss)
+	addr := ":" + tubarrPort
 
 	srv := &http.Server{
 		Addr:    addr,
@@ -108,11 +111,11 @@ func StartServer(ctx context.Context, s contracts.Store, db *sql.DB) error {
 	}()
 
 	// Start crawl watchdog in background (respects ctx cancellation)
-	go ss.startCrawlWatchdog(ctx, nil)
+	go ss.startCrawlWatchdog(inputCtx, nil)
 
 	// Wait for interrupt signal
 	select {
-	case <-ctx.Done():
+	case <-inputCtx.Done():
 		logger.Pl.S("Shutting down server (context cancelled)...")
 
 	case err := <-serverErr:
@@ -123,12 +126,12 @@ func StartServer(ctx context.Context, s contracts.Store, db *sql.DB) error {
 	}
 
 	// Create shutdown context with timeout
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(inputCtx, 10*time.Second)
 	defer cancel()
 
 	// Attempt graceful shutdown
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("server forced to shutdown: %v", err)
+		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
 
 	logger.Pl.S("Server at http://localhost%s shut down successfully\n", addr)

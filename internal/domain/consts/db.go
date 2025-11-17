@@ -20,6 +20,7 @@ const (
 	QProgRunning   = "running"
 )
 
+// ValidProgramKeys holds valid keys for the program database.
 var ValidProgramKeys = map[string]bool{
 	QProgHost:      true,
 	QProgID:        true,
@@ -44,6 +45,7 @@ const (
 	QChanUpdatedAt       = "updated_at"
 )
 
+// ValidChannelKeys holds valid keys for the channel database.
 var ValidChannelKeys = map[string]bool{
 	QChanID:              true,
 	QChanName:            true,
@@ -74,6 +76,7 @@ const (
 	QChanURLUpdatedAt = "updated_at"
 )
 
+// ValidChannelURLKeys holds valid keys for the channel URL database.
 var ValidChannelURLKeys = map[string]bool{
 	QChanURLID:        true,
 	QChanURLChannelID: true,
@@ -110,6 +113,7 @@ const (
 	QVidUpdatedAt    = "updated_at"
 )
 
+// ValidVideoKeys holds valid keys for the video database.
 var ValidVideoKeys = map[string]bool{
 	QVidID:           true,
 	QVidChanID:       true,
@@ -139,6 +143,7 @@ const (
 	QDLUpdatedAt = "updated_at"
 )
 
+// ValidDownloadKeys holds valid keys for the download database.
 var ValidDownloadKeys = map[string]bool{
 	QDLVidID:     true,
 	QDLStatus:    true,
@@ -157,6 +162,7 @@ const (
 	QNotifyUpdatedAt = "updated_at"
 )
 
+// ValidNotificationKeys holds valid keys for the notification database.
 var ValidNotificationKeys = map[string]bool{
 	QNotifyChanID:    true,
 	QNotifyName:      true,

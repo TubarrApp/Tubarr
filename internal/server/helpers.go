@@ -483,7 +483,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	}
 
 	// Bools
-	var useGlobalCookies bool = (useGlobalCookiesStr == "true")
+	useGlobalCookies := (useGlobalCookiesStr == "true")
 
 	// Model conversions (newline-separated, not space-separated)
 	filters, err := parsing.ParseFilterOps(splitNonEmptyLines(filtersStr))

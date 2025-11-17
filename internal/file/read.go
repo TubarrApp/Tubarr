@@ -131,7 +131,11 @@ func LoadMetarrLogs() [][]byte {
 		logger.Pl.E("Failed to open Metarr log file at %q: %v", paths.MetarrLogFilePath, err)
 		return nil
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			logger.Pl.E("Could not close file %q: %v", f, err)
+		}
+	}()
 
 	var lines [][]byte
 

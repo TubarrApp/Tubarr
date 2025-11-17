@@ -192,7 +192,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	// ===============================
 
 	now := time.Now()
-	var chanURLs []*models.ChannelURL
+	chanURLs := make([]*models.ChannelURL, 0, len(*input.URLs))
 
 	for _, u := range *input.URLs {
 		if u == "" {
@@ -451,7 +451,7 @@ func viperPtr[T any](v interface {
 	return &val, true
 }
 
-// getConfigValue retrieves values from a local viper instance.
+// GetConfigValue retrieves values from a local viper instance.
 //
 // Supports both kebab-case and snake_case keys.
 func GetConfigValue[T any](v interface {

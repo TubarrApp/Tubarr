@@ -118,7 +118,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 }
 
 // getHomepageCarouselVideos returns the latest 'n' downloaded videos.
-func (s *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) (videos []models.Video, err error) {
+func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) (videos []models.Video, err error) {
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s "+
@@ -142,11 +142,15 @@ func (s *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) 
 		consts.QVidUpdatedAt, // Most recent first
 	)
 
-	rows, err := s.db.Query(query, channel.ID, n)
+	rows, err := ss.db.Query(query, channel.ID, n)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query videos: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			logger.Pl.E("Could not close rows after homepage video fetch request: %v", closeErr)
+		}
+	}()
 
 	for rows.Next() {
 		var video models.Video
@@ -198,7 +202,7 @@ func (s *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) 
 // getActiveDownloads retrieves all currently downloading videos for a specific channel from the in-memory StatusUpdate map.
 //
 // This provides real-time updates without hitting the database on every poll.
-func (s *serverStore) getActiveDownloads(channel *models.Channel) ([]models.Video, error) {
+func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Video {
 	var videos []models.Video
 
 	// Iterate through the in-memory StatusUpdate to find active downloads for this channel
@@ -242,11 +246,11 @@ func (s *serverStore) getActiveDownloads(channel *models.Channel) ([]models.Vide
 	})
 
 	logger.Pl.D(1, "Found %d active downloads in memory for channel %d", len(videos), channel.ID)
-	return videos, nil
+	return videos
 }
 
 // cancelDownload marks a download as cancelled in the database.
-func (s *serverStore) cancelDownload(videoID int64) error {
+func (ss *serverStore) cancelDownload(videoID int64) error {
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = CURRENT_TIMESTAMP WHERE %s = ?",
 		consts.DBDownloads,
@@ -255,7 +259,7 @@ func (s *serverStore) cancelDownload(videoID int64) error {
 		consts.QDLVidID,
 	)
 
-	result, err := s.db.Exec(query, consts.DLStatusCancelled, videoID)
+	result, err := ss.db.Exec(query, consts.DLStatusCancelled, videoID)
 	if err != nil {
 		return fmt.Errorf("failed to cancel download: %w", err)
 	}

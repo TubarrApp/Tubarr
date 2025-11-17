@@ -37,7 +37,7 @@ func main() {
 	fmt.Printf("\nMain Tubarr file/dir locations:\n\nDatabase: %s\nLog file: %s\n\n",
 		paths.DBFilePath, paths.TubarrLogFilePath)
 
-	// Setup Tubarr logging
+	// Setup Tubarr logging.
 	logConfig := logging.LoggingConfig{
 		LogFilePath: paths.TubarrLogFilePath,
 		MaxSizeMB:   1,
@@ -53,26 +53,26 @@ func main() {
 	}
 	logger.Pl = pl
 
-	// Initialize application (DB, stores, etc)
+	// Initialize application (DB, stores, etc).
 	store, database, progControl, err := initializeApplication()
 	if err != nil {
 		logger.Pl.E("error initializing Tubarr: %v", err)
 		return
 	}
 
-	// Load in Metarr logs
+	// Load in Metarr logs.
 	vars.MetarrLogs = file.LoadMetarrLogs()
 
 	logger.Pl.I("Tubarr (PID: %d) started at: %v",
 		progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
 
-	// create cancellable context for shutdown
+	// create cancellable context for shutdown.
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 
-	// heartbeat shutdown channel
+	// heartbeat shutdown channel.
 	heartbeatDone := make(chan struct{})
 
-	// run heartbeat goroutine
+	// run heartbeat goroutine.
 	go func() {
 		startHeartbeat(ctx, progControl)
 		close(heartbeatDone)
@@ -94,7 +94,7 @@ func main() {
 		}
 
 		if abstractions.IsSet(keys.RunWebInterface) {
-			return server.StartServer(ctx, store, database)
+			return server.StartServer(ctx, cancel, store, database)
 		}
 
 		if abstractions.GetBool(keys.TerminalRunDefaultBehavior) {
@@ -107,8 +107,8 @@ func main() {
 	}()
 
 	// ---- SHUTDOWN ----
-	cancel()        // stop goroutines
-	<-heartbeatDone // wait for heartbeat to flush DB state
+	cancel()        // stop goroutines.
+	<-heartbeatDone // wait for heartbeat to flush DB state.
 	cleanup(progControl, startTime)
 
 	if runErr != nil {

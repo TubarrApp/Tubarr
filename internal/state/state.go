@@ -8,6 +8,7 @@ import (
 )
 
 // --- Crawl State --------------------------------------------------------------------------
+
 // Lock out of crawl function
 var crawlState sync.Map
 
@@ -45,6 +46,7 @@ func CrawlStateActive(channelName string) bool {
 }
 
 // ---- Jitter Times --------------------------------------------------------------------------
+
 // Cached jitter times per channel
 var watchdogJitter sync.Map
 
@@ -69,7 +71,8 @@ func GetOrComputeJitter(channelID int64, chanURLCount int, compute func() int) i
 }
 
 // --- Status Update --------------------------------------------------------------------------
-// State of current download
+
+// StatusUpdateCache holds status updates for downloads.
 var StatusUpdateCache sync.Map
 
 // SetStatusUpdate updates the download state in the map.
@@ -94,6 +97,7 @@ func GetStatusUpdate(videoID int64) (stateFromMap models.StatusUpdate) {
 }
 
 // --- Download Status --------------------------------------------------------------------------
+
 // State of current video download
 var activeVideoDownloadStatus sync.Map
 

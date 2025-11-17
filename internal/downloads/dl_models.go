@@ -119,20 +119,20 @@ func (d *JSONDownload) cleanup() {
 // RegisterDownloadContext registers a cancellation function for a video download.
 func RegisterDownloadContext(videoID int64, videoURL string, cancel context.CancelFunc) {
 	activeDownloadContexts.Store(videoID, cancel)
-	logger.Pl.D(2, "Registered cancellation context for video ID %d", videoID)
+	logger.Pl.D(2, "Registered cancellation context for video ID %d with URL %q", videoID, videoURL)
 }
 
 // UnregisterDownloadContext removes a video's cancellation function.
 func UnregisterDownloadContext(videoID int64, videoURL string) {
 	activeDownloadContexts.Delete(videoID)
-	logger.Pl.D(2, "Unregistered cancellation context for video ID %d", videoID)
+	logger.Pl.D(2, "Unregistered cancellation context for video ID %d with URL %q", videoID, videoURL)
 }
 
 // CancelDownloadByVideoID cancels an active download by video ID.
 func CancelDownloadByVideoID(videoID int64, videoURL string) bool {
 	if cancel, ok := activeDownloadContexts.Load(videoID); ok {
 		if cancelFunc, ok := cancel.(context.CancelFunc); ok {
-			logger.Pl.I("Cancelling download for video ID %d", videoID)
+			logger.Pl.I("Cancelling download for video ID %d with URL %q", videoID, videoURL)
 			cancelFunc()
 			return true
 		}

@@ -1,3 +1,4 @@
+// Package cmd handles settings command flags for interfaces like Cobra and Viper.
 package cmd
 
 import (
@@ -6,8 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Channel:
-// cmd.SetPrimaryChannelFlags sets the main flags for channels in, or intended for, the database.
+// SetPrimaryChannelFlags sets the main flags for channels in, or intended for, the database.
 func SetPrimaryChannelFlags(cmd *cobra.Command, name *string, urls *[]string, id *int) {
 	if id != nil {
 		cmd.Flags().IntVarP(id, keys.ID, "i", 0, "Channel ID in the DB")
@@ -20,7 +20,6 @@ func SetPrimaryChannelFlags(cmd *cobra.Command, name *string, urls *[]string, id
 	}
 }
 
-// Authorization:
 // SetAuthFlags sets flags related to channel authorization.
 func SetAuthFlags(cmd *cobra.Command, username, password, loginURL *string, authDetails *[]string) {
 	if username != nil {
@@ -40,7 +39,6 @@ func SetAuthFlags(cmd *cobra.Command, username, password, loginURL *string, auth
 	}
 }
 
-// Downloads:
 // SetDownloadFlags sets flags related to download tasks.
 func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookiesFromBrowser, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
 
@@ -81,7 +79,6 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 	}
 }
 
-// External programs
 // SetMetarrFlags sets flags for interaction with the Metarr software.
 func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	outputExt, extraFFmpegargs, minFreeMem, outDir, renameStyle, metaOpsFile,
@@ -177,7 +174,6 @@ func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuDir, videoFilter, quality *st
 	}
 }
 
-// Files & Directories
 // SetFileDirFlags sets the primary video and JSON directories.
 func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) {
 	if configFile != nil {
@@ -191,7 +187,6 @@ func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) 
 	}
 }
 
-// Program
 // SetProgramRelatedFlags sets flags for the Tubarr instance.
 func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd, moveOpsFile *string, moveOps *[]string, pause *bool) {
 	if concurrency != nil {

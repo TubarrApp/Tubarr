@@ -693,7 +693,9 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			}
 
 			v := viper.New()
-			file.LoadConfigFile(v, fileToUse)
+			if err := file.LoadConfigFile(v, fileToUse); err != nil {
+				return err
+			}
 
 			if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
 				return err
@@ -1255,7 +1257,9 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Change name
 			if newName != "" && newName != c.Name {
-				cs.UpdateChannelValue(key, val, consts.QChanName, newName)
+				if err := cs.UpdateChannelValue(key, val, consts.QChanName, newName); err != nil {
+					return err
+				}
 			}
 
 			// Check if the user got auth details from flags

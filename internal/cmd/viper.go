@@ -7,7 +7,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Transformers
+// Transformers ----------------------------------------------------------------------------------------------------------
+
 // InitFileTransformers initializes user flag settings for transformations applying to all files.
 func InitFileTransformers(rootCmd *cobra.Command) error {
 	// Prefix file with metafield
@@ -67,7 +68,8 @@ func InitMetaTransformers(rootCmd *cobra.Command) error {
 	return nil
 }
 
-// Program
+// Program ----------------------------------------------------------------------------------------------------------
+
 // InitProgramFlags initializes user flag settings related to the core program. E.g. logging level.
 func InitProgramFlags(rootCmd *cobra.Command) error {
 	// Skip initial wait
