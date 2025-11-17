@@ -22,7 +22,6 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 
-	"github.com/Masterminds/squirrel"
 	"github.com/TubarrApp/gocommon/logging"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
@@ -55,23 +54,20 @@ func (cs *ChannelStore) GetDB() *sql.DB {
 
 // GetChannelID gets the channel ID from an input key and value.
 func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
-	switch key {
-	case consts.QChanName, consts.QChanID:
-		if val == "" {
-			return 0, fmt.Errorf("please enter a value for key %q", key)
-		}
-	default:
-		return 0, errors.New("please input a unique constrained value, such as ID or name")
+	if !consts.ValidChannelKeys[key] {
+		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
 	var id int64
-	query := squirrel.
-		Select(consts.QChanID).
-		From(consts.DBChannels).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QChanID,
+		consts.DBChannels,
+		key,
+	)
 
-	if err := query.QueryRow().Scan(&id); err != nil {
+	err := cs.DB.QueryRow(query, val).Scan(&id)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, fmt.Errorf("channel with %s %q does not exist", key, val)
 		}
@@ -85,20 +81,17 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password, loginURL string, err error) {
 	var u, p, l sql.NullString // Use sql.NullString to handle NULL values
 
-	query := squirrel.
-		Select(
-			consts.QChanURLUsername,
-			consts.QChanURLPassword,
-			consts.QChanURLLoginURL,
-		).
-		From(consts.DBChannelURLs).
-		Where(squirrel.And{
-			squirrel.Eq{consts.QChanURLChannelID: channelID},
-			squirrel.Eq{consts.QChanURLURL: url},
-		}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s FROM %s WHERE %s = ? AND %s = ?",
+		consts.QChanURLUsername,
+		consts.QChanURLPassword,
+		consts.QChanURLLoginURL,
+		consts.DBChannelURLs,
+		consts.QChanURLChannelID,
+		consts.QChanURLURL,
+	)
 
-	if err = query.QueryRow().Scan(&u, &p, &l); err != nil {
+	if err = cs.DB.QueryRow(query, channelID, url).Scan(&u, &p, &l); err != nil {
 		logger.Pl.I("No auth details found in database for channel ID: %d, URL: %s", channelID, url)
 		return "", "", "", err
 	}
@@ -119,21 +112,28 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
-	fetchQuery := squirrel.
-		Select(
-			consts.QVidURL,
-			consts.QVidVideoPath,
-			consts.QVidJSONPath,
-		).
-		From(consts.DBVideos).
-		Where(squirrel.Eq{
-			consts.QVidChanID: channelID,
-			consts.QVidURL:    urls,
-		}).
-		RunWith(cs.DB)
+	placeholders := make([]string, len(urls))
+	args := make([]any, 0, len(urls)+1)
 
-	// Execute query to get rows
-	rows, err := fetchQuery.Query()
+	for i := range urls {
+		placeholders[i] = "?"
+		args = append(args, urls[i])
+	}
+
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s FROM %s WHERE %s = ? AND %s IN (%s)",
+		consts.QVidURL,
+		consts.QVidVideoPath,
+		consts.QVidJSONPath,
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidURL,
+		strings.Join(placeholders, ","), // join only the placeholders, not values
+	)
+
+	args = append([]any{channelID}, args...) // prepend channelID
+
+	rows, err := cs.DB.Query(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve videos: %w", err)
 	}
@@ -177,16 +177,34 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 	}
 
 	// Remove videos from database
-	deleteQuery := squirrel.
-		Delete(consts.DBVideos).
-		Where(squirrel.Eq{
-			consts.QVidChanID: channelID,
-			consts.QVidURL:    urls,
-		}).
-		RunWith(cs.DB)
+	deletePlaceholders := make([]string, len(urls))
+	deleteArgs := make([]any, 0, len(urls)+1)
 
-	if _, err := deleteQuery.Exec(); err != nil {
+	for i := range urls {
+		deletePlaceholders[i] = "?"
+		deleteArgs = append(deleteArgs, urls[i])
+	}
+
+	deleteQuery := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s = ? AND %s IN (%s)",
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidURL,
+		strings.Join(deletePlaceholders, ","),
+	)
+	deleteArgs = append([]any{channelID}, deleteArgs...)
+
+	deleteResult, err := cs.DB.Exec(deleteQuery, deleteArgs...)
+	if err != nil {
 		return err
+	}
+
+	deletedRows, err := deleteResult.RowsAffected()
+	if deletedRows == 0 && err == nil {
+		logger.Pl.I("No videos deleted for URLs: %v", urls)
+		return nil
+	} else if err != nil {
+		logger.Pl.E("Failed to retrieve affected rows: %v", err)
 	}
 
 	logger.Pl.S("Channel ID %d: Deleted videos for URLs %v", channelID, urls)
@@ -274,39 +292,40 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 
 // AddURLToIgnore adds a URL into the database to ignore in subsequent crawls.
 func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error {
-
 	if !cs.channelExistsID(channelID) {
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
-	query := squirrel.
-		Insert(consts.DBVideos).
-		Columns(consts.QVidChanID, consts.QVidURL, consts.QVidFinished).
-		Values(channelID, ignoreURL, true).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)",
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidURL,
+		consts.QVidFinished,
+	)
 
-	if _, err := query.Exec(); err != nil {
+	if _, err := cs.DB.Exec(query, channelID, ignoreURL, true); err != nil {
 		return err
 	}
+
 	logger.Pl.S("Added URL %q to ignore list for channel with ID '%d'", ignoreURL, channelID)
 	return nil
 }
 
 // GetNotifyURLs returns all notification URLs for a given channel.
 func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) {
-	query := squirrel.
-		Select(
-			consts.QNotifyChanID,
-			consts.QNotifyName,
-			consts.QNotifyChanURL,
-			consts.QNotifyURL,
-		).
-		From(consts.DBNotifications).
-		Where(squirrel.Eq{consts.QNotifyChanID: id}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
+		consts.QNotifyChanID,
+		consts.QNotifyName,
+		consts.QNotifyChanURL,
+		consts.QNotifyURL,
+		consts.DBNotifications,
+		consts.QNotifyChanID,
+	)
 
 	// Execute query to get rows
-	rows, err := query.Query()
+	rows, err := cs.DB.Query(query, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query notification URLs: %w", err)
 	}
@@ -350,18 +369,36 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
-	query := squirrel.
-		Delete(consts.DBNotifications).
-		Where(squirrel.Eq{
-			consts.QVidChanID: channelID,
-		}).
-		Where(squirrel.Or{
-			squirrel.Eq{consts.QNotifyURL: urls},
-			squirrel.Eq{consts.QNotifyName: names},
-		}).
-		RunWith(cs.DB)
+	urlPlaceholders := make([]string, len(urls))
+	urlArgs := make([]any, 0, len(urls))
+	for i := range urls {
+		urlPlaceholders[i] = "?"
+		urlArgs = append(urlArgs, urls[i])
+	}
 
-	if _, err := query.Exec(); err != nil {
+	namePlaceholders := make([]string, len(names))
+	nameArgs := make([]any, 0, len(names))
+	for i := range names {
+		namePlaceholders[i] = "?"
+		nameArgs = append(nameArgs, names[i])
+	}
+
+	query := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s = ? AND ((%s IN (%s)) OR (%s IN (%s)))",
+		consts.DBNotifications,
+		consts.QNotifyChanID,
+		consts.QNotifyURL,
+		strings.Join(urlPlaceholders, ","),
+		consts.QNotifyName,
+		strings.Join(namePlaceholders, ","),
+	)
+
+	args := make([]any, 0, 1+len(urlArgs)+len(nameArgs))
+	args = append(args, channelID)
+	args = append(args, urlArgs...)
+	args = append(args, nameArgs...)
+
+	if _, err := cs.DB.Exec(query, args...); err != nil {
 		return err
 	}
 
@@ -432,15 +469,16 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 			}
 		}
 
-		query := squirrel.
-			Update(consts.DBChannelURLs).
-			Set(consts.QChanURLUsername, a.Username).
-			Set(consts.QChanURLPassword, a.EncryptedPassword).
-			Set(consts.QChanURLLoginURL, a.LoginURL).
-			Where(squirrel.Eq{consts.QChanURLChannelID: chanID}).
-			RunWith(cs.DB)
+		query := fmt.Sprintf(
+			"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
+			consts.DBChannelURLs,
+			consts.QChanURLUsername,
+			consts.QChanURLPassword,
+			consts.QChanURLLoginURL,
+			consts.QChanURLChannelID,
+		)
 
-		if _, err := query.Exec(); err != nil {
+		if _, err := cs.DB.Exec(query, a.Username, a.EncryptedPassword, a.LoginURL, chanID); err != nil {
 			return err
 		}
 		logger.Pl.S("Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
@@ -508,29 +546,28 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 	// Insert into the channels table
 	now := time.Now()
-	query := squirrel.
-		Insert(consts.DBChannels).
-		Columns(
-			consts.QChanName,
-			consts.QChanConfigFile,
-			consts.QChanSettings,
-			consts.QChanMetarr,
-			consts.QChanLastScan,
-			consts.QChanCreatedAt,
-			consts.QChanUpdatedAt,
-		).
-		Values(
-			c.Name,
-			c.ConfigFile,
-			settingsJSON,
-			metarrJSON,
-			now,
-			now,
-			now,
-		).
-		RunWith(tx)
+	query := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		consts.DBChannels,
+		consts.QChanName,
+		consts.QChanConfigFile,
+		consts.QChanSettings,
+		consts.QChanMetarr,
+		consts.QChanLastScan,
+		consts.QChanCreatedAt,
+		consts.QChanUpdatedAt,
+	)
 
-	result, err := query.Exec()
+	result, err := tx.Exec(
+		query,
+		c.Name,
+		c.ConfigFile,
+		settingsJSON,
+		metarrJSON,
+		now,
+		now,
+		now,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert channel: %w", err)
 	}
@@ -572,42 +609,41 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			}
 		}
 
-		urlQuery := squirrel.
-			Insert(consts.DBChannelURLs).
-			Columns(
-				consts.QChanURLChannelID,
-				consts.QChanURLURL,
-				consts.QChanURLUsername,
-				consts.QChanURLPassword,
-				consts.QChanURLLoginURL,
-				consts.QChanURLIsManual,
-				consts.QChanURLMetarr,
-				consts.QChanURLSettings,
-				consts.QChanURLLastScan,
-				consts.QChanURLCreatedAt,
-				consts.QChanURLUpdatedAt,
-			).
-			Values(
-				id,
-				cu.URL,
-				cu.Username,
-				cu.EncryptedPassword,
-				cu.LoginURL,
-				false, // Not a manual URL
-				customMetarrArgs,
-				customSettings,
-				now,
-				now,
-				now,
-			).
-			RunWith(tx)
+		urlInsertQuery := fmt.Sprintf(
+			"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			consts.DBChannelURLs,
+			consts.QChanURLChannelID,
+			consts.QChanURLURL,
+			consts.QChanURLUsername,
+			consts.QChanURLPassword,
+			consts.QChanURLLoginURL,
+			consts.QChanURLIsManual,
+			consts.QChanURLMetarr,
+			consts.QChanURLSettings,
+			consts.QChanURLLastScan,
+			consts.QChanURLCreatedAt,
+			consts.QChanURLUpdatedAt,
+		)
 
-		result, err = urlQuery.Exec()
+		urlInsertResult, err := tx.Exec(
+			urlInsertQuery,
+			id,
+			cu.URL,
+			cu.Username,
+			cu.EncryptedPassword,
+			cu.LoginURL,
+			false,
+			customMetarrArgs,
+			customSettings,
+			now,
+			now,
+			now,
+		)
 		if err != nil {
 			return 0, fmt.Errorf("failed to insert URL %q for channel ID %d: %w", cu.URL, id, err)
 		}
 
-		urlID, err := result.LastInsertId()
+		urlID, err := urlInsertResult.LastInsertId()
 		if err != nil {
 			return 0, fmt.Errorf("failed to get last insert ID for URL %q: %w", cu.URL, err)
 		}
@@ -630,16 +666,17 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 // DeleteChannel deletes a channel from the database with a given key/value.
 func (cs *ChannelStore) DeleteChannel(key, val string) error {
-	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
-		return err
+	if !consts.ValidChannelKeys[key] {
+		return fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
-	query := squirrel.
-		Delete(consts.DBChannels).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s = ?",
+		consts.DBChannels,
+		key,
+	)
 
-	result, err := query.Exec()
+	result, err := cs.DB.Exec(query, val)
 	if err != nil {
 		return fmt.Errorf("failed to delete channel: %w", err)
 	}
@@ -760,8 +797,8 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 
 // GetChannelModel fills the channel model from the database.
 func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent bool) (*models.Channel, bool, error) {
-	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
-		return nil, false, err
+	if !consts.ValidChannelKeys[key] {
+		return nil, false, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
 	var (
@@ -769,34 +806,32 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		err                  error
 	)
 
-	query := squirrel.
-		Select(
-			consts.QChanID,
-			consts.QChanName,
-			consts.QChanConfigFile,
-			consts.QChanSettings,
-			consts.QChanMetarr,
-			consts.QChanLastScan,
-			consts.QChanCreatedAt,
-			consts.QChanUpdatedAt,
-		).
-		From(consts.DBChannels).
-		Where(squirrel.Eq{key: val})
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s FROM %s WHERE %s = ?",
+		consts.QChanID,
+		consts.QChanName,
+		consts.QChanConfigFile,
+		consts.QChanSettings,
+		consts.QChanMetarr,
+		consts.QChanLastScan,
+		consts.QChanCreatedAt,
+		consts.QChanUpdatedAt,
+		consts.DBChannels,
+		key,
+	)
 
 	var c models.Channel
-	if err := query.
-		RunWith(cs.DB).
-		QueryRow().
-		Scan(
-			&c.ID,
-			&c.Name,
-			&c.ConfigFile,
-			&settings,
-			&metarrJSON,
-			&c.LastScan,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-		); err != nil {
+	err = cs.DB.QueryRow(query, val).Scan(
+		&c.ID,
+		&c.Name,
+		&c.ConfigFile,
+		&settings,
+		&metarrJSON,
+		&c.LastScan,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+	)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
 		}
@@ -834,22 +869,21 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 
 // GetAllChannels retrieves all channels in the database.
 func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error) {
-	query := squirrel.
-		Select(
-			consts.QChanID,
-			consts.QChanName,
-			consts.QChanConfigFile,
-			consts.QChanSettings,
-			consts.QChanMetarr,
-			consts.QChanLastScan,
-			consts.QChanCreatedAt,
-			consts.QChanUpdatedAt,
-		).
-		From(consts.DBChannels).
-		OrderBy(consts.QChanName).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s FROM %s ORDER BY %s",
+		consts.QChanID,
+		consts.QChanName,
+		consts.QChanConfigFile,
+		consts.QChanSettings,
+		consts.QChanMetarr,
+		consts.QChanLastScan,
+		consts.QChanCreatedAt,
+		consts.QChanUpdatedAt,
+		consts.DBChannels,
+		consts.QChanName,
+	)
 
-	rows, err := query.Query()
+	rows, err := cs.DB.Query(query)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, false, nil
 	} else if err != nil {
@@ -897,25 +931,16 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 			return nil, true, fmt.Errorf("invalid metarr config from database for channel %q: %w", c.Name, err)
 		}
 
-		c.URLModels = []*models.ChannelURL{}
+		if c.URLModels, err = cs.GetChannelURLModels(&c, mergeURLsWithParent); err != nil {
+			return nil, true, err
+		}
 		channels = append(channels, &c)
-	}
-
-	// 0 as ID grabs all URL models with channel ID.
-	urlMap, err := cs.getChannelURLModelsMap(0, true)
-	if err != nil {
-		return nil, true, err
 	}
 
 	// Iterate all channels
 	for _, c := range channels {
-		urls, ok := urlMap[c.ID]
-		if ok {
-			c.URLModels = urls
-		}
-
 		// Check custom URL settings
-		for _, cURL := range urls {
+		for _, cURL := range c.URLModels {
 			if !models.SettingsAllZero(cURL.ChanURLSettings) && !models.ChildSettingsMatchParent(c.ChanSettings, cURL.ChanURLSettings) {
 				if err := validation.ValidateSettingsModel(cURL.ChanURLSettings); err != nil {
 					return nil, true, err
@@ -934,18 +959,19 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 
 // UpdateChannelMetarrArgsJSON updates args for Metarr output.
 func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error) {
-	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
-		return 0, err
+	if !consts.ValidChannelKeys[key] {
+		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
 	var metarrArgs json.RawMessage
-	query := squirrel.
-		Select(consts.QChanMetarr).
-		From(consts.DBChannels).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QChanMetarr,
+		consts.DBChannels,
+		key,
+	)
 
-	err := query.QueryRow().Scan(&metarrArgs)
+	err := cs.DB.QueryRow(query, val).Scan(&metarrArgs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
@@ -978,13 +1004,14 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 	logger.Pl.S("Updated MetarrArgs: %s", string(updatedArgs))
 
 	// Update the database with the new settings
-	updateQuery := squirrel.
-		Update(consts.DBChannels).
-		Set(consts.QChanMetarr, updatedArgs).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
+	updateQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ?",
+		consts.DBChannels,
+		consts.QChanMetarr,
+		key,
+	)
 
-	rtn, err := updateQuery.Exec()
+	rtn, err := cs.DB.Exec(updateQuery, updatedArgs, val)
 	if err != nil {
 		return 0, fmt.Errorf("failed to update channel settings in database: %w", err)
 	}
@@ -994,18 +1021,19 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 
 // UpdateChannelSettingsJSON updates specific settings in the channel's settings JSON.
 func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error) {
-	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
-		return 0, err
+	if !consts.ValidChannelKeys[key] {
+		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
 	var settingsJSON json.RawMessage
-	query := squirrel.
-		Select(consts.QChanSettings).
-		From(consts.DBChannels).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QChanSettings,
+		consts.DBChannels,
+		key,
+	)
 
-	err := query.QueryRow().Scan(&settingsJSON)
+	err := cs.DB.QueryRow(query, val).Scan(&settingsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
@@ -1038,13 +1066,14 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 	logger.Pl.S("Updated ChannelSettings: %s", string(updatedSettings))
 
 	// Update the database with the new settings
-	updateQuery := squirrel.
-		Update(consts.DBChannels).
-		Set(consts.QChanSettings, updatedSettings).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
+	updateQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ?",
+		consts.DBChannels,
+		consts.QChanSettings,
+		key,
+	)
 
-	rtn, err := updateQuery.Exec()
+	rtn, err := cs.DB.Exec(updateQuery, updatedSettings, val)
 	if err != nil {
 		return 0, fmt.Errorf("failed to update channel settings in database: %w", err)
 	}
@@ -1054,32 +1083,28 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 
 // UpdateChannelValue updates a single element in the database.
 func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) error {
-	if key == "" {
-		return errors.New("please do not enter the key and value blank")
+	if !consts.ValidChannelKeys[key] {
+		return fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
 	if !cs.channelExists(key, val) {
 		return fmt.Errorf("channel with key %q and value %q does not exist", key, val)
 	}
 
-	query := squirrel.
-		Update(consts.DBChannels).
-		Where(squirrel.Eq{key: val}).
-		Set(col, newVal).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ?",
+		consts.DBChannels,
+		col,
+		key,
+	)
 
 	// Print SQL query
 	if logging.Level > 1 {
-		sqlStr, args, err := query.ToSql()
-		if err != nil {
-			logger.Pl.W("Cannot print SQL string for update query in channel with %s %q: %v", key, val, err)
-		} else {
-			logger.Pl.P("Executing SQL: %s with args: %v\n", sqlStr, args)
-		}
+		logger.Pl.P("Executing SQL: %s with args: %v\n", query, []any{newVal, val})
 	}
 
 	// Execute query
-	res, err := query.Exec()
+	res, err := cs.DB.Exec(query, newVal, val)
 	if err != nil {
 		return err
 	}
@@ -1101,14 +1126,15 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 // UpdateLastScan updates the DB entry for when the channel was last scanned.
 func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	now := time.Now()
-	query := squirrel.
-		Update(consts.DBChannels).
-		Set(consts.QChanLastScan, now).
-		Set(consts.QChanUpdatedAt, now).
-		Where(squirrel.Eq{consts.QChanID: channelID}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
+		consts.DBChannels,
+		consts.QChanLastScan,
+		consts.QChanUpdatedAt,
+		consts.QChanID,
+	)
 
-	result, err := query.Exec()
+	result, err := cs.DB.Exec(query, now, now, channelID)
 	if err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
 	}
@@ -1132,33 +1158,29 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		return nil, false, errors.New("model entered has no ID")
 	}
 
-	query := squirrel.
-		Select(
-			consts.QVidID,
-			consts.QVidChanID,
-			consts.QVidChanURLID,
-			consts.QVidThumbnailURL,
-			consts.QVidFinished,
-			consts.QVidIgnored,
-			consts.QVidURL,
-			consts.QVidTitle,
-			consts.QVidDescription,
-			consts.QVidUploadDate,
-			consts.QVidMetadata,
-			consts.QVidCreatedAt,
-			consts.QVidUpdatedAt,
-		).
-		From(consts.DBVideos).
-		Where(squirrel.And{
-			squirrel.Eq{consts.QVidChanID: c.ID},
-			squirrel.Or{
-				squirrel.Eq{consts.QVidFinished: 1},
-				squirrel.Eq{consts.QVidIgnored: 1},
-			},
-		}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1)",
+		consts.QVidID,
+		consts.QVidChanID,
+		consts.QVidChanURLID,
+		consts.QVidThumbnailURL,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidURL,
+		consts.QVidTitle,
+		consts.QVidDescription,
+		consts.QVidUploadDate,
+		consts.QVidMetadata,
+		consts.QVidCreatedAt,
+		consts.QVidUpdatedAt,
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+	)
 
-	rows, err := query.Query()
+	rows, err := cs.DB.Query(query, c.ID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, false, nil
 	} else if err != nil {
@@ -1238,19 +1260,16 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 		return nil, errors.New("model entered has no ID")
 	}
 
-	query := squirrel.
-		Select(consts.QVidURL).
-		From(consts.DBVideos).
-		Where(squirrel.And{
-			squirrel.Eq{consts.QVidChanID: c.ID},
-			squirrel.Or{
-				squirrel.Eq{consts.QVidFinished: 1},
-				squirrel.Eq{consts.QVidIgnored: 1},
-			},
-		}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1)",
+		consts.QVidURL,
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+	)
 
-	rows, err := query.Query()
+	rows, err := cs.DB.Query(query, c.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -1377,7 +1396,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Println()
 }
 
-// ******************************** Private ********************************
+// ******************************** Private ***************************************************************************************
 
 // displaySettingsStruct prints the settings structure.
 func displaySettingsStruct(s *models.Settings) {
@@ -1427,7 +1446,7 @@ func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
 }
 
-// applyConfigChannelSettings applies the channel settings to the model and saves to database.
+// applyConfigChannelSettings applies the channel settings to the model.
 func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.Channel) (err error) {
 	// Initialize settings model if nil
 	if c.ChanSettings == nil {
@@ -1559,7 +1578,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 	return nil
 }
 
-// applyConfigChannelMetarrSettings applies the Metarr settings to the model and saves to database.
+// applyConfigChannelMetarrSettings applies the Metarr settings to the model.
 func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *models.Channel) (err error) {
 	// Initialize MetarrArgs model if nil
 	if c.ChanMetarrArgs == nil {
@@ -1580,8 +1599,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Filename ops
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MFilenameOps); ok {
-		c.ChanMetarrArgs.FilenameOps, err = parsing.ParseFilenameOps(v)
-		if err != nil {
+		if c.ChanMetarrArgs.FilenameOps, err = parsing.ParseFilenameOps(v); err != nil {
 			return fmt.Errorf("failed to parse filename ops: %w", err)
 		}
 	}
@@ -1593,8 +1611,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Meta ops
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MMetaOps); ok {
-		c.ChanMetarrArgs.MetaOps, err = parsing.ParseMetaOps(v)
-		if err != nil {
+		if c.ChanMetarrArgs.MetaOps, err = parsing.ParseMetaOps(v); err != nil {
 			return fmt.Errorf("failed to parse meta ops: %w", err)
 		}
 	}
@@ -1606,8 +1623,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Filtered meta ops
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MFilteredMetaOps); ok {
-		c.ChanMetarrArgs.FilteredMetaOps, err = parsing.ParseFilteredMetaOps(v)
-		if err != nil {
+		if c.ChanMetarrArgs.FilteredMetaOps, err = parsing.ParseFilteredMetaOps(v); err != nil {
 			return fmt.Errorf("failed to parse filtered meta ops: %w", err)
 		}
 	}
@@ -1684,8 +1700,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Metarr video filter
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeVideoFilter); ok {
-		c.ChanMetarrArgs.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(v)
-		if err != nil {
+		if c.ChanMetarrArgs.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(v); err != nil {
 			return err
 		}
 	}
@@ -1706,8 +1721,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Transcode GPU validation
 	if gpuGot != "" || gpuDirGot != "" {
-		c.ChanMetarrArgs.UseGPU, c.ChanMetarrArgs.GPUDir, err = validation.ValidateGPU(gpuGot, gpuDirGot)
-		if err != nil {
+		if c.ChanMetarrArgs.UseGPU, c.ChanMetarrArgs.GPUDir, err = validation.ValidateGPU(gpuGot, gpuDirGot); err != nil {
 			return err
 		}
 	}
@@ -1740,28 +1754,28 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 	const querySuffix = "ON CONFLICT (channel_id, notify_url) DO UPDATE SET notify_url = EXCLUDED.notify_url, updated_at = EXCLUDED.updated_at"
 
 	now := time.Now()
-	query := squirrel.
-		Insert(consts.DBNotifications).
-		Columns(
-			consts.QNotifyChanID,
-			consts.QNotifyName,
-			consts.QNotifyChanURL,
-			consts.QNotifyURL,
-			consts.QNotifyCreatedAt,
-			consts.QNotifyUpdatedAt,
-		).
-		Values(
-			id,
-			notifyName,
-			chanURL,
-			notifyURL,
-			now,
-			now,
-		).
-		Suffix(querySuffix).
-		RunWith(tx)
+	query := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?) %s",
+		consts.DBNotifications,
+		consts.QNotifyChanID,
+		consts.QNotifyName,
+		consts.QNotifyChanURL,
+		consts.QNotifyURL,
+		consts.QNotifyCreatedAt,
+		consts.QNotifyUpdatedAt,
+		querySuffix, // appended exactly like Squirrel's .Suffix()
+	)
 
-	if _, err := query.Exec(); err != nil {
+	_, err := tx.Exec(
+		query,
+		id,
+		notifyName,
+		chanURL,
+		notifyURL,
+		now,
+		now,
+	)
+	if err != nil {
 		return err
 	}
 
@@ -1771,19 +1785,19 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 
 // channelExists returns true if the channel exists in the database.
 func (cs *ChannelStore) channelExists(key, val string) bool {
-	if err := validation.ValidateColumnKeyVal(key, val); err != nil {
-		logger.Pl.E("Error validating column key/value pair, channel cannot exist in database: %v")
+	if !consts.ValidChannelKeys[key] {
+		logger.Pl.E("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 		return false
 	}
 
 	var count int
-	query := squirrel.
-		Select("COUNT(1)").
-		From(consts.DBChannels).
-		Where(squirrel.Eq{key: val}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT COUNT(1) FROM %s WHERE %s = ?",
+		consts.DBChannels,
+		key,
+	)
 
-	if err := query.QueryRow().Scan(&count); err != nil {
+	if err := cs.DB.QueryRow(query, val).Scan(&count); err != nil {
 		logger.Pl.E("failed to check if channel exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}
@@ -1793,18 +1807,19 @@ func (cs *ChannelStore) channelExists(key, val string) bool {
 // channelExistsID returns true if the channel ID exists in the database.
 func (cs ChannelStore) channelExistsID(id int64) bool {
 	var exists bool
-	query := squirrel.
-		Select("1").
-		From(consts.DBChannels).
-		Where(squirrel.Eq{consts.QChanID: id}).
-		RunWith(cs.DB)
+	query := fmt.Sprintf(
+		"SELECT 1 FROM %s WHERE %s = ?",
+		consts.DBChannels,
+		consts.QChanID,
+	)
 
-	if err := query.QueryRow().Scan(&exists); errors.Is(err, sql.ErrNoRows) {
+	if err := cs.DB.QueryRow(query, id).Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return false
 	} else if err != nil {
 		logger.Pl.E("Failed to check if channel with ID %d exists", id)
 		return exists
 	}
+
 	return exists
 }
 

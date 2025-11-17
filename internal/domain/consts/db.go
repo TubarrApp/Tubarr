@@ -1,56 +1,56 @@
 package consts
 
-// ValidDBColumns maps all valid database column keys to true for quick lookup.
-var ValidDBColumns = map[string]bool{
-	// Shared
-	QSharedID:        true,
-	QSharedChannelID: true,
-	QSharedSettings:  true,
-	QSharedMetarr:    true,
-	QSharedLastScan:  true,
-	QSharedCreatedAt: true,
-	QSharedUpdatedAt: true,
+// // ValidDBColumns maps all valid database column keys to true for quick lookup.
+// var ValidDBColumns = map[string]bool{
+// 	// Shared
+// 	QSharedID:        true,
+// 	QSharedChannelID: true,
+// 	QSharedSettings:  true,
+// 	QSharedMetarr:    true,
+// 	QSharedLastScan:  true,
+// 	QSharedCreatedAt: true,
+// 	QSharedUpdatedAt: true,
 
-	// Program keys
-	QProgHost:      true,
-	QProgHeartbeat: true,
-	QProgPID:       true,
-	QProgStartedAt: true,
-	QProgRunning:   true,
+// 	// Program keys
+// 	QProgHost:      true,
+// 	QProgHeartbeat: true,
+// 	QProgPID:       true,
+// 	QProgStartedAt: true,
+// 	QProgRunning:   true,
 
-	// Channel keys
-	QChanName:            true,
-	QChanConcurrency:     true,
-	QChanMetarrOutputDir: true,
-	QChanMetarrExt:       true,
+// 	// Channel keys
+// 	QChanName:            true,
+// 	QChanConcurrency:     true,
+// 	QChanMetarrOutputDir: true,
+// 	QChanMetarrExt:       true,
 
-	// Channel URL keys
-	QChanURLURL:      true,
-	QChanURLUsername: true,
-	QChanURLPassword: true,
-	QChanURLLoginURL: true,
-	QChanURLIsManual: true,
+// 	// Channel URL keys
+// 	QChanURLURL:      true,
+// 	QChanURLUsername: true,
+// 	QChanURLPassword: true,
+// 	QChanURLLoginURL: true,
+// 	QChanURLIsManual: true,
 
-	// Video keys
-	QVidChanURLID:   true,
-	QVidFinished:    true,
-	QVidTitle:       true,
-	QVidDescription: true,
-	QVidVideoPath:   true,
-	QVidJSONPath:    true,
-	QVidUploadDate:  true,
-	QVidMetadata:    true,
-	QVidDLStatus:    true,
+// 	// Video keys
+// 	QVidChanURLID:   true,
+// 	QVidFinished:    true,
+// 	QVidTitle:       true,
+// 	QVidDescription: true,
+// 	QVidVideoPath:   true,
+// 	QVidJSONPath:    true,
+// 	QVidUploadDate:  true,
+// 	QVidMetadata:    true,
+// 	QVidDLStatus:    true,
 
-	// Downloads keys
-	QDLVidID:  true,
-	QDLStatus: true,
-	QDLPct:    true,
+// 	// Downloads keys
+// 	QDLVidID:  true,
+// 	QDLStatus: true,
+// 	QDLPct:    true,
 
-	// Notification keys
-	QNotifyURL:     true,
-	QNotifyChanURL: true,
-}
+// 	// Notification keys
+// 	QNotifyURL:     true,
+// 	QNotifyChanURL: true,
+// }
 
 // Shared column names for valid DB column name map.
 const (
@@ -85,6 +85,18 @@ const (
 	QProgRunning   = "running"
 )
 
+var ValidProgramKeys = map[string]bool{
+	QSharedID:        true,
+	QSharedChannelID: true,
+	QSharedName:      true,
+	QSharedURL:       true,
+	QSharedLastScan:  true,
+	QSharedCreatedAt: true,
+	QSharedUpdatedAt: true,
+	QSharedSettings:  true,
+	QSharedMetarr:    true,
+}
+
 // Channel database entry keys.
 const (
 	QChanID              = "id"
@@ -99,6 +111,20 @@ const (
 	QChanCreatedAt       = "created_at"
 	QChanUpdatedAt       = "updated_at"
 )
+
+var ValidChannelKeys = map[string]bool{
+	QChanID:              true,
+	QChanName:            true,
+	QChanConfigFile:      true,
+	QChanConcurrency:     true,
+	QChanMetarrOutputDir: true,
+	QChanMetarrExt:       true,
+	QChanSettings:        true,
+	QChanMetarr:          true,
+	QChanLastScan:        true,
+	QChanCreatedAt:       true,
+	QChanUpdatedAt:       true,
+}
 
 // Channel URL database entry keys.
 const (
@@ -115,6 +141,21 @@ const (
 	QChanURLCreatedAt = "created_at"
 	QChanURLUpdatedAt = "updated_at"
 )
+
+var ValidChannelURLKeys = map[string]bool{
+	QChanURLID:        true,
+	QChanURLChannelID: true,
+	QChanURLURL:       true,
+	QChanURLUsername:  true,
+	QChanURLPassword:  true,
+	QChanURLLoginURL:  true,
+	QChanURLIsManual:  true,
+	QChanURLSettings:  true,
+	QChanURLMetarr:    true,
+	QChanURLLastScan:  true,
+	QChanURLCreatedAt: true,
+	QChanURLUpdatedAt: true,
+}
 
 // Video database entry keys.
 const (
@@ -137,6 +178,26 @@ const (
 	QVidUpdatedAt    = "updated_at"
 )
 
+var ValidVideoKeys = map[string]bool{
+	QVidID:           true,
+	QVidChanID:       true,
+	QVidChanURLID:    true,
+	QVidFinished:     true,
+	QVidIgnored:      true,
+	QVidThumbnailURL: true,
+	QVidURL:          true,
+	QVidTitle:        true,
+	QVidDescription:  true,
+	QVidVideoPath:    true,
+	QVidJSONPath:     true,
+	QVidUploadDate:   true,
+	QVidMetadata:     true,
+	QVidDLStatus:     true,
+	QVidDLPercentage: true,
+	QVidCreatedAt:    true,
+	QVidUpdatedAt:    true,
+}
+
 // Downloads database entry keys.
 const (
 	QDLVidID     = "video_id"
@@ -145,6 +206,14 @@ const (
 	QDLCreatedAt = "created_at"
 	QDLUpdatedAt = "updated_at"
 )
+
+var ValidDownloadKeys = map[string]bool{
+	QDLVidID:     true,
+	QDLStatus:    true,
+	QDLPct:       true,
+	QDLCreatedAt: true,
+	QDLUpdatedAt: true,
+}
 
 // Notification database entry keys.
 const (
@@ -155,6 +224,15 @@ const (
 	QNotifyCreatedAt = "created_at"
 	QNotifyUpdatedAt = "updated_at"
 )
+
+var ValidNotificationKeys = map[string]bool{
+	QNotifyChanID:    true,
+	QNotifyName:      true,
+	QNotifyURL:       true,
+	QNotifyChanURL:   true,
+	QNotifyCreatedAt: true,
+	QNotifyUpdatedAt: true,
+}
 
 // Misc
 const (

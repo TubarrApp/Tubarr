@@ -33,6 +33,8 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 				if val, ok := parsing.GetConfigValue[string](v, key); ok {
 					if err := f.Value.Set(val); err != nil {
 						errOrNil = err
+					} else {
+						f.Changed = true
 					}
 				}
 			case flagTypeInt:
@@ -45,12 +47,16 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 				if val, ok := parsing.GetConfigValue[bool](v, key); ok {
 					if err := f.Value.Set(strconv.FormatBool(val)); err != nil {
 						errOrNil = err
+					} else {
+						f.Changed = true
 					}
 				}
 			case flagTypeFloat64:
 				if val, ok := parsing.GetConfigValue[float64](v, key); ok {
 					if err := f.Value.Set(fmt.Sprintf("%f", val)); err != nil {
 						errOrNil = err
+					} else {
+						f.Changed = true
 					}
 				}
 			case flagTypeStringSlice:
@@ -59,11 +65,15 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 					if sv, ok := f.Value.(pflag.SliceValue); ok {
 						if err := sv.Replace(slice); err != nil {
 							errOrNil = err
+						} else {
+							f.Changed = true
 						}
 					} else {
 						// Fallback: Try join on comma for types that only implement Set(string)
 						if err := f.Value.Set(strings.Join(slice, ",")); err != nil {
 							errOrNil = err
+						} else {
+							f.Changed = true
 						}
 					}
 				}

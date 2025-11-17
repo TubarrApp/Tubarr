@@ -821,11 +821,13 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 				err  error
 			}
 
-			for _, batchConfigFile := range batchConfigFiles {
+			for i, batchConfigFile := range batchConfigFiles {
 				logger.Pl.I("Processing config file: %s", batchConfigFile)
 
-				input = models.ChannelInputPtrs{}
-				flags = models.ChannelFlagValues{}
+				if i > 0 {
+					input = models.ChannelInputPtrs{}
+					flags = models.ChannelFlagValues{}
+				}
 
 				cmd.Flags().VisitAll(func(f *pflag.Flag) {
 					f.Changed = false
@@ -911,8 +913,11 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 				logger.Pl.S("Successfully added channel %q from config file: %s", c.Name, batchConfigFile)
 			}
 
-			logger.Pl.I("====== Batch Add Summary ======\n")
-			logger.Pl.S("Successfully added %d channel(s)", len(successes))
+			fmt.Println()
+			logger.Pl.P("====== Batch Add Summary ======\n")
+			if len(successes) > 0 {
+				logger.Pl.S("Successfully added %d channel(s)", len(successes))
+			}
 			if len(failures) > 0 {
 				logger.Pl.E("Failed to add %d channel(s):", len(failures))
 				for _, f := range failures {

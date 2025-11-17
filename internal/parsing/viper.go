@@ -496,7 +496,7 @@ func ParseURLSettingsFromViper(v interface {
 
 	// Check if url-settings exists
 	if !v.IsSet("url-settings") && !v.IsSet("url_settings") {
-		logger.Pl.I("No url-settings found in config")
+		logger.Pl.I("No url-settings found in config file")
 		return urlSettings, nil
 	}
 

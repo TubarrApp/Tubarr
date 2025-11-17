@@ -47,7 +47,7 @@ func (s *Store) DownloadStore() contracts.DownloadStore {
 	return s.downloadStore
 }
 
-// ******************************** Private ********************************
+// ******************************** Private ***************************************************************************************
 
 // marshalVideoMetadataJSON marshals all JSON elements for a channel URL/video model.
 func marshalVideoMetadataJSON(v *models.Video) (metadata []byte, err error) {

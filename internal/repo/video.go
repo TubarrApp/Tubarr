@@ -8,8 +8,6 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-
-	"github.com/Masterminds/squirrel"
 )
 
 // VideoStore holds a pointer to the sql.DB.
@@ -72,14 +70,18 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 		videoID, exists := vs.videoExists(v, channelID)
 		if exists {
 			// Update finished and ignored status
-			updateQuery := squirrel.Update(consts.DBVideos).
-				Set(consts.QVidFinished, v.Finished).
-				Set(consts.QVidIgnored, v.Ignored).
-				Set(consts.QVidUpdatedAt, now).
-				Where(squirrel.Eq{consts.QVidChanID: channelID, consts.QVidURL: v.URL}).
-				RunWith(tx)
+			updateQuery := fmt.Sprintf(
+				"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ?",
+				consts.DBVideos,
+				consts.QVidFinished,
+				consts.QVidIgnored,
+				consts.QVidUpdatedAt,
+				consts.QVidChanID,
+				consts.QVidURL,
+			)
 
-			if _, err := updateQuery.Exec(); err != nil {
+			_, err := tx.Exec(updateQuery, v.Finished, v.Ignored, now, channelID, v.URL)
+			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to update video %q: %w", v.URL, err))
 				continue
 			}
@@ -93,38 +95,39 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 			}
 
 			// Insert new video with all fields
-			insertQuery := squirrel.Insert(consts.DBVideos).
-				Columns(
-					consts.QVidChanID,
-					consts.QVidChanURLID,
-					consts.QVidThumbnailURL,
-					consts.QVidURL,
-					consts.QVidTitle,
-					consts.QVidDescription,
-					consts.QVidFinished,
-					consts.QVidIgnored,
-					consts.QVidUploadDate,
-					consts.QVidMetadata,
-					consts.QVidCreatedAt,
-					consts.QVidUpdatedAt,
-				).
-				Values(
-					channelID,
-					v.ChannelURLID,
-					v.ThumbnailURL,
-					v.URL,
-					v.Title,
-					v.Description,
-					v.Finished,
-					v.Ignored,
-					v.UploadDate,
-					metadataJSON,
-					now,
-					now,
-				).
-				RunWith(tx)
+			insertQuery := fmt.Sprintf(
+				"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				consts.DBVideos,
+				consts.QVidChanID,
+				consts.QVidChanURLID,
+				consts.QVidThumbnailURL,
+				consts.QVidURL,
+				consts.QVidTitle,
+				consts.QVidDescription,
+				consts.QVidFinished,
+				consts.QVidIgnored,
+				consts.QVidUploadDate,
+				consts.QVidMetadata,
+				consts.QVidCreatedAt,
+				consts.QVidUpdatedAt,
+			)
 
-			result, err := insertQuery.Exec()
+			result, err := tx.Exec(
+				insertQuery,
+				channelID,
+				v.ChannelURLID,
+				v.ThumbnailURL,
+				v.URL,
+				v.Title,
+				v.Description,
+				v.Finished,
+				v.Ignored,
+				v.UploadDate,
+				metadataJSON,
+				now,
+				now,
+			)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to insert video %q: %w", v.URL, err))
 				continue
@@ -135,23 +138,36 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 				errs = append(errs, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err))
 				continue
 			}
+
 			v.ID = id
 		}
 
 		// Insert or update download status using SQLite UPSERT (INSERT ... ON CONFLICT)
 		//
 		// Squirrel doesn't support ON CONFLICT clause natively
-		sqlQuery := `
-			INSERT INTO ` + consts.DBDownloads + ` (` + consts.QDLVidID + `, ` + consts.QDLStatus + `, ` + consts.QDLPct + `, ` + consts.QDLCreatedAt + `, ` + consts.QDLUpdatedAt + `)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(` + consts.QDLVidID + `) DO UPDATE SET
-				` + consts.QDLStatus + ` = excluded.` + consts.QDLStatus + `,
-				` + consts.QDLPct + ` = excluded.` + consts.QDLPct + `,
-				` + consts.QDLUpdatedAt + ` = excluded.` + consts.QDLUpdatedAt + `
-		`
+		sqlQuery := fmt.Sprintf(
+			"INSERT INTO %s (%s, %s, %s, %s, %s) "+
+				"VALUES (?, ?, ?, ?, ?) "+
+				"ON CONFLICT(%s) DO UPDATE SET "+
+				"%s = excluded.%s, "+
+				"%s = excluded.%s, "+
+				"%s = excluded.%s",
+			consts.DBDownloads,
+			consts.QDLVidID,
+			consts.QDLStatus,
+			consts.QDLPct,
+			consts.QDLCreatedAt,
+			consts.QDLUpdatedAt,
+			consts.QDLVidID,
+			consts.QDLStatus, consts.QDLStatus,
+			consts.QDLPct, consts.QDLPct,
+			consts.QDLUpdatedAt, consts.QDLUpdatedAt,
+		)
+
 		if _, err := tx.Exec(sqlQuery, v.ID, v.DownloadStatus.Status, v.DownloadStatus.Percent, now, now); err != nil {
 			errs = append(errs, fmt.Errorf("failed to insert/update download status for video %d: %w", v.ID, err))
 		}
+
 	}
 
 	// Commit transaction
@@ -206,38 +222,39 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	now := time.Now()
 
 	// Insert into videos table
-	vidQuery := squirrel.Insert(consts.DBVideos).
-		Columns(
-			consts.QVidChanID,
-			consts.QVidChanURLID,
-			consts.QVidThumbnailURL,
-			consts.QVidURL,
-			consts.QVidTitle,
-			consts.QVidDescription,
-			consts.QVidFinished,
-			consts.QVidIgnored,
-			consts.QVidUploadDate,
-			consts.QVidMetadata,
-			consts.QVidCreatedAt,
-			consts.QVidUpdatedAt,
-		).
-		Values(
-			channelID,
-			channelURLID,
-			v.ThumbnailURL,
-			v.URL,
-			v.Title,
-			v.Description,
-			v.Finished,
-			v.Ignored,
-			v.UploadDate,
-			metadataJSON,
-			now,
-			now,
-		).
-		RunWith(tx)
+	vidQuery := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidChanURLID,
+		consts.QVidThumbnailURL,
+		consts.QVidURL,
+		consts.QVidTitle,
+		consts.QVidDescription,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidUploadDate,
+		consts.QVidMetadata,
+		consts.QVidCreatedAt,
+		consts.QVidUpdatedAt,
+	)
 
-	result, err := vidQuery.Exec()
+	result, err := tx.Exec(
+		vidQuery,
+		channelID,
+		channelURLID,
+		v.ThumbnailURL,
+		v.URL,
+		v.Title,
+		v.Description,
+		v.Finished,
+		v.Ignored,
+		v.UploadDate,
+		metadataJSON,
+		now,
+		now,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert video %q: %w", v.URL, err)
 	}
@@ -251,13 +268,15 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	// Insert into downloads table
 	logger.Pl.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
 
-	dlSQL, dlArgs, err := squirrel.Insert(consts.DBDownloads).
-		Columns(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
-		Values(videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent).
-		ToSql()
-	if err != nil {
-		return 0, fmt.Errorf("failed to build download insert SQL: %w", err)
-	}
+	dlSQL := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)",
+		consts.DBDownloads,
+		consts.QDLVidID,
+		consts.QDLStatus,
+		consts.QDLPct,
+	)
+	dlArgs := []any{videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent}
+
 	logger.Pl.D(1, "Download insert SQL: %s (args: %v)", dlSQL, dlArgs)
 
 	if _, err := tx.Exec(dlSQL, dlArgs...); err != nil {
@@ -300,25 +319,39 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	}
 
 	// Update videos table
-	videoQuery := squirrel.
-		Update(consts.DBVideos).
-		Set(consts.QVidThumbnailURL, v.ThumbnailURL).
-		Set(consts.QVidTitle, v.Title).
-		Set(consts.QVidDescription, v.Description).
-		Set(consts.QVidVideoPath, v.VideoPath).
-		Set(consts.QVidJSONPath, v.JSONPath).
-		Set(consts.QVidFinished, v.Finished).
-		Set(consts.QVidIgnored, v.Ignored).
-		Set(consts.QVidUploadDate, v.UploadDate).
-		Set(consts.QVidMetadata, metadataJSON).
-		Set(consts.QVidUpdatedAt, time.Now()).
-		Where(squirrel.And{
-			squirrel.Eq{consts.QVidURL: v.URL},
-			squirrel.Eq{consts.QVidChanID: channelID},
-		}).
-		RunWith(tx)
+	videoQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ? "+
+			"WHERE %s = ? AND %s = ?",
+		consts.DBVideos,
+		consts.QVidThumbnailURL,
+		consts.QVidTitle,
+		consts.QVidDescription,
+		consts.QVidVideoPath,
+		consts.QVidJSONPath,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidUploadDate,
+		consts.QVidMetadata,
+		consts.QVidUpdatedAt,
+		consts.QVidURL,
+		consts.QVidChanID,
+	)
 
-	result, err := videoQuery.Exec()
+	result, err := tx.Exec(
+		videoQuery,
+		v.ThumbnailURL,
+		v.Title,
+		v.Description,
+		v.VideoPath,
+		v.JSONPath,
+		v.Finished,
+		v.Ignored,
+		v.UploadDate,
+		metadataJSON,
+		time.Now(),
+		v.URL,
+		channelID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to update video: %w", err)
 	}
@@ -327,19 +360,21 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
+
 	if rows == 0 {
 		return fmt.Errorf("no video found with URL %s", v.URL)
 	}
 
 	// Update downloads table
-	dlQuery := squirrel.
-		Update(consts.DBDownloads).
-		Set(consts.QDLStatus, v.DownloadStatus.Status).
-		Set(consts.QDLPct, v.DownloadStatus.Percent).
-		Where(squirrel.Eq{consts.QDLVidID: v.ID}).
-		RunWith(tx)
+	dlQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
+		consts.DBDownloads,
+		consts.QDLStatus,
+		consts.QDLPct,
+		consts.QDLVidID,
+	)
 
-	if _, err := dlQuery.Exec(); err != nil {
+	if _, err := tx.Exec(dlQuery, v.DownloadStatus.Status, v.DownloadStatus.Percent, v.ID); err != nil {
 		return fmt.Errorf("failed to update download status: %w", err)
 	}
 
@@ -358,53 +393,55 @@ func (vs *VideoStore) DeleteVideo(videoURL string, channelID int64) error {
 		return errors.New("needs a video URL to delete, and channel ID to delete from")
 	}
 
-	query := squirrel.
-		Delete(consts.DBVideos).
-		Where(squirrel.And{
-			squirrel.Eq{consts.QVidURL: videoURL},
-			squirrel.Eq{consts.QVidChanID: channelID},
-		}).
-		RunWith(vs.DB)
+	query := fmt.Sprintf(
+		"DELETE FROM %s WHERE %s = ? AND %s = ?",
+		consts.DBVideos,
+		consts.QVidURL,
+		consts.QVidChanID,
+	)
 
-	if _, err := query.Exec(); err != nil {
+	_, err := vs.DB.Exec(query, videoURL, channelID)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("no video exists for channel %d with URL %q", channelID, videoURL)
 		}
 		return err
 	}
+
 	return nil
 }
 
 // GetVideoURLByID returns a video's URL by its ID in the database.
 func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error) {
-	query := squirrel.
-		Select(consts.QVidURL).
-		From(consts.DBVideos).
-		Where(squirrel.Eq{consts.QVidID: videoID}).
-		RunWith(vs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QVidURL,
+		consts.DBVideos,
+		consts.QVidID,
+	)
 
-	if err = query.QueryRow().Scan(&videoURL); err != nil {
+	if err = vs.DB.QueryRow(query, videoID).Scan(&videoURL); err != nil {
 		logger.Pl.I("Could not scan video URL from database for video ID: %d, URL: %q", videoID, videoURL)
 		return "", err
 	}
+
 	return videoURL, nil
 }
 
-// ******************************** Private ********************************
+// ******************************** Private ***************************************************************************************
 
 // videoExists returns true if the video exists in the database.
 func (vs *VideoStore) videoExists(v *models.Video, channelID int64) (int64, bool) {
 	var id int64
-	query := squirrel.
-		Select(consts.QVidID).
-		From(consts.DBVideos).
-		Where(squirrel.And{
-			squirrel.Eq{consts.QVidURL: v.URL},
-			squirrel.Eq{consts.QVidChanID: channelID},
-		}).
-		RunWith(vs.DB)
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ? AND %s = ?",
+		consts.QVidID,
+		consts.DBVideos,
+		consts.QVidURL,
+		consts.QVidChanID,
+	)
 
-	err := query.QueryRow().Scan(&id)
+	err := vs.DB.QueryRow(query, v.URL, channelID).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, false
 	} else if err != nil {

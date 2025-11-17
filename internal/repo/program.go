@@ -8,8 +8,6 @@ import (
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
-
-	"github.com/Masterminds/squirrel"
 )
 
 // ProgControl holds a pointer to the sql.DB, and program process ID.
@@ -51,19 +49,28 @@ func (pc *ProgControl) StartTubarr() (pid int, err error) {
 	}
 
 	now := time.Now()
-	query := squirrel.
-		Update(consts.DBProgram).
-		Set(consts.QProgRunning, true).
-		Set(consts.QProgPID, pid).
-		Set(consts.QProgStartedAt, now).
-		Set(consts.QProgHeartbeat, now).
-		Set(consts.QProgHost, host).
-		Where(squirrel.Eq{consts.QProgID: 1}).
-		RunWith(pc.DB)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ?, %s = ? WHERE %s = 1",
+		consts.DBProgram,
+		consts.QProgRunning,
+		consts.QProgPID,
+		consts.QProgStartedAt,
+		consts.QProgHeartbeat,
+		consts.QProgHost,
+		consts.QProgID,
+	)
 
-	if _, err := query.Exec(); err != nil {
+	if _, err := pc.DB.Exec(
+		query,
+		true,
+		pid,
+		now,
+		now,
+		host,
+	); err != nil {
 		return pid, fmt.Errorf("failure: %w", err)
 	}
+
 	return pid, nil
 }
 
@@ -83,18 +90,26 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 		logger.Pl.E("Failed to get device hostname: %v", err)
 	}
 
-	query := squirrel.
-		Update(consts.DBProgram).
-		Set(consts.QProgRunning, false).
-		Set(consts.QProgPID, 0).
-		Set(consts.QProgHeartbeat, now).
-		Set(consts.QProgHost, host).
-		Where(squirrel.Eq{consts.QProgID: 1}).
-		RunWith(pc.DB)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ? WHERE %s = 1",
+		consts.DBProgram,
+		consts.QProgRunning,
+		consts.QProgPID,
+		consts.QProgHeartbeat,
+		consts.QProgHost,
+		consts.QProgID,
+	)
 
-	if _, err := query.Exec(); err != nil {
+	if _, err := pc.DB.Exec(
+		query,
+		false,
+		0,
+		now,
+		host,
+	); err != nil {
 		return err
 	}
+
 	logger.Pl.I("Tubarr finished: %v\n\nTime elapsed: %.2f seconds\n",
 		now.Local().Format("2006-01-02 15:04:05.00 MST"),
 		now.Sub(startTime).Seconds())
@@ -106,19 +121,22 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 // This function is crucial for ensuring things like powercuts don't
 // permanently lock the user out of the database.
 func (pc *ProgControl) UpdateHeartbeat() error {
-	query := squirrel.
-		Update(consts.DBProgram).
-		Set(consts.QProgHeartbeat, time.Now()).
-		Where(squirrel.Eq{consts.QProgID: 1}).
-		RunWith(pc.DB)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = 1",
+		consts.DBProgram,
+		consts.QProgHeartbeat,
+		consts.QProgID,
+	)
 
-	if _, err := query.Exec(); err != nil {
+	_, err := pc.DB.Exec(query, time.Now())
+	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-// ******************************** Private ********************************
+// ******************************** Private ***************************************************************************************
 
 // checkProgRunning checks if the program is already running.
 func (pc *ProgControl) checkProgRunning() (int, bool, error) {
@@ -127,13 +145,15 @@ func (pc *ProgControl) checkProgRunning() (int, bool, error) {
 		pid     sql.NullInt64
 	)
 
-	query := squirrel.
-		Select(consts.QProgRunning, consts.QProgPID).
-		From(consts.DBProgram).
-		Where(squirrel.Eq{consts.QProgID: 1}).
-		RunWith(pc.DB)
+	query := fmt.Sprintf(
+		"SELECT %s, %s FROM %s WHERE %s = 1",
+		consts.QProgRunning,
+		consts.QProgPID,
+		consts.DBProgram,
+		consts.QProgID,
+	)
 
-	err := query.QueryRow().Scan(&running, &pid)
+	err := pc.DB.QueryRow(query).Scan(&running, &pid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, false, nil
@@ -154,13 +174,14 @@ func (pc *ProgControl) checkProgRunning() (int, bool, error) {
 func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 	var lastHeartbeat time.Time
 
-	query := squirrel.
-		Select(consts.QProgHeartbeat).
-		From(consts.DBProgram).
-		Where(squirrel.Eq{consts.QProgID: 1}).
-		RunWith(pc.DB)
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = 1",
+		consts.QProgHeartbeat,
+		consts.DBProgram,
+		consts.QProgID,
+	)
 
-	if err := query.QueryRow().Scan(&lastHeartbeat); err != nil {
+	if err := pc.DB.QueryRow(query).Scan(&lastHeartbeat); err != nil {
 		return false, err
 	}
 
@@ -168,14 +189,15 @@ func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 
 		logger.Pl.I("Detected stale process, resetting state...")
 
-		resetQuery := squirrel.
-			Update(consts.DBProgram).
-			Set(consts.QProgRunning, false).
-			Set(consts.QProgPID, 0).
-			Where(squirrel.Eq{consts.QProgID: 1}).
-			RunWith(pc.DB)
+		resetQuery := fmt.Sprintf(
+			"UPDATE %s SET %s = ?, %s = ? WHERE %s = 1",
+			consts.DBProgram,
+			consts.QProgRunning,
+			consts.QProgPID,
+			consts.QProgID,
+		)
 
-		if _, err := resetQuery.Exec(); err != nil {
+		if _, err := pc.DB.Exec(resetQuery, false, 0); err != nil {
 			return false, err
 		}
 		return true, nil // Reset, no error

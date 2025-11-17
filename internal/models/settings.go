@@ -534,7 +534,7 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 	if m.Concurrency != 0 {
 		return false
 	}
-	if m.MaxCPU != 0 {
+	if m.MaxCPU != 0.0 {
 		return false
 	}
 	if m.MinFreeMem != "" {

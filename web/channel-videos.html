@@ -15,10 +15,10 @@
     x-data="{ page: 'channelVideos', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
     class="dark bg-gray-900"
   >
-    <!-- ===== Preloader Start ===== -->
+    <!-- ===== Preloader Start (Removed: x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})") ===== -->
     <div
       x-show="loaded"
-      x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
+      x-init="loaded = false"
       class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black"
     >
       <div

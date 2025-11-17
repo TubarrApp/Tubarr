@@ -9,8 +9,6 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads"
 	"tubarr/internal/models"
-
-	"github.com/Masterminds/squirrel"
 )
 
 // DownloadStore holds a pointer to the sql.DB.
@@ -49,15 +47,22 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 		}
 	}()
 
-	query := squirrel.
-		Update(consts.DBDownloads).
-		Set(consts.QDLStatus, v.DownloadStatus.Status).
-		Set(consts.QDLPct, v.DownloadStatus.Percent).
-		Set(consts.QDLUpdatedAt, time.Now()).
-		Where(squirrel.Eq{consts.QVidID: v.ID}).
-		RunWith(tx)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
+		consts.DBDownloads,
+		consts.QDLStatus,
+		consts.QDLPct,
+		consts.QDLUpdatedAt,
+		consts.QVidID,
+	)
 
-	if _, err := query.Exec(); err != nil {
+	if _, err := tx.Exec(
+		query,
+		v.DownloadStatus.Status,
+		v.DownloadStatus.Percent,
+		time.Now(),
+		v.ID,
+	); err != nil {
 		return fmt.Errorf("failed to update status for video %d: %w", v.ID, err)
 	}
 
@@ -90,13 +95,21 @@ func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models
 	// Execute individual updates within the transaction
 	normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
 
-	query := squirrel.Update(consts.DBDownloads).
-		Set(consts.QDLStatus, update.Status).
-		Set(consts.QDLPct, update.Percent).
-		Where(squirrel.Eq{consts.QDLVidID: update.VideoID}).
-		RunWith(tx)
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
+		consts.DBDownloads,
+		consts.QDLStatus,
+		consts.QDLPct,
+		consts.QDLVidID,
+	)
 
-	if _, err := query.ExecContext(ctx); err != nil {
+	if _, err := tx.ExecContext(
+		ctx,
+		query,
+		update.Status,
+		update.Percent,
+		update.VideoID,
+	); err != nil {
 		return fmt.Errorf("failed to update download status for video %q: %w", update.VideoURL, err)
 	}
 
@@ -110,13 +123,18 @@ func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models
 // GetDownloadStatus retrieves the download status of a video.
 func (ds *DownloadStore) GetDownloadStatus(v *models.Video) error {
 
-	query := squirrel.Select(consts.QDLVidID, consts.QDLStatus, consts.QDLPct).
-		From(consts.DBDownloads).
-		Where(squirrel.Eq{consts.QDLVidID: v.ID}).
-		RunWith(ds.DB)
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
+		consts.QDLVidID,
+		consts.QDLStatus,
+		consts.QDLPct,
+		consts.DBDownloads,
+		consts.QDLVidID,
+	)
 
 	normalizeDownloadStatus(&v.DownloadStatus.Percent, &v.DownloadStatus.Status, v.ID)
-	if err := query.QueryRow().Scan(&v); err != nil {
+
+	if err := ds.DB.QueryRow(query, v.ID).Scan(&v); err != nil {
 		return fmt.Errorf("failed to query download statuses: %w", err)
 	}
 
@@ -128,7 +146,7 @@ func (ds *DownloadStore) CancelDownload(videoID int64, videoURL string) bool {
 	return downloads.CancelDownloadByVideoID(videoID, videoURL)
 }
 
-// ******************************** Private ********************************
+// ******************************** Private ***************************************************************************************
 
 // normalizeDownloadStatus normalizes percentage and statuses if required.
 func normalizeDownloadStatus(pctPtr *float64, statusPtr *consts.DownloadStatus, videoID int64) {

@@ -18,7 +18,7 @@
     <!-- ===== Preloader Start ===== -->
     <div
       x-show="loaded"
-      x-init="window.addEventListener('DOMContentLoaded', () => {setTimeout(() => loaded = false, 500)})"
+      x-init="loaded = false"
       class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black"
     >
       <div
@@ -1701,7 +1701,7 @@
 
               // Redirect after a short delay
               setTimeout(() => {
-                window.location.href = 'list-channels.html';
+                window.location.href = 'add-channel.html';
               }, 1500);
 
             } catch (err) {
