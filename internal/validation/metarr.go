@@ -1,7 +1,6 @@
 package validation
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -10,6 +9,7 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
@@ -111,14 +111,14 @@ func ValidateMetaOps(metaOps []models.MetaOps) error {
 
 // ValidateRenameFlag validates the rename style to apply.
 func ValidateRenameFlag(flag string) error {
-	// Trim whitespace for more robust validation
-	flag = strings.TrimSpace(strings.ToLower(flag))
+	// Normalize
+	flag = sharedvalidation.GetRenameFlag(flag)
 
 	switch flag {
-	case "spaces", "underscores", "fixes-only", "skip", "":
+	case sharedconsts.RenameFixesOnly, sharedconsts.RenameSkip, sharedconsts.RenameSpaces, sharedconsts.RenameUnderscores, "":
 		return nil
 	default:
-		return errors.New("'spaces', 'underscores', 'skip', or 'fixes-only' not selected for renaming style, skipping these modifications")
+		return fmt.Errorf("invalid renaming style %q, accept: %v", flag, sharedconsts.ValidRenameFlags)
 	}
 }
 

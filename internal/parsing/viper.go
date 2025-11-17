@@ -769,7 +769,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArgs, error) {
 	metarr := &models.MetarrArgs{}
 
-	// Only set string fields if explicitly provided
+	// Only set string fields if explicitly provided.
 	if input.MetarrExt != nil {
 		metarr.OutputExt = *input.MetarrExt
 	}
@@ -810,17 +810,17 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.TranscodeVideoFilter = *input.TranscodeVideoFilter
 	}
 
-	// Only set int fields if explicitly provided
+	// Only set int fields if explicitly provided.
 	if input.MetarrConcurrency != nil {
 		metarr.Concurrency = max(*input.MetarrConcurrency, 0)
 	}
 
-	// Only set float64 fields if explicitly provided
+	// Only set float64 fields if explicitly provided.
 	if input.MaxCPU != nil {
 		metarr.MaxCPU = sharedvalidation.ValidateMaxCPU(*input.MaxCPU, true)
 	}
 
-	// Validate and set rename style if provided
+	// Validate and set rename style if provided.
 	if input.RenameStyle != nil {
 		if err := validation.ValidateRenameFlag(*input.RenameStyle); err != nil {
 			return nil, fmt.Errorf("failed to validate rename style for per-URL settings: %w", err)
@@ -828,7 +828,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.RenameStyle = *input.RenameStyle
 	}
 
-	// Validate and set min free mem if provided
+	// Validate and set min free mem if provided.
 	if input.MinFreeMem != nil {
 		if _, err := sharedvalidation.ValidateMinFreeMem(*input.MinFreeMem); err != nil {
 			return nil, fmt.Errorf("failed to validate min free mem for per-URL settings: %w", err)
@@ -836,7 +836,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.MinFreeMem = *input.MinFreeMem
 	}
 
-	// Validate and set GPU settings if provided
+	// Validate and set GPU settings if provided.
 	if input.TranscodeGPU != nil {
 		g, d, err := validation.ValidateGPU(*input.TranscodeGPU, NilOrZeroValue(input.GPUDir))
 		if err != nil {
@@ -846,7 +846,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.GPUDir = d
 	}
 
-	// Validate and set video codecs if provided
+	// Validate and set video codecs if provided.
 	if input.VideoCodec != nil {
 		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.VideoCodec, metarr.UseGPU)
 		if err != nil {
@@ -855,7 +855,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.TranscodeVideoCodecs = c
 	}
 
-	// Validate and set audio codecs if provided
+	// Validate and set audio codecs if provided.
 	if input.AudioCodec != nil {
 		logger.Pl.I("Found audio codecs in per-URL override: %v", *input.AudioCodec)
 		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.AudioCodec)
@@ -865,7 +865,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.TranscodeAudioCodecs = c
 	}
 
-	// Validate and set transcode quality if provided
+	// Validate and set transcode quality if provided.
 	if input.TranscodeQuality != nil {
 		q, err := sharedvalidation.ValidateTranscodeQuality(*input.TranscodeQuality)
 		if err != nil {
@@ -874,7 +874,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.TranscodeQuality = q
 	}
 
-	// Parse meta ops if provided
+	// Parse meta ops if provided.
 	if input.MetaOps != nil {
 		m, err := ParseMetaOps(*input.MetaOps)
 		if err != nil {
@@ -883,7 +883,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.MetaOps = m
 	}
 
-	// Parse filename ops if provided
+	// Parse filename ops if provided.
 	if input.FilenameOps != nil {
 		m, err := ParseFilenameOps(*input.FilenameOps)
 		if err != nil {
@@ -892,7 +892,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.FilenameOps = m
 	}
 
-	// Parse filtered meta ops if provided
+	// Parse filtered meta ops if provided.
 	if input.FilteredMetaOps != nil {
 		m, err := ParseFilteredMetaOps(*input.FilteredMetaOps)
 		if err != nil {
@@ -901,7 +901,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.FilteredMetaOps = m
 	}
 
-	// Parse filtered filename ops if provided
+	// Parse filtered filename ops if provided.
 	if input.FilteredFilenameOps != nil {
 		m, err := ParseFilteredFilenameOps(*input.FilteredFilenameOps)
 		if err != nil {

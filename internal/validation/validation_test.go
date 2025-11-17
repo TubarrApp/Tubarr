@@ -11,6 +11,31 @@ import (
 	"tubarr/internal/validation"
 )
 
+// TestValidateRenameFlags ------------------------------------------------------------------------------------------------
+func TestValidateRenameFlag(t *testing.T) {
+	tests := []struct {
+		input string
+		ok    bool
+	}{
+		// Valid.
+		{"skips", true},
+		{"", true},
+
+		// Invalid.
+		{"blah", false},
+	}
+
+	for _, tt := range tests {
+		err := validation.ValidateRenameFlag(tt.input)
+		if tt.ok && err != nil {
+			t.Fatalf("input %q expected to pass, got err: %v", tt.input, err)
+		}
+		if !tt.ok && err == nil {
+			t.Fatalf("input %q expected to fail, got nil err", tt.input)
+		}
+	}
+}
+
 // TestValidateMetarrOutputDirs -------------------------------------------------------------------------------------------
 func TestValidateMetarrOutputDirs(t *testing.T) {
 	// Test 1: Empty map → no error
