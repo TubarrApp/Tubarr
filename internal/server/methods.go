@@ -16,8 +16,6 @@ import (
 	"tubarr/internal/times"
 
 	"github.com/TubarrApp/gocommon/abstractions"
-
-	"github.com/Masterminds/squirrel"
 )
 
 // startCrawlWatchdog constantly checks channels and runs crawls when they're due.
@@ -121,32 +119,30 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 
 // getHomepageCarouselVideos returns the latest 'n' downloaded videos.
 func (s *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) (videos []models.Video, err error) {
-	query := squirrel.
-		Select(
-			consts.QVidID,
-			consts.QVidChanID,
-			consts.QVidChanURLID,
-			consts.QVidThumbnailURL,
-			consts.QVidFinished,
-			consts.QVidURL,
-			consts.QVidTitle,
-			consts.QVidDescription,
-			consts.QVidUploadDate,
-			consts.QVidCreatedAt,
-			consts.QVidUpdatedAt,
-		).
-		From(consts.DBVideos).
-		Where(squirrel.Eq{consts.QVidChanID: channel.ID}).
-		Where(squirrel.Eq{consts.QVidFinished: 1}).            // Only finished downloads
-		OrderBy(fmt.Sprintf("%s DESC", consts.QVidUpdatedAt)). // Most recent first
-		Limit(uint64(n))
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+			"FROM %s "+
+			"WHERE %s = ? AND %s = 1 "+ // Only finished downloads
+			"ORDER BY %s DESC "+
+			"LIMIT ?",
+		consts.QVidID,
+		consts.QVidChanID,
+		consts.QVidChanURLID,
+		consts.QVidThumbnailURL,
+		consts.QVidFinished,
+		consts.QVidURL,
+		consts.QVidTitle,
+		consts.QVidDescription,
+		consts.QVidUploadDate,
+		consts.QVidCreatedAt,
+		consts.QVidUpdatedAt,
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidFinished,
+		consts.QVidUpdatedAt, // Most recent first
+	)
 
-	sqlPlaceholder, args, err := query.PlaceholderFormat(squirrel.Question).ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build query: %w", err)
-	}
-
-	rows, err := s.db.Query(sqlPlaceholder, args...)
+	rows, err := s.db.Query(query, channel.ID, n)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query videos: %w", err)
 	}
@@ -251,18 +247,15 @@ func (s *serverStore) getActiveDownloads(channel *models.Channel) ([]models.Vide
 
 // cancelDownload marks a download as cancelled in the database.
 func (s *serverStore) cancelDownload(videoID int64) error {
-	query := squirrel.
-		Update(consts.DBDownloads).
-		Set(consts.QDLStatus, consts.DLStatusCancelled).
-		Set(consts.QDLUpdatedAt, "CURRENT_TIMESTAMP").
-		Where(squirrel.Eq{consts.QDLVidID: videoID})
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = CURRENT_TIMESTAMP WHERE %s = ?",
+		consts.DBDownloads,
+		consts.QDLStatus,
+		consts.QDLUpdatedAt,
+		consts.QDLVidID,
+	)
 
-	sqlPlaceholder, args, err := query.PlaceholderFormat(squirrel.Question).ToSql()
-	if err != nil {
-		return fmt.Errorf("failed to build cancel download query: %w", err)
-	}
-
-	result, err := s.db.Exec(sqlPlaceholder, args...)
+	result, err := s.db.Exec(query, consts.DLStatusCancelled, videoID)
 	if err != nil {
 		return fmt.Errorf("failed to cancel download: %w", err)
 	}

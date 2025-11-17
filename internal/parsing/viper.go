@@ -817,7 +817,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Only set float64 fields if explicitly provided
 	if input.MaxCPU != nil {
-		metarr.MaxCPU = sharedvalidation.ValidateMaxCPU(*input.MaxCPU)
+		metarr.MaxCPU = sharedvalidation.ValidateMaxCPU(*input.MaxCPU, true)
 	}
 
 	// Validate and set rename style if provided

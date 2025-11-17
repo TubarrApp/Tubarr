@@ -129,7 +129,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	m.MaxCPU = sharedvalidation.ValidateMaxCPU(m.MaxCPU)
+	m.MaxCPU = sharedvalidation.ValidateMaxCPU(m.MaxCPU, true)
 
 	if m.MetaOps != nil {
 		if err := ValidateMetaOps(m.MetaOps); err != nil {

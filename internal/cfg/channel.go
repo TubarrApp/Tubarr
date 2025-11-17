@@ -1526,7 +1526,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Max CPU usage
 	if f.Changed(keys.MMaxCPU) {
-		c.maxCPU = sharedvalidation.ValidateMaxCPU(c.maxCPU)
+		c.maxCPU = sharedvalidation.ValidateMaxCPU(c.maxCPU, true)
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.MaxCPU = c.maxCPU
 			return nil

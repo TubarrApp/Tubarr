@@ -159,7 +159,7 @@ func ValidateYtdlpOutputExtension(e string) error {
 
 // ValidateLoggingLevel checks and validates the debug level.
 func ValidateLoggingLevel() {
-	logging.Level = min(max(abstractions.GetInt(keys.DebugLevel), -1), 5)
+	logging.Level = min(max(abstractions.GetInt(keys.DebugLevel), 0), 5)
 }
 
 // ValidateMaxFilesize checks that max filesize value is valid for yt-dlp.
