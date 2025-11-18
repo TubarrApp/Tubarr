@@ -10,12 +10,104 @@
     <title>Home | Tubarr</title>
     <link rel="icon" href="/favicon.ico">
     <link href="style.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <style>
-      /* Hide disabled carousel navigation buttons */
-      .swiper-button-next.swiper-button-disabled,
-      .swiper-button-prev.swiper-button-disabled {
-        display: none !important;
+      /* Scroll-snap carousel styles */
+      .scroll-carousel {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        gap: 20px;
+        padding: 0 4px;
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+      }
+
+      .scroll-carousel::-webkit-scrollbar {
+        display: none; /* Chrome/Safari/Opera */
+      }
+
+      .scroll-carousel-item {
+        scroll-snap-align: start;
+        flex: 0 0 100%;
+      }
+
+      @media (min-width: 640px) {
+        .scroll-carousel {
+          gap: 20px;
+        }
+        .scroll-carousel-item {
+          flex: 0 0 calc(50% - 10px);
+        }
+      }
+
+      @media (min-width: 1024px) {
+        .scroll-carousel {
+          gap: 30px;
+        }
+        .scroll-carousel-item {
+          flex: 0 0 calc(50% - 15px);
+        }
+      }
+
+      @media (min-width: 1280px) {
+        .scroll-carousel-item {
+          flex: 0 0 calc(33.333% - 20px);
+        }
+      }
+
+      .carousel-nav-button {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 10;
+        height: 40px;
+        width: 40px;
+        border-radius: 50%;
+        border: 0.5px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.9);
+        color: #374151;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.2s;
+      }
+
+      .carousel-nav-button:disabled {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .carousel-nav-button:not(:disabled):hover {
+        background: rgba(255, 255, 255, 1);
+      }
+
+      .carousel-nav-prev {
+        left: 12px;
+      }
+
+      .carousel-nav-next {
+        right: 12px;
+      }
+
+      @media (min-width: 640px) {
+        .carousel-nav-prev {
+          left: 16px;
+        }
+        .carousel-nav-next {
+          right: 16px;
+        }
+      }
+
+      /* Delete button hover effect */
+      .delete-button-hover:hover {
+        background-color: rgb(254 242 242); /* red-50 */
+      }
+      .dark .delete-button-hover:hover {
+        background-color: rgba(127, 29, 29, 0.2); /* red-900/20 */
       }
     </style>
   </head>
@@ -455,17 +547,33 @@
                 <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                   <!-- Channel Header -->
                   <div class="px-6 py-5 flex items-center justify-between">
-                    <div>
-                      <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
-                      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Latest 10 videos
-                      </p>
-                    </div>
-                    <div class="flex items-center gap-4">
+                    <button
+                      @click="toggleChannel(channel)"
+                      class="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                    >
+                      <svg
+                        class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform"
+                        :class="channel.expanded ? 'rotate-90' : ''"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      </svg>
+                      <div class="text-left">
+                        <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          <span x-show="!channel.expanded">Click to view latest videos</span>
+                          <span x-show="channel.expanded">Latest 10 videos</span>
+                        </p>
+                      </div>
+                    </button>
+                    <div class="relative flex items-center gap-4">
+                      <!-- Desktop Actions (hidden on mobile) -->
                       <button
                         @click="crawlChannel(channel.id)"
                         :disabled="crawling === channel.id"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg x-show="crawling !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -479,7 +587,7 @@
                       <button
                         @click="ignoreCrawlChannel(channel.id)"
                         :disabled="ignoring === channel.id"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg x-show="ignoring !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -492,110 +600,214 @@
                       </button>
                       <a
                         :href="'active-downloads.html?channel=' + channel.id"
-                        class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                        class="hidden md:inline-flex items-center gap-1.5 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
                       >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                         </svg>
                         Active Downloads
                       </a>
-                      <a
-                        :href="'channel-videos.html?channel=' + channel.id"
-                        class="text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+
+                      <!-- Mobile Menu Button -->
+                      <button
+                        @click.stop="toggleActionsMenu(channel.id)"
+                        class="md:hidden inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                       >
-                        View All Videos →
-                      </a>
+                        <span class="text-sm font-medium">Actions</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                      </button>
+
+                      <!-- Mobile Dropdown Menu -->
+                      <div
+                        x-show="actionsMenuOpen === channel.id"
+                        @click.outside="actionsMenuOpen = null"
+                        x-transition:enter="transition ease-out duration-100"
+                        x-transition:enter-start="transform opacity-0 scale-95"
+                        x-transition:enter-end="transform opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-75"
+                        x-transition:leave-start="transform opacity-100 scale-100"
+                        x-transition:leave-end="transform opacity-0 scale-95"
+                        class="md:hidden absolute right-0 top-12 z-50 w-56 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                      >
+                        <div class="py-1">
+                          <button
+                            @click="crawlChannel(channel.id); actionsMenuOpen = null"
+                            :disabled="crawling === channel.id"
+                            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <svg x-show="crawling !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <svg x-show="crawling === channel.id" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span x-text="crawling === channel.id ? 'Crawling...' : 'Crawl Now'"></span>
+                          </button>
+                          <button
+                            @click="ignoreCrawlChannel(channel.id); actionsMenuOpen = null"
+                            :disabled="ignoring === channel.id"
+                            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <svg x-show="ignoring !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <svg x-show="ignoring === channel.id" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span x-text="ignoring === channel.id ? 'Ignoring...' : 'Ignore to Date'"></span>
+                          </button>
+                          <a
+                            :href="'active-downloads.html?channel=' + channel.id"
+                            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            Active Downloads
+                          </a>
+                          <div class="border-t border-gray-200 dark:border-gray-700"></div>
+                          <button
+                            @click="editChannel(channel.id); actionsMenuOpen = null"
+                            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            Edit Channel
+                          </button>
+                          <button
+                            @click="deleteChannel(channel.id, channel.name); actionsMenuOpen = null"
+                            class="delete-button-hover flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            Delete Channel
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <!-- Videos Loading State -->
-                  <div x-show="channel.videosLoading" class="p-6 border-t border-gray-100 dark:border-gray-800 text-center">
-                    <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
-                  </div>
+                  <!-- Videos Section (only shown when expanded) -->
+                  <div x-show="channel.expanded" x-collapse>
+                    <!-- Videos Loading State -->
+                    <div x-show="channel.videosLoading" class="p-6 border-t border-gray-100 dark:border-gray-800 text-center">
+                      <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
+                    </div>
 
-                  <!-- No Videos State -->
-                  <div x-show="!channel.videosLoading && channel.videos.length === 0" class="p-6 border-t border-gray-100 dark:border-gray-800 text-center">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">No videos downloaded yet</p>
-                  </div>
+                    <!-- No Videos State -->
+                    <div x-show="!channel.videosLoading && channel.videos.length === 0" class="p-6 border-t border-gray-100 dark:border-gray-800 text-center">
+                      <p class="text-sm text-gray-500 dark:text-gray-400">No videos downloaded yet</p>
+                    </div>
 
-                  <!-- Carousel -->
-                  <div x-show="!channel.videosLoading && channel.videos.length > 0" class="p-3 border-t border-gray-100 dark:border-gray-800 sm:p-6">
-                    <div :class="'swiper channelCarousel-' + channel.id" class="carouselTwo rounded-lg border border-gray-200 dark:border-gray-800">
-                      <div class="swiper-wrapper">
-                        <!-- Video Slides -->
-                        <template x-for="video in channel.videos" :key="video.url">
-                          <div class="swiper-slide">
-                            <div class="overflow-hidden">
-                              <template x-if="video.thumbnail_url">
-                                <img :src="video.thumbnail_url" :alt="video.title" />
-                              </template>
-                              <template x-if="!video.thumbnail_url">
-                                <div class="flex items-center justify-center aspect-video bg-gray-200 dark:bg-gray-800">
-                                  <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    <!-- Carousel -->
+                    <div x-show="!channel.videosLoading && channel.videos.length > 0" class="p-3 border-t border-gray-100 dark:border-gray-800 sm:p-6">
+                      <div class="relative rounded-lg border border-gray-200 dark:border-gray-800">
+                        <div
+                          :id="'carousel-' + channel.id"
+                          class="scroll-carousel"
+                        >
+                          <!-- Video Items -->
+                          <template x-for="video in channel.videos" :key="video.url">
+                            <div class="scroll-carousel-item">
+                              <div class="overflow-hidden">
+                                <template x-if="video.thumbnail_url">
+                                  <img :src="video.thumbnail_url" :alt="video.title" />
+                                </template>
+                                <template x-if="!video.thumbnail_url">
+                                  <div class="flex items-center justify-center aspect-video bg-gray-200 dark:bg-gray-800">
+                                    <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                  </div>
+                                </template>
+                              </div>
+                              <div class="p-4 bg-white dark:bg-white/[0.03]">
+                                <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-2 line-clamp-2 min-h-[2.5rem]" x-text="video.title"></h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2" x-show="video.upload_date">
+                                  <span x-text="formatDate(video.upload_date)"></span>
+                                </p>
+                                <a
+                                  :href="video.url"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  class="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                                >
+                                  Visit original URL
+                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                                   </svg>
-                                </div>
-                              </template>
+                                </a>
+                              </div>
                             </div>
-                            <div class="p-4 bg-white dark:bg-white/[0.03]">
-                              <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-2 line-clamp-2 min-h-[2.5rem]" x-text="video.title"></h4>
-                              <p class="text-xs text-gray-500 dark:text-gray-400 mb-2" x-show="video.upload_date">
-                                <span x-text="formatDate(video.upload_date)"></span>
-                              </p>
-                              <a
-                                :href="video.url"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
-                              >
-                                Visit original URL
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                                </svg>
-                              </a>
-                            </div>
-                          </div>
-                        </template>
-                      </div>
+                          </template>
+                        </div>
 
-                      <!-- If we need navigation buttons -->
-                      <div class="swiper-button-prev">
-                        <svg
-                          class="h-auto w-auto stroke-current"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
+                        <!-- Navigation Buttons -->
+                        <button
+                          @click="scrollCarousel(channel.id, 'prev')"
+                          class="carousel-nav-button carousel-nav-prev"
+                          :disabled="!canScrollCarousel(channel.id, 'prev')"
                         >
-                          <path
-                            d="M15.25 6L9 12.25L15.25 18.5"
-                            stroke=""
-                            stroke-width="1.5"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
-                      </div>
-                      <div class="swiper-button-next">
-                        <svg
-                          class="stroke-current"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
+                          <svg
+                            class="h-auto w-auto stroke-current"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M15.25 6L9 12.25L15.25 18.5"
+                              stroke="currentColor"
+                              stroke-width="1.5"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          @click="scrollCarousel(channel.id, 'next')"
+                          class="carousel-nav-button carousel-nav-next"
+                          :disabled="!canScrollCarousel(channel.id, 'next')"
                         >
-                          <path
-                            d="M8.75 19L15 12.75L8.75 6.5"
-                            stroke=""
-                            stroke-width="1.5"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          />
-                        </svg>
+                          <svg
+                            class="stroke-current"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M8.75 19L15 12.75L8.75 6.5"
+                              stroke="currentColor"
+                              stroke-width="1.5"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            />
+                          </svg>
+                        </button>
                       </div>
+                    </div>
+
+                    <!-- View All Videos Link (shown when expanded, regardless of video count) -->
+                    <div x-show="!channel.videosLoading" class="px-3 pb-3 sm:px-6 sm:pb-6">
+                      <a
+                        :href="'channel-videos.html?channel=' + channel.id"
+                        class="flex items-center gap-2 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                      >
+                        View All Videos
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -618,6 +830,7 @@
           error: null,
           crawling: null,
           ignoring: null,
+          actionsMenuOpen: null,
 
           async loadChannels() {
             try {
@@ -628,17 +841,28 @@
 
               this.channels = await response.json();
 
-              // Load videos for each channel
+              // Initialize channel state without loading videos
               for (let channel of this.channels) {
                 channel.videos = [];
-                channel.videosLoading = true;
-                this.loadChannelVideos(channel);
+                channel.videosLoading = false;
+                channel.expanded = false;
+                channel.videosLoaded = false;
               }
 
               this.loading = false;
             } catch (err) {
               this.error = err.message;
               this.loading = false;
+            }
+          },
+
+          toggleChannel(channel) {
+            channel.expanded = !channel.expanded;
+
+            // Load videos on first expand
+            if (channel.expanded && !channel.videosLoaded) {
+              channel.videosLoading = true;
+              this.loadChannelVideos(channel);
             }
           },
 
@@ -652,61 +876,71 @@
               const videos = await response.json();
               channel.videos = videos || [];
               channel.videosLoading = false;
-
-              // Initialize Swiper after videos load and DOM updates
-              if (channel.videos.length > 0) {
-                this.$nextTick(() => {
-                  setTimeout(() => {
-                    this.initCarousel(channel.id);
-                  }, 150);
-                });
-              }
+              channel.videosLoaded = true;
             } catch (err) {
               console.error(`Failed to load videos for channel ${channel.name}:`, err);
               channel.videosLoading = false;
+              channel.videosLoaded = true; // Mark as loaded even on error to prevent retries
             }
           },
 
-          initCarousel(channelId) {
-            const carouselEl = document.querySelector(`.channelCarousel-${channelId}`);
-            if (!carouselEl) {
-              console.error(`Carousel element not found for channel ${channelId}`);
-              return;
-            }
+          scrollCarousel(channelId, direction) {
+            const carousel = document.getElementById(`carousel-${channelId}`);
+            if (!carousel) return;
 
-            // Check if already initialized
-            if (carouselEl.swiper) {
-              console.log(`Carousel already initialized for channel ${channelId}`);
-              return;
-            }
+            const scrollAmount = carousel.offsetWidth * 0.8; // Scroll by 80% of container width
+            const newScrollLeft = direction === 'next'
+              ? carousel.scrollLeft + scrollAmount
+              : carousel.scrollLeft - scrollAmount;
 
-            console.log(`Initializing carousel for channel ${channelId}`);
-
-            // Initialize with Swiper
-            new Swiper(`.channelCarousel-${channelId}`, {
-              slidesPerView: 1,
-              spaceBetween: 20,
-              navigation: {
-                nextEl: `.channelCarousel-${channelId} .swiper-button-next`,
-                prevEl: `.channelCarousel-${channelId} .swiper-button-prev`,
-              },
-              breakpoints: {
-                640: {
-                  slidesPerView: 2,
-                  spaceBetween: 20,
-                },
-                1024: {
-                  slidesPerView: 2,
-                  spaceBetween: 30,
-                },
-                1280: {
-                  slidesPerView: 3,
-                  spaceBetween: 30,
-                },
-              },
+            carousel.scrollTo({
+              left: newScrollLeft,
+              behavior: 'smooth'
             });
           },
-          
+
+          canScrollCarousel(channelId, direction) {
+            const carousel = document.getElementById(`carousel-${channelId}`);
+            if (!carousel) return false;
+
+            if (direction === 'prev') {
+              return carousel.scrollLeft > 0;
+            } else {
+              return carousel.scrollLeft < carousel.scrollWidth - carousel.offsetWidth - 10;
+            }
+          },
+
+          toggleActionsMenu(channelId) {
+            this.actionsMenuOpen = this.actionsMenuOpen === channelId ? null : channelId;
+          },
+
+          editChannel(channelId) {
+            window.location.href = `edit-channel.html?id=${channelId}`;
+          },
+
+          async deleteChannel(channelId, channelName) {
+            if (!confirm(`Are you sure you want to delete the channel "${channelName}"? This action cannot be undone.`)) {
+              return;
+            }
+
+            try {
+              const response = await fetch(`/api/v1/channels/${channelId}/delete`, {
+                method: 'DELETE'
+              });
+
+              if (!response.ok) {
+                throw new Error(`Failed to delete channel: ${response.statusText}`);
+              }
+
+              // Reload channels after successful deletion
+              this.loading = true;
+              await this.loadChannels();
+            } catch (err) {
+              this.error = err.message || 'Failed to delete channel';
+              console.error('Error deleting channel:', err);
+            }
+          },
+
           formatDate(dateString) {
             if (!dateString) return 'Unknown';
             
@@ -777,7 +1011,6 @@
       }
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script defer src="bundle.js"></script>
   </body>
 </html>

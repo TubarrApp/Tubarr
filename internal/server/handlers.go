@@ -965,9 +965,8 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			logger.Pl.E("Failed to write response message: %v", err)
 		}
 		return
-	} else {
-		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 	}
+	logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 
 	w.WriteHeader(http.StatusAlreadyReported)
 	if _, err := w.Write([]byte(`{"message": "Channel crawl already running for channel"}`)); err != nil {
@@ -1015,9 +1014,8 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 			logger.Pl.E("Failed to write response message: %v", err)
 		}
 		return
-	} else {
-		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 	}
+	logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 
 	w.WriteHeader(http.StatusAlreadyReported)
 	if _, err := w.Write([]byte(`{"message": "Channel ignore crawl already running for channel"}`)); err != nil {

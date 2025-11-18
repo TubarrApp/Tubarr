@@ -53,11 +53,17 @@ func InitProcess(
 
 	dirParser := parsing.NewDirectoryParser(c)
 
-	// Check if Metarr exists
+	// Check if Metarr exists and can be run.
 	_, metarrErr := exec.LookPath("metarr")
-	metarrExists := metarrErr == nil
-	if metarrErr != nil && !errors.Is(metarrErr, exec.ErrNotFound) {
-		return 0, 0, fmt.Errorf("unexpected error checking for 'metarr': %w", metarrErr)
+	if metarrErr == nil { // If err IS nil.
+		if err := exec.CommandContext(ctx, "metarr", "--help").Run(); err != nil { // Check path can be executed (not just exists).
+			metarrErr = fmt.Errorf("found 'metarr' in $PATH but failed to execute: %w", err)
+		}
+	}
+
+	metarrExecutable := metarrErr == nil
+	if metarrErr != nil {
+		logger.Pl.E("Cannot run 'metarr' due to error: %v", metarrErr)
 	}
 
 	var wg sync.WaitGroup
@@ -81,7 +87,7 @@ func InitProcess(
 					v,
 					cu,
 					c,
-					metarrExists)
+					metarrExecutable)
 
 				// If bot was detected, cancel the context to stop other workers
 				if err != nil && strings.Contains(err.Error(), consts.BotActivitySentinel) {
@@ -178,12 +184,14 @@ func videoJob(
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	metarrExists bool,
+	metarrExecutable bool,
 ) error {
+	// Bot detection avoidance wait time.
 	if err := times.WaitTime(procCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
 		return err
 	}
 
+	// Process JSON metadata phase.
 	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
 	if err != nil {
 		handleBotBlock(cs, c, cu, botBlockChannel)
@@ -194,20 +202,20 @@ func videoJob(
 		return nil
 	}
 
-	// Process video download phase
+	// Process video download phase.
 	botBlockChannel, err = processVideo(procCtx, v, cu, c, dlTracker)
 	if err != nil {
 		handleBotBlock(cs, c, cu, botBlockChannel)
 		return fmt.Errorf("video processing error for video URL %q: %w", v.URL, err)
 	}
 
-	// Check if Metarr is available
-	if !metarrExists {
+	// Check if Metarr can be run.
+	if !metarrExecutable {
 		logger.Pl.I("No 'metarr' at $PATH, skipping Metarr process and marking video as finished")
 		return completeAndStoreVideo(vs, v, c)
 	}
 
-	// Run metarr step
+	// Run metarr step.
 	if err := metarr.InitMetarr(procCtx, v, cu, c, dirParser); err != nil {
 		return fmt.Errorf("metarr processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
 	}

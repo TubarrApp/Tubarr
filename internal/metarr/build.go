@@ -340,7 +340,7 @@ func calcNumElements(fields []metCmdMapping) (singles, slices, flags int) {
 		case strSlice:
 			sliceElements += (len(f.metarrValue.strSlice) * 2) // One key and one value per entry.
 		case b:
-			flagElements += 1 // Flag only.
+			flagElements++ // Flag only.
 		}
 	}
 	return singleElements, sliceElements, flagElements
