@@ -106,7 +106,9 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Randomize requests (avoid detection as bot)
-	args = append(args, command.SleepRequests...)
+	for _, v := range command.SleepRequests {
+		args = append(args, v)
+	}
 
 	// Additional user arguments
 	if !abstractions.IsSet(keys.ExtraYTDLPVideoArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs != "" {
@@ -232,13 +234,13 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 	defer close(filenameChan)
 	defer close(errChan)
 
-	// Check if video is already downloading
+	// Check if video is already downloading.
 	if state.ActiveVideoDownloadStatusExists(d.Video.ID) {
 		errChan <- fmt.Errorf("video with ID %d is already downloading (URL: %q)", d.Video.ID, d.Video.URL)
 		return
 	}
 
-	// Save state to map (locks from other downloads until deletion from map)
+	// Save state to map (locks from other downloads until deletion from map).
 	state.SetActiveVideoDownloadStatus(d.Video.ID, d.Video.DownloadStatus)
 	defer state.DeleteActiveVideoDownloadStatus(d.Video.ID)
 
@@ -252,7 +254,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 			logger.Pl.D(4, "Video %d download terminal output: %q", d.Video.ID, line)
 		}
 
-		// Collect error messages
+		// Collect error messages.
 		lowerLine := strings.ToLower(line)
 		if strings.HasPrefix(lowerLine, "error:") {
 
@@ -265,7 +267,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 			}
 		}
 
-		// Aria2 progress parsing
+		// Aria2 progress parsing.
 		if d.DLTracker.downloader == command.DownloaderAria {
 			gotLine, itemsFound, downloadedItems, pct, status :=
 				downloaders.Aria2OutputParser(line, totalItemsFound, totalDownloadedItems, d.Video.DownloadStatus.Percent, d.Video.DownloadStatus.Status)
@@ -280,27 +282,25 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 			}
 		}
 
-		// Detect completed filename
+		// Detect completed filename.
 		if !completed && strings.HasPrefix(line, "/") {
-			ext := filepath.Ext(line)
-			for _, validExt := range consts.AllVidExtensions {
-				if ext == validExt { // Download succeeded
-					// Set model to complete
-					d.Video.DownloadStatus.Status = consts.DLStatusCompleted
-					d.Video.DownloadStatus.Percent = 100.0
-					d.DLTracker.sendUpdate(d.Video)
+			if consts.AllVidExtensions[filepath.Ext(line)] { // Download succeeded.
 
-					filenameChan <- line
-					completed = true
-					break
-				}
+				// Set model to complete.
+				d.Video.DownloadStatus.Status = consts.DLStatusCompleted
+				d.Video.DownloadStatus.Percent = 100.0
+				d.DLTracker.sendUpdate(d.Video)
+
+				filenameChan <- line
+				completed = true
+				break
 			}
 		}
 	}
 
-	// Send errors if download failed
+	// Send errors if download failed.
 	if !completed && len(errorLines) > 0 {
-		// Limit to last 5 error lines to avoid overwhelming the error message
+		// Limit to last 5 error lines to avoid overwhelming the error message.
 		if len(errorLines) > 5 {
 			errorLines = errorLines[len(errorLines)-5:]
 		}

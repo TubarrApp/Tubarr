@@ -8,18 +8,25 @@ const (
 	IDTag   = "id_"
 )
 
-// Webpage tags
-var (
-	WebDateTags        = []string{"release-date", "upload-date", "date", "date-text", "text-date"}
-	WebDescriptionTags = []string{"description", "longdescription", "long-description", "summary", "synopsis", "check-for-urls"}
-	WebCreditsTags     = []string{"creator", "uploader", "uploaded-by", "uploaded_by"}
-	WebTitleTags       = []string{"video-title", "video-name"}
-)
-
 // AllVidExtensions is a list of video file extensions.
-var AllVidExtensions = []string{".3gp", ".avi", ".f4v", ".flv", ".m4v", ".mkv",
-	".mov", ".mp4", ".mpeg", ".mpg", ".ogm", ".ogv",
-	".ts", ".vob", ".webm", ".wmv"}
+var AllVidExtensions = map[string]bool{
+	".3gp":  true,
+	".avi":  true,
+	".f4v":  true,
+	".flv":  true,
+	".m4v":  true,
+	".mkv":  true,
+	".mov":  true,
+	".mp4":  true,
+	".mpeg": true,
+	".mpg":  true,
+	".ogm":  true,
+	".ogv":  true,
+	".ts":   true,
+	".vob":  true,
+	".webm": true,
+	".wmv":  true,
+}
 
 // Op types
 const (
@@ -37,19 +44,19 @@ var BotTimeoutMap = map[string]float64{
 	// 240: 4 hours
 	// 180: 3 hours
 
-	"youtube.com":     2880,
-	"youtu.be":        2880,
-	"twitch.tv":       1440,
-	"twitter.com":     720,
-	"x.com":           720,
-	"reddit.com":      360,
-	"vimeo.com":       480,
-	"dailymotion.com": 360,
-	"tiktok.com":      720,
-	"instagram.com":   1440,
-	"facebook.com":    1440,
-	"soundcloud.com":  480,
-	"bandcamp.com":    240,
-	"streamable.com":  180,
-	"imgur.com":       180,
+	"utube.com":  2880,
+	"u.be":       2880,
+	"itch.tv":    1440,
+	"itter.com":  720,
+	"x.com":      720,
+	"dit.com":    360,
+	"imeo.com":   480,
+	"motion.com": 360,
+	"tok.com":    720,
+	"gram.com":   1440,
+	"book.com":   1440,
+	"cloud.com":  480,
+	"camp.com":   240,
+	"mable.com":  180,
+	"gur.com":    180,
 }

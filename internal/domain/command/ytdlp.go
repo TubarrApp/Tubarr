@@ -33,7 +33,7 @@ const (
 
 // Sleep yt-dlp commands.
 var (
-	SleepRequests = []string{"-t", "sleep"}
+	SleepRequests = [2]string{"-t", "sleep"}
 )
 
 // Downloaders

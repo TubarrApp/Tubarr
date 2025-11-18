@@ -37,9 +37,16 @@ const (
 //
 // E.g. ChannelName 'true' as '{{channel_name}}' is replaced with a Channel.Name variable.
 var TemplateMap = map[string]bool{
-	ChannelID: true, ChannelName: true, ChannelURL: true,
-	VideoID: true, VideoTitle: true, VideoURL: true,
-	MetDay: true, MetMonth: true, MetYear: true,
-	MetAuthor: true, MetDirector: true,
-	MetDomain: true,
+	ChannelID:   true,
+	ChannelName: true,
+	ChannelURL:  true,
+	VideoID:     true,
+	VideoTitle:  true,
+	VideoURL:    true,
+	MetDay:      true,
+	MetMonth:    true,
+	MetYear:     true,
+	MetAuthor:   true,
+	MetDirector: true,
+	MetDomain:   true,
 }

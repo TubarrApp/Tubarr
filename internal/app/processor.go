@@ -61,7 +61,7 @@ func InitProcess(
 		}
 	}
 
-	metarrExecutable := metarrErr == nil
+	metarrIsExecutable := metarrErr == nil
 	if metarrErr != nil {
 		logger.Pl.E("Cannot run 'metarr' due to error: %v", metarrErr)
 	}
@@ -87,7 +87,7 @@ func InitProcess(
 					v,
 					cu,
 					c,
-					metarrExecutable)
+					metarrIsExecutable)
 
 				// If bot was detected, cancel the context to stop other workers
 				if err != nil && strings.Contains(err.Error(), consts.BotActivitySentinel) {
@@ -184,7 +184,7 @@ func videoJob(
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	metarrExecutable bool,
+	metarrIsExecutable bool,
 ) error {
 	// Bot detection avoidance wait time.
 	if err := times.WaitTime(procCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
@@ -210,7 +210,7 @@ func videoJob(
 	}
 
 	// Check if Metarr can be run.
-	if !metarrExecutable {
+	if !metarrIsExecutable {
 		logger.Pl.I("No 'metarr' at $PATH, skipping Metarr process and marking video as finished")
 		return completeAndStoreVideo(vs, v, c)
 	}

@@ -82,7 +82,9 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	}
 
 	// Randomize requests (avoid detection as bot)
-	args = append(args, command.SleepRequests...)
+	for _, v := range command.SleepRequests {
+		args = append(args, v)
+	}
 
 	// Additional user arguments
 	if !abstractions.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {

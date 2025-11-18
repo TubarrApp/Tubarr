@@ -697,57 +697,57 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 //
 // Returns true if the channel was unlocked, false if still blocked.
 func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
-
-	// NOT BLOCKED:
 	if !c.IsBlocked() {
-		return true, nil // Not blocked, consider it "unlocked"
+		return true, nil // Not blocked, consider it "unlocked".
 	}
-
-	// BLOCKED LOGIC:
 	logger.Pl.W("Channel %q is currently blocked by %v", c.Name, c.ChanSettings.BotBlockedHostnames)
-
 	if len(c.ChanSettings.BotBlockedHostnames) == 0 {
-		return false, nil // Invalid state, keep blocked
+		return false, nil // Invalid state, keep blocked.
 	}
 
-	// Initialize timestamps map if nil
+	// Initialize timestamps map if nil.
 	if c.ChanSettings.BotBlockedTimestamps == nil {
 		c.ChanSettings.BotBlockedTimestamps = make(map[string]time.Time)
 	}
 
-	// Check each blocked hostname to see if any have exceeded timeout
+	// Check each blocked hostname to see if any have exceeded timeout.
 	stillBlockedHostnames := make([]string, 0, len(c.ChanSettings.BotBlockedHostnames))
 	anyUnlocked := false
 
+	// Iterate over blocked hostnames.
 	for _, hostname := range c.ChanSettings.BotBlockedHostnames {
-		timeoutMinutes, exists := consts.BotTimeoutMap[hostname]
+
+		// Determine timeout for this hostname.
+		var timeoutMinutes float64
+		var exists bool
+		for k, v := range consts.BotTimeoutMap {
+			if strings.Contains(hostname, k) {
+				timeoutMinutes = v
+				exists = true
+				break
+			}
+		}
+
+		// If no specific timeout found, use default from settings.
 		if !exists {
-			// No timeout configured, keep it blocked
-			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
-			continue
+			timeoutMinutes = 720.0
 		}
 
-		// Get the timestamp for this specific hostname
-		blockedTime, exists := c.ChanSettings.BotBlockedTimestamps[hostname]
-		if !exists || blockedTime.IsZero() {
-			// No timestamp found for this hostname, keep it blocked
-			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
-			logger.Pl.W("No timestamp found for hostname %q, keeping blocked", hostname)
-			continue
-		}
+		// Get the timestamp for this specific hostname.
+		blockedTime, timestampExists := c.ChanSettings.BotBlockedTimestamps[hostname]
 
+		// Check if timeout has expired or if timestamp is missing/zero.
 		minutesSinceBlock := time.Since(blockedTime).Minutes()
-		if minutesSinceBlock >= timeoutMinutes {
-			// This hostname's timeout has expired
+		if minutesSinceBlock >= timeoutMinutes || (!timestampExists || blockedTime.IsZero()) {
+			// This hostname's timeout has expired.
 			logger.Pl.S("Unlocking hostname %q for channel %d (%s) after timeout", hostname, c.ID, c.Name)
 			anyUnlocked = true
-			// Remove from timestamps map
 			delete(c.ChanSettings.BotBlockedTimestamps, hostname)
 		} else {
-			// Still blocked
+			// Still blocked.
 			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
 
-			// Print time remaining until unlock
+			// Print time remaining until unlock.
 			blockedAt := c.ChanSettings.BotBlockedTimestamps[hostname]
 			timeout := time.Duration(timeoutMinutes) * time.Minute
 			unlockTime := blockedAt.Add(timeout)
@@ -760,18 +760,19 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 		}
 	}
 
-	// Update the channel settings
+	// Update the channel settings.
 	if anyUnlocked {
-		// Update in-memory copy
+
+		// Update in-memory copy.
 		c.ChanSettings.BotBlockedHostnames = stillBlockedHostnames
 
-		// If no hostnames remain blocked, clear the blocked state entirely
+		// If no hostnames remain blocked, clear the blocked state entirely.
 		if len(stillBlockedHostnames) == 0 {
 			c.ChanSettings.BotBlocked = false
 			c.ChanSettings.BotBlockedTimestamps = make(map[string]time.Time)
 		}
 
-		// Persist changes
+		// Persist changes to database.
 		_, err := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
 			s.BotBlocked = c.ChanSettings.BotBlocked
 			s.BotBlockedHostnames = c.ChanSettings.BotBlockedHostnames
@@ -783,13 +784,13 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 		}
 	}
 
-	// Return true only if ALL hostnames are now unlocked
+	// Return true only if ALL hostnames are now unlocked.
 	if len(stillBlockedHostnames) == 0 {
 		logger.Pl.S("Channel %d (%s) fully unlocked - all hostnames cleared", c.ID, c.Name)
 		return true, nil
 	}
 
-	// Still some blocked hostnames remaining
+	// Still some blocked hostnames remaining.
 	logger.Pl.W("Unlock channel %q manually for hostnames %v with:\n\ntubarr channel unblock -n %q\n",
 		c.Name, stillBlockedHostnames, c.Name)
 	return false, nil
@@ -800,7 +801,6 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	if !consts.ValidChannelKeys[key] {
 		return nil, false, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
-
 	var (
 		settings, metarrJSON json.RawMessage
 		err                  error

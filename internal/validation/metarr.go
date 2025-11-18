@@ -144,21 +144,13 @@ func ValidateMetarrOutputExt(o string) (dottedExt string, err error) {
 	if !strings.HasPrefix(o, ".") {
 		o = "." + o
 	}
-
 	logger.Pl.D(4, "Checking Metarr output filetype: %q", o)
 
-	valid := false
-	for _, ext := range consts.AllVidExtensions {
-		if o != ext {
-			continue
-		}
-		valid = true
-		break
-	}
-
-	if valid {
+	// Check valid video extension.
+	if consts.AllVidExtensions[o] {
 		return o, nil
 	}
+
 	return "", fmt.Errorf("output filetype %q is not supported", o)
 }
 
