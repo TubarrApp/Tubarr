@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/models"
 
@@ -24,12 +25,12 @@ func TestMetarrArgsJSONMap(t *testing.T) {
 	t.Parallel()
 
 	metaOps := []models.MetaOps{
-		{Field: "title", OpType: "replace", OpFindString: "foo", OpValue: "bar"},
+		{Field: "title", OpType: consts.OpReplace, OpFindString: "foo", OpValue: "bar"},
 		{ChannelURL: "https://example.com/channel", Field: "director", OpType: "set", OpValue: "mr-cat"},
 	}
 	filenameOps := []models.FilenameOps{
 		{OpType: "prefix", OpValue: "[CAT]"},
-		{ChannelURL: "https://example.com/channel", OpType: "replace", OpFindString: "foo", OpValue: "bar"},
+		{ChannelURL: "https://example.com/channel", OpType: consts.OpReplace, OpFindString: "foo", OpValue: "bar"},
 	}
 	filteredMetaOps := []models.FilteredMetaOps{
 		{
@@ -352,7 +353,7 @@ func TestParseMetarrArgsFromMap(t *testing.T) {
 	if len(args.FilenameOps) != 2 {
 		t.Fatalf("FilenameOps length mismatch: %d", len(args.FilenameOps))
 	}
-	if args.FilenameOps[0].OpType != "prefix" || args.FilenameOps[1].OpType != "replace" {
+	if args.FilenameOps[0].OpType != "prefix" || args.FilenameOps[1].OpType != consts.OpReplace {
 		t.Fatalf("FilenameOps parsed incorrectly: %+v", args.FilenameOps)
 	}
 	if len(args.FilteredFilenameOps) != 1 {

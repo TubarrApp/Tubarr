@@ -5,11 +5,6 @@ const (
 	TerminalRunDefaultBehavior = "terminalRunDefaultBehavior"
 )
 
-// Logging
-const (
-	DebugLevel string = "debug"
-)
-
 // Benchmarking
 const (
 	BenchFiles string = "benchFiles"

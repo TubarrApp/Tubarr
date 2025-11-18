@@ -6,6 +6,7 @@ import (
 	"maps"
 	"net/url"
 	"strings"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
@@ -52,12 +53,12 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 			newFilenameOp.OpType = split[0]
 
 			switch split[0] {
-			case "replace-suffix", "replace-prefix", "replace":
+			case consts.OpReplaceSuffix, consts.OpReplacePrefix, consts.OpReplace:
 				newFilenameOp.OpFindString = split[1] // e.g. '_1'
 				newFilenameOp.OpValue = split[2]      // e.g. ''
 				key = strings.Join([]string{newFilenameOp.OpType, newFilenameOp.OpFindString, newFilenameOp.OpValue}, ":")
 
-			case "date-tag", "delete-date-tag":
+			case consts.OpDateTag, consts.OpDeleteDateTag:
 				newFilenameOp.OpLoc = split[1]      // e.g. 'prefix'
 				newFilenameOp.DateFormat = split[2] // e.g. 'ymd'
 				key = newFilenameOp.OpType
@@ -138,12 +139,12 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 			newMetaOp.OpType = split[1]
 
 			switch newMetaOp.OpType {
-			case "date-tag", "delete-date-tag":
+			case consts.OpDateTag, consts.OpDeleteDateTag:
 				newMetaOp.OpLoc = split[2]
 				newMetaOp.DateFormat = split[3]
 				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType}, ":")
 
-			case "replace", "replace-suffix", "replace-prefix":
+			case consts.OpReplace, consts.OpReplaceSuffix, consts.OpReplacePrefix:
 				newMetaOp.OpFindString = split[2]
 				newMetaOp.OpValue = split[3]
 				key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType, newMetaOp.OpFindString, newMetaOp.OpValue}, ":")

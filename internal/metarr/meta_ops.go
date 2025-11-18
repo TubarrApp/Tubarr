@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -10,7 +11,7 @@ import (
 )
 
 var isNonConflictingMetaOp = map[string]bool{
-	"append": true, "copy-to": true, "prefix": true, "replace": true,
+	"append": true, "copy-to": true, "prefix": true, consts.OpReplace: true,
 }
 
 // loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering

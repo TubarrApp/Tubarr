@@ -29,6 +29,12 @@ func InitFileTransformers(rootCmd *cobra.Command) error {
 		return err
 	}
 
+	// Purge metafile
+	rootCmd.PersistentFlags().String(keys.PurgeMetaFile, "", "Purge metadata files upon completion.")
+	if err := viper.BindPFlag(keys.PurgeMetaFile, rootCmd.PersistentFlags().Lookup(keys.PurgeMetaFile)); err != nil {
+		return err
+	}
+
 	return nil
 }
 

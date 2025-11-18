@@ -15,13 +15,13 @@ import (
 
 var validMetaActions = map[string]bool{
 	"append": true, "copy-to": true, "paste-from": true, "prefix": true,
-	"replace-prefix": true, "replace-suffix": true, "replace": true, "set": true,
-	"date-tag": true, "delete-date-tag": true,
+	consts.OpReplacePrefix: true, consts.OpReplaceSuffix: true, consts.OpReplace: true, "set": true,
+	consts.OpDateTag: true, consts.OpDeleteDateTag: true,
 }
 
 var validFilenameActions = map[string]bool{
-	"append": true, "prefix": true, "replace-prefix": true, "replace-suffix": true,
-	"replace": true, "date-tag": true, "delete-date-tag": true, "set": true,
+	"append": true, "prefix": true, consts.OpReplacePrefix: true, consts.OpReplaceSuffix: true,
+	consts.OpReplace: true, consts.OpDateTag: true, consts.OpDeleteDateTag: true, "set": true,
 }
 
 // ValidateFilenameOps validates filename transformation operation models.
@@ -41,7 +41,7 @@ func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
 		}
 
 		// Validate date-tag operations
-		if op.OpType == "date-tag" {
+		if op.OpType == consts.OpDateTag {
 			if op.OpLoc != "prefix" && op.OpLoc != "suffix" {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
 			}
@@ -51,7 +51,7 @@ func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
 		}
 
 		// Validate delete-date-tag operations
-		if op.OpType == "delete-date-tag" {
+		if op.OpType == consts.OpDeleteDateTag {
 			if op.OpLoc != "prefix" && op.OpLoc != "suffix" && op.OpLoc != "all" {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
 			}
@@ -81,7 +81,7 @@ func ValidateMetaOps(metaOps []models.MetaOps) error {
 		}
 
 		// Validate date-tag operations
-		if op.OpType == "date-tag" {
+		if op.OpType == consts.OpDateTag {
 			if op.OpLoc != "prefix" && op.OpLoc != "suffix" {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
 			}
@@ -91,7 +91,7 @@ func ValidateMetaOps(metaOps []models.MetaOps) error {
 		}
 
 		// Validate delete-date-tag operations
-		if op.OpType == "delete-date-tag" {
+		if op.OpType == consts.OpDeleteDateTag {
 			if op.OpLoc != "prefix" && op.OpLoc != "suffix" && op.OpLoc != "all" {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
 			}

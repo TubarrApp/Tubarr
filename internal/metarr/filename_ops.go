@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -10,7 +11,7 @@ import (
 )
 
 var isConflictingFilenameOp = map[string]bool{
-	"date-tag": true, "delete-date-tag": true,
+	consts.OpDateTag: true, consts.OpDeleteDateTag: true,
 }
 
 // loadAndMergeFilenameOps loads and merges filename ops: file ops override DB ops, then apply filtering

@@ -1,6 +1,9 @@
 package models
 
-import "tubarr/internal/domain/logger"
+import (
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
+)
 
 // ------ Filters -----------------------------------------------------------------
 
@@ -53,10 +56,10 @@ func MetaOpToString(m MetaOps) string {
 	}
 	// Reconstruct operations
 	switch m.OpType {
-	case "date-tag", "delete-date-tag":
+	case consts.OpDateTag, consts.OpDeleteDateTag:
 		op += m.Field + ":" + m.OpType + ":" + m.OpLoc + ":" + m.DateFormat
 
-	case "replace", "replace-suffix", "replace-prefix":
+	case consts.OpReplace, consts.OpReplaceSuffix, consts.OpReplacePrefix:
 		op += m.Field + ":" + m.OpType + ":" + m.OpFindString + ":" + m.OpValue
 
 	default:
@@ -93,10 +96,10 @@ func FilenameOpToString(f FilenameOps) string {
 	}
 	// Reconstruct operations
 	switch f.OpType {
-	case "date-tag", "delete-date-tag":
+	case consts.OpDateTag, consts.OpDeleteDateTag:
 		op += f.OpType + ":" + f.OpLoc + ":" + f.DateFormat
 
-	case "replace", "replace-suffix", "replace-prefix":
+	case consts.OpReplace, consts.OpReplaceSuffix, consts.OpReplacePrefix:
 		op += f.OpType + ":" + f.OpFindString + ":" + f.OpValue
 
 	default:

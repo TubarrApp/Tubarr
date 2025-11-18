@@ -28,6 +28,7 @@ type metVals struct {
 	strSlice []string
 	i        int
 	f64      float64
+	b        bool
 }
 
 type metValTypes int
@@ -37,6 +38,7 @@ const (
 	strSlice
 	i
 	f64
+	b
 )
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
@@ -145,13 +147,20 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			viperKey:    keys.DebugLevel,
 			cmdKey:      metkeys.Debug,
 		},
+		{
+			metarrValue: metVals{b: abstractions.GetBool(keys.PurgeMetaFile)},
+			valType:     b,
+			viperKey:    keys.PurgeMetaFile,
+			cmdKey:      metkeys.PurgeMetaFile,
+		},
 	}
 
-	singlesLen, sliceLen := calcNumElements(fields)
+	singlesLen, sliceLen, flagLen := calcNumElements(fields)
 
 	// Map use to ensure uniqueness
 	argMap := make(map[string]string, singlesLen)
 	argSlicesMap := make(map[string][]string, sliceLen)
+	argFlags := make([]string, 0, flagLen)
 
 	// Viper slice comma parsing issue workaround
 	argMap[metkeys.VideoFile] = cleanAndWrapCommaPaths(v.VideoPath)
@@ -169,7 +178,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 
 	var metaOW bool
 	for _, f := range fields {
-		if processField(f, argMap, argSlicesMap) {
+		if processField(f, argMap, argSlicesMap, &argFlags) {
 			metaOW = true
 		}
 	}
@@ -184,6 +193,8 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		}
 	}
 
+	args = append(args, argFlags...)
+
 	if metaOW {
 		args = append(args, metkeys.MetaOW)
 	}
@@ -191,8 +202,14 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 }
 
 // processField processes each field in the argument map.
-func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string) (metaOW bool) {
+func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[string][]string, argFlags *[]string) (metaOW bool) {
 	switch f.valType {
+	case b:
+		if f.metarrValue.b {
+			*argFlags = append(*argFlags, f.cmdKey)
+		} else if f.viperKey != "" && abstractions.IsSet(f.viperKey) && abstractions.GetBool(f.viperKey) {
+			*argFlags = append(*argFlags, f.cmdKey)
+		}
 	case i:
 		if f.metarrValue.i > 0 {
 			argMap[f.cmdKey] = strconv.Itoa(f.metarrValue.i)
@@ -295,18 +312,21 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 }
 
 // calcNumElements returns the required map sizes.
-func calcNumElements(fields []metCmdMapping) (singles, slices int) {
+func calcNumElements(fields []metCmdMapping) (singles, slices, flags int) {
 	singleElements := 2 // Start at 2 for VideoFile and JSONFile
 	sliceElements := 0
+	flagElements := 0
 	for _, f := range fields {
 		switch f.valType {
 		case str, i, f64:
 			singleElements += 2 // One key and one value
 		case strSlice:
 			sliceElements += (len(f.metarrValue.strSlice) * 2) // One key and one value per entry
+		case b:
+			flagElements += 1 // Flag only
 		}
 	}
-	return singleElements, sliceElements
+	return singleElements, sliceElements, flagElements
 }
 
 // cleanAndWrapCommaPaths performs escaping for strings containing commas (can be misinterpreted in slices)

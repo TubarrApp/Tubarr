@@ -1,14 +1,14 @@
 // Package keys holds various keys for software operations, such as terminal input keys and internal Viper keys.
 package keys
 
-// Channel identifiers
+// Channel identifiers.
 const (
 	URL  string = "channel-urls"
 	Name string = "channel-name"
 	ID   string = "channel-id"
 )
 
-// Auth
+// Auth.
 const (
 	AuthUsername string = "auth-username"
 	AuthPassword string = "auth-password"
@@ -16,12 +16,12 @@ const (
 	AuthDetails  string = "auth-details"
 )
 
-// Notification
+// Notification.
 const (
 	NotifyPair string = "notify"
 )
 
-// Files and directories
+// Files and directories.
 const (
 	ConfigFile     string = "channel-config-file"
 	VideoDir       string = "video-directory"
@@ -30,7 +30,7 @@ const (
 	OutputFiletype string = "output-ext"
 )
 
-// Transcoding
+// Transcoding.
 const (
 	TranscodeGPU         string = "transcode-gpu"
 	TranscodeGPUDir      string = "transcode-gpu-directory"
@@ -40,7 +40,7 @@ const (
 	TranscodeVideoFilter string = "transcode-video-filter"
 )
 
-// Downloading
+// Downloading.
 const (
 	ChanOrURLConcurrencyLimit string = "concurrency"
 	YtdlpOutputExt            string = "ytdlp-output-extension"
@@ -56,7 +56,7 @@ const (
 	ExternalDownloaderArgs    string = "external-downloader-args"
 )
 
-// Program inputs
+// Program inputs.
 const (
 	GlobalConcurrency string = "global-concurrency"
 	MoveOnComplete    string = "move-on-complete"
@@ -68,7 +68,7 @@ const (
 	SkipAllWaits      string = "skip-all-waits"
 )
 
-// Settings
+// Settings.
 const (
 	FilterOpsInput string = "filter-ops"
 	FilterOpsFile  string = "filter-ops-file"
@@ -77,13 +77,13 @@ const (
 	CrawlFreq      string = "crawl-freq"
 )
 
-// Database operations
+// Database operations.
 const (
 	DBOpsInput   string = "db-ops"
 	ChanOpsInput string = "channel-ops"
 )
 
-// Metarr operations
+// Metarr operations.
 const (
 	MDescDatePfx             string = "metarr-desc-date-prefix"
 	MDescDateSfx             string = "metarr-desc-date-suffix"
@@ -113,16 +113,22 @@ const (
 	MOutputDir               string = "metarr-default-output-dir"
 	MURLOutputDirs           string = "metarr-url-output-dirs"
 	MOutputExt               string = "metarr-output-ext"
-	MExtraFFmpegArgs         string = "extra-ffmpeg-args"
+	MExtraFFmpegArgs         string = "metarr-extra-ffmpeg-args"
 )
 
-// Custom additional commands
+// Custom additional commands.
 const (
-	ExtraYTDLPVideoArgs = "extra-ytdlp-video-args" // applied only to video downloads
-	ExtraYTDLPMetaArgs  = "extra-ytdlp-meta-args"  // applies only to metadata downloads
+	ExtraYTDLPVideoArgs = "extra-ytdlp-video-args" // applied only to video downloads.
+	ExtraYTDLPMetaArgs  = "extra-ytdlp-meta-args"  // applies only to metadata downloads.
 )
 
-// Web interface or terminal
+// Web interface or terminal.
 const (
 	RunWebInterface = "web"
+)
+
+// Miscellaneous.
+const (
+	DebugLevel    string = "debug"
+	PurgeMetaFile string = "purge-metafile"
 )

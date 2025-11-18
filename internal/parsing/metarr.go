@@ -1,14 +1,17 @@
 package parsing
 
-import "tubarr/internal/models"
+import (
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/models"
+)
 
 // BuildMetaOpsKey creates a unique key for meta operations
 func BuildMetaOpsKey(mo models.MetaOps) string {
 	var key string
 	switch mo.OpType {
-	case "date-tag", "delete-date-tag":
+	case consts.OpDateTag, consts.OpDeleteDateTag:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpLoc + ":" + mo.DateFormat
-	case "replace":
+	case consts.OpReplace:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpFindString + ":" + mo.OpValue
 	default:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpValue
@@ -20,9 +23,9 @@ func BuildMetaOpsKey(mo models.MetaOps) string {
 func BuildMetaOpsKeyWithChannel(mo models.MetaOps) string {
 	var key string
 	switch mo.OpType {
-	case "date-tag", "delete-date-tag":
+	case consts.OpDateTag, consts.OpDeleteDateTag:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpLoc + ":" + mo.DateFormat
-	case "replace":
+	case consts.OpReplace:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpFindString + ":" + mo.OpValue
 	default:
 		key = mo.Field + ":" + mo.OpType + ":" + mo.OpValue
@@ -38,9 +41,9 @@ func BuildMetaOpsKeyWithChannel(mo models.MetaOps) string {
 func BuildFilenameOpsKey(fo models.FilenameOps) string {
 	var key string
 	switch fo.OpType {
-	case "date-tag", "delete-date-tag":
+	case consts.OpDateTag, consts.OpDeleteDateTag:
 		key = fo.OpType + ":" + fo.OpLoc + ":" + fo.DateFormat
-	case "replace", "replace-suffix", "replace-prefix":
+	case consts.OpReplace, consts.OpReplaceSuffix, consts.OpReplacePrefix:
 		key = fo.OpType + ":" + fo.OpFindString + ":" + fo.OpValue
 	default:
 		key = fo.OpType + ":" + fo.OpValue
@@ -52,9 +55,9 @@ func BuildFilenameOpsKey(fo models.FilenameOps) string {
 func BuildFilenameOpsKeyWithChannel(fo models.FilenameOps) string {
 	var key string
 	switch fo.OpType {
-	case "date-tag", "delete-date-tag":
+	case consts.OpDateTag, consts.OpDeleteDateTag:
 		key = fo.OpType + ":" + fo.OpLoc + ":" + fo.DateFormat
-	case "replace", "replace-suffix", "replace-prefix":
+	case consts.OpReplace, consts.OpReplaceSuffix, consts.OpReplacePrefix:
 		key = fo.OpType + ":" + fo.OpFindString + ":" + fo.OpValue
 	default:
 		key = fo.OpType + ":" + fo.OpValue
