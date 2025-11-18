@@ -13,6 +13,7 @@ import (
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
+// fillChannelFromConfigFile parses a Channel and its access details from a config file input.
 func fillChannelFromConfigFile(w http.ResponseWriter, input models.ChannelInputPtrs) (*models.Channel, map[string]*models.ChannelAccessDetails) {
 	c, m, err := parsing.BuildChannelFromInput(input)
 	if err != nil {
@@ -22,7 +23,7 @@ func fillChannelFromConfigFile(w http.ResponseWriter, input models.ChannelInputP
 	return c, m
 }
 
-// metarrArgsJSONMap returns a map of Metarr JSON keys and their values.
+// metarrArgsJSONMap returns a map of MetarrArgs JSON keys and their values.
 func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	metarrMap := make(map[string]any)
 	if mArgs.OutputDir != "" {
@@ -84,7 +85,7 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	return metarrMap
 }
 
-// settingsJSONMap returns a map of settings JSON keys and their values.
+// settingsJSONMap returns a map of Settings JSON keys and their values.
 func settingsJSONMap(settings *models.Settings) map[string]any {
 	settingsMap := make(map[string]any)
 	if settings.VideoDir != "" {
@@ -228,7 +229,7 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 		settings.ToDate = validDate
 	}
 
-	// Extract integer fields
+	// Extract integer fields.
 	if v, ok := data[jsonkeys.SettingsMaxConcurrency].(int); ok {
 		valid := sharedvalidation.ValidateConcurrencyLimit(v)
 		settings.Concurrency = valid
@@ -240,12 +241,12 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 		settings.Retries = max(v, 0)
 	}
 
-	// Extract boolean fields
+	// Extract boolean fields.
 	if v, ok := data[jsonkeys.SettingsUseGlobalCookies].(bool); ok {
 		settings.UseGlobalCookies = v
 	}
 
-	// Parse model fields from strings (newline-separated, not space-separated)
+	// Parse model fields from strings (newline-separated, not space-separated).
 	if filtersStr, ok := data[jsonkeys.SettingsFilters].(string); ok && filtersStr != "" {
 		lines := splitNonEmptyLines(filtersStr)
 		filters, err := parsing.ParseFilterOps(lines)
@@ -498,6 +499,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 		return nil
 	}
 
+	// Return Settings.
 	return &models.Settings{
 		Concurrency:            maxConcurrency,
 		CookiesFromBrowser:     cookiesFromBrowser,
@@ -527,7 +529,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 // getMetarrArgsStrings retrieves MetarrArgs model strings, converting where needed.
 func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.MetarrArgs {
 	// -- Initialize --
-	// Strings not needing validation
+	// Strings not needing validation.
 	outExt := r.FormValue(jsonkeys.MetarrOutputExt)
 	filenameOpsFile := r.FormValue(jsonkeys.MetarrFilenameOpsFile)
 	filteredFilenameOpsFile := r.FormValue(jsonkeys.MetarrFilteredFilenameOpsFile)
@@ -535,7 +537,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	filteredMetaOpsFile := r.FormValue(jsonkeys.MetarrFilteredMetaOpsFile)
 	extraFFmpegArgs := r.FormValue(jsonkeys.MetarrExtraFFmpegArgs)
 
-	// Strings requiring validation
+	// Strings requiring validation.
 	renameStyle := r.FormValue(jsonkeys.MetarrRenameStyle)
 	minFreeMem := r.FormValue(jsonkeys.MetarrMinFreeMem)
 	useGPUStr := r.FormValue(jsonkeys.MetarrGPU)
@@ -546,18 +548,18 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	transcodeAudioCodecStr := r.FormValue(jsonkeys.MetarrAudioCodecs)
 	transcodeQualityStr := r.FormValue(jsonkeys.MetarrTranscodeQuality)
 
-	// Ints
+	// Ints.
 	maxConcurrencyStr := r.FormValue(jsonkeys.MetarrConcurrency)
 	maxCPUStr := r.FormValue(jsonkeys.MetarrMaxCPU)
 
-	// Models
+	// Models.
 	filenameOpsStr := r.FormValue(jsonkeys.MetarrFilenameOps)
 	filteredFilenameOpsStr := r.FormValue(jsonkeys.MetarrFilteredFilenameOps)
 	filteredMetaOpsStr := r.FormValue(jsonkeys.MetarrFilteredMetaOps)
 	metaOpsStr := r.FormValue(jsonkeys.MetarrMetaOps)
 
 	// -- Validation --
-	//Strings
+	//Strings.
 	if err := validation.ValidateRenameFlag(renameStyle); err != nil {
 		http.Error(w, fmt.Sprintf("invalid rename style %q: %v", renameStyle, err), http.StatusBadRequest)
 		return nil
@@ -596,7 +598,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		return nil
 	}
 
-	// Integers & Floats
+	// Integers & floats.
 	maxConcurrency, err := strconv.Atoi(maxConcurrencyStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
@@ -613,7 +615,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		}
 	}
 
-	// Models (newline-separated, not space-separated)
+	// Models (newline-separated, not space-separated).
 	filenameOps, err := parsing.ParseFilenameOps(splitNonEmptyLines(filenameOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid filename ops %q: %v", filenameOpsStr, err), http.StatusBadRequest)
@@ -635,6 +637,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		return nil
 	}
 
+	// Return MetarrArgs.
 	return &models.MetarrArgs{
 		OutputExt:               outExt,
 		FilenameOps:             filenameOps,
@@ -664,6 +667,8 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 func splitNonEmptyLines(s string) []string {
 	lines := strings.Split(s, "\n")
 	result := make([]string, 0, len(lines))
+
+	// Normalize lines and append non-empty ones.
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line != "" {

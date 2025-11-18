@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -30,27 +29,27 @@ import (
 func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
 	var input models.ChannelInputPtrs
 
-	// Grab config file from form
+	// Grab config filepath from form.
 	addFromFile := r.FormValue("add_from_config_file")
 	if addFromFile == "" {
 		http.Error(w, "no config file entered, could not add new channel", http.StatusBadRequest)
 		return
 	}
 
-	// Use local viper instance for consistency with directory handler
+	// Use local viper instance for consistency with directory handler.
 	v := viper.New()
 	if err := file.LoadConfigFile(v, addFromFile); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Load viper variables into the struct from local instance
+	// Load viper variables into the struct from local instance.
 	if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Parse per-URL settings if present
+	// Parse per-URL settings if present.
 	urlSettings, err := parsing.ParseURLSettingsFromViper(v)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse url-settings: %v", err), http.StatusBadRequest)
@@ -58,24 +57,18 @@ func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.R
 	}
 	input.URLSettings = urlSettings
 
+	// Fill channel from config file input.
 	c, authMap := fillChannelFromConfigFile(w, input)
 	if c == nil {
 		return
 	}
 
-	fmt.Println()
-	for _, u := range c.URLModels {
-		logger.Pl.I("Got channel URL output ext: %q", u.ChanURLMetarrArgs.OutputExt)
-		logger.Pl.I("Got max filesize: %q", u.ChanURLSettings.MaxFilesize)
-	}
-	fmt.Println()
-
+	// Add channel to database.
 	channelID, err := ss.cs.AddChannel(c)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
 	c.ID = channelID
 
 	if len(authMap) > 0 {
@@ -85,6 +78,7 @@ func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	// Add notifications if present.
 	if input.Notification != nil && len(*input.Notification) != 0 {
 		v, err := parsing.ParseNotifications(*input.Notification)
 		if err != nil {
@@ -98,10 +92,24 @@ func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	// Ignore run if desired.
 	if input.IgnoreRun != nil && *input.IgnoreRun {
-		//nolint:contextcheck
-		if err := app.CrawlChannelIgnore(ss.ctx, ss.s, c); err != nil {
-			logger.Pl.E("Failed to complete ignore crawl run: %v", err)
+		if !state.CrawlStateActive(c.Name) {
+			state.LockCrawlState(c.Name)
+
+			//nolint:contextcheck
+			go func(ctx context.Context) {
+				defer state.UnlockCrawlState(c.Name)
+				logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
+
+				if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+					logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+				} else {
+					logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
+				}
+			}(ss.ctx)
+		} else {
+			logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 		}
 	}
 
@@ -226,10 +234,24 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 			}
 		}
 
+		// Ignore run if desired.
 		if input.IgnoreRun != nil && *input.IgnoreRun {
-			//nolint:contextcheck
-			if err := app.CrawlChannelIgnore(ss.ctx, ss.s, c); err != nil {
-				logger.Pl.E("Failed to complete ignore crawl run: %v", err)
+			if !state.CrawlStateActive(c.Name) {
+				state.LockCrawlState(c.Name)
+
+				//nolint:contextcheck
+				go func(ctx context.Context) {
+					defer state.UnlockCrawlState(c.Name)
+					logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
+
+					if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+						logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+					} else {
+						logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
+					}
+				}(ss.ctx)
+			} else {
+				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 			}
 		}
 
@@ -332,7 +354,7 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	}
 	response["auth_details"] = authDetails
 
-	// Build url_settings map with per-URL custom settings and display strings
+	// Build url_settings map.
 	urlSettings := make(map[string]map[string]any)
 	for _, urlModel := range c.URLModels {
 		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil {
@@ -361,12 +383,13 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 
 // handleCreateChannel creates a new channel entry.
 func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Request) {
-	// Parse form data
+	// Parse form data.
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
 		return
 	}
 
+	// Get form values.
 	name := r.FormValue("name")
 	urls := strings.Fields(r.FormValue("urls"))
 	authDetails := strings.Fields(r.FormValue("auth_details"))
@@ -375,14 +398,14 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 	password := r.FormValue("password")
 	now := time.Now()
 
-	// Parse and validate authentication details
+	// Parse authentication details.
 	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	// Parse per-URL settings JSON if provided
+	// Parse per-URL settings JSON if provided.
 	urlSettingsRaw := make(map[string]map[string]map[string]any)
 	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
 		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsRaw); err != nil {
@@ -391,7 +414,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Parse the URL settings into proper structures
+	// Parse the URL settings into proper structures.
 	urlSettingsMap := make(map[string]struct {
 		Settings *models.Settings
 		Metarr   *models.MetarrArgs
@@ -418,7 +441,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		urlSettingsMap[channelURL] = parsed
 	}
 
-	// Add channel URLs
+	// Validate and create ChannelURL models.
 	var chanURLs = make([]*models.ChannelURL, 0, len(urls))
 	for _, u := range urls {
 		if u != "" {
@@ -426,6 +449,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 				http.Error(w, fmt.Sprintf("invalid channel URL %q: %v", u, err), http.StatusBadRequest)
 				return
 			}
+			// Get auth details for this URL if they exist.
 			var parsedUsername, parsedPassword, parsedLoginURL string
 			if _, exists := authMap[u]; exists {
 				parsedUsername = authMap[u].Username
@@ -433,6 +457,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 				parsedLoginURL = authMap[u].LoginURL
 			}
 
+			// Create channel URL model.
 			chanURL := &models.ChannelURL{
 				URL:       u,
 				Username:  parsedUsername,
@@ -443,7 +468,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 				UpdatedAt: now,
 			}
 
-			// Apply per-URL custom settings if they exist
+			// Apply per-URL custom settings if they exist.
 			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
 				chanURL.ChanURLSettings = urlSettings.Settings
 				chanURL.ChanURLMetarrArgs = urlSettings.Metarr
@@ -453,7 +478,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Create model
+	// Create model.
 	c := &models.Channel{
 		Name:      name,
 		URLModels: chanURLs,
@@ -462,7 +487,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		UpdatedAt: now,
 	}
 
-	// Get and validate settings
+	// Get and validate settings.
 	c.ChanSettings = getSettingsStrings(w, r)
 	if c.ChanSettings == nil {
 		c.ChanSettings = &models.Settings{}
@@ -479,13 +504,25 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Ignore run if desired
+	// Ignore run if desired.
 	if r.FormValue("ignore_run") == "true" {
-		log.Printf("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
-		//nolint:contextcheck
-		if err := app.CrawlChannelIgnore(ss.ctx, ss.s, c); err != nil {
-			http.Error(w, fmt.Sprintf("failed to run ignore crawl on channel %q: %v", name, err), http.StatusInternalServerError)
-			return
+		if !state.CrawlStateActive(c.Name) {
+			logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
+			state.LockCrawlState(c.Name)
+
+			//nolint:contextcheck
+			go func(ctx context.Context) {
+				defer state.UnlockCrawlState(c.Name)
+				logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
+
+				if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+					logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+				} else {
+					logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
+				}
+			}(ss.ctx)
+		} else {
+			logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 		}
 	}
 
@@ -545,7 +582,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Update channel metarr args.
+	// Update channel Metarr args.
 	newMetarr := getMetarrArgsStrings(w, r)
 	if newMetarr != nil {
 		_, err = ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
@@ -644,6 +681,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
+		// Get auth details for this URL if they exist.
 		var parsedUsername, parsedPassword, parsedLoginURL string
 		if _, exists := authMap[u]; exists {
 			parsedUsername = authMap[u].Username
@@ -691,6 +729,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 				chanURL.ChanURLMetarrArgs = urlSettings.Metarr
 			}
 
+			// Add the new URL to the channel.
 			if _, err := ss.cs.AddChannelURL(channelID, chanURL, true); err != nil {
 				http.Error(w, fmt.Sprintf("failed to add URL %q: %v", u, err), http.StatusInternalServerError)
 				return
@@ -754,6 +793,8 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 // handleDeleteChannel deletes a channel from Tubarr.
 func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+
+	// Delete associated downloads from state manager.
 	if err := ss.cs.DeleteChannel(consts.QChanID, id); err != nil {
 		logger.Pl.E("Failed to delete channel %d: %v", id, err)
 	}
@@ -924,7 +965,10 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			logger.Pl.E("Failed to write response message: %v", err)
 		}
 		return
+	} else {
+		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 	}
+
 	w.WriteHeader(http.StatusAlreadyReported)
 	if _, err := w.Write([]byte(`{"message": "Channel crawl already running for channel"}`)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
@@ -971,7 +1015,10 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 			logger.Pl.E("Failed to write response message: %v", err)
 		}
 		return
+	} else {
+		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 	}
+
 	w.WriteHeader(http.StatusAlreadyReported)
 	if _, err := w.Write([]byte(`{"message": "Channel ignore crawl already running for channel"}`)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)

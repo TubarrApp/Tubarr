@@ -19,6 +19,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/state"
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedvalidation"
@@ -473,12 +474,13 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
+			// Get channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				return fmt.Errorf("no rows in the database for channel with %s %q", key, val)
@@ -487,18 +489,26 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 				return err
 			}
 
-			// Initialize URL list
+			// Fetch URL models.
 			c.URLModels, err = cs.GetChannelURLModels(c, false)
 			if err != nil {
 				return fmt.Errorf("failed to fetch URL models for channel: %w", err)
 			}
 
+			// Log retrieved URLs.
 			cURLs := c.GetURLs()
-			logger.Pl.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
+			logger.Pl.D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
-			// Run an ignore crawl
-			if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
-				return err
+			// Run ignore crawl.
+			if !state.CrawlStateActive(c.Name) {
+				state.LockCrawlState(c.Name)
+				defer state.UnlockCrawlState(c.Name)
+
+				if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+					return err
+				}
+			} else {
+				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 			}
 
 			// Success
@@ -740,10 +750,19 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				}
 			}
 
+			// Ignore run if desired.
 			if input.IgnoreRun != nil && *input.IgnoreRun {
-				logger.Pl.I("Running an 'ignore crawl'...")
-				if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
-					logger.Pl.E("Failed to complete ignore crawl run: %v", err)
+				if !state.CrawlStateActive(c.Name) {
+					state.LockCrawlState(c.Name)
+					defer state.UnlockCrawlState(c.Name)
+
+					logger.Pl.I("Running an 'ignore crawl'...")
+
+					if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+						logger.Pl.E("Failed to complete ignore crawl run: %v", err)
+					}
+				} else {
+					logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 				}
 			}
 
@@ -905,10 +924,18 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					}
 				}
 
+				// Ignore run if desired.
 				if input.IgnoreRun != nil && *input.IgnoreRun {
-					logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
-					if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
-						logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
+					if !state.CrawlStateActive(c.Name) {
+						state.LockCrawlState(c.Name)
+						defer state.UnlockCrawlState(c.Name)
+
+						logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
+						if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+							logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
+						}
+					} else {
+						logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 					}
 				}
 
@@ -1106,9 +1133,15 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 				return err
 			}
 
-			// Don't print errors from CrawlChannel, already handled in function
-			if err := app.CrawlChannel(ctx, s, c); err != nil {
-				return err
+			// Crawl channel.
+			if !state.CrawlStateActive(c.Name) {
+				state.LockCrawlState(c.Name)
+				defer state.UnlockCrawlState(c.Name)
+				if err := app.CrawlChannel(ctx, s, c); err != nil {
+					return err
+				}
+			} else {
+				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 			}
 
 			// Success
