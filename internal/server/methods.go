@@ -224,8 +224,8 @@ func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Vide
 			return true
 		}
 
-		// Only include Pending or Downloading statuses
-		if statusUpdate.Status == consts.DLStatusPending || statusUpdate.Status == consts.DLStatusDownloading {
+		// Only include Queued or Downloading statuses
+		if statusUpdate.Status == consts.DLStatusQueued || statusUpdate.Status == consts.DLStatusDownloading {
 			// Build a Video model from the StatusUpdate
 			video := models.Video{
 				ID:           statusUpdate.VideoID,

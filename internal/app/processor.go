@@ -253,7 +253,7 @@ func processJSON(
 		return false, false, fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
 	}
 
-	// ONLY download JSON if it's NOT a custom file (custom scraper already created it)
+	// ONLY download JSON if it's NOT a custom file (custom scraper already created it).
 	if v.JSONCustomFile == "" {
 		dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
 			MaxRetries:       3,
@@ -270,15 +270,16 @@ func processJSON(
 		logger.Pl.D(1, "Skipping JSON download - using custom scraped file: %s", v.JSONCustomFile)
 	}
 
-	// Validate and filter (delegates to metadata package)
+	// Validate and filter.
 	passedChecks, useFilteredMetaOps, useFilteredFilenameOps, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
 	if err != nil {
 		return false, false, err
 	}
-	// Store filtered operations in the video (per-video, not shared)
+	// Store filtered operations in the video (per-video, not shared).
 	v.FilteredMetaOps = useFilteredMetaOps
 	v.FilteredFilenameOps = useFilteredFilenameOps
 
+	// If video failed checks, mark and save to DB.
 	if !passedChecks {
 		v.MarkVideoAsIgnored()
 		if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
@@ -287,16 +288,15 @@ func processJSON(
 		return false, false, nil
 	}
 
-	// Will download this video (passed checks)
-	v.DownloadStatus.Status = consts.DLStatusPending
+	// Will download this video (passed checks).
+	v.DownloadStatus.Status = consts.DLStatusQueued
 	v.DownloadStatus.Percent = 0.0
-	logger.Pl.D(1, "Setting video %q to Pending status before saving to DB", v.URL)
+	logger.Pl.D(1, "Setting video %q to Queued status before saving to DB", v.URL)
 
-	// Save video to database
+	// Save video to database.
 	if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
 		return false, false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
-	logger.Pl.D(1, "Saved video %q (ID: %d) to DB with Pending status", v.URL, v.ID)
 
 	logger.Pl.S("Processed metadata for: %s", v.URL)
 	return true, false, nil

@@ -15,7 +15,7 @@
     json_directory TEXT,
     video_path TEXT,
     json_path TEXT,
-    download_status TEXT DEFAULT "Pending",
+    download_status TEXT DEFAULT "Queued",
     download_pct INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

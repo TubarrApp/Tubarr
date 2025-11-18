@@ -184,7 +184,7 @@ type DownloadStatus string
 
 // Download status strings.
 const (
-	DLStatusPending     DownloadStatus = "Pending"
+	DLStatusQueued      DownloadStatus = "Queued"
 	DLStatusDownloading DownloadStatus = "Downloading"
 	DLStatusCompleted   DownloadStatus = "Finished"
 	DLStatusFailed      DownloadStatus = "Failed"

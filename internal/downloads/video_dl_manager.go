@@ -118,8 +118,8 @@ func (d *VideoDownload) videoDLAttempt() error {
 	d.cmd = d.buildVideoCommand()
 	d.mu.Unlock()
 
-	// Set video "Pending" status
-	d.Video.DownloadStatus.Status = consts.DLStatusPending
+	// Set video "Queued" status
+	d.Video.DownloadStatus.Status = consts.DLStatusQueued
 	d.Video.DownloadStatus.Percent = 0.0
 	d.DLTracker.sendUpdate(d.Video)
 

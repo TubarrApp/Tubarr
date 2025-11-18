@@ -51,14 +51,14 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 	for _, n := range notifications {
 
 		if n.ChannelURL == "" {
-			logger.Pl.D(3, "Channel URL is empty for notification URL %q, appending to notification list", n.ChannelURL)
+			logger.Pl.D(3, "Channel URL is empty for notification URL %q, adding to notification list", n.ChannelURL)
 			urls = append(urls, n.NotifyURL)
 			continue
 		}
 
 		logger.Pl.D(3, "Checking %q exists in notification", n.ChannelURL)
 		if channelsWithNewMap[strings.ToLower(n.ChannelURL)] {
-			logger.Pl.D(3, "Found %q in notification  appending to notification list", n.ChannelURL)
+			logger.Pl.D(3, "Found %q in notification  adding to notification list", n.ChannelURL)
 			urls = append(urls, n.NotifyURL)
 		}
 	}
