@@ -1,5 +1,7 @@
 package consts
 
+import "tubarr/internal/domain/jsonkeys"
+
 // Database table names.
 const (
 	DBProgram       = "program"
@@ -36,7 +38,7 @@ const (
 	QChanName            = "name"
 	QChanConfigFile      = "config_file"
 	QChanConcurrency     = "concurrency"
-	QChanMetarrOutputDir = "metarr_output_directory"
+	QChanMetarrOutputDir = jsonkeys.MetarrOutputDirectory
 	QChanMetarrExt       = "metarr_ext"
 	QChanSettings        = "settings"
 	QChanMetarr          = "metarr"

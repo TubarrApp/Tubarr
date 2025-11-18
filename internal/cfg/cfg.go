@@ -76,7 +76,7 @@ var rootCmd = &cobra.Command{
 // InitCommands initializes all commands and their flags.
 func InitCommands(ctx context.Context, s contracts.Store) error {
 	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert "video_directory" to "video-directory"
+	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory"
 
 	// Web version vs. terminal version toggle
 	rootCmd.PersistentFlags().Bool(keys.RunWebInterface, false, "Run Tubarr as a web interface")

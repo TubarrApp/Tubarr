@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -2065,7 +2066,7 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 // verifyChanRowUpdateValid verifies that your update operation is valid
 func verifyChanRowUpdateValid(col, val string) error {
 	switch col {
-	case "name", "video_directory", "json_directory":
+	case "name", jsonkeys.SettingsVideoDirectory, jsonkeys.SettingsJSONDirectory:
 		if val == "" {
 			return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
 		}

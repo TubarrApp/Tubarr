@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
@@ -25,60 +26,60 @@ func fillChannelFromConfigFile(w http.ResponseWriter, input models.ChannelInputP
 func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	metarrMap := make(map[string]any)
 	if mArgs.OutputDir != "" {
-		metarrMap["metarr_output_directory"] = mArgs.OutputDir
+		metarrMap[jsonkeys.MetarrOutputDirectory] = mArgs.OutputDir
 	}
 	if mArgs.OutputExt != "" {
-		metarrMap["metarr_output_ext"] = mArgs.OutputExt
+		metarrMap[jsonkeys.MetarrOutputExt] = mArgs.OutputExt
 	}
 	if mArgs.RenameStyle != "" {
-		metarrMap["metarr_rename_style"] = mArgs.RenameStyle
+		metarrMap[jsonkeys.MetarrRenameStyle] = mArgs.RenameStyle
 	}
 	if mArgs.Concurrency > 0 {
-		metarrMap["metarr_concurrency"] = mArgs.Concurrency
+		metarrMap[jsonkeys.MetarrConcurrency] = mArgs.Concurrency
 	}
 	if mArgs.MaxCPU > 0 {
-		metarrMap["metarr_max_cpu_usage"] = mArgs.MaxCPU
+		metarrMap[jsonkeys.MetarrMaxCPU] = mArgs.MaxCPU
 	}
 	if mArgs.MinFreeMem != "" {
-		metarrMap["metarr_min_free_mem"] = mArgs.MinFreeMem
+		metarrMap[jsonkeys.MetarrMinFreeMem] = mArgs.MinFreeMem
 	}
 	if mArgs.UseGPU != "" {
-		metarrMap["metarr_gpu"] = mArgs.UseGPU
+		metarrMap[jsonkeys.MetarrGPU] = mArgs.UseGPU
 	}
 	if len(mArgs.TranscodeVideoCodecs) != 0 {
-		metarrMap["metarr_video_transcode_codecs"] = mArgs.TranscodeVideoCodecs
+		metarrMap[jsonkeys.MetarrVideoCodecs] = mArgs.TranscodeVideoCodecs
 	}
 	if len(mArgs.TranscodeAudioCodecs) != 0 {
-		metarrMap["metarr_transcode_audio_codecs"] = mArgs.TranscodeAudioCodecs
+		metarrMap[jsonkeys.MetarrAudioCodecs] = mArgs.TranscodeAudioCodecs
 	}
 	if mArgs.TranscodeQuality != "" {
-		metarrMap["metarr_transcode_quality"] = mArgs.TranscodeQuality
+		metarrMap[jsonkeys.MetarrTranscodeQuality] = mArgs.TranscodeQuality
 	}
 	if mArgs.TranscodeVideoFilter != "" {
-		metarrMap["metarr_transcode_video_filter"] = mArgs.TranscodeVideoFilter
+		metarrMap[jsonkeys.MetarrTranscodeVideoFilter] = mArgs.TranscodeVideoFilter
 	}
 	if mArgs.ExtraFFmpegArgs != "" {
-		metarrMap["metarr_extra_ffmpeg_args"] = mArgs.ExtraFFmpegArgs
+		metarrMap[jsonkeys.MetarrExtraFFmpegArgs] = mArgs.ExtraFFmpegArgs
 	}
 	if len(mArgs.MetaOps) > 0 {
-		metarrMap["metarr_meta_ops"] = strings.Join(models.MetaOpsArrayToSlice(mArgs.MetaOps), "\n")
+		metarrMap[jsonkeys.MetarrMetaOps] = strings.Join(models.MetaOpsArrayToSlice(mArgs.MetaOps), "\n")
 	}
 	if len(mArgs.FilenameOps) > 0 {
-		metarrMap["metarr_filename_ops"] = strings.Join(models.FilenameOpsArrayToSlice(mArgs.FilenameOps), "\n")
+		metarrMap[jsonkeys.MetarrFilenameOps] = strings.Join(models.FilenameOpsArrayToSlice(mArgs.FilenameOps), "\n")
 	}
 	if len(mArgs.FilteredMetaOps) > 0 {
 		filteredMetaStrings := make([]string, 0)
 		for i := range mArgs.FilteredMetaOps {
 			filteredMetaStrings = append(filteredMetaStrings, models.FilteredMetaOpsToSlice(mArgs.FilteredMetaOps[i])...)
 		}
-		metarrMap["filtered_meta_ops"] = strings.Join(filteredMetaStrings, "\n")
+		metarrMap[jsonkeys.MetarrFilteredMetaOps] = strings.Join(filteredMetaStrings, "\n")
 	}
 	if len(mArgs.FilteredFilenameOps) > 0 {
 		filteredFilenameStrings := make([]string, 0)
 		for i := range mArgs.FilteredFilenameOps {
 			filteredFilenameStrings = append(filteredFilenameStrings, models.FilteredFilenameOpsToSlice(mArgs.FilteredFilenameOps[i])...)
 		}
-		metarrMap["filtered_filename_ops"] = strings.Join(filteredFilenameStrings, "\n")
+		metarrMap[jsonkeys.MetarrFilteredFilenameOps] = strings.Join(filteredFilenameStrings, "\n")
 	}
 	return metarrMap
 }
@@ -87,65 +88,65 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 func settingsJSONMap(settings *models.Settings) map[string]any {
 	settingsMap := make(map[string]any)
 	if settings.VideoDir != "" {
-		settingsMap["video_directory"] = settings.VideoDir
+		settingsMap[jsonkeys.SettingsVideoDirectory] = settings.VideoDir
 	}
 	if settings.JSONDir != "" {
-		settingsMap["json_directory"] = settings.JSONDir
+		settingsMap[jsonkeys.SettingsJSONDirectory] = settings.JSONDir
 	}
 	if settings.Concurrency > 0 {
-		settingsMap["max_concurrency"] = settings.Concurrency
+		settingsMap[jsonkeys.SettingsMaxConcurrency] = settings.Concurrency
 	}
 	if settings.CrawlFreq > 0 {
-		settingsMap["crawl_freq"] = settings.CrawlFreq
+		settingsMap[jsonkeys.SettingsCrawlFreq] = settings.CrawlFreq
 	}
 	if settings.Retries > 0 {
-		settingsMap["download_retries"] = settings.Retries
+		settingsMap[jsonkeys.SettingsDownloadRetries] = settings.Retries
 	}
 	if settings.MaxFilesize != "" {
-		settingsMap["max_filesize"] = settings.MaxFilesize
+		settingsMap[jsonkeys.SettingsMaxFilesize] = settings.MaxFilesize
 	}
 	if settings.FromDate != "" {
-		settingsMap["from_date"] = settings.FromDate
+		settingsMap[jsonkeys.SettingsFromDate] = settings.FromDate
 	}
 	if settings.ToDate != "" {
-		settingsMap["to_date"] = settings.ToDate
+		settingsMap[jsonkeys.SettingsToDate] = settings.ToDate
 	}
 	if settings.FilterFile != "" {
-		settingsMap["filter_file"] = settings.FilterFile
+		settingsMap[jsonkeys.SettingsFilterFile] = settings.FilterFile
 	}
 	if len(settings.Filters) > 0 {
-		settingsMap["filters"] = strings.Join(models.FiltersArrayToSlice(settings.Filters), "\n")
+		settingsMap[jsonkeys.SettingsFilters] = strings.Join(models.FiltersArrayToSlice(settings.Filters), "\n")
 	}
 	if settings.YtdlpOutputExt != "" {
-		settingsMap["ytdlp_output_ext"] = settings.YtdlpOutputExt
+		settingsMap[jsonkeys.SettingsYtdlpOutputExt] = settings.YtdlpOutputExt
 	}
 	if settings.CookiesFromBrowser != "" {
-		settingsMap["cookies_from_browser"] = settings.CookiesFromBrowser
+		settingsMap[jsonkeys.SettingsCookiesFromBrowser] = settings.CookiesFromBrowser
 	}
 	if settings.ExternalDownloader != "" {
-		settingsMap["external_downloader"] = settings.ExternalDownloader
+		settingsMap[jsonkeys.SettingsExternalDownloader] = settings.ExternalDownloader
 	}
 	if settings.ExternalDownloaderArgs != "" {
-		settingsMap["external_downloader_args"] = settings.ExternalDownloaderArgs
+		settingsMap[jsonkeys.SettingsExternalDownloaderArgs] = settings.ExternalDownloaderArgs
 	}
 	if settings.ExtraYTDLPVideoArgs != "" {
-		settingsMap["extra_ytdlp_video_args"] = settings.ExtraYTDLPVideoArgs
+		settingsMap[jsonkeys.SettingsExtraYtdlpVideoArgs] = settings.ExtraYTDLPVideoArgs
 	}
 	if settings.ExtraYTDLPMetaArgs != "" {
-		settingsMap["extra_ytdlp_meta_args"] = settings.ExtraYTDLPMetaArgs
+		settingsMap[jsonkeys.SettingsExtraYtdlpMetaArgs] = settings.ExtraYTDLPMetaArgs
 	}
 	if settings.MetaFilterMoveOpFile != "" {
-		settingsMap["move_ops_file"] = settings.MetaFilterMoveOpFile
+		settingsMap[jsonkeys.SettingsMoveOpsFile] = settings.MetaFilterMoveOpFile
 	}
 	if len(settings.MetaFilterMoveOps) > 0 {
 		moveOpStrings := make([]string, len(settings.MetaFilterMoveOps))
 		for i := range settings.MetaFilterMoveOps {
 			moveOpStrings[i] = models.MetaFilterMoveOpsToString(settings.MetaFilterMoveOps[i])
 		}
-		settingsMap["move_ops"] = strings.Join(moveOpStrings, "\n")
+		settingsMap[jsonkeys.SettingsMoveOps] = strings.Join(moveOpStrings, "\n")
 	}
 	if settings.UseGlobalCookies {
-		settingsMap["use_global_cookies"] = true
+		settingsMap[jsonkeys.SettingsUseGlobalCookies] = true
 	}
 	if settings.Paused {
 		settingsMap["paused"] = true
@@ -160,66 +161,66 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	settings := &models.Settings{}
 
 	// Extract string fields
-	if v, ok := data["cookies_from_browser"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsCookiesFromBrowser].(string); ok {
 		settings.CookiesFromBrowser = v
 	}
-	if v, ok := data["external_downloader"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsExternalDownloader].(string); ok {
 		settings.ExternalDownloader = v
 	}
-	if v, ok := data["external_downloader_args"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsExternalDownloaderArgs].(string); ok {
 		settings.ExternalDownloaderArgs = v
 	}
-	if v, ok := data["extra_ytdlp_video_args"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsExtraYtdlpVideoArgs].(string); ok {
 		settings.ExtraYTDLPVideoArgs = v
 	}
-	if v, ok := data["extra_ytdlp_meta_args"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsExtraYtdlpMetaArgs].(string); ok {
 		settings.ExtraYTDLPMetaArgs = v
 	}
-	if v, ok := data["filter_file"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsFilterFile].(string); ok {
 		if _, err := validation.ValidateFile(v, false); err != nil {
 			return nil, err
 		}
 		settings.FilterFile = v
 	}
-	if v, ok := data["move_ops_file"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsMoveOpsFile].(string); ok {
 		if _, err := validation.ValidateFile(v, false); err != nil {
 			return nil, err
 		}
 		settings.MetaFilterMoveOpFile = v
 	}
-	if v, ok := data["json_directory"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsJSONDirectory].(string); ok {
 		if _, err := validation.ValidateDirectory(v, true); err != nil {
 			return nil, err
 		}
 		settings.JSONDir = v
 	}
-	if v, ok := data["video_directory"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsVideoDirectory].(string); ok {
 		if _, err := validation.ValidateDirectory(v, true); err != nil {
 			return nil, err
 		}
 		settings.VideoDir = v
 	}
-	if v, ok := data["max_filesize"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsMaxFilesize].(string); ok {
 		validFilesize, err := validation.ValidateMaxFilesize(v)
 		if err != nil {
 			return nil, err
 		}
 		settings.MaxFilesize = validFilesize
 	}
-	if v, ok := data["ytdlp_output_ext"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsYtdlpOutputExt].(string); ok {
 		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
 			return nil, err
 		}
 		settings.YtdlpOutputExt = v
 	}
-	if v, ok := data["from_date"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsFromDate].(string); ok {
 		validDate, err := validation.ValidateToFromDate(v)
 		if err != nil {
 			return nil, err
 		}
 		settings.FromDate = validDate
 	}
-	if v, ok := data["to_date"].(string); ok {
+	if v, ok := data[jsonkeys.SettingsToDate].(string); ok {
 		validDate, err := validation.ValidateToFromDate(v)
 		if err != nil {
 			return nil, err
@@ -228,24 +229,24 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	}
 
 	// Extract integer fields
-	if v, ok := data["max_concurrency"].(int); ok {
+	if v, ok := data[jsonkeys.SettingsMaxConcurrency].(int); ok {
 		valid := sharedvalidation.ValidateConcurrencyLimit(v)
 		settings.Concurrency = valid
 	}
-	if v, ok := data["crawl_freq"].(int); ok {
+	if v, ok := data[jsonkeys.SettingsCrawlFreq].(int); ok {
 		settings.CrawlFreq = max(v, 0)
 	}
-	if v, ok := data["download_retries"].(int); ok {
+	if v, ok := data[jsonkeys.SettingsDownloadRetries].(int); ok {
 		settings.Retries = max(v, 0)
 	}
 
 	// Extract boolean fields
-	if v, ok := data["use_global_cookies"].(bool); ok {
+	if v, ok := data[jsonkeys.SettingsUseGlobalCookies].(bool); ok {
 		settings.UseGlobalCookies = v
 	}
 
 	// Parse model fields from strings (newline-separated, not space-separated)
-	if filtersStr, ok := data["filters"].(string); ok && filtersStr != "" {
+	if filtersStr, ok := data[jsonkeys.SettingsFilters].(string); ok && filtersStr != "" {
 		lines := splitNonEmptyLines(filtersStr)
 		filters, err := parsing.ParseFilterOps(lines)
 		if err != nil {
@@ -253,7 +254,7 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 		}
 		settings.Filters = filters
 	}
-	if moveOpsStr, ok := data["move_ops"].(string); ok && moveOpsStr != "" {
+	if moveOpsStr, ok := data[jsonkeys.SettingsMoveOps].(string); ok && moveOpsStr != "" {
 		lines := splitNonEmptyLines(moveOpsStr)
 		moveOps, err := parsing.ParseMetaFilterMoveOps(lines)
 		if err != nil {
@@ -272,82 +273,82 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 	metarr := &models.MetarrArgs{}
 
 	// Extract string fields
-	if v, ok := data["metarr_output_ext"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrOutputExt].(string); ok {
 		metarr.OutputExt = v
 	}
-	if v, ok := data["metarr_filename_ops_file"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrFilenameOpsFile].(string); ok {
 		if _, err := validation.ValidateFile(v, false); err != nil {
 			return nil, err
 		}
 		metarr.FilenameOpsFile = v
 	}
-	if v, ok := data["filtered_filename_ops_file"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrFilteredFilenameOpsFile].(string); ok {
 		if _, err := validation.ValidateFile(v, false); err != nil {
 			return nil, err
 		}
 		metarr.FilteredFilenameOpsFile = v
 	}
-	if v, ok := data["metarr_meta_ops_file"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrMetaOpsFile].(string); ok {
 		if _, err := validation.ValidateFile(v, false); err != nil {
 			return nil, err
 		}
 		metarr.MetaOpsFile = v
 	}
-	if v, ok := data["filtered_meta_ops_file"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrFilteredMetaOpsFile].(string); ok {
 		if _, err := validation.ValidateFile(v, false); err != nil {
 			return nil, err
 		}
 		metarr.FilteredMetaOpsFile = v
 	}
-	if v, ok := data["metarr_extra_ffmpeg_args"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrExtraFFmpegArgs].(string); ok {
 		metarr.ExtraFFmpegArgs = v
 	}
-	if v, ok := data["metarr_rename_style"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrRenameStyle].(string); ok {
 		if err := validation.ValidateRenameFlag(v); err != nil {
 			return nil, err
 		}
 		metarr.RenameStyle = v
 	}
-	if v, ok := data["metarr_min_free_mem"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrMinFreeMem].(string); ok {
 		if _, err := sharedvalidation.ValidateMinFreeMem(v); err != nil {
 			return nil, err
 		}
 		metarr.MinFreeMem = v
 	}
-	if v, ok := data["metarr_gpu_directory"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrGPUDirectory].(string); ok {
 		metarr.GPUDir = v
 	}
-	if v, ok := data["metarr_gpu"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrGPU].(string); ok {
 		validGPU, _, err := validation.ValidateGPU(v, metarr.GPUDir)
 		if err != nil {
 			return nil, err
 		}
 		metarr.UseGPU = validGPU
 	}
-	if v, ok := data["metarr_output_directory"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrOutputDirectory].(string); ok {
 		if _, err := validation.ValidateDirectory(v, true); err != nil {
 			return nil, err
 		}
 		metarr.OutputDir = v
 	}
-	if v, ok := data["metarr_transcode_video_filter"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrTranscodeVideoFilter].(string); ok {
 		metarr.TranscodeVideoFilter = v
 	}
-	if v, ok := data["metarr_video_transcode_codecs"].([]string); ok {
+	if v, ok := data[jsonkeys.MetarrVideoCodecs].([]string); ok {
 		validPairs, err := validation.ValidateVideoTranscodeCodecSlice(v, metarr.UseGPU)
 		if err != nil {
 			return nil, err
 		}
 		metarr.TranscodeVideoCodecs = validPairs
 	}
-	if v, ok := data["metarr_transcode_audio_codecs"].([]string); ok {
+	if v, ok := data[jsonkeys.MetarrAudioCodecs].([]string); ok {
 		validPairs, err := validation.ValidateAudioTranscodeCodecSlice(v)
 		if err != nil {
 			return nil, err
 		}
 		metarr.TranscodeAudioCodecs = validPairs
 	}
-	if v, ok := data["metarr_transcode_quality"].(string); ok {
+	if v, ok := data[jsonkeys.MetarrTranscodeQuality].(string); ok {
 		validQuality, err := sharedvalidation.ValidateTranscodeQuality(v)
 		if err != nil {
 			return nil, err
@@ -356,17 +357,17 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 	}
 
 	// Extract integer fields
-	if v, ok := data["metarr_concurrency"].(int); ok {
+	if v, ok := data[jsonkeys.MetarrConcurrency].(int); ok {
 		metarr.Concurrency = max(v, 0)
 	}
 
 	// Extract float fields
-	if v, ok := data["metarr_max_cpu_usage"].(float64); ok {
+	if v, ok := data[jsonkeys.MetarrMaxCPU].(float64); ok {
 		metarr.MaxCPU = v
 	}
 
 	// Parse model fields from strings (newline-separated, not space-separated)
-	if filenameOpsStr, ok := data["metarr_filename_ops"].(string); ok && filenameOpsStr != "" {
+	if filenameOpsStr, ok := data[jsonkeys.MetarrFilenameOps].(string); ok && filenameOpsStr != "" {
 		lines := splitNonEmptyLines(filenameOpsStr)
 		filenameOps, err := parsing.ParseFilenameOps(lines)
 		if err != nil {
@@ -374,7 +375,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		}
 		metarr.FilenameOps = filenameOps
 	}
-	if filteredFilenameOpsStr, ok := data["filtered_filename_ops"].(string); ok && filteredFilenameOpsStr != "" {
+	if filteredFilenameOpsStr, ok := data[jsonkeys.MetarrFilteredFilenameOps].(string); ok && filteredFilenameOpsStr != "" {
 		lines := splitNonEmptyLines(filteredFilenameOpsStr)
 		filteredFilenameOps, err := parsing.ParseFilteredFilenameOps(lines)
 		if err != nil {
@@ -382,7 +383,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		}
 		metarr.FilteredFilenameOps = filteredFilenameOps
 	}
-	if metaOpsStr, ok := data["metarr_meta_ops"].(string); ok && metaOpsStr != "" {
+	if metaOpsStr, ok := data[jsonkeys.MetarrMetaOps].(string); ok && metaOpsStr != "" {
 		lines := splitNonEmptyLines(metaOpsStr)
 		metaOps, err := parsing.ParseMetaOps(lines)
 		if err != nil {
@@ -390,7 +391,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		}
 		metarr.MetaOps = metaOps
 	}
-	if filteredMetaOpsStr, ok := data["filtered_meta_ops"].(string); ok && filteredMetaOpsStr != "" {
+	if filteredMetaOpsStr, ok := data[jsonkeys.MetarrFilteredMetaOps].(string); ok && filteredMetaOpsStr != "" {
 		lines := splitNonEmptyLines(filteredMetaOpsStr)
 		filteredMetaOps, err := parsing.ParseFilteredMetaOps(lines)
 		if err != nil {
@@ -406,33 +407,33 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings {
 	// -- Initialize --
 	// Strings not needing validation
-	cookiesFromBrowser := r.FormValue("cookies_from_browser")
-	externalDownloader := r.FormValue("external_downloader")
-	externalDownloaderArgs := r.FormValue("external_downloader_args")
-	extraYtdlpVideoArgs := r.FormValue("extra_ytdlp_video_args")
-	extraYtdlpMetaArgs := r.FormValue("extra_ytdlp_meta_args")
-	filterFile := r.FormValue("filter_file")
-	moveOpFile := r.FormValue("move_ops_file")
+	cookiesFromBrowser := r.FormValue(jsonkeys.SettingsCookiesFromBrowser)
+	externalDownloader := r.FormValue(jsonkeys.SettingsExternalDownloader)
+	externalDownloaderArgs := r.FormValue(jsonkeys.SettingsExternalDownloaderArgs)
+	extraYtdlpVideoArgs := r.FormValue(jsonkeys.SettingsExtraYtdlpVideoArgs)
+	extraYtdlpMetaArgs := r.FormValue(jsonkeys.SettingsExtraYtdlpMetaArgs)
+	filterFile := r.FormValue(jsonkeys.SettingsFilterFile)
+	moveOpFile := r.FormValue(jsonkeys.SettingsMoveOpsFile)
 
 	// Strings needing validation
-	jDir := r.FormValue("json_directory")
-	vDir := r.FormValue("video_directory")
-	maxFilesizeStr := r.FormValue("max_filesize")
-	ytdlpOutExt := r.FormValue("ytdlp_output_ext")
-	fromDateStr := r.FormValue("from_date")
-	toDateStr := r.FormValue("to_date")
+	jDir := r.FormValue(jsonkeys.SettingsJSONDirectory)
+	vDir := r.FormValue(jsonkeys.SettingsVideoDirectory)
+	maxFilesizeStr := r.FormValue(jsonkeys.SettingsMaxFilesize)
+	ytdlpOutExt := r.FormValue(jsonkeys.SettingsYtdlpOutputExt)
+	fromDateStr := r.FormValue(jsonkeys.SettingsFromDate)
+	toDateStr := r.FormValue(jsonkeys.SettingsToDate)
 
 	// Integers
-	maxConcurrencyStr := r.FormValue("max_concurrency")
-	crawlFreqStr := r.FormValue("crawl_freq")
-	retriesStr := r.FormValue("download_retries")
+	maxConcurrencyStr := r.FormValue(jsonkeys.SettingsMaxConcurrency)
+	crawlFreqStr := r.FormValue(jsonkeys.SettingsCrawlFreq)
+	retriesStr := r.FormValue(jsonkeys.SettingsDownloadRetries)
 
 	// Bools
-	useGlobalCookiesStr := r.FormValue("use_global_cookies")
+	useGlobalCookiesStr := r.FormValue(jsonkeys.SettingsUseGlobalCookies)
 
 	// Models
-	filtersStr := r.FormValue("filters")
-	moveOpsStr := r.FormValue("move_ops")
+	filtersStr := r.FormValue(jsonkeys.SettingsFilters)
+	moveOpsStr := r.FormValue(jsonkeys.SettingsMoveOps)
 
 	// -- Validation --
 	// Strings
@@ -527,33 +528,33 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.MetarrArgs {
 	// -- Initialize --
 	// Strings not needing validation
-	outExt := r.FormValue("metarr_output_ext")
-	filenameOpsFile := r.FormValue("metarr_filename_ops_file")
-	filteredFilenameOpsFile := r.FormValue("filtered_filename_ops_file")
-	metaOpsFile := r.FormValue("metarr_meta_ops_file")
-	filteredMetaOpsFile := r.FormValue("filtered_meta_ops_file")
-	extraFFmpegArgs := r.FormValue("metarr_extra_ffmpeg_args")
+	outExt := r.FormValue(jsonkeys.MetarrOutputExt)
+	filenameOpsFile := r.FormValue(jsonkeys.MetarrFilenameOpsFile)
+	filteredFilenameOpsFile := r.FormValue(jsonkeys.MetarrFilteredFilenameOpsFile)
+	metaOpsFile := r.FormValue(jsonkeys.MetarrMetaOpsFile)
+	filteredMetaOpsFile := r.FormValue(jsonkeys.MetarrFilteredMetaOpsFile)
+	extraFFmpegArgs := r.FormValue(jsonkeys.MetarrExtraFFmpegArgs)
 
 	// Strings requiring validation
-	renameStyle := r.FormValue("metarr_rename_style")
-	minFreeMem := r.FormValue("metarr_min_free_mem")
-	useGPUStr := r.FormValue("metarr_gpu")
-	gpuDirStr := r.FormValue("metarr_gpu_directory")
-	outputDir := r.FormValue("metarr_output_directory")
-	transcodeVideoFilterStr := r.FormValue("metarr_transcode_video_filter")
-	transcodeCodecStr := r.FormValue("metarr_video_transcode_codecs")
-	transcodeAudioCodecStr := r.FormValue("metarr_transcode_audio_codecs")
-	transcodeQualityStr := r.FormValue("metarr_transcode_quality")
+	renameStyle := r.FormValue(jsonkeys.MetarrRenameStyle)
+	minFreeMem := r.FormValue(jsonkeys.MetarrMinFreeMem)
+	useGPUStr := r.FormValue(jsonkeys.MetarrGPU)
+	gpuDirStr := r.FormValue(jsonkeys.MetarrGPUDirectory)
+	outputDir := r.FormValue(jsonkeys.MetarrOutputDirectory)
+	transcodeVideoFilterStr := r.FormValue(jsonkeys.MetarrTranscodeVideoFilter)
+	transcodeCodecStr := r.FormValue(jsonkeys.MetarrVideoCodecs)
+	transcodeAudioCodecStr := r.FormValue(jsonkeys.MetarrAudioCodecs)
+	transcodeQualityStr := r.FormValue(jsonkeys.MetarrTranscodeQuality)
 
 	// Ints
-	maxConcurrencyStr := r.FormValue("metarr_concurrency")
-	maxCPUStr := r.FormValue("metarr_max_cpu_usage")
+	maxConcurrencyStr := r.FormValue(jsonkeys.MetarrConcurrency)
+	maxCPUStr := r.FormValue(jsonkeys.MetarrMaxCPU)
 
 	// Models
-	filenameOpsStr := r.FormValue("metarr_filename_ops")
-	filteredFilenameOpsStr := r.FormValue("filtered_filename_ops")
-	filteredMetaOpsStr := r.FormValue("filtered_meta_ops")
-	metaOpsStr := r.FormValue("metarr_meta_ops")
+	filenameOpsStr := r.FormValue(jsonkeys.MetarrFilenameOps)
+	filteredFilenameOpsStr := r.FormValue(jsonkeys.MetarrFilteredFilenameOps)
+	filteredMetaOpsStr := r.FormValue(jsonkeys.MetarrFilteredMetaOps)
+	metaOpsStr := r.FormValue(jsonkeys.MetarrMetaOps)
 
 	// -- Validation --
 	//Strings
