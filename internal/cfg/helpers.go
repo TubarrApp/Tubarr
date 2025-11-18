@@ -104,7 +104,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 		in.OutDir = &f.OutDir
 	}
 	if cmd.Flags().Changed(keys.TranscodeGPUDir) {
-		in.GPUDir = &f.GPUDir
+		in.TranscodeGPUDirectory = &f.TranscodeGPUDirectory
 	}
 	if cmd.Flags().Changed(keys.FilterOpsFile) {
 		in.DLFilterFile = &f.DLFilterFile
@@ -203,10 +203,10 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 		in.TranscodeVideoFilter = &f.TranscodeVideoFilter
 	}
 	if cmd.Flags().Changed(keys.TranscodeCodec) {
-		in.VideoCodec = &f.VideoCodec
+		in.TranscodeVideoCodec = &f.TranscodeVideoCodec
 	}
 	if cmd.Flags().Changed(keys.TranscodeAudioCodec) {
-		in.AudioCodec = &f.AudioCodec
+		in.TranscodeAudioCodec = &f.TranscodeAudioCodec
 	}
 	if cmd.Flags().Changed(keys.ExtraYTDLPVideoArgs) {
 		in.ExtraYTDLPVideoArgs = &f.ExtraYTDLPVideoArgs

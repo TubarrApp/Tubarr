@@ -717,7 +717,7 @@
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
                               <textarea
-                                x-model="urlEntry.custom.metarr_video_transcode_codecs"
+                                x-model="urlEntry.custom.metarr_transcode_video_transcode_codecs"
                                 placeholder="Use global (one per line, e.g. h264:hevc or av1)"
                                 rows="2"
                                 class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
@@ -757,11 +757,11 @@
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.filtered_meta_ops" rows="2" placeholder="filter_rule|meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" placeholder="filter_rule|meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.filtered_filename_ops" rows="2" placeholder="filter_rule|filename_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <textarea x-model="urlEntry.custom.metarr_filtered_filename_ops" rows="2" placeholder="filter_rule|filename_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
                           </div>
                         </div>
 
@@ -1190,7 +1190,7 @@
                           Video Transcode Codecs
                         </label>
                         <textarea
-                          x-model="formData.metarr.metarr_video_transcode_codecs"
+                          x-model="formData.metarr.metarr_transcode_video_transcode_codecs"
                           placeholder="Leave empty for copy (no transcoding)"
                           rows="3"
                           class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 font-mono"
@@ -1319,7 +1319,7 @@
                         </label>
                         <input
                           type="text"
-                          x-model="formData.metarr.filtered_meta_ops_file"
+                          x-model="formData.metarr.metarr_filtered_meta_ops_file"
                           placeholder="/path/to/filtered_meta_ops.txt"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
@@ -1331,7 +1331,7 @@
                           Filtered Meta Operations
                         </label>
                         <textarea
-                          x-model="formData.metarr.filtered_meta_ops"
+                          x-model="formData.metarr.metarr_filtered_meta_ops"
                           rows="3"
                           placeholder="title:contains:cat|title:prefix:[CAT VIDEO]&#10;title:contains:dog|artist:set:Dog Channel"
                           class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
@@ -1377,7 +1377,7 @@
                         </label>
                         <input
                           type="text"
-                          x-model="formData.metarr.filtered_filename_ops_file"
+                          x-model="formData.metarr.metarr_filtered_filename_ops_file"
                           placeholder="/path/to/filtered_filename_ops.txt"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
@@ -1389,7 +1389,7 @@
                           Filtered Filename Operations
                         </label>
                         <textarea
-                          x-model="formData.metarr.filtered_filename_ops"
+                          x-model="formData.metarr.metarr_filtered_filename_ops"
                           rows="3"
                           placeholder="title:contains:tutorial|prefix:[TUTORIAL] &#10;title:contains:review|prefix:[REVIEW] "
                           class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
@@ -1506,15 +1506,15 @@
                   metarr_max_cpu_usage: null,
                   metarr_min_free_mem: '',
                   metarr_gpu: '',
-                  metarr_video_transcode_codecs: '',
+                  metarr_transcode_video_transcode_codecs: '',
                   metarr_transcode_audio_codecs: '',
                   metarr_transcode_quality: null,
                   metarr_transcode_video_filter: '',
                   metarr_extra_ffmpeg_args: '',
                   metarr_meta_ops: '',
                   metarr_filename_ops: '',
-                  filtered_meta_ops: '',
-                  filtered_filename_ops: ''
+                  metarr_filtered_meta_ops: '',
+                  metarr_filtered_filename_ops: ''
                 }
               }
             ],
@@ -1549,19 +1549,19 @@
               metarr_min_free_mem: '',
               metarr_gpu: '',
               metarr_gpu_directory: '',
-              metarr_video_transcode_codecs: '',
+              metarr_transcode_video_transcode_codecs: '',
               metarr_transcode_audio_codecs: '',
               metarr_transcode_quality: '',
               metarr_transcode_video_filter: '',
               metarr_extra_ffmpeg_args: '',
               metarr_filename_ops: '',
               metarr_filename_ops_file: '',
-              filtered_filename_ops: '',
-              filtered_filename_ops_file: '',
+              metarr_filtered_filename_ops: '',
+              metarr_filtered_filename_ops_file: '',
               metarr_meta_ops: '',
               metarr_meta_ops_file: '',
-              filtered_meta_ops: '',
-              filtered_meta_ops_file: ''
+              metarr_filtered_meta_ops: '',
+              metarr_filtered_meta_ops_file: ''
             }
           },
           error: '',
@@ -1603,15 +1603,15 @@
                 metarr_max_cpu_usage: null,
                 metarr_min_free_mem: '',
                 metarr_gpu: '',
-                metarr_video_transcode_codecs: '',
+                metarr_transcode_video_transcode_codecs: '',
                 metarr_transcode_audio_codecs: '',
                 metarr_transcode_quality: null,
                 metarr_transcode_video_filter: '',
                 metarr_extra_ffmpeg_args: '',
                 metarr_meta_ops: '',
                 metarr_filename_ops: '',
-                filtered_meta_ops: '',
-                filtered_filename_ops: ''
+                metarr_filtered_meta_ops: '',
+                metarr_filtered_filename_ops: ''
               }
             });
           },
@@ -1665,11 +1665,11 @@
               if (payload.metarr_filename_ops && payload.metarr_filename_ops.includes('\n')) {
                 payload.metarr_filename_ops = payload.metarr_filename_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
               }
-              if (payload.filtered_meta_ops && payload.filtered_meta_ops.includes('\n')) {
-                payload.filtered_meta_ops = payload.filtered_meta_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
+              if (payload.metarr_filtered_meta_ops && payload.metarr_filtered_meta_ops.includes('\n')) {
+                payload.metarr_filtered_meta_ops = payload.metarr_filtered_meta_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
               }
-              if (payload.filtered_filename_ops && payload.filtered_filename_ops.includes('\n')) {
-                payload.filtered_filename_ops = payload.filtered_filename_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
+              if (payload.metarr_filtered_filename_ops && payload.metarr_filtered_filename_ops.includes('\n')) {
+                payload.metarr_filtered_filename_ops = payload.metarr_filtered_filename_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
               }
 
               // Add ignore_run if checked (backend expects "true" string or absence)
@@ -1766,10 +1766,10 @@
                 const metarrFields = [
                   'metarr_output_directory', 'metarr_output_ext', 'metarr_rename_style',
                   'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
-                  'metarr_gpu', 'metarr_video_transcode_codecs', 'metarr_transcode_audio_codecs',
+                  'metarr_gpu', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
                   'metarr_transcode_quality', 'metarr_transcode_video_filter',
                   'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_filename_ops',
-                  'filtered_meta_ops', 'filtered_filename_ops'
+                  'metarr_filtered_meta_ops', 'metarr_filtered_filename_ops'
                 ];
 
                 metarrFields.forEach(field => {

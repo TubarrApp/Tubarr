@@ -2,18 +2,17 @@ package models
 
 // ChannelInputPtrs contains pointers to variables used for adding channels.
 type ChannelInputPtrs struct {
-	// Channel identifiers
+	// Channel identifiers.
 	Name              *string   `viper:"channel-name"`
 	URLs              *[]string `viper:"channel-urls"`
 	ChannelConfigFile *string   `viper:"channel-config-file"`
 
-	// Directory paths
+	// Directory paths.
 	VideoDir *string `viper:"video-directory"`
 	JSONDir  *string `viper:"json-directory"`
 	OutDir   *string `viper:"metarr-default-output-dir"`
-	GPUDir   *string `viper:"transcode-gpu-directory"`
 
-	// Configuration files
+	// Configuration files.
 	DLFilterFile            *string `viper:"filter-ops-file"`
 	MoveOpFile              *string `viper:"move-ops-file"`
 	MetaOpsFile             *string `viper:"metarr-meta-ops-file"`
@@ -21,16 +20,16 @@ type ChannelInputPtrs struct {
 	FilenameOpsFile         *string `viper:"metarr-filename-ops-file"`
 	FilteredFilenameOpsFile *string `viper:"metarr-filtered-filename-ops-file"`
 
-	// Authentication details
+	// Authentication details.
 	Username    *string   `viper:"auth-username"`
 	Password    *string   `viper:"auth-password"`
 	LoginURL    *string   `viper:"auth-url"`
 	AuthDetails *[]string `viper:"auth-details"`
 
-	// Notification details
+	// Notification details.
 	Notification *[]string `viper:"notify"`
 
-	// Download settings
+	// Download settings.
 	CookiesFromBrowser     *string `viper:"cookies-from-browser"`
 	ExternalDownloader     *string `viper:"external-downloader"`
 	ExternalDownloaderArgs *string `viper:"external-downloader-args"`
@@ -40,7 +39,7 @@ type ChannelInputPtrs struct {
 	ToDate                 *string `viper:"to-date"`
 	UseGlobalCookies       *bool   `viper:"use-global-cookies"`
 
-	// Filter and operation settings
+	// Filter and operation settings.
 	DLFilters           *[]string `viper:"filter-ops"`
 	MoveOps             *[]string `viper:"move-ops"`
 	MetaOps             *[]string `viper:"metarr-meta-ops"`
@@ -49,35 +48,36 @@ type ChannelInputPtrs struct {
 	FilteredFilenameOps *[]string `viper:"metarr-filtered-filename-ops"`
 	URLOutputDirs       *[]string `viper:"metarr-url-output-dirs"`
 
-	// Metarr settings
+	// Metarr settings.
 	MetarrExt   *string `viper:"metarr-output-ext"`
 	RenameStyle *string `viper:"metarr-rename-style"`
 	MinFreeMem  *string `viper:"metarr-min-free-mem"`
 
-	// Transcoding settings
-	TranscodeGPU         *string   `viper:"transcode-gpu"`
-	TranscodeQuality     *string   `viper:"transcode-quality"`
-	TranscodeVideoFilter *string   `viper:"transcode-video-filter"`
-	VideoCodec           *[]string `viper:"transcode-video-codecs"`
-	AudioCodec           *[]string `viper:"transcode-audio-codecs"`
+	// Transcoding settings.
+	TranscodeGPU          *string   `viper:"transcode-gpu"`
+	TranscodeGPUDirectory *string   `viper:"transcode-gpu-directory"`
+	TranscodeQuality      *string   `viper:"transcode-quality"`
+	TranscodeVideoFilter  *string   `viper:"transcode-video-filter"`
+	TranscodeVideoCodec   *[]string `viper:"transcode-video-codecs"`
+	TranscodeAudioCodec   *[]string `viper:"transcode-audio-codecs"`
 
-	// Extra arguments
+	// Extra arguments.
 	ExtraYTDLPVideoArgs *string `viper:"extra-ytdlp-video-args"`
 	ExtraYTDLPMetaArgs  *string `viper:"extra-ytdlp-meta-args"`
 	ExtraFFmpegArgs     *string `viper:"extra-ffmpeg-args"`
 
-	// Concurrency and performance settings
+	// Concurrency and performance settings.
 	CrawlFreq         *int     `viper:"crawl-freq"`
 	Concurrency       *int     `viper:"concurrency-limit"`
 	MetarrConcurrency *int     `viper:"metarr-concurrency"`
 	Retries           *int     `viper:"dl-retries"`
 	MaxCPU            *float64 `viper:"metarr-max-cpu"`
 
-	// Boolean flags
+	// Boolean flags.
 	Pause     *bool `viper:"pause-toggle"`
 	IgnoreRun *bool `viper:"ignore-run"`
 
-	// Per-URL settings overrides (no viper tag - handled manually)
+	// Per-URL settings overrides (no viper tag - handled manually).
 	URLSettings map[string]*URLSettingsOverride
 }
 

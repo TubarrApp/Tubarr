@@ -11,7 +11,6 @@ type ChannelFlagValues struct {
 	VideoDir string
 	JSONDir  string
 	OutDir   string
-	GPUDir   string
 
 	// Configuration files
 	DLFilterFile            string
@@ -55,11 +54,12 @@ type ChannelFlagValues struct {
 	MinFreeMem  string
 
 	// Transcoding settings
-	TranscodeGPU         string
-	TranscodeQuality     string
-	TranscodeVideoFilter string
-	VideoCodec           []string
-	AudioCodec           []string
+	TranscodeGPU          string
+	TranscodeQuality      string
+	TranscodeVideoFilter  string
+	TranscodeGPUDirectory string
+	TranscodeVideoCodec   []string
+	TranscodeAudioCodec   []string
 
 	// Extra arguments
 	ExtraYTDLPVideoArgs string

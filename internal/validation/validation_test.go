@@ -1,15 +1,17 @@
 package validation_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // TestValidateRenameFlags ------------------------------------------------------------------------------------------------
@@ -33,6 +35,30 @@ func TestValidateRenameFlag(t *testing.T) {
 		}
 		if !tt.ok && err == nil {
 			t.Fatalf("input %q expected to fail, got nil err", tt.input)
+		}
+	}
+}
+
+func TestMaxCPU(t *testing.T) {
+	tests := []struct {
+		input     float64
+		allowZero bool
+		expect    float64
+	}{
+		// Zero values.
+		{0, true, 0.0},
+		{0, false, 101.0},
+
+		// Non-zero values.
+		{100, false, 101.0},
+		{1, false, 5.0},
+		{105, false, 101.0},
+	}
+
+	for _, tt := range tests {
+		got := sharedvalidation.ValidateMaxCPU(tt.input, tt.allowZero)
+		if tt.expect != got {
+			t.Fatalf("input %f allowZero %v: expected %f, got %f", tt.input, tt.allowZero, tt.expect, got)
 		}
 	}
 }
@@ -116,10 +142,10 @@ func TestValidateDirectory_CreateIfMissing(t *testing.T) {
 	invalidName := tmp + "/bad\x00name"
 	t.Cleanup(func() {
 		if err := os.Remove(missing); err != nil {
-			t.Fatalf("Could not remove %q: %v", missing, err)
+			fmt.Printf("Could not remove %q: %v", missing, err)
 		}
 		if err := os.Remove(invalidName); err != nil {
-			t.Fatalf("Could not remove %q: %v", invalidName, err)
+			fmt.Printf("Could not remove %q: %v", invalidName, err)
 		}
 	})
 
@@ -193,7 +219,7 @@ func TestValidateFile_ExistingFile(t *testing.T) {
 	f := filepath.Join(tmp, "x.txt")
 	t.Cleanup(func() {
 		if err := os.Remove(f); err != nil {
-			t.Fatalf("Could not remove %q: %v", f, err)
+			fmt.Printf("Could not remove %q: %v", f, err)
 		}
 	})
 
@@ -216,10 +242,10 @@ func TestValidateFile_CreateIfMissing(t *testing.T) {
 	invalid := tmp + "\x00"
 	t.Cleanup(func() {
 		if err := os.Remove(valid); err != nil {
-			logger.Pl.E("Could not remove file %q: %v", valid, err)
+			fmt.Printf("Could not remove file %q: %v", valid, err)
 		}
 		if err := os.Remove(invalid); err != nil {
-			logger.Pl.E("Could not remove file %q: %v", invalid, err)
+			fmt.Printf("Could not remove file %q: %v", invalid, err)
 		}
 	})
 
@@ -554,7 +580,7 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 	missingDir := filepath.Join(tmp, "fake_dir")
 	t.Cleanup(func() {
 		if err := os.RemoveAll(missingDir); err != nil {
-			t.Fatalf("Could not remove %q: %v", missingDir, err)
+			fmt.Printf("Could not remove %q: %v", missingDir, err)
 		}
 	})
 

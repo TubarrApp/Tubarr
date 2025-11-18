@@ -793,9 +793,9 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	cmd.SetAuthFlags(addCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	cmd.SetTranscodeFlags(addCmd, &flags.TranscodeGPU, &flags.GPUDir,
-		&flags.TranscodeVideoFilter, &flags.TranscodeQuality, &flags.VideoCodec,
-		&flags.AudioCodec)
+	cmd.SetTranscodeFlags(addCmd, &flags.TranscodeGPU, &flags.TranscodeGPUDirectory,
+		&flags.TranscodeVideoFilter, &flags.TranscodeQuality, &flags.TranscodeVideoCodec,
+		&flags.TranscodeAudioCodec)
 
 	cmd.SetCustomYDLPArgFlags(addCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
 
@@ -978,8 +978,8 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 	cmd.SetAuthFlags(batchCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.GPUDir, &flags.TranscodeVideoFilter,
-		&flags.TranscodeQuality, &flags.VideoCodec, &flags.AudioCodec)
+	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.TranscodeGPUDirectory, &flags.TranscodeVideoFilter,
+		&flags.TranscodeQuality, &flags.TranscodeVideoCodec, &flags.TranscodeAudioCodec)
 
 	cmd.SetCustomYDLPArgFlags(batchCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
 	cmd.SetNotifyFlags(batchCmd, &flags.Notification)
@@ -1763,7 +1763,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.UseGPU = validGPU
+			m.TranscodeGPU = validGPU
 			return nil
 		})
 	}
@@ -1782,7 +1782,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 					}
 				}
 			}
-			m.GPUDir = c.gpuDir
+			m.TranscodeGPUDirectory = c.gpuDir
 			return nil
 		})
 	}

@@ -103,16 +103,16 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.ExtraFFmpegArgs,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.UseGPU},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeGPU},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metkeys.HWAccel,
+			cmdKey:      metkeys.TranscodeGPU,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.GPUDir},
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeGPUDirectory},
 			valType:     str,
 			viperKey:    "",
-			cmdKey:      metkeys.GPUDir,
+			cmdKey:      metkeys.TranscodeGPUDirectory,
 		},
 		{
 			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.TranscodeVideoCodecs},

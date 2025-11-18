@@ -131,28 +131,28 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	}
 
 	if input.TranscodeGPU != nil && *input.TranscodeGPU != "" {
-		g, d, err := validation.ValidateGPU(*input.TranscodeGPU, NilOrZeroValue(input.GPUDir))
+		g, d, err := validation.ValidateGPU(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
 		if err != nil {
 			return nil, nil, err
 		}
 		input.TranscodeGPU = &g
-		input.GPUDir = &d
+		input.TranscodeGPUDirectory = &d
 	}
 
-	if input.VideoCodec != nil && len(*input.VideoCodec) != 0 {
-		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.VideoCodec, NilOrZeroValue(input.TranscodeGPU))
+	if input.TranscodeVideoCodec != nil && len(*input.TranscodeVideoCodec) != 0 {
+		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.TranscodeVideoCodec, NilOrZeroValue(input.TranscodeGPU))
 		if err != nil {
 			return nil, nil, err
 		}
-		input.VideoCodec = &c
+		input.TranscodeVideoCodec = &c
 	}
 
-	if input.AudioCodec != nil && len(*input.AudioCodec) != 0 {
-		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.AudioCodec)
+	if input.TranscodeAudioCodec != nil && len(*input.TranscodeAudioCodec) != 0 {
+		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.TranscodeAudioCodec)
 		if err != nil {
 			return nil, nil, err
 		}
-		input.AudioCodec = &c
+		input.TranscodeAudioCodec = &c
 	}
 
 	if input.TranscodeQuality != nil && *input.TranscodeQuality != "" {
@@ -289,10 +289,10 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 			OutputDir:               NilOrZeroValue(input.OutDir),
 			URLOutputDirs:           NilOrZeroValue(input.URLOutputDirs),
 			Concurrency:             NilOrZeroValue(input.MetarrConcurrency),
-			UseGPU:                  NilOrZeroValue(input.TranscodeGPU),
-			GPUDir:                  NilOrZeroValue(input.GPUDir),
-			TranscodeVideoCodecs:    NilOrZeroValue(input.VideoCodec),
-			TranscodeAudioCodecs:    NilOrZeroValue(input.AudioCodec),
+			TranscodeGPU:            NilOrZeroValue(input.TranscodeGPU),
+			TranscodeGPUDirectory:   NilOrZeroValue(input.TranscodeGPUDirectory),
+			TranscodeVideoCodecs:    NilOrZeroValue(input.TranscodeVideoCodec),
+			TranscodeAudioCodecs:    NilOrZeroValue(input.TranscodeAudioCodec),
 			TranscodeQuality:        NilOrZeroValue(input.TranscodeQuality),
 			TranscodeVideoFilter:    NilOrZeroValue(input.TranscodeVideoFilter),
 		},
@@ -838,17 +838,17 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Validate and set GPU settings if provided.
 	if input.TranscodeGPU != nil {
-		g, d, err := validation.ValidateGPU(*input.TranscodeGPU, NilOrZeroValue(input.GPUDir))
+		g, d, err := validation.ValidateGPU(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate GPU settings for per-URL settings: %w", err)
 		}
-		metarr.UseGPU = g
-		metarr.GPUDir = d
+		metarr.TranscodeGPU = g
+		metarr.TranscodeGPUDirectory = d
 	}
 
 	// Validate and set video codecs if provided.
-	if input.VideoCodec != nil {
-		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.VideoCodec, metarr.UseGPU)
+	if input.TranscodeVideoCodec != nil {
+		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.TranscodeVideoCodec, metarr.TranscodeGPU)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate video codecs for per-URL settings: %w", err)
 		}
@@ -856,9 +856,9 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 	}
 
 	// Validate and set audio codecs if provided.
-	if input.AudioCodec != nil {
-		logger.Pl.I("Found audio codecs in per-URL override: %v", *input.AudioCodec)
-		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.AudioCodec)
+	if input.TranscodeAudioCodec != nil {
+		logger.Pl.I("Found audio codecs in per-URL override: %v", *input.TranscodeAudioCodec)
+		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.TranscodeAudioCodec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate audio codecs for per-URL settings: %w", err)
 		}

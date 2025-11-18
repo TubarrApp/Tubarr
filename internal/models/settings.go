@@ -48,17 +48,17 @@ type Settings struct {
 type MetarrArgs struct {
 	// Metarr file operations.
 	OutputExt               string                `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
-	FilenameOps             []FilenameOps         `json:"metarr_filename_ops"`
+	FilenameOps             []FilenameOps         `json:"metarr_filename_ops" mapstructure:"metarr-filename-ops"`
 	FilenameOpsFile         string                `json:"metarr_filename_ops_file" mapstructure:"metarr-filename-ops-file"`
-	FilteredFilenameOps     []FilteredFilenameOps `json:"filtered_filename_ops"`
-	FilteredFilenameOpsFile string                `json:"filtered_filename_ops_file" mapstructure:"metarr-filtered-filename-ops-file"`
+	FilteredFilenameOps     []FilteredFilenameOps `json:"metarr_filtered_filename_ops" mapstructure:"metarr-filtered-filename-ops"`
+	FilteredFilenameOpsFile string                `json:"metarr_filtered_filename_ops_file" mapstructure:"metarr-filtered-filename-ops-file"`
 	RenameStyle             string                `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
 
 	// Metarr metadata operations.
-	MetaOps             []MetaOps         `json:"metarr_meta_ops"`
+	MetaOps             []MetaOps         `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`
 	MetaOpsFile         string            `json:"metarr_meta_ops_file" mapstructure:"metarr-meta-ops-file"`
-	FilteredMetaOps     []FilteredMetaOps `json:"filtered_meta_ops"`
-	FilteredMetaOpsFile string            `json:"filtered_meta_ops_file" mapstructure:"metarr-filtered-meta-ops-file"`
+	FilteredMetaOps     []FilteredMetaOps `json:"metarr_filtered_meta_ops" mapstructure:"metarr-filtered-meta-ops"`
+	FilteredMetaOpsFile string            `json:"metarr_filtered_meta_ops_file" mapstructure:"metarr-filtered-meta-ops-file"`
 
 	// Metarr output directories.
 	OutputDir     string `json:"metarr_output_directory" mapstructure:"metarr-default-output-dir"`
@@ -71,13 +71,13 @@ type MetarrArgs struct {
 	MinFreeMem  string  `json:"metarr_min_free_mem" mapstructure:"metarr-min-free-mem"`
 
 	// FFmpeg transcoding operations.
-	GPUDir               string   `json:"metarr_gpu_directory" mapstructure:"transcode-gpu-directory"`
-	UseGPU               string   `json:"metarr_gpu" mapstructure:"transcode-gpu"`
-	TranscodeVideoFilter string   `json:"metarr_transcode_video_filter" mapstructure:"transcode-video-filter"`
-	TranscodeVideoCodecs []string `json:"metarr_video_transcode_codecs" mapstructure:"transcode-video-codecs"`
-	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs" mapstructure:"transcode-audio-codecs"`
-	TranscodeQuality     string   `json:"metarr_transcode_quality" mapstructure:"transcode-quality"`
-	ExtraFFmpegArgs      string   `json:"metarr_extra_ffmpeg_args" mapstructure:"extra-ffmpeg-args"`
+	TranscodeGPUDirectory string   `json:"metarr_transcode_gpu_directory" mapstructure:"transcode-gpu-directory"`
+	TranscodeGPU          string   `json:"metarr_transcode_gpu" mapstructure:"transcode-gpu"`
+	TranscodeVideoFilter  string   `json:"metarr_transcode_video_filter" mapstructure:"transcode-video-filter"`
+	TranscodeVideoCodecs  []string `json:"metarr_transcode_video_codecs" mapstructure:"transcode-video-codecs"`
+	TranscodeAudioCodecs  []string `json:"metarr_transcode_audio_codecs" mapstructure:"transcode-audio-codecs"`
+	TranscodeQuality      string   `json:"metarr_transcode_quality" mapstructure:"transcode-quality"`
+	ExtraFFmpegArgs       string   `json:"metarr_extra_ffmpeg_args" mapstructure:"metarr-extra-ffmpeg-args"`
 }
 
 // ChannelAccessDetails holds details related to authentication and cookies.
@@ -316,13 +316,13 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 			return false
 		}
 	}
-	if child.UseGPU != "" {
-		if parent.UseGPU != child.UseGPU {
+	if child.TranscodeGPU != "" {
+		if parent.TranscodeGPU != child.TranscodeGPU {
 			return false
 		}
 	}
-	if child.GPUDir != "" {
-		if parent.GPUDir != child.GPUDir {
+	if child.TranscodeGPUDirectory != "" {
+		if parent.TranscodeGPUDirectory != child.TranscodeGPUDirectory {
 			return false
 		}
 	}
@@ -542,10 +542,10 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 	}
 
 	// FFmpeg transcoding operations.
-	if m.UseGPU != "" {
+	if m.TranscodeGPU != "" {
 		return false
 	}
-	if m.GPUDir != "" {
+	if m.TranscodeGPUDirectory != "" {
 		return false
 	}
 	if m.TranscodeVideoFilter != "" {

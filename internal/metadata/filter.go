@@ -389,7 +389,7 @@ func loadFilteredMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *par
 
 	filterFile := cu.ChanURLMetarrArgs.FilteredMetaOpsFile
 
-	if filterFile, err = dp.ParseDirectory(filterFile, v, "filtered-meta-ops"); err != nil {
+	if filterFile, err = dp.ParseDirectory(filterFile, v, "metarr-filtered-meta-ops"); err != nil {
 		logger.Pl.E("Failed to parse directory %q: %v", filterFile, err)
 		return nil
 	}
@@ -433,7 +433,7 @@ func loadFilteredFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp 
 
 	filterFile := cu.ChanURLMetarrArgs.FilteredFilenameOpsFile
 
-	if filterFile, err = dp.ParseDirectory(filterFile, v, "filtered-filename-ops"); err != nil {
+	if filterFile, err = dp.ParseDirectory(filterFile, v, "metarr-filtered-filename-ops"); err != nil {
 		logger.Pl.E("Failed to parse directory %q: %v", filterFile, err)
 		return nil
 	}

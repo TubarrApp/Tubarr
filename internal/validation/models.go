@@ -123,8 +123,8 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	if m.UseGPU != "" {
-		if _, _, err := ValidateGPU(m.UseGPU, m.GPUDir); err != nil {
+	if m.TranscodeGPU != "" {
+		if _, _, err := ValidateGPU(m.TranscodeGPU, m.TranscodeGPUDirectory); err != nil {
 			return fmt.Errorf("invalid GPU config in Metarr Settings: %w", err)
 		}
 	}

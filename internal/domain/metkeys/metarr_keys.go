@@ -34,11 +34,11 @@ const (
 
 // FFmpeg related commands.
 const (
-	ExtraFFmpegArgs      = "--extra-ffmpeg-args"
-	HWAccel              = "--hwaccel"
-	GPUDir               = "--transcode-gpu-directory"
-	TranscodeVideoCodecs = "--transcode-video-codecs"
-	TranscodeAudioCodecs = "--transcode-audio-codecs"
-	TranscodeQuality     = "--transcode-quality"
-	TranscodeVideoFilter = "--transcode-video-filter"
+	ExtraFFmpegArgs       = "--extra-ffmpeg-args"
+	TranscodeGPU          = "--hwaccel"
+	TranscodeGPUDirectory = "--transcode-gpu-directory"
+	TranscodeVideoCodecs  = "--transcode-video-codecs"
+	TranscodeAudioCodecs  = "--transcode-audio-codecs"
+	TranscodeQuality      = "--transcode-quality"
+	TranscodeVideoFilter  = "--transcode-video-filter"
 )
