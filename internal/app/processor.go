@@ -5,12 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
+	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
 	"tubarr/internal/dev"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads"
 	"tubarr/internal/metadata"
@@ -215,6 +218,21 @@ func videoJob(
 // completeAndStoreVideo marks a video as complete.
 func completeAndStoreVideo(vs contracts.VideoStore, v *models.Video, c *models.Channel) error {
 	v.MarkVideoAsCompleted()
+
+	// Handle metadata file purging if configured.
+	if abstractions.IsSet(keys.PurgeMetaFile) {
+		if abstractions.GetBool(keys.PurgeMetaFile) {
+			logger.Pl.I("Purging metadata file for video with URL %q as per configuration", v.URL)
+			if err := os.Remove(v.JSONPath); err != nil && !os.IsNotExist(err) {
+				logger.Pl.W("Failed to delete metadata file %q: %v", v.JSONPath, err)
+			} else {
+				logger.Pl.D(1, "Deleted metadata file %q successfully", v.JSONPath)
+				v.JSONPath = ""
+			}
+		}
+	}
+
+	// Update video in database.
 	if err := vs.UpdateVideo(v, c.ID); err != nil {
 		return fmt.Errorf("failed to update video DB entry: %w", err)
 	}
