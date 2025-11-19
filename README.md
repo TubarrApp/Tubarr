@@ -29,8 +29,8 @@ Tubarr is a Go-powered companion to Metarr that keeps long-form video libraries 
 ```bash
 git clone https://github.com/TubarrApp/Tubarr.git
 cd Tubarr
-mv ./cmd/tubarr /usr/bin/tubarr
-/usr/bin/tubarr --help
+sudo mv tubarr /usr/local/bin/tubarr
+tubarr --help
 ```
 
 Tubarr stores its database and logs under `~/.tubarr`. Metarr logs live in `~/.metarr`.
