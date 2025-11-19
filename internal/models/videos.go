@@ -85,8 +85,8 @@ func (v *Video) MarkVideoAsIgnored() {
 	v.Ignored = true
 }
 
-// MarkVideoAsCompleted marks the video with the finished status.
-func (v *Video) MarkVideoAsCompleted() {
+// MarkVideoAsComplete marks the video with the finished status.
+func (v *Video) MarkVideoAsComplete() {
 	v.DownloadStatus.Status = consts.DLStatusCompleted
 	v.DownloadStatus.Percent = 100.0
 	v.DownloadStatus.Error = nil

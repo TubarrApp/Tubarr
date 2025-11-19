@@ -245,9 +245,9 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	// ===============================
 
 	c := &models.Channel{
-		URLModels:  chanURLs,
-		Name:       *input.Name,
-		ConfigFile: NilOrZeroValue(input.ChannelConfigFile),
+		URLModels:         chanURLs,
+		Name:              *input.Name,
+		ChannelConfigFile: NilOrZeroValue(input.ChannelConfigFile),
 
 		ChanSettings: &models.Settings{
 			Concurrency:            NilOrZeroValue(input.Concurrency),

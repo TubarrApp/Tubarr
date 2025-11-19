@@ -18,17 +18,17 @@ import (
 func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args := make([]string, 0, 32)
 
-	// Restrict filenames
+	// Restrict filenames.
 	args = append(args, command.RestrictFilenames)
 
-	// Download JSON to directory
+	// Download JSON to directory.
 	args = append(args,
 		command.SkipVideo,
 		command.WriteInfoJSON,
 		command.P, d.Video.ParsedMetaDir,
 		command.Output, command.FilenameSyntax)
 
-	// Cookie path
+	// Cookie path.
 	if d.ChannelURL.CookiePath == "" {
 		if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
 			args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
@@ -37,7 +37,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
 
-	// Cookie source
+	// Cookie source.
 	if abstractions.IsSet(keys.CookiesFromBrowser) {
 		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
 		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
@@ -46,12 +46,12 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		logger.Pl.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 
-	// Max filesize specified
+	// Max filesize specified.
 	if d.ChannelURL.ChanURLSettings.MaxFilesize != "" {
 		args = append(args, command.MaxFilesize, d.ChannelURL.ChanURLSettings.MaxFilesize)
 	}
 
-	// External downloaders & arguments
+	// External downloaders and arguments.
 	if d.ChannelURL.ChanURLSettings.ExternalDownloader != "" {
 		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)
 		if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
@@ -76,15 +76,15 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		}
 	}
 
-	// Retry download X times
+	// Retry download X times.
 	if d.ChannelURL.ChanURLSettings.Retries != 0 {
 		args = append(args, command.Retries, strconv.Itoa(d.ChannelURL.ChanURLSettings.Retries))
 	}
 
-	// Randomize requests (avoid detection as bot)
+	// Randomize requests (avoid detection as bot).
 	args = append(args, command.SleepRequests...)
 
-	// Additional user arguments
+	// Additional user arguments.
 	if !abstractions.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {
 		args = append(args, strings.Fields(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs)...)
 	}
@@ -95,7 +95,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	// Add target URL [ MUST GO LAST !! ]
 	args = append(args, d.Video.URL)
 
-	// Build command with context
+	// Build command with context.
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
 	return cmd
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"os"
 	"strings"
 	"tubarr/internal/database"
 	"tubarr/internal/domain/logger"
@@ -14,13 +13,11 @@ func initializeApplication() (store *repo.Store, db *sql.DB, progControl *repo.P
 	// Database & stores
 	database, err := database.InitDB()
 	if err != nil {
-		logger.Pl.P("Tubarr exiting with error: %v\n", err)
-		os.Exit(1)
+		return nil, nil, nil, err
 	}
 	store, err = repo.InitStores(database.DB)
 	if err != nil {
-		logger.Pl.P("Tubarr exiting with error: %v\n", err)
-		os.Exit(1)
+		return nil, nil, nil, err
 	}
 
 	// Start controller
@@ -28,10 +25,10 @@ func initializeApplication() (store *repo.Store, db *sql.DB, progControl *repo.P
 	if progControl.ProcessID, err = progControl.StartTubarr(); err != nil {
 		if strings.HasPrefix(err.Error(), "failure:") {
 			logger.Pl.E("DB %v\n", err)
-			os.Exit(1)
+			return nil, nil, nil, err
 		}
 		logger.Pl.P("Tubarr exiting with error: %v\n", err)
-		os.Exit(1)
+		return nil, nil, nil, err
 	}
 
 	return store, database.DB, progControl, err

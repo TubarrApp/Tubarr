@@ -91,7 +91,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.URL) {
 		in.URLs = &f.URLs
 	}
-	if cmd.Flags().Changed(keys.ConfigFile) {
+	if cmd.Flags().Changed(keys.ChannelConfigFile) {
 		in.ChannelConfigFile = &f.ChannelConfigFile
 	}
 	if cmd.Flags().Changed(keys.VideoDir) {

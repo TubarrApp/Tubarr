@@ -14,11 +14,12 @@ import (
 func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, v *models.Video) error {
 	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
 
-	// Ensure the directory exists
+	// Ensure the directory exists.
 	if _, err := validation.ValidateDirectory(outputDir, true); err != nil {
 		return err
 	}
 
+	// Create the file.
 	file, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
@@ -29,6 +30,7 @@ func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, 
 		}
 	}()
 
+	// Write JSON data with indentation.
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(metadata); err != nil {

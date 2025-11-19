@@ -1124,3 +1124,17 @@ func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, _ *http.Reques
 		}
 	}
 }
+
+// handleNewVideoNotificationSeen marks a new video notification as seen.
+func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := ss.cs.UpdateChannelValue(consts.QChanID, id, consts.QChanNewVideoNotification, false); err != nil {
+		http.Error(w, fmt.Sprintf("failed to mark new video notification as seen for channel ID %q: %v", id, err), http.StatusInternalServerError)
+		return
+	}
+	// Parse form data.
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
+		return
+	}
+}

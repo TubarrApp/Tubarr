@@ -96,10 +96,10 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 func (t *DownloadTracker) flushUpdates(ctx context.Context, update models.StatusUpdate) {
 	lastUpdate := state.GetStatusUpdate(update.VideoID)
 
-	// Normalize percentage
+	// Normalize percentage.
 	update.Percent = min(update.Percent, 100.0)
 
-	// Check if state is different
+	// Check if state is different.
 	if update.Status == lastUpdate.Status &&
 		update.Percent == lastUpdate.Percent &&
 		errors.Is(update.Error, lastUpdate.Error) {

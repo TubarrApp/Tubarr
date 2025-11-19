@@ -18,9 +18,9 @@ import (
 // UpdateFromConfigFile loads in config file data.
 func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
 
-	if c.ConfigFile != "" && !c.UpdatedFromConfig {
+	if c.ChannelConfigFile != "" && !c.UpdatedFromConfig {
 		if err := cs.UpdateChannelFromConfig(c); err != nil {
-			logger.Pl.E("failed to update from config file %q: %v", c.ConfigFile, err)
+			logger.Pl.E("failed to update from config file %q: %v", c.ChannelConfigFile, err)
 		}
 
 		c.UpdatedFromConfig = true
@@ -58,7 +58,7 @@ func ReadFileLines(path string) ([]string, error) {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
-			continue // skip blank lines and comments
+			continue // skip blank lines and comments.
 		}
 		f = append(f, line)
 	}
@@ -74,7 +74,7 @@ func ReadFileLines(path string) ([]string, error) {
 //
 // Returns a slice of absolute paths to valid config files.
 func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
-	// Validate directory exists
+	// Validate directory exists.
 	dirInfo, err := os.Stat(dirPath)
 	if err != nil {
 		return nil, err
@@ -83,13 +83,13 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 		return nil, os.ErrInvalid
 	}
 
-	// Read directory contents
+	// Read directory contents.
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Viper supported extensions
+	// Viper supported extensions.
 	validExts := map[string]bool{
 		".yaml":       true,
 		".yml":        true,
@@ -105,12 +105,12 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 
 	var configFiles []string
 	for _, entry := range entries {
-		// Skip directories
+		// Skip directories.
 		if entry.IsDir() {
 			continue
 		}
 
-		// Check if file has valid extension
+		// Check if file has valid extension.
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
 		if validExts[ext] {
 			fullPath := filepath.Join(dirPath, entry.Name())

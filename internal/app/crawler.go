@@ -27,7 +27,7 @@ import (
 
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(ctx context.Context, s contracts.Store) error {
-	// Grab all channels from database
+	// Grab all channels from database.
 	cs := s.ChannelStore()
 	channels, hasRows, err := cs.GetAllChannels(true)
 	if !hasRows {
@@ -43,12 +43,12 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 		wg      sync.WaitGroup
 	)
 
-	// Iterate over channels
+	// Iterate over channels.
 	for _, c := range channels {
-		// Load in config file
+		// Load in config file.
 		file.UpdateFromConfigFile(s.ChannelStore(), c)
 
-		// Ignore channel if paused
+		// Ignore channel if paused.
 		if c.ChanSettings.Paused {
 			logger.Pl.I("Channel with name %q is paused, skipping checks.", c.Name)
 			continue
@@ -73,7 +73,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 			}
 		}
 
-		// Run concurrent jobs
+		// Run concurrent jobs.
 		wg.Add(1)
 		go func(c *models.Channel) {
 			defer wg.Done()
@@ -82,7 +82,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 				<-sem
 			}()
 
-			// Initiate crawl
+			// Initiate crawl.
 			if err := CrawlChannel(ctx, s, c); err != nil {
 				errChan <- err
 			}
@@ -92,7 +92,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	wg.Wait()
 	close(errChan)
 
-	// Aggregate errors
+	// Aggregate errors.
 	allErrs := make([]error, 0, len(channels))
 	for e := range errChan {
 		allErrs = append(allErrs, e)
@@ -111,12 +111,12 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		return fmt.Errorf("invalid nil parameters (channel: %v, channel settings: %v)", c == nil, c.ChanSettings == nil)
 	}
 
-	// Add random sleep before processing (added bot detection)
+	// Add random sleep before processing (added bot detection).
 	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
 		return err
 	}
 
-	// Check if site is blocked or should be unlocked
+	// Check if site is blocked or should be unlocked.
 	unlocked := false
 	if c.IsBlocked() {
 		unlocked, err = cs.CheckOrUnlockChannel(c)
@@ -124,21 +124,20 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			logger.Pl.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
 			return nil
 		}
-
 		// Filter out matching hostnames later.
 	}
 
-	// Load config file settings
+	// Load config file settings.
 	file.UpdateFromConfigFile(s.ChannelStore(), c)
 
-	// Grab existing releases
+	// Grab existing releases.
 	scrape := scraper.New()
 	existingVideoURLsMap, _, err := scrape.GetExistingReleases(cs, c)
 	if err != nil {
 		return err
 	}
 
-	// Populate AccessDetails for all ChannelURLs upfront
+	// Populate AccessDetails for all ChannelURLs upfront.
 	for _, cu := range c.URLModels {
 		cu.Cookies, cu.CookiePath, err = scrape.GetChannelCookies(ctx, cs, c, cu)
 		if err != nil {
@@ -146,16 +145,16 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		}
 	}
 
-	// Build a map of channel URL -> ChannelURL model for quick lookup
+	// Build a map of channel URL -> ChannelURL model for quick lookup.
 	channelURLMap := make(map[string]*models.ChannelURL, len(c.URLModels))
 	for _, cu := range c.URLModels {
 		channelURLMap[cu.URL] = cu
 	}
 
-	// Video request model slice
+	// Video request model slice.
 	customVideoRequests := make([]*models.Video, 0, len(videoURLs))
 
-	// Track which ChannelURL model each video uses (by ChannelURLID)
+	// Track which ChannelURL model each video uses (by ChannelURLID).
 	channelURLModels := make(map[int64]*models.ChannelURL, len(videoURLs))
 
 	for _, videoURL := range videoURLs {
@@ -164,7 +163,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			actualVideoURL        string
 		)
 
-		// Parse pipe-delimited format: "channelURL|videoURL"
+		// Parse pipe-delimited format: "channelURL|videoURL".
 		if strings.Contains(videoURL, "|") {
 			targetChannelURLModel, actualVideoURL, err = parsePipedVideoURL(videoURL, channelURLMap)
 			if err != nil {
@@ -184,7 +183,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 				continue
 			}
 			hostname := parsed.Hostname()
-			if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil
+			if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil.
 				hostname = strings.ToLower(domain)
 			}
 
@@ -193,12 +192,12 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			}
 		}
 
-		// Check if already downloaded
+		// Check if already downloaded.
 		if _, exists := existingVideoURLsMap[actualVideoURL]; exists {
 			return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-videos' first if you wish to re-download it", actualVideoURL)
 		}
 
-		// Store the model for later use
+		// Store the model for later use.
 		channelURLModels[targetChannelURLModel.ID] = targetChannelURLModel
 
 		customVideoRequests = append(customVideoRequests, &models.Video{
@@ -208,26 +207,26 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		})
 	}
 
-	// Fill output directories and batch channels together
+	// Fill output directories and batch channels together.
 	videosByChannelURL := make(map[int64][]*models.Video)
 	for _, v := range customVideoRequests {
 		videosByChannelURL[v.ChannelURLID] = append(videosByChannelURL[v.ChannelURLID], v)
 	}
 
-	// Main process
+	// Main process.
 	var (
 		nSucceeded        int
 		procError         error
 		channelURLsGotNew []string
 	)
 
-	// Process each ChannelURL's videos
+	// Process each ChannelURL's videos.
 	for channelURLID, videos := range videosByChannelURL {
 		if len(videos) == 0 {
 			continue
 		}
 
-		// Get the ChannelURL model stored earlier
+		// Get the ChannelURL model stored earlier.
 		cu, exists := channelURLModels[channelURLID]
 		if !exists {
 			logger.Pl.E("Could not find ChannelURL model for ID %d", channelURLID)
@@ -244,12 +243,12 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		procError = errors.Join(procError, procErr)
 	}
 
-	// Update last scan time
+	// Update last scan time.
 	if err := cs.UpdateLastScan(c.ID); err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
 	}
 
-	// Handle results
+	// Handle results and notify services.
 	if nSucceeded == 0 {
 		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(customVideoRequests), procError)
 	}
@@ -271,7 +270,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	}
 	cs := s.ChannelStore()
 
-	// Add random sleep before processing (added bot detection)
+	// Add random sleep before processing (added bot detection).
 	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
 		return err
 	}
@@ -287,7 +286,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	fmt.Println()
 	logger.Pl.I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
 
-	// Check if site is blocked or should be unlocked, and filter URLs if needed
+	// Check if site is blocked or should be unlocked, and filter URLs if needed.
 	if c.IsBlocked() {
 		unlocked, err := cs.CheckOrUnlockChannel(c)
 		if err != nil {
@@ -295,7 +294,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 			return nil
 		}
 
-		// If still blocked, filter out URLs from blocked hostname
+		// If still blocked, filter out URLs from blocked hostname.
 		if !unlocked {
 			allowedURLModels, hasAllowed := filterBlockedURLs(c)
 
@@ -304,12 +303,12 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 				return nil
 			}
 
-			// Replace with filtered list
+			// Replace with filtered list.
 			c.URLModels = allowedURLModels
 		}
 	}
 
-	// Get new releases for channel
+	// Get new releases for channel.
 	scrape := scraper.New()
 	videos, err := scrape.GetNewReleases(ctx, cs, c)
 	if err != nil {
@@ -332,14 +331,14 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 		channelURLsGotNew []string
 	)
 
-	// Process channel URLs
+	// Process channel URLs.
 	for _, cu := range c.URLModels {
-		// Skip manual channel entry
+		// Skip manual channel entry.
 		if cu.IsManual || cu.ChanURLSettings.Paused {
 			continue
 		}
 
-		// Get requests for this channel
+		// Get requests for this channel.
 		var vRequests []*models.Video
 		for _, v := range videos {
 			if v.ChannelURLID == cu.ID {
@@ -352,10 +351,10 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 
 		logger.Pl.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 
-		// Process video batch
+		// Process video batch.
 		succeeded, downloaded, procErr := InitProcess(ctx, s, c, cu, vRequests, scrape)
 
-		// Succeeded/downloaded
+		// Succeeded/downloaded.
 		if succeeded != 0 {
 			nSucceeded += succeeded
 			if downloaded > 0 {
@@ -367,24 +366,24 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 		procError = errors.Join(procError, procErr)
 	}
 
-	// Last scan time update
+	// Last scan time update.
 	if err := cs.UpdateLastScan(c.ID); err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
 	}
 
-	// All videos failed
+	// All videos failed.
 	if nSucceeded == 0 {
 		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procError)
 	}
 
-	// Some succeeded, notify URLs
+	// Some succeeded, notify URLs.
 	if nDownloaded > 0 {
 		if err := NotifyServices(cs, c, channelURLsGotNew); err != nil {
 			return errors.Join(procError, err)
 		}
 	}
 
-	// Some errors encountered
+	// Some errors encountered.
 	if procError != nil {
 		return fmt.Errorf("channel %q encountered errors processing: %w", c.Name, procError)
 	}
@@ -399,7 +398,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 	}
 	cs := s.ChannelStore()
 
-	// Check if site is blocked or should be unlocked
+	// Check if site is blocked or should be unlocked.
 	if c.IsBlocked() {
 		unlocked, err := cs.CheckOrUnlockChannel(c)
 		if err != nil {
@@ -412,17 +411,17 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 		}
 	}
 
-	// Load in config file
+	// Load in config file.
 	file.UpdateFromConfigFile(cs, c)
 
-	// Get new releases
+	// Get new releases.
 	scrape := scraper.New()
 	videos, err := scrape.GetNewReleases(ctx, cs, c)
 	if err != nil {
 		return err
 	}
 
-	// Add videos to ignore
+	// Add videos to ignore.
 	if len(videos) > 0 {
 		for _, v := range videos {
 			if v.URL == "" {
@@ -448,7 +447,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 // filterBlockedURLs filters out URLs blocked by the hostname of a given channel URL.
 func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
-
+	// Filter out manual URLs.
 	allowedURLModels := make([]*models.ChannelURL, 0, len(c.URLModels))
 	for _, cu := range c.URLModels {
 		if cu.IsManual {
@@ -462,7 +461,7 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 		}
 
 		hostname := parsed.Hostname()
-		if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil
+		if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil.
 			hostname = strings.ToLower(domain)
 		}
 
@@ -471,24 +470,23 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 			continue
 		}
 
-		// Hostname doesn't match the blocked site, safe to proceed
+		// Hostname doesn't match the blocked site, safe to proceed.
 		allowedURLModels = append(allowedURLModels, cu)
 	}
-
 	return allowedURLModels, len(allowedURLModels) > 0
 }
 
 // ensureManualDownloadsChannelURL ensures a special "manual-downloads" ChannelURL exists for the channel.
 func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channel) (*models.ChannelURL, error) {
-	// First check in-memory models
+	// First check in-memory models.
 	for _, cu := range c.URLModels {
 		if cu.IsManual {
-			return cu, nil // Return existing model
+			return cu, nil // Return existing model.
 		}
 	}
 
-	// If not found in memory, check database directly
-	// This handles cases where the channel was loaded before the manual entry was created
+	// If not found in memory, check database directly.
+	// This handles cases where the channel was loaded before the manual entry was created.
 	existingCU, hasRows, err := cs.GetChannelURLModel(c.ID, consts.ManualDownloadsCol, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for existing manual downloads URL: %w", err)
@@ -498,14 +496,14 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 		return existingCU, nil
 	}
 
-	// Get channel to inherit settings
+	// Get channel to inherit settings.
 	manualChanURL := &models.ChannelURL{
 		URL:               consts.ManualDownloadsCol,
 		ChanURLSettings:   c.ChanSettings,
 		ChanURLMetarrArgs: c.ChanMetarrArgs,
 	}
 
-	// Create it if it doesn't exist
+	// Create it if it doesn't exist.
 	id, err := cs.AddChannelURL(c.ID, manualChanURL, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create manual downloads channel URL: %w", err)
@@ -514,7 +512,7 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 	manualChanURL.ID = id
 	manualChanURL.IsManual = true
 
-	// Add to in-memory models
+	// Add to in-memory models.
 	c.URLModels = append(c.URLModels, manualChanURL)
 
 	return manualChanURL, nil
@@ -529,21 +527,21 @@ func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *m
 		hostname = cu.URL
 	}
 
-	// Extract the eTLD+1 (effective top-level domain + 1 label)
-	// e.g., m.google.com -> google.com, www.bbc.co.uk -> bbc.co.uk
-	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil
+	// Extract the eTLD+1 (effective top-level domain + 1 label).
+	// e.g., m.google.com -> google.com, www.bbc.co.uk -> bbc.co.uk.
+	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil.
 		hostname = strings.ToLower(domain)
 	}
 
 	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
 		s.BotBlocked = true
 
-		// Add hostname if not already in the list
+		// Add hostname if not already in the list.
 		if !slices.Contains(s.BotBlockedHostnames, hostname) {
 			s.BotBlockedHostnames = append(s.BotBlockedHostnames, hostname)
 		}
 
-		// Initialize map if nil
+		// Initialize map if nil.
 		if s.BotBlockedTimestamps == nil {
 			s.BotBlockedTimestamps = make(map[string]time.Time)
 		}
@@ -583,17 +581,16 @@ func parseManualVideoURL(ctx context.Context, cs contracts.ChannelStore, c *mode
 		return nil, "", fmt.Errorf("channel cannot be nil")
 	}
 
-	// Use special manual downloads entry
+	// Use special manual downloads entry.
 	targetChannelURLModel, err := ensureManualDownloadsChannelURL(cs, c)
 	if err != nil {
 		return nil, "", err
 	}
 
-	// Get access details for manual downloads
+	// Get access details for manual downloads.
 	targetChannelURLModel.Cookies, targetChannelURLModel.CookiePath, err = scrape.GetChannelCookies(ctx, cs, c, targetChannelURLModel)
 	if err != nil {
 		return nil, "", err
 	}
-
 	return targetChannelURLModel, videoURL, nil
 }

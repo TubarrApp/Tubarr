@@ -1269,13 +1269,13 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			// Load config file location if existent and one wasn't hardcoded into terminal
 			//
 			// Do not load again if hardcoded configFile is the same as the channel model's config file.
-			if (!cmd.Flags().Changed(keys.ConfigFile) || configFile == "") && c.ConfigFile != "" && c.ConfigFile != configFile {
+			if (!cmd.Flags().Changed(keys.ChannelConfigFile) || configFile == "") && c.ChannelConfigFile != "" && c.ChannelConfigFile != configFile {
 				fileToUse := ""
 				if configFile != "" {
 					fileToUse = configFile
 				}
-				if c.ConfigFile != "" {
-					fileToUse = c.ConfigFile
+				if c.ChannelConfigFile != "" {
+					fileToUse = c.ChannelConfigFile
 				}
 
 				v := viper.New()

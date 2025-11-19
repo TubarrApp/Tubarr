@@ -9,16 +9,17 @@ import (
 //
 // Contains ChannelURL models and top level configuration.
 type Channel struct {
-	ID                int64         `json:"id" db:"id"`
-	URLModels         []*ChannelURL `json:"url_models"`
-	Name              string        `json:"name" db:"name"`
-	ConfigFile        string        `json:"channel_config_file" mapstructure:"channel-config-file"`
-	ChanSettings      *Settings     `json:"settings" db:"settings"`
-	ChanMetarrArgs    *MetarrArgs   `json:"metarr" db:"metarr"`
-	UpdatedFromConfig bool          `json:"updated_from_config"`
-	LastScan          time.Time     `json:"last_scan" db:"last_scan"`
-	CreatedAt         time.Time     `json:"created_at" db:"created_at"`
-	UpdatedAt         time.Time     `json:"updated_at" db:"updated_at"`
+	ID                   int64         `json:"id" db:"id"`
+	URLModels            []*ChannelURL `json:"url_models"`
+	Name                 string        `json:"name" db:"name"`
+	ChannelConfigFile    string        `json:"channel_config_file" db:"channel_config_file"`
+	ChanSettings         *Settings     `json:"settings" db:"settings"`
+	ChanMetarrArgs       *MetarrArgs   `json:"metarr" db:"metarr"`
+	UpdatedFromConfig    bool          `json:"updated_from_config"`
+	LastScan             time.Time     `json:"last_scan" db:"last_scan"`
+	CreatedAt            time.Time     `json:"created_at" db:"created_at"`
+	UpdatedAt            time.Time     `json:"updated_at" db:"updated_at"`
+	NewVideoNotification bool          `json:"new_video_notification" db:"new_video_notification"`
 }
 
 // GetCrawlFreq returns the program's crawl frequency (-1 is unset).

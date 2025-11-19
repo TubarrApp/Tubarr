@@ -217,7 +217,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return fmt.Errorf("dev error: channel sent in nil")
 	}
 
-	cfgFile := c.ConfigFile
+	cfgFile := c.ChannelConfigFile
 	if cfgFile == "" {
 		logger.Pl.D(2, "No config file path, nothing to apply")
 		return nil
@@ -561,7 +561,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	result, err := tx.Exec(
 		query,
 		c.Name,
-		c.ConfigFile,
+		c.ChannelConfigFile,
 		settingsJSON,
 		metarrJSON,
 		now,
@@ -807,7 +807,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	)
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QChanID,
 		consts.QChanName,
 		consts.QChanConfigFile,
@@ -816,6 +816,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		consts.QChanLastScan,
 		consts.QChanCreatedAt,
 		consts.QChanUpdatedAt,
+		consts.QChanNewVideoNotification,
 		consts.DBChannels,
 		key,
 	)
@@ -824,12 +825,13 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	err = cs.DB.QueryRow(query, val).Scan(
 		&c.ID,
 		&c.Name,
-		&c.ConfigFile,
+		&c.ChannelConfigFile,
 		&settings,
 		&metarrJSON,
 		&c.LastScan,
 		&c.CreatedAt,
 		&c.UpdatedAt,
+		&c.NewVideoNotification,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -870,7 +872,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 // GetAllChannels retrieves all channels in the database.
 func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s FROM %s ORDER BY %s",
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s ORDER BY %s",
 		consts.QChanID,
 		consts.QChanName,
 		consts.QChanConfigFile,
@@ -879,6 +881,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		consts.QChanLastScan,
 		consts.QChanCreatedAt,
 		consts.QChanUpdatedAt,
+		consts.QChanNewVideoNotification,
 		consts.DBChannels,
 		consts.QChanName,
 	)
@@ -902,12 +905,13 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		if err := rows.Scan(
 			&c.ID,
 			&c.Name,
-			&c.ConfigFile,
+			&c.ChannelConfigFile,
 			&settingsJSON,
 			&metarrJSON,
 			&c.LastScan,
 			&c.CreatedAt,
 			&c.UpdatedAt,
+			&c.NewVideoNotification,
 		); err != nil {
 			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 		}
@@ -1317,7 +1321,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("\n%sBasic Info:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	fmt.Printf("ID: %d\n", c.ID)
 	fmt.Printf("Name: %s\n", c.Name)
-	fmt.Printf("Config File: %s\n", c.ConfigFile)
+	fmt.Printf("Config File: %s\n", c.ChannelConfigFile)
 	fmt.Printf("URLs: %+v\n", cURLs)
 
 	// Channel settings
@@ -1454,11 +1458,11 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 	}
 
 	// Channel config file location
-	if v, ok := parsing.GetConfigValue[string](vip, keys.ConfigFile); ok {
+	if v, ok := parsing.GetConfigValue[string](vip, keys.ChannelConfigFile); ok {
 		if _, err = validation.ValidateFile(v, false); err != nil {
 			return err
 		}
-		c.ConfigFile = v
+		c.ChannelConfigFile = v
 	}
 
 	// Concurrency limit
@@ -1572,7 +1576,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Validate complete Settings model at config boundary
 	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
-		return fmt.Errorf("invalid settings in config file %q: %w", c.ConfigFile, err)
+		return fmt.Errorf("invalid settings in config file %q: %w", c.ChannelConfigFile, err)
 	}
 
 	return nil
@@ -1592,7 +1596,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	// Metarr output extension
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MOutputExt); ok {
 		if _, err := validation.ValidateMetarrOutputExt(v); err != nil {
-			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ConfigFile)
+			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ChannelConfigFile)
 		}
 		c.ChanMetarrArgs.OutputExt = v
 	}
@@ -1736,7 +1740,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Validate complete MetarrArgs model at config boundary
 	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs); err != nil {
-		return fmt.Errorf("invalid metarr config in config file %q: %w", c.ConfigFile, err)
+		return fmt.Errorf("invalid metarr config in config file %q: %w", c.ChannelConfigFile, err)
 	}
 
 	return nil

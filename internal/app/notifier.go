@@ -30,7 +30,7 @@ func newNotifyHTTPClients(noLANtimeout, lanTimeout time.Duration) (nolan *http.C
 
 // NotifyServices notifies URLs set for the channel by the user.
 func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew []string) error {
-	// Retrieve notifications for this channel
+	// Retrieve notifications for this channel.
 	notifications, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {
 		return fmt.Errorf("failed to get notification URLs for channel %q (ID: %d): %w", c.Name, c.ID, err)
@@ -40,13 +40,13 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 		return nil
 	}
 
-	// Create lookup map for new channels
+	// Create lookup map for new channels.
 	channelsWithNewMap := make(map[string]bool, len(channelURLsWithNew))
 	for _, u := range channelURLsWithNew {
 		channelsWithNewMap[strings.ToLower(u)] = true
 	}
 
-	// Append valid URLs
+	// Append valid URLs.
 	urls := make([]string, 0, len(notifications))
 	for _, n := range notifications {
 
@@ -63,13 +63,13 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 		}
 	}
 
-	// Check if any valid URLs
+	// Check if any valid URLs.
 	if len(urls) == 0 {
 		logger.Pl.D(2, "No notification URLs matched for channel %q (ID: %d)", c.Name, c.ID)
 		return nil
 	}
 
-	// Send notifications
+	// Send notifications.
 	if errs := notify(c, urls); len(errs) != 0 {
 		return fmt.Errorf("errors sending notifications for channel with ID %d: %w", c.ID, errors.Join(errs...))
 	}
@@ -79,7 +79,7 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 
 // notify pings notification services as required.
 func notify(c *models.Channel, notifyURLs []string) []error {
-	// Inner function
+	// Inner function.
 	notifyFunc := func(client *http.Client, notifyURL string) error {
 		resp, err := client.Post(notifyURL, "application/json", nil)
 		if err != nil {
@@ -98,7 +98,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 		return nil
 	}
 
-	// Notify for each URL
+	// Notify for each URL.
 	errs := make([]error, 0, len(notifyURLs))
 
 	for _, notifyURL := range notifyURLs {

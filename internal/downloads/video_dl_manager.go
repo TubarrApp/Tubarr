@@ -47,17 +47,17 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
-	// Ensure cleanup on exit
+	// Ensure cleanup on exit.
 	defer d.cleanup()
 
 	var lastErr error
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
-		// Check if URL should be avoided (set by previous videos)
+		// Check if URL should be avoided (set by previous videos).
 		if err := checkIfAvoidURL(d.Video.URL); err != nil {
 			return false, err
 		}
 
-		// Continue to attempt download
+		// Continue to attempt download.
 		logger.Pl.I("Starting video download attempt %d/%d for URL: %s",
 			attempt, d.Options.MaxRetries, d.Video.URL)
 
@@ -67,17 +67,17 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 			return false, d.cancelVideoDownload()
 		default:
 			if err := d.videoDLAttempt(); err != nil {
-				// Check bot detection FIRST - abort immediately if detected
+				// Check bot detection FIRST - abort immediately if detected.
 				if botErr := checkBotDetection(d.Video.URL, err); botErr != nil {
-					return true, botErr // Only 'TRUE' path for bot detected
+					return true, botErr // Only 'TRUE' path for bot detected.
 				}
 
-				// Check if URL should be avoided (in case bot was just detected)
+				// Check if URL should be avoided (in case bot was just detected).
 				if avoidErr := checkIfAvoidURL(d.Video.URL); avoidErr != nil {
 					return false, avoidErr
 				}
 
-				// Other errors - continue retry logic
+				// Other errors - continue retry logic.
 				lastErr = err
 				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
 				d.Video.DownloadStatus.Status = consts.DLStatusFailed
@@ -118,11 +118,11 @@ func (d *VideoDownload) videoDLAttempt() error {
 	d.cmd = d.buildVideoCommand()
 	d.mu.Unlock()
 
-	// Set video "Queued" status
+	// Set video "Queued" status.
 	d.Video.DownloadStatus.Status = consts.DLStatusQueued
 	d.Video.DownloadStatus.Percent = 0.0
 	d.DLTracker.sendUpdate(d.Video)
 
-	// Execute the video download
+	// Execute the video download.
 	return d.executeVideoDownload(d.cmd)
 }

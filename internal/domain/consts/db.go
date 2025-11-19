@@ -1,7 +1,5 @@
 package consts
 
-import "tubarr/internal/domain/jsonkeys"
-
 // Database table names.
 const (
 	DBProgram       = "program"
@@ -34,32 +32,28 @@ var ValidProgramKeys = map[string]bool{
 
 // Channel database entry keys.
 const (
-	QChanID              = "id"
-	QChanName            = "name"
-	QChanConfigFile      = "config_file"
-	QChanConcurrency     = "concurrency"
-	QChanMetarrOutputDir = jsonkeys.MetarrOutputDirectory
-	QChanMetarrExt       = "metarr_ext"
-	QChanSettings        = "settings"
-	QChanMetarr          = "metarr"
-	QChanLastScan        = "last_scan"
-	QChanCreatedAt       = "created_at"
-	QChanUpdatedAt       = "updated_at"
+	QChanID                   = "id"
+	QChanName                 = "name"
+	QChanConfigFile           = "config_file"
+	QChanSettings             = "settings"
+	QChanMetarr               = "metarr"
+	QChanLastScan             = "last_scan"
+	QChanCreatedAt            = "created_at"
+	QChanUpdatedAt            = "updated_at"
+	QChanNewVideoNotification = "new_video_notification"
 )
 
 // ValidChannelKeys holds valid keys for the channel database.
 var ValidChannelKeys = map[string]bool{
-	QChanID:              true,
-	QChanName:            true,
-	QChanConfigFile:      true,
-	QChanConcurrency:     true,
-	QChanMetarrOutputDir: true,
-	QChanMetarrExt:       true,
-	QChanSettings:        true,
-	QChanMetarr:          true,
-	QChanLastScan:        true,
-	QChanCreatedAt:       true,
-	QChanUpdatedAt:       true,
+	QChanID:                   true,
+	QChanName:                 true,
+	QChanConfigFile:           true,
+	QChanSettings:             true,
+	QChanMetarr:               true,
+	QChanLastScan:             true,
+	QChanCreatedAt:            true,
+	QChanUpdatedAt:            true,
+	QChanNewVideoNotification: true,
 }
 
 // Channel URL database entry keys.

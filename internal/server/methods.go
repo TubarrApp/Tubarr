@@ -122,7 +122,7 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s "+
-			"WHERE %s = ? AND %s = 1 "+ // Only finished downloads
+			"WHERE %s = ? AND %s = 1 "+ // Only finished downloads.
 			"ORDER BY %s DESC "+
 			"LIMIT ?",
 		consts.QVidID,
@@ -139,9 +139,10 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidFinished,
-		consts.QVidUpdatedAt, // Most recent first
+		consts.QVidUpdatedAt, // Order by most recent first.
 	)
 
+	// Execute query.
 	rows, err := ss.db.Query(query, channel.ID, n)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query videos: %w", err)
@@ -152,6 +153,7 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 		}
 	}()
 
+	// Parse results.
 	for rows.Next() {
 		var video models.Video
 		var thumbnailURL sql.NullString

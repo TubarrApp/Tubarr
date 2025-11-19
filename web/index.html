@@ -109,6 +109,25 @@
       .dark .delete-button-hover:hover {
         background-color: rgba(127, 29, 29, 0.2); /* red-900/20 */
       }
+
+      /* Notification dot for new content */
+      .notification-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #d62c27; /* Tubarr brand red */
+        animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      @keyframes pulse-dot {
+        0%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
     </style>
   </head>
   <body
@@ -532,6 +551,7 @@
 
               <!-- No Channels State -->
               <div x-show="!loading && !error && channels.length === 0" class="rounded-2xl border border-gray-200 bg-white px-5 py-12 dark:border-gray-800 dark:bg-white/[0.03] text-center">
+                <br>
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                 </svg>
@@ -540,6 +560,8 @@
                 <a href="add-channel.html" class="mt-4 inline-flex items-center px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600">
                   Add Channel
                 </a>
+                <br>
+                <br>
               </div>
 
               <!-- Channels List -->
@@ -561,7 +583,14 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                       </svg>
                       <div class="text-left">
-                        <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
+                        <div class="flex items-center gap-2">
+                          <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
+                          <span
+                            x-show="channel.new_video_notification"
+                            class="notification-dot"
+                            title="New content in the last 24 hours"
+                          ></span>
+                        </div>
                         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           <span x-show="!channel.expanded">Click to view latest videos</span>
                           <span x-show="channel.expanded">Latest 10 videos</span>
@@ -856,13 +885,37 @@
             }
           },
 
-          toggleChannel(channel) {
+          async toggleChannel(channel) {
             channel.expanded = !channel.expanded;
+
+            // If expanding the channel and there's a new video notification, mark it as seen
+            if (channel.expanded && channel.new_video_notification) {
+              this.markNotificationSeen(channel);
+            }
 
             // Load videos on first expand
             if (channel.expanded && !channel.videosLoaded) {
               channel.videosLoading = true;
               this.loadChannelVideos(channel);
+            }
+          },
+
+          async markNotificationSeen(channel) {
+            // Immediately remove the notification dot for better UX
+            channel.new_video_notification = false;
+
+            try {
+              const response = await fetch(`/api/v1/channels/${channel.id}/notification-seen`, {
+                method: 'POST'
+              });
+
+              if (!response.ok) {
+                console.error('Failed to mark notification as seen');
+                // Don't revert the UI change even if the backend call fails
+              }
+            } catch (err) {
+              console.error('Error marking notification as seen:', err);
+              // Don't revert the UI change even if the backend call fails
             }
           },
 
@@ -943,14 +996,14 @@
 
           formatDate(dateString) {
             if (!dateString) return 'Unknown';
-            
+
             const date = new Date(dateString);
             const now = new Date();
             const diffMs = now - date;
             const diffMins = Math.floor(diffMs / 60000);
             const diffHours = Math.floor(diffMs / 3600000);
             const diffDays = Math.floor(diffMs / 86400000);
-            
+
             if (diffMins < 60) {
               return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
             } else if (diffHours < 24) {

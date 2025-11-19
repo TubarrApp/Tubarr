@@ -11,10 +11,10 @@ import (
 )
 
 var ongoingDownloads sync.Map
-var avoidURLs sync.Map // Avoid attempting downloads for these URLs (e.g. when bot activity detection triggers)
+var avoidURLs sync.Map // Avoid attempting downloads for these URLs (e.g. when bot activity detection triggers).
 
-// activeDownloadContexts tracks cancellation functions for active downloads by video ID
-var activeDownloadContexts sync.Map // map[int64]context.CancelFunc
+// activeDownloadContexts tracks cancellation functions for active downloads by video ID.
+var activeDownloadContexts sync.Map // map[int64]context.CancelFunc.
 
 // DownloadType represents the type of download operation.
 type DownloadType string
@@ -58,17 +58,17 @@ func (d *VideoDownload) cleanup() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// Kill running command if exists
+	// Kill running command if exists.
 	if d.cmd != nil && d.cmd.Process != nil {
-		// Try graceful termination first
+		// Try graceful termination first.
 		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
-			// Force kill if graceful fails
+			// Force kill if graceful fails.
 			_ = d.cmd.Process.Kill()
 		}
 		d.cmd = nil
 	}
 
-	// Clean up temp file if exists
+	// Clean up temp file if exists.
 	if d.tempFile != "" {
 		if err := os.Remove(d.tempFile); err != nil && !os.IsNotExist(err) {
 			logger.Pl.W("Failed to remove temp file %s: %v", d.tempFile, err)
@@ -97,11 +97,11 @@ func (d *JSONDownload) cleanup() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	// Kill running command if exists
+	// Kill running command if exists.
 	if d.cmd != nil && d.cmd.Process != nil {
-		// Try graceful termination first
+		// Try graceful termination first.
 		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
-			// Force kill if graceful fails
+			// Force kill if graceful fails.
 			_ = d.cmd.Process.Kill()
 		}
 		d.cmd = nil

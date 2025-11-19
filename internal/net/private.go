@@ -16,7 +16,7 @@ func IsPrivateNetwork(host string) bool {
 		if u, parseErr := url.Parse(host); parseErr == nil && u.Hostname() != "" {
 			h = u.Hostname()
 		} else {
-			h = host // fallback to original input if Hostname() was empty
+			h = host // fallback to original input if Hostname() was empty.
 		}
 	}
 
@@ -67,9 +67,9 @@ func IsPrivateNetwork(host string) bool {
 
 // IsPrivateNetworkFallback resolves the hostname and checks if the IP is private.
 func IsPrivateNetworkFallback(h string) bool {
-	// Attempt to resolve hostname to IP addresses
+	// Attempt to resolve hostname to IP addresses.
 	ips, err := net.LookupIP(h)
-	if err == nil { // If err IS nil
+	if err == nil { // If err IS nil.
 		for _, ip := range ips {
 			if IsPrivateIP(ip.String(), h) {
 				return true
@@ -78,7 +78,7 @@ func IsPrivateNetworkFallback(h string) bool {
 		return false
 	}
 
-	// If resolution fails, check if the input is a direct IP address
+	// If resolution fails, check if the input is a direct IP address.
 	parts := strings.Split(h, ".")
 	if len(parts) == 4 {
 		octets := make([]int, 4)

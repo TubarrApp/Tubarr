@@ -23,11 +23,11 @@ const (
 
 // Files and directories.
 const (
-	ConfigFile     string = "channel-config-file"
-	VideoDir       string = "video-directory"
-	JSONDir        string = "json-directory"
-	MetarrPreset   string = "metarr-preset"
-	OutputFiletype string = "output-ext"
+	ChannelConfigFile string = "channel-config-file"
+	VideoDir          string = "video-directory"
+	JSONDir           string = "json-directory"
+	MetarrPreset      string = "metarr-preset"
+	OutputFiletype    string = "output-ext"
 )
 
 // Transcoding.

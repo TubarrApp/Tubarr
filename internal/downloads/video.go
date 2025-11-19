@@ -67,7 +67,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		args = append(args, command.MaxFilesize, d.ChannelURL.ChanURLSettings.MaxFilesize)
 	}
 
-	// External downloaders & arguments.
+	// External downloaders and arguments.
 	if d.ChannelURL.ChanURLSettings.ExternalDownloader != "" {
 		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)
 		if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
