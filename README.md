@@ -17,7 +17,6 @@ Tubarr is a Go-powered companion to Metarr that keeps long-form video libraries 
 
 ## Requirements
 
-- Go 1.25+
 - `yt-dlp` on `PATH`
 - Optional: `metarr` for tagging
 - SQLite (bundled via `github.com/mattn/go-sqlite3`)
@@ -30,8 +29,8 @@ Tubarr is a Go-powered companion to Metarr that keeps long-form video libraries 
 ```bash
 git clone https://github.com/TubarrApp/Tubarr.git
 cd Tubarr
-go build ./cmd/tubarr
-./tubarr --help
+mv ./cmd/tubarr /usr/bin/tubarr
+/usr/bin/tubarr --help
 ```
 
 Tubarr stores its database and logs under `~/.tubarr`. Metarr logs live in `~/.metarr`.
