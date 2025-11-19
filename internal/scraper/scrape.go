@@ -262,7 +262,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 }
 
 // ScrapeCensoredTVMetadata scrapes Censored.TV links for metadata.
-func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.Video) error {
+func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.Video, c *models.Channel) error {
 	// Initialize collector with cookies
 	collector, err := initializeCollector(urlStr, s.cookieManager)
 	if err != nil {
@@ -323,7 +323,7 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 
 	// Write metadata to file
 	filename := fmt.Sprintf("%s.json", sanitizeFilename(v.Title))
-	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v); err != nil {
+	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v, c); err != nil {
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}
 

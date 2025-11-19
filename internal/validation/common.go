@@ -4,7 +4,6 @@ package validation
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,11 +11,11 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/regex"
-	"tubarr/internal/domain/templates"
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
@@ -32,16 +31,16 @@ func ValidateMetarrOutputDirs(outDirMap map[string]string) error {
 
 	validatedDirs := make(map[string]bool, len(outDirMap))
 
-	// Validate directories
+	// Validate directories.
 	for urlStr, dir := range outDirMap {
-		// Validate URL format
+		// Validate URL format.
 		if _, err := url.Parse(urlStr); err != nil {
 			return fmt.Errorf("output directory map has invalid URL %q: %w", urlStr, err)
 		}
 
-		// Validate directory exists (only check once per unique directory)
+		// Validate directory exists (only check once per unique directory).
 		if !validatedDirs[dir] {
-			if _, err := ValidateDirectory(dir, false); err != nil {
+			if _, _, err := sharedvalidation.ValidateDirectory(dir, false, sharedtemplates.AllTemplatesMap); err != nil {
 				return fmt.Errorf("output directory %q is invalid: %w", dir, err)
 			}
 			validatedDirs[dir] = true
@@ -49,48 +48,6 @@ func ValidateMetarrOutputDirs(outDirMap map[string]string) error {
 	}
 
 	return nil
-}
-
-// ValidateDirectory validates that the directory exists, else creates it if desired.
-func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
-	possibleTemplate := strings.Contains(dir, "{{") && strings.Contains(dir, "}}")
-	logger.Pl.D(3, "Statting directory %q. Templating detected? %v...", dir, possibleTemplate)
-
-	// Handle templated directories.
-	if possibleTemplate {
-		if !checkTemplateTags(dir) {
-			t := make([]string, 0, len(templates.TemplateMap))
-			for k := range templates.TemplateMap {
-				t = append(t, k)
-			}
-			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
-		}
-		logger.Pl.D(3, "Directory %q appears to contain templating elements, will not stat", dir)
-		return nil, nil // templates are valid, no need to stat.
-	}
-
-	return sharedvalidation.ValidateDirectory(dir, createIfNotFound)
-}
-
-// ValidateFile validates that the file exists, else creates it if desired.
-func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
-	possibleTemplate := strings.Contains(f, "{{") && strings.Contains(f, "}}")
-	logger.Pl.D(3, "Statting file %q...", f)
-
-	// Handle templated directories.
-	if possibleTemplate {
-		if !checkTemplateTags(f) {
-			t := make([]string, 0, len(templates.TemplateMap))
-			for k := range templates.TemplateMap {
-				t = append(t, k)
-			}
-			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
-		}
-		logger.Pl.D(3, "Directory %q appears to contain templating elements, will not stat", f)
-		return nil, nil // templates are valid, no need to stat.
-	}
-
-	return sharedvalidation.ValidateFile(f, createIfNotFound)
 }
 
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
@@ -229,13 +186,13 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 		}
 
 		if op.OutputDir != "" {
-			if _, err := ValidateDirectory(op.OutputDir, false); err != nil {
+			if _, _, err := sharedvalidation.ValidateDirectory(op.OutputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
 				return err
 			}
 		}
 
 		// Validate output directory exists
-		if _, err := ValidateDirectory(op.OutputDir, false); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(op.OutputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 		}
 	}
@@ -383,23 +340,4 @@ func ValidateToFromDate(d string) (string, error) {
 	logger.Pl.D(1, "Made from/to date %q", output)
 
 	return output, nil
-}
-
-// checkTemplateTags checks if templating tags are present.
-func checkTemplateTags(d string) (hasTemplating bool) {
-	s := strings.Index(d, "{{")
-	e := strings.Index(d, "}}")
-
-	if s > -1 && e > s+2 {
-		if exists := templates.TemplateMap[d[(s+2):e]]; exists { // "+ 2" to skip the "{{" opening tag and leave just the tag
-			return true
-		}
-	}
-
-	if e+2 < len(d) {
-		if s := strings.Index(d[e+2:], "{{"); s >= 0 {
-			return checkTemplateTags(d[e+2:])
-		}
-	}
-	return false
 }

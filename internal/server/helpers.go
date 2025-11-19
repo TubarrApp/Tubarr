@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
@@ -178,25 +179,25 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 		settings.ExtraYTDLPMetaArgs = v
 	}
 	if v, ok := data[jsonkeys.SettingsFilterFile].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		settings.FilterFile = v
 	}
 	if v, ok := data[jsonkeys.SettingsMoveOpsFile].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		settings.MetaFilterMoveOpFile = v
 	}
 	if v, ok := data[jsonkeys.SettingsJSONDirectory].(string); ok {
-		if _, err := validation.ValidateDirectory(v, true); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		settings.JSONDir = v
 	}
 	if v, ok := data[jsonkeys.SettingsVideoDirectory].(string); ok {
-		if _, err := validation.ValidateDirectory(v, true); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		settings.VideoDir = v
@@ -278,25 +279,25 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.OutputExt = v
 	}
 	if v, ok := data[jsonkeys.MetarrFilenameOpsFile].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		metarr.FilenameOpsFile = v
 	}
 	if v, ok := data[jsonkeys.MetarrFilteredFilenameOpsFile].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		metarr.FilteredFilenameOpsFile = v
 	}
 	if v, ok := data[jsonkeys.MetarrMetaOpsFile].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		metarr.MetaOpsFile = v
 	}
 	if v, ok := data[jsonkeys.MetarrFilteredMetaOpsFile].(string); ok {
-		if _, err := validation.ValidateFile(v, false); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		metarr.FilteredMetaOpsFile = v
@@ -327,7 +328,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.TranscodeGPU = validGPU
 	}
 	if v, ok := data[jsonkeys.MetarrOutputDirectory].(string); ok {
-		if _, err := validation.ValidateDirectory(v, true); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		metarr.OutputDir = v
@@ -438,11 +439,11 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 
 	// -- Validation --
 	// Strings
-	if _, err := validation.ValidateDirectory(vDir, true); err != nil {
+	if _, _, err := sharedvalidation.ValidateDirectory(vDir, true, sharedtemplates.AllTemplatesMap); err != nil {
 		http.Error(w, fmt.Sprintf("video directory %q is invalid: %v", vDir, err), http.StatusBadRequest)
 		return nil
 	}
-	if _, err := validation.ValidateDirectory(jDir, true); err != nil {
+	if _, _, err := sharedvalidation.ValidateDirectory(jDir, true, sharedtemplates.AllTemplatesMap); err != nil {
 		http.Error(w, fmt.Sprintf("JSON directory %q is invalid: %v", jDir, err), http.StatusBadRequest)
 		return nil
 	}
@@ -593,7 +594,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid transcode quality string %q: %v", transcodeQualityStr, err), http.StatusBadRequest)
 		return nil
 	}
-	if _, err := validation.ValidateDirectory(outputDir, false); err != nil {
+	if _, _, err := sharedvalidation.ValidateDirectory(outputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
 		http.Error(w, fmt.Sprintf("cannot get output directories. Input string %q. Error: %v", outputDir, err), http.StatusBadRequest)
 		return nil
 	}

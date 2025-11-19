@@ -22,6 +22,7 @@ import (
 	"tubarr/internal/state"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -214,7 +215,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			var urlLines []string
 			// Check URL file if existent.
 			if cFile != "" {
-				cFileInfo, err := validation.ValidateFile(cFile, false)
+				_, cFileInfo, err := sharedvalidation.ValidateFile(cFile, false, sharedtemplates.AllTemplatesMap)
 				if err != nil {
 					err = fmt.Errorf("file entered (%q) is not valid: %w", cFile, err)
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -1667,7 +1668,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	// Output directory.
 	if f.Changed(keys.MOutputDir) {
 		if c.outputDir != "" {
-			if _, err = validation.ValidateDirectory(c.outputDir, false); err != nil {
+			if _, _, err = sharedvalidation.ValidateDirectory(c.outputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
 				return nil, err
 			}
 		}
@@ -1682,7 +1683,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		validOutDirs := make([]string, 0, len(c.urlOutputDirs))
 		if len(c.urlOutputDirs) != 0 {
 			for _, u := range c.urlOutputDirs {
-				if _, err = validation.ValidateDirectory(u, false); err != nil {
+				if _, _, err = sharedvalidation.ValidateDirectory(u, false, sharedtemplates.AllTemplatesMap); err != nil {
 					return nil, err
 				}
 				validOutDirs = append(validOutDirs, u)
@@ -1989,7 +1990,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 			c.jsonDir = c.videoDir
 		}
 
-		if _, err = validation.ValidateDirectory(c.jsonDir, false); err != nil {
+		if _, _, err = sharedvalidation.ValidateDirectory(c.jsonDir, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 
@@ -2044,7 +2045,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 			return nil, fmt.Errorf("video directory cannot be empty")
 		}
 
-		if _, err = validation.ValidateDirectory(c.videoDir, false); err != nil {
+		if _, _, err = sharedvalidation.ValidateDirectory(c.videoDir, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(s *models.Settings) error {

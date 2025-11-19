@@ -12,6 +12,7 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
@@ -128,7 +129,7 @@ func TestValidateMetarrOutputDirs(t *testing.T) {
 func TestValidateDirectory_ExistingDirectory(t *testing.T) {
 	tmp := t.TempDir()
 
-	info, err := validation.ValidateDirectory(tmp, false)
+	_, info, err := sharedvalidation.ValidateDirectory(tmp, false, sharedtemplates.AllTemplatesMap)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -151,7 +152,7 @@ func TestValidateDirectory_CreateIfMissing(t *testing.T) {
 	})
 
 	// Missing, create it
-	info, err := validation.ValidateDirectory(missing, true)
+	_, info, err := sharedvalidation.ValidateDirectory(missing, true, sharedtemplates.AllTemplatesMap)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestValidateDirectory_CreateIfMissing(t *testing.T) {
 	}
 
 	// Missing, invalid directory name
-	info, err = validation.ValidateDirectory(invalidName, true)
+	_, info, err = sharedvalidation.ValidateDirectory(invalidName, true, sharedtemplates.AllTemplatesMap)
 	if err == nil {
 		t.Fatalf("expected error, got: %v", err)
 	}
@@ -179,7 +180,7 @@ func TestValidateDirectory_ErrorIfMissing(t *testing.T) {
 	tmp := t.TempDir()
 	missing := tmp + "/missing"
 
-	info, err := validation.ValidateDirectory(missing, false)
+	_, info, err := sharedvalidation.ValidateDirectory(missing, false, sharedtemplates.AllTemplatesMap)
 	if err == nil {
 		t.Fatalf("expected error for missing directory, got nil")
 	}
@@ -192,7 +193,7 @@ func TestValidateDirectory_ErrorIfMissing(t *testing.T) {
 func TestValidateDirectory_ValidTemplate(t *testing.T) {
 	goodTag := "/path/{{video_title}}/file"
 
-	info, err := validation.ValidateDirectory(goodTag, false)
+	_, info, err := sharedvalidation.ValidateDirectory(goodTag, false, sharedtemplates.AllTemplatesMap)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -205,7 +206,7 @@ func TestValidateDirectory_InvalidTemplate(t *testing.T) {
 	// Unsupported tag: {{badtag}}
 	dir := "/root/{{badtag}}/video"
 
-	info, err := validation.ValidateDirectory(dir, false)
+	_, info, err := sharedvalidation.ValidateDirectory(dir, false, sharedtemplates.AllTemplatesMap)
 	if err == nil {
 		t.Fatalf("expected error for invalid template tag")
 	}
@@ -228,7 +229,7 @@ func TestValidateFile_ExistingFile(t *testing.T) {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
-	info, err := validation.ValidateFile(f, false)
+	_, info, err := sharedvalidation.ValidateFile(f, false, sharedtemplates.AllTemplatesMap)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -251,7 +252,7 @@ func TestValidateFile_CreateIfMissing(t *testing.T) {
 	})
 
 	// Valid filename
-	info, err := validation.ValidateFile(valid, true)
+	_, info, err := sharedvalidation.ValidateFile(valid, true, sharedtemplates.AllTemplatesMap)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -263,7 +264,7 @@ func TestValidateFile_CreateIfMissing(t *testing.T) {
 	}
 
 	// Invalid filename
-	info, err = validation.ValidateFile(invalid, true)
+	_, info, err = sharedvalidation.ValidateFile(invalid, true, sharedtemplates.AllTemplatesMap)
 	if err == nil {
 		t.Fatalf("expected error, got: %v", err)
 	}
@@ -279,7 +280,7 @@ func TestValidateFile_MissingNoCreate(t *testing.T) {
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "does_not_exist.txt")
 
-	if _, err := validation.ValidateFile(f, false); err == nil {
+	if _, _, err := sharedvalidation.ValidateFile(f, false, sharedtemplates.AllTemplatesMap); err == nil {
 		t.Fatalf("expected error for missing file without create flag")
 	}
 }
@@ -287,7 +288,7 @@ func TestValidateFile_MissingNoCreate(t *testing.T) {
 func TestValidateFile_PathIsDirectory(t *testing.T) {
 	tmp := t.TempDir()
 
-	_, err := validation.ValidateFile(tmp, false)
+	_, _, err := sharedvalidation.ValidateFile(tmp, false, sharedtemplates.AllTemplatesMap)
 	if err == nil {
 		t.Fatalf("expected error when path is a directory")
 	}
@@ -297,7 +298,7 @@ func TestValidateFile_ValidTemplate(t *testing.T) {
 	tmp := os.TempDir()
 	goodTag := tmp + "/{{video_title}}.txt"
 
-	info, err := validation.ValidateFile(goodTag, false)
+	_, info, err := sharedvalidation.ValidateFile(goodTag, false, sharedtemplates.AllTemplatesMap)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -311,7 +312,7 @@ func TestValidateFile_InvalidTemplate(t *testing.T) {
 	tmp := os.TempDir()
 	badTag := tmp + "/{{badtag}}.txt"
 
-	info, err := validation.ValidateFile(badTag, false)
+	_, info, err := sharedvalidation.ValidateFile(badTag, false, sharedtemplates.AllTemplatesMap)
 	if err == nil {
 		t.Fatalf("expected error for invalid template tag")
 	}

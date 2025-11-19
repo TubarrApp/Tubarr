@@ -9,8 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/domain/templates"
 	"tubarr/internal/models"
+
+	"github.com/TubarrApp/gocommon/sharedtemplates"
 )
 
 const (
@@ -108,49 +109,46 @@ func (dp *DirectoryParser) parseTemplate(dir string, v *models.Video) (string, e
 // replaceTemplateTags makes template replacements in the directory string.
 func (dp *DirectoryParser) replaceTemplateTags(tag string, v *models.Video) (string, error) {
 	c := dp.C
+	tag = strings.ToLower(tag)
 
-	switch strings.ToLower(tag) {
-
-	case templates.ChannelID:
+	switch tag {
+	case sharedtemplates.ChannelID:
 		if c != nil && c.ID != 0 {
 			return strconv.Itoa(int(c.ID)), nil
 		}
 		return "", errors.New("templating: channel ID is 0")
 
-	case templates.ChannelName:
+	case sharedtemplates.ChannelName:
 		if c != nil && c.Name != "" {
 			return c.Name, nil
 		}
 		return "", errors.New("templating: channel name empty")
 
-	case templates.VideoID:
+	case sharedtemplates.VideoID:
 		if v != nil && v.ID != 0 {
 			return strconv.Itoa(int(v.ID)), nil
 		}
 		return "", errors.New("templating: video ID is 0")
 
-	case templates.VideoTitle:
+	case sharedtemplates.VideoTitle:
 		if v != nil && v.Title != "" {
 			return v.Title, nil
 		}
 		return "", errors.New("templating: video title is empty")
 
-	case templates.VideoURL:
+	case sharedtemplates.VideoURL:
 		if v != nil && v.URL != "" {
 			return v.URL, nil
 		}
 		return "", errors.New("templating: video URL is empty")
 
-		// Metarr cases:
-	case templates.MetAuthor, templates.MetDay, templates.MetDirector,
-		templates.MetDomain, templates.MetMonth, templates.MetYear:
-
-		if _, err := exec.LookPath("metarr"); err != nil {
-			return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not found", tag)
-		}
-		return "{{" + tag + "}}", nil
-
 	default:
+		if sharedtemplates.MetarrTemplateTags[tag] {
+			if _, err := exec.LookPath("metarr"); err != nil {
+				return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %v", tag, err)
+			}
+			return "{{" + tag + "}}", nil
+		}
 		return "", fmt.Errorf("tag %q detected as invalid", tag)
 	}
 }

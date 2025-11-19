@@ -9,9 +9,11 @@ import (
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/validation"
+	"tubarr/internal/parsing"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedtemplates"
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
@@ -92,7 +94,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPMetaArgs))...)
 	}
 
-	// Add target URL [ MUST GO LAST !! ]
+	// Add target URL [ MUST GO LAST !! ].
 	args = append(args, d.Video.URL)
 
 	// Build command with context.
@@ -106,12 +108,24 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("no command built for URL %s", d.Video.URL)
 	}
 
-	// Ensure the directory exists
-	if _, err := validation.ValidateDirectory(d.ChannelURL.ChanURLSettings.VideoDir, true); err != nil {
+	// Ensure the directory exists.
+	if stillHasTemplating, _, err := sharedvalidation.ValidateDirectory(d.ChannelURL.ChanURLSettings.VideoDir, true, sharedtemplates.AllTemplatesMap); stillHasTemplating || err != nil {
+		if stillHasTemplating {
+			logger.Pl.E("Dev Error: Element still has template tags before downloading to destination %q.", d.ChannelURL.ChanURLSettings.VideoDir)
+
+			// Attempt fill for non-nil channel.
+			if d.Channel != nil {
+				logger.Pl.I("Attempting to fill tags before downloading to destination %q.", d.ChannelURL.ChanURLSettings.VideoDir)
+				dp := parsing.NewDirectoryParser(d.Channel)
+				if d.ChannelURL.ChanURLSettings.VideoDir, err = dp.ParseDirectory(d.ChannelURL.ChanURLSettings.VideoDir, d.Video, "video"); err != nil {
+					return fmt.Errorf("directory %q was not able to fill all template elements", d.ChannelURL.ChanURLSettings.VideoDir)
+				}
+			}
+		}
 		return err
 	}
 
-	// Execute JSON download
+	// Execute JSON download.
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -122,11 +136,11 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("yt-dlp error for %s: %w\nStderr: %s", d.Video.URL, err, stderr.String())
 	}
 
-	// Find the line containing the JSON path
+	// Find the line containing the JSON path.
 	outputLines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
 	if len(outputLines) == 0 {
-		logger.Pl.D(1, "Full stdout: %s", stdout.String())
-		logger.Pl.D(1, "Full stderr: %s", stderr.String())
+		logger.Pl.D(3, "Full stdout: %s", stdout.String())
+		logger.Pl.D(3, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("no output lines found for %s", d.Video.URL)
 	}
 
@@ -144,7 +158,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 
 	d.Video.JSONPath = jsonPath
 
-	// Verify the file exists
+	// Verify the file exists.
 	if err := verifyJSONDownload(d.Video.JSONPath); err != nil {
 		return err
 	}

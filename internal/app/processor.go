@@ -111,7 +111,7 @@ func InitProcess(
 		video.ParsedMetaDir, video.ParsedVideoDir = parseVideoJSONDirs(video, cu, c, dirParser)
 
 		// Use custom scraper if needed.
-		if video.JSONPath, err = executeCustomScraper(scrape, video); err != nil {
+		if video.JSONPath, err = executeCustomScraper(scrape, video, c); err != nil {
 			logger.Pl.E("Custom scraper failed for %q: %v", video.URL, err)
 			errs = append(errs, err)
 			continue
@@ -157,7 +157,7 @@ func InitProcess(
 }
 
 // executeCustomScraper checks if a custom scraper should be used for this release.
-func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON string, err error) {
+func executeCustomScraper(s *scraper.Scraper, v *models.Video, c *models.Channel) (customJSON string, err error) {
 	if v == nil || s == nil {
 		return "", fmt.Errorf("invalid nil parameter (video: %v, scraper: %v)", v == nil, s == nil)
 	}
@@ -168,7 +168,7 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON strin
 			logger.Pl.I("Using regular scraper for censored.tv ...")
 		} else {
 			logger.Pl.I("Detected a censored.tv link. Using specialized scraper.")
-			if err := s.ScrapeCensoredTVMetadata(v.URL, v.ParsedMetaDir, v); err != nil {
+			if err := s.ScrapeCensoredTVMetadata(v.URL, v.ParsedMetaDir, v, c); err != nil {
 				return "", fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
 			}
 		}
