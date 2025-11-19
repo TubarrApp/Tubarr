@@ -56,7 +56,7 @@ func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 	possibleTemplate := strings.Contains(dir, "{{") && strings.Contains(dir, "}}")
 	logger.Pl.D(3, "Statting directory %q. Templating detected? %v...", dir, possibleTemplate)
 
-	// Handle templated directories
+	// Handle templated directories.
 	if possibleTemplate {
 		if !checkTemplateTags(dir) {
 			t := make([]string, 0, len(templates.TemplateMap))
@@ -66,7 +66,7 @@ func ValidateDirectory(dir string, createIfNotFound bool) (os.FileInfo, error) {
 			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
 		}
 		logger.Pl.D(3, "Directory %q appears to contain templating elements, will not stat", dir)
-		return nil, nil // templates are valid, no need to stat
+		return nil, nil // templates are valid, no need to stat.
 	}
 
 	return sharedvalidation.ValidateDirectory(dir, createIfNotFound)
@@ -77,7 +77,7 @@ func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 	possibleTemplate := strings.Contains(f, "{{") && strings.Contains(f, "}}")
 	logger.Pl.D(3, "Statting file %q...", f)
 
-	// Handle templated directories
+	// Handle templated directories.
 	if possibleTemplate {
 		if !checkTemplateTags(f) {
 			t := make([]string, 0, len(templates.TemplateMap))
@@ -87,7 +87,7 @@ func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 			return nil, fmt.Errorf("directory contains unsupported template tags. Supported tags: %v", t)
 		}
 		logger.Pl.D(3, "Directory %q appears to contain templating elements, will not stat", f)
-		return nil, nil // templates are valid, no need to stat
+		return nil, nil // templates are valid, no need to stat.
 	}
 
 	return sharedvalidation.ValidateFile(f, createIfNotFound)
@@ -95,7 +95,7 @@ func ValidateFile(f string, createIfNotFound bool) (os.FileInfo, error) {
 
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {
-	// Meta purge
+	// Meta purge.
 	if abstractions.IsSet(keys.MMetaPurge) {
 		purge := abstractions.GetString(keys.MMetaPurge)
 		if purge != "" && !ValidatePurgeMetafiles(purge) {
@@ -103,7 +103,7 @@ func ValidateViperFlags() error {
 		}
 	}
 
-	// Logging
+	// Logging.
 	ValidateLoggingLevel()
 	abstractions.Set(keys.GlobalConcurrency, sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.GlobalConcurrency)))
 	return nil
@@ -118,12 +118,12 @@ func ValidateNotifications(notifications []*models.Notification) error {
 	logger.Pl.D(1, "Validating %d notifications...", len(notifications))
 
 	for i, n := range notifications {
-		// Validate notify URL is not empty
+		// Validate notify URL is not empty.
 		if n.NotifyURL == "" {
 			return fmt.Errorf("notification at position %d has empty notify URL", i)
 		}
 
-		// Validate notify URL format
+		// Validate notify URL format.
 		if _, err := url.Parse(n.NotifyURL); err != nil {
 			if u, err := url.Parse(n.NotifyURL); err != nil {
 				return fmt.Errorf("notify URL %q is not valid", u)

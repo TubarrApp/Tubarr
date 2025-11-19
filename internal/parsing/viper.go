@@ -812,7 +812,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Only set int fields if explicitly provided.
 	if input.MetarrConcurrency != nil {
-		metarr.Concurrency = max(*input.MetarrConcurrency, 0)
+		metarr.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*input.MetarrConcurrency)
 	}
 
 	// Only set float64 fields if explicitly provided.

@@ -1477,7 +1477,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Crawl frequency
 	if v, ok := parsing.GetConfigValue[int](vip, keys.CrawlFreq); ok {
-		c.ChanSettings.CrawlFreq = max(v, -1)
+		c.ChanSettings.CrawlFreq = max(v, 0)
 	}
 
 	// Download retries

@@ -359,7 +359,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 
 	// Extract integer fields
 	if v, ok := data[jsonkeys.MetarrConcurrency].(int); ok {
-		metarr.Concurrency = max(v, 0)
+		metarr.Concurrency = sharedvalidation.ValidateConcurrencyLimit(v)
 	}
 
 	// Extract float fields

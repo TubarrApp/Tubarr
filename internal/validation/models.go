@@ -13,7 +13,7 @@ import (
 func ValidateSettingsModel(s *models.Settings) error {
 	var err error
 
-	s.Concurrency = max(s.Concurrency, 0)
+	s.Concurrency = sharedvalidation.ValidateConcurrencyLimit(s.Concurrency)
 	s.CrawlFreq = max(s.CrawlFreq, 0)
 
 	if s.FilterFile != "" {
@@ -59,7 +59,6 @@ func ValidateSettingsModel(s *models.Settings) error {
 	}
 
 	s.Retries = max(s.Retries, 0)
-
 	if s.ToDate != "" {
 		if s.ToDate, err = ValidateToFromDate(s.ToDate); err != nil {
 			return fmt.Errorf("invalid to date %q in settings: %w", s.ToDate, err)
@@ -85,7 +84,7 @@ func ValidateSettingsModel(s *models.Settings) error {
 //
 // Ensures all metarr settings are valid before storage/after retrieval.
 func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
-	m.Concurrency = max(m.Concurrency, 0)
+	m.Concurrency = sharedvalidation.ValidateConcurrencyLimit(m.Concurrency)
 
 	if m.FilenameOps != nil {
 		if err := ValidateFilenameOps(m.FilenameOps); err != nil {

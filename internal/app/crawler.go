@@ -21,6 +21,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 
 	"golang.org/x/net/publicsuffix"
 )
@@ -37,7 +38,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	}
 
 	var (
-		conc    = max(abstractions.GetInt(keys.GlobalConcurrency), 1)
+		conc    = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.GlobalConcurrency))
 		errChan = make(chan error, len(channels))
 		sem     = make(chan struct{}, conc)
 		wg      sync.WaitGroup

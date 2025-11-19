@@ -1883,7 +1883,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	// Concurrency
 	if f.Changed(keys.ChanOrURLConcurrencyLimit) {
 		fns = append(fns, func(s *models.Settings) error {
-			s.Concurrency = max(c.concurrency, 1)
+			s.Concurrency = sharedvalidation.ValidateConcurrencyLimit(c.concurrency)
 			return nil
 		})
 	}
@@ -1899,7 +1899,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	// Crawl frequency
 	if f.Changed(keys.CrawlFreq) {
 		fns = append(fns, func(s *models.Settings) error {
-			s.CrawlFreq = max(c.crawlFreq, -1)
+			s.CrawlFreq = max(c.crawlFreq, 0)
 			return nil
 		})
 	}

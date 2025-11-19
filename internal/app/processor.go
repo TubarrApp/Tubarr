@@ -22,6 +22,8 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
 	"tubarr/internal/times"
+
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // InitProcess begins processing metadata/videos and respective downloads.
@@ -35,7 +37,7 @@ func InitProcess(
 	// Initialize variables.
 	var (
 		errs []error
-		conc = max(c.ChanSettings.Concurrency, 1)
+		conc = sharedvalidation.ValidateConcurrencyLimit(c.ChanSettings.Concurrency)
 	)
 
 	logger.Pl.I("Starting meta/video processing for %d videos", len(videos))
