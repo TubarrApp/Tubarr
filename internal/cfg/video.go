@@ -2,10 +2,8 @@ package cfg
 
 import (
 	"errors"
-	"strconv"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 
 	"github.com/spf13/cobra"
@@ -25,7 +23,7 @@ func InitVideoCmds(s contracts.Store) *cobra.Command {
 	vs := s.VideoStore()
 	cs := s.ChannelStore()
 
-	// Add subcommands with dependencies
+	// Add subcommands with dependencies.
 	vidCmd.AddCommand(deleteCmdVideo(vs, cs))
 
 	return vidCmd
@@ -34,8 +32,8 @@ func InitVideoCmds(s contracts.Store) *cobra.Command {
 // deleteCmdVideo deletes a channel from the database.
 func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.Command {
 	var (
-		chanName, chanKey, chanVal, url string
-		chanID                          int
+		chanName, url string
+		chanID        int
 	)
 
 	delCmd := &cobra.Command{
@@ -43,15 +41,9 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 		Short: "Delete video entry",
 		Long:  "Delete a video entry from a channel by URL",
 		RunE: func(_ *cobra.Command, _ []string) error {
-
-			switch {
-			case chanName != "":
-				chanKey = consts.QChanName
-				chanVal = chanName
-			case chanID != 0:
-				chanKey = consts.QChanID
-				chanVal = strconv.Itoa(chanID)
-			default:
+			// Get channel key and value.
+			key, val, err := getChanKeyVal(chanID, chanName)
+			if err != nil {
 				return errors.New("must enter a channel name/URL, and a video URL to delete")
 			}
 
@@ -59,11 +51,13 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 				return errors.New("must enter a video URL to delete")
 			}
 
-			cID, err := cs.GetChannelID(chanKey, chanVal)
+			// Get channel ID.
+			cID, err := cs.GetChannelID(key, val)
 			if err != nil {
 				return err
 			}
 
+			// Delete video.
 			if err := vs.DeleteVideo(url, cID); err != nil {
 				return err
 			}
@@ -72,7 +66,7 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
 	delCmd.Flags().StringVar(&url, "delete-url", "", "Video URL")
 

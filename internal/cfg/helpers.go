@@ -23,7 +23,7 @@ const (
 
 // resetCobraFlagsAndLoadViper loads in variables from config file(s).
 func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
-	// Apply defaults for all known flags
+	// Apply defaults for all known flags.
 	var errOrNil error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if !f.Changed {
@@ -61,7 +61,7 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 				}
 			case flagTypeStringSlice:
 				if slice, ok := parsing.GetConfigValue[[]string](v, key); ok && len(slice) > 0 {
-					// Try to type assert pflag.Value to pflag.SliceValue
+					// Try to type assert pflag.Value to pflag.SliceValue.
 					if sv, ok := f.Value.(pflag.SliceValue); ok {
 						if err := sv.Replace(slice); err != nil {
 							errOrNil = err
@@ -69,7 +69,7 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 							f.Changed = true
 						}
 					} else {
-						// Fallback: Try join on comma for types that only implement Set(string)
+						// Fallback: Try join on comma for types that only implement Set(string).
 						if err := f.Value.Set(strings.Join(slice, ",")); err != nil {
 							errOrNil = err
 						} else {

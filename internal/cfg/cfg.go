@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// rootCmd is the base command for Tubarr.
 var rootCmd = &cobra.Command{
 	Use:   "tubarr",
 	Short: "Tubarr is a video downloading and metatagging tool.",
@@ -28,7 +29,7 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		// Setup benchmarking if flag is set
+		// Setup benchmarking if flag is set.
 		if viper.GetBool(keys.Benchmarking) {
 			var err error
 			vars.BenchmarkFiles, err = benchmark.SetupBenchmarking(logger.Pl, paths.BenchmarkDir)
@@ -38,7 +39,7 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		// Setup channel flags from config file
+		// Setup channel flags from config file.
 		if viper.IsSet(keys.ChannelConfigFile) {
 			configFile := viper.GetString(keys.ChannelConfigFile)
 			cInfo, err := os.Stat(configFile)
@@ -52,7 +53,7 @@ var rootCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			if configFile != "" {
-				// load and normalize keys from any Viper-supported config file
+				// load and normalize keys from any Viper-supported config file.
 				v := viper.New()
 				if err := file.LoadConfigFile(v, configFile); err != nil {
 					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
@@ -76,9 +77,9 @@ var rootCmd = &cobra.Command{
 // InitCommands initializes all commands and their flags.
 func InitCommands(ctx context.Context, s contracts.Store) error {
 	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory"
+	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory".
 
-	// Web version vs. terminal version toggle
+	// Web version vs. terminal version toggle.
 	rootCmd.PersistentFlags().Bool(keys.RunWebInterface, false, "Run Tubarr as a web interface")
 	if err := viper.BindPFlag(keys.RunWebInterface, rootCmd.PersistentFlags().Lookup(keys.RunWebInterface)); err != nil {
 		return err
@@ -106,7 +107,7 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	return nil
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately
+// Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() error {
 	return rootCmd.Execute()
 }

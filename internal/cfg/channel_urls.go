@@ -38,13 +38,13 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Update settings for URL(s) within a channel.",
 		Long:  "Update settings for a specific channel URL, or all URLs if --url is not specified. Use --reset-settings to clear URL-specific overrides and inherit from channel defaults.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Validate channel name or ID is present
+			// Validate channel name or ID is present.
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				return err
 			}
 
-			// Get channel model
+			// Get channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, false)
 			if err != nil {
 				return err
@@ -53,11 +53,11 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("channel not found with %s %q", key, val)
 			}
 
-			// Determine which URLs to update
+			// Determine which URLs to update.
 			var urlsToUpdate []*models.ChannelURL
 
 			if url != "" {
-				// Update specific URL
+				// Update specific URL.
 				cu, hasRows, err := cs.GetChannelURLModel(c.ID, url, false)
 				if err != nil {
 					return err
@@ -68,12 +68,12 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				urlsToUpdate = append(urlsToUpdate, cu)
 				logger.Pl.I("Updating settings for URL: %s", url)
 			} else {
-				// Update all URLs
+				// Update all URLs.
 				urlsToUpdate = c.URLModels
 				logger.Pl.I("Updating settings for %d URL(s) in channel %q", len(urlsToUpdate), c.Name)
 			}
 
-			// If reset flag is set, clear settings to inherit from channel
+			// If reset flag is set, clear settings to inherit from channel.
 			if resetSettings {
 				for _, cu := range urlsToUpdate {
 					cu.ChanURLSettings = nil
@@ -89,7 +89,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				return nil
 			}
 
-			// Gather settings update functions
+			// Gather settings update functions.
 			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
 				concurrency:            concurrency,
 				cookiesFromBrowser:     cookiesFromBrowser,
@@ -116,7 +116,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Gather metarr update functions
+			// Gather metarr update functions.
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
 				renameStyle:     renameStyle,
 				extraFFmpegArgs: extraFFmpegArgs,
@@ -148,10 +148,10 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Apply updates to each URL
+			// Apply updates to each URL.
 			updatedCount := 0
 			for _, cu := range urlsToUpdate {
-				// Initialize settings if nil
+				// Initialize settings if nil.
 				if cu.ChanURLSettings == nil {
 					cu.ChanURLSettings = &models.Settings{}
 				}
@@ -159,7 +159,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 				}
 
-				// Apply settings updates
+				// Apply settings updates.
 				if len(fnSettingsArgs) > 0 {
 					for _, fn := range fnSettingsArgs {
 						if err := fn(cu.ChanURLSettings); err != nil {
@@ -168,7 +168,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					}
 				}
 
-				// Apply metarr updates
+				// Apply metarr updates.
 				if len(fnMetarrArray) > 0 {
 					for _, fn := range fnMetarrArray {
 						if err := fn(cu.ChanURLMetarrArgs); err != nil {
@@ -177,7 +177,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					}
 				}
 
-				// Save to database
+				// Save to database.
 				if err := cs.UpdateChannelURLSettings(cu); err != nil {
 					logger.Pl.E("Failed to update URL %s: %v", cu.URL, err)
 					continue
@@ -192,26 +192,26 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		},
 	}
 
-	// Primary identifiers
+	// Primary identifiers.
 	updateURLSettingsCmd.Flags().StringVarP(&channelName, "channel-name", "n", "", "Channel name")
 	updateURLSettingsCmd.Flags().IntVar(&channelID, "channel-id", 0, "Channel ID")
 	updateURLSettingsCmd.Flags().StringVar(&url, "url", "", "Specific URL to update (if not provided, updates all URLs in channel)")
 
-	// Files/dirs
+	// Files/dirs.
 	cmd.SetFileDirFlags(updateURLSettingsCmd, nil, &jDir, &vDir)
 
-	// Program related
+	// Program related.
 	cmd.SetProgramRelatedFlags(updateURLSettingsCmd, &concurrency, &crawlFreq,
 		&externalDownloaderArgs, &externalDownloader, &moveOpsFile,
 		&moveOps, &pause)
 
-	// Download
+	// Download.
 	cmd.SetDownloadFlags(updateURLSettingsCmd, &retries, &useGlobalCookies,
 		&ytdlpOutExt, &fromDate, &toDate,
 		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
 		&dlFilters)
 
-	// Metarr
+	// Metarr.
 	cmd.SetMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
@@ -219,15 +219,15 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&urlOutDirs, &filenameOps, &filteredFilenameOps,
 		&metaOps, &filteredMetaOps)
 
-	// Transcoding
+	// Transcoding.
 	cmd.SetTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuDir,
 		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
 		&audioCodec)
 
-	// Additional YTDLP args
+	// Additional YTDLP args.
 	cmd.SetCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
 
-	// Reset flag
+	// Reset flag.
 	updateURLSettingsCmd.Flags().BoolVar(&resetSettings, "clear-settings", false, "Clear all URL-specific settings and inherit from channel defaults")
 
 	return updateURLSettingsCmd

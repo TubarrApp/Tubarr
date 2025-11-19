@@ -85,19 +85,18 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Add authentication details to a channel.",
 		Long:  "Add authentication details to a channel for use in crawls.",
 		RunE: func(_ *cobra.Command, _ []string) error {
-
 			// Valid items set?
 			if len(authDetails) == 0 && (username == "" || loginURL == "") {
 				return errors.New("must enter a username and login URL, or fully qualified authentication detail string ('channel URL|username|password|login URL')")
 			}
 
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				return err
 			}
 
-			// Get and check ID
+			// Get and check ID.
 			id, err := cs.GetChannelID(key, val)
 			if err != nil {
 				return err
@@ -107,7 +106,7 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("could not get valid ID (got %d) for channel with %s %q", id, key, val)
 			}
 
-			// Fetch channel model (retrieve the URLs)
+			// Fetch channel model (retrieve the URLs).
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
@@ -116,7 +115,7 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Parse and set authentication details
+			// Parse and set authentication details.
 			cURLs := c.GetURLs()
 			authDetails, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, cURLs, false)
 			if err != nil {
@@ -129,7 +128,7 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 				}
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Channel with %s %q set authentication details", key, val)
 			return nil
 		},
@@ -143,11 +142,11 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		channelID   int
 		channelName string
 
-		// URLs and files
+		// URLs and files.
 		cFile string
 		urls  []string
 	)
@@ -160,17 +159,19 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 			if cFile == "" && len(urls) == 0 {
 				return errors.New("must enter a URL source")
 			}
-
+			// Get key/val pair.
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				return err
 			}
 
+			// Get channel ID.
 			chanID, err := cs.GetChannelID(key, val)
 			if err != nil {
 				return err
 			}
 
+			// Delete videos based on URL list.
 			if err := cs.DeleteVideosByURLs(chanID, urls); err != nil {
 				return err
 			}
@@ -187,11 +188,11 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 // downloadVideoURLs downloads a list of URLs inputted by the user.
 func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		channelID   int
 		channelName string
 
-		// URLs and files
+		// URLs and files.
 		cFile string
 		urls  []string
 	)
@@ -211,7 +212,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			}
 
 			var urlLines []string
-			// Check URL file if existent
+			// Check URL file if existent.
 			if cFile != "" {
 				cFileInfo, err := validation.ValidateFile(cFile, false)
 				if err != nil {
@@ -230,10 +231,10 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 				}
 			}
 
-			// Combine with video URLs if any
+			// Combine with video URLs if any.
 			videoURLs := append(urls, urlLines...)
 
-			// Check URLs have valid syntax
+			// Check URLs have valid syntax.
 			for _, u := range videoURLs {
 				splitLen := len(strings.Split(u, "|"))
 				if splitLen > 2 {
@@ -243,14 +244,14 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 				}
 			}
 
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}
 
-			// Retrieve channel model
+			// Retrieve channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				err := fmt.Errorf("no channel model in database with %s %q", key, val)
@@ -265,12 +266,12 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			cURLs := c.GetURLs()
 			logger.Pl.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
-			// Download URLs - errors already logged, DON'T print here
+			// Download URLs - errors already logged, DON'T print here.
 			if err := app.DownloadVideosToChannel(ctx, s, cs, c, videoURLs); err != nil {
 				return err
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
@@ -286,11 +287,11 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 // deleteNotifyURLs deletes notification URLs from a channel.
 func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		channelID   int
 		channelName string
 
-		// Notification details
+		// Notification details.
 		notifyURLs  []string
 		notifyNames []string
 	)
@@ -306,7 +307,7 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 				return errors.New("must enter at least one notify URL or name to delete")
 			}
 
-			// Get and check ID
+			// Get and check ID.
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				return err
@@ -321,18 +322,18 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("could not get valid ID (got %d) for channel name %q", id, channelName)
 			}
 
-			// Run command
+			// Run command.
 			if err := cs.DeleteNotifyURLs(id, notifyURLs, notifyNames); err != nil {
 				return err
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Deleted notify URLs for channel with %s %q: %v", key, val, notifyURLs)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(deleteNotifyCmd, &channelName, nil, &channelID)
 	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, "notify-urls", nil, "Full notification URLs (e.g. 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE')")
 	deleteNotifyCmd.Flags().StringSliceVar(&notifyNames, "notify-names", nil, "Full notification names")
@@ -343,11 +344,11 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 // addNotifyURLs adds a notification URL (can use to send requests to update Plex libraries on new video addition).
 func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		channelID   int
 		channelName string
 
-		// Notification details
+		// Notification details.
 		notification []string
 	)
 
@@ -356,13 +357,12 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Adds notify function to a channel.",
 		Long:  "Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. (notification pair format is 'URL|Friendly Name')",
 		RunE: func(_ *cobra.Command, _ []string) error {
-
 			// Valid items set?
 			if len(notification) == 0 {
 				return errors.New("no notification URL|Name pairs entered")
 			}
 
-			// Get and check ID
+			// Get and check ID.
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
 				return err
@@ -377,7 +377,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("could not get valid ID (got %d) for channel name %q", id, channelName)
 			}
 
-			// Parse notification URLs
+			// Parse notification URLs.
 			validPairs, err := parsing.ParseNotifications(notification)
 			if err != nil {
 				return err
@@ -387,7 +387,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Success
+			// Success.
 			pairSlice := make([]string, 0, len(validPairs))
 			for _, vp := range validPairs {
 				pairSlice = append(pairSlice, (vp.ChannelURL + "|" + vp.NotifyURL + "|" + vp.Name))
@@ -397,7 +397,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(addNotifyCmd, &channelName, nil, &channelID)
 	cmd.SetNotifyFlags(addNotifyCmd, &notification)
 
@@ -407,11 +407,11 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 // addVideoURLToIgnore adds a user inputted URL to ignore from crawls.
 func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 
-		// Ignore details
+		// Ignore details.
 		ignoreURL string
 	)
 
@@ -426,7 +426,7 @@ func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 				return errors.New("cannot enter the target ignore URL blank")
 			}
 
-			// Get and check ID
+			// Get and check ID.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
@@ -441,18 +441,18 @@ func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("could not get valid ID (got %d) for channel name %q", id, name)
 			}
 
-			// Add URLs to ignore
+			// Add URLs to ignore.
 			if err := cs.AddURLToIgnore(id, ignoreURL); err != nil {
 				return err
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Ignoring URL %q for channel with %s %q", ignoreURL, key, val)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(ignoreURLCmd, &name, nil, nil)
 	ignoreURLCmd.Flags().StringVarP(&ignoreURL, "ignore-video-url", "i", "", "Video URL to ignore")
 
@@ -462,7 +462,7 @@ func addVideoURLToIgnore(cs contracts.ChannelStore) *cobra.Command {
 // ignoreCrawl crawls the current state of the channel page and adds the URLs as though they are already grabbed.
 func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 	)
@@ -473,7 +473,6 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 		Long:         "Crawls the current state of a channel page and adds all video URLs to ignore.",
 		SilenceUsage: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-
 			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
@@ -511,13 +510,13 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Completed ignore crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(ignoreCrawlCmd, &name, nil, nil)
 
 	return ignoreCrawlCmd
@@ -526,7 +525,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 // pauseChannelCmd pauses a channel from downloads in upcoming crawls.
 func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 	)
@@ -536,14 +535,13 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Pause a channel.",
 		Long:  "Paused channels won't download new videos when the main program runs a crawl.",
 		RunE: func(_ *cobra.Command, _ []string) error {
-
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
-			// Get channel model
+			// Get channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key/value %q:%q", key, val)
@@ -552,7 +550,7 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Alter and save model settings
+			// Alter and save model settings.
 			c.ChanSettings.Paused = true
 
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.Settings) error {
@@ -563,13 +561,13 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("failed to unpause channel: %w", err)
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Paused channel %q", c.Name)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(pauseCmd, &name, nil, &id)
 
 	return pauseCmd
@@ -578,7 +576,7 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // unpauseChannelCmd unpauses a channel to allow for downloads in upcoming crawls.
 func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 	)
@@ -588,14 +586,13 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Unpause a channel.",
 		Long:  "Unpauses a channel, allowing it to download new videos when the main program runs a crawl.",
 		RunE: func(_ *cobra.Command, _ []string) error {
-
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
-			// Get channel model
+			// Get channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
@@ -604,7 +601,7 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Send update
+			// Send update.
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.Settings) error {
 				s.Paused = false
 				return nil
@@ -613,13 +610,13 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("failed to unpause channel: %w", err)
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Unpaused channel %q", c.Name)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(unPauseCmd, &name, nil, &id)
 
 	return unPauseCmd
@@ -628,7 +625,7 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // unblockChannelCmd unblocks channels which were locked (usually due to bot activity detection).
 func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 	)
@@ -638,14 +635,13 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Unblock a channel.",
 		Long:  "Unblocks a channel (usually blocked due to sites detecting Tubarr as a bot), allowing it to download new videos.",
 		RunE: func(_ *cobra.Command, _ []string) error {
-
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
-			// Get channel model
+			// Get channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
@@ -654,7 +650,7 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Send update
+			// Send update.
 			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.Settings) error {
 				s.BotBlocked = false
 				s.BotBlockedHostnames = nil
@@ -665,13 +661,13 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 				return fmt.Errorf("failed to unblock channel: %w", err)
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Unblocked channel %q", c.Name)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(unblockCmd, &name, nil, &id)
 
 	return unblockCmd
@@ -722,11 +718,14 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			return nil
 		},
 		RunE: func(_ *cobra.Command, _ []string) error {
+			// Build channel from input.
 			c, authMap, err := parsing.BuildChannelFromInput(input)
 			if err != nil {
 				return err
 			}
 
+			// Add channel to database.
+			logger.Pl.I("Adding channel %q to Tubarr...", c.Name)
 			channelID, err := cs.AddChannel(c)
 			if err != nil {
 				return err
@@ -739,6 +738,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 				}
 			}
 
+			// Add notification URLs if any.
 			if input.Notification != nil && len(*input.Notification) != 0 {
 				validPairs, err := parsing.ParseNotifications(*input.Notification)
 				if err != nil {
@@ -843,6 +843,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 				err  error
 			}
 
+			// Process each config file.
 			for i, batchConfigFile := range batchConfigFiles {
 				logger.Pl.I("Processing config file: %s", batchConfigFile)
 
@@ -851,15 +852,18 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					flags = models.ChannelFlagValues{}
 				}
 
+				// Reset all flags to not changed.
 				cmd.Flags().VisitAll(func(f *pflag.Flag) {
 					f.Changed = false
 				})
 
+				// Load config file into Viper.
 				v := viper.New()
 				if err := file.LoadConfigFile(v, batchConfigFile); err != nil {
 					return err
 				}
 
+				// Apply Viper settings to Cobra flags.
 				if err := resetCobraFlagsAndLoadViper(cmd, v); err != nil {
 					failures = append(failures, struct {
 						file string
@@ -868,13 +872,16 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					continue
 				}
 
+				// Load Viper into input struct.
 				mergeFlagsIntoInput(cmd, &flags, &input)
 
+				// Parse URL settings from Viper.
 				urlSettings, err := parsing.ParseURLSettingsFromViper(v)
 				if err == nil {
 					input.URLSettings = urlSettings
 				}
 
+				// Build channel from input.
 				c, authMap, err := parsing.BuildChannelFromInput(input)
 				if err != nil || c == nil {
 					failures = append(failures, struct {
@@ -884,6 +891,8 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					continue
 				}
 
+				// Add channel to database.
+				logger.Pl.I("Adding channel %q to Tubarr...", c.Name)
 				channelID, err := cs.AddChannel(c)
 				if err != nil {
 					failures = append(failures, struct {
@@ -895,6 +904,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 				c.ID = channelID
 
+				// Add auth if existent.
 				if len(authMap) > 0 {
 					if err := cs.AddAuth(channelID, authMap); err != nil {
 						failures = append(failures, struct {
@@ -905,6 +915,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					}
 				}
 
+				// Add notification URLs if existent.
 				if input.Notification != nil && len(*input.Notification) != 0 {
 					validPairs, err := parsing.ParseNotifications(*input.Notification)
 					if err != nil {
@@ -993,11 +1004,11 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 // deleteChannelCmd deletes a channel from the database.
 func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 
-		// URLs
+		// URLs.
 		urls []string
 	)
 
@@ -1007,24 +1018,24 @@ func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 		Long:  "Delete a channel by ID, name, or URL.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
-			// Delete channel
+			// Delete channel.
 			if err := cs.DeleteChannel(key, val); err != nil {
 				return err
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Successfully deleted channel with %s %q", key, val)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(delCmd, &name, &urls, &id)
 
 	return delCmd
@@ -1033,7 +1044,7 @@ func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 // listAllChannel returns details about a single channel in the database.
 func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		channelID int
 		name      string
 	)
@@ -1043,13 +1054,13 @@ func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 		Long:  "Lists details of a channel in the database.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(channelID, name)
 			if err != nil {
 				return err
 			}
 
-			// Fetch channel model
+			// Fetch channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, false)
 			if !hasRows {
 				logger.Pl.I("Entry for channel with %s %q does not exist in the database", key, val)
@@ -1059,12 +1070,12 @@ func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Display settings and return
+			// Display settings and return.
 			cs.DisplaySettings(c)
 			return nil
 		},
 	}
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(listCmd, &name, nil, &channelID)
 	return listCmd
 }
@@ -1077,7 +1088,7 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 		Long:  "Lists all channels currently saved in the database.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 
-			// Fetch channels from database
+			// Fetch channels from database.
 			chans, hasRows, err := cs.GetAllChannels(false)
 			if !hasRows {
 				logger.Pl.I("No entries in the database")
@@ -1087,7 +1098,7 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Display settings and return
+			// Display settings and return.
 			for _, ch := range chans {
 				cs.DisplaySettings(ch)
 			}
@@ -1100,7 +1111,7 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 // crawlChannelCmd initiates a crawl of a given channel.
 func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 	)
@@ -1113,15 +1124,15 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 
-			// Get and check key/val pair
+			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
-				// Print flag/validation errors since they're user-facing
+				// Print flag/validation errors since they're user-facing.
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}
 
-			// Retrieve channel model
+			// Retrieve channel model.
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				err := fmt.Errorf("no channel model in database with %s %q", key, val)
@@ -1144,13 +1155,13 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(crawlCmd, &name, nil, &id)
 	return crawlCmd
 }
@@ -1158,22 +1169,22 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 // updateChannelSettingsCmd updates channel settings.
 func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id      int
 		name    string
 		newName string
 
-		// URLs
+		// URLs.
 		urls       []string
 		urlOutDirs []string
 
-		// Directory paths
+		// Directory paths.
 		vDir   string
 		jDir   string
 		outDir string
 		gpuDir string
 
-		// Configuration files
+		// Configuration files.
 		configFile              string
 		dlFilterFile            string
 		moveOpsFile             string
@@ -1182,13 +1193,13 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		filenameOpsFile         string
 		filteredFilenameOpsFile string
 
-		// Authentication details
+		// Authentication details.
 		username    string
 		password    string
 		loginURL    string
 		authDetails []string
 
-		// Download settings
+		// Download settings.
 		cookiesFromBrowser     string
 		externalDownloader     string
 		externalDownloaderArgs string
@@ -1198,7 +1209,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		toDate                 string
 		useGlobalCookies       bool
 
-		// Filter and operation settings
+		// Filter and operation settings.
 		dlFilters           []string
 		moveOps             []string
 		metaOps             []string
@@ -1206,31 +1217,31 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		filteredMetaOps     []string
 		filteredFilenameOps []string
 
-		// Metarr settings
+		// Metarr settings.
 		metarrExt   string
 		renameStyle string
 		minFreeMem  string
 
-		// Transcoding settings
+		// Transcoding settings.
 		useGPU               string
 		transcodeQuality     string
 		transcodeVideoFilter string
 		videoCodec           []string
 		audioCodec           []string
 
-		// Extra arguments
+		// Extra arguments.
 		extraYTDLPVideoArgs string
 		extraYTDLPMetaArgs  string
 		extraFFmpegArgs     string
 
-		// Concurrency and performance settings
+		// Concurrency and performance settings.
 		concurrency       int
 		crawlFreq         int
 		metarrConcurrency int
 		retries           int
 		maxCPU            float64
 
-		// Boolean flags
+		// Boolean flags.
 		pause      bool
 		deleteAuth bool
 	)
@@ -1240,7 +1251,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Update channel settings.",
 		Long:  "Update channel settings with various parameters, both for Tubarr itself and for external software like Metarr.",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
-			// Load in file if specified
+			// Load in file if specified.
 			v := viper.New()
 			if configFile != "" {
 				if err := file.LoadConfigFile(v, configFile); err != nil {
@@ -1251,13 +1262,13 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			return resetCobraFlagsAndLoadViper(cmd, v)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Check key/val pair
+			// Check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
-			// Fetch model from database
+			// Fetch model from database.
 			c, hasRows, err := cs.GetChannelModel(key, val, false)
 			if !hasRows {
 				return fmt.Errorf("no channel model in database with %s %q", key, val)
@@ -1266,7 +1277,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				return err
 			}
 
-			// Load config file location if existent and one wasn't hardcoded into terminal
+			// Load config file location if existent and one wasn't hardcoded into terminal.
 			//
 			// Do not load again if hardcoded configFile is the same as the channel model's config file.
 			if (!cmd.Flags().Changed(keys.ChannelConfigFile) || configFile == "") && c.ChannelConfigFile != "" && c.ChannelConfigFile != configFile {
@@ -1289,22 +1300,22 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				}
 			}
 
-			// Change name
+			// Change name.
 			if newName != "" && newName != c.Name {
 				if err := cs.UpdateChannelValue(key, val, consts.QChanName, newName); err != nil {
 					return err
 				}
 			}
 
-			// Check if the user got auth details from flags
+			// Check if the user got auth details from flags.
 			gotAuthDetails := cmd.Flags().Changed(keys.AuthUsername) ||
 				cmd.Flags().Changed(keys.AuthPassword) ||
 				cmd.Flags().Changed(keys.AuthURL) ||
 				cmd.Flags().Changed(keys.AuthDetails)
 
-			// Parse and set authentication details if set by user, clear all if flag is set
+			// Parse and set authentication details if set by user, clear all if flag is set.
 			if gotAuthDetails || deleteAuth {
-				// Get and check ID
+				// Get and check ID.
 				id, err := cs.GetChannelID(key, val)
 				if err != nil {
 					return err
@@ -1327,7 +1338,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				}
 			}
 
-			// Gather channel settings
+			// Gather channel settings.
 			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
 				concurrency:            concurrency,
 				cookiesFromBrowser:     cookiesFromBrowser,
@@ -1363,13 +1374,13 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					return nil
 				}
 
-				// Save channel settings to database
+				// Save channel settings to database.
 				if _, err := cs.UpdateChannelSettingsJSON(key, val, finalUpdateFn); err != nil {
 					return err
 				}
 			}
 
-			// Metarr arguments
+			// Metarr arguments.
 			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
 				renameStyle:     renameStyle,
 				extraFFmpegArgs: extraFFmpegArgs,
@@ -1411,36 +1422,36 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					return nil
 				}
 
-				// Save Metarr arguments to database
+				// Save Metarr arguments to database.
 				if _, err := cs.UpdateChannelMetarrArgsJSON(key, val, finalUpdateFn); err != nil {
 					return err
 				}
 			}
 
-			// Success
+			// Success.
 			logger.Pl.S("Completed update for channel with %s %q", key, val)
 			return nil
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(updateSettingsCmd, &name, &urls, &id)
 
-	// Files/dirs
+	// Files/dirs.
 	cmd.SetFileDirFlags(updateSettingsCmd, &configFile, &jDir, &vDir)
 
-	// Program related
+	// Program related.
 	cmd.SetProgramRelatedFlags(updateSettingsCmd, &concurrency, &crawlFreq,
 		&externalDownloaderArgs, &externalDownloader, &moveOpsFile,
 		&moveOps, &pause)
 
-	// Download
+	// Download.
 	cmd.SetDownloadFlags(updateSettingsCmd, &retries, &useGlobalCookies,
 		&ytdlpOutExt, &fromDate, &toDate,
 		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
 		&dlFilters)
 
-	// Metarr
+	// Metarr.
 	cmd.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
@@ -1448,17 +1459,16 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&urlOutDirs, &filenameOps, &filteredFilenameOps,
 		&metaOps, &filteredMetaOps)
 
-	// Transcoding
+	// Transcoding.
 	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuDir,
 		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
 		&audioCodec)
 
-	// Auth
+	// Auth.
 	cmd.SetAuthFlags(updateSettingsCmd, &username, &password,
 		&loginURL, &authDetails)
 
-	// Additional YTDLP args
-	// YTDLPFlags
+	// Additional YTDLP args.
 	cmd.SetCustomYDLPArgFlags(updateSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
 
 	updateSettingsCmd.Flags().StringVar(&newName, "change-name-to", "", "Change the channel name to this value")
@@ -1470,11 +1480,11 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 // updateChannelValue provides a command allowing the alteration of a channel row.
 func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers
+		// Channel identifiers.
 		id   int
 		name string
 
-		// Update details
+		// Update details.
 		col    string
 		newVal string
 	)
@@ -1485,18 +1495,18 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 		Long:  "Enter a column to update and a value to update that column to.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 
-			// Check key/val pair
+			// Check key/val pair.
 			key, val, err := getChanKeyVal(id, name)
 			if err != nil {
 				return err
 			}
 
-			// Check validity
+			// Check validity.
 			if err := verifyChanRowUpdateValid(col, newVal); err != nil {
 				return err
 			}
 
-			// Update value in database
+			// Update value in database.
 			if err := cs.UpdateChannelValue(key, val, col, newVal); err != nil {
 				return err
 			}
@@ -1507,7 +1517,7 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 		},
 	}
 
-	// Primary channel elements
+	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(updateRowCmd, &name, nil, &id)
 
 	updateRowCmd.Flags().StringVar(&col, "column-name", "", "The name of the column in the table (e.g. video_directory)")
@@ -1517,6 +1527,7 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 
 // ******************************** Private ********************************
 
+// cobraMetarrArgs holds Metarr argument values from Cobra flags.
 type cobraMetarrArgs struct {
 	renameStyle     string
 	extraFFmpegArgs string
@@ -1549,7 +1560,7 @@ type cobraMetarrArgs struct {
 func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.MetarrArgs) error, err error) {
 	f := cmd.Flags()
 
-	// Min free memory
+	// Min free memory.
 	if f.Changed(keys.MMinFreeMem) {
 		if c.minFreeMem != "" {
 			if _, err := sharedvalidation.ValidateMinFreeMem(c.minFreeMem); err != nil {
@@ -1562,7 +1573,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Max CPU usage
+	// Max CPU usage.
 	if f.Changed(keys.MMaxCPU) {
 		c.maxCPU = sharedvalidation.ValidateMaxCPU(c.maxCPU, true)
 		fns = append(fns, func(m *models.MetarrArgs) error {
@@ -1571,7 +1582,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Metarr final video output extension (e.g. 'mp4')
+	// Metarr final video output extension (e.g. 'mp4').
 	if f.Changed(keys.MOutputExt) {
 		if c.metarrExt != "" {
 			_, err := validation.ValidateMetarrOutputExt(c.metarrExt)
@@ -1586,7 +1597,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Rename style (e.g. 'spaces')
+	// Rename style (e.g. 'spaces').
 	if f.Changed(keys.MRenameStyle) {
 		if c.renameStyle != "" {
 			if err := validation.ValidateRenameFlag(c.renameStyle); err != nil {
@@ -1599,7 +1610,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Extra FFmpeg arguments
+	// Extra FFmpeg arguments.
 	if f.Changed(keys.MExtraFFmpegArgs) {
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.ExtraFFmpegArgs = c.extraFFmpegArgs
@@ -1607,7 +1618,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Filename operations (e.g. 'prefix:[DOG COLLECTION] ')
+	// Filename operations (e.g. 'prefix:[DOG COLLECTION] ').
 	if f.Changed(keys.MFilenameOps) {
 		parsed := []models.FilenameOps{}
 
@@ -1630,7 +1641,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Filtered filename operations
+	// Filtered filename operations.
 	if f.Changed(keys.MFilteredFilenameOps) {
 		parsed := []models.FilteredFilenameOps{}
 
@@ -1653,7 +1664,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Output directory
+	// Output directory.
 	if f.Changed(keys.MOutputDir) {
 		if c.outputDir != "" {
 			if _, err = validation.ValidateDirectory(c.outputDir, false); err != nil {
@@ -1666,7 +1677,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Output directory strings
+	// Output directory strings.
 	if f.Changed(keys.MURLOutputDirs) {
 		validOutDirs := make([]string, 0, len(c.urlOutputDirs))
 		if len(c.urlOutputDirs) != 0 {
@@ -1683,7 +1694,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Meta operations (e.g. 'all-credits:set:author')
+	// Meta operations (e.g. 'all-credits:set:author').
 	if f.Changed(keys.MMetaOps) {
 		parsed := []models.MetaOps{}
 
@@ -1706,7 +1717,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Filename meta operations (e.g. 'prefix:[COOL CAT VIDEOS]')
+	// Filename meta operations (e.g. 'prefix:[COOL CAT VIDEOS]').
 	if f.Changed(keys.MFilenameOps) {
 		parsed := []models.FilenameOps{}
 
@@ -1729,7 +1740,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Filtered meta operations (e.g. 'title:contains:dog|title:prefix:[DOG VIDEOS]')
+	// Filtered meta operations (e.g. 'title:contains:dog|title:prefix:[DOG VIDEOS]').
 	if f.Changed(keys.MFilteredMetaOps) {
 		parsed := []models.FilteredMetaOps{}
 
@@ -1752,7 +1763,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Use GPU for transcoding
+	// Use GPU for transcoding.
 	if f.Changed(keys.TranscodeGPU) {
 		validGPU := c.useGPU
 
@@ -1768,7 +1779,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Transcoding GPU directory
+	// Transcoding GPU directory.
 	if f.Changed(keys.TranscodeGPUDir) {
 		fns = append(fns, func(m *models.MetarrArgs) error {
 
@@ -1787,7 +1798,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Video codec
+	// Video codec.
 	if f.Changed(keys.TranscodeCodec) {
 		validTranscodeCodec := c.transcodeVideoCodec
 
@@ -1803,7 +1814,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Audio codec
+	// Audio codec.
 	if f.Changed(keys.TranscodeAudioCodec) {
 		validTranscodeAudioCodec := c.transcodeAudioCodec
 
@@ -1819,7 +1830,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Transcode quality
+	// Transcode quality.
 	if f.Changed(keys.TranscodeQuality) {
 		validTranscodeQuality := c.transcodeQuality
 
@@ -1835,7 +1846,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Transcode video filter
+	// Transcode video filter.
 	if f.Changed(keys.TranscodeVideoFilter) {
 		validTranscodeVideoFilter := c.transcodeVideoFilter
 
@@ -1853,6 +1864,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	return fns, nil
 }
 
+// chanSettings holds local channel settings for updating.
 type chanSettings struct {
 	concurrency            int
 	cookiesFromBrowser     string
@@ -1880,7 +1892,7 @@ type chanSettings struct {
 func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models.Settings) error, err error) {
 	f := cmd.Flags()
 
-	// Concurrency
+	// Concurrency.
 	if f.Changed(keys.ChanOrURLConcurrencyLimit) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.Concurrency = sharedvalidation.ValidateConcurrencyLimit(c.concurrency)
@@ -1888,7 +1900,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Cookie source
+	// Cookie source.
 	if f.Changed(keys.CookiesFromBrowser) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.CookiesFromBrowser = c.cookiesFromBrowser
@@ -1896,7 +1908,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Crawl frequency
+	// Crawl frequency.
 	if f.Changed(keys.CrawlFreq) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.CrawlFreq = max(c.crawlFreq, 0)
@@ -1904,7 +1916,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Download retry amount
+	// Download retry amount.
 	if f.Changed(keys.DLRetries) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.Retries = c.retries
@@ -1912,7 +1924,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// External downloader
+	// External downloader.
 	if f.Changed(keys.ExternalDownloader) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.ExternalDownloader = c.externalDownloader
@@ -1920,7 +1932,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// External downloader arguments
+	// External downloader arguments.
 	if f.Changed(keys.ExternalDownloaderArgs) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.ExternalDownloaderArgs = c.externalDownloaderArgs
@@ -1928,7 +1940,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Filter ops ('field:contains:frogs:must')
+	// Filter ops ('field:contains:frogs:must').
 	if f.Changed(keys.FilterOpsInput) {
 		dlFilters, err := parsing.ParseFilterOps(c.filters)
 		if err != nil {
@@ -1940,7 +1952,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Move ops ('field:value:output directory')
+	// Move ops ('field:value:output directory').
 	if f.Changed(keys.MoveOps) {
 		moveOperations, err := parsing.ParseMetaFilterMoveOps(c.metaFilterMoveOps)
 		if err != nil {
@@ -1952,7 +1964,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// From date
+	// From date.
 	if f.Changed(keys.FromDate) {
 		var validFromDate string
 
@@ -1968,7 +1980,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// JSON directory
+	// JSON directory.
 	if f.Changed(keys.JSONDir) {
 		if c.jsonDir == "" {
 			if c.videoDir == "" {
@@ -1987,7 +1999,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Max download filesize
+	// Max download filesize.
 	if f.Changed(keys.MaxFilesize) {
 		if c.maxFilesize != "" {
 			c.maxFilesize, err = validation.ValidateMaxFilesize(c.maxFilesize)
@@ -2001,7 +2013,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Pause channel
+	// Pause channel.
 	if f.Changed(keys.Pause) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.Paused = c.paused
@@ -2009,7 +2021,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// To date
+	// To date.
 	if f.Changed(keys.ToDate) {
 		var validToDate string
 
@@ -2026,7 +2038,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Video directory
+	// Video directory.
 	if f.Changed(keys.VideoDir) {
 		if c.videoDir == "" {
 			return nil, fmt.Errorf("video directory cannot be empty")
@@ -2041,7 +2053,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Use global cookies
+	// Use global cookies.
 	if f.Changed(keys.UseGlobalCookies) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.UseGlobalCookies = c.useGlobalCookies
@@ -2049,7 +2061,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// YT-DLP output filetype for 'merge-output-format'
+	// YT-DLP output filetype for 'merge-output-format'.
 	if f.Changed(keys.YtdlpOutputExt) {
 		if c.ytdlpOutputExt != "" {
 			c.ytdlpOutputExt = strings.ToLower(c.ytdlpOutputExt)
@@ -2063,7 +2075,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Additional yt-dlp video download arguments
+	// Additional yt-dlp video download arguments.
 	if f.Changed(keys.ExtraYTDLPVideoArgs) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.ExtraYTDLPVideoArgs = c.extraYtdlpVideoArgs
@@ -2071,7 +2083,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 		})
 	}
 
-	// Additional yt-dlp metadata download arguments
+	// Additional yt-dlp metadata download arguments.
 	if f.Changed(keys.ExtraYTDLPMetaArgs) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.ExtraYTDLPMetaArgs = c.extraYtdlpMetaArgs
@@ -2096,7 +2108,7 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 	return key, val, nil
 }
 
-// verifyChanRowUpdateValid verifies that your update operation is valid
+// verifyChanRowUpdateValid verifies that your update operation is valid.
 func verifyChanRowUpdateValid(col, val string) error {
 	switch col {
 	case "name", jsonkeys.SettingsVideoDirectory, jsonkeys.SettingsJSONDirectory:
