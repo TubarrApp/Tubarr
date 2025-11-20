@@ -12,7 +12,7 @@ require (
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
 	golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
-	golang.org/x/net v0.46.0
+	golang.org/x/net v0.47.0
 )
 
 require gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
@@ -53,9 +53,9 @@ require (
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/zalando/go-keyring v0.2.6 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	www.velocidex.com/golang/go-ese v0.2.0 // indirect
