@@ -126,6 +126,40 @@
                 </li>
                 <!-- Menu Item Home -->
 
+                <!-- Menu Item Active Downloads -->
+                <li>
+                  <a
+                    href="active-downloads.html"
+                    @click="selected = 'Active Downloads'"
+                    class="menu-item group"
+                    :class="(selected === 'Active Downloads') || (page === 'activeDownloads') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Active Downloads') || (page === 'activeDownloads') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M12 3.25C12.4142 3.25 12.75 3.58579 12.75 4V12.1893L15.4697 9.46967C15.7626 9.17678 16.2374 9.17678 16.5303 9.46967C16.8232 9.76256 16.8232 10.2374 16.5303 10.5303L12.5303 14.5303C12.2374 14.8232 11.7626 14.8232 11.4697 14.5303L7.46967 10.5303C7.17678 10.2374 7.17678 9.76256 7.46967 9.46967C7.76256 9.17678 8.23744 9.17678 8.53033 9.46967L11.25 12.1893V4C11.25 3.58579 11.5858 3.25 12 3.25ZM3.25 15C3.66421 15 4 15.3358 4 15.75V18.5C4 18.9142 4.33579 19.25 4.75 19.25H19.25C19.6642 19.25 20 18.9142 20 18.5V15.75C20 15.3358 20.3358 15 20.75 15C21.1642 15 21.5 15.3358 21.5 15.75V18.5C21.5 19.7426 20.4926 20.75 19.25 20.75H4.75C3.50736 20.75 2.5 19.7426 2.5 18.5V15.75C2.5 15.3358 2.83579 15 3.25 15Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Active Downloads
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Active Downloads -->
+
                 <!-- Menu Item Channels -->
                 <li>
                   <a
@@ -1869,10 +1903,12 @@
                 const metarrFields = [
                   'metarr_output_directory', 'metarr_output_ext', 'metarr_rename_style',
                   'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
-                  'metarr_gpu', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
+                  'metarr_gpu', 'metarr_gpu_directory', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
                   'metarr_transcode_quality', 'metarr_transcode_video_filter',
-                  'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_filename_ops',
-                  'filtered_meta_ops', 'filtered_filename_ops'
+                  'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_meta_ops_file',
+                  'metarr_filename_ops', 'metarr_filename_ops_file',
+                  'metarr_filtered_meta_ops', 'metarr_filtered_meta_ops_file',
+                  'metarr_filtered_filename_ops', 'metarr_filtered_filename_ops_file'
                 ];
 
                 metarrFields.forEach(field => {

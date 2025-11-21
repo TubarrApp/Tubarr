@@ -45,6 +45,7 @@ type ChannelStore interface {
 	GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls []string, err error)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetChannelID(key, val string) (int64, error)
+	GetChannelName(key, val string) (string, error)
 	GetChannelModel(key, val string, mergeURLsWithParent bool) (*models.Channel, bool, error)
 	GetChannelURLModel(channelID int64, urlStr string, mergeWithParent bool) (chanURL *models.ChannelURL, hasRows bool, err error)
 	GetChannelURLModels(c *models.Channel, mergeWithParent bool) ([]*models.ChannelURL, error)

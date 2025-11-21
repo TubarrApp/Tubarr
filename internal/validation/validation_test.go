@@ -49,12 +49,16 @@ func TestMaxCPU(t *testing.T) {
 	}{
 		// Zero values.
 		{0, true, 0.0},
+		{0.0, true, 0.0},
 		{0, false, 101.0},
 
 		// Non-zero values.
 		{100, false, 101.0},
 		{1, false, 5.0},
 		{105, false, 101.0},
+		{100, true, 101.0},
+		{1, true, 5.0},
+		{105, true, 101.0},
 	}
 
 	for _, tt := range tests {
@@ -962,4 +966,40 @@ func TestValidateToFromDate_InvalidYear(t *testing.T) {
 	}
 
 	t.Logf("Got date %q back from input %q", d, in)
+}
+
+func TestValidateGPU(t *testing.T) {
+	tests := []struct {
+		gpu         string
+		directory   string
+		expectGPU   string
+		expectDir   string
+		gpuMatch    bool
+		gpuDirMatch bool
+		ok          bool
+	}{
+		// Pass.
+		{"auto", "", "auto", "", true, true, true},
+		{"", "", "", "", true, true, true},
+		{"nvidia", "/dev/dri/renderD128", "cuda", "/dev/dri/renderD128", true, true, true},
+
+		// Fail.
+		{"auto", "", "", "", false, true, false},
+		{"cuda", "", "cuda", "", true, true, false},
+		{"fake", "", "", "", false, true, false},
+		{"fake", "/dev/dri/FAKE", "", "", false, false, false},
+	}
+
+	for _, tt := range tests {
+		gpu, gpuDir, err := validation.ValidateGPU(tt.gpu, tt.directory)
+		if err != nil && tt.ok {
+			t.Fatalf("Expected pass, failed with error: %q", err)
+		}
+		if gpu != tt.expectGPU && tt.gpuMatch {
+			t.Fatalf("Expected %q, got %q", tt.expectGPU, gpu)
+		}
+		if gpuDir != tt.expectDir && tt.gpuDirMatch {
+			t.Fatalf("Expected %q, got %q", tt.expectDir, gpuDir)
+		}
+	}
 }

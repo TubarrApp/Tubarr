@@ -51,7 +51,6 @@ func NewRouter(ss serverStore) http.Handler {
 			r.Post("/add-from-file", ss.handleAddChannelFromFile)
 			r.Post("/add-from-directory", ss.handleAddChannelsFromDir)
 			r.Get("/{id}", ss.handleGetChannel)
-			r.Get("/{id}/downloads", ss.handleGetDownloads)
 			r.Get("/{id}/latest-downloads", ss.handleLatestDownloads)
 			r.Get("/{id}/all-videos", ss.handleGetAllVideos)
 			r.Put("/{id}/update", ss.handleUpdateChannel)
@@ -62,6 +61,9 @@ func NewRouter(ss serverStore) http.Handler {
 			r.Post("/{id}/ignore-crawl", ss.handleIgnoreCrawlChannel)
 			r.Post("/{id}/notification-seen", ss.handleNewVideoNotificationSeen)
 		})
+
+		// Downloads API
+		r.Get("/downloads", ss.handleGetDownloads)
 
 		// Logs API
 		r.Get("/logs", ss.handleGetTubarrLogs)

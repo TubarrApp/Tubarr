@@ -367,7 +367,7 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Build response with properly formatted data for the edit form
+	// Build response with properly formatted data for the edit form.
 	response := make(map[string]any)
 	response[consts.QChanID] = c.ID
 	response[consts.QChanName] = c.Name
@@ -376,19 +376,19 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	response[consts.QChanCreatedAt] = c.CreatedAt
 	response[consts.QChanUpdatedAt] = c.UpdatedAt
 
-	// Convert global settings to map with string representations
+	// Convert global settings to map with string representations.
 	if c.ChanSettings != nil {
 		settingsMap := settingsJSONMap(c.ChanSettings)
 		response[consts.QChanSettings] = settingsMap
 	}
 
-	// Convert global metarr args to map with string representations
+	// Convert global metarr args to map with string representations.
 	if c.ChanMetarrArgs != nil {
 		metarrMap := metarrArgsJSONMap(c.ChanMetarrArgs)
 		response[consts.QChanMetarr] = metarrMap
 	}
 
-	// Build auth_details array
+	// Build auth_details array.
 	authDetails := make([]map[string]string, 0)
 	for _, urlModel := range c.URLModels {
 		if urlModel.Username != "" || urlModel.LoginURL != "" {
@@ -408,13 +408,13 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil {
 			urlSettings[urlModel.URL] = make(map[string]any)
 
-			// Add settings with display strings
+			// Add settings with display strings.
 			if urlModel.ChanURLSettings != nil {
 				settingsMap := settingsJSONMap(urlModel.ChanURLSettings)
 				urlSettings[urlModel.URL][consts.QChanURLSettings] = settingsMap
 			}
 
-			// Add metarr with display strings
+			// Add metarr with display strings.
 			if urlModel.ChanURLMetarrArgs != nil {
 				metarrMap := metarrArgsJSONMap(urlModel.ChanURLMetarrArgs)
 				urlSettings[urlModel.URL][consts.QChanURLMetarr] = metarrMap
@@ -874,23 +874,45 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleGetDownloads retrieves active downloads for a given channel.
+// handleGetDownloads retrieves active downloads for all channels.
 func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
+	channels, found, err := ss.cs.GetAllChannels(false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found || c == nil {
-		http.Error(w, "channel nil or not found", http.StatusNotFound)
+	if !found {
+		// No channels found, return empty array
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode([]any{}); err != nil {
+			logger.Pl.E("Failed to encode empty downloads array: %v", err)
+		}
 		return
 	}
 
-	// Get active downloads with progress (filtered by channel in memory).
-	videos := ss.getActiveDownloads(c)
+	// Collect active downloads from all channels
+	allDownloads := make([]map[string]any, 0)
+	for _, c := range channels {
+		videos := ss.getActiveDownloads(c)
+
+		// Convert each video to a map and add channel name
+		for _, video := range videos {
+			videoMap := make(map[string]any)
+			videoMap[consts.QVidID] = video.ID
+			videoMap[consts.QVidTitle] = video.Title
+			videoMap[consts.QVidChanID] = video.ChannelID
+			videoMap[consts.QVidChanURLID] = video.ChannelURLID
+			videoMap["channel_name"] = c.Name
+			videoMap[consts.QVidURL] = video.URL
+			videoMap[consts.QVidThumbnailURL] = video.ThumbnailURL
+			videoMap[consts.QVidDLStatus] = video.DownloadStatus
+
+			allDownloads = append(allDownloads, videoMap)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(videos); err != nil {
+	if err := json.NewEncoder(w).Encode(allDownloads); err != nil {
 		logger.Pl.E("Could not encode videos to JSON: %v", err)
 	}
 }

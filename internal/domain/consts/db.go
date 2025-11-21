@@ -41,6 +41,7 @@ const (
 	QChanCreatedAt            = "created_at"
 	QChanUpdatedAt            = "updated_at"
 	QChanNewVideoNotification = "new_video_notification"
+	QChanNewVideoURLs         = "new_video_urls"
 )
 
 // ValidChannelKeys holds valid keys for the channel database.
@@ -54,6 +55,7 @@ var ValidChannelKeys = map[string]bool{
 	QChanCreatedAt:            true,
 	QChanUpdatedAt:            true,
 	QChanNewVideoNotification: true,
+	QChanNewVideoURLs:         true,
 }
 
 // Channel URL database entry keys.

@@ -53,6 +53,31 @@ func (cs *ChannelStore) GetDB() *sql.DB {
 	return cs.DB
 }
 
+// GetChannelName returns the channel name from an input key and value.
+func (cs *ChannelStore) GetChannelName(key, val string) (string, error) {
+	if !consts.ValidChannelKeys[key] {
+		return "", fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
+	}
+
+	var name string
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QChanName,
+		consts.DBChannels,
+		key,
+	)
+
+	err := cs.DB.QueryRow(query, val).Scan(&name)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("channel with %s %q does not exist", key, val)
+		}
+		return "", err
+	}
+
+	return name, nil
+}
+
 // GetChannelID gets the channel ID from an input key and value.
 func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 	if !consts.ValidChannelKeys[key] {

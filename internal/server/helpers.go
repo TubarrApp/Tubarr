@@ -39,7 +39,7 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	if mArgs.Concurrency > 0 {
 		metarrMap[jsonkeys.MetarrConcurrency] = mArgs.Concurrency
 	}
-	if mArgs.MaxCPU > 0 {
+	if mArgs.MaxCPU >= 0 {
 		metarrMap[jsonkeys.MetarrMaxCPU] = mArgs.MaxCPU
 	}
 	if mArgs.MinFreeMem != "" {
@@ -47,6 +47,9 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	}
 	if mArgs.TranscodeGPU != "" {
 		metarrMap[jsonkeys.MetarrGPU] = mArgs.TranscodeGPU
+	}
+	if mArgs.TranscodeGPUDirectory != "" {
+		metarrMap[jsonkeys.MetarrGPUDirectory] = mArgs.TranscodeGPUDirectory
 	}
 	if len(mArgs.TranscodeVideoCodecs) != 0 {
 		metarrMap[jsonkeys.MetarrVideoCodecs] = mArgs.TranscodeVideoCodecs
@@ -62,6 +65,18 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	}
 	if mArgs.ExtraFFmpegArgs != "" {
 		metarrMap[jsonkeys.MetarrExtraFFmpegArgs] = mArgs.ExtraFFmpegArgs
+	}
+	if mArgs.FilenameOpsFile != "" {
+		metarrMap[jsonkeys.MetarrFilenameOpsFile] = mArgs.FilenameOpsFile
+	}
+	if mArgs.FilteredFilenameOpsFile != "" {
+		metarrMap[jsonkeys.MetarrFilteredFilenameOpsFile] = mArgs.FilteredFilenameOpsFile
+	}
+	if mArgs.MetaOpsFile != "" {
+		metarrMap[jsonkeys.MetarrMetaOpsFile] = mArgs.MetaOpsFile
+	}
+	if mArgs.FilteredMetaOpsFile != "" {
+		metarrMap[jsonkeys.MetarrFilteredMetaOpsFile] = mArgs.FilteredMetaOpsFile
 	}
 	if len(mArgs.MetaOps) > 0 {
 		metarrMap[jsonkeys.MetarrMetaOps] = strings.Join(models.MetaOpsArrayToSlice(mArgs.MetaOps), "\n")
@@ -607,7 +622,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	}
 	maxConcurrency = sharedvalidation.ValidateConcurrencyLimit(maxConcurrency)
 
-	maxCPU := 100.00
+	maxCPU := 0.00
 	if maxCPUStr != "" {
 		maxCPU, err = strconv.ParseFloat(maxCPUStr, 64)
 		if err != nil {

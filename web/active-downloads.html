@@ -3,6 +3,44 @@
   <head>
     <style>
       [x-cloak] { display: none !important; }
+      .active-downloads-table {
+        width: 100%;
+      }
+      .active-downloads-table .video-col {
+        width: 32%;
+      }
+      .active-downloads-table .channel-col {
+        width: 12%;
+      }
+      .active-downloads-table .status-col {
+        width: 12%;
+      }
+      .active-downloads-table .progress-col {
+        width: 32%;
+      }
+      .video-text {
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: thin;
+      }
+      .scrollable-text {
+        display: block;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+      .scrollable-text-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 100%;
+        white-space: nowrap;
+      }
+      .video-text::-webkit-scrollbar {
+        height: 4px;
+      }
+      .scrollable-text::-webkit-scrollbar {
+        height: 4px;
+      }
     </style>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
@@ -40,44 +78,255 @@
         >
           <a href="index.html">
             <span class="logo" :class="sidebarToggle ? 'hidden' : ''">
-              <img src="/src/images/logo/logo-dark.svg" alt="Logo" />
+              <img class="dark:hidden" src="/src/images/logo/logo.svg" alt="Logo" />
+              <img
+                class="hidden dark:block"
+                src="/src/images/logo/logo-dark.svg"
+                alt="Logo"
+              />
             </span>
-            <img class="logo-icon" :class="sidebarToggle ? 'xl:block' : 'hidden'" src="/src/images/logo/logo-icon.svg" alt="Logo" />
+
+            <img
+              class="logo-icon"
+              :class="sidebarToggle ? 'xl:block' : 'hidden'"
+              src="/src/images/logo/logo-icon.svg"
+              alt="Logo"
+            />
           </a>
         </div>
         <!-- SIDEBAR HEADER -->
 
-        <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
+        <div
+          class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear"
+        >
           <!-- Sidebar Menu -->
           <nav x-data="{selected: $persist('Active Downloads')}">
+            <!-- Menu Group -->
             <div>
               <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
-                <span class="menu-group-title" :class="sidebarToggle ? 'xl:hidden' : ''">MENU</span>
+                <span
+                  class="menu-group-title"
+                  :class="sidebarToggle ? 'xl:hidden' : ''"
+                >
+                  MENU
+                </span>
+
+                <svg
+                  :class="sidebarToggle ? 'xl:block hidden' : 'hidden'"
+                  class="menu-group-icon mx-auto fill-current"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M5.99915 10.2451C6.96564 10.2451 7.74915 11.0286 7.74915 11.9951V12.0051C7.74915 12.9716 6.96564 13.7551 5.99915 13.7551C5.03265 13.7551 4.24915 12.9716 4.24915 12.0051V11.9951C4.24915 11.0286 5.03265 10.2451 5.99915 10.2451ZM17.9991 10.2451C18.9656 10.2451 19.7491 11.0286 19.7491 11.9951V12.0051C19.7491 12.9716 18.9656 13.7551 17.9991 13.7551C17.0326 13.7551 16.2491 12.9716 16.2491 12.0051V11.9951C16.2491 11.0286 17.0326 10.2451 17.9991 10.2451ZM13.7491 11.9951C13.7491 11.0286 12.9656 10.2451 11.9991 10.2451C11.0326 10.2451 10.2491 11.0286 10.2491 11.9951V12.0051C10.2491 12.9716 11.0326 13.7551 11.9991 13.7551C12.9656 13.7551 13.7491 12.9716 13.7491 12.0051V11.9951Z"
+                    fill="currentColor"
+                  />
+                </svg>
               </h3>
 
               <ul class="mb-6 flex flex-col gap-1">
                 <!-- Menu Item Home -->
                 <li>
-                  <a href="index.html" class="menu-item group menu-item-inactive">
-                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path fill-rule="evenodd" clip-rule="evenodd" d="M5.5 3.25C4.25736 3.25 3.25 4.25736 3.25 5.5V8.99998C3.25 10.2426 4.25736 11.25 5.5 11.25H9C10.2426 11.25 11.25 10.2426 11.25 8.99998V5.5C11.25 4.25736 10.2426 3.25 9 3.25H5.5ZM4.75 5.5C4.75 5.08579 5.08579 4.75 5.5 4.75H9C9.41421 4.75 9.75 5.08579 9.75 5.5V8.99998C9.75 9.41419 9.41421 9.74998 9 9.74998H5.5C5.08579 9.74998 4.75 9.41419 4.75 8.99998V5.5ZM5.5 12.75C4.25736 12.75 3.25 13.7574 3.25 15V18.5C3.25 19.7426 4.25736 20.75 5.5 20.75H9C10.2426 20.75 11.25 19.7427 11.25 18.5V15C11.25 13.7574 10.2426 12.75 9 12.75H5.5ZM4.75 15C4.75 14.5858 5.08579 14.25 5.5 14.25H9C9.41421 14.25 9.75 14.5858 9.75 15V18.5C9.75 18.9142 9.41421 19.25 9 19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5V15ZM12.75 5.5C12.75 4.25736 13.7574 3.25 15 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V8.99998C20.75 10.2426 19.7426 11.25 18.5 11.25H15C13.7574 11.25 12.75 10.2426 12.75 8.99998V5.5ZM15 4.75C14.5858 4.75 14.25 5.08579 14.25 5.5V8.99998C14.25 9.41419 14.5858 9.74998 15 9.74998H18.5C18.9142 9.74998 19.25 9.41419 19.25 8.99998V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H15ZM15 12.75C13.7574 12.75 12.75 13.7574 12.75 15V18.5C12.75 19.7426 13.7574 20.75 15 20.75H18.5C19.7426 20.75 20.75 19.7427 20.75 18.5V15C20.75 13.7574 19.7426 12.75 18.5 12.75H15ZM14.25 15C14.25 14.5858 14.5858 14.25 15 14.25H18.5C18.9142 14.25 19.25 14.5858 19.25 15V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H15C14.5858 19.25 14.25 18.9142 14.25 18.5V15Z" fill="currentColor" />
+                  <a
+                    href="index.html"
+                    @click="selected = 'Home'"
+                    class="menu-item group"
+                    :class="(selected === 'Home') || (page === 'home') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Home') || (page === 'home') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M5.5 3.25C4.25736 3.25 3.25 4.25736 3.25 5.5V8.99998C3.25 10.2426 4.25736 11.25 5.5 11.25H9C10.2426 11.25 11.25 10.2426 11.25 8.99998V5.5C11.25 4.25736 10.2426 3.25 9 3.25H5.5ZM4.75 5.5C4.75 5.08579 5.08579 4.75 5.5 4.75H9C9.41421 4.75 9.75 5.08579 9.75 5.5V8.99998C9.75 9.41419 9.41421 9.74998 9 9.74998H5.5C5.08579 9.74998 4.75 9.41419 4.75 8.99998V5.5ZM5.5 12.75C4.25736 12.75 3.25 13.7574 3.25 15V18.5C3.25 19.7426 4.25736 20.75 5.5 20.75H9C10.2426 20.75 11.25 19.7427 11.25 18.5V15C11.25 13.7574 10.2426 12.75 9 12.75H5.5ZM4.75 15C4.75 14.5858 5.08579 14.25 5.5 14.25H9C9.41421 14.25 9.75 14.5858 9.75 15V18.5C9.75 18.9142 9.41421 19.25 9 19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5V15ZM12.75 5.5C12.75 4.25736 13.7574 3.25 15 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V8.99998C20.75 10.2426 19.7426 11.25 18.5 11.25H15C13.7574 11.25 12.75 10.2426 12.75 8.99998V5.5ZM15 4.75C14.5858 4.75 14.25 5.08579 14.25 5.5V8.99998C14.25 9.41419 14.5858 9.74998 15 9.74998H18.5C18.9142 9.74998 19.25 9.41419 19.25 8.99998V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H15ZM15 12.75C13.7574 12.75 12.75 13.7574 12.75 15V18.5C12.75 19.7426 13.7574 20.75 15 20.75H18.5C19.7426 20.75 20.75 19.7427 20.75 18.5V15C20.75 13.7574 19.7426 12.75 18.5 12.75H15ZM14.25 15C14.25 14.5858 14.5858 14.25 15 14.25H18.5C18.9142 14.25 19.25 14.5858 19.25 15V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H15C14.5858 19.25 14.25 18.9142 14.25 18.5V15Z"
+                        fill="currentColor"
+                      />
                     </svg>
-                    <span class="menu-item-text" :class="sidebarToggle ? 'xl:hidden' : ''">Home</span>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Home
+                    </span>
                   </a>
                 </li>
+                <!-- Menu Item Home -->
+
+                <!-- Menu Item Active Downloads -->
+                <li>
+                  <a
+                    href="active-downloads.html"
+                    @click="selected = 'Active Downloads'"
+                    class="menu-item group"
+                    :class="(selected === 'Active Downloads') || (page === 'activeDownloads') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Active Downloads') || (page === 'activeDownloads') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M12 3.25C12.4142 3.25 12.75 3.58579 12.75 4V12.1893L15.4697 9.46967C15.7626 9.17678 16.2374 9.17678 16.5303 9.46967C16.8232 9.76256 16.8232 10.2374 16.5303 10.5303L12.5303 14.5303C12.2374 14.8232 11.7626 14.8232 11.4697 14.5303L7.46967 10.5303C7.17678 10.2374 7.17678 9.76256 7.46967 9.46967C7.76256 9.17678 8.23744 9.17678 8.53033 9.46967L11.25 12.1893V4C11.25 3.58579 11.5858 3.25 12 3.25ZM3.25 15C3.66421 15 4 15.3358 4 15.75V18.5C4 18.9142 4.33579 19.25 4.75 19.25H19.25C19.6642 19.25 20 18.9142 20 18.5V15.75C20 15.3358 20.3358 15 20.75 15C21.1642 15 21.5 15.3358 21.5 15.75V18.5C21.5 19.7426 20.4926 20.75 19.25 20.75H4.75C3.50736 20.75 2.5 19.7426 2.5 18.5V15.75C2.5 15.3358 2.83579 15 3.25 15Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Active Downloads
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Active Downloads -->
+
+                <!-- Menu Item Channels -->
+                <li>
+                  <a
+                    href="#"
+                    @click.prevent="selected = (selected === 'Channels' ? '':'Channels')"
+                    class="menu-item group"
+                    :class=" (selected === 'Channels') || (page === 'addChannel' || page === 'addChannelFromFile' || page === 'listChannels') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Channels') || (page === 'addChannel' || page === 'addChannelFromFile' || page === 'listChannels') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M3.25 5.5C3.25 4.25736 4.25736 3.25 5.5 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V18.5C20.75 19.7426 19.7426 20.75 18.5 20.75H5.5C4.25736 20.75 3.25 19.7426 3.25 18.5V5.5ZM5.5 4.75C5.08579 4.75 4.75 5.08579 4.75 5.5V8.58325L19.25 8.58325V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H5.5ZM19.25 10.0833H15.416V13.9165H19.25V10.0833ZM13.916 10.0833L10.083 10.0833V13.9165L13.916 13.9165V10.0833ZM8.58301 10.0833H4.75V13.9165H8.58301V10.0833ZM4.75 18.5V15.4165H8.58301V19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5ZM10.083 19.25V15.4165L13.916 15.4165V19.25H10.083ZM15.416 19.25V15.4165H19.25V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H15.416Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Channels
+                    </span>
+
+                    <svg
+                      class="menu-item-arrow"
+                      :class="[(selected === 'Channels') ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'xl:hidden' : '' ]"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4.79175 7.39584L10.0001 12.6042L15.2084 7.39585"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </a>
+
+                  <!-- Dropdown Menu Start -->
+                  <div
+                    class="translate transform overflow-hidden"
+                    :class="(selected === 'Channels') ? 'block' :'hidden'"
+                  >
+                    <ul
+                      :class="sidebarToggle ? 'xl:hidden' : 'flex'"
+                      class="menu-dropdown mt-2 flex flex-col gap-1 pl-9"
+                    >
+                      <li>
+                        <a
+                          href="add-channel.html"
+                          class="menu-dropdown-item group"
+                          :class="page === 'addChannel' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'"
+                        >
+                          Add Channel
+                        </a>
+                      </li>
+                      <li>
+                        <a
+                          href="add-channel-from-files.html"
+                          class="menu-dropdown-item group"
+                          :class="page === 'addChannelFromFile' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'"
+                        >
+                          Add from Files
+                        </a>
+                      </li>
+                      <li>
+                        <a
+                          href="list-channels.html"
+                          class="menu-dropdown-item group"
+                          :class="page === 'listChannels' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'"
+                        >
+                          List Channels
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                  <!-- Dropdown Menu End -->
+                </li>
+                <!-- Menu Item Channels -->
 
                 <!-- Menu Item Logs -->
                 <li>
-                  <a href="logs.html" class="menu-item group menu-item-inactive">
-                    <svg class="menu-item-icon-inactive" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path fill-rule="evenodd" clip-rule="evenodd" d="M3.25 5.5C3.25 4.25736 4.25736 3.25 5.5 3.25H15.3787C15.9635 3.25 16.5243 3.48243 16.9369 3.89508L20.1049 7.06307C20.5176 7.47572 20.75 8.03651 20.75 8.62132V18.5C20.75 19.7426 19.7426 20.75 18.5 20.75H5.5C4.25736 20.75 3.25 19.7426 3.25 18.5V5.5ZM5.5 4.75C5.08579 4.75 4.75 5.08579 4.75 5.5V18.5C4.75 18.9142 5.08579 19.25 5.5 19.25H18.5C18.9142 19.25 19.25 18.9142 19.25 18.5V8.62132C19.25 8.43353 19.1754 8.25332 19.0431 8.12099L15.8751 4.95301C15.7428 4.82067 15.5626 4.75 15.3787 4.75H5.5ZM7.25 10C7.25 9.58579 7.58579 9.25 8 9.25H16C16.4142 9.25 16.75 9.58579 16.75 10C16.75 10.4142 16.4142 10.75 16 10.75H8C7.58579 10.75 7.25 10.4142 7.25 10ZM8 13.25C7.58579 13.25 7.25 13.5858 7.25 14C7.25 14.4142 7.58579 14.75 8 14.75H16C16.4142 14.75 16.75 14.4142 16.75 14C16.75 13.5858 16.4142 13.25 16 13.25H8ZM7.25 18C7.25 17.5858 7.58579 17.25 8 17.25H12C12.4142 17.25 12.75 17.5858 12.75 18C12.75 18.4142 12.4142 18.75 12 18.75H8C7.58579 18.75 7.25 18.4142 7.25 18Z" fill="currentColor" />
+                  <a
+                    href="logs.html"
+                    @click="selected = 'Logs'"
+                    class="menu-item group"
+                    :class="(selected === 'Logs') || (page === 'logs') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Logs') || (page === 'logs') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        clip-rule="evenodd"
+                        d="M3.25 5.5C3.25 4.25736 4.25736 3.25 5.5 3.25H15.3787C15.9635 3.25 16.5243 3.48243 16.9369 3.89508L20.1049 7.06307C20.5176 7.47572 20.75 8.03651 20.75 8.62132V18.5C20.75 19.7426 19.7426 20.75 18.5 20.75H5.5C4.25736 20.75 3.25 19.7426 3.25 18.5V5.5ZM5.5 4.75C5.08579 4.75 4.75 5.08579 4.75 5.5V18.5C4.75 18.9142 5.08579 19.25 5.5 19.25H18.5C18.9142 19.25 19.25 18.9142 19.25 18.5V8.62132C19.25 8.43353 19.1754 8.25332 19.0431 8.12099L15.8751 4.95301C15.7428 4.82067 15.5626 4.75 15.3787 4.75H5.5ZM7.25 10C7.25 9.58579 7.58579 9.25 8 9.25H16C16.4142 9.25 16.75 9.58579 16.75 10C16.75 10.4142 16.4142 10.75 16 10.75H8C7.58579 10.75 7.25 10.4142 7.25 10ZM8 13.25C7.58579 13.25 7.25 13.5858 7.25 14C7.25 14.4142 7.58579 14.75 8 14.75H16C16.4142 14.75 16.75 14.4142 16.75 14C16.75 13.5858 16.4142 13.25 16 13.25H8ZM7.25 18C7.25 17.5858 7.58579 17.25 8 17.25H12C12.4142 17.25 12.75 17.5858 12.75 18C12.75 18.4142 12.4142 18.75 12 18.75H8C7.58579 18.75 7.25 18.4142 7.25 18Z"
+                        fill="currentColor"
+                      />
                     </svg>
-                    <span class="menu-item-text" :class="sidebarToggle ? 'xl:hidden' : ''">Logs</span>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Logs
+                    </span>
                   </a>
                 </li>
+                <!-- Menu Item Logs -->
               </ul>
             </div>
           </nav>
+          <!-- Sidebar Menu -->
         </div>
       </aside>
       <!-- ===== Sidebar End ===== -->
@@ -210,7 +459,7 @@
             </div>
 
             <!-- Active Downloads List -->
-            <div x-show="!loading && !error" class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <div x-show="!loading && !error" class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
               <!-- No Downloads Message -->
               <div x-show="downloads.length === 0" class="p-8 text-center">
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,45 +471,57 @@
 
               <!-- Downloads Table -->
               <div x-show="downloads.length > 0" class="overflow-x-auto">
-                <table class="w-full">
+                <table class="w-full active-downloads-table">
                   <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
                     <tr>
-                      <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Video</th>
-                      <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Status</th>
-                      <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Progress</th>
-                      <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
+                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 video-col">Video</th>
+                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 channel-col">Channel</th>
+                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 status-col">Status</th>
+                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 progress-col">Progress</th>
+                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                     <template x-for="download in downloads" :key="download.id">
                       <tr>
                         <!-- Video Info -->
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3 video-col">
                           <div class="flex items-center gap-3">
                             <img x-show="download.thumbnail_url" :src="download.thumbnail_url" :alt="download.title" class="h-12 w-20 object-cover rounded" />
-                            <div class="flex-1 min-w-0">
-                              <p class="text-sm font-medium text-gray-900 truncate dark:text-gray-100" x-text="download.title || 'Unknown'"></p>
-                              <p class="text-sm text-gray-500 dark:text-gray-400 truncate" x-text="download.url"></p>
+                            <div class="flex-1 min-w-0 video-text">
+                              <div class="scrollable-text">
+                                <div class="scrollable-text-content">
+                                  <p class="text-sm font-medium text-brand-600 dark:text-brand-400" x-text="download.title || 'Unknown'"></p>
+                                  <p class="text-sm text-gray-500 dark:text-gray-400" x-text="download.url"></p>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </td>
+                        <!-- Channel -->
+                        <td class="px-4 py-3 channel-col">
+                          <span class="text-sm text-gray-900 dark:text-white" x-text="download.channel_name || 'Unknown'"></span>
+                        </td>
                         <!-- Status -->
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3 status-col">
                           <span x-show="download.download_status.status === 'Downloading'" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30" style="color: #1e40af;" x-bind:style="$root.classList.contains('dark') ? 'color: #93c5fd;' : 'color: #1e40af;'" x-text="download.download_status.status"></span>
                           <span x-show="download.download_status.status === 'Queued'" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30" style="color: #92400e;" x-bind:style="$root.classList.contains('dark') ? 'color: #fcd34d;' : 'color: #92400e;'" x-text="download.download_status.status"></span>
                           <span x-show="download.download_status.status === 'Failed'" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30" style="color: #991b1b;" x-bind:style="$root.classList.contains('dark') ? 'color: #fca5a5;' : 'color: #991b1b;'" x-text="download.download_status.status"></span>
                         </td>
                         <!-- Progress -->
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3 progress-col">
                           <div class="flex items-center gap-2">
-                            <div class="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                              <div class="bg-brand-600 h-2 rounded-full transition-all duration-300" :style="`width: ${download.download_status.percentage}%`"></div>
+                            <div class="flex-1 bg-gray-200 rounded-b-full h-2 dark:bg-gray-700">
+                              <div
+                                class="bg-brand-600 h-2 rounded-b-full transition-all duration-300"
+                                :style="`width: ${download.download_status.percentage}%`"
+                              ></div>
                             </div>
                             <span class="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem]" x-text="`${download.download_status.percentage.toFixed(1)}%`"></span>
                           </div>
                         </td>
                         <!-- Actions -->
-                        <td class="px-6 py-4">
+                        <td class="px-4 py-3">
                           <button
                             @click="cancelDownload(download.id)"
                             :disabled="cancelling === download.id"
@@ -294,7 +555,6 @@
     <script>
       function downloadsData() {
         return {
-          channelId: null,
           downloads: [],
           loading: true,
           error: null,
@@ -302,16 +562,6 @@
           pollInterval: null,
 
           init() {
-            // Get channel ID from URL params
-            const urlParams = new URLSearchParams(window.location.search);
-            this.channelId = urlParams.get('channel');
-
-            if (!this.channelId) {
-              this.error = 'No channel ID provided';
-              this.loading = false;
-              return;
-            }
-
             this.loadDownloads();
 
             // Poll for updates every 2 seconds
@@ -326,7 +576,7 @@
             }
 
             try {
-              const response = await fetch(`/api/v1/channels/${this.channelId}/downloads`);
+              const response = await fetch('/api/v1/downloads');
               if (!response.ok) {
                 throw new Error('Failed to fetch active downloads');
               }
@@ -353,8 +603,16 @@
 
             this.cancelling = videoId;
 
+            // Find the download to get its channel ID
+            const download = this.downloads.find(d => d.id === videoId);
+            if (!download) {
+              alert('Download not found');
+              this.cancelling = null;
+              return;
+            }
+
             try {
-              const response = await fetch(`/api/v1/channels/${this.channelId}/cancel-download/${videoId}`, {
+              const response = await fetch(`/api/v1/channels/${download.channel_id}/cancel-download/${videoId}`, {
                 method: 'DELETE'
               });
 

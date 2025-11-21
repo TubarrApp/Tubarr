@@ -7,33 +7,33 @@ import (
 // Settings are the primary settings for a channel, affecting videos belonging to it.
 type Settings struct {
 	// Configurations.
-	Concurrency int `json:"max_concurrency" mapstructure:"concurrency"`
+	Concurrency int `json:"max_concurrency"`
 
 	// Download-related operations.
-	CookiesFromBrowser     string `json:"cookies_from_browser" mapstructure:"cookie-from-browser"`
-	CrawlFreq              int    `json:"crawl_freq" mapstructure:"crawl-freq"`
-	ExternalDownloader     string `json:"external_downloader" mapstructure:"external-downloader"`
-	ExternalDownloaderArgs string `json:"external_downloader_args" mapstructure:"external-downloader-args"`
-	MaxFilesize            string `json:"max_filesize" mapstructure:"max-filesize"`
-	Retries                int    `json:"download_retries" mapstructure:"download-retries"`
-	UseGlobalCookies       bool   `json:"use_global_cookies" mapstructure:"use-global-cookies"`
-	YtdlpOutputExt         string `json:"ytdlp_output_ext" mapstructure:"ytdlp-output-ext"`
+	CookiesFromBrowser     string `json:"cookies_from_browser"`
+	CrawlFreq              int    `json:"crawl_freq"`
+	ExternalDownloader     string `json:"external_downloader"`
+	ExternalDownloaderArgs string `json:"external_downloader_args"`
+	MaxFilesize            string `json:"max_filesize"`
+	Retries                int    `json:"download_retries"`
+	UseGlobalCookies       bool   `json:"use_global_cookies"`
+	YtdlpOutputExt         string `json:"ytdlp_output_ext"`
 
 	// Custom args
-	ExtraYTDLPVideoArgs string `json:"extra_ytdlp_video_args" mapstructure:"extra-ytdlp-video-args"`
-	ExtraYTDLPMetaArgs  string `json:"extra_ytdlp_meta_args" mapstructure:"extra-ytdlp-meta-args"`
+	ExtraYTDLPVideoArgs string `json:"extra_ytdlp_video_args"`
+	ExtraYTDLPMetaArgs  string `json:"extra_ytdlp_meta_args"`
 
 	// Metadata operations.
-	Filters              []Filters           `json:"filters" mapstructure:"filters"`
-	FilterFile           string              `json:"filter_file" mapstructure:"filter-file"`
-	MetaFilterMoveOps    []MetaFilterMoveOps `json:"move_ops" mapstructure:"move-ops"`
-	MetaFilterMoveOpFile string              `json:"move_ops_file" mapstructure:"move-ops-file"`
-	FromDate             string              `json:"from_date" mapstructure:"from-date"`
-	ToDate               string              `json:"to_date" mapstructure:"to-date"`
+	Filters              []Filters           `json:"filters"`
+	FilterFile           string              `json:"filter_file"`
+	MetaFilterMoveOps    []MetaFilterMoveOps `json:"move_ops"`
+	MetaFilterMoveOpFile string              `json:"move_ops_file"`
+	FromDate             string              `json:"from_date"`
+	ToDate               string              `json:"to_date"`
 
 	// JSON and video directories.
-	JSONDir  string `json:"json_directory" mapstructure:"json-directory"`
-	VideoDir string `json:"video_directory" mapstructure:"video-directory"`
+	JSONDir  string `json:"json_directory"`
+	VideoDir string `json:"video_directory"`
 
 	// Bot blocking elements.
 	BotBlocked           bool                 `json:"bot_blocked"`
@@ -41,43 +41,43 @@ type Settings struct {
 	BotBlockedTimestamps map[string]time.Time `json:"bot_blocked_timestamps"`
 
 	// Channel toggles.
-	Paused bool `json:"paused" mapstructure:"pause"`
+	Paused bool `json:"paused"`
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
 type MetarrArgs struct {
 	// Metarr file operations.
-	OutputExt               string                `json:"metarr_output_ext" mapstructure:"metarr-output-ext"`
-	FilenameOps             []FilenameOps         `json:"metarr_filename_ops" mapstructure:"metarr-filename-ops"`
-	FilenameOpsFile         string                `json:"metarr_filename_ops_file" mapstructure:"metarr-filename-ops-file"`
-	FilteredFilenameOps     []FilteredFilenameOps `json:"metarr_filtered_filename_ops" mapstructure:"metarr-filtered-filename-ops"`
-	FilteredFilenameOpsFile string                `json:"metarr_filtered_filename_ops_file" mapstructure:"metarr-filtered-filename-ops-file"`
-	RenameStyle             string                `json:"metarr_rename_style" mapstructure:"metarr-rename-style"`
+	OutputExt               string                `json:"metarr_output_ext"`
+	FilenameOps             []FilenameOps         `json:"metarr_filename_ops"`
+	FilenameOpsFile         string                `json:"metarr_filename_ops_file"`
+	FilteredFilenameOps     []FilteredFilenameOps `json:"metarr_filtered_filename_ops"`
+	FilteredFilenameOpsFile string                `json:"metarr_filtered_filename_ops_file"`
+	RenameStyle             string                `json:"metarr_rename_style"`
 
 	// Metarr metadata operations.
-	MetaOps             []MetaOps         `json:"metarr_meta_ops" mapstructure:"metarr-meta-ops"`
-	MetaOpsFile         string            `json:"metarr_meta_ops_file" mapstructure:"metarr-meta-ops-file"`
-	FilteredMetaOps     []FilteredMetaOps `json:"metarr_filtered_meta_ops" mapstructure:"metarr-filtered-meta-ops"`
-	FilteredMetaOpsFile string            `json:"metarr_filtered_meta_ops_file" mapstructure:"metarr-filtered-meta-ops-file"`
+	MetaOps             []MetaOps         `json:"metarr_meta_ops"`
+	MetaOpsFile         string            `json:"metarr_meta_ops_file"`
+	FilteredMetaOps     []FilteredMetaOps `json:"metarr_filtered_meta_ops"`
+	FilteredMetaOpsFile string            `json:"metarr_filtered_meta_ops_file"`
 
 	// Metarr output directories.
-	OutputDir     string `json:"metarr_output_directory" mapstructure:"metarr-default-output-dir"`
+	OutputDir     string `json:"metarr_output_directory"`
 	OutputDirMap  map[string]string
-	URLOutputDirs []string `json:"metarr_url_output_directories" mapstructure:"metarr-url-output-dirs"`
+	URLOutputDirs []string `json:"metarr_url_output_directories"`
 
 	// Program operations.
-	Concurrency int     `json:"metarr_concurrency" mapstructure:"metarr-concurrency"`
-	MaxCPU      float64 `json:"metarr_max_cpu_usage" mapstructure:"metarr-max-cpu"`
-	MinFreeMem  string  `json:"metarr_min_free_mem" mapstructure:"metarr-min-free-mem"`
+	Concurrency int     `json:"metarr_concurrency"`
+	MaxCPU      float64 `json:"metarr_max_cpu_usage"`
+	MinFreeMem  string  `json:"metarr_min_free_mem"`
 
 	// FFmpeg transcoding operations.
-	TranscodeGPUDirectory string   `json:"metarr_transcode_gpu_directory" mapstructure:"transcode-gpu-directory"`
-	TranscodeGPU          string   `json:"metarr_transcode_gpu" mapstructure:"transcode-gpu"`
-	TranscodeVideoFilter  string   `json:"metarr_transcode_video_filter" mapstructure:"transcode-video-filter"`
-	TranscodeVideoCodecs  []string `json:"metarr_transcode_video_codecs" mapstructure:"transcode-video-codecs"`
-	TranscodeAudioCodecs  []string `json:"metarr_transcode_audio_codecs" mapstructure:"transcode-audio-codecs"`
-	TranscodeQuality      string   `json:"metarr_transcode_quality" mapstructure:"transcode-quality"`
-	ExtraFFmpegArgs       string   `json:"metarr_extra_ffmpeg_args" mapstructure:"metarr-extra-ffmpeg-args"`
+	TranscodeGPUDirectory string   `json:"metarr_transcode_gpu_directory"`
+	TranscodeGPU          string   `json:"metarr_transcode_gpu"`
+	TranscodeVideoFilter  string   `json:"metarr_transcode_video_filter"`
+	TranscodeVideoCodecs  []string `json:"metarr_transcode_video_codecs"`
+	TranscodeAudioCodecs  []string `json:"metarr_transcode_audio_codecs"`
+	TranscodeQuality      string   `json:"metarr_transcode_quality"`
+	ExtraFFmpegArgs       string   `json:"metarr_extra_ffmpeg_args"`
 }
 
 // ChannelAccessDetails holds details related to authentication and cookies.

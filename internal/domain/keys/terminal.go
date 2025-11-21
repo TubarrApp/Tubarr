@@ -32,12 +32,12 @@ const (
 
 // Transcoding.
 const (
-	TranscodeGPU         string = "transcode-gpu"
-	TranscodeGPUDir      string = "transcode-gpu-directory"
-	TranscodeCodec       string = "transcode-video-codecs"
-	TranscodeAudioCodec  string = "transcode-audio-codecs"
-	TranscodeQuality     string = "transcode-quality"
-	TranscodeVideoFilter string = "transcode-video-filter"
+	TranscodeGPU         string = "metarr-transcode-gpu"
+	TranscodeGPUDir      string = "metarr-transcode-gpu-directory"
+	TranscodeCodec       string = "metarr-transcode-video-codecs"
+	TranscodeAudioCodec  string = "metarr-transcode-audio-codecs"
+	TranscodeQuality     string = "metarr-transcode-quality"
+	TranscodeVideoFilter string = "metarr-transcode-video-filter"
 )
 
 // Downloading.

@@ -24,13 +24,13 @@ metarr_concurrency = 5
 metarr_default_output_dir = "/home/user/tubarr/{{channel_name}}/{{year}}"
 
 # Transcoding
-transcode_gpu = "auto"
-transcode_gpu_directory = "/dev/dri/renderD128"
-transcode_video_codecs = [
+metarr-transcode_gpu = "auto"
+metarr-transcode_gpu_directory = "/dev/dri/renderD128"
+metarr-transcode_video_codecs = [
   "h264:hevc",
   "webm:h264"
 ]
-transcode_audio_codecs = [
+metarr-transcode_audio_codecs = [
   "aac:ac3",
   "dts:eac3",
   "flac:mp3"
