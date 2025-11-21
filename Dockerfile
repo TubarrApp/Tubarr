@@ -54,11 +54,11 @@ RUN wget -O /usr/local/bin/yt-dlp \
     && chmod +x /usr/local/bin/yt-dlp
 
 # Copy built binaries from the builder
-COPY --from=builder /build/tubarr /usr/local/bin/tubarr
+COPY --from=builder /build/tubarr /app/tubarr
 COPY --from=builder /build/metarr /usr/local/bin/metarr
 
 # Fix permissions
-RUN chmod +x /usr/local/bin/tubarr /usr/local/bin/metarr
+RUN chmod +x /app/tubarr /usr/local/bin/metarr
 
 # yt-dlp auto-updater
 RUN printf '%s\n' \
