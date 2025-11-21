@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Build stage
 FROM golang:1.25-alpine AS builder
 
@@ -33,15 +32,9 @@ RUN apk add --no-cache \
 RUN wget -O /usr/local/bin/metarr https://github.com/TubarrApp/Metarr/releases/latest/download/metarr && \
     chmod +x /usr/local/bin/metarr
 
-# Auto update yt-dlp
-RUN printf '%s\n' '#!/bin/sh' \
-'while true; do' \
-'  echo "[Updater] Checking for yt-dlp updates..."' \
-'  yt-dlp -U > /dev/null 2>&1 || echo "[Updater] yt-dlp update failed."' \
-'  echo "[Updater] Update check complete. Sleeping 24h..."' \
-'  sleep 86400' \
-'done &' \
-> /usr/local/bin/auto-updater && chmod +x /usr/local/bin/auto-updater
+# Yt-dlp updater
+RUN printf '#!/bin/sh\nwhile true; do\n  echo "[Updater] Checking for yt-dlp updates..."\n  yt-dlp -U > /dev/null 2>&1 || echo "[Updater] yt-dlp update failed."\n  echo "[Updater] Update check complete. Sleeping 24h..."\n  sleep 86400\ndone &\n' > /usr/local/bin/auto-updater \
+ && chmod +x /usr/local/bin/auto-updater
 
 # App files
 WORKDIR /app
