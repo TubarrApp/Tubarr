@@ -208,9 +208,9 @@ func generateCookieFilePath(channelName, videoURL string) string {
 		return filepath.Join(paths.HomeTubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
 	}
 
-	// Generate a short hash for the URL to ensure uniqueness
+	// Generate a short hash for the URL to ensure uniqueness.
 	urlHash := sha256.Sum256([]byte(videoURL))
-	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use first 8 hex characters
+	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use first 8 hex characters.
 
 	return filepath.Join(paths.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
 }
@@ -232,13 +232,13 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 		}
 	}()
 
-	// Write the header for the Netscape cookies file
+	// Write the header for the Netscape cookies file.
 	_, err = file.WriteString("# Netscape HTTP Cookie File\n# https://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n")
 	if err != nil {
 		return err
 	}
 
-	// Log the cookies for debugging
+	// Log the cookies for debugging.
 	logger.Pl.D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
 
 	for _, cookie := range cookies {
@@ -251,7 +251,7 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 			domain = "." + domain
 		}
 
-		// Domain-specified flag: TRUE if domain starts with dot
+		// Domain-specified flag: TRUE if domain starts with dot.
 		domainSpecified := "FALSE"
 		if strings.HasPrefix(domain, ".") {
 			domainSpecified = "TRUE"
@@ -262,7 +262,7 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 			secure = "TRUE"
 		}
 
-		// Handle expiration time
+		// Handle expiration time.
 		var expires int64
 		if !cookie.Expires.IsZero() {
 			expires = cookie.Expires.Unix()
@@ -281,19 +281,19 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 func mergeCookies(primary, secondary []*http.Cookie) []*http.Cookie {
 	cookieMap := make(map[string]*http.Cookie)
 
-	// secondary first (e.g. Firefox)
+	// secondary first (e.g. Firefox).
 	for _, c := range secondary {
 		key := c.Domain + "|" + c.Path + "|" + c.Name
 		cookieMap[key] = c
 	}
 
-	// primary overrides (e.g. manual/auth cookies)
+	// primary overrides (e.g. manual/auth cookies).
 	for _, c := range primary {
 		key := c.Domain + "|" + c.Path + "|" + c.Name
 		cookieMap[key] = c
 	}
 
-	// Merge deduplicated (from map) cookies together
+	// Merge deduplicated (from map) cookies together.
 	merged := make([]*http.Cookie, 0, len(cookieMap))
 	for _, c := range cookieMap {
 		merged = append(merged, c)
@@ -301,7 +301,7 @@ func mergeCookies(primary, secondary []*http.Cookie) []*http.Cookie {
 	return merged
 }
 
-// tryLoadCachedCookies attempts to load cookies from cache for a given key
+// tryLoadCachedCookies attempts to load cookies from cache for a given key.
 func tryLoadCachedCookies(key string) ([]*http.Cookie, bool) {
 	val, ok := globalAuthCookieCache.Load(key)
 	if !ok {
@@ -310,7 +310,7 @@ func tryLoadCachedCookies(key string) ([]*http.Cookie, bool) {
 
 	cookies, ok := val.([]*http.Cookie)
 	if !ok {
-		// Invalid type in cache, delete and re-auth
+		// Invalid type in cache, delete and re-auth.
 		globalAuthCookieCache.Delete(key)
 		return nil, false
 	}
