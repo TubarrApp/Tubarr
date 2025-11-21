@@ -46,7 +46,9 @@ RUN apk add --no-cache \
     py3-pip \
     wget \
     sqlite-libs \
-    su-exec
+    su-exec \
+    aria2 \
+    axel
 
 # yt-dlp download
 RUN wget -O /usr/local/bin/yt-dlp \
