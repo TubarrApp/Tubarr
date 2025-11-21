@@ -955,7 +955,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
 
 			if err := app.CrawlChannel(ctx, ss.s, c); err != nil {
-				logger.Pl.E("Failed to crawl channel %q: %v", c.Name, err)
+				logger.Pl.E("Encountered errors crawling channel %q: %v", c.Name, err)
 			} else {
 				logger.Pl.S("Successfully completed crawl for channel %q", c.Name)
 			}
