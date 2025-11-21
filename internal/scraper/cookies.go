@@ -37,7 +37,7 @@ func NewCookieManager() *CookieManager {
 
 // GetChannelCookies returns channel access details for a given video.
 func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
-	// Fetch auth details if this is a manual entry or not from DB
+	// Fetch auth details if this is a manual entry or not from DB.
 	if cu.IsManual || cu.ID == 0 {
 		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
 		if err != nil {
@@ -48,18 +48,18 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 	// Should login?
 	doLogin := cu.NeedsAuth()
 
-	// Early return if no cookies needed
+	// Early return if no cookies needed.
 	if !doLogin && !c.ChanSettings.UseGlobalCookies {
 		return nil, "", nil
 	}
 
-	// Create cookie file path
+	// Create cookie file path.
 	cu.CookiePath = generateCookieFilePath(c.Name, cu.URL)
 
 	// Collect cookies...
 	var authCookies, regCookies []*http.Cookie
 
-	// Cookies from direct login
+	// Cookies from direct login.
 	if doLogin {
 		parsed, err := url.Parse(cu.URL)
 		if err != nil {
@@ -76,22 +76,22 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 		}
 	}
 
-	// Cookies from Kooky's 'FindAllCookieStores()' function
+	// Cookies from Kooky's 'FindAllCookieStores()' function.
 	if c.ChanSettings.UseGlobalCookies {
-		regCookies, err = cm.GetCookies(cu.URL)
+		regCookies, err = cm.GetCookies(ctx, cu.URL)
 		if err != nil {
 			logger.Pl.E("Failed to get cookies for %q with cookie source %q: %v", cu.URL, c.ChanSettings.CookiesFromBrowser, err)
 		}
 	}
 
-	// Combine cookies
+	// Combine cookies.
 	cookies = mergeCookies(authCookies, regCookies)
 
 	for i := range cookies {
 		logger.Pl.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
 	}
 
-	// Save cookies to file
+	// Save cookies to file.
 	if len(cookies) > 0 {
 		err = saveCookiesToFile(cookies, cu.LoginURL, cu.CookiePath)
 		if err != nil {
@@ -104,18 +104,18 @@ func (cm *CookieManager) GetChannelCookies(ctx context.Context, cs contracts.Cha
 }
 
 // GetCookies retrieves cookies for a given URL.
-func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
+func (cm *CookieManager) GetCookies(ctx context.Context, u string) ([]*http.Cookie, error) {
 	baseDomain, err := getBaseDomain(u)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
 
-	// Initialize once
+	// Initialize once.
 	cm.init.Do(func() {
-		cm.stores = kooky.FindAllCookieStores()
+		cm.stores = kooky.FindAllCookieStores(ctx)
 	})
 
-	// Check if cookies already exist for domain
+	// Check if cookies already exist for domain.
 	cm.mu.RLock()
 	if cookies, ok := cm.cookies[baseDomain]; ok {
 		cm.mu.RUnlock()
@@ -123,10 +123,10 @@ func (cm *CookieManager) GetCookies(u string) ([]*http.Cookie, error) {
 	}
 	cm.mu.RUnlock()
 
-	// Load cookies for domain
-	cookies := cm.loadCookiesForDomain(baseDomain)
+	// Load cookies for domain.
+	cookies := cm.loadCookiesForDomain(ctx, baseDomain)
 
-	// Store cookies
+	// Store cookies.
 	cm.mu.Lock()
 	cm.cookies[baseDomain] = cookies
 	cm.mu.Unlock()
@@ -147,42 +147,35 @@ func (cm *CookieManager) GetCachedAuthCookies(hostname string) []*http.Cookie {
 // ******************************** Private ********************************
 
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
-func (cm *CookieManager) loadCookiesForDomain(domain string) []*http.Cookie {
+func (cm *CookieManager) loadCookiesForDomain(ctx context.Context, domain string) []*http.Cookie {
 	var cookies []*http.Cookie
-	attempted := make([]string, 0, len(cm.stores))
+	attempted := make([]string, 0)
 
 	domainsToTry := []string{domain, "." + domain}
 
-	for _, store := range cm.stores {
-		browserName := store.Browser()
-		attempted = append(attempted, browserName)
+	for _, d := range domainsToTry {
+		kookieCookies, err := kooky.ReadCookies(ctx, kooky.Valid, kooky.Domain(d))
+		if err != nil {
+			logger.Pl.D(2, "Failed reading cookies for domain %s: %v", d, err)
+			continue
+		}
 
-		for _, d := range domainsToTry {
-			kookieCookies, err := store.ReadCookies(kooky.Valid, kooky.Domain(d))
-			if err != nil {
-				logger.Pl.D(4, "Failed reading cookies from %s for domain %s: %v", browserName, d, err)
-				if !os.IsNotExist(err) {
-					logger.Pl.D(2, "Failed reading cookies from %s for domain %s: %v", browserName, d, err)
-				}
+		cookiesFound := 0
+		for _, c := range kookieCookies {
+			name := strings.ToLower(c.Name)
+			if strings.HasPrefix(name, "st-") || strings.HasPrefix(name, "cst-") || strings.HasPrefix(name, "temp-") {
 				continue
 			}
-
-			// Filter and count cookies before adding
-			cookiesFound := 0
-			for _, c := range kookieCookies {
-				// Filter out temporary session cookies
-				name := strings.ToLower(c.Name)
-				if strings.HasPrefix(name, "st-") || strings.HasPrefix(name, "cst-") || strings.HasPrefix(name, "temp-") {
-					continue
-				}
-				cookies = append(cookies, convertToHTTPCookies([]*kooky.Cookie{c})...)
-				cookiesFound++
-			}
-
-			if cookiesFound > 0 {
-				logger.Pl.I("Found %d cookies from %s for domain %s", cookiesFound, browserName, d)
-			}
+			cookies = append(cookies, convertToHTTPCookies([]*kooky.Cookie{c})...)
+			cookiesFound++
 		}
+
+		if cookiesFound > 0 {
+			logger.Pl.I("Found %d cookies for domain %s", cookiesFound, d)
+		}
+
+		// ReadCookies already uses all registered stores internally.
+		attempted = append(attempted, "kooky.ReadCookies")
 	}
 
 	logger.Pl.I("Checked browsers: %v", attempted)
