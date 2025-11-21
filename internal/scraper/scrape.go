@@ -26,6 +26,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedtags"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
@@ -279,10 +280,10 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 
 		// Extract all metadata
 		v.Title = extractTitle(consts.HTMLCensoredTitle, doc)
-		metadata[consts.MetadataTitle] = v.Title
+		metadata[sharedtags.JTitle] = v.Title
 
 		v.Description = extractDescription(consts.HTMLCensoredDesc, doc)
-		metadata[consts.MetadataDesc] = v.Description
+		metadata[sharedtags.JDescription] = v.Description
 
 		uploadDate := extractDate(consts.HTMLCensoredDate, doc)
 		if strings.Contains(uploadDate, "-") {
@@ -300,13 +301,13 @@ func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.V
 			logger.Pl.I("Extracted upload date %q from metadata (Video URL: %q)", v.UploadDate.String(), v.URL)
 		}
 
-		metadata[consts.MetadataDate] = uploadDate
+		metadata[sharedtags.JReleaseDate] = uploadDate
 
 		v.DirectVideoURL = extractVideoURL(consts.HTMLCensoredVideoURL, doc)
-		metadata[consts.MetadataVideoURL] = v.DirectVideoURL
+		metadata[sharedtags.JDirectVideoURL] = v.DirectVideoURL
 
 		v.ThumbnailURL = extractVideoThumbnail(consts.HTMLCensoredThumbnail, doc)
-		metadata[consts.MetadataThumbnail] = v.ThumbnailURL
+		metadata[sharedtags.JThumbnailURL] = v.ThumbnailURL
 	})
 
 	// Visit the webpage

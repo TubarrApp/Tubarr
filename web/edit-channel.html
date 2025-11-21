@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -8,7 +11,7 @@
     />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Edit Channel | Tubarr</title>
-    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" href="/src/images/favicon.ico">
     <link href="style.css" rel="stylesheet">
   </head>
   <body
@@ -28,7 +31,7 @@
     <!-- ===== Preloader End ===== -->
 
     <!-- ===== Page Wrapper Start ===== -->
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden" x-cloak>
       <!-- ===== Sidebar Start ===== -->
       <aside
         :class="sidebarToggle ? 'translate-x-0 xl:w-[90px]' : '-translate-x-full'"
@@ -1599,9 +1602,8 @@
 
                 // Check if this URL has custom settings
                 if (data.url_settings && data.url_settings[url]) {
-                  urlEntry.hasCustomSettings = true;
                   const urlSettings = data.url_settings[url];
-                  
+
                   // Populate custom settings
                   if (urlSettings.settings) {
                     Object.keys(urlSettings.settings).forEach(key => {
@@ -1626,6 +1628,9 @@
                       }
                     });
                   }
+
+                  // Only check hasCustomSettings after populating values
+                  urlEntry.hasCustomSettings = this.hasActualCustomSettings(urlEntry.custom);
                 }
 
                 return urlEntry;
@@ -1700,6 +1705,22 @@
               filtered_meta_ops: '',
               filtered_filename_ops: ''
             };
+          },
+
+          hasActualCustomSettings(custom) {
+            // Check if any custom setting has a non-empty, non-default value
+            if (!custom) return false;
+
+            for (const key in custom) {
+              const value = custom[key];
+              // Skip null, undefined, empty strings
+              if (value === null || value === undefined || value === '') continue;
+              // Skip numeric defaults (0 is usually not set by user)
+              if (typeof value === 'number' && value === 0) continue;
+              // Has an actual value
+              return true;
+            }
+            return false;
           },
 
           addURL() {

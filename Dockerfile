@@ -28,37 +28,19 @@ RUN apk add --no-cache \
     python3 \
     py3-pip \
     wget \
-    git \
-    sqlite-libs \
-    gcc \
-    musl-dev && \
+    sqlite-libs && \
     wget -O /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp && \
     chmod +x /usr/local/bin/yt-dlp
 
-# Copy Go toolchain for Metarr build
-COPY --from=builder /usr/local/go /usr/local/go
-ENV PATH="/usr/local/go/bin:${PATH}"
+# Download Metarr binary from latest release
+RUN wget -O /usr/local/bin/metarr https://github.com/TubarrApp/Metarr/releases/latest/download/metarr && \
+    chmod +x /usr/local/bin/metarr
 
-# Build and install Metarr
-RUN cd /tmp && \
-    git clone https://github.com/TubarrApp/Metarr.git && \
-    cd Metarr && \
-    go build -o /usr/local/bin/metarr ./cmd/metarr && \
-    chmod +x /usr/local/bin/metarr && \
-    cd / && rm -rf /tmp/Metarr
-
-# Add background updater
+# Add background updater (yt-dlp only - Metarr version is pinned to Tubarr release)
 RUN echo '#!/bin/sh\n\
 while true; do\n\
-  echo "[Updater] Checking for updates..."\n\
+  echo "[Updater] Checking for yt-dlp updates..."\n\
   yt-dlp -U > /dev/null 2>&1 || echo "[Updater] yt-dlp update failed."\n\
-  TMPDIR=$(mktemp -d)\n\
-  cd "$TMPDIR"\n\
-  git clone --depth 1 https://github.com/TubarrApp/Metarr.git > /dev/null 2>&1 && \
-  cd Metarr && \
-  go build -o /usr/local/bin/metarr ./cmd/metarr > /dev/null 2>&1 && \
-  chmod +x /usr/local/bin/metarr\n\
-  cd / && rm -rf "$TMPDIR"\n\
   echo "[Updater] Update check complete. Sleeping 24h..."\n\
   sleep 86400\n\
 done &' > /usr/local/bin/auto-updater && chmod +x /usr/local/bin/auto-updater

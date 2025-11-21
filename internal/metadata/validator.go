@@ -8,10 +8,11 @@ import (
 	"os"
 	"strings"
 	"time"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+
+	"github.com/TubarrApp/gocommon/sharedtags"
 )
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
@@ -124,7 +125,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	// Thumbnails
 	if v.ThumbnailURL == "" {
 		// Check directly
-		if thumbnailVal, exists := m[consts.MetadataThumbnail]; exists {
+		if thumbnailVal, exists := m[sharedtags.JThumbnailURL]; exists {
 			if thumbnail, ok := thumbnailVal.(string); ok {
 				v.ThumbnailURL = thumbnail
 			}

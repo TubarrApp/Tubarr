@@ -299,17 +299,65 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, _ *http.Request
 		}
 		return
 	}
+
+	// Build response with properly formatted data (consistent with handleGetChannel)
+	response := make([]map[string]any, 0, len(channels))
+	for _, c := range channels {
+		channelMap := make(map[string]any)
+		channelMap["id"] = c.ID
+		channelMap["name"] = c.Name
+		channelMap["urls"] = c.GetURLs()
+		channelMap["last_scan"] = c.LastScan
+		channelMap["created_at"] = c.CreatedAt
+		channelMap["updated_at"] = c.UpdatedAt
+		channelMap["channel_config_file"] = c.ChannelConfigFile
+		channelMap["new_video_notification"] = c.NewVideoNotification
+
+		// Convert settings to map with string representations
+		if c.ChanSettings != nil {
+			channelMap["settings"] = settingsJSONMap(c.ChanSettings)
+		}
+
+		// Convert metarr args to map with string representations
+		if c.ChanMetarrArgs != nil {
+			channelMap["metarr"] = metarrArgsJSONMap(c.ChanMetarrArgs)
+		}
+
+		// Include URL models with their settings converted
+		if len(c.URLModels) > 0 {
+			urlModels := make([]map[string]any, 0, len(c.URLModels))
+			for _, urlModel := range c.URLModels {
+				urlMap := make(map[string]any)
+				urlMap["id"] = urlModel.ID
+				urlMap["url"] = urlModel.URL
+				urlMap["username"] = urlModel.Username
+				urlMap["login_url"] = urlModel.LoginURL
+
+				if urlModel.ChanURLSettings != nil {
+					urlMap["settings"] = settingsJSONMap(urlModel.ChanURLSettings)
+				}
+				if urlModel.ChanURLMetarrArgs != nil {
+					urlMap["metarr"] = metarrArgsJSONMap(urlModel.ChanURLMetarrArgs)
+				}
+				urlModels = append(urlModels, urlMap)
+			}
+			channelMap["url_models"] = urlModels
+		}
+
+		response = append(response, channelMap)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(channels); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		logger.Pl.E("Failed to encode channels: %v", err)
 	}
 }
 
 // handleGetChannel returns the data for a specific channel.
 func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	id := chi.URLParam(r, consts.QChanID)
 
-	c, found, err := ss.cs.GetChannelModel("id", id, false)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -321,23 +369,23 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 
 	// Build response with properly formatted data for the edit form
 	response := make(map[string]any)
-	response["id"] = c.ID
-	response["name"] = c.Name
+	response[consts.QChanID] = c.ID
+	response[consts.QChanName] = c.Name
 	response["urls"] = c.GetURLs()
-	response["last_scan"] = c.LastScan
-	response["created_at"] = c.CreatedAt
-	response["updated_at"] = c.UpdatedAt
+	response[consts.QChanLastScan] = c.LastScan
+	response[consts.QChanCreatedAt] = c.CreatedAt
+	response[consts.QChanUpdatedAt] = c.UpdatedAt
 
 	// Convert global settings to map with string representations
 	if c.ChanSettings != nil {
 		settingsMap := settingsJSONMap(c.ChanSettings)
-		response["settings"] = settingsMap
+		response[consts.QChanSettings] = settingsMap
 	}
 
 	// Convert global metarr args to map with string representations
 	if c.ChanMetarrArgs != nil {
 		metarrMap := metarrArgsJSONMap(c.ChanMetarrArgs)
-		response["metarr"] = metarrMap
+		response[consts.QChanMetarr] = metarrMap
 	}
 
 	// Build auth_details array
@@ -363,13 +411,13 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 			// Add settings with display strings
 			if urlModel.ChanURLSettings != nil {
 				settingsMap := settingsJSONMap(urlModel.ChanURLSettings)
-				urlSettings[urlModel.URL]["settings"] = settingsMap
+				urlSettings[urlModel.URL][consts.QChanURLSettings] = settingsMap
 			}
 
 			// Add metarr with display strings
 			if urlModel.ChanURLMetarrArgs != nil {
 				metarrMap := metarrArgsJSONMap(urlModel.ChanURLMetarrArgs)
-				urlSettings[urlModel.URL]["metarr"] = metarrMap
+				urlSettings[urlModel.URL][consts.QChanURLMetarr] = metarrMap
 			}
 		}
 	}
@@ -742,53 +790,6 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		logger.Pl.E("Failed to write response message: %v", err)
 	}
 }
-
-// // handleUpdateChannelURLSettings updates parameters for a given channel URL.
-// func (ss *serverStore) handleUpdateChannelURLSettings(w http.ResponseWriter, r *http.Request) {
-// 	idStr := chi.URLParam(r, "id")
-// 	cURLStr := chi.URLParam(r, "channel_url")
-
-// 	id, err := strconv.ParseInt(idStr, 10, 64)
-// 	if err != nil {
-// 		http.Error(w, fmt.Sprintf("Invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	cURL, found, err := ss.cs.GetChannelURLModel(id, cURLStr, false)
-// 	if err != nil {
-// 		http.Error(w, "internal server error", http.StatusInternalServerError)
-// 		return
-// 	}
-// 	if !found || cURL == nil {
-// 		http.Error(w, "channel URL nil or not found", http.StatusNotFound)
-// 		return
-// 	}
-
-// 	cURL.ChanURLSettings = getSettingsStrings(w, r)
-// 	cURL.ChanURLMetarrArgs = getMetarrArgsStrings(w, r)
-
-// 	if err := ss.cs.UpdateChannelURLSettings(cURL); err != nil {
-// 		http.Error(w, fmt.Sprintf("Could not update channel URL %q Metarr Arguments: %v", cURL.URL, err), http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Write([]byte("Updated channel URL in channel " + idStr))
-// }
-
-// // handleDeleteChannelURL deletes a URL for a given channel.
-// func handleDeleteChannelURL(w http.ResponseWriter, r *http.Request) {
-// 	id := chi.URLParam(r, "id")
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Write([]byte("Updated channel URL " + id))
-// }
-
-// // handleAddChannelURL deletes a URL for a given channel.
-// func handleAddChannelURL(w http.ResponseWriter, r *http.Request) {
-// 	id := chi.URLParam(r, "id")
-// 	w.WriteHeader(http.StatusOK)
-// 	w.Write([]byte("Added channel URL for channel " + id))
-// }
 
 // handleDeleteChannel deletes a channel from Tubarr.
 func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Request) {

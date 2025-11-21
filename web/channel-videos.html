@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -8,7 +11,7 @@
     />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Channel Videos | Tubarr</title>
-    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" href="/src/images/favicon.ico">
     <link href="style.css" rel="stylesheet">
   </head>
   <body
@@ -28,7 +31,7 @@
     <!-- ===== Preloader End ===== -->
 
     <!-- ===== Page Wrapper Start ===== -->
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden" x-cloak>
       <!-- ===== Sidebar Start ===== -->
       <aside
         :class="sidebarToggle ? 'translate-x-0 xl:w-[90px]' : '-translate-x-full'"

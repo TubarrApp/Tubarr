@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -8,14 +11,14 @@
     />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Logs | Tubarr</title>
-    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" href="/src/images/favicon.ico">
     <link href="style.css" rel="stylesheet">
   </head>
   <body
     class="dark bg-gray-900"
     x-data="{ page: 'logs', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
   >
-    <!-- ===== Preloader Start ===== -->
+    <!-- ===== Preloader Start (Removed: x-init="setTimeout(() => loaded = false, 150)") ===== -->
     <div
       x-show="loaded"
       x-init="loaded = false"
@@ -28,7 +31,7 @@
     <!-- ===== Preloader End ===== -->
 
     <!-- ===== Page Wrapper Start ===== -->
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden" x-cloak>
       <!-- ===== Sidebar Start ===== -->
       <aside
         :class="sidebarToggle ? 'translate-x-0 xl:w-[90px]' : '-translate-x-full'"
@@ -42,7 +45,12 @@
         >
           <a href="index.html">
             <span class="logo" :class="sidebarToggle ? 'hidden' : ''">
-              <img src="/src/images/logo/logo-dark.svg" alt="Logo" />
+              <img class="dark:hidden" src="/src/images/logo/logo.svg" alt="Logo" />
+              <img
+                class="hidden dark:block"
+                src="/src/images/logo/logo-dark.svg"
+                alt="Logo"
+              />
             </span>
 
             <img
@@ -59,7 +67,7 @@
           class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear"
         >
           <!-- Sidebar Menu -->
-          <nav x-data="{selected: $persist('Channels')}">
+          <nav x-data="{selected: $persist('Logs')}">
             <!-- Menu Group -->
             <div>
               <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
@@ -337,14 +345,30 @@
               </button>
               <!-- Hamburger Toggle BTN -->
 
-              <div class="flex items-center gap-3">
-                <!-- Page Title -->
-                <h1 class="text-lg font-semibold text-gray-900 sm:text-xl dark:text-white">
+              <a href="index.html" class="xl:hidden">
+                <img class="dark:hidden" src="/src/images/logo/logo.svg" alt="Logo" />
+                <img
+                  class="hidden dark:block"
+                  src="/src/images/logo/logo-dark.svg"
+                  alt="Logo"
+                />
+              </a>
+
+              <div class="hidden xl:block">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
                   Logs
-                </h1>
+                </h2>
               </div>
             </div>
 
+            <div
+              class="shadow-theme-md w-full items-center justify-between gap-4 px-5 py-4 xl:flex xl:justify-end xl:px-0 xl:shadow-none"
+            >
+              <div class="2xsm:gap-3 flex items-center gap-2">
+
+                <!-- Dark Mode Toggler -->
+              </div>
+            </div>
           </div>
         </header>
         <!-- ===== Header End ===== -->

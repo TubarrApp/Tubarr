@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -8,7 +11,7 @@
     />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>List Channels | Tubarr</title>
-    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" href="/src/images/favicon.ico">
     <link href="style.css" rel="stylesheet">
   </head>
   <body
@@ -28,7 +31,7 @@
     <!-- ===== Preloader End ===== -->
 
     <!-- ===== Page Wrapper Start ===== -->
-    <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden" x-cloak>
       <!-- ===== Sidebar Start ===== -->
       <aside
         :class="sidebarToggle ? 'translate-x-0 xl:w-[90px]' : '-translate-x-full'"
@@ -500,7 +503,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Move Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.move_ops?.length ? channel.settings.move_ops.length + ' operation(s)' : 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.settings?.move_ops ? (typeof channel.settings.move_ops === 'string' ? channel.settings.move_ops.split('\\n').join('<br>') : channel.settings.move_ops.map(op => typeof op === 'string' ? op : ((op.move_op_field || '') + ':' + (op.move_op_value || '') + ' → ' + (op.move_op_output_dir || ''))).join('<br>')) : 'None'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filter File:</span>
@@ -509,6 +512,10 @@
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Move Ops File:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.move_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Channel Config File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.channel_config_file || 'Not set'"></span>
                             </div>
                           </div>
                         </div>
@@ -571,11 +578,11 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Meta Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_meta_ops?.length ? channel.metarr.metarr_meta_ops.length + ' operation(s)' : 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_meta_ops?.split('\n').join('<br>') || 'None'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filename Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filename_ops?.length ? channel.metarr.metarr_filename_ops.length + ' operation(s)' : 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_filename_ops?.split('\n').join('<br>') || 'None'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Meta Ops File:</span>
@@ -584,6 +591,22 @@
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filename Ops File:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filename_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filtered_meta_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Operations:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_filtered_meta_ops?.split('\n').join('<br>') || 'None'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Filename Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filtered_filename_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Filename Operations:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_filtered_filename_ops?.split('\n').join('<br>') || 'None'"></span>
                             </div>
                           </div>
                         </div>
