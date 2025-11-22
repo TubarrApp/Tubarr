@@ -8,26 +8,6 @@ const (
 	IDTag   = "id_"
 )
 
-// AllVidExtensions is a list of video file extensions.
-var AllVidExtensions = map[string]bool{
-	".3gp":  true,
-	".avi":  true,
-	".f4v":  true,
-	".flv":  true,
-	".m4v":  true,
-	".mkv":  true,
-	".mov":  true,
-	".mp4":  true,
-	".mpeg": true,
-	".mpg":  true,
-	".ogm":  true,
-	".ogv":  true,
-	".ts":   true,
-	".vob":  true,
-	".webm": true,
-	".wmv":  true,
-}
-
 // Op types
 const (
 	FilterContains = "contains"

@@ -1656,6 +1656,8 @@
                         // Convert codec arrays to newline-separated strings
                         if ((key === 'metarr_transcode_video_transcode_codecs' || key === 'metarr_transcode_audio_codecs') && Array.isArray(value)) {
                           urlEntry.custom[key] = value.join('\n');
+                        } else if (key === 'metarr_max_cpu_usage' && value === 0) {
+                          urlEntry.custom[key] = null;
                         } else {
                           urlEntry.custom[key] = value;
                         }
@@ -1693,6 +1695,8 @@
                   // Convert codec arrays to newline-separated strings
                   if ((key === 'metarr_transcode_video_transcode_codecs' || key === 'metarr_transcode_audio_codecs') && Array.isArray(value)) {
                     this.formData.metarr[key] = value.join('\n');
+                  } else if (key === 'metarr_max_cpu_usage' && value === 0) {
+                    this.formData.metarr[key] = '';
                   } else {
                     this.formData.metarr[key] = value;
                   }

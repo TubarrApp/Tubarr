@@ -1621,7 +1621,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Metarr output extension
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MOutputExt); ok {
-		if _, err := validation.ValidateMetarrOutputExt(v); err != nil {
+		if _, err := sharedvalidation.ValidateFFmpegOutputExt(v); err != nil {
 			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ChannelConfigFile)
 		}
 		c.ChanMetarrArgs.OutputExt = v

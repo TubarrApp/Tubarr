@@ -63,7 +63,11 @@ func (d *VideoDownload) cleanup() {
 		// Try graceful termination first.
 		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
 			// Force kill if graceful fails.
-			_ = d.cmd.Process.Kill()
+			if d.cmd.Process != nil {
+				if err := d.cmd.Process.Kill(); err != nil {
+					logger.Pl.E("Failed to cleanup video download process %v: %v", d.cmd.Process, err)
+				}
+			}
 		}
 		d.cmd = nil
 	}
@@ -102,7 +106,11 @@ func (d *JSONDownload) cleanup() {
 		// Try graceful termination first.
 		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
 			// Force kill if graceful fails.
-			_ = d.cmd.Process.Kill()
+			if d.cmd.Process != nil {
+				if err := d.cmd.Process.Kill(); err != nil {
+					logger.Pl.E("Failed to cleanup JSON download process %v: %v", d.cmd.Process, err)
+				}
+			}
 		}
 		d.cmd = nil
 	}

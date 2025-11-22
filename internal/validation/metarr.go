@@ -138,22 +138,6 @@ func ValidateDateFormat(dateFmt string) bool {
 	return false
 }
 
-// ValidateMetarrOutputExt verifies the output filetype is valid for FFmpeg.
-func ValidateMetarrOutputExt(o string) (dottedExt string, err error) {
-	o = strings.ToLower(strings.TrimSpace(o))
-	if !strings.HasPrefix(o, ".") {
-		o = "." + o
-	}
-	logger.Pl.D(4, "Checking Metarr output filetype: %q", o)
-
-	// Check valid video extension.
-	if consts.AllVidExtensions[o] {
-		return o, nil
-	}
-
-	return "", fmt.Errorf("output filetype %q is not supported", o)
-}
-
 // ValidatePurgeMetafiles checks and sets the type of metafile purge to perform.
 func ValidatePurgeMetafiles(purgeType string) bool {
 	purgeType = strings.TrimSpace(purgeType)

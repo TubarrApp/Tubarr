@@ -1,9 +1,7 @@
 package metadata
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/consts"
@@ -17,13 +15,12 @@ import (
 	"github.com/TubarrApp/gocommon/logging"
 )
 
-// filterOpsFilter determines whether a video should be filtered out based on metadata it contains or omits.
-func filterOpsFilter(v *models.Video, filters []models.Filters, channelName string) bool {
+// checkFilters determines whether a video matches the given filters.
+func checkFilters(v *models.Video, filterType string, filters []models.Filters) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
 	for _, filter := range filters {
-
 		switch filter.MustAny {
 		case "must":
 			mustTotal++
@@ -37,17 +34,13 @@ func filterOpsFilter(v *models.Video, filters []models.Filters, channelName stri
 
 		var passed, failHard bool
 		switch filter.Value {
-		case "": // empty filter value
-			passed, failHard = checkFilterWithEmptyValue(filter, "Download Filters", v.URL, exists)
-		default: // non-empty filter value
-			passed, failHard = checkFilterWithValue(filter, "Download Filters", v.URL, strVal, filterVal) // Treats non-existent and empty metadata fields the same...
+		case "":
+			passed, failHard = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
+		default:
+			passed, failHard = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
 		}
 
 		if failHard {
-			if err := removeUnwantedJSON(v.JSONPath); err != nil {
-				logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-			}
-			logger.Pl.I("Video %q failed hard on filter %v for channel %q", v.URL, filter, channelName)
 			return false
 		}
 
@@ -58,11 +51,9 @@ func filterOpsFilter(v *models.Video, filters []models.Filters, channelName stri
 			case "any":
 				anyPassed++
 			}
-			logger.Pl.S("Video %q passed filter %v for channel %q", v.URL, filter, channelName)
 		}
 	}
 
-	// Tally checks
 	if mustPassed != mustTotal {
 		return false
 	}
@@ -89,7 +80,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 
 	for _, fmo := range filteredMetaOps {
 		// Check if filters match
-		filtersMatched := checkFiltersOnly(v, "Filtered Meta Ops", fmo.Filters)
+		filtersMatched := checkFilters(v, "Filtered meta ops", fmo.Filters)
 
 		// Deduplicate meta ops using buildKey
 		dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
@@ -118,6 +109,58 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 	return result
 }
 
+// evaluateFilters checks if the filters match.
+func evaluateFilters(v *models.Video, filters []models.Filters, filterType, channelName string, logPasses, stopOnHard bool) bool {
+	mustTotal, mustPassed := 0, 0
+	anyTotal, anyPassed := 0, 0
+
+	for _, filter := range filters {
+		switch filter.MustAny {
+		case "must":
+			mustTotal++
+		case "any":
+			anyTotal++
+		}
+
+		val, exists := v.MetadataMap[filter.Field]
+		strVal := strings.ToLower(fmt.Sprint(val))
+		filterVal := strings.ToLower(filter.Value)
+
+		passed, failHard := false, false
+		if filter.Value == "" {
+			passed, failHard = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
+		} else {
+			passed, failHard = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
+		}
+
+		if failHard && stopOnHard {
+			logger.Pl.I("Video %q failed hard on filter %v for channel %q", v.URL, filter, channelName)
+			return false
+		}
+
+		if passed {
+			switch filter.MustAny {
+			case "must":
+				mustPassed++
+			case "any":
+				anyPassed++
+			}
+			if logPasses {
+				logger.Pl.S("Video %q passed filter %v for channel %q", v.URL, filter, channelName)
+			}
+		}
+	}
+
+	if mustPassed != mustTotal {
+		return false
+	}
+	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
+		return false
+	}
+
+	return true
+}
+
 // filteredFilenameOpsMatches checks which arguments match and returns the filename operations.
 func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filteredFilenameOps []models.FilteredFilenameOps, channelName string) []models.FilteredFilenameOps {
 	if len(filteredFilenameOps) == 0 {
@@ -133,7 +176,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 
 	for _, ffo := range filteredFilenameOps {
 		// Check if filters match
-		filtersMatched := checkFiltersOnly(v, "Filtered Filename Ops", ffo.Filters)
+		filtersMatched := checkFilters(v, "Filtered filename ops", ffo.Filters)
 
 		// Deduplicate filename ops using buildKey
 		dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
@@ -160,52 +203,6 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		}
 	}
 	return result
-}
-
-// checkFiltersOnly checks if filters match WITHOUT removing JSON files on failure.
-func checkFiltersOnly(v *models.Video, filterType string, filters []models.Filters) bool {
-	mustTotal, mustPassed := 0, 0
-	anyTotal, anyPassed := 0, 0
-
-	for _, filter := range filters {
-		switch filter.MustAny {
-		case "must":
-			mustTotal++
-		case "any":
-			anyTotal++
-		}
-
-		val, exists := v.MetadataMap[filter.Field]
-		strVal := strings.ToLower(fmt.Sprint(val))
-		filterVal := strings.ToLower(filter.Value)
-
-		var passed bool
-		switch filter.Value {
-		case "": // empty filter value
-			passed, _ = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
-		default: // non-empty filter value
-			passed, _ = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
-		}
-
-		if passed {
-			switch filter.MustAny {
-			case "must":
-				mustPassed++
-			case "any":
-				anyPassed++
-			}
-		}
-	}
-
-	// Tally checks
-	if mustPassed != mustTotal {
-		return false
-	}
-	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
-		return false
-	}
-
-	return true
 }
 
 // checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
@@ -289,17 +286,10 @@ func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum i
 
 	fromDate, err := strconv.Atoi(cu.ChanURLSettings.FromDate)
 	if err != nil {
-		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-		}
 		return false, fmt.Errorf("invalid 'from date' format: %w", err)
 	}
 
 	if uploadDateNum < fromDate {
-		logger.Pl.I("Filtering out %q: uploaded on \"%d\", before 'from date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.FromDate)
-		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-		}
 		logger.Pl.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, fromDate, uploadDateNum)
 		return false, nil
 	}
@@ -316,17 +306,10 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 
 	toDate, err := strconv.Atoi(cu.ChanURLSettings.ToDate)
 	if err != nil {
-		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-		}
 		return false, fmt.Errorf("invalid 'to date' format: %w", err)
 	}
 
 	if uploadDateNum > toDate {
-		logger.Pl.I("Filtering out %q: uploaded on \"%d\", after 'to date' %q", v.URL, uploadDateNum, cu.ChanURLSettings.ToDate)
-		if err := removeUnwantedJSON(v.JSONPath); err != nil {
-			logger.Pl.E("Failed to remove unwanted JSON at %q: %v", v.JSONPath, err)
-		}
 		logger.Pl.I("Video %q failed 'To Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, toDate, uploadDateNum)
 		return false, nil
 	}
@@ -509,35 +492,4 @@ func loadMoveOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.Dir
 	}
 
 	return parsedMoves
-}
-
-// removeUnwantedJSON removes filtered out JSON files.
-func removeUnwantedJSON(path string) error {
-	if path == "" {
-		err := errors.New("path sent in empty, not removing")
-		return err
-	}
-
-	check, err := os.Stat(path)
-	if err != nil {
-		err = fmt.Errorf("not deleting unwanted JSON file, got error: %w", err)
-		return err
-	}
-
-	switch {
-	case check.IsDir():
-		err := fmt.Errorf("JSON path sent in as a directory %q, not deleting", path)
-		return err
-	case !check.Mode().IsRegular():
-		err := fmt.Errorf("JSON file %q is not a regular file, not deleting", path)
-		return err
-	}
-
-	if err := os.Remove(path); err != nil {
-		err = fmt.Errorf("failed to remove unwanted JSON file at %q: %w", path, err)
-		return err
-	}
-
-	logger.Pl.S("Removed unwanted JSON file %q", path)
-	return nil
 }

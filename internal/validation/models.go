@@ -150,7 +150,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 	}
 
 	if m.OutputExt != "" {
-		if _, err := ValidateMetarrOutputExt(m.OutputExt); err != nil {
+		if _, err := sharedvalidation.ValidateFFmpegOutputExt(m.OutputExt); err != nil {
 			return fmt.Errorf("invalid output filetype in Metarr settings: %w", err)
 		}
 	}

@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads"
+	"tubarr/internal/file"
 	"tubarr/internal/metadata"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
@@ -298,6 +299,13 @@ func processJSON(
 
 	// If video failed checks, mark and save to DB.
 	if !passedChecks {
+		// Remove metadata JSON file since video is being ignored.
+		if v.JSONPath != "" {
+			if err := file.RemoveMetadataJSON(v.JSONPath); err != nil && !os.IsNotExist(err) {
+				logger.Pl.W("Failed to remove metadata file for ignored video %q: %v", v.JSONPath, err)
+			}
+		}
+
 		v.MarkVideoAsIgnored()
 		if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
 			return false, false, fmt.Errorf("failed to update ignored video: %w", err)

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
@@ -19,6 +18,7 @@ import (
 	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
@@ -134,9 +134,6 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("no command built for URL %s", d.Video.URL)
 	}
 
-	// Set process group to allow killing children processes (e.g. Aria2c).
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
 	// Set pipes.
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -185,8 +182,8 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		// End the command.
 		if err := cmd.Cancel(); err != nil {
 			if cmd.Process != nil {
-				if err = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
-					logger.Pl.E("Failed to kill process %v: %v", cmd.Process.Pid, err)
+				if err := cmd.Process.Kill(); err != nil {
+					logger.Pl.E("Failed to kill video download process %v: %v", cmd.Process, err)
 				}
 			}
 		}
@@ -282,7 +279,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 
 		// Detect completed filename.
 		if !completed && strings.HasPrefix(line, "/") {
-			if consts.AllVidExtensions[filepath.Ext(line)] { // Download succeeded.
+			if sharedconsts.AllVidExtensions[filepath.Ext(line)] { // Download succeeded.
 
 				// Set model to complete.
 				d.Video.DownloadStatus.Status = consts.DLStatusCompleted

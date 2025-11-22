@@ -1586,7 +1586,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	// Metarr final video output extension (e.g. 'mp4').
 	if f.Changed(keys.MOutputExt) {
 		if c.metarrExt != "" {
-			_, err := validation.ValidateMetarrOutputExt(c.metarrExt)
+			_, err := sharedvalidation.ValidateFFmpegOutputExt(c.metarrExt)
 			if err != nil {
 				return nil, err
 			}

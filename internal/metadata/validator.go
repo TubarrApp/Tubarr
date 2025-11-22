@@ -198,7 +198,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 
 	relevantFilters := getRelevantFilters(allFilters, cu.URL)
 
-	if !filterOpsFilter(v, relevantFilters, c.Name) {
+	if !checkFilters(v, "Download filters", relevantFilters) {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
