@@ -413,7 +413,7 @@
                           <input
                             type="checkbox"
                             @change="toggleSelectAll($event.target.checked)"
-                            :checked="selectedVideos.length === paginatedVideos.length && paginatedVideos.length > 0"
+                            :checked="selectedVideos.length === totalVideos && totalVideos > 0"
                             class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                           />
                         </th>
@@ -441,7 +441,7 @@
                             <input
                               type="checkbox"
                               :value="video.url"
-                              @change="toggleVideoSelection(video.url, $event.target.checked)"
+                              @click="handleCheckboxClick(video.url, $event)"
                               :checked="selectedVideos.includes(video.url)"
                               class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                             />
@@ -558,6 +558,7 @@
           deleting: false,
           currentPage: 1,
           itemsPerPage: 25,
+          lastClickedIndex: null,
 
           init() {
             // Get channel ID from URL params
@@ -641,28 +642,48 @@
             }
           },
 
-          toggleVideoSelection(videoUrl, checked) {
-            if (checked) {
-              if (!this.selectedVideos.includes(videoUrl)) {
-                this.selectedVideos.push(videoUrl);
+          handleCheckboxClick(videoUrl, event) {
+            const currentIndex = this.videos.findIndex(v => v.url === videoUrl);
+            if (currentIndex === -1) return;
+
+            const shouldSelect = event.target.checked;
+
+            if (event.shiftKey && this.lastClickedIndex !== null) {
+              const start = Math.min(this.lastClickedIndex, currentIndex);
+              const end = Math.max(this.lastClickedIndex, currentIndex);
+              const selectedSet = new Set(this.selectedVideos);
+
+              // Mirror typical multi-select behavior by applying the current click to the whole range
+              for (let i = start; i <= end; i++) {
+                const url = this.videos[i].url;
+                if (shouldSelect) {
+                  selectedSet.add(url);
+                } else {
+                  selectedSet.delete(url);
+                }
               }
+
+              this.selectedVideos = Array.from(selectedSet);
             } else {
-              this.selectedVideos = this.selectedVideos.filter(url => url !== videoUrl);
+              const selectedSet = new Set(this.selectedVideos);
+              if (shouldSelect) {
+                selectedSet.add(videoUrl);
+              } else {
+                selectedSet.delete(videoUrl);
+              }
+              this.selectedVideos = Array.from(selectedSet);
             }
+
+            this.lastClickedIndex = currentIndex;
           },
 
           toggleSelectAll(checked) {
             if (checked) {
-              // Select all videos on current page
-              this.paginatedVideos.forEach(video => {
-                if (!this.selectedVideos.includes(video.url)) {
-                  this.selectedVideos.push(video.url);
-                }
-              });
+              // Select all videos across all pages
+              this.selectedVideos = this.videos.map(v => v.url);
             } else {
-              // Deselect all videos on current page
-              const currentPageUrls = this.paginatedVideos.map(v => v.url);
-              this.selectedVideos = this.selectedVideos.filter(url => !currentPageUrls.includes(url));
+              // Deselect all videos
+              this.selectedVideos = [];
             }
           },
 

@@ -318,6 +318,12 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		// Store updated URLs back to DB.
 		if err := cs.UpdateNewVideoURLs(consts.QChanID, cIDStr, updated); err != nil {
 			logger.Pl.E("Could not store 'new video url' array in database: %v", err)
+		} else {
+			if len(updated) == 0 {
+				if err := cs.UpdateChannelValue(consts.QChanID, cIDStr, consts.QChanNewVideoNotification, false); err != nil {
+					logger.Pl.E("Failed to clear notification dot: %v", err)
+				}
+			}
 		}
 	}
 
@@ -638,6 +644,12 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("failed to marshal metarr settings: %w", err)
 	}
 
+	// Convert empty slice to JSON
+	newVideoURLs, err := json.Marshal([]string{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal empty new video URL slice: %w", err)
+	}
+
 	// Begin transaction
 	tx, err := cs.DB.Begin()
 	if err != nil {
@@ -661,12 +673,13 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	// Insert into the channels table
 	now := time.Now()
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		consts.DBChannels,
 		consts.QChanName,
 		consts.QChanConfigFile,
 		consts.QChanSettings,
 		consts.QChanMetarr,
+		consts.QChanNewVideoURLs,
 		consts.QChanLastScan,
 		consts.QChanCreatedAt,
 		consts.QChanUpdatedAt,
@@ -678,6 +691,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		c.ChannelConfigFile,
 		settingsJSON,
 		metarrJSON,
+		newVideoURLs,
 		now,
 		now,
 		now,
@@ -971,13 +985,12 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	}
 
 	// Unmarshal video URLs
-	if len(newVideoURLs) == 0 || string(newVideoURLs) == "null" {
-		c.NewVideoNotification = false
-		c.NewVideoURLs = []string{}
-	} else {
+	if len(newVideoURLs) > 0 {
 		if err := json.Unmarshal(newVideoURLs, &c.NewVideoURLs); err != nil {
 			return nil, true, fmt.Errorf("failed to unmarshal new video URLs: %w", err)
 		}
+	} else {
+		c.NewVideoURLs = []string{}
 	}
 
 	// Validate models at DB read boundary
@@ -1056,13 +1069,12 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 				return nil, true, fmt.Errorf("failed to unmarshal metarr settings: %w", err)
 			}
 		}
-		if len(newVideoURLs) == 0 || string(newVideoURLs) == "null" {
-			c.NewVideoNotification = false
-			c.NewVideoURLs = []string{}
-		} else {
+		if len(newVideoURLs) > 0 {
 			if err := json.Unmarshal(newVideoURLs, &c.NewVideoURLs); err != nil {
 				return nil, true, fmt.Errorf("failed to unmarshal new video URLs: %w", err)
 			}
+		} else {
+			c.NewVideoURLs = []string{}
 		}
 
 		// Validate models at DB read boundary
@@ -1479,6 +1491,10 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		return
 	}
 	displayMetarrArgsStruct(c.ChanMetarrArgs)
+
+	fmt.Printf("\n%sNew Video Notifications:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
+	fmt.Printf("Notification Displayed? %v\n", c.NewVideoNotification)
+	fmt.Printf("Unseen URLs: %v\n", c.NewVideoURLs)
 
 	// Notification URLs
 	nURLs := make([]string, 0, len(notifyURLs))
