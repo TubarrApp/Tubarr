@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS channels (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     new_video_notification INTEGER DEFAULT 0,
-    new_video_urls JSON,
+    new_video_urls JSON
 );
 CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
 CREATE INDEX IF NOT EXISTS idx_channels_last_scan ON channels(last_scan);
