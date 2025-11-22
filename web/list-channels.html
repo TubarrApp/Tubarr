@@ -45,7 +45,12 @@
         >
           <a href="index.html">
             <span class="logo" :class="sidebarToggle ? 'hidden' : ''">
-              <img src="/src/images/logo/logo-dark.svg" alt="Logo" />
+              <img class="dark:hidden" src="/src/images/logo/logo.svg" alt="Logo" />
+              <img
+                class="hidden dark:block"
+                src="/src/images/logo/logo-dark.svg"
+                alt="Logo"
+              />
             </span>
 
             <img
@@ -322,31 +327,81 @@
                 @click.stop="sidebarToggle = !sidebarToggle"
               >
                 <svg
-                  class="fill-current"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 20 20"
+                  class="hidden fill-current xl:block"
+                  width="16"
+                  height="12"
+                  viewBox="0 0 16 12"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <path
-                    d="M2.5 5.41666C2.5 5.18655 2.59219 4.96582 2.75628 4.80173C2.92038 4.63763 3.14111 4.54544 3.37122 4.54544H16.6288C16.8589 4.54544 17.0796 4.63763 17.2437 4.80173C17.4078 4.96582 17.5 5.18655 17.5 5.41666C17.5 5.64677 17.4078 5.8675 17.2437 6.0316C17.0796 6.19569 16.8589 6.28788 16.6288 6.28788H3.37122C3.14111 6.28788 2.92038 6.19569 2.75628 6.0316C2.59219 5.8675 2.5 5.64677 2.5 5.41666ZM2.5 10C2.5 9.76989 2.59219 9.54916 2.75628 9.38507C2.92038 9.22097 3.14111 9.12878 3.37122 9.12878H16.6288C16.8589 9.12878 17.0796 9.22097 17.2437 9.38507C17.4078 9.54916 17.5 9.76989 17.5 10C17.5 10.2301 17.4078 10.4508 17.2437 10.6149C17.0796 10.779 16.8589 10.8712 16.6288 10.8712H3.37122C3.14111 10.8712 2.92038 10.779 2.75628 10.6149C2.59219 10.4508 2.5 10.2301 2.5 10ZM2.5 14.5833C2.5 14.3532 2.59219 14.1325 2.75628 13.9684C2.92038 13.8043 3.14111 13.7121 3.37122 13.7121H16.6288C16.8589 13.7121 17.0796 13.8043 17.2437 13.9684C17.4078 14.1325 17.5 14.3532 17.5 14.5833C17.5 14.8134 17.4078 15.0342 17.2437 15.1983C17.0796 15.3624 16.8589 15.4545 16.6288 15.4545H3.37122C3.14111 15.4545 2.92038 15.3624 2.75628 15.1983C2.59219 15.0342 2.5 14.8134 2.5 14.5833Z"
-                    fill="currentColor"
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z"
+                    fill=""
+                  />
+                </svg>
+
+                <svg
+                  :class="sidebarToggle ? 'hidden' : 'block xl:hidden'"
+                  class="fill-current xl:hidden"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M3.25 6C3.25 5.58579 3.58579 5.25 4 5.25L20 5.25C20.4142 5.25 20.75 5.58579 20.75 6C20.75 6.41421 20.4142 6.75 20 6.75L4 6.75C3.58579 6.75 3.25 6.41422 3.25 6ZM3.25 18C3.25 17.5858 3.58579 17.25 4 17.25L20 17.25C20.4142 17.25 20.75 17.5858 20.75 18C20.75 18.4142 20.4142 18.75 20 18.75L4 18.75C3.58579 18.75 3.25 18.4142 3.25 18ZM4 11.25C3.58579 11.25 3.25 11.5858 3.25 12C3.25 12.4142 3.58579 12.75 4 12.75L12 12.75C12.4142 12.75 12.75 12.4142 12.75 12C12.75 11.5858 12.4142 11.25 12 11.25L4 11.25Z"
+                    fill=""
+                  />
+                </svg>
+
+                <!-- cross icon -->
+                <svg
+                  :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
+                  class="fill-current"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
+                    fill=""
                   />
                 </svg>
               </button>
               <!-- Hamburger Toggle BTN -->
 
-              <div class="hidden sm:block">
-                <h1 class="mb-0 text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">
-                  Channels
-                </h1>
+              <a href="index.html" class="xl:hidden">
+                <img class="dark:hidden" src="/src/images/logo/logo.svg" alt="Logo" />
+                <img
+                  class="hidden dark:block"
+                  src="/src/images/logo/logo-dark.svg"
+                  alt="Logo"
+                />
+              </a>
+
+              <div class="hidden xl:block">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
+                  Tubarr
+                </h2>
               </div>
             </div>
 
-            <div class="flex items-center gap-3 border-b border-gray-200 px-3 py-3 xl:border-b-0 xl:py-4 dark:border-gray-800">
-              
-              <!-- Dark Mode Toggler -->
+            <div
+              class="shadow-theme-md w-full items-center justify-between gap-4 px-5 py-4 xl:flex xl:justify-end xl:px-0 xl:shadow-none"
+            >
+              <div class="2xsm:gap-3 flex items-center gap-2">
+
+                <!-- Dark Mode Toggler -->
+              </div>
             </div>
           </div>
         </header>

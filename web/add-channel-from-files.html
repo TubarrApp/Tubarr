@@ -45,7 +45,12 @@
         >
           <a href="index.html">
             <span class="logo" :class="sidebarToggle ? 'hidden' : ''">
-              <img src="/src/images/logo/logo-dark.svg" alt="Logo" />
+              <img class="dark:hidden" src="/src/images/logo/logo.svg" alt="Logo" />
+              <img
+                class="hidden dark:block"
+                src="/src/images/logo/logo-dark.svg"
+                alt="Logo"
+              />
             </span>
 
             <img
@@ -374,14 +379,30 @@
               </button>
               <!-- Hamburger Toggle BTN -->
 
-              <div class="flex items-center gap-3">
-                <!-- Page Title -->
-                <h1 class="text-lg font-semibold text-gray-900 sm:text-xl dark:text-white">
-                  Add Channel from Files
-                </h1>
+              <a href="index.html" class="xl:hidden">
+                <img class="dark:hidden" src="/src/images/logo/logo.svg" alt="Logo" />
+                <img
+                  class="hidden dark:block"
+                  src="/src/images/logo/logo-dark.svg"
+                  alt="Logo"
+                />
+              </a>
+
+              <div class="hidden xl:block">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
+                  Tubarr
+                </h2>
               </div>
             </div>
 
+            <div
+              class="shadow-theme-md w-full items-center justify-between gap-4 px-5 py-4 xl:flex xl:justify-end xl:px-0 xl:shadow-none"
+            >
+              <div class="2xsm:gap-3 flex items-center gap-2">
+
+                <!-- Dark Mode Toggler -->
+              </div>
+            </div>
           </div>
         </header>
         <!-- ===== Header End ===== -->
