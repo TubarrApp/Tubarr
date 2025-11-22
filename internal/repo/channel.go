@@ -17,6 +17,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -51,6 +52,61 @@ func GetChannelStore(db *sql.DB) (*ChannelStore, error) {
 // GetDB returns the database.
 func (cs *ChannelStore) GetDB() *sql.DB {
 	return cs.DB
+}
+
+// GetNewVideoURLs returns the slice of new video URLs from the database (used for notification dot).
+func (cs *ChannelStore) GetNewVideoURLs(key, val string) ([]string, error) {
+	if !consts.ValidChannelKeys[key] {
+		return []string{}, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
+	}
+
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QChanNewVideoURLs,
+		consts.DBChannels,
+		key,
+	)
+
+	var raw []byte
+	err := cs.DB.QueryRow(query, val).Scan(&raw)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []string{}, fmt.Errorf("channel with %s %q does not exist", key, val)
+		}
+		return []string{}, err
+	}
+
+	if len(raw) == 0 {
+		return []string{}, nil
+	}
+
+	var urls []string
+	json.Unmarshal(raw, &urls)
+	return urls, nil
+}
+
+// UpdateNewVideoURLs stores new video URLs into the database.
+func (cs *ChannelStore) UpdateNewVideoURLs(key, val string, newVideoURLs []string) error {
+	if !consts.ValidChannelKeys[key] {
+		return fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
+	}
+
+	vidURLJSON, err := json.Marshal(newVideoURLs)
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ?",
+		consts.DBChannels,
+		consts.QChanNewVideoURLs,
+		key,
+	)
+
+	if _, err := cs.DB.Exec(query, vidURLJSON, val); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetChannelName returns the channel name from an input key and value.
@@ -231,6 +287,38 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		return nil
 	} else if err != nil {
 		logger.Pl.E("Failed to retrieve affected rows: %v", err)
+	}
+
+	// Lock for array update.
+	vars.UpdateNewVideoURLMutex.Lock()
+	defer vars.UpdateNewVideoURLMutex.Unlock()
+
+	// Get channel ID as a string.
+	cIDStr := strconv.FormatInt(channelID, 10)
+
+	// Get new video URLs from database.
+	newVideoURLs, err := cs.GetNewVideoURLs(consts.QChanID, cIDStr)
+	if err != nil {
+		logger.Pl.E("Could not fetch 'new video URLs' from database: %v", err)
+	} else {
+		// On no error, update the slice.
+		updated := make([]string, 0, len(newVideoURLs))
+		deletedURLs := make(map[string]struct{}, len(urls))
+		for _, u := range urls {
+			deletedURLs[u] = struct{}{}
+		}
+
+		// Check if any 'new video urls' were deleted.
+		for _, nvu := range newVideoURLs {
+			if _, exists := deletedURLs[nvu]; !exists {
+				updated = append(updated, nvu)
+			}
+		}
+
+		// Store updated URLs back to DB.
+		if err := cs.UpdateNewVideoURLs(consts.QChanID, cIDStr, updated); err != nil {
+			logger.Pl.E("Could not store 'new video url' array in database: %v", err)
+		}
 	}
 
 	logger.Pl.S("Channel ID %d: Deleted videos for URLs %v", channelID, urls)
@@ -828,12 +916,12 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		return nil, false, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 	var (
-		settings, metarrJSON json.RawMessage
-		err                  error
+		settings, metarrJSON, newVideoURLs json.RawMessage
+		err                                error
 	)
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QChanID,
 		consts.QChanName,
 		consts.QChanConfigFile,
@@ -843,6 +931,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		consts.QChanCreatedAt,
 		consts.QChanUpdatedAt,
 		consts.QChanNewVideoNotification,
+		consts.QChanNewVideoURLs,
 		consts.DBChannels,
 		key,
 	)
@@ -858,6 +947,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.NewVideoNotification,
+		&newVideoURLs,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -867,14 +957,25 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	}
 
 	// Unmarshal settings
-	if err := json.Unmarshal(settings, &c.ChanSettings); err != nil {
-		return nil, true, fmt.Errorf("parsing channel settings: %w", err)
+	if len(settings) > 0 {
+		if err := json.Unmarshal(settings, &c.ChanSettings); err != nil {
+			return nil, true, fmt.Errorf("failed to unmarshal channel settings: %w", err)
+		}
 	}
 
 	// Unmarshal metarr settings
 	if len(metarrJSON) > 0 {
 		if err := json.Unmarshal(metarrJSON, &c.ChanMetarrArgs); err != nil {
-			return nil, true, fmt.Errorf("parsing metarr settings: %w", err)
+			return nil, true, fmt.Errorf("failed to unmarshal metarr settings: %w", err)
+		}
+	}
+
+	// Unmarshal video URLs
+	if len(newVideoURLs) == 0 {
+		c.NewVideoNotification = false
+	} else {
+		if err := json.Unmarshal(newVideoURLs, &c.NewVideoURLs); err != nil {
+			return nil, true, fmt.Errorf("failed to unmarshal new video URLs: %w", err)
 		}
 	}
 
@@ -898,7 +999,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 // GetAllChannels retrieves all channels in the database.
 func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s ORDER BY %s",
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s ORDER BY %s",
 		consts.QChanID,
 		consts.QChanName,
 		consts.QChanConfigFile,
@@ -908,6 +1009,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		consts.QChanCreatedAt,
 		consts.QChanUpdatedAt,
 		consts.QChanNewVideoNotification,
+		consts.QChanNewVideoURLs,
 		consts.DBChannels,
 		consts.QChanName,
 	)
@@ -926,7 +1028,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 
 	for rows.Next() {
 		var c models.Channel
-		var settingsJSON, metarrJSON []byte
+		var settingsJSON, metarrJSON, newVideoURLs json.RawMessage
 
 		if err := rows.Scan(
 			&c.ID,
@@ -938,6 +1040,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 			&c.CreatedAt,
 			&c.UpdatedAt,
 			&c.NewVideoNotification,
+			&newVideoURLs,
 		); err != nil {
 			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 		}
@@ -950,6 +1053,13 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		if len(metarrJSON) > 0 {
 			if err := json.Unmarshal(metarrJSON, &c.ChanMetarrArgs); err != nil {
 				return nil, true, fmt.Errorf("failed to unmarshal metarr settings: %w", err)
+			}
+		}
+		if len(newVideoURLs) == 0 {
+			c.NewVideoNotification = false
+		} else {
+			if err := json.Unmarshal(newVideoURLs, &c.NewVideoURLs); err != nil {
+				return nil, true, fmt.Errorf("failed to unmarshal new video URLs: %w", err)
 			}
 		}
 

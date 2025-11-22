@@ -387,30 +387,6 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	return nil
 }
 
-// DeleteVideo deletes an existent downloaded video from the database.
-func (vs *VideoStore) DeleteVideo(videoURL string, channelID int64) error {
-	if videoURL == "" || channelID == 0 {
-		return errors.New("needs a video URL to delete, and channel ID to delete from")
-	}
-
-	query := fmt.Sprintf(
-		"DELETE FROM %s WHERE %s = ? AND %s = ?",
-		consts.DBVideos,
-		consts.QVidURL,
-		consts.QVidChanID,
-	)
-
-	_, err := vs.DB.Exec(query, videoURL, channelID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("no video exists for channel %d with URL %q", channelID, videoURL)
-		}
-		return err
-	}
-
-	return nil
-}
-
 // GetVideoURLByID returns a video's URL by its ID in the database.
 func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error) {
 	query := fmt.Sprintf(

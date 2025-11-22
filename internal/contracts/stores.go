@@ -32,6 +32,7 @@ type ChannelStore interface {
 	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
 	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error)
 	UpdateLastScan(channelID int64) error
+	UpdateNewVideoURLs(key, val string, newVideoURLs []string) error
 
 	// Delete operations.
 	DeleteChannel(key, val string) error
@@ -50,6 +51,7 @@ type ChannelStore interface {
 	GetChannelURLModel(channelID int64, urlStr string, mergeWithParent bool) (chanURL *models.ChannelURL, hasRows bool, err error)
 	GetChannelURLModels(c *models.Channel, mergeWithParent bool) ([]*models.ChannelURL, error)
 	GetNotifyURLs(id int64) ([]*models.Notification, error)
+	GetNewVideoURLs(key, val string) ([]string, error)
 
 	// Other channel database functions.
 	CheckOrUnlockChannel(c *models.Channel) (bool, error)
@@ -81,7 +83,4 @@ type VideoStore interface {
 
 	// Update operations.
 	UpdateVideo(v *models.Video, channelID int64) error
-
-	// Delete operations.
-	DeleteVideo(videoURL string, channelID int64) error
 }

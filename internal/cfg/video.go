@@ -20,20 +20,18 @@ func InitVideoCmds(s contracts.Store) *cobra.Command {
 		},
 	}
 
-	vs := s.VideoStore()
-	cs := s.ChannelStore()
-
 	// Add subcommands with dependencies.
-	vidCmd.AddCommand(deleteCmdVideo(vs, cs))
+	vidCmd.AddCommand(deleteCmdVideo(s.ChannelStore()))
 
 	return vidCmd
 }
 
 // deleteCmdVideo deletes a channel from the database.
-func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.Command {
+func deleteCmdVideo(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		chanName, url string
-		chanID        int
+		chanName string
+		urls     []string
+		chanID   int
 	)
 
 	delCmd := &cobra.Command{
@@ -47,7 +45,7 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 				return errors.New("must enter a channel name/URL, and a video URL to delete")
 			}
 
-			if url == "" {
+			if len(urls) == 0 {
 				return errors.New("must enter a video URL to delete")
 			}
 
@@ -58,17 +56,17 @@ func deleteCmdVideo(vs contracts.VideoStore, cs contracts.ChannelStore) *cobra.C
 			}
 
 			// Delete video.
-			if err := vs.DeleteVideo(url, cID); err != nil {
+			if err := cs.DeleteVideosByURLs(cID, urls); err != nil {
 				return err
 			}
-			logger.Pl.S("Successfully deleted video with URL %q", url)
+			logger.Pl.S("Successfully deleted videos with URLs: %v", urls)
 			return nil
 		},
 	}
 
 	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
-	delCmd.Flags().StringVar(&url, "delete-url", "", "Video URL")
+	delCmd.Flags().StringSliceVar(&urls, "delete-urls", []string{}, "Video URLs to delete")
 
 	return delCmd
 }
