@@ -20,7 +20,6 @@ type Channel struct {
 	CreatedAt            time.Time `db:"created_at"`
 	UpdatedAt            time.Time `db:"updated_at"`
 	NewVideoNotification bool      `db:"new_video_notification"`
-	NewVideoURLs         []string  `json:"new_video_urls" db:"new_video_urls"`
 }
 
 // GetCrawlFreq returns the program's crawl frequency (-1 is unset).
