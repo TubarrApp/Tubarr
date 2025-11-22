@@ -971,8 +971,9 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	}
 
 	// Unmarshal video URLs
-	if len(newVideoURLs) == 0 {
+	if len(newVideoURLs) == 0 || string(newVideoURLs) == "null" {
 		c.NewVideoNotification = false
+		c.NewVideoURLs = []string{}
 	} else {
 		if err := json.Unmarshal(newVideoURLs, &c.NewVideoURLs); err != nil {
 			return nil, true, fmt.Errorf("failed to unmarshal new video URLs: %w", err)
@@ -1055,8 +1056,9 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 				return nil, true, fmt.Errorf("failed to unmarshal metarr settings: %w", err)
 			}
 		}
-		if len(newVideoURLs) == 0 {
+		if len(newVideoURLs) == 0 || string(newVideoURLs) == "null" {
 			c.NewVideoNotification = false
+			c.NewVideoURLs = []string{}
 		} else {
 			if err := json.Unmarshal(newVideoURLs, &c.NewVideoURLs); err != nil {
 				return nil, true, fmt.Errorf("failed to unmarshal new video URLs: %w", err)
