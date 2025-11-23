@@ -2,16 +2,15 @@
 
 # --- Build stage -------------------------------------------------------------
 
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.25-alpine AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
     git \
     ca-certificates \
     tzdata \
-    build-essential \
-    pkg-config \
-    sqlite3 libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    gcc \
+    musl-dev \
+    sqlite-dev
 
 WORKDIR /build
 
@@ -37,33 +36,31 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 
 # --- Runtime stage -----------------------------------------------------------
 
-FROM debian:bookworm
+FROM alpine:3.20
 
-RUN printf '%s\n' \
-    "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" \
-    "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" \
-    "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" \
-    > /etc/apt/sources.list \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
-    ffmpeg \
+RUN apk add --no-cache \
     ca-certificates \
     tzdata \
+    python3 \
+    py3-pip \
     wget \
-    python3 python3-pip \
-    sqlite3 \
+    sqlite-libs \
+    su-exec \
     aria2 \
     axel \
-    libva2 libva-drm2 libva-x11-2 \
-    mesa-va-drivers \
-    intel-media-va-driver-non-free \
-    libvpl2 \
-    libmfx1 \
-    v4l-utils \
-    libdrm2 \
-    gosu \
-    udev \
- && rm -rf /var/lib/apt/lists/*
+    mesa \
+    mesa-va-gallium \
+    intel-media-driver \
+    libva \
+    libva-intel-driver
+
+# Install Jellyfin ffmpeg portable (static build with full hardware acceleration)
+RUN wget -O /tmp/jellyfin-ffmpeg.tar.xz \
+    https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/v7.0.2-5/jellyfin-ffmpeg_7.0.2-5_portable_linux64-gpl.tar.xz \
+ && tar -xf /tmp/jellyfin-ffmpeg.tar.xz -C /usr/local --strip-components=1 \
+ && rm /tmp/jellyfin-ffmpeg.tar.xz \
+ && ln -sf /usr/local/bin/ffmpeg /usr/bin/ffmpeg \
+ && ln -sf /usr/local/bin/ffprobe /usr/bin/ffprobe
 
 # yt-dlp download
 RUN wget -O /usr/local/bin/yt-dlp \
