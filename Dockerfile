@@ -49,6 +49,7 @@ RUN apk add --no-cache \
     aria2 \
     axel \
     gcompat \
+    libc6-compat \
     mesa \
     mesa-va-gallium \
     intel-media-driver \
