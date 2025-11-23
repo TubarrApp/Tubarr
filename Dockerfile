@@ -57,10 +57,11 @@ RUN apk add --no-cache \
 # Install Jellyfin ffmpeg portable (static build with full hardware acceleration)
 RUN wget -O /tmp/jellyfin-ffmpeg.tar.xz \
     https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/v7.0.2-5/jellyfin-ffmpeg_7.0.2-5_portable_linux64-gpl.tar.xz \
- && tar -xf /tmp/jellyfin-ffmpeg.tar.xz -C /usr/local --strip-components=1 \
+ && mkdir -p /opt/jellyfin-ffmpeg \
+ && tar -xf /tmp/jellyfin-ffmpeg.tar.xz -C /opt/jellyfin-ffmpeg \
  && rm /tmp/jellyfin-ffmpeg.tar.xz \
- && ln -sf /usr/local/bin/ffmpeg /usr/bin/ffmpeg \
- && ln -sf /usr/local/bin/ffprobe /usr/bin/ffprobe
+ && find /opt/jellyfin-ffmpeg -name ffmpeg -type f -exec ln -sf {} /usr/bin/ffmpeg \; \
+ && find /opt/jellyfin-ffmpeg -name ffprobe -type f -exec ln -sf {} /usr/bin/ffprobe \;
 
 # yt-dlp download
 RUN wget -O /usr/local/bin/yt-dlp \
