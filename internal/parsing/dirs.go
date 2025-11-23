@@ -143,7 +143,7 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string, v *models.Video) (str
 		return "", errors.New("templating: video URL is empty")
 
 	default:
-		if sharedtemplates.MetarrTemplateTags[tag] {
+		if _, ok := sharedtemplates.MetarrTemplateTags[tag]; ok {
 			if _, err := exec.LookPath("metarr"); err != nil {
 				return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %v", tag, err)
 			}

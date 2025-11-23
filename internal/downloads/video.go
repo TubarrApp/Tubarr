@@ -279,7 +279,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 
 		// Detect completed filename.
 		if !completed && strings.HasPrefix(line, "/") {
-			if sharedconsts.AllVidExtensions[filepath.Ext(line)] { // Download succeeded.
+			if _, ok := sharedconsts.AllVidExtensions[filepath.Ext(line)]; ok { // Download succeeded.
 
 				// Set model to complete.
 				d.Video.DownloadStatus.Status = consts.DLStatusCompleted
