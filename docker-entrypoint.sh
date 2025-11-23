@@ -17,4 +17,4 @@ chown -R tubarr:tubarr /home/tubarr /downloads /metadata 2>/dev/null || true
 /usr/local/bin/auto-updater &
 
 # Drop to the correct user
-exec gosu tubarr /app/tubarr --web
+exec su-exec tubarr /app/tubarr --web
