@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1
 
 # --- Build stage -------------------------------------------------------------
-
 FROM golang:1.25-bookworm AS builder
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     tzdata \
-    gcc \
-    musl-dev \
-    sqlite-dev
+    build-essential \
+    pkg-config \
+    sqlite3 libsqlite3-dev \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -32,19 +32,17 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
  && CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
       -o /build/metarr ./cmd/metarr
 
-
-
 # --- Runtime stage -----------------------------------------------------------
 
-FROM debian:bookworm-slim
+FROM debian:bookworm
 
 RUN set -eux; \
     printf '%s\n' \
       "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" \
       "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" \
-      "deb http://deb.debian.org/debian-updates bookworm-updates main contrib non-free non-free-firmware" \
+      "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" \
       > /etc/apt/sources.list; \
-    apt-get update; \
+    apt-get update || (echo "APT ERROR — SHOWING LOGS:" && cat /var/log/apt/* && exit 1); \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         aria2 \
         axel \
@@ -58,15 +56,27 @@ RUN set -eux; \
         gosu \
         tzdata \
         wget \
-        xz-utils; \
+        xz-utils \
+        || (echo "APT ERROR — SHOWING LOGS:" && cat /var/log/apt/* && exit 1); \
     rm -rf /var/lib/apt/lists/*
 
 # Install Jellyfin ffmpeg (Debian bookworm build with hardware acceleration)
 RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
+    printf '%s\n' \
+      "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" \
+      "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" \
+      "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" \
+      > /etc/apt/sources.list; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        wget \
+        xz-utils \
+        ca-certificates; \
     wget -O /tmp/jellyfin-ffmpeg.deb \
         https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/v7.1.2-4/jellyfin-ffmpeg7_7.1.2-4-bookworm_amd64.deb; \
     apt-get install -y --no-install-recommends /tmp/jellyfin-ffmpeg.deb; \
-    rm /tmp/jellyfin-ffmpeg.deb; \
+    rm -f /tmp/jellyfin-ffmpeg.deb; \
     rm -rf /var/lib/apt/lists/*
 
 # yt-dlp download
