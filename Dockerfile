@@ -1,7 +1,5 @@
 # syntax=docker/dockerfile:1
 
-FROM jrottenberg/ffmpeg:7.1.2-scratch320 AS ffmpeg_full
-
 # --- Build stage -------------------------------------------------------------
 
 FROM golang:1.25-bookworm AS builder
@@ -42,6 +40,7 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
     ca-certificates \
     tzdata \
     wget \
@@ -69,10 +68,6 @@ RUN wget -O /usr/local/bin/yt-dlp \
 # Copy built binaries from the builder
 COPY --from=builder /build/tubarr /app/tubarr
 COPY --from=builder /build/metarr /usr/local/bin/metarr
-
-# Copy ffmpeg from build stage
-COPY --from=ffmpeg_full /usr/local/bin/ffmpeg /usr/local/bin/
-COPY --from=ffmpeg_full /usr/local/bin/ffprobe /usr/local/bin/
 
 # Fix permissions
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
