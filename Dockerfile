@@ -39,21 +39,22 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 
 FROM debian:bookworm
 
-RUN sed -i 's/main/main contrib non-free non-free-firmware/' /etc/apt/sources.list \
+RUN printf '%s\n' \
+    "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" \
+    "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" \
+    "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" \
+    > /etc/apt/sources.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
     ffmpeg \
     ca-certificates \
     tzdata \
     wget \
-    python3 \
-    python3-pip \
+    python3 python3-pip \
     sqlite3 \
     aria2 \
     axel \
-    libva2 \
-    libva-drm2 \
-    libva-x11-2 \
+    libva2 libva-drm2 libva-x11-2 \
     mesa-va-drivers \
     intel-media-va-driver-non-free \
     libvpl2 \
