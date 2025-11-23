@@ -2,12 +2,12 @@
 
 # Create group if needed
 if ! getent group tubarr >/dev/null; then
-    addgroup -g "$PGID" tubarr
+    groupadd -g "$PGID" tubarr
 fi
 
 # Create user if needed
 if ! id -u tubarr >/dev/null 2>&1; then
-    adduser -D -u "$PUID" -G tubarr tubarr
+    useradd -u "$PUID" -g tubarr -d /home/tubarr -s /bin/sh -m tubarr
 fi
 
 # Fix permissions on bind mounts
@@ -17,4 +17,4 @@ chown -R tubarr:tubarr /home/tubarr /downloads /metadata 2>/dev/null || true
 /usr/local/bin/auto-updater &
 
 # Drop to the correct user
-exec su-exec tubarr /app/tubarr --web
+exec gosu tubarr /app/tubarr --web

@@ -36,34 +36,34 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 
 # --- Runtime stage -----------------------------------------------------------
 
-FROM alpine:3.20
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache \
-    ca-certificates \
-    tzdata \
-    python3 \
-    py3-pip \
-    wget \
-    sqlite-libs \
-    su-exec \
-    aria2 \
-    axel \
-    gcompat \
-    libc6-compat \
-    mesa \
-    mesa-va-gallium \
-    intel-media-driver \
-    libva \
-    libva-intel-driver
+RUN set -eux; \
+    sed -ri 's/ main$/ main contrib non-free non-free-firmware/' /etc/apt/sources.list; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        aria2 \
+        axel \
+        ca-certificates \
+        intel-media-va-driver-non-free \
+        libsqlite3-0 \
+        libva2 \
+        mesa-va-drivers \
+        python3 \
+        python3-pip \
+        sqlite3 \
+        gosu \
+        tzdata \
+        wget \
+        xz-utils
 
-# Install Jellyfin ffmpeg portable (static build with full hardware acceleration)
-RUN wget -O /tmp/jellyfin-ffmpeg.tar.xz \
-    https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/v7.0.2-5/jellyfin-ffmpeg_7.0.2-5_portable_linux64-gpl.tar.xz \
- && mkdir -p /opt/jellyfin-ffmpeg \
- && tar -xf /tmp/jellyfin-ffmpeg.tar.xz -C /opt/jellyfin-ffmpeg \
- && rm /tmp/jellyfin-ffmpeg.tar.xz \
- && find /opt/jellyfin-ffmpeg -name ffmpeg -type f -exec ln -sf {} /usr/bin/ffmpeg \; \
- && find /opt/jellyfin-ffmpeg -name ffprobe -type f -exec ln -sf {} /usr/bin/ffprobe \;
+# Install Jellyfin ffmpeg (Debian bookworm build with hardware acceleration)
+RUN set -eux; \
+    wget -O /tmp/jellyfin-ffmpeg.deb \
+        https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/v7.1.2-4/jellyfin-ffmpeg7_7.1.2-4-bookworm_amd64.deb; \
+    apt-get install -y --no-install-recommends /tmp/jellyfin-ffmpeg.deb; \
+    rm /tmp/jellyfin-ffmpeg.deb; \
+    rm -rf /var/lib/apt/lists/*
 
 # yt-dlp download
 RUN wget -O /usr/local/bin/yt-dlp \
