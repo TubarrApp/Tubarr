@@ -46,7 +46,6 @@ RUN printf '%s\n' \
     > /etc/apt/sources.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
-    ffmpeg \
     ca-certificates \
     tzdata \
     wget \
@@ -62,6 +61,17 @@ RUN printf '%s\n' \
     v4l-utils \
     libdrm2 \
     udev \
+    gosu \
+    mesa-vdpau-drivers \
+    vdpau-va-driver \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Jellyfin ffmpeg (comprehensive hardware acceleration support)
+RUN wget -O /tmp/jellyfin-ffmpeg.deb \
+    https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/v7.0.2-5/jellyfin-ffmpeg7_7.0.2-5-bookworm_amd64.deb \
+ && apt-get update \
+ && apt-get install -y /tmp/jellyfin-ffmpeg.deb \
+ && rm /tmp/jellyfin-ffmpeg.deb \
  && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp download
