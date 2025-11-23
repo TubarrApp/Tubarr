@@ -34,7 +34,7 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 
 # --- Runtime stage -----------------------------------------------------------
 
-FROM debian:bookworm
+FROM debian:bookworm-slim
 
 RUN set -eux; \
     printf '%s\n' \
