@@ -4,7 +4,7 @@ FROM jrottenberg/ffmpeg:7.1.2-scratch320 AS ffmpeg_full
 
 # --- Build stage -------------------------------------------------------------
 
-FROM golang:1.25-slim AS builder
+FROM golang:1.25-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
