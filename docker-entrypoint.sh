@@ -18,9 +18,9 @@ else
 fi
 
 mkdir -p /home/tubarr /downloads /metadata
-chown -R "$PUID":"$PGID" /home/tubarr /downloads /metadata 2>/dev/null || true
+chown -R "$PUID":"$PGID" /app/tubarr /downloads /metadata 2>/dev/null || true
 
 # Run updater in background
 /usr/local/bin/auto-updater &
 
-exec gosu "$USER" /tubarr/tubarr --web
+exec gosu "$USER" /app/tubarr --web
