@@ -51,10 +51,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     axel \
     libva2 libva-drm2 libva-x11-2 \
     mesa-va-drivers \
-    intel-media-va-driver-non-free \
-    libvpl2 libmfx1 \
-    intel-opencl-icd \
-    libnvidia-encode1 libnvidia-decode1 \
     v4l-utils \
     libdrm2 \
     udev \
