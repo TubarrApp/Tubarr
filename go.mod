@@ -17,7 +17,7 @@ require (
 
 require gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 
-require github.com/TubarrApp/gocommon v0.0.0-20251122181001-688f4a9e2a43
+require github.com/TubarrApp/gocommon v0.0.0-20251123011501-1ddec5e8ec5b
 
 require (
 	github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a // indirect

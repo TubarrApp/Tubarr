@@ -38,6 +38,8 @@ github.com/TubarrApp/gocommon v0.0.0-20251122180829-77460360ad74 h1:ec8Nj9B7P4PC
 github.com/TubarrApp/gocommon v0.0.0-20251122180829-77460360ad74/go.mod h1:5m/9WZD2eDGJgR/Y7TO8OZyOuEjhVBVcwBN8ZvKjw1k=
 github.com/TubarrApp/gocommon v0.0.0-20251122181001-688f4a9e2a43 h1:iF4f8sPmu9fJ6qyfawhaQaQyHOjmIYjbzVBudhLLD8E=
 github.com/TubarrApp/gocommon v0.0.0-20251122181001-688f4a9e2a43/go.mod h1:5m/9WZD2eDGJgR/Y7TO8OZyOuEjhVBVcwBN8ZvKjw1k=
+github.com/TubarrApp/gocommon v0.0.0-20251123011501-1ddec5e8ec5b h1:Y2puRSMFj1kALkoaUGqlgL78GUERbGL1qc3ZDepFcE8=
+github.com/TubarrApp/gocommon v0.0.0-20251123011501-1ddec5e8ec5b/go.mod h1:5m/9WZD2eDGJgR/Y7TO8OZyOuEjhVBVcwBN8ZvKjw1k=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a h1:AeXPUzhU0yhID/v5JJEIkjaE85ASe+Vh4Kuv1RSLL+4=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a/go.mod h1:ukJBuruT9b24pdgZwWDvOaCYHeS03B7oQPCUWh25bwM=
 github.com/Velocidex/ordereddict v0.0.0-20220107075049-3dbe58412844/go.mod h1:Y5Tfx5SKGOzkulpqfonrdILSPIuNg+GqKE/DhVJgnpg=
