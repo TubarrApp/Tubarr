@@ -27,9 +27,7 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
  && CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
       -o /build/metarr ./cmd/metarr
 
-FROM jrottenberg/ffmpeg:7.1-ubuntu-edge AS ffmpeg
-
-FROM ubuntu:24.04
+FROM jrottenberg/ffmpeg:7.1-ubuntu2404-edge
 
 RUN apt-get update || (echo "APT ERROR — SHOWING LOGS:" && cat /var/log/apt/* && exit 1); \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -48,9 +46,6 @@ RUN apt-get update || (echo "APT ERROR — SHOWING LOGS:" && cat /var/log/apt/* 
         xz-utils \
         || (echo "APT ERROR — SHOWING LOGS:" && cat /var/log/apt/* && exit 1); \
     rm -rf /var/lib/apt/lists/*
-
-COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
-COPY --from=ffmpeg /usr/local/bin/ffprobe /usr/local/bin/ffprobe
 
 RUN wget -O /usr/local/bin/yt-dlp \
         https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \
