@@ -1,20 +1,21 @@
 #!/bin/sh
 
-# Create group if needed
-if ! getent group tubarr >/dev/null; then
-    groupadd -g "$PGID" tubarr
+# If a group with PGID exists, use it; otherwise create it
+if getent group "$PGID" >/dev/null 2>&1; then
+    GROUP_NAME=$(getent group "$PGID" | cut -d: -f1)
+else
+    GROUP_NAME=app
+    groupadd -g "$PGID" "$GROUP_NAME"
 fi
 
-# Create user if needed
-if ! id -u tubarr >/dev/null 2>&1; then
-    useradd -u "$PUID" -g tubarr -d /home/tubarr -s /bin/sh -m tubarr
+# If a user with PUID exists, use it; otherwise create it
+if getent passwd "$PUID" >/dev/null 2>&1; then
+    USER_NAME=$(getent passwd "$PUID" | cut -d: -f1)
+else
+    USER_NAME=app
+    useradd -u "$PUID" -g "$PGID" -d /home/app -s /bin/sh -m "$USER_NAME"
 fi
 
-# Fix permissions on bind mounts
-chown -R tubarr:tubarr /home/tubarr /downloads /metadata 2>/dev/null || true
+chown -R "$PUID":"$PGID" /home/app /downloads /metadata 2>/dev/null || true
 
-# Run updater in background
-/usr/local/bin/auto-updater &
-
-# Drop to the correct user
-exec gosu tubarr /app/tubarr --web
+exec gosu "$USER_NAME" /app/tubarr --web
