@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -75,7 +74,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 
 	// Use buildKey for consistency
 	for _, mo := range cu.ChanURLMetarrArgs.MetaOps {
-		dedupMetaOpsMap[keys.BuildMetaOpsKeyWithChannel(mo)] = true
+		dedupMetaOpsMap[models.MetaOpToString(mo, true)] = true
 	}
 
 	for _, fmo := range filteredMetaOps {
@@ -85,7 +84,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		// Deduplicate meta ops using buildKey
 		dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
 		for _, mo := range fmo.MetaOps {
-			key := keys.BuildMetaOpsKeyWithChannel(mo)
+			key := models.MetaOpToString(mo, true)
 			if !dedupMetaOpsMap[key] {
 				dedupMetaOpsMap[key] = true
 				dedupMetaOps = append(dedupMetaOps, mo)
@@ -102,7 +101,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		logger.Pl.P("Filtered meta op results for channel %q:", channelName)
 		for _, fmo := range result {
 			for _, mo := range fmo.MetaOps {
-				logger.Pl.P("%q [FILTERS MATCHED?: %v]", keys.BuildMetaOpsKeyWithChannel(mo), fmo.FiltersMatched)
+				logger.Pl.P("%q [FILTERS MATCHED?: %v]", models.MetaOpToString(mo, true), fmo.FiltersMatched)
 			}
 		}
 	}
@@ -171,7 +170,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 	dedupFilenameOpsMap := make(map[string]bool)
 
 	for _, fo := range cu.ChanURLMetarrArgs.FilenameOps {
-		dedupFilenameOpsMap[keys.BuildFilenameOpsKeyWithChannel(fo)] = true
+		dedupFilenameOpsMap[models.FilenameOpToString(fo, true)] = true
 	}
 
 	for _, ffo := range filteredFilenameOps {
@@ -181,7 +180,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		// Deduplicate filename ops using buildKey
 		dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
 		for _, fo := range ffo.FilenameOps {
-			key := keys.BuildFilenameOpsKeyWithChannel(fo)
+			key := models.FilenameOpToString(fo, true)
 			if !dedupFilenameOpsMap[key] {
 				dedupFilenameOpsMap[key] = true
 				dedupFilenameOps = append(dedupFilenameOps, fo)
@@ -198,7 +197,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		logger.Pl.P("Filtered filename op results for channel %q:", channelName)
 		for _, ffo := range result {
 			for _, fo := range ffo.FilenameOps {
-				logger.Pl.P("%q [FILTERS MATCHED?: %v]", keys.BuildFilenameOpsKeyWithChannel(fo), ffo.FiltersMatched)
+				logger.Pl.P("%q [FILTERS MATCHED?: %v]", models.FilenameOpToString(fo, true), ffo.FiltersMatched)
 			}
 		}
 	}

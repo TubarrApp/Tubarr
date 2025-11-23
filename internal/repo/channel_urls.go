@@ -453,7 +453,7 @@ func (cs *ChannelStore) DeleteChannelURLAuth(cu *models.ChannelURL) error {
 
 // channelURLExists returns true if the channel URL exists in the database.
 func (cs *ChannelStore) channelURLExists(key, val string) bool {
-	if !consts.ValidChannelURLKeys[key] {
+	if _, ok := consts.ValidChannelURLKeys[key]; !ok {
 		logger.Pl.E("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelURLKeys)
 		return false
 	}

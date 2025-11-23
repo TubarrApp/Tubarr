@@ -1,8 +1,9 @@
 package models
 
 import (
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // ------ Filters -----------------------------------------------------------------
@@ -42,24 +43,24 @@ func MetaOpsArrayToSlice(moModels []MetaOps) []string {
 	metaOps := make([]string, 0, len(moModels))
 
 	for _, m := range moModels {
-		metaOps = append(metaOps, MetaOpToString(m))
+		metaOps = append(metaOps, MetaOpToString(m, true))
 	}
 	return metaOps
 }
 
 // MetaOpToString converts a meta ops model back to a string.
-func MetaOpToString(m MetaOps) string {
+func MetaOpToString(m MetaOps, addURLPart bool) string {
 	var op string
 	// Add channel URL if present
-	if m.ChannelURL != "" {
+	if addURLPart && m.ChannelURL != "" {
 		op = m.ChannelURL + "|"
 	}
 	// Reconstruct operations
 	switch m.OpType {
-	case consts.OpDateTag, consts.OpDeleteDateTag:
+	case sharedconsts.OpDateTag, sharedconsts.OpDeleteDateTag:
 		op += m.Field + ":" + m.OpType + ":" + m.OpLoc + ":" + m.DateFormat
 
-	case consts.OpReplace, consts.OpReplaceSuffix, consts.OpReplacePrefix:
+	case sharedconsts.OpReplace, sharedconsts.OpReplaceSuffix, sharedconsts.OpReplacePrefix:
 		op += m.Field + ":" + m.OpType + ":" + m.OpFindString + ":" + m.OpValue
 
 	default:
@@ -78,7 +79,7 @@ func FilenameOpsArrayToSlice(foModels []FilenameOps) []string {
 	filenameOps := make([]string, 0, len(foModels))
 
 	for _, f := range foModels {
-		filenameOps = append(filenameOps, FilenameOpToString(f))
+		filenameOps = append(filenameOps, FilenameOpToString(f, true))
 	}
 	return filenameOps
 }
@@ -88,18 +89,18 @@ func FilenameOpsArrayToSlice(foModels []FilenameOps) []string {
 // date-tag:prefix:ymd
 // replace:_:
 // prefix:[Video]
-func FilenameOpToString(f FilenameOps) string {
+func FilenameOpToString(f FilenameOps, addURLPart bool) string {
 	var op string
 	// Add channel URL if present
-	if f.ChannelURL != "" {
+	if addURLPart && f.ChannelURL != "" {
 		op = f.ChannelURL + "|"
 	}
 	// Reconstruct operations
 	switch f.OpType {
-	case consts.OpDateTag, consts.OpDeleteDateTag:
+	case sharedconsts.OpDateTag, sharedconsts.OpDeleteDateTag:
 		op += f.OpType + ":" + f.OpLoc + ":" + f.DateFormat
 
-	case consts.OpReplace, consts.OpReplaceSuffix, consts.OpReplacePrefix:
+	case sharedconsts.OpReplace, sharedconsts.OpReplaceSuffix, sharedconsts.OpReplacePrefix:
 		op += f.OpType + ":" + f.OpFindString + ":" + f.OpValue
 
 	default:

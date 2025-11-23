@@ -1,17 +1,21 @@
 package metarr
 
 import (
-	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-var isNonConflictingMetaOp = map[string]bool{
-	"append": true, "copy-to": true, "prefix": true, consts.OpReplace: true,
+// nonConflictingMetaOp contains keys which do not conflict with other writes.
+var nonConflictingMetaOp = map[string]struct{}{
+	sharedconsts.OpAppend:  {},
+	sharedconsts.OpCopyTo:  {},
+	sharedconsts.OpPrefix:  {},
+	sharedconsts.OpReplace: {},
 }
 
 // loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering
@@ -80,17 +84,18 @@ func filterConflictingMetaOps(fileOps, dbOps []models.MetaOps) []models.MetaOps 
 
 	// Build conflicting key map (Field:OpType only, NOT value [otherwise conflicting keys may not match in map])
 	for _, op := range fileOps {
-		if !isNonConflictingMetaOp[op.OpType] {
+		if _, ok := nonConflictingMetaOp[op.OpType]; !ok {
 			fileOpKeys[op.Field+":"+op.OpType] = true
 		}
 	}
 
 	result := make([]models.MetaOps, 0, len(dbOps))
 	for _, op := range dbOps {
-		if !fileOpKeys[op.Field+":"+op.OpType] || isNonConflictingMetaOp[op.OpType] {
+		_, nonConflicting := nonConflictingMetaOp[op.OpType]
+		if !fileOpKeys[op.Field+":"+op.OpType] || nonConflicting {
 			result = append(result, op)
 		} else {
-			logger.Pl.D(2, "File meta op overrides DB op: %s", keys.BuildMetaOpsKey(op))
+			logger.Pl.D(2, "File meta op overrides DB op: %s", models.MetaOpToString(op, false))
 		}
 	}
 	return result
@@ -104,7 +109,7 @@ func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMet
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.MetaOps, 0, len(ops))
 	for _, op := range ops {
-		key := keys.BuildMetaOpsKey(op)
+		key := models.MetaOpToString(op, false)
 		if !matchedFilteredKeys[key] {
 			logger.Pl.D(2, "Added operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -132,8 +137,9 @@ func extractMatchedFilteredMetaOps(filteredOps []models.FilteredMetaOps) []model
 func buildMetaOpKeySet(ops []models.MetaOps, includeNonConflicting bool) map[string]bool {
 	metaOpsKeys := make(map[string]bool, len(ops))
 	for _, op := range ops {
-		if includeNonConflicting || !isNonConflictingMetaOp[op.OpType] {
-			metaOpsKeys[keys.BuildMetaOpsKey(op)] = true
+		_, nonConflicting := nonConflictingMetaOp[op.OpType]
+		if includeNonConflicting || !nonConflicting {
+			metaOpsKeys[models.MetaOpToString(op, false)] = true
 		}
 	}
 	return metaOpsKeys
@@ -156,7 +162,7 @@ func getDedupedMetaOpStrings(ops []models.MetaOps) []string {
 	result := make([]string, 0, len(ops))
 
 	for _, op := range ops {
-		opStr := keys.BuildMetaOpsKey(op)
+		opStr := models.MetaOpToString(op, false)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)

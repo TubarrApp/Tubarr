@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
@@ -626,7 +626,7 @@ func TestValidateFilteredMetaOps_Valid(t *testing.T) {
 	metaOps := []models.MetaOps{
 		{
 			Field:  "title",
-			OpType: consts.OpReplace,
+			OpType: sharedconsts.OpReplace,
 		},
 	}
 
@@ -654,7 +654,7 @@ func TestValidateFilteredMetaOps_InvalidFilters(t *testing.T) {
 	metaOps := []models.MetaOps{
 		{
 			Field:  "title",
-			OpType: consts.OpReplace,
+			OpType: sharedconsts.OpReplace,
 		},
 	}
 
@@ -678,7 +678,7 @@ func TestValidateFilteredMetaOps_NoFilters(t *testing.T) {
 	metaOps := []models.MetaOps{
 		{
 			Field:  "title",
-			OpType: consts.OpReplace,
+			OpType: sharedconsts.OpReplace,
 		},
 	}
 
@@ -741,7 +741,7 @@ func TestValidateFilteredFilenameOps_Valid(t *testing.T) {
 	}
 	filenameOps := []models.FilenameOps{
 		{
-			OpType: consts.OpReplace,
+			OpType: sharedconsts.OpReplace,
 		},
 	}
 
@@ -767,7 +767,7 @@ func TestValidateFilteredFilenameOps_InvalidFilters(t *testing.T) {
 	}
 	filenameOps := []models.FilenameOps{
 		{
-			OpType: consts.OpReplace,
+			OpType: sharedconsts.OpReplace,
 		},
 	}
 
@@ -790,7 +790,7 @@ func TestValidateFilteredFilenameOps_InvalidFilters(t *testing.T) {
 func TestValidateFilteredFilenameOps_NoFilters(t *testing.T) {
 	filenameOps := []models.FilenameOps{
 		{
-			OpType: consts.OpReplace,
+			OpType: sharedconsts.OpReplace,
 		},
 	}
 

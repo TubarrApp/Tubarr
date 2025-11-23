@@ -21,13 +21,13 @@ const (
 )
 
 // ValidProgramKeys holds valid keys for the program database.
-var ValidProgramKeys = map[string]bool{
-	QProgHost:      true,
-	QProgID:        true,
-	QProgHeartbeat: true,
-	QProgPID:       true,
-	QProgStartedAt: true,
-	QProgRunning:   true,
+var ValidProgramKeys = map[string]struct{}{
+	QProgHost:      {},
+	QProgID:        {},
+	QProgHeartbeat: {},
+	QProgPID:       {},
+	QProgStartedAt: {},
+	QProgRunning:   {},
 }
 
 // Channel database entry keys.
@@ -45,17 +45,17 @@ const (
 )
 
 // ValidChannelKeys holds valid keys for the channel database.
-var ValidChannelKeys = map[string]bool{
-	QChanID:                   true,
-	QChanName:                 true,
-	QChanConfigFile:           true,
-	QChanSettings:             true,
-	QChanMetarr:               true,
-	QChanLastScan:             true,
-	QChanCreatedAt:            true,
-	QChanUpdatedAt:            true,
-	QChanNewVideoNotification: true,
-	QChanNewVideoURLs:         true,
+var ValidChannelKeys = map[string]struct{}{
+	QChanID:                   {},
+	QChanName:                 {},
+	QChanConfigFile:           {},
+	QChanSettings:             {},
+	QChanMetarr:               {},
+	QChanLastScan:             {},
+	QChanCreatedAt:            {},
+	QChanUpdatedAt:            {},
+	QChanNewVideoNotification: {},
+	QChanNewVideoURLs:         {},
 }
 
 // Channel URL database entry keys.
@@ -75,19 +75,19 @@ const (
 )
 
 // ValidChannelURLKeys holds valid keys for the channel URL database.
-var ValidChannelURLKeys = map[string]bool{
-	QChanURLID:        true,
-	QChanURLChannelID: true,
-	QChanURLURL:       true,
-	QChanURLUsername:  true,
-	QChanURLPassword:  true,
-	QChanURLLoginURL:  true,
-	QChanURLIsManual:  true,
-	QChanURLSettings:  true,
-	QChanURLMetarr:    true,
-	QChanURLLastScan:  true,
-	QChanURLCreatedAt: true,
-	QChanURLUpdatedAt: true,
+var ValidChannelURLKeys = map[string]struct{}{
+	QChanURLID:        {},
+	QChanURLChannelID: {},
+	QChanURLURL:       {},
+	QChanURLUsername:  {},
+	QChanURLPassword:  {},
+	QChanURLLoginURL:  {},
+	QChanURLIsManual:  {},
+	QChanURLSettings:  {},
+	QChanURLMetarr:    {},
+	QChanURLLastScan:  {},
+	QChanURLCreatedAt: {},
+	QChanURLUpdatedAt: {},
 }
 
 // Video database entry keys.
@@ -112,24 +112,24 @@ const (
 )
 
 // ValidVideoKeys holds valid keys for the video database.
-var ValidVideoKeys = map[string]bool{
-	QVidID:           true,
-	QVidChanID:       true,
-	QVidChanURLID:    true,
-	QVidFinished:     true,
-	QVidIgnored:      true,
-	QVidThumbnailURL: true,
-	QVidURL:          true,
-	QVidTitle:        true,
-	QVidDescription:  true,
-	QVidVideoPath:    true,
-	QVidJSONPath:     true,
-	QVidUploadDate:   true,
-	QVidMetadata:     true,
-	QVidDLStatus:     true,
-	QVidDLPercentage: true,
-	QVidCreatedAt:    true,
-	QVidUpdatedAt:    true,
+var ValidVideoKeys = map[string]struct{}{
+	QVidID:           {},
+	QVidChanID:       {},
+	QVidChanURLID:    {},
+	QVidFinished:     {},
+	QVidIgnored:      {},
+	QVidThumbnailURL: {},
+	QVidURL:          {},
+	QVidTitle:        {},
+	QVidDescription:  {},
+	QVidVideoPath:    {},
+	QVidJSONPath:     {},
+	QVidUploadDate:   {},
+	QVidMetadata:     {},
+	QVidDLStatus:     {},
+	QVidDLPercentage: {},
+	QVidCreatedAt:    {},
+	QVidUpdatedAt:    {},
 }
 
 // Downloads database entry keys.
@@ -142,12 +142,12 @@ const (
 )
 
 // ValidDownloadKeys holds valid keys for the download database.
-var ValidDownloadKeys = map[string]bool{
-	QDLVidID:     true,
-	QDLStatus:    true,
-	QDLPct:       true,
-	QDLCreatedAt: true,
-	QDLUpdatedAt: true,
+var ValidDownloadKeys = map[string]struct{}{
+	QDLVidID:     {},
+	QDLStatus:    {},
+	QDLPct:       {},
+	QDLCreatedAt: {},
+	QDLUpdatedAt: {},
 }
 
 // Notification database entry keys.
@@ -161,13 +161,13 @@ const (
 )
 
 // ValidNotificationKeys holds valid keys for the notification database.
-var ValidNotificationKeys = map[string]bool{
-	QNotifyChanID:    true,
-	QNotifyName:      true,
-	QNotifyURL:       true,
-	QNotifyChanURL:   true,
-	QNotifyCreatedAt: true,
-	QNotifyUpdatedAt: true,
+var ValidNotificationKeys = map[string]struct{}{
+	QNotifyChanID:    {},
+	QNotifyName:      {},
+	QNotifyURL:       {},
+	QNotifyChanURL:   {},
+	QNotifyCreatedAt: {},
+	QNotifyUpdatedAt: {},
 }
 
 // Misc

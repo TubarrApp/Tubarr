@@ -5,7 +5,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
@@ -13,15 +12,28 @@ import (
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
-var validMetaActions = map[string]bool{
-	"append": true, "copy-to": true, "paste-from": true, "prefix": true,
-	consts.OpReplacePrefix: true, consts.OpReplaceSuffix: true, consts.OpReplace: true, "set": true,
-	consts.OpDateTag: true, consts.OpDeleteDateTag: true,
+var validMetaActions = map[string]struct{}{
+	sharedconsts.OpAppend:        {},
+	sharedconsts.OpCopyTo:        {},
+	sharedconsts.OpPasteFrom:     {},
+	sharedconsts.OpPrefix:        {},
+	sharedconsts.OpReplacePrefix: {},
+	sharedconsts.OpReplaceSuffix: {},
+	sharedconsts.OpReplace:       {},
+	sharedconsts.OpSet:           {},
+	sharedconsts.OpDateTag:       {},
+	sharedconsts.OpDeleteDateTag: {},
 }
 
-var validFilenameActions = map[string]bool{
-	"append": true, "prefix": true, consts.OpReplacePrefix: true, consts.OpReplaceSuffix: true,
-	consts.OpReplace: true, consts.OpDateTag: true, consts.OpDeleteDateTag: true, "set": true,
+var validFilenameActions = map[string]struct{}{
+	sharedconsts.OpAppend:        {},
+	sharedconsts.OpPrefix:        {},
+	sharedconsts.OpReplacePrefix: {},
+	sharedconsts.OpReplaceSuffix: {},
+	sharedconsts.OpReplace:       {},
+	sharedconsts.OpDateTag:       {},
+	sharedconsts.OpDeleteDateTag: {},
+	sharedconsts.OpSet:           {},
 }
 
 // ValidateFilenameOps validates filename transformation operation models.
@@ -36,13 +48,13 @@ func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
 	// Validate each filename operation
 	for i, op := range filenameOps {
 		// Validate operation type is valid
-		if !validFilenameActions[op.OpType] {
+		if _, ok := validFilenameActions[op.OpType]; !ok {
 			return fmt.Errorf("invalid filename operation type %q at position %d (valid: append, prefix, replace-prefix, replace-suffix, replace, date-tag, delete-date-tag, set)", op.OpType, i)
 		}
 
 		// Validate date-tag operations
-		if op.OpType == consts.OpDateTag {
-			if op.OpLoc != "prefix" && op.OpLoc != "suffix" {
+		if op.OpType == sharedconsts.OpDateTag {
+			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
 			}
 			if !ValidateDateFormat(op.DateFormat) {
@@ -51,8 +63,8 @@ func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
 		}
 
 		// Validate delete-date-tag operations
-		if op.OpType == consts.OpDeleteDateTag {
-			if op.OpLoc != "prefix" && op.OpLoc != "suffix" && op.OpLoc != "all" {
+		if op.OpType == sharedconsts.OpDeleteDateTag {
+			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix && op.OpLoc != sharedconsts.OpLocAll {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
 			}
 			if !ValidateDateFormat(op.DateFormat) {
@@ -76,13 +88,13 @@ func ValidateMetaOps(metaOps []models.MetaOps) error {
 	// Validate each meta operation
 	for i, op := range metaOps {
 		// Validate operation type is valid
-		if !validMetaActions[op.OpType] {
+		if _, ok := validMetaActions[op.OpType]; !ok {
 			return fmt.Errorf("invalid meta operation type %q at position %d (valid: append, copy-to, paste-from, prefix, replace-prefix, replace-suffix, replace, set, date-tag, delete-date-tag)", op.OpType, i)
 		}
 
 		// Validate date-tag operations
-		if op.OpType == consts.OpDateTag {
-			if op.OpLoc != "prefix" && op.OpLoc != "suffix" {
+		if op.OpType == sharedconsts.OpDateTag {
+			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
 			}
 			if !ValidateDateFormat(op.DateFormat) {
@@ -91,8 +103,8 @@ func ValidateMetaOps(metaOps []models.MetaOps) error {
 		}
 
 		// Validate delete-date-tag operations
-		if op.OpType == consts.OpDeleteDateTag {
-			if op.OpLoc != "prefix" && op.OpLoc != "suffix" && op.OpLoc != "all" {
+		if op.OpType == sharedconsts.OpDeleteDateTag {
+			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix && op.OpLoc != sharedconsts.OpLocAll {
 				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
 			}
 			if !ValidateDateFormat(op.DateFormat) {

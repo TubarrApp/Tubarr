@@ -1,17 +1,19 @@
 package metarr
 
 import (
-	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-var isConflictingFilenameOp = map[string]bool{
-	consts.OpDateTag: true, consts.OpDeleteDateTag: true,
+// conflictingFilenameOp contains conflicting filename operations.
+var conflictingFilenameOp = map[string]struct{}{
+	sharedconsts.OpDateTag:       {},
+	sharedconsts.OpDeleteDateTag: {},
 }
 
 // loadAndMergeFilenameOps loads and merges filename ops: file ops override DB ops, then apply filtering
@@ -80,7 +82,7 @@ func filterConflictingFilenameOps(fileOps, dbOps []models.FilenameOps) []models.
 
 	// Build conflict keys
 	for _, op := range fileOps {
-		if isConflictingFilenameOp[op.OpType] {
+		if _, conflicts := conflictingFilenameOp[op.OpType]; conflicts {
 			fileOpKeys[op.OpType] = true
 		}
 	}
@@ -88,10 +90,11 @@ func filterConflictingFilenameOps(fileOps, dbOps []models.FilenameOps) []models.
 	// Add new operations
 	result := make([]models.FilenameOps, 0, len(dbOps))
 	for _, op := range dbOps {
-		if !fileOpKeys[op.OpType] || !isConflictingFilenameOp[op.OpType] {
+		_, conflicts := conflictingFilenameOp[op.OpType]
+		if !fileOpKeys[op.OpType] || !conflicts {
 			result = append(result, op)
 		} else {
-			logger.Pl.D(2, "File filename op overrides DB op: %s", keys.BuildFilenameOpsKey(op))
+			logger.Pl.D(2, "File filename op overrides DB op: %s", models.FilenameOpToString(op, false))
 		}
 	}
 	return result
@@ -105,7 +108,7 @@ func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.Fil
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.FilenameOps, 0, len(ops))
 	for _, op := range ops {
-		key := keys.BuildFilenameOpsKey(op)
+		key := models.FilenameOpToString(op, false)
 		if !matchedFilteredKeys[key] {
 			logger.Pl.D(2, "Added filename operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -133,8 +136,9 @@ func extractMatchedFilteredFilenameOps(filteredOps []models.FilteredFilenameOps)
 func buildFilenameOpKeySet(ops []models.FilenameOps, includeNonConflicting bool) map[string]bool {
 	filenameOpsKeys := make(map[string]bool, len(ops))
 	for _, op := range ops {
-		if includeNonConflicting || !isConflictingFilenameOp[op.OpType] {
-			filenameOpsKeys[keys.BuildFilenameOpsKey(op)] = true
+		_, conflicts := conflictingFilenameOp[op.OpType]
+		if includeNonConflicting || !conflicts {
+			filenameOpsKeys[models.FilenameOpToString(op, false)] = true
 		}
 	}
 	return filenameOpsKeys
@@ -158,7 +162,7 @@ func getDedupedFilenameOpStrings(ops []models.FilenameOps) []string {
 
 	// Make deduplicated filename op slice
 	for _, op := range ops {
-		opStr := keys.BuildFilenameOpsKey(op)
+		opStr := models.FilenameOpToString(op, false)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)

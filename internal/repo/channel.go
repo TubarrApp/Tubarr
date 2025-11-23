@@ -56,7 +56,7 @@ func (cs *ChannelStore) GetDB() *sql.DB {
 
 // GetNewVideoURLs returns the slice of new video URLs from the database (used for notification dot).
 func (cs *ChannelStore) GetNewVideoURLs(key, val string) ([]string, error) {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return []string{}, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -87,7 +87,7 @@ func (cs *ChannelStore) GetNewVideoURLs(key, val string) ([]string, error) {
 
 // UpdateNewVideoURLs stores new video URLs into the database.
 func (cs *ChannelStore) UpdateNewVideoURLs(key, val string, newVideoURLs []string) error {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -111,7 +111,7 @@ func (cs *ChannelStore) UpdateNewVideoURLs(key, val string, newVideoURLs []strin
 
 // GetChannelName returns the channel name from an input key and value.
 func (cs *ChannelStore) GetChannelName(key, val string) (string, error) {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return "", fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -136,7 +136,7 @@ func (cs *ChannelStore) GetChannelName(key, val string) (string, error) {
 
 // GetChannelID gets the channel ID from an input key and value.
 func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -796,7 +796,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 // DeleteChannel deletes a channel from the database with a given key/value.
 func (cs *ChannelStore) DeleteChannel(key, val string) error {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -928,7 +928,7 @@ func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
 
 // GetChannelModel fills the channel model from the database.
 func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent bool) (*models.Channel, bool, error) {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return nil, false, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 	var (
@@ -1095,7 +1095,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 
 // UpdateChannelMetarrArgsJSON updates args for Metarr output.
 func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error) {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -1157,7 +1157,7 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 
 // UpdateChannelSettingsJSON updates specific settings in the channel's settings JSON.
 func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error) {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -1219,7 +1219,7 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 
 // UpdateChannelValue updates a single element in the database.
 func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) error {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
 
@@ -1933,7 +1933,7 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 
 // channelExists returns true if the channel exists in the database.
 func (cs *ChannelStore) channelExists(key, val string) bool {
-	if !consts.ValidChannelKeys[key] {
+	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		logger.Pl.E("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 		return false
 	}
