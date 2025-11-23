@@ -2,7 +2,7 @@
 
 # --- Build stage -------------------------------------------------------------
 
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-bookworm AS builder
 
 RUN apk add --no-cache \
     git \
@@ -39,7 +39,11 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 FROM debian:bookworm-slim
 
 RUN set -eux; \
-    sed -ri 's/ main$/ main contrib non-free non-free-firmware/' /etc/apt/sources.list; \
+    printf '%s\n' \
+      "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" \
+      "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" \
+      "deb http://deb.debian.org/debian-updates bookworm-updates main contrib non-free non-free-firmware" \
+      > /etc/apt/sources.list; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         aria2 \
@@ -49,13 +53,13 @@ RUN set -eux; \
         libsqlite3-0 \
         libva2 \
         mesa-va-drivers \
-        python3 \
-        python3-pip \
+        python3 python3-pip \
         sqlite3 \
         gosu \
         tzdata \
         wget \
-        xz-utils
+        xz-utils; \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Jellyfin ffmpeg (Debian bookworm build with hardware acceleration)
 RUN set -eux; \
