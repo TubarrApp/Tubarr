@@ -20,4 +20,7 @@ fi
 mkdir -p /home/app /downloads /metadata
 chown -R "$PUID":"$PGID" /home/app /downloads /metadata 2>/dev/null || true
 
+# Run updater in background
+/usr/local/bin/auto-updater &
+
 exec gosu "$USER" /app/tubarr --web
