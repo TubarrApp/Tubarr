@@ -37,24 +37,31 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 
 # --- Runtime stage -----------------------------------------------------------
 
-FROM debian:bookworm-slim
+FROM debian:bookworm
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's/main/main contrib non-free non-free-firmware/' /etc/apt/sources.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
     ffmpeg \
     ca-certificates \
     tzdata \
     wget \
-    python3 python3-pip \
+    python3 \
+    python3-pip \
     sqlite3 \
-    su-exec \
     aria2 \
     axel \
-    libva2 libva-drm2 libva-x11-2 \
+    libva2 \
+    libva-drm2 \
+    libva-x11-2 \
     mesa-va-drivers \
+    intel-media-va-driver-non-free \
+    libvpl2 \
+    libmfx1 \
     v4l-utils \
     libdrm2 \
     udev \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp download
 RUN wget -O /usr/local/bin/yt-dlp \
