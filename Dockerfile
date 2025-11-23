@@ -76,6 +76,8 @@ RUN set -eux; \
     wget -O /tmp/jellyfin-ffmpeg.deb \
         https://github.com/jellyfin/jellyfin-ffmpeg/releases/download/v7.1.2-4/jellyfin-ffmpeg7_7.1.2-4-bookworm_amd64.deb; \
     apt-get install -y --no-install-recommends /tmp/jellyfin-ffmpeg.deb; \
+    ln -sf /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/bin/ffmpeg; \
+    ln -sf /usr/lib/jellyfin-ffmpeg/ffprobe /usr/bin/ffprobe; \
     rm -f /tmp/jellyfin-ffmpeg.deb; \
     rm -rf /var/lib/apt/lists/*
 
