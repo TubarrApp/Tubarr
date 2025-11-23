@@ -1,16 +1,19 @@
 # syntax=docker/dockerfile:1
 
+FROM jrottenberg/ffmpeg:7.1.2-scratch320 AS ffmpeg_full
+
 # --- Build stage -------------------------------------------------------------
 
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-slim AS builder
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     tzdata \
-    gcc \
-    musl-dev \
-    sqlite-dev
+    build-essential \
+    pkg-config \
+    sqlite3 libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -36,19 +39,27 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
 
 # --- Runtime stage -----------------------------------------------------------
 
-FROM alpine:3.20
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
-    ffmpeg \
-    python3 \
-    py3-pip \
     wget \
-    sqlite-libs \
+    python3 python3-pip \
+    sqlite3 \
     su-exec \
     aria2 \
-    axel
+    axel \
+    libva2 libva-drm2 libva-x11-2 \
+    mesa-va-drivers \
+    intel-media-va-driver-non-free \
+    libvpl2 libmfx1 \
+    intel-opencl-icd \
+    libnvidia-encode1 libnvidia-decode1 \
+    v4l-utils \
+    libdrm2 \
+    udev \
+    && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp download
 RUN wget -O /usr/local/bin/yt-dlp \
@@ -58,6 +69,10 @@ RUN wget -O /usr/local/bin/yt-dlp \
 # Copy built binaries from the builder
 COPY --from=builder /build/tubarr /app/tubarr
 COPY --from=builder /build/metarr /usr/local/bin/metarr
+
+# Copy ffmpeg from build stage
+COPY --from=ffmpeg_full /usr/local/bin/ffmpeg /usr/local/bin/
+COPY --from=ffmpeg_full /usr/local/bin/ffprobe /usr/local/bin/
 
 # Fix permissions
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
