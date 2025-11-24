@@ -165,16 +165,24 @@ func ValidatePurgeMetafiles(purgeType string) bool {
 // ValidateGPU validates the GPU selection.
 func ValidateGPU(g, devDir string) (gpuType string, dir string, err error) {
 	g = strings.ToLower(strings.TrimSpace(g))
+
+	// Verify OS support.
+	if !sharedvalidation.OSSupportsAccelType(g) {
+		logger.Pl.W("OS does not support acceleration of type %q, omitting.", g)
+		g = ""
+	}
+
+	// Return on empty or if explicitly unwanted.
 	if g == "" || g == "none" {
 		return "", "", nil
 	}
 
-	// Validate acceleration type
+	// Validate acceleration type.
 	if g, err = sharedvalidation.ValidateGPUAccelType(g); err != nil {
 		return "", "", err
 	}
 
-	// Check device directory exists
+	// Check device directory exists.
 	if devDir != "" {
 		if _, err := os.Stat(devDir); err != nil {
 			return "", "", fmt.Errorf("cannot access driver location %q: %w", devDir, err)
