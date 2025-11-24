@@ -21,8 +21,7 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 		logger.Pl.D(4, "No filename operations to parse")
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	filenameOps = validation.DeduplicateSliceEntries(filenameOps)
 
 	valid := make([]models.FilenameOps, 0, len(filenameOps))
@@ -105,8 +104,7 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 		logger.Pl.D(4, "No meta operations to parse")
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	metaOps = validation.DeduplicateSliceEntries(metaOps)
 
 	valid := make([]models.MetaOps, 0, len(metaOps))
@@ -132,7 +130,7 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 			newMetaOp.OpType = split[1]  // e.g. 'set'
 			newMetaOp.OpValue = split[2] // e.g. 'Spielberg'
 
-			// Build uniqueness key
+			// Build uniqueness key.
 			key = strings.Join([]string{newMetaOp.Field, newMetaOp.OpType, newMetaOp.OpValue}, ":")
 
 		case 4: // e.g. 'title:date-tag:suffix:ymd' or 'title:replace:old:new'
@@ -160,19 +158,19 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 			continue
 		}
 
-		// Check if key exists (skip duplicates)
+		// Check if key exists (skip duplicates).
 		if exists[key] {
 			logger.Pl.I("Duplicate meta operation %q, skipping", opPart)
 			continue
 		}
 		exists[key] = true
 
-		// Add channel URL if present
+		// Add channel URL if present.
 		if opURL != "" {
 			newMetaOp.ChannelURL = opURL
 		}
 
-		// Add successful meta operation
+		// Add successful meta operation.
 		valid = append(valid, newMetaOp)
 	}
 
@@ -189,18 +187,17 @@ func ParseFilterOps(ops []string) ([]models.Filters, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	ops = validation.DeduplicateSliceEntries(ops)
 
 	const formatErrorMsg = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\n" +
-		"'title:omits:frogs:must' ignores all videos with frogs in the metatitle.\n\n" +
-		"'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n\n" +
+		"'title:omits:frogs:must' ignores all videos with frogs in the metatitle.\n" +
+		"'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n" +
 		"'date:omits:must' omits videos only when the metafile contains a date field"
 
 	var filters = make([]models.Filters, 0, len(ops))
 	for _, op := range ops {
-		// Extract optional channel URL and remaining filter string
+		// Extract optional channel URL and remaining filter string.
 		chanURL, op := validation.CheckForOpURL(op)
 		split := validation.EscapedSplit(op, ':')
 
@@ -209,7 +206,7 @@ func ParseFilterOps(ops []string) ([]models.Filters, error) {
 			return nil, errors.New("filter format error")
 		}
 
-		// Normalize values
+		// Normalize values.
 		field := strings.ToLower(strings.TrimSpace(split[0]))
 		containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
 		mustAny := strings.ToLower(strings.TrimSpace(split[len(split)-1]))
@@ -218,7 +215,7 @@ func ParseFilterOps(ops []string) ([]models.Filters, error) {
 			value = strings.ToLower(split[2])
 		}
 
-		// Append filter
+		// Append filter.
 		filters = append(filters, models.Filters{
 			Field:         field,
 			ContainsOmits: containsOmits,
@@ -237,8 +234,7 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 	if len(notifications) == 0 {
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	notifications = validation.DeduplicateSliceEntries(notifications)
 
 	notificationModels := make([]*models.Notification, 0, len(notifications))
@@ -249,7 +245,7 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 
 		entry := validation.EscapedSplit(n, '|')
 
-		// Check entries for validity and fill field details
+		// Check entries for validity and fill field details.
 		var chanURL, nURL, name string
 		switch {
 		case len(entry) > 3 || len(entry) < 2:
@@ -284,19 +280,19 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 			}
 		}
 
-		// Use URL as name if name field is missing
+		// Use URL as name if name field is missing.
 		if name == "" {
 			name = nURL
 		}
 
-		// Create model
+		// Create model.
 		newNotificationModel := models.Notification{
 			ChannelURL: chanURL,
 			NotifyURL:  nURL,
 			Name:       name,
 		}
 
-		// Append to collection
+		// Append to collection.
 		notificationModels = append(notificationModels, &newNotificationModel)
 		logger.Pl.D(3, "Added notification model: %+v", newNotificationModel)
 	}
@@ -310,8 +306,7 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	ops = validation.DeduplicateSliceEntries(ops)
 
 	const moveOpFormatError string = "please enter move operations in the format 'field:value:output directory'.\n\n" +
@@ -347,8 +342,7 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 	if len(filteredMetaOps) == 0 {
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	filteredMetaOps = validation.DeduplicateSliceEntries(filteredMetaOps)
 
 	validFilteredMetaOps := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
@@ -365,7 +359,7 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 		filterRule := split[:1]
 		metaRules := split[1:]
 
-		// Parse both filter and meta operations
+		// Parse both filter and meta operations.
 		filterOps, err := ParseFilterOps(filterRule)
 		if err != nil {
 			return nil, err
@@ -395,8 +389,7 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 	if len(filteredFilenameOps) == 0 {
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	filteredFilenameOps = validation.DeduplicateSliceEntries(filteredFilenameOps)
 
 	validFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
@@ -413,7 +406,7 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 		filterRule := split[:1]
 		filenameRules := split[1:]
 
-		// Parse both filter and filename operations
+		// Parse both filter and filename operations.
 		filterOps, err := ParseFilterOps(filterRule)
 		if err != nil {
 			return nil, err
@@ -438,29 +431,28 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 
 // ParseMetarrOutputDirs parses output directory mappings for Metarr.
 //
-// Format: "url|directory" pairs with optional default directory
+// Format: "url|directory" pairs with optional default directory.
 func ParseMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Channel) (map[string]string, error) {
 	if len(urlDirs) == 0 && defaultDir == "" {
 		return nil, nil
 	}
-
-	// Deduplicate
+	// Deduplicate.
 	urlDirs = validation.DeduplicateSliceEntries(urlDirs)
 
-	// Initialize map and fill from existing
+	// Initialize map and fill from existing.
 	outDirMap := make(map[string]string)
 	if c.ChanMetarrArgs.OutputDirMap != nil {
 		maps.Copy(outDirMap, c.ChanMetarrArgs.OutputDirMap)
 	}
 
-	// Parse URL output directory pairs
+	// Parse URL output directory pairs.
 	for _, pair := range urlDirs {
 		u, dir, err := parseURLDirPair(pair)
 		if err != nil {
 			return nil, err
 		}
 
-		// Check if this URL exists in the channel
+		// Check if this URL exists in the channel.
 		found := false
 		for _, cu := range c.URLModels {
 			if strings.EqualFold(strings.TrimSpace(cu.URL), strings.TrimSpace(u)) {
@@ -476,7 +468,7 @@ func ParseMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Channe
 		outDirMap[u] = dir
 	}
 
-	// Fill blank channel entries with channel default
+	// Fill blank channel entries with channel default.
 	for _, cu := range c.URLModels {
 		if outDirMap[cu.URL] == "" && defaultDir != "" {
 			outDirMap[cu.URL] = defaultDir
@@ -493,7 +485,6 @@ func parseURLDirPair(pair string) (u string, d string, err error) {
 	if len(parts) != 2 {
 		return "", "", fmt.Errorf("invalid URL|directory pair: %q", pair)
 	}
-
 	u = parts[0]
 	if _, err := url.ParseRequestURI(u); err != nil {
 		return "", "", fmt.Errorf("invalid URL format: %q", u)

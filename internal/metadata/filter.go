@@ -12,6 +12,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // checkFilters determines whether a video matches the given filters.
@@ -21,9 +22,9 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 	for _, filter := range filters {
 		switch filter.MustAny {
-		case "must":
+		case sharedconsts.OpMust:
 			mustTotal++
-		case "any":
+		case sharedconsts.OpAny:
 			anyTotal++
 		}
 
@@ -45,9 +46,9 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 		if passed {
 			switch filter.MustAny {
-			case "must":
+			case sharedconsts.OpMust:
 				mustPassed++
-			case "any":
+			case sharedconsts.OpAny:
 				anyPassed++
 			}
 		}
@@ -72,16 +73,17 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 	result := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
 	dedupMetaOpsMap := make(map[string]bool)
 
-	// Use buildKey for consistency
+	// Use buildKey for consistency.
 	for _, mo := range cu.ChanURLMetarrArgs.MetaOps {
 		dedupMetaOpsMap[models.MetaOpToString(mo, true)] = true
 	}
 
+	// Check filtered meta ops.
 	for _, fmo := range filteredMetaOps {
-		// Check if filters match
+		// Check if filters match.
 		filtersMatched := checkFilters(v, "Filtered meta ops", fmo.Filters)
 
-		// Deduplicate meta ops using buildKey
+		// Deduplicate meta ops using buildKey.
 		dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
 		for _, mo := range fmo.MetaOps {
 			key := models.MetaOpToString(mo, true)
@@ -91,7 +93,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 			}
 		}
 
-		// Add to result, mark failures
+		// Add to result, mark failures.
 		fmo.MetaOps = dedupMetaOps
 		fmo.FiltersMatched = filtersMatched
 		result = append(result, fmo)
@@ -108,58 +110,6 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 	return result
 }
 
-// evaluateFilters checks if the filters match.
-func evaluateFilters(v *models.Video, filters []models.Filters, filterType, channelName string, logPasses, stopOnHard bool) bool {
-	mustTotal, mustPassed := 0, 0
-	anyTotal, anyPassed := 0, 0
-
-	for _, filter := range filters {
-		switch filter.MustAny {
-		case "must":
-			mustTotal++
-		case "any":
-			anyTotal++
-		}
-
-		val, exists := v.MetadataMap[filter.Field]
-		strVal := strings.ToLower(fmt.Sprint(val))
-		filterVal := strings.ToLower(filter.Value)
-
-		passed, failHard := false, false
-		if filter.Value == "" {
-			passed, failHard = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
-		} else {
-			passed, failHard = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
-		}
-
-		if failHard && stopOnHard {
-			logger.Pl.I("Video %q failed hard on filter %v for channel %q", v.URL, filter, channelName)
-			return false
-		}
-
-		if passed {
-			switch filter.MustAny {
-			case "must":
-				mustPassed++
-			case "any":
-				anyPassed++
-			}
-			if logPasses {
-				logger.Pl.S("Video %q passed filter %v for channel %q", v.URL, filter, channelName)
-			}
-		}
-	}
-
-	if mustPassed != mustTotal {
-		return false
-	}
-	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
-		return false
-	}
-
-	return true
-}
-
 // filteredFilenameOpsMatches checks which arguments match and returns the filename operations.
 func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filteredFilenameOps []models.FilteredFilenameOps, channelName string) []models.FilteredFilenameOps {
 	if len(filteredFilenameOps) == 0 {
@@ -173,11 +123,12 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		dedupFilenameOpsMap[models.FilenameOpToString(fo, true)] = true
 	}
 
+	// Check filtered filename ops.
 	for _, ffo := range filteredFilenameOps {
-		// Check if filters match
+		// Check if filters match.
 		filtersMatched := checkFilters(v, "Filtered filename ops", ffo.Filters)
 
-		// Deduplicate filename ops using buildKey
+		// Deduplicate filename ops using buildKey.
 		dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
 		for _, fo := range ffo.FilenameOps {
 			key := models.FilenameOpToString(fo, true)
@@ -187,7 +138,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 			}
 		}
 
-		// Add to result, mark failures
+		// Add to result, mark failures.
 		ffo.FilenameOps = dedupFilenameOps
 		ffo.FiltersMatched = filtersMatched
 		result = append(result, ffo)
@@ -214,7 +165,7 @@ func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL strin
 		}
 		return true, false
 	case consts.FilterOmits:
-		if exists && filter.MustAny == "must" {
+		if exists && filter.MustAny == sharedconsts.OpMust {
 			logger.Pl.I("%s mismatch: Video %q contains unwanted field %q", filterType, videoURL, filter.Field)
 			return false, true
 		}
@@ -230,7 +181,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 		if strings.Contains(strVal, filterVal) {
 			return true, false
 		}
-		if filter.MustAny == "must" {
+		if filter.MustAny == sharedconsts.OpMust {
 			logger.Pl.I("%s mismatch: Video %q does not contain desired %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
@@ -238,7 +189,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 		if !strings.Contains(strVal, filterVal) {
 			return true, false
 		}
-		if filter.MustAny == "must" {
+		if filter.MustAny == sharedconsts.OpMust {
 			logger.Pl.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}

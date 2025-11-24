@@ -27,7 +27,7 @@ func NewProgController(database *sql.DB) *ProgControl {
 
 // StartTubarr sets Tubarr fields in the database.
 func (pc *ProgControl) StartTubarr() (pid int, err error) {
-	// Check running or stale state
+	// Check running or stale state.
 	id, running, err := pc.checkProgRunning()
 	if err != nil {
 		return 0, err
@@ -161,7 +161,7 @@ func (pc *ProgControl) checkProgRunning() (int, bool, error) {
 		return 0, false, fmt.Errorf("failed to query program running row: %w", err)
 	}
 
-	// Extract the int value, defaulting to 0 if NULL
+	// Extract the int value, defaulting to 0 if NULL.
 	pidValue := int(0)
 	if pid.Valid {
 		pidValue = int(pid.Int64)
@@ -200,7 +200,7 @@ func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 		if _, err := pc.DB.Exec(resetQuery, false, 0); err != nil {
 			return false, err
 		}
-		return true, nil // Reset, no error
+		return true, nil // Reset, no error.
 	}
-	return false, nil // Not reset, no error
+	return false, nil // Not reset, no error.
 }

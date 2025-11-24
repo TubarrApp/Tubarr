@@ -15,30 +15,31 @@ import (
 )
 
 // BuildChannelFromInput builds a Channel model from the unified ChannelInputPtrs struct.
+//
 // It performs all validation and returns a fully prepared channel + auth map.
 func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	*models.Channel,
 	map[string]*models.ChannelAccessDetails,
 	error,
 ) {
-	// Validate required fields
+	// Validate required fields.
 	if input.VideoDir == nil || *input.VideoDir == "" ||
 		input.Name == nil || *input.Name == "" ||
 		input.URLs == nil || len(*input.URLs) == 0 {
 		return nil, nil, fmt.Errorf("channels require a video directory, name, and at least one channel URL")
 	}
 
-	// Default JSONDir to VideoDir
+	// Default JSONDir to VideoDir.
 	if input.JSONDir == nil {
 		input.JSONDir = input.VideoDir
 	}
 
-	// Validate the video directory exists
+	// Validate the video directory exists.
 	if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.AllTemplatesMap); err != nil {
 		return nil, nil, err
 	}
 
-	// Channel config file
+	// Channel config file.
 	if input.ChannelConfigFile != nil {
 		if _, _, err := sharedvalidation.ValidateFile(*input.ChannelConfigFile, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, nil, err
@@ -310,7 +311,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 func convertConfigValue[T any](v any) (T, bool) {
 	var zero T
 
-	// Direct type match
+	// Direct type match.
 	if val, ok := v.(T); ok {
 		return val, true
 	}
@@ -461,14 +462,14 @@ func GetConfigValue[T any](v interface {
 }, key string) (T, bool) {
 	var zero T
 
-	// Try original key first
+	// Try original key first.
 	if v.IsSet(key) {
 		if val, ok := convertConfigValue[T](v.Get(key)); ok {
 			return val, true
 		}
 	}
 
-	// Try snake_case version
+	// Try snake_case version.
 	snakeKey := strings.ReplaceAll(key, "-", "_")
 	if snakeKey != key && v.IsSet(snakeKey) {
 		if val, ok := convertConfigValue[T](v.Get(snakeKey)); ok {
@@ -476,7 +477,7 @@ func GetConfigValue[T any](v interface {
 		}
 	}
 
-	// Try kebab-case version
+	// Try kebab-case version.
 	kebabKey := strings.ReplaceAll(key, "_", "-")
 	if kebabKey != key && v.IsSet(kebabKey) {
 		if val, ok := convertConfigValue[T](v.Get(kebabKey)); ok {
@@ -495,13 +496,13 @@ func ParseURLSettingsFromViper(v interface {
 }) (map[string]*models.URLSettingsOverride, error) {
 	urlSettings := make(map[string]*models.URLSettingsOverride)
 
-	// Check if url-settings exists
+	// Check if url-settings exists.
 	if !v.IsSet("url-settings") && !v.IsSet("url_settings") {
 		logger.Pl.I("No url-settings found in config file")
 		return urlSettings, nil
 	}
 
-	// Get the raw url-settings data
+	// Get the raw url-settings data.
 	var urlSettingsRaw any
 	if v.IsSet("url-settings") {
 		urlSettingsRaw = v.Get("url-settings")
@@ -509,16 +510,16 @@ func ParseURLSettingsFromViper(v interface {
 		urlSettingsRaw = v.Get("url_settings")
 	}
 
-	// Cast to map
+	// Cast to map.
 	urlSettingsMap, ok := urlSettingsRaw.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("url-settings must be a map[string]any")
 	}
 
-	// Process each URL's settings
+	// Process each URL's settings.
 	for channelURL, settingsData := range urlSettingsMap {
 
-		// Normalize URL to lowercase for case-insensitive matching
+		// Normalize URL to lowercase for case-insensitive matching.
 		normalizedURL := strings.ToLower(channelURL)
 
 		override := &models.URLSettingsOverride{}
@@ -527,14 +528,14 @@ func ParseURLSettingsFromViper(v interface {
 			return nil, fmt.Errorf("settings for URL %q must be a map", channelURL)
 		}
 
-		// Handle "settings" section
+		// Handle "settings" section.
 		var settingsMap map[string]any
 		if settingsRaw, hasSettings := dataMap["settings"]; hasSettings {
 			if settingsMap, ok = settingsRaw.(map[string]any); !ok {
 				return nil, fmt.Errorf("settings section for URL %q must be a map", channelURL)
 			}
 
-			// Create new Viper instance and load the settings map
+			// Create new Viper instance and load the settings map.
 			settingsViper := &urlConfigSettingsParser{data: settingsMap}
 			settingsInput := &models.ChannelInputPtrs{}
 			if err := LoadViperIntoStruct(settingsViper, settingsInput); err != nil {
@@ -546,14 +547,14 @@ func ParseURLSettingsFromViper(v interface {
 			logger.Pl.D(1, "No settings section found in %+v", settingsMap)
 		}
 
-		// Handle "metarr" section
+		// Handle "metarr" section.
 		var metarrMap map[string]any
 		if metarrRaw, hasMetarr := dataMap["metarr"]; hasMetarr {
 			if metarrMap, ok = metarrRaw.(map[string]any); !ok {
 				return nil, fmt.Errorf("metarr section for URL %q must be a map", channelURL)
 			}
 
-			// Create new Viper instance and load the metarr map
+			// Create new Viper instance and load the metarr map.
 			metarrViper := &urlConfigSettingsParser{data: metarrMap}
 			metarrInput := &models.ChannelInputPtrs{}
 			if err := LoadViperIntoStruct(metarrViper, metarrInput); err != nil {
@@ -581,7 +582,7 @@ func (u *urlConfigSettingsParser) IsSet(key string) bool {
 	if _, ok := u.data[key]; ok {
 		return true
 	}
-	// Try with underscore/hyphen variations
+	// Try with underscore/hyphen variations.
 	snakeKey := strings.ReplaceAll(key, "-", "_")
 	if snakeKey != key {
 		if _, ok := u.data[snakeKey]; ok {
@@ -599,18 +600,18 @@ func (u *urlConfigSettingsParser) IsSet(key string) bool {
 
 // Get returns the key from the data.
 func (u *urlConfigSettingsParser) Get(key string) any {
-	// Try original key
+	// Try original key.
 	if val, ok := u.data[key]; ok {
 		return val
 	}
-	// Try snake_case
+	// Try snake_case.
 	snakeKey := strings.ReplaceAll(key, "-", "_")
 	if snakeKey != key {
 		if val, ok := u.data[snakeKey]; ok {
 			return val
 		}
 	}
-	// Try kebab-case
+	// Try kebab-case.
 	kebabKey := strings.ReplaceAll(key, "_", "-")
 	if kebabKey != key {
 		if val, ok := u.data[kebabKey]; ok {
@@ -627,22 +628,22 @@ func (u *urlConfigSettingsParser) Get(key string) any {
 func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, error) {
 	settings := &models.Settings{}
 
-	// Set CookiesFromBrowser (no validation available)
+	// Set CookiesFromBrowser.
 	if input.CookiesFromBrowser != nil {
 		settings.CookiesFromBrowser = *input.CookiesFromBrowser
 	}
 
-	// Set ExternalDownloader (no validation available)
+	// Set ExternalDownloader.
 	if input.ExternalDownloader != nil {
 		settings.ExternalDownloader = *input.ExternalDownloader
 	}
 
-	// Set ExternalDownloaderArgs (no validation available)
+	// Set ExternalDownloaderArgs.
 	if input.ExternalDownloaderArgs != nil {
 		settings.ExternalDownloaderArgs = *input.ExternalDownloaderArgs
 	}
 
-	// Validate and set FilterFile if provided
+	// Validate and set FilterFile if provided.
 	if input.DLFilterFile != nil && *input.DLFilterFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(*input.DLFilterFile, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, fmt.Errorf("invalid filter file for per-URL settings: %w", err)
@@ -650,7 +651,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.FilterFile = *input.DLFilterFile
 	}
 
-	// Validate and set JSONDir if provided
+	// Validate and set JSONDir if provided.
 	if input.JSONDir != nil && *input.JSONDir != "" {
 		if _, _, err := sharedvalidation.ValidateDirectory(*input.JSONDir, true, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, fmt.Errorf("invalid JSON directory for per-URL settings: %w", err)
@@ -658,7 +659,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.JSONDir = *input.JSONDir
 	}
 
-	// Validate and set MaxFilesize if provided
+	// Validate and set MaxFilesize if provided.
 	if input.MaxFilesize != nil && *input.MaxFilesize != "" {
 		v, err := validation.ValidateMaxFilesize(*input.MaxFilesize)
 		if err != nil {
@@ -667,7 +668,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.MaxFilesize = v
 	}
 
-	// Validate and set MoveOpFile if provided
+	// Validate and set MoveOpFile if provided.
 	if input.MoveOpFile != nil && *input.MoveOpFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(*input.MoveOpFile, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, fmt.Errorf("invalid move ops file for per-URL settings: %w", err)
@@ -675,7 +676,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.MetaFilterMoveOpFile = *input.MoveOpFile
 	}
 
-	// Validate and set VideoDir if provided
+	// Validate and set VideoDir if provided.
 	if input.VideoDir != nil && *input.VideoDir != "" {
 		if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, fmt.Errorf("invalid video directory for per-URL settings: %w", err)
@@ -683,32 +684,32 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.VideoDir = *input.VideoDir
 	}
 
-	// Set ExtraYTDLPVideoArgs (no validation available)
+	// Set ExtraYTDLPVideoArgs.
 	if input.ExtraYTDLPVideoArgs != nil {
 		settings.ExtraYTDLPVideoArgs = *input.ExtraYTDLPVideoArgs
 	}
 
-	// Set ExtraYTDLPMetaArgs (no validation available)
+	// Set ExtraYTDLPMetaArgs.
 	if input.ExtraYTDLPMetaArgs != nil {
 		settings.ExtraYTDLPMetaArgs = *input.ExtraYTDLPMetaArgs
 	}
 
-	// Validate and set Concurrency if provided
+	// Validate and set Concurrency if provided.
 	if input.Concurrency != nil {
 		settings.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*input.Concurrency)
 	}
 
-	// Set CrawlFreq (no validation available)
+	// Set CrawlFreq.
 	if input.CrawlFreq != nil {
 		settings.CrawlFreq = max(*input.CrawlFreq, 0)
 	}
 
-	// Set Retries (no validation available)
+	// Set Retries.
 	if input.Retries != nil {
 		settings.Retries = max(*input.Retries, 0)
 	}
 
-	// Set bools
+	// Set bools.
 	if input.Pause != nil {
 		settings.Paused = *input.Pause
 	}
@@ -716,7 +717,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.UseGlobalCookies = *input.UseGlobalCookies
 	}
 
-	// Validate and set FromDate if provided
+	// Validate and set FromDate if provided.
 	if input.FromDate != nil && *input.FromDate != "" {
 		v, err := validation.ValidateToFromDate(*input.FromDate)
 		if err != nil {
@@ -725,7 +726,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.FromDate = v
 	}
 
-	// Validate and set ToDate if provided
+	// Validate and set ToDate if provided.
 	if input.ToDate != nil && *input.ToDate != "" {
 		v, err := validation.ValidateToFromDate(*input.ToDate)
 		if err != nil {
@@ -734,7 +735,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.ToDate = v
 	}
 
-	// Validate and set YTDLP output extension if provided
+	// Validate and set YTDLP output extension if provided.
 	if input.YTDLPOutputExt != nil && *input.YTDLPOutputExt != "" {
 		v := strings.ToLower(*input.YTDLPOutputExt)
 		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
@@ -743,7 +744,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.YtdlpOutputExt = v
 	}
 
-	// Parse filter ops if provided
+	// Parse filter ops if provided.
 	if input.DLFilters != nil {
 		m, err := ParseFilterOps(*input.DLFilters)
 		if err != nil {
@@ -752,7 +753,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.Filters = m
 	}
 
-	// Parse move ops if provided
+	// Parse move ops if provided.
 	if input.MoveOps != nil {
 		m, err := ParseMetaFilterMoveOps(*input.MoveOps)
 		if err != nil {

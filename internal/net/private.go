@@ -31,35 +31,17 @@ func IsPrivateNetwork(host string) bool {
 
 	// IPv4
 	if ip4 := ip.To4(); ip4 != nil {
-		// Class A: 10.0.0.0/8
-		if ip4[0] == 10 {
-			return true
-		}
-		// Class B: 172.16.0.0/12
-		if ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31 {
-			return true
-		}
-		// Class C: 192.168.0.0/16
-		if ip4[0] == 192 && ip4[1] == 168 {
-			return true
-		}
-		// Localhost: 127.0.0.0/8
-		if ip4[0] == 127 {
+		if ip4.IsPrivate() || ip4.IsLoopback() {
 			return true
 		}
 	}
 
 	// IPv6
-	// Unique Local Address (ULA): fc00::/7
-	if ip[0] >= 0xfc && ip[0] <= 0xfd {
+	if ip.IsPrivate() || ip.IsLoopback() {
 		return true
 	}
 	// Link-local: fe80::/10
-	if ip[0] == 0xfe && (ip[1]&0xc0) == 0x80 {
-		return true
-	}
-	// Localhost: ::1
-	if ip.Equal(net.IPv6loopback) {
+	if ip.IsLinkLocalUnicast() {
 		return true
 	}
 	return false
@@ -76,6 +58,8 @@ func IsPrivateNetworkFallback(h string) bool {
 			}
 		}
 		return false
+	} else {
+		logger.Pl.E("Unable to perform DNS lookup for %q: %v", h, err)
 	}
 
 	// If resolution fails, check if the input is a direct IP address.
@@ -85,7 +69,7 @@ func IsPrivateNetworkFallback(h string) bool {
 		for i, p := range parts {
 			n, err := strconv.Atoi(p)
 			if err != nil || n < 0 || n > 255 {
-				logger.Pl.E("Malformed IP string %q", h)
+				logger.Pl.E("%q is not a valid IP string: %v", h, err)
 				return false
 			}
 			octets[i] = n
@@ -99,8 +83,6 @@ func IsPrivateNetworkFallback(h string) bool {
 			return true
 		}
 	}
-
-	logger.Pl.E("Failed to resolve hostname %q", h)
 	return false
 }
 

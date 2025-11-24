@@ -12,38 +12,24 @@ import (
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
-var validMetaActions = map[string]struct{}{
-	sharedconsts.OpAppend:        {},
-	sharedconsts.OpCopyTo:        {},
-	sharedconsts.OpPasteFrom:     {},
-	sharedconsts.OpPrefix:        {},
-	sharedconsts.OpReplacePrefix: {},
-	sharedconsts.OpReplaceSuffix: {},
-	sharedconsts.OpReplace:       {},
-	sharedconsts.OpSet:           {},
-	sharedconsts.OpDateTag:       {},
-	sharedconsts.OpDeleteDateTag: {},
-}
-
-var validFilenameActions = map[string]struct{}{
-	sharedconsts.OpAppend:        {},
-	sharedconsts.OpPrefix:        {},
-	sharedconsts.OpReplacePrefix: {},
-	sharedconsts.OpReplaceSuffix: {},
-	sharedconsts.OpReplace:       {},
-	sharedconsts.OpDateTag:       {},
-	sharedconsts.OpDeleteDateTag: {},
-	sharedconsts.OpSet:           {},
-}
-
 // ValidateFilenameOps validates filename transformation operation models.
 func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
 	if len(filenameOps) == 0 {
 		logger.Pl.D(4, "No filename operations to validate")
 		return nil
 	}
-
 	logger.Pl.D(1, "Validating %d filename operations...", len(filenameOps))
+
+	var validFilenameActions = map[string]struct{}{
+		sharedconsts.OpAppend:        {},
+		sharedconsts.OpPrefix:        {},
+		sharedconsts.OpReplacePrefix: {},
+		sharedconsts.OpReplaceSuffix: {},
+		sharedconsts.OpReplace:       {},
+		sharedconsts.OpDateTag:       {},
+		sharedconsts.OpDeleteDateTag: {},
+		sharedconsts.OpSet:           {},
+	}
 
 	// Validate each filename operation
 	for i, op := range filenameOps {
@@ -82,8 +68,20 @@ func ValidateMetaOps(metaOps []models.MetaOps) error {
 		logger.Pl.D(4, "No meta operations to validate")
 		return nil
 	}
-
 	logger.Pl.D(1, "Validating %d meta operations...", len(metaOps))
+
+	var validMetaActions = map[string]struct{}{
+		sharedconsts.OpAppend:        {},
+		sharedconsts.OpCopyTo:        {},
+		sharedconsts.OpPasteFrom:     {},
+		sharedconsts.OpPrefix:        {},
+		sharedconsts.OpReplacePrefix: {},
+		sharedconsts.OpReplaceSuffix: {},
+		sharedconsts.OpReplace:       {},
+		sharedconsts.OpSet:           {},
+		sharedconsts.OpDateTag:       {},
+		sharedconsts.OpDeleteDateTag: {},
+	}
 
 	// Validate each meta operation
 	for i, op := range metaOps {

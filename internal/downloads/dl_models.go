@@ -65,7 +65,7 @@ func (d *VideoDownload) cleanup() {
 			// Force kill if graceful fails.
 			if d.cmd.Process != nil {
 				if err := d.cmd.Process.Kill(); err != nil {
-					logger.Pl.E("Failed to cleanup video download process %v: %v", d.cmd.Process, err)
+					logger.Pl.W("Failed to cleanup video download process %d: %v", d.cmd.Process.Pid, err)
 				}
 			}
 		}
@@ -108,7 +108,7 @@ func (d *JSONDownload) cleanup() {
 			// Force kill if graceful fails.
 			if d.cmd.Process != nil {
 				if err := d.cmd.Process.Kill(); err != nil {
-					logger.Pl.E("Failed to cleanup JSON download process %v: %v", d.cmd.Process, err)
+					logger.Pl.W("Failed to cleanup JSON download process %d: %v", d.cmd.Process.Pid, err)
 				}
 			}
 		}

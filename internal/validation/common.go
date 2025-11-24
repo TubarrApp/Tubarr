@@ -15,6 +15,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
@@ -108,7 +109,7 @@ func ValidateYtdlpOutputExtension(e string) error {
 		"mp4",
 		"webm",
 	}, e) {
-		return fmt.Errorf("output extension %v is invalid or not supported", e)
+		return fmt.Errorf("yt-dlp output extension %v is invalid or not supported", e)
 	}
 
 	return nil
@@ -150,21 +151,21 @@ func ValidateFilterOps(filters []models.Filters) error {
 	if len(filters) == 0 {
 		return nil
 	}
-
 	logger.Pl.D(1, "Validating %d filter operations...", len(filters))
 
+	// Validate filter parts.
 	for i, filter := range filters {
-		// Validate contains/omits
-		if filter.ContainsOmits != "contains" && filter.ContainsOmits != "omits" {
+		// Validate contains/omits.
+		if filter.ContainsOmits != sharedconsts.OpContains && filter.ContainsOmits != sharedconsts.OpOmits {
 			return fmt.Errorf("filter at position %d has invalid type %q (must be 'contains' or 'omits')", i, filter.ContainsOmits)
 		}
 
-		// Validate must/any
-		if filter.MustAny != "must" && filter.MustAny != "any" {
+		// Validate must/any.
+		if filter.MustAny != sharedconsts.OpMust && filter.MustAny != sharedconsts.OpAny {
 			return fmt.Errorf("filter at position %d has invalid condition %q (must be 'must' or 'any')", i, filter.MustAny)
 		}
 
-		// Validate field is not empty
+		// Validate field is not empty.
 		if filter.Field == "" {
 			return fmt.Errorf("filter at position %d has empty field", i)
 		}
@@ -204,21 +205,21 @@ func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
 	if len(filteredMetaOps) == 0 {
 		return nil
 	}
-
 	logger.Pl.D(1, "Validating %d filtered meta operations...", len(filteredMetaOps))
 
+	// Validate filtered meta operations.
 	for i, fmo := range filteredMetaOps {
-		// Validate filters
+		// Validate filters.
 		if err := ValidateFilterOps(fmo.Filters); err != nil {
 			return fmt.Errorf("filtered meta operation at position %d has invalid filters: %w", i, err)
 		}
 
-		// Validate meta operations
+		// Validate meta operations.
 		if err := ValidateMetaOps(fmo.MetaOps); err != nil {
 			return fmt.Errorf("filtered meta operation at position %d has invalid meta operations: %w", i, err)
 		}
 
-		// Ensure both filters and meta ops are present
+		// Ensure both filters and meta ops are present.
 		if len(fmo.Filters) == 0 {
 			return fmt.Errorf("filtered meta operation at position %d has no filters", i)
 		}
@@ -234,21 +235,21 @@ func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOp
 	if len(filteredFilenameOps) == 0 {
 		return nil
 	}
-
 	logger.Pl.D(1, "Validating %d filtered filename operations...", len(filteredFilenameOps))
 
+	// Validate filtered filename operations.
 	for i, ffo := range filteredFilenameOps {
-		// Validate filters
+		// Validate filters.
 		if err := ValidateFilterOps(ffo.Filters); err != nil {
 			return fmt.Errorf("filtered filename operation at position %d has invalid filters: %w", i, err)
 		}
 
-		// Validate filename operations
+		// Validate filename operations.
 		if err := ValidateFilenameOps(ffo.FilenameOps); err != nil {
 			return fmt.Errorf("filtered filename operation at position %d has invalid filename operations: %w", i, err)
 		}
 
-		// Ensure both filters and filename ops are present
+		// Ensure both filters and filename ops are present.
 		if len(ffo.Filters) == 0 {
 			return fmt.Errorf("filtered filename operation at position %d has no filters", i)
 		}
@@ -269,49 +270,49 @@ func ValidateToFromDate(d string) (string, error) {
 	d = strings.ReplaceAll(d, "-", "")
 	d = strings.ReplaceAll(d, " ", "")
 
-	// Handle "today" special case
+	// Handle "today" special case.
 	if d == "today" {
 		return time.Now().Format("20060102"), nil
 	}
 
-	// Regex to extract explicitly marked years, months, and days
+	// Regex to extract explicitly marked years, months, and days.
 	re := regex.YearFragmentsCompile()
 	matches := re.FindStringSubmatch(d)
 	if matches == nil {
 		return "", fmt.Errorf("invalid date format %q: expected 'Ymd' format", d)
 	}
 
-	// Default values
+	// Default values.
 	year := strconv.Itoa(time.Now().Year())
 	month := "01"
 	day := "01"
 
-	// Year
+	// Year.
 	if matches[1] != "" {
 		year = matches[1]
-	} else if len(d) == 8 && !strings.ContainsAny(d, "ymd") { // No markers, assume raw format
+	} else if len(d) == 8 && !strings.ContainsAny(d, "ymd") { // No markers, assume raw format.
 		year, month, day = d[:4], d[4:6], d[6:8]
 	}
 
-	// Month
+	// Month.
 	if matches[2] != "" {
 		if len(matches[2]) == 1 {
-			month = "0" + matches[2] // Pad single-digit months
+			month = "0" + matches[2] // Pad single-digit months.
 		} else {
 			month = matches[2]
 		}
 	}
 
-	// Day
+	// Day.
 	if matches[3] != "" {
 		if len(matches[3]) == 1 {
-			day = "0" + matches[3] // Pad single-digit days
+			day = "0" + matches[3] // Pad single-digit days.
 		} else {
 			day = matches[3]
 		}
 	}
 
-	// Convert to integers
+	// Convert to integers.
 	yearInt, err := strconv.Atoi(year)
 	if err != nil {
 		return "", fmt.Errorf("unable to convert year %q", year)
@@ -325,7 +326,7 @@ func ValidateToFromDate(d string) (string, error) {
 		return "", fmt.Errorf("unable to convert day %q", day)
 	}
 
-	// Check validity
+	// Check validity.
 	if yearInt < 1000 || yearInt > 9999 {
 		return "", fmt.Errorf("invalid year in yyyy-mm-dd date %q: year must be 4 digits", d)
 	}

@@ -156,11 +156,7 @@ func settingsJSONMap(settings *models.Settings) map[string]any {
 		settingsMap[jsonkeys.SettingsMoveOpsFile] = settings.MetaFilterMoveOpFile
 	}
 	if len(settings.MetaFilterMoveOps) > 0 {
-		moveOpStrings := make([]string, len(settings.MetaFilterMoveOps))
-		for i := range settings.MetaFilterMoveOps {
-			moveOpStrings[i] = models.MetaFilterMoveOpsToString(settings.MetaFilterMoveOps[i])
-		}
-		settingsMap[jsonkeys.SettingsMoveOps] = strings.Join(moveOpStrings, "\n")
+		settingsMap[jsonkeys.SettingsMoveOps] = strings.Join(models.MetaFilterMoveOpsArrayToSlice(settings.MetaFilterMoveOps), "\n")
 	}
 	if settings.UseGlobalCookies {
 		settingsMap[jsonkeys.SettingsUseGlobalCookies] = true

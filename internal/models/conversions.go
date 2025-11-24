@@ -91,11 +91,11 @@ func FilenameOpsArrayToSlice(foModels []FilenameOps) []string {
 // prefix:[Video]
 func FilenameOpToString(f FilenameOps, addURLPart bool) string {
 	var op string
-	// Add channel URL if present
+	// Add channel URL if present.
 	if addURLPart && f.ChannelURL != "" {
 		op = f.ChannelURL + "|"
 	}
-	// Reconstruct operations
+	// Reconstruct operations.
 	switch f.OpType {
 	case sharedconsts.OpDateTag, sharedconsts.OpDeleteDateTag:
 		op += f.OpType + ":" + f.OpLoc + ":" + f.DateFormat
@@ -125,7 +125,7 @@ func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 // url|title:dog:/dogs
 func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
 	var op string
-	// Add channel URL if present
+	// Add channel URL if present.
 	if m.ChannelURL != "" {
 		op = m.ChannelURL + "|"
 	}

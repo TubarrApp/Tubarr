@@ -11,21 +11,11 @@ import (
 func HyphenateYyyyMmDd(d string) string {
 	d = strings.ReplaceAll(d, " ", "")
 	d = strings.ReplaceAll(d, "-", "")
-
 	if len(d) < 8 {
 		return d
 	}
 
-	b := strings.Builder{}
-	b.Grow(10)
-
-	b.WriteString(d[0:4])
-	b.WriteByte('-')
-	b.WriteString(d[4:6])
-	b.WriteByte('-')
-	b.WriteString(d[6:8])
-
-	return b.String()
+	return d[0:4] + "-" + d[4:6] + "-" + d[6:8]
 }
 
 // ParseWordDate parses and formats the inputted word date (e.g. Jan 2nd, 2006).
