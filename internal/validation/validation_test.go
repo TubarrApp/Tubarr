@@ -970,13 +970,13 @@ func TestValidateToFromDate_InvalidYear(t *testing.T) {
 
 func TestValidateGPU(t *testing.T) {
 	tests := []struct {
-		gpu         string
-		directory   string
-		expectGPU   string
-		expectDir   string
-		gpuMatch    bool
-		gpuDirMatch bool
-		ok          bool
+		gpu          string
+		directory    string
+		expectGPU    string
+		expectDir    string
+		gpuMatch     bool
+		gpuNodeMatch bool
+		ok           bool
 	}{
 		// Pass.
 		{"auto", "", "auto", "", true, true, true},
@@ -991,15 +991,15 @@ func TestValidateGPU(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		gpu, gpuDir, err := validation.ValidateGPUAcceleration(tt.gpu, tt.directory)
+		gpu, gpuNode, err := validation.ValidateGPUAcceleration(tt.gpu, tt.directory)
 		if err != nil && tt.ok {
 			t.Fatalf("Expected pass, failed with error: %q", err)
 		}
 		if gpu != tt.expectGPU && tt.gpuMatch {
 			t.Fatalf("Expected %q, got %q", tt.expectGPU, gpu)
 		}
-		if gpuDir != tt.expectDir && tt.gpuDirMatch {
-			t.Fatalf("Expected %q, got %q", tt.expectDir, gpuDir)
+		if gpuNode != tt.expectDir && tt.gpuNodeMatch {
+			t.Fatalf("Expected %q, got %q", tt.expectDir, gpuNode)
 		}
 	}
 }

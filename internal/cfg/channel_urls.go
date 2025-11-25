@@ -26,7 +26,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		maxFilesize, externalDownloader, externalDownloaderArgs                                               string
 		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps, filteredFilenameOps                        []string
 		dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
-		useGPU, gpuDir, transcodeQuality, transcodeVideoFilter                                                string
+		useGPU, gpuNode, transcodeQuality, transcodeVideoFilter                                               string
 		fromDate, toDate                                                                                      string
 		ytdlpOutExt                                                                                           string
 		useGlobalCookies, pause, resetSettings                                                                bool
@@ -138,7 +138,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
 				useGPU:               useGPU,
-				gpuDir:               gpuDir,
+				gpuNode:              gpuNode,
 				transcodeVideoCodec:  videoCodec,
 				transcodeAudioCodec:  audioCodec,
 				transcodeQuality:     transcodeQuality,
@@ -220,7 +220,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding.
-	cmd.SetTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuDir,
+	cmd.SetTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuNode,
 		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
 		&audioCodec)
 

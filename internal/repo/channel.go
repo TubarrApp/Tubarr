@@ -1734,7 +1734,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	}
 
 	var (
-		gpuDirGot, gpuGot string
+		gpuNodeGot, gpuGot string
 	)
 
 	// Metarr output extension
@@ -1842,8 +1842,8 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPU); ok {
 		gpuGot = v
 	}
-	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPUDir); ok {
-		gpuDirGot = v
+	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPUNode); ok {
+		gpuNodeGot = v
 	}
 
 	// Metarr video filter
@@ -1868,8 +1868,8 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	}
 
 	// Transcode GPU validation
-	if gpuGot != "" || gpuDirGot != "" {
-		if c.ChanMetarrArgs.TranscodeGPU, c.ChanMetarrArgs.TranscodeGPUDirectory, err = validation.ValidateGPUAcceleration(gpuGot, gpuDirGot); err != nil {
+	if gpuGot != "" || gpuNodeGot != "" {
+		if c.ChanMetarrArgs.TranscodeGPU, c.ChanMetarrArgs.TranscodeGPUDirectory, err = validation.ValidateGPUAcceleration(gpuGot, gpuNodeGot); err != nil {
 			return err
 		}
 	}

@@ -1180,10 +1180,10 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		urlOutDirs []string
 
 		// Directory paths.
-		vDir   string
-		jDir   string
-		outDir string
-		gpuDir string
+		vDir    string
+		jDir    string
+		outDir  string
+		gpuNode string
 
 		// Configuration files.
 		configFile              string
@@ -1403,7 +1403,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
 				useGPU:               useGPU,
-				gpuDir:               gpuDir,
+				gpuNode:              gpuNode,
 				transcodeVideoCodec:  videoCodec,
 				transcodeAudioCodec:  audioCodec,
 				transcodeQuality:     transcodeQuality,
@@ -1461,7 +1461,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding.
-	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuDir,
+	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuNode,
 		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
 		&audioCodec)
 
@@ -1550,7 +1550,7 @@ type cobraMetarrArgs struct {
 	maxCPU               float64
 	minFreeMem           string
 	useGPU               string
-	gpuDir               string
+	gpuNode              string
 	transcodeVideoCodec  []string
 	transcodeAudioCodec  []string
 	transcodeQuality     string
@@ -1769,7 +1769,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		validGPU := c.useGPU
 
 		if c.useGPU != "" {
-			validGPU, _, err = validation.ValidateGPUAcceleration(c.useGPU, c.gpuDir)
+			validGPU, _, err = validation.ValidateGPUAcceleration(c.useGPU, c.gpuNode)
 			if err != nil {
 				return nil, err
 			}
@@ -1781,20 +1781,20 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	}
 
 	// Transcoding GPU directory.
-	if f.Changed(keys.TranscodeGPUDir) {
+	if f.Changed(keys.TranscodeGPUNode) {
 		fns = append(fns, func(m *models.MetarrArgs) error {
 
-			if c.gpuDir != "" {
-				if _, err := os.Stat(c.gpuDir); err != nil {
+			if c.gpuNode != "" {
+				if _, err := os.Stat(c.gpuNode); err != nil {
 					switch {
 					case os.IsNotExist(err):
-						return fmt.Errorf("gpu directory was entered as %v, but path does not exist", c.gpuDir)
+						return fmt.Errorf("gpu directory was entered as %v, but path does not exist", c.gpuNode)
 					default:
-						return fmt.Errorf("error checking GPU directory %v: %w", c.gpuDir, err)
+						return fmt.Errorf("error checking GPU directory %v: %w", c.gpuNode, err)
 					}
 				}
 			}
-			m.TranscodeGPUDirectory = c.gpuDir
+			m.TranscodeGPUDirectory = c.gpuNode
 			return nil
 		})
 	}

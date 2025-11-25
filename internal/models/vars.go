@@ -75,7 +75,7 @@ type ChannelInputPtrs struct {
 
 	// Transcoding.
 	TranscodeGPU          *string   `viper:"metarr-transcode-gpu"`
-	TranscodeGPUDirectory *string   `viper:"metarr-transcode-gpu-directory"`
+	TranscodeGPUDirectory *string   `viper:"metarr-transcode-gpu-node"`
 	TranscodeQuality      *string   `viper:"metarr-transcode-quality"`
 	TranscodeVideoFilter  *string   `viper:"metarr-transcode-video-filter"`
 	TranscodeVideoCodec   *[]string `viper:"metarr-transcode-video-codecs"`

@@ -553,7 +553,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	renameStyle := r.FormValue(jsonkeys.MetarrRenameStyle)
 	minFreeMem := r.FormValue(jsonkeys.MetarrMinFreeMem)
 	transcodeGPUStr := r.FormValue(jsonkeys.MetarrGPU)
-	transcodeGPUDirStr := r.FormValue(jsonkeys.MetarrGPUDirectory)
+	transcodeGPUNodeStr := r.FormValue(jsonkeys.MetarrGPUDirectory)
 	outputDir := r.FormValue(jsonkeys.MetarrOutputDirectory)
 	transcodeVideoFilterStr := r.FormValue(jsonkeys.MetarrTranscodeVideoFilter)
 	transcodeCodecStr := r.FormValue(jsonkeys.MetarrVideoCodecs)
@@ -580,9 +580,9 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid min free mem %q: %v", minFreeMem, err), http.StatusBadRequest)
 		return nil
 	}
-	transcodeGPU, transcodeGPUDir, err := validation.ValidateGPUAcceleration(transcodeGPUStr, transcodeGPUDirStr)
+	transcodeGPU, transcodeGPUNode, err := validation.ValidateGPUAcceleration(transcodeGPUStr, transcodeGPUNodeStr)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid GPU type or device directory (%q : %q): %v", transcodeGPUStr, transcodeGPUDirStr, err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("invalid GPU type or device directory (%q : %q): %v", transcodeGPUStr, transcodeGPUNodeStr, err), http.StatusBadRequest)
 		return nil
 	}
 	transcodeVideoFilter, err := validation.ValidateTranscodeVideoFilter(transcodeVideoFilterStr)
@@ -666,7 +666,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		MaxCPU:                  maxCPU,
 		MinFreeMem:              minFreeMem,
 		TranscodeGPU:            transcodeGPU,
-		TranscodeGPUDirectory:   transcodeGPUDir,
+		TranscodeGPUDirectory:   transcodeGPUNode,
 		TranscodeVideoFilter:    transcodeVideoFilter,
 		TranscodeVideoCodecs:    transcodeVideoCodecs,
 		TranscodeAudioCodecs:    transcodeAudioCodecs,

@@ -71,7 +71,7 @@ type MetarrArgs struct {
 	MinFreeMem  string  `json:"metarr_min_free_mem"`
 
 	// FFmpeg transcoding operations.
-	TranscodeGPUDirectory string   `json:"metarr_transcode_gpu_directory"`
+	TranscodeGPUDirectory string   `json:"metarr_transcode_gpu_node"`
 	TranscodeGPU          string   `json:"metarr_transcode_gpu"`
 	TranscodeVideoFilter  string   `json:"metarr_transcode_video_filter"`
 	TranscodeVideoCodecs  []string `json:"metarr_transcode_video_codecs"`

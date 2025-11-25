@@ -103,7 +103,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.MOutputDir) {
 		in.OutDir = &f.OutDir
 	}
-	if cmd.Flags().Changed(keys.TranscodeGPUDir) {
+	if cmd.Flags().Changed(keys.TranscodeGPUNode) {
 		in.TranscodeGPUDirectory = &f.TranscodeGPUDirectory
 	}
 	if cmd.Flags().Changed(keys.FilterOpsFile) {

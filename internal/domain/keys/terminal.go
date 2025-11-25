@@ -33,7 +33,7 @@ const (
 // Transcoding.
 const (
 	TranscodeGPU         string = "metarr-transcode-gpu"
-	TranscodeGPUDir      string = "metarr-transcode-gpu-directory"
+	TranscodeGPUNode     string = "metarr-transcode-gpu-node"
 	TranscodeCodec       string = "metarr-transcode-video-codecs"
 	TranscodeAudioCodec  string = "metarr-transcode-audio-codecs"
 	TranscodeQuality     string = "metarr-transcode-quality"
@@ -87,8 +87,6 @@ const (
 const (
 	MDescDatePfx             string = "metarr-desc-date-prefix"
 	MDescDateSfx             string = "metarr-desc-date-suffix"
-	MGPU                     string = "metarr-gpu"
-	MGPUDirectory            string = "metarr-gpu-directory"
 	MMetaOps                 string = "metarr-meta-ops"
 	MMetaOpsFile             string = "metarr-meta-ops-file"
 	MFilenameOps             string = "metarr-filename-ops"
