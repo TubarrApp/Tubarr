@@ -991,7 +991,7 @@ func TestValidateGPU(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		gpu, gpuDir, err := validation.ValidateGPU(tt.gpu, tt.directory)
+		gpu, gpuDir, err := validation.ValidateGPUAcceleration(tt.gpu, tt.directory)
 		if err != nil && tt.ok {
 			t.Fatalf("Expected pass, failed with error: %q", err)
 		}

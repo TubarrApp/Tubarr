@@ -133,7 +133,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	}
 
 	if input.TranscodeGPU != nil && *input.TranscodeGPU != "" {
-		g, d, err := validation.ValidateGPU(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
+		g, d, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -840,7 +840,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Validate and set GPU settings if provided.
 	if input.TranscodeGPU != nil {
-		g, d, err := validation.ValidateGPU(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
+		g, d, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate GPU settings for per-URL settings: %w", err)
 		}

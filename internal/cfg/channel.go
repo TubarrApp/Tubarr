@@ -1769,7 +1769,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		validGPU := c.useGPU
 
 		if c.useGPU != "" {
-			validGPU, _, err = validation.ValidateGPU(c.useGPU, c.gpuDir)
+			validGPU, _, err = validation.ValidateGPUAcceleration(c.useGPU, c.gpuDir)
 			if err != nil {
 				return nil, err
 			}

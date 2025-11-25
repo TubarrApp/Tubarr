@@ -332,7 +332,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.TranscodeGPUDirectory = v
 	}
 	if v, ok := data[jsonkeys.MetarrGPU].(string); ok {
-		validGPU, _, err := validation.ValidateGPU(v, metarr.TranscodeGPUDirectory)
+		validGPU, _, err := validation.ValidateGPUAcceleration(v, metarr.TranscodeGPUDirectory)
 		if err != nil {
 			return nil, err
 		}
@@ -580,7 +580,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid min free mem %q: %v", minFreeMem, err), http.StatusBadRequest)
 		return nil
 	}
-	transcodeGPU, transcodeGPUDir, err := validation.ValidateGPU(transcodeGPUStr, transcodeGPUDirStr)
+	transcodeGPU, transcodeGPUDir, err := validation.ValidateGPUAcceleration(transcodeGPUStr, transcodeGPUDirStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid GPU type or device directory (%q : %q): %v", transcodeGPUStr, transcodeGPUDirStr, err), http.StatusBadRequest)
 		return nil

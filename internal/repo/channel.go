@@ -1869,7 +1869,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Transcode GPU validation
 	if gpuGot != "" || gpuDirGot != "" {
-		if c.ChanMetarrArgs.TranscodeGPU, c.ChanMetarrArgs.TranscodeGPUDirectory, err = validation.ValidateGPU(gpuGot, gpuDirGot); err != nil {
+		if c.ChanMetarrArgs.TranscodeGPU, c.ChanMetarrArgs.TranscodeGPUDirectory, err = validation.ValidateGPUAcceleration(gpuGot, gpuDirGot); err != nil {
 			return err
 		}
 	}

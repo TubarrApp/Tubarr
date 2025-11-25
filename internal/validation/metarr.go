@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 	"tubarr/internal/domain/logger"
@@ -162,8 +161,8 @@ func ValidatePurgeMetafiles(purgeType string) bool {
 	return false
 }
 
-// ValidateGPU validates the GPU selection.
-func ValidateGPU(g, devDir string) (gpuType string, dir string, err error) {
+// ValidateGPUAcceleration validates the GPU selection.
+func ValidateGPUAcceleration(g, devDir string) (gpuType string, dir string, err error) {
 	g = strings.ToLower(strings.TrimSpace(g))
 
 	// Verify OS support.
@@ -183,10 +182,8 @@ func ValidateGPU(g, devDir string) (gpuType string, dir string, err error) {
 	}
 
 	// Check device directory exists.
-	if devDir != "" {
-		if _, err := os.Stat(devDir); err != nil {
-			return "", "", fmt.Errorf("cannot access driver location %q: %w", devDir, err)
-		}
+	if devDir, err = sharedvalidation.ValidateAccelTypeDeviceNode(g, devDir); err != nil {
+		return "", "", err
 	}
 
 	return g, devDir, nil
