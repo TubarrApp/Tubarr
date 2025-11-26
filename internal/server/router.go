@@ -103,7 +103,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		logger.Pl.S("Tubarr web server listening on %s\n", srv.Addr)
+		logger.Pl.S("Tubarr web server listening on http://localhost%s\n", srv.Addr)
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErr <- fmt.Errorf("server failed: %w", err)

@@ -423,6 +423,21 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	}
 	response["url_settings"] = urlSettings
 
+	// Fetch and include notification URLs.
+	notifications, err := ss.cs.GetNotifyURLs(c.ID)
+	if err != nil {
+		logger.Pl.E("Failed to fetch notification URLs for channel %d: %v", c.ID, err)
+	} else if len(notifications) > 0 {
+		// Extract just the NotifyURL values for the frontend.
+		notifyURLs := make([]string, 0, len(notifications))
+		for _, n := range notifications {
+			if n.NotifyURL != "" {
+				notifyURLs = append(notifyURLs, n.NotifyURL)
+			}
+		}
+		response["notifications"] = notifyURLs
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "failed to encode JSON", http.StatusInternalServerError)
@@ -780,6 +795,61 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			// Add the new URL to the channel.
 			if _, err := ss.cs.AddChannelURL(channelID, chanURL, true); err != nil {
 				http.Error(w, fmt.Sprintf("failed to add URL %q: %v", u, err), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	// Handle notification URLs update.
+	// First, get existing notifications to delete them.
+	existingNotifications, err := ss.cs.GetNotifyURLs(channelID)
+	if err != nil {
+		logger.Pl.E("Failed to fetch existing notifications for channel %d: %v", channelID, err)
+	}
+
+	// Delete all existing notifications if there are any.
+	if len(existingNotifications) > 0 {
+		existingURLs := make([]string, 0, len(existingNotifications))
+		existingNames := make([]string, 0, len(existingNotifications))
+		for _, n := range existingNotifications {
+			if n.NotifyURL != "" {
+				existingURLs = append(existingURLs, n.NotifyURL)
+			}
+			if n.Name != "" {
+				existingNames = append(existingNames, n.Name)
+			}
+		}
+		if len(existingURLs) > 0 || len(existingNames) > 0 {
+			if err := ss.cs.DeleteNotifyURLs(channelID, existingURLs, existingNames); err != nil {
+				logger.Pl.E("Failed to delete existing notifications for channel %d: %v", channelID, err)
+				http.Error(w, fmt.Sprintf("failed to delete existing notifications: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	// Add new notifications if provided.
+	notificationsStr := r.FormValue("notifications")
+	if notificationsStr != "" {
+		// Parse notification URLs from space-separated string.
+		notificationURLs := strings.Fields(notificationsStr)
+
+		// Convert to Notification models.
+		notifications := make([]*models.Notification, 0, len(notificationURLs))
+		for _, notifyURL := range notificationURLs {
+			if notifyURL != "" {
+				notifications = append(notifications, &models.Notification{
+					ChannelID: channelID,
+					NotifyURL: notifyURL,
+				})
+			}
+		}
+
+		// Add new notifications if any.
+		if len(notifications) > 0 {
+			if err := ss.cs.AddNotifyURLs(channelID, notifications); err != nil {
+				logger.Pl.E("Failed to add notification URLs for channel %d: %v", channelID, err)
+				http.Error(w, fmt.Sprintf("failed to add notification URLs: %v", err), http.StatusInternalServerError)
 				return
 			}
 		}
