@@ -748,8 +748,19 @@
                               <input type="text" x-model="urlEntry.custom.metarr_min_free_mem" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_gpu" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
+                              <select x-model="urlEntry.custom.metarr_gpu" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Use global</option>
+                                <option value="auto">Auto</option>
+                                <option value="nvidia">NVIDIA</option>
+                                <option value="amd">AMD</option>
+                                <option value="intel">Intel</option>
+                                <option value="vaapi">VAAPI</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Node Path</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_gpu_node" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
@@ -785,16 +796,32 @@
                             </div>
                           </div>
                           <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Meta Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_meta_ops_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                          </div>
+                          <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Meta Operations (one per line)</label>
                             <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" placeholder="artist:set:Value" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_filtered_meta_ops_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line)</label>
+                            <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" placeholder="filter_rule|meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filename Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_filename_ops_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filename Operations (one per line)</label>
                             <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" placeholder="prefix:[PREFIX] " class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" placeholder="filter_rule|meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Filename Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_filtered_filename_ops_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
                           </div>
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line)</label>
@@ -1212,7 +1239,7 @@
 
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          GPU Directory
+                          GPU Node Path
                         </label>
                         <input
                           type="text"
@@ -1543,14 +1570,19 @@
                   metarr_max_cpu_usage: null,
                   metarr_min_free_mem: '',
                   metarr_gpu: '',
+                  metarr_gpu_node: '',
                   metarr_transcode_video_transcode_codecs: '',
                   metarr_transcode_audio_codecs: '',
                   metarr_transcode_quality: null,
                   metarr_transcode_video_filter: '',
                   metarr_extra_ffmpeg_args: '',
+                  metarr_meta_ops_file: '',
                   metarr_meta_ops: '',
-                  metarr_filename_ops: '',
+                  metarr_filtered_meta_ops_file: '',
                   metarr_filtered_meta_ops: '',
+                  metarr_filename_ops_file: '',
+                  metarr_filename_ops: '',
+                  metarr_filtered_filename_ops_file: '',
                   metarr_filtered_filename_ops: ''
                 }
               }
@@ -1640,14 +1672,19 @@
                 metarr_max_cpu_usage: null,
                 metarr_min_free_mem: '',
                 metarr_gpu: '',
+                metarr_gpu_node: '',
                 metarr_transcode_video_transcode_codecs: '',
                 metarr_transcode_audio_codecs: '',
                 metarr_transcode_quality: null,
                 metarr_transcode_video_filter: '',
                 metarr_extra_ffmpeg_args: '',
+                metarr_meta_ops_file: '',
                 metarr_meta_ops: '',
-                metarr_filename_ops: '',
+                metarr_filtered_meta_ops_file: '',
                 metarr_filtered_meta_ops: '',
+                metarr_filename_ops_file: '',
+                metarr_filename_ops: '',
+                metarr_filtered_filename_ops_file: '',
                 metarr_filtered_filename_ops: ''
               }
             });
@@ -1669,10 +1706,24 @@
               const payload = {
                 name: this.formData.name,
                 urls: this.formData.urls.filter(u => u.url).map(u => u.url).join(' '),
-                auth_details: this.buildAuthDetails(),
-                ...this.formData.settings,
-                ...this.formData.metarr
+                auth_details: this.buildAuthDetails()
               };
+
+              // Add global settings (filter out null/empty values to allow clearing)
+              Object.keys(this.formData.settings).forEach(key => {
+                const value = this.formData.settings[key];
+                if (value !== null && value !== undefined && value !== '') {
+                  payload[key] = value;
+                }
+              });
+
+              // Add global metarr settings (filter out null/empty values to allow clearing)
+              Object.keys(this.formData.metarr).forEach(key => {
+                const value = this.formData.metarr[key];
+                if (value !== null && value !== undefined && value !== '') {
+                  payload[key] = value;
+                }
+              });
 
               // Add notifications (split by newlines and filter empty)
               if (this.formData.notifications && this.formData.notifications.trim()) {
@@ -1803,10 +1854,12 @@
                 const metarrFields = [
                   'metarr_output_directory', 'metarr_output_ext', 'metarr_rename_style',
                   'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
-                  'metarr_gpu', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
+                  'metarr_gpu', 'metarr_gpu_node', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
                   'metarr_transcode_quality', 'metarr_transcode_video_filter',
-                  'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_filename_ops',
-                  'metarr_filtered_meta_ops', 'metarr_filtered_filename_ops'
+                  'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_meta_ops_file',
+                  'metarr_filename_ops', 'metarr_filename_ops_file',
+                  'metarr_filtered_meta_ops', 'metarr_filtered_meta_ops_file',
+                  'metarr_filtered_filename_ops', 'metarr_filtered_filename_ops_file'
                 ];
 
                 metarrFields.forEach(field => {
