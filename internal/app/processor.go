@@ -179,7 +179,7 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video, c *models.Channel
 	}
 
 	// Detect custom site.
-	s.ScrapeCustomSite(v.URL, v.JSONFilePath, v, c)
+	s.ScrapeCustomSite(v.URL, v.JSONDir, v, c)
 
 	return v.JSONCustomFile, nil
 }
