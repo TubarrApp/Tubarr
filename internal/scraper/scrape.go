@@ -8,14 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
+	"tubarr/internal/dev"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -28,7 +29,6 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedtags"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
 	"golang.org/x/net/publicsuffix"
 )
@@ -124,6 +124,56 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 	}
 
 	return newRequests, nil
+}
+
+// ScrapeCustomSite scrapes custom sites for metadata.
+func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video, c *models.Channel) error {
+	// Initialize collector with cookies.
+	collector, err := initializeCollector(urlStr, s.cookieManager)
+	if err != nil {
+		return err
+	}
+
+	metadata := make(map[string]any, 5)
+
+	// Determine which rule set to use based on URL.
+	switch {
+	case strings.Contains(v.URL, "censored.tv"):
+		if !dev.CensoredTVUseCustom {
+			logger.Pl.I("Using regular scraper for censored.tv ...")
+		} else {
+			metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLCensored)
+		}
+	case strings.Contains(v.URL, "bitchute.com"):
+		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLBitchute)
+	case strings.Contains(v.URL, "odysee.com"):
+		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLOdysee)
+	case strings.Contains(v.URL, "rumble.com"):
+		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLRumble)
+	default:
+		logger.Pl.W("No custom scraping rules found for URL: %s", v.URL)
+	}
+
+	// Visit the webpage.
+	if err := collector.Visit(urlStr); err != nil {
+		return fmt.Errorf("failed to visit URL: %w", err)
+	}
+	collector.Wait()
+
+	// Validate required fields.
+	if v.Title == "" {
+		logger.Pl.D(1, "Scraped metadata: %+v", metadata)
+		return fmt.Errorf("missing required metadata fields (title: %q)", v.Title)
+	}
+
+	// Write metadata to file.
+	filename := fmt.Sprintf("%s.json", sanitizeFilename(v.Title))
+	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v, c); err != nil {
+		return fmt.Errorf("failed to write metadata JSON: %w", err)
+	}
+
+	logger.Pl.S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
+	return nil
 }
 
 // GetChannelCookies is now just a wrapper that delegates to CookieManager
@@ -262,76 +312,6 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	return uniqueEpisodeURLs, nil
 }
 
-// ScrapeCensoredTVMetadata scrapes Censored.TV links for metadata.
-func (s *Scraper) ScrapeCensoredTVMetadata(urlStr, outputDir string, v *models.Video, c *models.Channel) error {
-	// Initialize collector with cookies
-	collector, err := initializeCollector(urlStr, s.cookieManager)
-	if err != nil {
-		return err
-	}
-
-	// Metadata to populate
-	metadata := make(map[string]any)
-
-	logger.Pl.I("Scraping %q for metadata...", urlStr)
-
-	collector.OnHTML("html", func(container *colly.HTMLElement) {
-		doc := container.DOM
-
-		// Extract all metadata
-		v.Title = extractTitle(consts.HTMLCensoredTitle, doc)
-		metadata[sharedtags.JTitle] = v.Title
-
-		v.Description = extractDescription(consts.HTMLCensoredDesc, doc)
-		metadata[sharedtags.JDescription] = v.Description
-
-		uploadDate := extractDate(consts.HTMLCensoredDate, doc)
-		if strings.Contains(uploadDate, "-") {
-			if t, err := time.Parse("2006-01-02", uploadDate); err == nil { // If error IS nil
-				v.UploadDate = t
-			}
-		} else if !strings.Contains(uploadDate, "-") {
-			if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
-				v.UploadDate = t
-			}
-		}
-		if v.UploadDate.IsZero() {
-			logger.Pl.E("Failed to custom scraped parse upload date %q: %v", uploadDate, err)
-		} else {
-			logger.Pl.I("Extracted upload date %q from metadata (Video URL: %q)", v.UploadDate.String(), v.URL)
-		}
-
-		metadata[sharedtags.JReleaseDate] = uploadDate
-
-		v.DirectVideoURL = extractVideoURL(consts.HTMLCensoredVideoURL, doc)
-		metadata[sharedtags.JDirectVideoURL] = v.DirectVideoURL
-
-		v.ThumbnailURL = extractVideoThumbnail(consts.HTMLCensoredThumbnail, doc)
-		metadata[sharedtags.JThumbnailURL] = v.ThumbnailURL
-	})
-
-	// Visit the webpage
-	if err := collector.Visit(urlStr); err != nil {
-		return fmt.Errorf("failed to visit URL: %w", err)
-	}
-	collector.Wait()
-
-	// Validate required fields
-	if v.Title == "" || v.DirectVideoURL == "" {
-		logger.Pl.D(1, "Scraped metadata: %+v", metadata)
-		return fmt.Errorf("missing required metadata fields (title: %q, video URL: %q)", v.Title, v.DirectVideoURL)
-	}
-
-	// Write metadata to file
-	filename := fmt.Sprintf("%s.json", sanitizeFilename(v.Title))
-	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v, c); err != nil {
-		return fmt.Errorf("failed to write metadata JSON: %w", err)
-	}
-
-	logger.Pl.S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
-	return nil
-}
-
 // initializeCollector initializes Colly with any cookies.
 func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
@@ -375,96 +355,151 @@ func sanitizeFilename(name string) string {
 	}, name)
 }
 
-// extractTitle grabs the title from the webpage.
-func extractTitle(findStr string, doc *goquery.Selection) string {
-	title := strings.TrimSpace(doc.Find(findStr).Text())
-	if title != "" {
-		logger.Pl.D(2, "Scraped title: %s", title)
-	} else {
-		logger.Pl.D(1, "Title not found")
+// setupFieldScraping applies scraping rules for a specific field.
+func setupFieldScraping(c *colly.Collector, fieldName string, rules []consts.HTMLMetadataRule, result *string) {
+	if result == nil {
+		return
 	}
-	return title
+
+	for _, rule := range rules {
+		c.OnHTML(rule.Selector, func(h *colly.HTMLElement) {
+			if *result != "" {
+				return
+			}
+
+			var value string
+			if rule.Attr != "" {
+				value = h.Attr(rule.Attr)
+			} else {
+				// For description fields without Attr, get HTML content and process it
+				if fieldName == sharedtags.JDescription {
+					html, err := h.DOM.Html()
+					if err == nil {
+						// Clean HTML tags and format
+						html = strings.ReplaceAll(html, "<br>", "\n")
+						html = strings.ReplaceAll(html, "<br/>", "\n")
+						html = strings.ReplaceAll(html, "<br />", "\n")
+						html = strings.ReplaceAll(html, "&nbsp", "\n")
+						html = strings.ReplaceAll(html, " \n", "\n")
+						html = strings.ReplaceAll(html, "\n ", "\n")
+						html = strings.TrimSpace(html)
+						value = html
+					} else {
+						value = h.Text
+					}
+				} else {
+					value = h.Text
+				}
+			}
+
+			value = strings.TrimSpace(value)
+
+			if value != "" {
+				logger.Pl.S("Grabbed value %q for field %q using selector %q", value, fieldName, rule.Selector)
+				*result = value
+			}
+		})
+	}
 }
 
-// extractDescription grabs the description from the webpage.
-func extractDescription(findStr string, doc *goquery.Selection) string {
-	description, err := doc.Find(findStr).Html()
-	if err != nil {
-		logger.Pl.E("Failed to grab description: %v", err.Error())
-		return ""
-	}
+// ScrapeWithRules scrapes metadata using HTMLMetadataQuery rules.
+func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *models.Video, query consts.HTMLMetadataQuery) map[string]any {
+	metadata := make(map[string]any)
 
-	// Clean newline tags
-	description = strings.ReplaceAll(description, "<br>", "\n")
-	description = strings.ReplaceAll(description, "<br/>", "\n")
-	description = strings.ReplaceAll(description, "<br />", "\n")
-	description = strings.ReplaceAll(description, "&nbsp", "\n")
-
-	// Fix newline quirks
-	description = strings.ReplaceAll(description, " \n", "\n")
-	description = strings.ReplaceAll(description, "\n ", "\n")
-
-	// Trim space
-	description = strings.TrimSpace(description)
-
-	// Unescape special characters
-	description = html.UnescapeString(description)
-
-	if description != "" {
-		logger.Pl.D(2, "Scraped description: %s", description)
-	} else {
-		logger.Pl.D(1, "Description not found")
-	}
-
-	return description
-}
-
-// extractDate pulls the video release date from metadata.
-func extractDate(findStr string, doc *goquery.Selection) string {
 	var (
-		parsedDate string
-		err        error
+		title          string
+		description    string
+		releaseDate    string
+		directVideoURL string
+		thumbnailURL   string
 	)
-	date := strings.TrimSpace(doc.Find(findStr).Text())
-	if date != "" {
-		parsedDate, err = parsing.ParseWordDate(date)
-		if err != nil {
-			logger.Pl.E(err.Error())
+
+	logger.Pl.I("Scraping %q using rules for %s...", urlStr, query.Site)
+
+	// Group rules by field name
+	rulesByField := make(map[string][]consts.HTMLMetadataRule)
+	for _, rule := range query.Rules {
+		rulesByField[rule.Name] = append(rulesByField[rule.Name], rule)
+	}
+
+	// Setup scraping for each field
+	if rules, ok := rulesByField[sharedtags.JTitle]; ok {
+		setupFieldScraping(collector, sharedtags.JTitle, rules, &title)
+	}
+	if rules, ok := rulesByField[sharedtags.JDescription]; ok {
+		setupFieldScraping(collector, sharedtags.JDescription, rules, &description)
+	}
+	if rules, ok := rulesByField[sharedtags.JReleaseDate]; ok {
+		setupFieldScraping(collector, sharedtags.JReleaseDate, rules, &releaseDate)
+	}
+	if rules, ok := rulesByField[sharedtags.JDirectVideoURL]; ok {
+		setupFieldScraping(collector, sharedtags.JDirectVideoURL, rules, &directVideoURL)
+	}
+	if rules, ok := rulesByField[sharedtags.JThumbnailURL]; ok {
+		setupFieldScraping(collector, sharedtags.JThumbnailURL, rules, &thumbnailURL)
+	}
+
+	// After scraping completes, populate the Video struct
+	collector.OnScraped(func(r *colly.Response) {
+		if title != "" {
+			v.Title = title
+			metadata[sharedtags.JTitle] = title
 		}
-		logger.Pl.D(2, "Scraped release date: %s", date)
-	} else {
-		logger.Pl.D(1, "Release date not found")
-	}
-	return strings.TrimSpace(parsedDate)
-}
 
-// extractVideoURL extracts the video URL from the webpage.
-func extractVideoURL(findStr string, doc *goquery.Selection) string {
-	videoURL, ok := doc.Find(findStr).Attr("href")
-	if ok {
-		logger.Pl.D(2, "Scraped video URL: %s", videoURL)
-	} else {
-		logger.Pl.D(1, "Video URL not found")
-	}
-	return videoURL
-}
+		if description != "" {
+			v.Description = description
+			metadata[sharedtags.JDescription] = description
+		}
 
-// extractVideoThumbnail extracts the thumbnail URL from the webpage.
-func extractVideoThumbnail(findStr string, doc *goquery.Selection) string {
-	elem := doc.Find(findStr).First()
-	if elem == nil {
-		return ""
-	}
+		if releaseDate != "" {
+			// Parse the date
+			var t time.Time
+			var err error
 
-	// Try href first (for <a>), fallback to poster and src
-	if val, ok := elem.Attr("href"); ok && val != "" {
-		return val
-	}
-	if val, ok := elem.Attr("poster"); ok && val != "" {
-		return val
-	}
-	if val, ok := elem.Attr("src"); ok && val != "" {
-		return val
-	}
-	return ""
+			// Plain number.
+			if _, parseErr := strconv.ParseInt(releaseDate, 10, 64); parseErr == nil { // if err IS nil.
+				t, err = time.Parse("2006-01-02", releaseDate)
+			}
+			// Plain number and hyphens.
+			if strings.Contains(releaseDate, "-") {
+				num := strings.ReplaceAll(releaseDate, "-", "")
+				if _, parseErr := strconv.ParseInt(num, 10, 64); parseErr == nil { // if err IS nil.
+					t, err = time.Parse("2006-01-02", releaseDate)
+				}
+			}
+			if err != nil || t.IsZero() {
+				if strings.Contains(releaseDate, "T") {
+					t, err = time.Parse(time.RFC3339, releaseDate)
+				}
+			}
+			if err != nil || t.IsZero() {
+				parsedDate, parseErr := parsing.ParseWordDate(releaseDate)
+				if parseErr == nil {
+					t, err = time.Parse("2006-01-02", parsedDate)
+				}
+			}
+
+			releaseDateValue := releaseDate
+			if !t.IsZero() && err == nil {
+				v.UploadDate = t
+				releaseDateValue = t.Format("2006-01-02")
+				logger.Pl.I("Extracted upload date %q from metadata", v.UploadDate.String())
+			} else {
+				logger.Pl.E("Failed to parse upload date %q: %v", releaseDate, err)
+			}
+			metadata[sharedtags.JReleaseDate] = releaseDateValue
+		}
+
+		if directVideoURL != "" {
+			v.DirectVideoURL = directVideoURL
+			metadata[sharedtags.JDirectVideoURL] = directVideoURL
+		}
+
+		if thumbnailURL != "" {
+			v.ThumbnailURL = thumbnailURL
+			metadata[sharedtags.JThumbnailURL] = thumbnailURL
+		}
+	})
+
+	return metadata
 }

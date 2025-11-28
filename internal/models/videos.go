@@ -16,10 +16,10 @@ type Video struct {
 	ChannelID           int64                 `json:"channel_id" db:"channel_id"`
 	ChannelURLID        int64                 `json:"channel_url_id" db:"channel_url_id"`
 	ThumbnailURL        string                `json:"thumbnail_url" db:"thumbnail_url"`
-	ParsedVideoDir      string                `json:"-" db:"-"`
-	VideoPath           string                `json:"video_path" db:"video_path"`
-	ParsedMetaDir       string                `json:"-" db:"-"`
-	JSONPath            string                `json:"json_path" db:"json_path"`
+	VideoFilePath       string                `json:"video_path" db:"video_path"`
+	VideoDir            string                `json:"-" db:"-"`
+	JSONFilePath        string                `json:"json_path" db:"json_path"`
+	JSONDir             string                `json:"-" db:"-"`
 	Finished            bool                  `json:"finished" db:"finished"`
 	JSONCustomFile      string                `json:"-" db:"-"`
 	URL                 string                `json:"url" db:"url"`
@@ -57,7 +57,7 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) {
 				if _, err := os.Stat(mVPath); err != nil {
 					logger.Pl.E("Got invalid video path %q from Metarr: %v", mVPath, err)
 				}
-				v.VideoPath = mVPath
+				v.VideoFilePath = mVPath
 			}
 		}
 
@@ -67,11 +67,11 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) {
 				if _, err := os.Stat(mJPath); err != nil {
 					logger.Pl.E("Got invalid JSON path %q from Metarr: %v", mJPath, err)
 				}
-				v.JSONPath = mJPath
+				v.JSONFilePath = mJPath
 			}
 		}
 	}
-	logger.Pl.S("Video %q got filenames from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.VideoPath, v.JSONPath)
+	logger.Pl.S("Video %q got filenames from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.VideoFilePath, v.JSONFilePath)
 }
 
 // MarkVideoAsIgnored marks the video as completed and ignored.

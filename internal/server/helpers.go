@@ -190,25 +190,25 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 		settings.ExtraYTDLPMetaArgs = v
 	}
 	if v, ok := data[jsonkeys.SettingsFilterFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		settings.FilterFile = v
 	}
 	if v, ok := data[jsonkeys.SettingsMoveOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		settings.MetaFilterMoveOpFile = v
 	}
 	if v, ok := data[jsonkeys.SettingsJSONDirectory].(string); ok {
-		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		settings.JSONDir = v
 	}
 	if v, ok := data[jsonkeys.SettingsVideoDirectory].(string); ok {
-		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		settings.VideoDir = v
@@ -290,25 +290,25 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.OutputExt = v
 	}
 	if v, ok := data[jsonkeys.MetarrFilenameOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		metarr.FilenameOpsFile = v
 	}
 	if v, ok := data[jsonkeys.MetarrFilteredFilenameOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		metarr.FilteredFilenameOpsFile = v
 	}
 	if v, ok := data[jsonkeys.MetarrMetaOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		metarr.MetaOpsFile = v
 	}
 	if v, ok := data[jsonkeys.MetarrFilteredMetaOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		metarr.FilteredMetaOpsFile = v
@@ -450,11 +450,11 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 
 	// -- Validation --
 	// Strings
-	if _, _, err := sharedvalidation.ValidateDirectory(vDir, true, sharedtemplates.AllTemplatesMap); err != nil {
+	if _, _, err := sharedvalidation.ValidateDirectory(vDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
 		http.Error(w, fmt.Sprintf("video directory %q is invalid: %v", vDir, err), http.StatusBadRequest)
 		return nil
 	}
-	if _, _, err := sharedvalidation.ValidateDirectory(jDir, true, sharedtemplates.AllTemplatesMap); err != nil {
+	if _, _, err := sharedvalidation.ValidateDirectory(jDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
 		http.Error(w, fmt.Sprintf("JSON directory %q is invalid: %v", jDir, err), http.StatusBadRequest)
 		return nil
 	}

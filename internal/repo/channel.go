@@ -346,7 +346,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	}
 
 	logger.Pl.I("Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
-	if _, _, err := sharedvalidation.ValidateFile(cfgFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+	if _, _, err := sharedvalidation.ValidateFile(cfgFile, false, sharedtemplates.NoTemplateTags); err != nil {
 		return err
 	}
 
@@ -1603,7 +1603,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Channel config file location
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ChannelConfigFile); ok {
-		if _, _, err = sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err = sharedvalidation.ValidateFile(v, false, sharedtemplates.NoTemplateTags); err != nil {
 			return err
 		}
 		c.ChannelConfigFile = v
@@ -1641,7 +1641,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Filter ops file
 	if v, ok := parsing.GetConfigValue[string](vip, keys.FilterOpsFile); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
 		}
 		c.ChanSettings.FilterFile = v
@@ -1656,7 +1656,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// JSON directory
 	if v, ok := parsing.GetConfigValue[string](vip, keys.JSONDir); ok {
-		if _, _, err = sharedvalidation.ValidateDirectory(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err = sharedvalidation.ValidateDirectory(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
 		}
 		c.ChanSettings.JSONDir = v
@@ -1669,7 +1669,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Move ops file
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MoveOpsFile); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
 		}
 		c.ChanSettings.MetaFilterMoveOpFile = v
@@ -1694,7 +1694,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Video directory
 	if v, ok := parsing.GetConfigValue[string](vip, keys.VideoDir); ok {
-		if _, _, err = sharedvalidation.ValidateDirectory(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err = sharedvalidation.ValidateDirectory(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
 		}
 		c.ChanSettings.VideoDir = v

@@ -30,7 +30,7 @@ func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
 
 // LoadConfigFile loads in the preset configuration file.
 func LoadConfigFile(v *viper.Viper, file string) error {
-	if _, _, err := sharedvalidation.ValidateFile(file, false, sharedtemplates.AllTemplatesMap); err != nil {
+	if _, _, err := sharedvalidation.ValidateFile(file, false, sharedtemplates.NoTemplateTags); err != nil {
 		return err
 	}
 

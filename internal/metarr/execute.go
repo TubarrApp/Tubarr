@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"syscall"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
@@ -20,6 +21,9 @@ func InitMetarr(procCtx context.Context, v *models.Video, cu *models.ChannelURL,
 	}
 
 	cmd := exec.CommandContext(procCtx, "metarr", args...)
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(syscall.SIGTERM)
+	}
 
 	if err := runMetarr(cmd, v); err != nil {
 		return err

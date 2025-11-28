@@ -23,18 +23,27 @@ const (
 
 // DirectoryParser holds a channel model, used for filling some template tags.
 type DirectoryParser struct {
-	C *models.Channel
+	C       *models.Channel
+	Tagging TubarrOrMetarrTags
 }
 
+type TubarrOrMetarrTags int
+
+const (
+	TubarrTags TubarrOrMetarrTags = iota
+	AllTags
+)
+
 // NewDirectoryParser returns a directory parser model.
-func NewDirectoryParser(c *models.Channel) (parseDir *DirectoryParser) {
+func NewDirectoryParser(c *models.Channel, tagType TubarrOrMetarrTags) (parseDir *DirectoryParser) {
 	return &DirectoryParser{
-		C: c,
+		C:       c,
+		Tagging: tagType,
 	}
 }
 
 // ParseDirectory returns the absolute directory path with template replacements.
-func (dp *DirectoryParser) ParseDirectory(dir string, v *models.Video, fileType string) (parsedDir string, err error) {
+func (dp *DirectoryParser) ParseDirectory(dir string, fileType string) (parsedDir string, err error) {
 	if dir == "" {
 		return "", errors.New("directory sent in empty")
 	}
@@ -43,7 +52,7 @@ func (dp *DirectoryParser) ParseDirectory(dir string, v *models.Video, fileType 
 	if strings.Contains(dir, openTemplate) {
 		var err error
 
-		parsed, err = dp.parseTemplate(dir, v)
+		parsed, err = dp.parseTemplate(dir)
 		if err != nil {
 			return "", fmt.Errorf("template parsing error: %w", err)
 		}
@@ -55,14 +64,14 @@ func (dp *DirectoryParser) ParseDirectory(dir string, v *models.Video, fileType 
 		}
 	}
 
-	logger.Pl.I("Parsed %s file output directory for video %q as %q", fileType, v.URL, parsed)
+	logger.Pl.I("Parsed %s file output directory as %q", fileType, parsed)
 	return parsed, nil
 }
 
 // parseTemplate parses template options inside the directory string.
 //
 // Returns error if the desired data isn't present, to prevent unexpected results for the user.
-func (dp *DirectoryParser) parseTemplate(dir string, v *models.Video) (string, error) {
+func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 	opens := strings.Count(dir, openTemplate)
 	closes := strings.Count(dir, closeTemplate)
 
@@ -88,9 +97,14 @@ func (dp *DirectoryParser) parseTemplate(dir string, v *models.Video) (string, e
 		// String up to template open
 		b.WriteString(remaining[:startIdx])
 
-		// Replacement string
+		// Get tag part, check tag is not invalid.
 		tag := remaining[startIdx+len(openTemplate) : endIdx]
-		replacement, err := dp.replaceTemplateTags(strings.TrimSpace(tag), v)
+		if _, ok := sharedtemplates.MetarrTemplateTags[tag]; ok && dp.Tagging == TubarrTags {
+			return "", fmt.Errorf("cannot use Metarr tags for %q. Please avoid %v", dir, sharedtemplates.MetarrTemplateTags)
+		}
+
+		// Replacement string
+		replacement, err := dp.replaceTemplateTags(strings.TrimSpace(tag))
 		if err != nil {
 			return "", err
 		}
@@ -107,7 +121,7 @@ func (dp *DirectoryParser) parseTemplate(dir string, v *models.Video) (string, e
 }
 
 // replaceTemplateTags makes template replacements in the directory string.
-func (dp *DirectoryParser) replaceTemplateTags(tag string, v *models.Video) (string, error) {
+func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 	c := dp.C
 	tag = strings.ToLower(tag)
 
@@ -123,24 +137,6 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string, v *models.Video) (str
 			return c.Name, nil
 		}
 		return "", errors.New("templating: channel name empty")
-
-	case sharedtemplates.VideoID:
-		if v != nil && v.ID != 0 {
-			return strconv.Itoa(int(v.ID)), nil
-		}
-		return "", errors.New("templating: video ID is 0")
-
-	case sharedtemplates.VideoTitle:
-		if v != nil && v.Title != "" {
-			return v.Title, nil
-		}
-		return "", errors.New("templating: video title is empty")
-
-	case sharedtemplates.VideoURL:
-		if v != nil && v.URL != "" {
-			return v.URL, nil
-		}
-		return "", errors.New("templating: video URL is empty")
 
 	default:
 		if _, ok := sharedtemplates.MetarrTemplateTags[tag]; ok {

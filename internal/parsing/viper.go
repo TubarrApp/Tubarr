@@ -35,13 +35,18 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	}
 
 	// Validate the video directory exists.
-	if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.AllTemplatesMap); err != nil {
+	if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+		return nil, nil, err
+	}
+
+	// Validate the JSON directory exists.
+	if _, _, err := sharedvalidation.ValidateDirectory(*input.JSONDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
 		return nil, nil, err
 	}
 
 	// Channel config file.
 	if input.ChannelConfigFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.ChannelConfigFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*input.ChannelConfigFile, false, sharedtemplates.NoTemplateTags); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -645,7 +650,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Validate and set FilterFile if provided.
 	if input.DLFilterFile != nil && *input.DLFilterFile != "" {
-		if _, _, err := sharedvalidation.ValidateFile(*input.DLFilterFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*input.DLFilterFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid filter file for per-URL settings: %w", err)
 		}
 		settings.FilterFile = *input.DLFilterFile
@@ -653,7 +658,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Validate and set JSONDir if provided.
 	if input.JSONDir != nil && *input.JSONDir != "" {
-		if _, _, err := sharedvalidation.ValidateDirectory(*input.JSONDir, true, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(*input.JSONDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid JSON directory for per-URL settings: %w", err)
 		}
 		settings.JSONDir = *input.JSONDir
@@ -670,7 +675,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Validate and set MoveOpFile if provided.
 	if input.MoveOpFile != nil && *input.MoveOpFile != "" {
-		if _, _, err := sharedvalidation.ValidateFile(*input.MoveOpFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*input.MoveOpFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid move ops file for per-URL settings: %w", err)
 		}
 		settings.MetaFilterMoveOpFile = *input.MoveOpFile
@@ -678,7 +683,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Validate and set VideoDir if provided.
 	if input.VideoDir != nil && *input.VideoDir != "" {
-		if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid video directory for per-URL settings: %w", err)
 		}
 		settings.VideoDir = *input.VideoDir
@@ -779,25 +784,25 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.ExtraFFmpegArgs = *input.ExtraFFmpegArgs
 	}
 	if input.MetaOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.MetaOpsFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*input.MetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid meta ops file for per-URL settings: %w", err)
 		}
 		metarr.MetaOpsFile = *input.MetaOpsFile
 	}
 	if input.FilteredMetaOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.FilteredMetaOpsFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*input.FilteredMetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid filtered meta ops file for per-URL settings: %w", err)
 		}
 		metarr.FilteredMetaOpsFile = *input.FilteredMetaOpsFile
 	}
 	if input.FilenameOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.FilenameOpsFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*input.FilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid filename ops file for per-URL settings: %w", err)
 		}
 		metarr.FilenameOpsFile = *input.FilenameOpsFile
 	}
 	if input.FilteredFilenameOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.FilteredFilenameOpsFile, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*input.FilteredFilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid filtered filename ops file for per-URL settings: %w", err)
 		}
 		metarr.FilteredFilenameOpsFile = *input.FilteredFilenameOpsFile

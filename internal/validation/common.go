@@ -186,15 +186,11 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 			return fmt.Errorf("move operation at position %d has empty field", i)
 		}
 
+		// Validate output directory exists
 		if op.OutputDir != "" {
 			if _, _, err := sharedvalidation.ValidateDirectory(op.OutputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
-				return err
+				return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 			}
-		}
-
-		// Validate output directory exists
-		if _, _, err := sharedvalidation.ValidateDirectory(op.OutputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
-			return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 		}
 	}
 	return nil

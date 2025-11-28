@@ -38,7 +38,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Output location + restricted filename syntax.
-	args = append(args, command.P, d.Video.ParsedVideoDir)
+	args = append(args, command.P, d.Video.VideoDir)
 	args = append(args, command.Output, outputSyntax)
 
 	// Print filename to console upon completion.
@@ -199,7 +199,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		if filename == "" {
 			return errors.New("no output filename captured")
 		}
-		d.Video.VideoPath = filename
+		d.Video.VideoFilePath = filename
 	}
 
 	// Wait for the command to finish.
@@ -214,10 +214,10 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	// Verify filename.
 	if filename != "" {
 		// Ensure file is fully written.
-		if err := d.waitForFile(d.Video.VideoPath, 10*time.Second); err != nil {
+		if err := d.waitForFile(d.Video.VideoFilePath, 10*time.Second); err != nil {
 			return err
 		}
-		if err := verifyVideoDownload(d.Video.VideoPath); err != nil {
+		if err := verifyVideoDownload(d.Video.VideoFilePath); err != nil {
 			return err
 		}
 	}

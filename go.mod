@@ -3,7 +3,7 @@ module tubarr
 go 1.25
 
 require (
-	github.com/PuerkitoBio/goquery v1.11.0
+	github.com/PuerkitoBio/goquery v1.11.0 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/browserutils/kooky v0.2.4
 	github.com/gocolly/colly v1.2.0
@@ -17,7 +17,7 @@ require (
 
 require gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 
-require github.com/TubarrApp/gocommon v0.0.0-20251125013109-6c34fcf55e67
+require github.com/TubarrApp/gocommon v0.0.0-20251128230429-231182080c65
 
 require (
 	github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a // indirect

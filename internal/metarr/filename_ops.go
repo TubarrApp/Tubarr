@@ -19,7 +19,7 @@ var conflictingFilenameOp = map[string]struct{}{
 // loadAndMergeFilenameOps loads and merges filename ops: file ops override DB ops, then apply filtering
 func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 	// Load file ops (highest priority)
-	fileFilenameOps := loadFilenameOpsFromFile(v, cu, dirParser)
+	fileFilenameOps := loadFilenameOpsFromFile(cu, dirParser)
 
 	// Ops from file override DB ops with same key
 	nonConflictingDBOps := filterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps)
@@ -40,14 +40,14 @@ func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.C
 // loadFilenameOpsFromFile loads in file operations from the given file.
 //
 // File ops take precedence and will replace any matching DB ops.
-func loadFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilenameOps {
+func loadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilenameOps {
 	if cu.ChanURLMetarrArgs.FilenameOpsFile == "" {
 		return nil
 	}
 
 	filenameOpsFile := cu.ChanURLMetarrArgs.FilenameOpsFile
 	var err error
-	if filenameOpsFile, err = dp.ParseDirectory(filenameOpsFile, v, "filename ops"); err != nil {
+	if filenameOpsFile, err = dp.ParseDirectory(filenameOpsFile, "filename ops"); err != nil {
 		logger.Pl.E("Failed to parse directory %q: %v", filenameOpsFile, err)
 		return nil
 	}

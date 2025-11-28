@@ -12,7 +12,6 @@ import (
 	"sync"
 	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
-	"tubarr/internal/dev"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -56,7 +55,20 @@ func InitProcess(
 	jobs := make(chan *models.Video, len(videos))
 	results := make(chan error, len(videos))
 
-	dirParser := parsing.NewDirectoryParser(c)
+	// Parse directories.
+	dirParser := parsing.NewDirectoryParser(c, parsing.TubarrTags)
+	if c.ChanSettings.VideoDir, err = dirParser.ParseDirectory(c.ChanSettings.VideoDir, "channel video directory"); err != nil {
+		return 0, 0, err
+	}
+	if c.ChanSettings.JSONDir, err = dirParser.ParseDirectory(c.ChanSettings.JSONDir, "channel JSON directory"); err != nil {
+		return 0, 0, err
+	}
+	if cu.ChanURLSettings.VideoDir, err = dirParser.ParseDirectory(cu.ChanURLSettings.VideoDir, "channel URL video directory"); err != nil {
+		return 0, 0, err
+	}
+	if cu.ChanURLSettings.JSONDir, err = dirParser.ParseDirectory(cu.ChanURLSettings.JSONDir, "channel URL JSON directory"); err != nil {
+		return 0, 0, err
+	}
 
 	// Check if Metarr exists and can be run.
 	_, metarrErr := exec.LookPath("metarr")
@@ -110,11 +122,12 @@ func InitProcess(
 			continue
 		}
 
-		// Parse directories (templating options can include video elements).
-		video.ParsedMetaDir, video.ParsedVideoDir = parseVideoJSONDirs(video, cu, c, dirParser)
+		// Get video paths.
+		video.JSONDir = cu.ChanURLSettings.JSONDir
+		video.VideoDir = cu.ChanURLSettings.VideoDir
 
 		// Use custom scraper if needed.
-		if video.JSONPath, err = executeCustomScraper(scrape, video, c); err != nil {
+		if video.JSONFilePath, err = executeCustomScraper(scrape, video, c); err != nil {
 			logger.Pl.E("Custom scraper failed for %q: %v", video.URL, err)
 			errs = append(errs, err)
 			continue
@@ -165,17 +178,9 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video, c *models.Channel
 		return "", fmt.Errorf("invalid nil parameter (video: %v, scraper: %v)", v == nil, s == nil)
 	}
 
-	// Detect censored.tv links.
-	if strings.Contains(v.URL, "censored.tv") {
-		if !dev.CensoredTVUseCustom {
-			logger.Pl.I("Using regular scraper for censored.tv ...")
-		} else {
-			logger.Pl.I("Detected a censored.tv link. Using specialized scraper.")
-			if err := s.ScrapeCensoredTVMetadata(v.URL, v.ParsedMetaDir, v, c); err != nil {
-				return "", fmt.Errorf("failed to scrape censored.tv metadata: %w", err)
-			}
-		}
-	}
+	// Detect custom site.
+	s.ScrapeCustomSite(v.URL, v.JSONFilePath, v, c)
+
 	return v.JSONCustomFile, nil
 }
 
@@ -190,7 +195,7 @@ func videoJob(
 	cu *models.ChannelURL,
 	c *models.Channel,
 	metarrIsExecutable bool,
-) error {
+) (err error) {
 	// Bot detection avoidance wait time.
 	if err := times.WaitTime(procCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
 		return err
@@ -236,11 +241,11 @@ func completeAndStoreVideo(cs contracts.ChannelStore, vs contracts.VideoStore, v
 	if abstractions.IsSet(keys.PurgeMetaFile) {
 		if abstractions.GetBool(keys.PurgeMetaFile) {
 			logger.Pl.I("Purging metadata file for video with URL %q as per configuration", v.URL)
-			if err := os.Remove(v.JSONPath); err != nil && !os.IsNotExist(err) {
-				logger.Pl.W("Failed to delete metadata file %q: %v", v.JSONPath, err)
+			if err := os.Remove(v.JSONFilePath); err != nil && !os.IsNotExist(err) {
+				logger.Pl.W("Failed to delete metadata file %q: %v", v.JSONFilePath, err)
 			} else {
-				logger.Pl.D(1, "Deleted metadata file %q successfully", v.JSONPath)
-				v.JSONPath = ""
+				logger.Pl.D(1, "Deleted metadata file %q successfully", v.JSONFilePath)
+				v.JSONFilePath = ""
 			}
 		}
 	}
@@ -322,9 +327,9 @@ func processJSON(
 	// If video failed checks, mark and save to DB.
 	if !passedChecks {
 		// Remove metadata JSON file since video is being ignored.
-		if v.JSONPath != "" {
-			if err := file.RemoveMetadataJSON(v.JSONPath); err != nil && !os.IsNotExist(err) {
-				logger.Pl.W("Failed to remove metadata file for ignored video %q: %v", v.JSONPath, err)
+		if v.JSONFilePath != "" {
+			if err := file.RemoveMetadataJSON(v.JSONFilePath); err != nil && !os.IsNotExist(err) {
+				logger.Pl.W("Failed to remove metadata file for ignored video %q: %v", v.JSONFilePath, err)
 			}
 		}
 
@@ -379,41 +384,6 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 
 	logger.Pl.D(1, "Successfully processed and marked as downloaded: %s", v.URL)
 	return false, nil
-}
-
-// parseVideoJSONDirs parses video and JSON directories.
-func parseVideoJSONDirs(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (jsonDir, videoDir string) {
-	// Initialize dirParser if nil.
-	if dirParser == nil {
-		dirParser = parsing.NewDirectoryParser(c)
-	}
-
-	var (
-		cSettings = cu.ChanURLSettings
-		err       error
-	)
-	logger.Pl.I("Parsing directories for channel %q (Video Dir: %q, JSON Dir: %q)", c.Name, cSettings.VideoDir, cSettings.JSONDir)
-
-	// Return if no template directives.
-	if !strings.Contains(cSettings.JSONDir, "{") && !strings.Contains(cSettings.VideoDir, "{") {
-		return cSettings.JSONDir, cSettings.VideoDir
-	}
-
-	// Parse templates.
-	jsonDir, err = dirParser.ParseDirectory(cSettings.JSONDir, v, "JSON")
-	if err != nil {
-		logger.Pl.W("Failed to parse JSON directory %q, using raw: %v", cSettings.JSONDir, err)
-		jsonDir = cSettings.JSONDir
-	}
-
-	videoDir, err = dirParser.ParseDirectory(cSettings.VideoDir, v, "video")
-	if err != nil {
-		logger.Pl.W("Failed to parse video directory %q, using raw: %v", cSettings.VideoDir, err)
-		videoDir = cSettings.VideoDir
-	}
-
-	logger.Pl.I("Retrieved parsed directories for channel %q (Video Dir: %q, JSON Dir: %q)", c.Name, cSettings.VideoDir, cSettings.JSONDir)
-	return jsonDir, videoDir
 }
 
 // handleBotBlock handles cases where the program has been detected as a bot.

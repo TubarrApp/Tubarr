@@ -19,7 +19,7 @@ import (
 //
 // Returns true if the video passes all filters and JSON validity checks.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	logger.Pl.I("Validating and filtering JSON file %q...", v.JSONPath)
+	logger.Pl.I("Validating and filtering JSON file %q...", v.JSONFilePath)
 	// Parse and store JSON
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
@@ -43,13 +43,13 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 
 // parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
 func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
-	f, err := os.Open(v.JSONPath)
+	f, err := os.Open(v.JSONFilePath)
 	if err != nil {
 		return false, err
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			logger.Pl.E("Failed to close file at %q", v.JSONPath)
+			logger.Pl.E("Failed to close file at %q", v.JSONFilePath)
 		}
 	}()
 

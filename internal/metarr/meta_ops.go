@@ -21,7 +21,7 @@ var nonConflictingMetaOp = map[string]struct{}{
 // loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering
 func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 	// Load file ops (highest priority)
-	fileMetaOps := loadMetaOpsFromFile(v, cu, dirParser)
+	fileMetaOps := loadMetaOpsFromFile(cu, dirParser)
 
 	// File ops override DB ops with same key
 	nonConflictingDBOps := filterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
@@ -42,14 +42,14 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 // loadMetaOpsFromFile loads in meta operations from the given file.
 //
 // File ops take precedence and will replace any matching DB ops.
-func loadMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaOps {
+func loadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaOps {
 	if cu.ChanURLMetarrArgs.MetaOpsFile == "" {
 		return nil
 	}
 
 	metaOpsFile := cu.ChanURLMetarrArgs.MetaOpsFile
 	var err error
-	if metaOpsFile, err = dp.ParseDirectory(metaOpsFile, v, "meta ops"); err != nil {
+	if metaOpsFile, err = dp.ParseDirectory(metaOpsFile, "meta ops"); err != nil {
 		logger.Pl.E("Failed to parse directory %q: %v", metaOpsFile, err)
 		return nil
 	}

@@ -9,11 +9,8 @@ import (
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/parsing"
 
 	"github.com/TubarrApp/gocommon/abstractions"
-	"github.com/TubarrApp/gocommon/sharedtemplates"
-	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
@@ -27,7 +24,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args = append(args,
 		command.SkipVideo,
 		command.WriteInfoJSON,
-		command.P, d.Video.ParsedMetaDir,
+		command.P, d.Video.JSONDir,
 		command.Output, command.FilenameSyntax)
 
 	// Cookie path.
@@ -108,23 +105,6 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("no command built for URL %s", d.Video.URL)
 	}
 
-	// Ensure the directory exists.
-	if stillHasTemplating, _, err := sharedvalidation.ValidateDirectory(d.ChannelURL.ChanURLSettings.VideoDir, true, sharedtemplates.AllTemplatesMap); stillHasTemplating || err != nil {
-		if stillHasTemplating {
-			logger.Pl.E("Dev Error: Element still has template tags before downloading to destination %q.", d.ChannelURL.ChanURLSettings.VideoDir)
-
-			// Attempt fill for non-nil channel.
-			if d.Channel != nil {
-				logger.Pl.I("Attempting to fill tags before downloading to destination %q.", d.ChannelURL.ChanURLSettings.VideoDir)
-				dp := parsing.NewDirectoryParser(d.Channel)
-				if d.ChannelURL.ChanURLSettings.VideoDir, err = dp.ParseDirectory(d.ChannelURL.ChanURLSettings.VideoDir, d.Video, "video"); err != nil {
-					return fmt.Errorf("directory %q was not able to fill all template elements", d.ChannelURL.ChanURLSettings.VideoDir)
-				}
-			}
-		}
-		return err
-	}
-
 	// Execute JSON download.
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -156,13 +136,13 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("could not find JSON file path in output for %s", d.Video.URL)
 	}
 
-	d.Video.JSONPath = jsonPath
+	d.Video.JSONFilePath = jsonPath
 
 	// Verify the file exists.
-	if err := verifyJSONDownload(d.Video.JSONPath); err != nil {
+	if err := verifyJSONDownload(d.Video.JSONFilePath); err != nil {
 		return err
 	}
 
-	logger.Pl.I("Successfully saved JSON file to %q", d.Video.JSONPath)
+	logger.Pl.I("Successfully saved JSON file to %q", d.Video.JSONFilePath)
 	return nil
 }
