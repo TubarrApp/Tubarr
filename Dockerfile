@@ -90,8 +90,17 @@ COPY --from=builder /build/web /app/web
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# Remove ubuntu user if it exists, then create tubarr user
+RUN userdel -r ubuntu 2>/dev/null || true \
+    && groupadd -g 1000 tubarr \
+    && useradd -u 1000 -g tubarr -d /home/tubarr -s /bin/bash -m tubarr
+
+# Create necessary directories with proper ownership
+RUN mkdir -p /home/tubarr/.tubarr /downloads /metadata \
+    && chown -R tubarr:tubarr /home/tubarr /downloads /metadata
+
+
 ENV PUID=1000 PGID=1000
-ENV TUBARR_HOME=/home/tubarr/.tubarr
 ENV HOME=/home/tubarr
 ENV TZ=UTC
 

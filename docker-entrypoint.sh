@@ -33,4 +33,4 @@ chown -R "$PUID":"$PGID" /app/tubarr /downloads /metadata 2>/dev/null || true
 /usr/local/bin/auto-updater &
 
 # Start web interface
-exec env HOME=/home/tubarr gosu "$USER" /app/tubarr --web
+exec gosu "$USER" /app/tubarr --web
