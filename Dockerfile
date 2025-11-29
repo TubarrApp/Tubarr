@@ -92,6 +92,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV PUID=1000 PGID=1000
 ENV TUBARR_HOME=/home/tubarr/.tubarr
+ENV HOME=/home/tubarr
 ENV TZ=UTC
 
 EXPOSE 8827
