@@ -18,9 +18,17 @@ Tubarr is a Go-powered companion to Metarr that keeps long-form video libraries 
 ## Requirements
 
 - `yt-dlp` on `PATH`
-- Optional: `metarr` for tagging
-- SQLite (bundled via `github.com/mattn/go-sqlite3`)
-- Browser cookies (via `kooky`) for members-only sources if needed
+- Optional: `metarr` for tagging, outputting to directories, etc.
+
+(All included in the container image)
+
+---
+
+## Container Note
+
+It is recommended you do not impose resource limitations on the container. Tubarr/Metarr run heavy transcoding operations via FFmpeg so it is normal for CPU and RAM usage to spike during this process.
+
+Setting limits is possible but could heavily impact transcode speed.
 
 ---
 

@@ -2,8 +2,10 @@ package downloads
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
@@ -15,6 +17,11 @@ var avoidURLs sync.Map // Avoid attempting downloads for these URLs (e.g. when b
 
 // activeDownloadContexts tracks cancellation functions for active downloads by video ID.
 var activeDownloadContexts sync.Map // map[int64]context.CancelFunc.
+
+// isProcessNotExist checks if an error indicates a process doesn't exist.
+func isProcessNotExist(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no such process")
+}
 
 // DownloadType represents the type of download operation.
 type DownloadType string
@@ -62,10 +69,13 @@ func (d *VideoDownload) cleanup() {
 	if d.cmd != nil && d.cmd.Process != nil {
 		// Try graceful termination first.
 		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
-			// Force kill if graceful fails.
+			// Force kill if graceful fails (but only if process still exists).
 			if d.cmd.Process != nil {
 				if err := d.cmd.Process.Kill(); err != nil {
-					logger.Pl.W("Failed to cleanup video download process %d: %v", d.cmd.Process.Pid, err)
+					// Only log if it's not "process already finished" or "no such process".
+					if !errors.Is(err, os.ErrProcessDone) && !isProcessNotExist(err) {
+						logger.Pl.W("Failed to cleanup video download process %d: %v", d.cmd.Process.Pid, err)
+					}
 				}
 			}
 		}
@@ -105,10 +115,13 @@ func (d *JSONDownload) cleanup() {
 	if d.cmd != nil && d.cmd.Process != nil {
 		// Try graceful termination first.
 		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
-			// Force kill if graceful fails.
+			// Force kill if graceful fails (but only if process still exists).
 			if d.cmd.Process != nil {
 				if err := d.cmd.Process.Kill(); err != nil {
-					logger.Pl.W("Failed to cleanup JSON download process %d: %v", d.cmd.Process.Pid, err)
+					// Only log if it's not "process already finished" or "no such process".
+					if !errors.Is(err, os.ErrProcessDone) && !isProcessNotExist(err) {
+						logger.Pl.W("Failed to cleanup JSON download process %d: %v", d.cmd.Process.Pid, err)
+					}
 				}
 			}
 		}

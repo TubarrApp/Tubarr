@@ -511,13 +511,13 @@
                         <!-- Progress -->
                         <td class="px-4 py-3 progress-col">
                           <div class="flex items-center gap-2">
-                            <div class="flex-1 bg-gray-200 rounded-b-full h-2 dark:bg-gray-700">
+                            <div class="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                               <div
-                                class="bg-brand-600 h-2 rounded-b-full transition-all duration-300"
+                                class="bg-brand-600 h-2 rounded-full transition-all duration-300"
                                 :style="`width: ${download.download_status.percentage}%`"
                               ></div>
                             </div>
-                            <span class="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem]" x-text="`${download.download_status.percentage.toFixed(1)}%`"></span>
+                            <span class="text-sm text-gray-600 dark:text-gray-400 w-[3.5rem] text-right" x-text="`${download.download_status.percentage.toFixed(1)}%`"></span>
                           </div>
                         </td>
                         <!-- Actions -->
