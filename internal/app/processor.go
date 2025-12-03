@@ -42,11 +42,21 @@ func InitProcess(
 		conc = sharedvalidation.ValidateConcurrencyLimit(c.ChanSettings.Concurrency)
 	)
 
-	logger.Pl.I("Starting meta/video processing for %d videos", len(videos))
+	// Initialize metarr semaphore.
+	mConc := 1
+	if abstractions.IsSet(keys.MConcurrency) {
+		mConc = abstractions.GetInt(keys.MConcurrency)
+	}
+	metarrSem := make(chan struct{}, mConc)
+	var metarrWg sync.WaitGroup
+	defer metarrWg.Wait()
 
 	// Bot detection context.
 	procCtx, procCancel := context.WithCancel(ctx)
 	defer procCancel()
+
+	// Begin main process.
+	logger.Pl.I("Starting meta/video processing for %d videos", len(videos))
 
 	dlTracker := downloads.NewDownloadTracker(s.DownloadStore(), c.ChanSettings.ExternalDownloader)
 	dlTracker.Start(ctx)
@@ -104,6 +114,8 @@ func InitProcess(
 					v,
 					cu,
 					c,
+					metarrSem,
+					&metarrWg,
 					metarrIsExecutable)
 
 				// If bot was detected, cancel the context to stop other workers.
@@ -165,9 +177,11 @@ func InitProcess(
 		}
 	}
 
+	// Return errors, and succeeded/downloaded counts.
 	if len(errs) > 0 {
-		logger.Pl.E("Finished with %d error(s): %v", len(errs), err)
-		return nSucceeded, nDownloaded, errors.Join(errs...)
+		joined := errors.Join(errs...)
+		logger.Pl.E("Finished with %d error(s): %v", len(errs), joined)
+		return nSucceeded, nDownloaded, joined
 	}
 	return nSucceeded, nDownloaded, nil
 }
@@ -194,6 +208,8 @@ func videoJob(
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
+	metarrSem chan struct{},
+	metarrWg *sync.WaitGroup,
 	metarrIsExecutable bool,
 ) (err error) {
 	// Bot detection avoidance wait time.
@@ -226,11 +242,30 @@ func videoJob(
 	}
 
 	// Run metarr step.
-	if err := metarr.InitMetarr(procCtx, v, cu, c, dirParser); err != nil {
-		return fmt.Errorf("metarr processing error for video (ID: %d, URL: %s): %w", v.ID, v.URL, err)
-	}
+	metarrWg.Add(1)
+	go func(video *models.Video, channelURL *models.ChannelURL, channel *models.Channel) {
+		defer metarrWg.Done()
 
-	return completeAndStoreVideo(cs, vs, v, c)
+		// Acquire semaphore slot.
+		select {
+		case metarrSem <- struct{}{}:
+			defer func() { <-metarrSem }()
+		case <-procCtx.Done():
+			logger.Pl.W("Metarr cancelled for video %s: %v", video.URL, procCtx.Err())
+			return
+		}
+
+		if err := metarr.InitMetarr(procCtx, video, channelURL, channel, dirParser); err != nil {
+			logger.Pl.E("Metarr processing error for video (ID: %d, URL: %s): %v", video.ID, video.URL, err)
+			return
+		}
+
+		if err := completeAndStoreVideo(cs, vs, video, channel); err != nil {
+			logger.Pl.E("Failed to complete video after metarr (ID: %d, URL: %s): %v", video.ID, video.URL, err)
+		}
+	}(v, cu, c)
+
+	return nil
 }
 
 // completeAndStoreVideo marks a video as complete.
