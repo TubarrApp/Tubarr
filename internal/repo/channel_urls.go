@@ -610,9 +610,6 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 	urlMetarr.TranscodeGPU, c = mergeStringSettings(urlMetarr.TranscodeGPU, channelMetarr.TranscodeGPU)
 	changed = changed || c
 
-	urlMetarr.TranscodeGPUDirectory, c = mergeStringSettings(urlMetarr.TranscodeGPUDirectory, channelMetarr.TranscodeGPUDirectory)
-	changed = changed || c
-
 	urlMetarr.TranscodeVideoFilter, c = mergeStringSettings(urlMetarr.TranscodeVideoFilter, channelMetarr.TranscodeVideoFilter)
 	changed = changed || c
 

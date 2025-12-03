@@ -42,14 +42,19 @@ func InitProcess(
 		conc = sharedvalidation.ValidateConcurrencyLimit(c.ChanSettings.Concurrency)
 	)
 
-	// Initialize metarr semaphore.
+	// Initialize Metarr semaphore and context.
 	mConc := 1
-	if abstractions.IsSet(keys.MConcurrency) {
+	// Prioritize channel URL-specific metarr concurrency setting.
+	if cu.ChanURLMetarrArgs.Concurrency > 0 {
+		mConc = cu.ChanURLMetarrArgs.Concurrency
+	} else if abstractions.IsSet(keys.MConcurrency) {
 		mConc = abstractions.GetInt(keys.MConcurrency)
 	}
 	metarrSem := make(chan struct{}, mConc)
 	var metarrWg sync.WaitGroup
 	defer metarrWg.Wait()
+
+	metarrCtx := ctx
 
 	// Bot detection context.
 	procCtx, procCancel := context.WithCancel(ctx)
@@ -107,6 +112,7 @@ func InitProcess(
 
 				err := videoJob(
 					procCtx,
+					metarrCtx,
 					s.VideoStore(),
 					s.ChannelStore(),
 					dlTracker,
@@ -201,6 +207,7 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video, c *models.Channel
 // videoJob starts a worker's process for a video.
 func videoJob(
 	procCtx context.Context,
+	metarrCtx context.Context,
 	vs contracts.VideoStore,
 	cs contracts.ChannelStore,
 	dlTracker *downloads.DownloadTracker,
@@ -250,12 +257,12 @@ func videoJob(
 		select {
 		case metarrSem <- struct{}{}:
 			defer func() { <-metarrSem }()
-		case <-procCtx.Done():
-			logger.Pl.W("Metarr cancelled for video %s: %v", video.URL, procCtx.Err())
+		case <-metarrCtx.Done():
+			logger.Pl.W("Metarr cancelled for video %s: %v", video.URL, metarrCtx.Err())
 			return
 		}
 
-		if err := metarr.InitMetarr(procCtx, video, channelURL, channel, dirParser); err != nil {
+		if err := metarr.InitMetarr(metarrCtx, video, channelURL, channel, dirParser); err != nil {
 			logger.Pl.E("Metarr processing error for video (ID: %d, URL: %s): %v", video.ID, video.URL, err)
 			return
 		}

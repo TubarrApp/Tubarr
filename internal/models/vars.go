@@ -74,12 +74,11 @@ type ChannelInputPtrs struct {
 	URLOutputDirs       *[]string `viper:"metarr-url-output-dirs"`
 
 	// Transcoding.
-	TranscodeGPU          *string   `viper:"metarr-transcode-gpu"`
-	TranscodeGPUDirectory *string   `viper:"metarr-transcode-gpu-node"`
-	TranscodeQuality      *string   `viper:"metarr-transcode-quality"`
-	TranscodeVideoFilter  *string   `viper:"metarr-transcode-video-filter"`
-	TranscodeVideoCodec   *[]string `viper:"metarr-transcode-video-codecs"`
-	TranscodeAudioCodec   *[]string `viper:"metarr-transcode-audio-codecs"`
+	TranscodeGPU         *string   `viper:"metarr-transcode-gpu"`
+	TranscodeQuality     *string   `viper:"metarr-transcode-quality"`
+	TranscodeVideoFilter *string   `viper:"metarr-transcode-video-filter"`
+	TranscodeVideoCodec  *[]string `viper:"metarr-transcode-video-codecs"`
+	TranscodeAudioCodec  *[]string `viper:"metarr-transcode-audio-codecs"`
 
 	// Resources and limits.
 	MinFreeMem        *string  `viper:"metarr-min-free-mem"`

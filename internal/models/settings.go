@@ -71,13 +71,12 @@ type MetarrArgs struct {
 	MinFreeMem  string  `json:"metarr_min_free_mem"`
 
 	// FFmpeg transcoding operations.
-	TranscodeGPUDirectory string   `json:"metarr_transcode_gpu_node"`
-	TranscodeGPU          string   `json:"metarr_transcode_gpu"`
-	TranscodeVideoFilter  string   `json:"metarr_transcode_video_filter"`
-	TranscodeVideoCodecs  []string `json:"metarr_transcode_video_codecs"`
-	TranscodeAudioCodecs  []string `json:"metarr_transcode_audio_codecs"`
-	TranscodeQuality      string   `json:"metarr_transcode_quality"`
-	ExtraFFmpegArgs       string   `json:"metarr_extra_ffmpeg_args"`
+	TranscodeGPU         string   `json:"metarr_transcode_gpu"`
+	TranscodeVideoFilter string   `json:"metarr_transcode_video_filter"`
+	TranscodeVideoCodecs []string `json:"metarr_transcode_video_codecs"`
+	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs"`
+	TranscodeQuality     string   `json:"metarr_transcode_quality"`
+	ExtraFFmpegArgs      string   `json:"metarr_extra_ffmpeg_args"`
 }
 
 // ChannelAccessDetails holds details related to authentication and cookies.
@@ -321,11 +320,6 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 			return false
 		}
 	}
-	if child.TranscodeGPUDirectory != "" {
-		if parent.TranscodeGPUDirectory != child.TranscodeGPUDirectory {
-			return false
-		}
-	}
 	if child.TranscodeVideoFilter != "" {
 		if parent.TranscodeVideoFilter != child.TranscodeVideoFilter {
 			return false
@@ -543,9 +537,6 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 
 	// FFmpeg transcoding operations.
 	if m.TranscodeGPU != "" {
-		return false
-	}
-	if m.TranscodeGPUDirectory != "" {
 		return false
 	}
 	if m.TranscodeVideoFilter != "" {

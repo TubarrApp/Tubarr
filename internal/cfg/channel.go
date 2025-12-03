@@ -794,7 +794,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	cmd.SetAuthFlags(addCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	cmd.SetTranscodeFlags(addCmd, &flags.TranscodeGPU, &flags.TranscodeGPUDirectory,
+	cmd.SetTranscodeFlags(addCmd, &flags.TranscodeGPU,
 		&flags.TranscodeVideoFilter, &flags.TranscodeQuality, &flags.TranscodeVideoCodec,
 		&flags.TranscodeAudioCodec)
 
@@ -990,7 +990,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 	cmd.SetAuthFlags(batchCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.TranscodeGPUDirectory, &flags.TranscodeVideoFilter,
+	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.TranscodeVideoFilter,
 		&flags.TranscodeQuality, &flags.TranscodeVideoCodec, &flags.TranscodeAudioCodec)
 
 	cmd.SetCustomYDLPArgFlags(batchCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
@@ -1180,10 +1180,9 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		urlOutDirs []string
 
 		// Directory paths.
-		vDir    string
-		jDir    string
-		outDir  string
-		gpuNode string
+		vDir   string
+		jDir   string
+		outDir string
 
 		// Configuration files.
 		configFile              string
@@ -1403,7 +1402,6 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
 				useGPU:               useGPU,
-				gpuNode:              gpuNode,
 				transcodeVideoCodec:  videoCodec,
 				transcodeAudioCodec:  audioCodec,
 				transcodeQuality:     transcodeQuality,
@@ -1461,7 +1459,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding.
-	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuNode,
+	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU,
 		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
 		&audioCodec)
 
@@ -1550,7 +1548,6 @@ type cobraMetarrArgs struct {
 	maxCPU               float64
 	minFreeMem           string
 	useGPU               string
-	gpuNode              string
 	transcodeVideoCodec  []string
 	transcodeAudioCodec  []string
 	transcodeQuality     string
@@ -1769,32 +1766,13 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		validGPU := c.useGPU
 
 		if c.useGPU != "" {
-			validGPU, _, err = validation.ValidateGPUAcceleration(c.useGPU, c.gpuNode)
+			validGPU, err = validation.ValidateGPUAcceleration(c.useGPU)
 			if err != nil {
 				return nil, err
 			}
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeGPU = validGPU
-			return nil
-		})
-	}
-
-	// Transcoding GPU directory.
-	if f.Changed(keys.TranscodeGPUNode) {
-		fns = append(fns, func(m *models.MetarrArgs) error {
-
-			if c.gpuNode != "" {
-				if _, err := os.Stat(c.gpuNode); err != nil {
-					switch {
-					case os.IsNotExist(err):
-						return fmt.Errorf("gpu directory was entered as %v, but path does not exist", c.gpuNode)
-					default:
-						return fmt.Errorf("error checking GPU directory %v: %w", c.gpuNode, err)
-					}
-				}
-			}
-			m.TranscodeGPUDirectory = c.gpuNode
 			return nil
 		})
 	}

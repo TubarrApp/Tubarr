@@ -1578,7 +1578,6 @@ func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
 	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)
 	fmt.Printf("HW Acceleration: %s\n", m.TranscodeGPU)
-	fmt.Printf("HW Acceleration Directory: %s\n", m.TranscodeGPUDirectory)
 	fmt.Printf("Video Codec: %v\n", m.TranscodeVideoCodecs)
 	fmt.Printf("Audio Codec: %v\n", m.TranscodeAudioCodecs)
 	fmt.Printf("Transcode Quality: %s\n", m.TranscodeQuality)
@@ -1733,9 +1732,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 		c.ChanMetarrArgs = &models.MetarrArgs{}
 	}
 
-	var (
-		gpuNodeGot, gpuGot string
-	)
+	var gpuGot string
 
 	// Metarr output extension
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MOutputExt); ok {
@@ -1842,9 +1839,6 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPU); ok {
 		gpuGot = v
 	}
-	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPUNode); ok {
-		gpuNodeGot = v
-	}
 
 	// Metarr video filter
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeVideoFilter); ok {
@@ -1868,8 +1862,8 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	}
 
 	// Transcode GPU validation
-	if gpuGot != "" || gpuNodeGot != "" {
-		if c.ChanMetarrArgs.TranscodeGPU, c.ChanMetarrArgs.TranscodeGPUDirectory, err = validation.ValidateGPUAcceleration(gpuGot, gpuNodeGot); err != nil {
+	if gpuGot != "" {
+		if c.ChanMetarrArgs.TranscodeGPU, err = validation.ValidateGPUAcceleration(gpuGot); err != nil {
 			return err
 		}
 	}

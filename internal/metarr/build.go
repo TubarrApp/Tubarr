@@ -65,12 +65,6 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	// Define fields to process.
 	fields := []metCmdMapping{
 		// Metarr args:
-		// {
-		// 	metarrValue: metVals{i: cu.ChanURLMetarrArgs.Concurrency},
-		// 	valType:     i,
-		// 	viperKey:    "", // Don't use Tubarr concurrency key for Metarr.
-		// 	cmdKey:      metkeys.Concurrency,
-		// },
 		{
 			metarrValue: metVals{strSlice: validFilenameOps},
 			valType:     strSlice,
@@ -125,12 +119,6 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeGPU,
-		},
-		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeGPUDirectory},
-			valType:     str,
-			viperKey:    "",
-			cmdKey:      metkeys.TranscodeGPUDirectory,
 		},
 		{
 			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.TranscodeVideoCodecs},

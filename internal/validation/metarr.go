@@ -162,7 +162,7 @@ func ValidatePurgeMetafiles(purgeType string) bool {
 }
 
 // ValidateGPUAcceleration validates the GPU selection.
-func ValidateGPUAcceleration(g, devDir string) (gpuType string, dir string, err error) {
+func ValidateGPUAcceleration(g string) (gpuType string, err error) {
 	g = strings.ToLower(strings.TrimSpace(g))
 
 	// Verify OS support.
@@ -173,20 +173,15 @@ func ValidateGPUAcceleration(g, devDir string) (gpuType string, dir string, err 
 
 	// Return on empty or if explicitly unwanted.
 	if g == "" || g == "none" {
-		return "", "", nil
+		return "", nil
 	}
 
 	// Validate acceleration type.
 	if g, err = sharedvalidation.ValidateGPUAccelType(g); err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	// Check device directory exists.
-	if devDir, err = sharedvalidation.ValidateAccelTypeDeviceNode(g, devDir); err != nil {
-		return "", "", err
-	}
-
-	return g, devDir, nil
+	return g, nil
 }
 
 // ValidateAudioTranscodeCodecSlice sets mappings for audio codec inputs.

@@ -759,10 +759,6 @@
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Node Path</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_gpu_node" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
-                            </div>
-                            <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
                               <textarea
                                 x-model="urlEntry.custom.metarr_transcode_video_transcode_codecs"
@@ -1231,22 +1227,10 @@
                           <option value="">None</option>
                           <option value="auto">Auto</option>
                           <option value="cuda">Nvidia</option>
-                          <option value="amd">AMD</option>
+                          <option value="amd">AMF (Windows Only)</option>
                           <option value="qsv">Intel</option>
                           <option value="vaapi">VAAPI</option>
                         </select>
-                      </div>
-
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          GPU Node Path
-                        </label>
-                        <input
-                          type="text"
-                          x-model="formData.metarr.metarr_gpu_node"
-                          placeholder="/dev/dri/renderD128"
-                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                        />
                       </div>
 
                       <div>
@@ -1570,7 +1554,6 @@
                   metarr_max_cpu_usage: null,
                   metarr_min_free_mem: '',
                   metarr_gpu: '',
-                  metarr_gpu_node: '',
                   metarr_transcode_video_transcode_codecs: '',
                   metarr_transcode_audio_codecs: '',
                   metarr_transcode_quality: null,
@@ -1617,7 +1600,6 @@
               metarr_max_cpu_usage: '',
               metarr_min_free_mem: '',
               metarr_gpu: '',
-              metarr_gpu_node: '',
               metarr_transcode_video_transcode_codecs: '',
               metarr_transcode_audio_codecs: '',
               metarr_transcode_quality: '',
@@ -1672,7 +1654,6 @@
                 metarr_max_cpu_usage: null,
                 metarr_min_free_mem: '',
                 metarr_gpu: '',
-                metarr_gpu_node: '',
                 metarr_transcode_video_transcode_codecs: '',
                 metarr_transcode_audio_codecs: '',
                 metarr_transcode_quality: null,
@@ -1854,7 +1835,7 @@
                 const metarrFields = [
                   'metarr_output_directory', 'metarr_output_ext', 'metarr_rename_style',
                   'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
-                  'metarr_gpu', 'metarr_gpu_node', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
+                  'metarr_gpu', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
                   'metarr_transcode_quality', 'metarr_transcode_video_filter',
                   'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_meta_ops_file',
                   'metarr_filename_ops', 'metarr_filename_ops_file',

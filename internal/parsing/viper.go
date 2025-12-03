@@ -138,12 +138,11 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	}
 
 	if input.TranscodeGPU != nil && *input.TranscodeGPU != "" {
-		g, d, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
+		g, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU)
 		if err != nil {
 			return nil, nil, err
 		}
 		input.TranscodeGPU = &g
-		input.TranscodeGPUDirectory = &d
 	}
 
 	if input.TranscodeVideoCodec != nil && len(*input.TranscodeVideoCodec) != 0 {
@@ -297,7 +296,6 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 			URLOutputDirs:           NilOrZeroValue(input.URLOutputDirs),
 			Concurrency:             NilOrZeroValue(input.MetarrConcurrency),
 			TranscodeGPU:            NilOrZeroValue(input.TranscodeGPU),
-			TranscodeGPUDirectory:   NilOrZeroValue(input.TranscodeGPUDirectory),
 			TranscodeVideoCodecs:    NilOrZeroValue(input.TranscodeVideoCodec),
 			TranscodeAudioCodecs:    NilOrZeroValue(input.TranscodeAudioCodec),
 			TranscodeQuality:        NilOrZeroValue(input.TranscodeQuality),
@@ -845,12 +843,11 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 
 	// Validate and set GPU settings if provided.
 	if input.TranscodeGPU != nil {
-		g, d, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU, NilOrZeroValue(input.TranscodeGPUDirectory))
+		g, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate GPU settings for per-URL settings: %w", err)
 		}
 		metarr.TranscodeGPU = g
-		metarr.TranscodeGPUDirectory = d
 	}
 
 	// Validate and set video codecs if provided.

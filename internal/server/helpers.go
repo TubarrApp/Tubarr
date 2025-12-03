@@ -48,9 +48,6 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	if mArgs.TranscodeGPU != "" {
 		metarrMap[jsonkeys.MetarrGPU] = mArgs.TranscodeGPU
 	}
-	if mArgs.TranscodeGPUDirectory != "" {
-		metarrMap[jsonkeys.MetarrGPUDirectory] = mArgs.TranscodeGPUDirectory
-	}
 	if len(mArgs.TranscodeVideoCodecs) != 0 {
 		metarrMap[jsonkeys.MetarrVideoCodecs] = mArgs.TranscodeVideoCodecs
 	}
@@ -328,11 +325,8 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		}
 		metarr.MinFreeMem = v
 	}
-	if v, ok := data[jsonkeys.MetarrGPUDirectory].(string); ok {
-		metarr.TranscodeGPUDirectory = v
-	}
 	if v, ok := data[jsonkeys.MetarrGPU].(string); ok {
-		validGPU, _, err := validation.ValidateGPUAcceleration(v, metarr.TranscodeGPUDirectory)
+		validGPU, err := validation.ValidateGPUAcceleration(v)
 		if err != nil {
 			return nil, err
 		}
@@ -553,7 +547,6 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	renameStyle := r.FormValue(jsonkeys.MetarrRenameStyle)
 	minFreeMem := r.FormValue(jsonkeys.MetarrMinFreeMem)
 	transcodeGPUStr := r.FormValue(jsonkeys.MetarrGPU)
-	transcodeGPUNodeStr := r.FormValue(jsonkeys.MetarrGPUDirectory)
 	outputDir := r.FormValue(jsonkeys.MetarrOutputDirectory)
 	transcodeVideoFilterStr := r.FormValue(jsonkeys.MetarrTranscodeVideoFilter)
 	transcodeCodecStr := r.FormValue(jsonkeys.MetarrVideoCodecs)
@@ -580,9 +573,9 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid min free mem %q: %v", minFreeMem, err), http.StatusBadRequest)
 		return nil
 	}
-	transcodeGPU, transcodeGPUNode, err := validation.ValidateGPUAcceleration(transcodeGPUStr, transcodeGPUNodeStr)
+	transcodeGPU, err := validation.ValidateGPUAcceleration(transcodeGPUStr)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid GPU type or device directory (%q : %q): %v", transcodeGPUStr, transcodeGPUNodeStr, err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("invalid GPU type %q: %v", transcodeGPUStr, err), http.StatusBadRequest)
 		return nil
 	}
 	transcodeVideoFilter, err := validation.ValidateTranscodeVideoFilter(transcodeVideoFilterStr)
@@ -666,7 +659,6 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		MaxCPU:                  maxCPU,
 		MinFreeMem:              minFreeMem,
 		TranscodeGPU:            transcodeGPU,
-		TranscodeGPUDirectory:   transcodeGPUNode,
 		TranscodeVideoFilter:    transcodeVideoFilter,
 		TranscodeVideoCodecs:    transcodeVideoCodecs,
 		TranscodeAudioCodecs:    transcodeAudioCodecs,
