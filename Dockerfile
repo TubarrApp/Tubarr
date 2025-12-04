@@ -7,6 +7,10 @@ FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+RUN sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
+ && sed -i 's/^# deb-src .*multiverse/deb-src &/' /etc/apt/sources.list \
+ && apt-get update
+
 # Core build deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -61,16 +65,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfdk-aac-dev \
     libass-dev \
     \
-    # Intel QSV
+    # Intel QSV (Arc, UHD, QSV)
     libvpl-dev \
+    libvpl2 \
     libva-dev \
     libva-drm2 \
     libdrm-dev \
+    libmfx1 \
     intel-media-va-driver \
+    intel-media-va-driver-non-free \
     \
-    # NVIDIA (Ubuntu-only)
+    # NVIDIA NVENC/NVDEC (Ubuntu only)
     libnvidia-encode-550 \
     libnvidia-decode-550 \
+    \
     && rm -rf /var/lib/apt/lists/*
 
 ############ NVENC headers ############
@@ -93,6 +101,7 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
         --enable-nonfree \
         --enable-shared \
         --disable-debug \
+        --enable-lto \
         \
         --enable-libx264 \
         --enable-libx265 \
@@ -109,11 +118,16 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
         --enable-vaapi \
         --enable-libdrm \
         --enable-libvpl \
+        --enable-libmfx \
         \
         --enable-nvenc \
         --enable-nvdec \
     && make -j"$(nproc)" && make install && ldconfig && \
+    strip /usr/local/bin/ffmpeg || true && \
+    strip /usr/local/bin/ffprobe || true && \
+    find /usr/local/lib -name "*.so" -exec strip --strip-unneeded {} + || true && \
     rm -rf /ffmpeg
+
 
 ###############################
 # 2. Runtime Stage (Ubuntu)
@@ -121,6 +135,10 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
+ && sed -i 's/^# deb-src .*multiverse/deb-src &/' /etc/apt/sources.list \
+ && apt-get update
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     aria2 \
@@ -133,15 +151,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     xz-utils \
     \
+    # Intel Arc / QSV runtime
     intel-media-va-driver \
+    libvpl2 \
     libigdgmm12 \
     libva2 \
     libva-drm2 \
     mesa-va-drivers \
     \
+    # NVIDIA NVENC/NVDEC (Ubuntu)
     libnvidia-encode-550 \
     libnvidia-decode-550 \
+    \
     && rm -rf /var/lib/apt/lists/*
+
+# Fix /tmp permissions for non-root usage
+RUN chmod 1777 /tmp
 
 ######## Install FFmpeg runtime ########
 COPY --from=builder /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
