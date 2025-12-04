@@ -1,73 +1,90 @@
 # syntax=docker/dockerfile:1
 
-# --- Build stage: Go + FFmpeg -----------------------------------------------
-FROM golang:1.25 AS builder
+###############################
+# 1. Builder stage (Ubuntu)
+###############################
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Core build deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
     ca-certificates \
-    tzdata \
+    git \
+    wget \
     build-essential \
     pkg-config \
+    cmake \
+    ninja-build \
+    yasm \
+    nasm \
+    xz-utils \
+    tzdata \
     sqlite3 libsqlite3-dev \
-    yasm nasm \
-    cmake ninja-build \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go manually (Ubuntu’s golang-go is too old)
+RUN wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.25.0.linux-amd64.tar.gz && \
+    rm go1.25.0.linux-amd64.tar.gz
+
+ENV PATH="/usr/local/go/bin:${PATH}"
 
 WORKDIR /build
 
-# --- Build Tubarr -----------------------------------------------------------
+############ Build Tubarr ############
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-
 RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
     -o tubarr ./cmd/tubarr
 
-# --- Build Metarr -----------------------------------------------------------
-RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
- && cd /build/metarr-src \
- && go mod download \
- && CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
-    -o /build/metarr ./cmd/metarr
+############ Build Metarr ############
+RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src && \
+    cd /build/metarr-src && \
+    go mod download && \
+    CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
+        -o /build/metarr ./cmd/metarr
 
-# --- Install NVENC headers --------------------------------------------------
+############ FFmpeg build dependencies ############
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libx264-dev \
+    libx265-dev \
+    libvpx-dev \
+    libsvtav1-dev \
+    libdav1d-dev \
+    libmp3lame-dev \
+    libopus-dev \
+    libvorbis-dev \
+    libflac-dev \
+    libfdk-aac-dev \
+    libass-dev \
+    \
+    # Intel QSV
+    libvpl-dev \
+    libva-dev \
+    libva-drm2 \
+    libdrm-dev \
+    intel-media-va-driver \
+    \
+    # NVIDIA (Ubuntu-only)
+    libnvidia-encode-550 \
+    libnvidia-decode-550 \
+    && rm -rf /var/lib/apt/lists/*
+
+############ NVENC headers ############
 RUN git clone https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
     make -C /tmp/nv install && rm -rf /tmp/nv
 
-# --- Install SVT-AV1 (needed by FFmpeg) -------------------------------------
+############ Build SVT-AV1 ############
 RUN git clone --depth 1 https://gitlab.com/AOMediaCodec/SVT-AV1.git /tmp/svtav1 && \
-    cd /tmp/svtav1 && \
-    mkdir build && cd build && \
+    cd /tmp/svtav1 && mkdir build && cd build && \
     cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && \
     ninja -j"$(nproc)" && ninja install && ldconfig && \
     rm -rf /tmp/svtav1
 
-# --- Build FFmpeg from source -----------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libx264-dev \
-        libx265-dev \
-        libvpx-dev \
-        libsvtav1-dev \
-        libdav1d-dev \
-        libmp3lame-dev \
-        libopus-dev \
-        libvorbis-dev \
-        libflac-dev \
-        libfdk-aac-dev \
-        libass-dev \
-        libvpl-dev \
-        libva-dev \
-        libva-drm2 \
-        libdrm-dev \
-        intel-media-va-driver \
-        libnvidia-encode-550 \
-        libnvidia-decode-550 \
-    && rm -rf /var/lib/apt/lists/*
-
+############ Build FFmpeg from source ############
 RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
     cd /ffmpeg && \
     PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/local/lib/pkgconfig" ./configure \
@@ -98,52 +115,51 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
     && make -j"$(nproc)" && make install && ldconfig && \
     rm -rf /ffmpeg
 
-
-# --- Runtime stage -----------------------------------------------------------
+###############################
+# 2. Runtime Stage (Ubuntu)
+###############################
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Runtime-only libs (NO compilers, NO dev packages)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        aria2 \
-        axel \
-        ca-certificates \
-        libsqlite3-0 \
-        python3 python3-pip \
-        sqlite3 \
-        gosu \
-        tzdata \
-        wget \
-        xz-utils \
-        \
-        intel-media-va-driver \
-        libigdgmm12 \
-        libva2 \
-        libva-drm2 \
-        mesa-va-drivers \
-        \
-        libnvidia-encode-550 \
-        libnvidia-decode-550 \
+    aria2 \
+    axel \
+    ca-certificates \
+    python3 python3-pip \
+    sqlite3 \
+    gosu \
+    tzdata \
+    wget \
+    xz-utils \
+    \
+    intel-media-va-driver \
+    libigdgmm12 \
+    libva2 \
+    libva-drm2 \
+    mesa-va-drivers \
+    \
+    libnvidia-encode-550 \
+    libnvidia-decode-550 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install FFmpeg binaries from builder
+######## Install FFmpeg runtime ########
 COPY --from=builder /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=builder /usr/local/bin/ffprobe /usr/local/bin/ffprobe
 COPY --from=builder /usr/local/lib/ /usr/local/lib/
 RUN ldconfig
 
-# yt-dlp
+######## Install yt-dlp ########
 RUN wget -O /usr/local/bin/yt-dlp \
         https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \
     && chmod +x /usr/local/bin/yt-dlp
 
-# Copy binaries
+######## Copy Tubarr + Metarr ########
 COPY --from=builder /build/tubarr /app/tubarr
 COPY --from=builder /build/metarr /usr/local/bin/metarr
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
 
-# Auto-updater
+######## Auto-updater ########
 RUN printf '%s\n' \
 '#!/bin/sh' \
 'while true; do' \
@@ -152,19 +168,19 @@ RUN printf '%s\n' \
 'done &' \
 > /usr/local/bin/auto-updater && chmod +x /usr/local/bin/auto-updater
 
-# App files
+######## App files ########
 WORKDIR /app
 COPY --from=builder /build/web /app/web
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# --- User setup ---------------------------------------
-RUN userdel -r ubuntu 2>/dev/null || true \
-    && groupadd -g 1000 tubarr \
-    && useradd -u 1000 -g tubarr -d /home/tubarr -s /bin/bash -m tubarr
+######## User Logic ########
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    groupadd -g 1000 tubarr && \
+    useradd -u 1000 -g tubarr -d /home/tubarr -s /bin/bash -m tubarr
 
-RUN mkdir -p /home/tubarr/.tubarr /downloads /metadata \
-    && chown -R tubarr:tubarr /home/tubarr /downloads /metadata
+RUN mkdir -p /home/tubarr/.tubarr /downloads /metadata && \
+    chown -R tubarr:tubarr /home/tubarr /downloads /metadata
 
 ENV PUID=1000 PGID=1000
 ENV HOME=/home/tubarr
