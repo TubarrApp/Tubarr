@@ -44,7 +44,6 @@ func InitProcess(
 
 	// Initialize Metarr semaphore and context.
 	mConc := 1
-	// Prioritize channel URL-specific metarr concurrency setting.
 	if cu.ChanURLMetarrArgs.Concurrency > 0 {
 		mConc = cu.ChanURLMetarrArgs.Concurrency
 	} else if abstractions.IsSet(keys.MConcurrency) {
@@ -52,14 +51,14 @@ func InitProcess(
 	}
 	metarrSem := make(chan struct{}, mConc)
 
-	// Create independent context for metarr to prevent premature cancellation.
-	metarrCtx, metarrCancel := context.WithCancel(context.Background())
+	// Create context for Metarr derived from parent so shutdown propagates.
+	metarrCtx, metarrCancel := context.WithCancel(ctx)
 	defer metarrCancel()
 
 	var metarrWg sync.WaitGroup
 	defer metarrWg.Wait()
 
-	// Bot detection context.
+	// Bot detection context for video workers only.
 	procCtx, procCancel := context.WithCancel(ctx)
 	defer procCancel()
 
