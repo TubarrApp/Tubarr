@@ -48,7 +48,7 @@ func InitProcess(
 	if cu.ChanURLMetarrArgs.Concurrency > 0 {
 		mConc = cu.ChanURLMetarrArgs.Concurrency
 	} else if abstractions.IsSet(keys.MConcurrency) {
-		mConc = abstractions.GetInt(keys.MConcurrency)
+		mConc = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.MConcurrency))
 	}
 	metarrSem := make(chan struct{}, mConc)
 	var metarrWg sync.WaitGroup
