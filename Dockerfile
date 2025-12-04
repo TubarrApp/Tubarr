@@ -36,21 +36,6 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 
 WORKDIR /build
 
-############ Build Tubarr ############
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
-    -o tubarr ./cmd/tubarr
-
-############ Build Metarr ############
-RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src && \
-    cd /build/metarr-src && \
-    go mod download && \
-    CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
-        -o /build/metarr ./cmd/metarr
-
 ############ FFmpeg build dependencies ############
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libx264-dev \
@@ -72,7 +57,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libva-drm2 \
     libdrm-dev \
     libmfx1 \
-    intel-media-va-driver \
     intel-media-va-driver-non-free \
     \
     # NVIDIA NVENC/NVDEC (Ubuntu only)
@@ -128,6 +112,20 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
     find /usr/local/lib -name "*.so" -exec strip --strip-unneeded {} + || true && \
     rm -rf /ffmpeg
 
+############ Build Tubarr ############
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
+    -o tubarr ./cmd/tubarr
+
+############ Build Metarr ############
+RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src && \
+    cd /build/metarr-src && \
+    go mod download && \
+    CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
+        -o /build/metarr ./cmd/metarr
 
 ###############################
 # 2. Runtime Stage (Ubuntu)
