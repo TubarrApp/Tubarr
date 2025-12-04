@@ -232,13 +232,19 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 		if f.metarrValue.str != "" {
 			argMap[f.cmdKey] = f.metarrValue.str
 		} else if f.viperKey != "" && abstractions.IsSet(f.viperKey) {
-			argMap[f.cmdKey] = abstractions.GetString(f.viperKey)
+			viperVal := abstractions.GetString(f.viperKey)
+			if viperVal != "" {
+				argMap[f.cmdKey] = viperVal
+			}
 		}
 	case strSlice:
 		if len(f.metarrValue.strSlice) > 0 {
 			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(f.metarrValue.strSlice)
 		} else if f.viperKey != "" && abstractions.IsSet(f.viperKey) {
-			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(abstractions.GetStringSlice(f.viperKey))
+			viperSlice := abstractions.GetStringSlice(f.viperKey)
+			if len(viperSlice) > 0 {
+				argSlicesMap[f.cmdKey] = cleanCommaSliceValues(viperSlice)
+			}
 		}
 		// Set Meta Overwrite flag if meta-ops arguments exist.
 		if f.cmdKey == metkeys.MetaOps {
