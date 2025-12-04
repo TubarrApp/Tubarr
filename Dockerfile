@@ -53,12 +53,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfdk-aac-dev \
     libass-dev \
     \
-    # Intel QSV / VPL
+    # Intel QSV / VPL (Arc-enabled)
     libvpl-dev \
     libva-dev \
     libva-drm2 \
     libdrm-dev \
     intel-media-va-driver-non-free \
+    libmfx-gen1.2 \
     \
     # NVIDIA NVENC/NVDEC runtime libs
     libnvidia-encode-550 \
@@ -218,6 +219,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libva-x11-2 \
     mesa-va-drivers \
     libdrm2 \
+    libze-intel-gpu1 \
+    libmfx-gen1.2 \
     ##########################################################################
     # NVIDIA NVENC/NVDEC runtime stack
     # (relies on NVIDIA container runtime on host)
@@ -259,6 +262,8 @@ RUN apt-get update && for p in \
     libva-x11-2 \
     mesa-va-drivers \
     libdrm2 \
+    libze-intel-gpu1 \
+    libmfx-gen1.2 \
     libnvidia-encode-550 \
     libnvidia-decode-550; \
 do \
