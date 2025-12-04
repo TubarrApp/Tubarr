@@ -63,6 +63,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libnvidia-encode-550 \
     libnvidia-decode-550 \
     \
+    # FFprobe
+    zlib1g-dev \
+    libbz2-dev \
+    libxml2-dev \
+    \
     && rm -rf /var/lib/apt/lists/*
 
 ############ NVENC headers ############
@@ -84,8 +89,12 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
         --enable-gpl \
         --enable-nonfree \
         --enable-shared \
+        --enable-programs \
         --disable-debug \
         --enable-lto \
+        \
+        --enable-ffmpeg \
+        --enable-ffprobe \
         \
         --enable-libx264 \
         --enable-libx265 \
@@ -106,10 +115,11 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
         \
         --enable-nvenc \
         --enable-nvdec \
-    && make -j"$(nproc)" && make install && ldconfig && \
-    strip /usr/local/bin/ffmpeg || true && \
-    strip /usr/local/bin/ffprobe || true && \
+    && make -j"$(nproc)" && make install && \
+    ls -la /usr/local/bin/ffmpeg /usr/local/bin/ffprobe && \
+    strip /usr/local/bin/ffmpeg /usr/local/bin/ffprobe && \
     find /usr/local/lib -name "*.so" -exec strip --strip-unneeded {} + || true && \
+    ldconfig && \
     rm -rf /ffmpeg
 
 ############ Build Tubarr ############
