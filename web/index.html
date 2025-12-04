@@ -651,6 +651,16 @@
                       </svg>
                       <div class="text-left">
                         <div class="flex items-center gap-2">
+                          <svg
+                            x-show="channel.settings?.paused"
+                            class="w-4 h-4 text-gray-500 dark:text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            title="Channel is paused"
+                          >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          </svg>
                           <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
                           <span
                             x-show="channel.new_video_notification"
