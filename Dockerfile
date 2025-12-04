@@ -7,7 +7,10 @@ FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
+# Add multiverse and universe repos
+RUN sed -i 's/^# deb .*universe/deb &/' /etc/apt/sources.list \
+ && sed -i 's/^# deb-src .*universe/deb-src &/' /etc/apt/sources.list \
+ && sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
  && sed -i 's/^# deb-src .*multiverse/deb-src &/' /etc/apt/sources.list \
  && apt-get update
 
@@ -55,7 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libva-dev \
     libva-drm2 \
     libdrm-dev \
-    intel-media-driver \
+    intel-media-va-driver-non-free \
     \
     # NVIDIA NVENC/NVDEC runtime libs
     libnvidia-encode-550 \
@@ -153,7 +156,10 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
+# Add multiverse and universe repos
+RUN sed -i 's/^# deb .*universe/deb &/' /etc/apt/sources.list \
+ && sed -i 's/^# deb-src .*universe/deb-src &/' /etc/apt/sources.list \
+ && sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
  && sed -i 's/^# deb-src .*multiverse/deb-src &/' /etc/apt/sources.list \
  && apt-get update
 
@@ -179,15 +185,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libvorbis0a \
     libvorbisenc2 \
     libfdk-aac2 \
-    libflac8 \
+    libflac12 \
     \
     # Video codecs
     libx264-164 \
     libx265-199 \
-    libvpx7 \
+    libvpx9 \
     libdav1d7 \
-    libsvtav1enc2 \
-    libsvtav1dec2 \
+    libsvtav1enc1d1 \
+    libsvtav1dec0 \
     \
     # Subtitle / text rendering (required by libass)
     libass9 \
@@ -203,10 +209,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ##########################################################################
     # Intel QSV / VAAPI runtime stack
     ##########################################################################
-    intel-media-driver \
+    intel-media-va-driver-non-free \
     libigdgmm12 \
     libvpl2 \
-    libvpl-tools \
+    onevpl-tools \
     libva2 \
     libva-drm2 \
     libva-x11-2 \
@@ -222,6 +228,43 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Cleanup
     ##########################################################################
     && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && for p in \
+    libmp3lame0 \
+    libopus0 \
+    libvorbis0a \
+    libvorbisenc2 \
+    libfdk-aac2 \
+    libflac12 \
+    libx264-164 \
+    libx265-199 \
+    libvpx9 \
+    libdav1d7 \
+    libsvtav1enc1d1 \
+    libsvtav1dec0 \
+    libass9 \
+    libfreetype6 \
+    libfribidi0 \
+    libharfbuzz0b \
+    libfontconfig1 \
+    zlib1g \
+    libbz2-1.0 \
+    libxml2 \
+    intel-media-va-driver-non-free \
+    libigdgmm12 \
+    libvpl2 \
+    onevpl-tools \
+    libva2 \
+    libva-drm2 \
+    libva-x11-2 \
+    mesa-va-drivers \
+    libdrm2 \
+    libnvidia-encode-550 \
+    libnvidia-decode-550; \
+do \
+    echo "CHECKING $p" ; \
+    apt-cache show "$p" >/dev/null 2>&1 && echo "FOUND $p" || echo "NOT FOUND $p" ; \
+done
 
 
 # Fix /tmp permissions for non-root usage
