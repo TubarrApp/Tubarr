@@ -11,7 +11,7 @@ RUN sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
  && sed -i 's/^# deb-src .*multiverse/deb-src &/' /etc/apt/sources.list \
  && apt-get update
 
-# Core build deps
+# Core build deps + Go toolchain deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
@@ -33,11 +33,11 @@ RUN wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz && \
     rm go1.25.0.linux-amd64.tar.gz
 
 ENV PATH="/usr/local/go/bin:${PATH}"
-
 WORKDIR /build
 
 ############ FFmpeg build dependencies ############
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Video codecs
     libx264-dev \
     libx265-dev \
     libvpx-dev \
@@ -50,24 +50,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfdk-aac-dev \
     libass-dev \
     \
-    # Intel QSV (Arc, UHD, QSV)
+    # Intel QSV / VPL
     libvpl-dev \
-    libvpl2 \
     libva-dev \
     libva-drm2 \
     libdrm-dev \
-    libmfx1 \
-    intel-media-va-driver-non-free \
+    intel-media-va-driver \
     \
-    # NVIDIA NVENC/NVDEC (Ubuntu only)
+    # NVIDIA NVENC/NVDEC runtime libs
     libnvidia-encode-550 \
     libnvidia-decode-550 \
     \
-    # FFprobe
+    # FFprobe / misc
     zlib1g-dev \
     libbz2-dev \
     libxml2-dev \
-    \
     && rm -rf /var/lib/apt/lists/*
 
 ############ NVENC headers ############
@@ -82,19 +79,17 @@ RUN git clone --depth 1 https://gitlab.com/AOMediaCodec/SVT-AV1.git /tmp/svtav1 
     rm -rf /tmp/svtav1
 
 ############ Build FFmpeg from source ############
-RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
+RUN set -e && \
+    rm -rf /ffmpeg && \
+    git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
     cd /ffmpeg && \
     PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/local/lib/pkgconfig" ./configure \
         --prefix=/usr/local \
+        --bindir=/usr/local/bin \
         --enable-gpl \
         --enable-nonfree \
         --enable-shared \
-        --enable-programs \
         --disable-debug \
-        --enable-lto \
-        \
-        --enable-ffmpeg \
-        --enable-ffprobe \
         \
         --enable-libx264 \
         --enable-libx265 \
@@ -111,16 +106,30 @@ RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
         --enable-vaapi \
         --enable-libdrm \
         --enable-libvpl \
-        --enable-libmfx \
         \
         --enable-nvenc \
         --enable-nvdec \
-    && make -j"$(nproc)" && make install && \
-    ls -la /usr/local/bin/ffmpeg /usr/local/bin/ffprobe && \
-    strip /usr/local/bin/ffmpeg /usr/local/bin/ffprobe && \
-    find /usr/local/lib -name "*.so" -exec strip --strip-unneeded {} + || true && \
-    ldconfig && \
-    rm -rf /ffmpeg
+    && make -j"$(nproc)" \
+    && make install \
+    \
+    # In case ffmpeg/ffprobe are built as *_g, normalize names
+    && if [ -f /usr/local/bin/ffmpeg_g ]; then mv /usr/local/bin/ffmpeg_g /usr/local/bin/ffmpeg; fi \
+    && if [ -f /usr/local/bin/ffprobe_g ]; then mv /usr/local/bin/ffprobe_g /usr/local/bin/ffprobe; fi \
+    \
+    # Verify installation (fail early if missing)
+    && ls -la /usr/local/bin \
+    && test -f /usr/local/bin/ffmpeg \
+    && test -f /usr/local/bin/ffprobe \
+    \
+    # Strip (optional) and refresh ld cache
+    && strip /usr/local/bin/ffmpeg /usr/local/bin/ffprobe || true \
+    && find /usr/local/lib -name "*.so" -exec strip --strip-unneeded {} + \; || true \
+    && ldconfig
+
+# Extra hard fail if somehow broken in a later cached layer
+RUN ls -la /usr/local/bin
+RUN test -f /usr/local/bin/ffmpeg
+RUN test -f /usr/local/bin/ffprobe
 
 ############ Build Tubarr ############
 COPY go.mod go.sum ./
@@ -160,14 +169,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     \
     # Intel Arc / QSV runtime
-    intel-media-va-driver-non-free \
+    intel-media-va-driver \
     libvpl2 \
     libigdgmm12 \
     libva2 \
     libva-drm2 \
     mesa-va-drivers \
     \
-    # NVIDIA NVENC/NVDEC (Ubuntu)
+    # NVIDIA NVENC/NVDEC runtime
     libnvidia-encode-550 \
     libnvidia-decode-550 \
     \
