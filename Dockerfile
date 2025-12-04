@@ -150,7 +150,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     \
     # Intel Arc / QSV runtime
-    intel-media-va-driver \
+    intel-media-va-driver-non-free \
     libvpl2 \
     libigdgmm12 \
     libva2 \
