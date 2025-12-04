@@ -51,10 +51,13 @@ func InitProcess(
 		mConc = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.MConcurrency))
 	}
 	metarrSem := make(chan struct{}, mConc)
+
+	// Create independent context for metarr to prevent premature cancellation.
+	metarrCtx, metarrCancel := context.WithCancel(context.Background())
+	defer metarrCancel()
+
 	var metarrWg sync.WaitGroup
 	defer metarrWg.Wait()
-
-	metarrCtx := ctx
 
 	// Bot detection context.
 	procCtx, procCancel := context.WithCancel(ctx)
