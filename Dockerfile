@@ -14,14 +14,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
+# Download deps
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy source
 COPY . .
 
+# Build Tubarr (CGO enabled)
 RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
     -o tubarr ./cmd/tubarr
 
+# Build Metarr
 RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
  && cd /build/metarr-src \
  && go mod download \
@@ -29,12 +33,13 @@ RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
       -o /build/metarr ./cmd/metarr
 
 # --- Runtime stage -----------------------------------------------------------
+
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
         aria2 \
         axel \
         ca-certificates \
@@ -45,32 +50,97 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         tzdata \
         wget \
         xz-utils \
+        git \
+        build-essential \
+        pkg-config \
+        yasm \
+        nasm \
         \
-        # VAAPI runtime libs (for Intel GPU acceleration)
-        intel-media-va-driver \
+        # Video encoders / decoders
+        libx264-dev \
+        libx265-dev \
+        libvpx-dev \
+        libsvtav1-dev \
+        libdav1d-dev \
+        libmp3lame-dev \
+        libopus-dev \
+        libvorbis-dev \
+        libflac-dev \
+        libfdk-aac-dev \
+        libass-dev \
+        \
+        # Intel QSV (modern – required)
+        libvpl-dev \
+        libva-dev \
         libva-drm2 \
-        libva2 \
+        libdrm-dev \
+        intel-media-va-driver \
+        \
+        # NVIDIA NVENC/NVDEC
+        libnvidia-encode-550 \
+        libnvidia-decode-550 \
+        \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install BtbN FFmpeg build
-# Using latest release - you can pin to a specific version if needed
-RUN wget -O ffmpeg.tar.xz \
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl-shared.tar.xz" \
- && tar -xf ffmpeg.tar.xz \
- && cd ffmpeg-master-latest-linux64-gpl-shared \
- && cp -r bin/* /usr/local/bin/ \
- && cp -r lib/* /usr/local/lib/ \
- && cp -r include/* /usr/local/include/ \
- && ldconfig \
- && cd .. \
- && rm -rf ffmpeg.tar.xz ffmpeg-master-latest-linux64-gpl-shared
+# NVIDIA NVENC/NVDEC headers
+RUN git clone https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
+    make -C /tmp/nv install && rm -rf /tmp/nv
 
-# yt-dlp
+# Dependencies needed to build SVT-AV1 from source
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake \
+    ninja-build \
+    yasm \
+    nasm \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build SVT-AV1 from source (required for FFmpeg)
+RUN git clone --depth 1 https://gitlab.com/AOMediaCodec/SVT-AV1.git /tmp/svtav1 && \
+    cd /tmp/svtav1 && \
+    mkdir build && cd build && \
+    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && \
+    ninja -j"$(nproc)" && ninja install && ldconfig && \
+    rm -rf /tmp/svtav1
+
+# Build FFmpeg from current master (required for VPL)
+RUN git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
+    cd /ffmpeg && \
+    PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/local/lib/pkgconfig" ./configure \
+        --prefix=/usr/local \
+        --enable-gpl \
+        --enable-nonfree \
+        --enable-shared \
+        --disable-debug \
+        \
+        --enable-libx264 \
+        --enable-libx265 \
+        --enable-libvpx \
+        --enable-libsvtav1 \
+        --enable-libdav1d \
+        \
+        --enable-libmp3lame \
+        --enable-libopus \
+        --enable-libvorbis \
+        --enable-libfdk-aac \
+        --enable-libass \
+        \
+        --enable-vaapi \
+        --enable-libdrm \
+        --enable-libvpl \
+        \
+        --enable-nvenc \
+        --enable-nvdec \
+    && make -j"$(nproc)" && make install && ldconfig && \
+    rm -rf /ffmpeg
+
+# yt-dlp download
 RUN wget -O /usr/local/bin/yt-dlp \
         https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \
     && chmod +x /usr/local/bin/yt-dlp
 
-# Copy binaries
+# Copy built binaries from the builder
 COPY --from=builder /build/tubarr /app/tubarr
 COPY --from=builder /build/metarr /usr/local/bin/metarr
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
@@ -79,12 +149,13 @@ RUN chmod +x /app/tubarr /usr/local/bin/metarr
 RUN printf '%s\n' \
 '#!/bin/sh' \
 'while true; do' \
-'  yt-dlp -U > /dev/null 2>&1 || true' \
+'  yt-dlp -U > /dev/null 2>&1' \
 '  sleep 86400' \
 'done &' \
 > /usr/local/bin/auto-updater \
  && chmod +x /usr/local/bin/auto-updater
 
+# App files
 WORKDIR /app
 COPY --from=builder /build/web /app/web
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -98,7 +169,6 @@ RUN userdel -r ubuntu 2>/dev/null || true \
 # Create necessary directories with proper ownership
 RUN mkdir -p /home/tubarr/.tubarr /downloads /metadata \
     && chown -R tubarr:tubarr /home/tubarr /downloads /metadata
-
 
 ENV PUID=1000 PGID=1000
 ENV HOME=/home/tubarr

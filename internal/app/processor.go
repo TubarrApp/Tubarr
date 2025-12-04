@@ -52,7 +52,8 @@ func InitProcess(
 	metarrSem := make(chan struct{}, mConc)
 
 	// Create context for Metarr derived from parent so shutdown propagates.
-	metarrCtx := context.WithoutCancel(ctx)
+	metarrCtx, metarrCancel := context.WithCancel(ctx)
+	defer metarrCancel()
 
 	var metarrWg sync.WaitGroup
 	defer metarrWg.Wait()
