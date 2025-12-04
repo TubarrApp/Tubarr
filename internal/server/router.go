@@ -29,7 +29,7 @@ type serverStore struct {
 	cancel context.CancelFunc
 }
 
-// tubarrPort
+// tubarrPort.
 const tubarrPort = "8827"
 
 // NewRouter returns a http Handler.
@@ -42,9 +42,13 @@ func NewRouter(ss serverStore) http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// --- Metarr Log ---
+	// POST endpoint for Metarr instances to send logs.
+	r.Post("/metarr-logs", ss.handlePostMetarrLogs)
+
 	// --- API Routes ---
 	r.Route("/api/v1", func(r chi.Router) {
-		// Channels API
+		// Channels API.
 		r.Route("/channels", func(r chi.Router) {
 			r.Get("/all", ss.handleListChannels)
 			r.Post("/add", ss.handleCreateChannel)
@@ -60,20 +64,25 @@ func NewRouter(ss serverStore) http.Handler {
 			r.Post("/{id}/crawl", ss.handleCrawlChannel)
 			r.Post("/{id}/ignore-crawl", ss.handleIgnoreCrawlChannel)
 			r.Post("/{id}/notification-seen", ss.handleNewVideoNotificationSeen)
+			r.Post("/{id}/toggle-pause", ss.handleTogglePauseChannel)
 		})
 
-		// Downloads API
+		// Downloads API.
 		r.Get("/downloads", ss.handleGetDownloads)
 
-		// Logs API
+		// Logs API.
 		r.Get("/logs", ss.handleGetTubarrLogs)
 		r.Get("/logs/metarr", ss.handleGetMetarrLogs)
 		r.Get("/logs/level", ss.handleGetLogLevel)
 		r.Post("/logs/level/{level}", ss.handleSetLogLevel)
+
+		// Blocked Domains API.
+		r.Get("/blocked-domains", ss.handleGetBlockedDomains)
+		r.Delete("/blocked-domains/{domain}", ss.handleUnblockDomain)
 	})
 
 	// --- Static Frontend ---
-	// Serve compiled web UI for all unmatched routes (after API routes)
+	// Serve compiled web UI for all unmatched routes (after API routes).
 	staticHandler := StaticHandler()
 	r.Handle("/*", staticHandler)
 
@@ -113,10 +122,10 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		serverErr <- nil
 	}()
 
-	// Start crawl watchdog in background (respects ctx cancellation)
+	// Start crawl watchdog in background (respects ctx cancellation).
 	go ss.startCrawlWatchdog(inputCtx, nil)
 
-	// Wait for interrupt signal
+	// Wait for interrupt signal.
 	select {
 	case <-inputCtx.Done():
 		logger.Pl.S("Shutting down server (context cancelled)...")
@@ -128,11 +137,11 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		}
 	}
 
-	// Create shutdown context with timeout
+	// Create shutdown context with timeout.
 	shutdownCtx, cancel := context.WithTimeout(inputCtx, 10*time.Second)
 	defer cancel()
 
-	// Attempt graceful shutdown
+	// Attempt graceful shutdown.
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("server forced to shutdown: %w", err)
 	}

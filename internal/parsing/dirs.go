@@ -27,8 +27,10 @@ type DirectoryParser struct {
 	Tagging TubarrOrMetarrTags
 }
 
+// TubarrOrMetarrTags determines the desired tag type.
 type TubarrOrMetarrTags int
 
+// TubarrOrMetarrTags enums.
 const (
 	TubarrTags TubarrOrMetarrTags = iota
 	AllTags
@@ -141,7 +143,7 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 	default:
 		if _, ok := sharedtemplates.MetarrTemplateTags[tag]; ok {
 			if _, err := exec.LookPath("metarr"); err != nil {
-				return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %v", tag, err)
+				return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %w", tag, err)
 			}
 			return "{{" + tag + "}}", nil
 		}

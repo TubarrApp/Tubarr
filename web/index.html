@@ -376,6 +376,36 @@
                 </li>
                 <!-- Menu Item Channels -->
 
+                <!-- Menu Item Blocked Domains -->
+                <li>
+                  <a
+                    href="blocked-domains.html"
+                    @click="selected = 'Blocked Domains'"
+                    class="menu-item group"
+                    :class="(selected === 'Blocked Domains') || (page === 'blockedDomains') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Blocked Domains') || (page === 'blockedDomains') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                      <line x1="5.63604" y1="5.63604" x2="18.364" y2="18.364" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Blocked Domains
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Blocked Domains -->
+
                 <!-- Menu Item Logs -->
                 <li>
                   <a
@@ -730,6 +760,21 @@
                             Edit Channel
                           </button>
                           <button
+                            @click="togglePauseChannel(channel.id, channel.settings?.paused); actionsMenuOpen = null"
+                            :disabled="togglingPause === channel.id"
+                            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <svg x-show="togglingPause !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path x-show="channel.settings?.paused" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              <path x-show="!channel.settings?.paused" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <svg x-show="togglingPause === channel.id" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span x-text="togglingPause === channel.id ? 'Toggling...' : (channel.settings?.paused ? 'Resume Channel' : 'Pause Channel')"></span>
+                          </button>
+                          <button
                             @click="deleteChannel(channel.id, channel.name); actionsMenuOpen = null"
                             class="delete-button-hover flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400"
                           >
@@ -880,6 +925,7 @@
           error: null,
           crawling: null,
           ignoring: null,
+          togglingPause: null,
           actionsMenuOpen: null,
 
           async loadChannels() {
@@ -1079,6 +1125,39 @@
               alert(`Failed to ignore uploads: ${err.message}`);
             } finally {
               this.ignoring = null;
+            }
+          },
+
+          async togglePauseChannel(channelId, currentPausedState) {
+            if (this.togglingPause) return;
+
+            this.togglingPause = channelId;
+
+            try {
+              const response = await fetch(`/api/v1/channels/${channelId}/toggle-pause`, {
+                method: 'POST'
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to toggle pause state');
+              }
+
+              const data = await response.json();
+
+              // Update the channel's paused state in the local data
+              const channel = this.channels.find(c => c.id === channelId);
+              if (channel) {
+                if (!channel.settings) {
+                  channel.settings = {};
+                }
+                channel.settings.paused = data.paused;
+              }
+
+              alert(data.message || 'Channel pause state updated successfully.');
+            } catch (err) {
+              alert(`Failed to toggle pause state: ${err.message}`);
+            } finally {
+              this.togglingPause = null;
             }
           }
         };

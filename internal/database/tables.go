@@ -10,12 +10,13 @@ import (
 var sqlFiles embed.FS
 
 const (
-	channelSQL      = "sql/channels.sql"
-	channelURLsSQL  = "sql/channel_urls.sql"
-	downloadSQL     = "sql/downloads.sql"
-	notificationSQL = "sql/notifications.sql"
-	programSQL      = "sql/program.sql"
-	videoSQL        = "sql/videos.sql"
+	blockedDomainsSQL = "sql/blocked_domains.sql"
+	channelSQL        = "sql/channels.sql"
+	channelURLsSQL    = "sql/channel_urls.sql"
+	downloadSQL       = "sql/downloads.sql"
+	notificationSQL   = "sql/notifications.sql"
+	programSQL        = "sql/program.sql"
+	videoSQL          = "sql/videos.sql"
 )
 
 // initProgramTable initializes the primary program database table.
@@ -46,6 +47,11 @@ func initVideosTable(tx *sql.Tx) error {
 // initDownloadsTable initializes the download status table for videos.
 func initDownloadsTable(tx *sql.Tx) error {
 	return executeSQLFile(tx, downloadSQL, "downloads table")
+}
+
+// initBlockedDomainsTable initializes the blocked domains table.
+func initBlockedDomainsTable(tx *sql.Tx) error {
+	return executeSQLFile(tx, blockedDomainsSQL, "blocked domains table")
 }
 
 // readSQLFile reads the SQL file stored in memory from go:embed.

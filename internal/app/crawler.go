@@ -5,11 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"tubarr/internal/blocking"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -117,16 +116,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		return err
 	}
 
-	// Check if site is blocked or should be unlocked.
-	unlocked := false
-	if c.IsBlocked() {
-		unlocked, err = cs.CheckOrUnlockChannel(c)
-		if err != nil {
-			logger.Pl.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
-			return nil
-		}
-		// Filter out matching hostnames later.
-	}
+	// Global domain blocking is checked per-URL below
 
 	// Load config file settings.
 	file.UpdateFromConfigFile(s.ChannelStore(), c)
@@ -177,20 +167,19 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			}
 		}
 
-		if !unlocked {
-			parsed, err := url.Parse(targetChannelURLModel.URL)
-			if err != nil {
-				logger.Pl.W("Unable to parse %q, skipping...", targetChannelURLModel.URL)
-				continue
-			}
-			hostname := parsed.Hostname()
-			if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil.
-				hostname = strings.ToLower(domain)
-			}
-
-			if slices.Contains(c.ChanSettings.BotBlockedHostnames, hostname) {
-				continue // Hostname is blocked, skipping...
-			}
+		// Check if this URL's domain is blocked globally for its authentication context.
+		parsed, err := url.Parse(targetChannelURLModel.URL)
+		if err != nil {
+			logger.Pl.W("Unable to parse %q, skipping...", targetChannelURLModel.URL)
+			continue
+		}
+		hostname := parsed.Hostname()
+		context := blocking.GetBlockContext(targetChannelURLModel)
+		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, context)
+		if isBlocked {
+			logger.Pl.W("Skipping video %q for channel %q. Domain is blocked for context %q (Blocked at: %v, Time remaining: %v)",
+				actualVideoURL, c.Name, context, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
+			continue
 		}
 
 		// Check if already downloaded.
@@ -287,27 +276,14 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	fmt.Println()
 	logger.Pl.I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
 
-	// Check if site is blocked or should be unlocked, and filter URLs if needed.
-	if c.IsBlocked() {
-		unlocked, err := cs.CheckOrUnlockChannel(c)
-		if err != nil {
-			logger.Pl.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
-			return nil
-		}
-
-		// If still blocked, filter out URLs from blocked hostname.
-		if !unlocked {
-			allowedURLModels, hasAllowed := filterBlockedURLs(c)
-
-			if !hasAllowed {
-				logger.Pl.D(1, "All URLs for channel %q are blocked by hostname(s) %v, skipping crawl", c.Name, c.ChanSettings.BotBlockedHostnames)
-				return nil
-			}
-
-			// Replace with filtered list.
-			c.URLModels = allowedURLModels
-		}
+	// Filter out any URLs that are blocked globally for their authentication context.
+	allowedURLModels, hasAllowed := filterBlockedURLs(c)
+	if !hasAllowed {
+		logger.Pl.D(1, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
+		return nil
 	}
+	// Replace with filtered list (may be same as original if nothing blocked).
+	c.URLModels = allowedURLModels
 
 	// Get new releases for channel.
 	scrape := scraper.New()
@@ -399,18 +375,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 	}
 	cs := s.ChannelStore()
 
-	// Check if site is blocked or should be unlocked.
-	if c.IsBlocked() {
-		unlocked, err := cs.CheckOrUnlockChannel(c)
-		if err != nil {
-			logger.Pl.E("Failed to unlock channel %q, skipping due to error: %v", c.Name, err)
-			return nil
-		}
-
-		if !unlocked {
-			return nil
-		}
-	}
+	// Global domain blocking is checked per-URL during scraping.
 
 	// Load in config file.
 	file.UpdateFromConfigFile(cs, c)
@@ -448,7 +413,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 // filterBlockedURLs filters out URLs blocked by the hostname of a given channel URL.
 func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
-	// Filter out manual URLs.
+	// Filter out manual URLs and globally blocked URLs.
 	allowedURLModels := make([]*models.ChannelURL, 0, len(c.URLModels))
 	for _, cu := range c.URLModels {
 		if cu.IsManual {
@@ -466,12 +431,16 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 			hostname = strings.ToLower(domain)
 		}
 
-		if slices.Contains(c.ChanSettings.BotBlockedHostnames, hostname) {
-			logger.Pl.D(1, "Skipping URL %q for channel %q. (Blocked by %q)", cu.URL, c.Name, hostname)
+		// Check if this URL is blocked globally for its authentication context.
+		context := blocking.GetBlockContext(cu)
+		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, context)
+		if isBlocked {
+			logger.Pl.W("Skipping URL %q for channel %q. Domain %q is blocked for context %q (Blocked at: %v, Time remaining: %v)",
+				cu.URL, c.Name, hostname, context, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
 			continue
 		}
 
-		// Hostname doesn't match the blocked site, safe to proceed.
+		// Hostname not blocked, safe to proceed.
 		allowedURLModels = append(allowedURLModels, cu)
 	}
 	return allowedURLModels, len(allowedURLModels) > 0
@@ -519,42 +488,33 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 	return manualChanURL, nil
 }
 
-// blockChannelBotDetected blocks a channel due to bot detection on the given URL.
-func blockChannelBotDetected(cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) error {
-	parsedCURL, err := url.Parse(cu.URL)
-	hostname := parsedCURL.Hostname()
+// blockChannelBotDetected blocks a domain globally due to bot detection on the given URL.
+// Uses context-aware blocking based on the channel URL's authentication method.
+// videoURL should be the actual video URL that triggered the bot detection (important for manual downloads).
+func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, videoURL string) error {
+	// For manual downloads, use the actual video URL to extract the hostname.
+	// Otherwise, use the channel URL.
+	urlToBlock := cu.URL
+	if cu.URL == consts.ManualDownloadsCol {
+		urlToBlock = videoURL
+	}
+
+	parsedURL, err := url.Parse(urlToBlock)
+	hostname := parsedURL.Hostname()
 	if err != nil {
-		logger.Pl.E("Could not parse %q, will use full domain", cu.URL)
-		hostname = cu.URL
+		logger.Pl.E("Could not parse %q, will use full domain", urlToBlock)
+		hostname = urlToBlock
 	}
 
-	// Extract the eTLD+1 (effective top-level domain + 1 label).
-	// e.g., m.google.com -> google.com, www.bbc.co.uk -> bbc.co.uk.
-	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil { // If err IS nil.
-		hostname = strings.ToLower(domain)
+	// Determine the block context based on authentication
+	context := blocking.GetBlockContext(cu)
+
+	// Block the domain globally for this context
+	db := cs.GetDB()
+	if err := blocking.BlockDomain(db, hostname, context); err != nil {
+		return fmt.Errorf("failed to block domain %q (context: %s): %w", hostname, context, err)
 	}
 
-	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
-		s.BotBlocked = true
-
-		// Add hostname if not already in the list.
-		if !slices.Contains(s.BotBlockedHostnames, hostname) {
-			s.BotBlockedHostnames = append(s.BotBlockedHostnames, hostname)
-		}
-
-		// Initialize map if nil.
-		if s.BotBlockedTimestamps == nil {
-			s.BotBlockedTimestamps = make(map[string]time.Time)
-		}
-		s.BotBlockedTimestamps[hostname] = time.Now()
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to block channel %q due to bot detection: %w", c.Name, err)
-	}
-
-	logger.Pl.W("Blocked channel %q due to bot detection on hostname %q", c.Name, hostname)
 	return nil
 }
 

@@ -20,13 +20,13 @@ import (
 // Returns true if the video passes all filters and JSON validity checks.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
 	logger.Pl.I("Validating and filtering JSON file %q...", v.JSONFilePath)
-	// Parse and store JSON
+	// Parse and store JSON.
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
 		logger.Pl.E("JSON parsing/storage failed for %q: %v", v.URL, err)
 	}
 
-	// Apply filters
+	// Apply filters.
 	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
 	if err != nil {
 		logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
@@ -35,7 +35,7 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
-	// Check move operations
+	// Check move operations.
 	v.MoveOpOutputDir = handleMoveOps(v, cu, dirParser)
 
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
@@ -66,7 +66,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	}
 	v.MetadataMap = m
 
-	// Titles
+	// Titles.
 	if v.Title == "" {
 		for _, key := range []string{"fulltitle", "title", "full_title"} {
 			if titleVal, exists := m[key]; exists {
@@ -88,7 +88,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 			if uploadDateVal, exists := m[key]; exists {
 				if uploadDate, ok := uploadDateVal.(string); ok {
 					if strings.Contains(uploadDate, "-") {
-						if t, err := time.Parse("2006-01-02", uploadDate); err == nil { // If error IS nil
+						if t, err := time.Parse("2006-01-02", uploadDate); err == nil { // If err IS nil.
 							v.UploadDate = t
 							if v.UploadDate.IsZero() {
 								logger.Pl.E("Failed to parse upload date %q: %v", uploadDate, err)
@@ -96,7 +96,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 							break
 						}
 					} else if !strings.Contains(uploadDate, "-") {
-						if t, err := time.Parse("20060102", uploadDate); err == nil { // If error IS nil
+						if t, err := time.Parse("20060102", uploadDate); err == nil { // If err IS nil.
 							v.UploadDate = t
 							if v.UploadDate.IsZero() {
 								logger.Pl.E("Failed to parse upload date %q: %v", uploadDate, err)
@@ -109,7 +109,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 		}
 	}
 
-	// Description
+	// Description.
 	if v.Description == "" {
 		for _, key := range []string{"description", "longdescription", "long_description", "summary", "synopsis"} {
 			if descriptionVal, exists := m[key]; exists {
@@ -122,15 +122,15 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 		}
 	}
 
-	// Thumbnails
+	// Thumbnails.
 	if v.ThumbnailURL == "" {
-		// Check directly
+		// Check directly.
 		if thumbnailVal, exists := m[sharedtags.JThumbnailURL]; exists {
 			if thumbnail, ok := thumbnailVal.(string); ok {
 				v.ThumbnailURL = thumbnail
 			}
 		}
-		// Still empty, check arrays
+		// Still empty, check arrays.
 		if v.ThumbnailURL == "" {
 			if thumbsVal, exists := m["thumbnails"]; exists {
 				if thumbs, ok := thumbsVal.([]any); ok {
@@ -142,14 +142,14 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 							if urlStr == "" {
 								continue
 							}
-							// Highest-resolution or best preference
+							// Highest-resolution or best preference.
 							if pref, ok := thumbMap["preference"].(float64); ok {
 								if int(pref) > maxPref {
 									maxPref = int(pref)
 									best = urlStr
 								}
 							} else if best == "" {
-								// fallback if preference missing
+								// fallback if preference missing.
 								best = urlStr
 							}
 						}
@@ -169,31 +169,31 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 
 // handleFilters uses user input filters to check if the video should be downloaded.
 func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	// Check filtered meta ops
+	// Check filtered meta ops.
 	filteredMetaOps := make([]models.FilteredMetaOps, len(cu.ChanURLMetarrArgs.FilteredMetaOps))
 	copy(filteredMetaOps, cu.ChanURLMetarrArgs.FilteredMetaOps)
 
-	filteredMetaOpsFileFilters := loadFilteredMetaOpsFromFile(v, cu, dirParser)
+	filteredMetaOpsFileFilters := loadFilteredMetaOpsFromFile(cu, dirParser)
 	filteredMetaOps = append(filteredMetaOps, filteredMetaOpsFileFilters...)
 
 	relevantFilteredMetaOps := getRelevantFilteredMetaOps(filteredMetaOps, cu.URL)
 	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, relevantFilteredMetaOps, c.Name)
 
-	// Check filtered filename ops
+	// Check filtered filename ops.
 	filteredFilenameOps := make([]models.FilteredFilenameOps, len(cu.ChanURLMetarrArgs.FilteredFilenameOps))
 	copy(filteredFilenameOps, cu.ChanURLMetarrArgs.FilteredFilenameOps)
 
-	filteredFilenameOpsFileFilters := loadFilteredFilenameOpsFromFile(v, cu, dirParser)
+	filteredFilenameOpsFileFilters := loadFilteredFilenameOpsFromFile(cu, dirParser)
 	filteredFilenameOps = append(filteredFilenameOps, filteredFilenameOpsFileFilters...)
 
 	relevantFilteredFilenameOps := getRelevantFilteredFilenameOps(filteredFilenameOps, cu.URL)
 	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
 
-	// Check download filters
+	// Check download filters.
 	allFilters := make([]models.Filters, len(cu.ChanURLSettings.Filters))
 	copy(allFilters, cu.ChanURLSettings.Filters)
 
-	fileFilters := loadFilterOpsFromFile(v, cu, dirParser)
+	fileFilters := loadFilterOpsFromFile(cu, dirParser)
 	allFilters = append(allFilters, fileFilters...)
 
 	relevantFilters := getRelevantFilters(allFilters, cu.URL)
@@ -202,7 +202,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
-	// Check upload date filter
+	// Check upload date filter.
 	passUploadDate, err := uploadDateFilter(v, cu, c.Name)
 	if err != nil {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, err
@@ -220,7 +220,7 @@ func getRelevantFilters(filters []models.Filters, currentURL string) []models.Fi
 	relevant := make([]models.Filters, 0, len(filters))
 
 	for _, filter := range filters {
-		// Include if no specific URL specified, or if it matches current URL
+		// Include if no specific URL specified, or if it matches current URL.
 		if filter.ChannelURL == "" ||
 			strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
 			relevant = append(relevant, filter)
@@ -241,7 +241,7 @@ func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, curren
 		relevantFilters := make([]models.Filters, 0, len(fmo.Filters))
 
 		for _, filter := range fmo.Filters {
-			// Include if no specific URL specified, or if it matches current URL
+			// Include if no specific URL specified, or if it matches current URL.
 			if filter.ChannelURL == "" ||
 				strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
 				relevantFilters = append(relevantFilters, filter)
@@ -264,7 +264,7 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 	for _, ffo := range filteredFilenameOps {
 		relevantFilters := make([]models.Filters, 0, len(ffo.Filters))
 		for _, filter := range ffo.Filters {
-			// Include if no specific URL specified, or if it matches current URL
+			// Include if no specific URL specified, or if it matches current URL.
 			if filter.ChannelURL == "" ||
 				strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
 				relevantFilters = append(relevantFilters, filter)
@@ -281,21 +281,21 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 
 // handleMoveOps checks if Metarr should use an output directory based on existent metadata.
 func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
-	// Work with a copy of database move ops
+	// Work with a copy of database move ops.
 	allMoveOps := make([]models.MetaFilterMoveOps, len(cu.ChanURLSettings.MetaFilterMoveOps))
 	copy(allMoveOps, cu.ChanURLSettings.MetaFilterMoveOps)
 
-	// Add file-based move ops (ephemeral - re-read each time)
-	fileMoveOps := loadMoveOpsFromFile(v, cu, dirParser)
+	// Add file-based move ops.
+	fileMoveOps := loadMoveOpsFromFile(cu, dirParser)
 	allMoveOps = append(allMoveOps, fileMoveOps...)
 
-	// Filter to relevant ones for this URL (non-mutating)
+	// Filter to relevant ones for this URL.
 	relevantMoveOps := getRelevantMoveOps(allMoveOps, cu.URL)
 
-	// Check each move operation against video metadata
+	// Check each move operation against video metadata.
 	for _, op := range relevantMoveOps {
 		if raw, exists := v.MetadataMap[op.Field]; exists {
-			// Convert any type to string
+			// Convert any type to string.
 			val := fmt.Sprint(raw)
 
 			if strings.Contains(strings.ToLower(val), strings.ToLower(op.ContainsValue)) {
@@ -314,7 +314,7 @@ func getRelevantMoveOps(moveOps []models.MetaFilterMoveOps, currentURL string) [
 	relevant := make([]models.MetaFilterMoveOps, 0, len(moveOps))
 
 	for _, op := range moveOps {
-		// Include if no specific URL specified, or if it matches current URL
+		// Include if no specific URL specified, or if it matches current URL.
 		if op.ChannelURL == "" ||
 			strings.EqualFold(strings.TrimSpace(op.ChannelURL), strings.TrimSpace(currentURL)) {
 			relevant = append(relevant, op)

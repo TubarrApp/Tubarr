@@ -9,6 +9,7 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/sharedtemplates"
@@ -149,6 +150,11 @@ func LoadMetarrLogs() [][]byte {
 		copy(line, raw)
 		line[len(raw)] = '\n'
 		lines = append(lines, line)
+	}
+
+	// Enforce log limit - keep only the most recent MaxMetarrLogs entries.
+	if len(lines) > vars.MaxMetarrLogs {
+		lines = lines[len(lines)-vars.MaxMetarrLogs:]
 	}
 
 	return lines

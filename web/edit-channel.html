@@ -252,6 +252,36 @@
                 </li>
                 <!-- Menu Item Channels -->
 
+                <!-- Menu Item Blocked Domains -->
+                <li>
+                  <a
+                    href="blocked-domains.html"
+                    @click="selected = 'Blocked Domains'"
+                    class="menu-item group"
+                    :class="(selected === 'Blocked Domains') || (page === 'blockedDomains') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Blocked Domains') || (page === 'blockedDomains') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                      <line x1="5.63604" y1="5.63604" x2="18.364" y2="18.364" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Blocked Domains
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Blocked Domains -->
+
                 <!-- Menu Item Logs -->
                 <li>
                   <a
@@ -754,9 +784,8 @@
                               <select x-model="urlEntry.custom.metarr_gpu" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use global</option>
                                 <option value="auto">Auto</option>
-                                <option value="cuda">Nvidia</option>
-                                <option value="amd">AMD</option>
-                                <option value="qsv">Intel</option>
+                                <option value="cuda">Nvidia (Cuda)</option>
+                                <option value="qsv">Intel (QSV)</option>
                                 <option value="vaapi">VAAPI</option>
                               </select>
                             </div>
@@ -1228,8 +1257,8 @@
                         >
                           <option value="">None</option>
                           <option value="auto">Auto</option>
-                          <option value="cuda">Nvidia</option>
-                          <option value="qsv">Intel</option>
+                          <option value="cuda">Nvidia (Cuda)</option>
+                          <option value="qsv">Intel (QSV)</option>
                           <option value="vaapi">VAAPI</option>
                         </select>
                       </div>

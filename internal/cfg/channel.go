@@ -7,15 +7,16 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 	"tubarr/internal/app"
 	"tubarr/internal/auth"
+	"tubarr/internal/blocking"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -623,53 +624,73 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	return unPauseCmd
 }
 
-// unblockChannelCmd unblocks channels which were locked (usually due to bot activity detection).
+// unblockChannelCmd unblocks domains which were locked (usually due to bot activity detection).
 func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		// Channel identifiers.
-		id   int
-		name string
+		domain  string
+		context string
+		all     bool
 	)
 
 	unblockCmd := &cobra.Command{
 		Use:   "unblock",
-		Short: "Unblock a channel.",
-		Long:  "Unblocks a channel (usually blocked due to sites detecting Tubarr as a bot), allowing it to download new videos.",
+		Short: "Unblock a domain globally.",
+		Long:  "Unblocks a domain globally (usually blocked due to sites detecting Tubarr as a bot), allowing channels to access it again.",
+		Example: `  # Unblock a domain for all authentication contexts
+  tubarr unblock --domain "youtube.com"
+
+  # Unblock a domain for a specific authentication context
+  tubarr unblock --domain "youtube.com" --context "auth"
+
+  # Unblock all domains
+  tubarr unblock --all`,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			// Get and check key/val pair.
-			key, val, err := getChanKeyVal(id, name)
-			if err != nil {
-				return err
-			}
+			db := cs.GetDB()
 
-			// Get channel model.
-			c, hasRows, err := cs.GetChannelModel(key, val, true)
-			if !hasRows {
-				return fmt.Errorf("channel model does not exist in database for channel with key %q and value %q", key, val)
-			}
-			if err != nil {
-				return err
-			}
+			if all {
+				// Unblock all domains for all contexts.
+				allBlocked := blocking.GetAllBlockedDomains()
+				if len(allBlocked) == 0 {
+					logger.Pl.I("No blocked domains found")
+					return nil
+				}
 
-			// Send update.
-			_, err = cs.UpdateChannelSettingsJSON(key, val, func(s *models.Settings) error {
-				s.BotBlocked = false
-				s.BotBlockedHostnames = nil
-				s.BotBlockedTimestamps = make(map[string]time.Time)
+				for d := range allBlocked {
+					if err := blocking.UnblockDomain(db, d, ""); err != nil {
+						return fmt.Errorf("failed to unblock domain %q: %w", d, err)
+					}
+				}
+				logger.Pl.S("Unblocked all domains")
 				return nil
-			})
-			if err != nil {
-				return fmt.Errorf("failed to unblock channel: %w", err)
 			}
 
-			// Success.
-			logger.Pl.S("Unblocked channel %q", c.Name)
+			if domain == "" {
+				return fmt.Errorf("either --domain or --all must be specified")
+			}
+
+			// Determine context.
+			var ctx vars.BlockContext
+			if context != "" {
+				ctx = vars.BlockContext(context)
+				// Validate context.
+				if ctx != vars.BlockContextUnauth && ctx != vars.BlockContextCookie && ctx != vars.BlockContextAuth {
+					return fmt.Errorf("invalid context %q (must be one of: unauth, cookie, auth)", context)
+				}
+			}
+
+			// Unblock the domain.
+			if err := blocking.UnblockDomain(db, domain, ctx); err != nil {
+				return fmt.Errorf("failed to unblock domain: %w", err)
+			}
+
 			return nil
 		},
 	}
 
-	// Primary channel elements.
-	cmd.SetPrimaryChannelFlags(unblockCmd, &name, nil, &id)
+	// Flags.
+	unblockCmd.Flags().StringVar(&domain, "domain", "", "Domain to unblock (e.g. youtube.com)")
+	unblockCmd.Flags().StringVar(&context, "context", "", "Authentication context to unblock (unauth/cookie/auth). If not specified, unblocks all contexts for the domain.")
+	unblockCmd.Flags().BoolVar(&all, "all", false, "Unblock all domains")
 
 	return unblockCmd
 }

@@ -30,13 +30,6 @@ func (c *Channel) GetCrawlFreq() int {
 	return c.ChanSettings.CrawlFreq
 }
 
-// IsBlocked checks if a channel is currently blocked.
-//
-// Safely returns BotBlocked state.
-func (c *Channel) IsBlocked() bool {
-	return c.ChanSettings != nil && c.ChanSettings.BotBlocked
-}
-
 // ShouldCrawl determines if a channel should be included in the default crawl or not.
 //
 // Returns true if ChanSettings 'Paused' is true OR the time since last scan exceeds the crawl frequency.

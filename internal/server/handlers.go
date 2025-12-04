@@ -12,6 +12,7 @@ import (
 	"time"
 	"tubarr/internal/app"
 	"tubarr/internal/auth"
+	"tubarr/internal/blocking"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
@@ -945,7 +946,7 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 }
 
 // handleGetDownloads retrieves active downloads for all channels.
-func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request) {
+func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, _ *http.Request) {
 	channels, found, err := ss.cs.GetAllChannels(false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -1194,27 +1195,140 @@ func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, _ *http.Reques
 		vars.MetarrFinished = false
 	}
 
-	// Print file logs first (only once per Tubarr startup).
+	// Print logs from memory with read lock.
+	vars.MetarrLogsMutex.RLock()
+	defer vars.MetarrLogsMutex.RUnlock()
+
 	for _, line := range vars.MetarrLogs {
 		if _, err := w.Write(line); err != nil {
 			logger.Pl.E("Failed to write Metarr log line %q: %v", line, err)
 		}
 	}
+}
 
-	// Try to append live RAM logs if Metarr is running.
-	resp, err := http.Get("http://127.0.0.1:6387/logs")
-	if err == nil { // if err IS nil
-		if resp != nil {
-			defer func() {
-				if err := resp.Body.Close(); err != nil {
-					logger.Pl.E("Failed to close response body for Metarr log fetch: %v", err)
-				}
-			}()
+// handlePostMetarrLogs receives log entries from Metarr instances via POST.
+func (ss *serverStore) handlePostMetarrLogs(w http.ResponseWriter, r *http.Request) {
+	// Read the log body from the request.
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Pl.E("Failed to read Metarr log body: %v", err)
+		http.Error(w, "failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		if closeErr := r.Body.Close(); closeErr != nil {
+			logger.Pl.E("Could not close response body: %v", closeErr)
+		}
+	}()
 
-			if _, err := io.Copy(w, resp.Body); err != nil {
-				logger.Pl.E("Failed to close response body for Metarr log fetch: %v", err)
+	if len(body) == 0 {
+		// No logs to add, return success.
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Split body into lines (each log entry should end with a newline).
+	lines := strings.Split(string(body), "\n")
+
+	// Lock and append non-empty lines to the global log store.
+	vars.MetarrLogsMutex.Lock()
+	defer vars.MetarrLogsMutex.Unlock()
+
+	for _, line := range lines {
+		if len(line) > 0 {
+			// Append newline back since Split removes it.
+			vars.MetarrLogs = append(vars.MetarrLogs, []byte(line+"\n"))
+		}
+	}
+
+	// Enforce log limit by trimming oldest entries if exceeded.
+	if len(vars.MetarrLogs) > vars.MaxMetarrLogs {
+		// Keep only the most recent MaxMetarrLogs entries.
+		excess := len(vars.MetarrLogs) - vars.MaxMetarrLogs
+		vars.MetarrLogs = vars.MetarrLogs[excess:]
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleGetBlockedDomains returns all currently blocked domains with their contexts and timestamps.
+func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, _ *http.Request) {
+	// Clean expired blocks first.
+	if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
+		logger.Pl.W("Failed to clean expired blocks: %v", err)
+	}
+
+	allBlocked := blocking.GetAllBlockedDomains()
+
+	// Build response structure.
+	type BlockedDomainResponse struct {
+		Domain        string                          `json:"domain"`
+		Contexts      map[vars.BlockContext]time.Time `json:"contexts"`
+		TimeRemaining map[vars.BlockContext]string    `json:"time_remaining"`
+	}
+
+	response := make([]BlockedDomainResponse, 0, len(allBlocked))
+	for domain, contexts := range allBlocked {
+		activeContexts := make(map[vars.BlockContext]time.Time)
+		timeRemaining := make(map[vars.BlockContext]string)
+
+		// Only include non-expired contexts.
+		for context, blockedAt := range contexts {
+			isBlocked, _, remaining := blocking.IsBlocked(domain, context)
+			if isBlocked {
+				activeContexts[context] = blockedAt
+				timeRemaining[context] = remaining.Round(time.Second).String()
 			}
 		}
+
+		// Skip domains with no active blocks.
+		if len(activeContexts) == 0 {
+			continue
+		}
+
+		response = append(response, BlockedDomainResponse{
+			Domain:        domain,
+			Contexts:      activeContexts,
+			TimeRemaining: timeRemaining,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Pl.E("Failed to encode blocked domains: %v", err)
+	}
+}
+
+// handleUnblockDomain unblocks a domain for all contexts or a specific context.
+// Context can be specified via query parameter: ?context=unauth|cookie|auth
+func (ss *serverStore) handleUnblockDomain(w http.ResponseWriter, r *http.Request) {
+	domain := chi.URLParam(r, "domain")
+	contextParam := r.URL.Query().Get("context")
+
+	if domain == "" {
+		http.Error(w, "domain parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	var ctx vars.BlockContext
+	if contextParam != "" {
+		ctx = vars.BlockContext(contextParam)
+		// Validate context.
+		if ctx != vars.BlockContextUnauth && ctx != vars.BlockContextCookie && ctx != vars.BlockContextAuth {
+			http.Error(w, fmt.Sprintf("invalid context %q (must be one of: unauth, cookie, auth)", contextParam), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Unblock the domain.
+	if err := blocking.UnblockDomain(ss.db, domain, ctx); err != nil {
+		http.Error(w, fmt.Sprintf("failed to unblock domain: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write([]byte(`{"message": "Domain unblocked successfully"}`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
 	}
 }
 
@@ -1241,5 +1355,40 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
 		return
+	}
+}
+
+// handleTogglePauseChannel toggles the pause state of a channel.
+func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+
+	// Track the new pause state (set inside the update function).
+	var newPauseState bool
+
+	// Update channel settings with toggled pause state.
+	_, err := ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+		// Toggle the current pause state.
+		newPauseState = !s.Paused
+		s.Paused = newPauseState
+		return nil
+	})
+	if err != nil {
+		logger.Pl.E("Failed to update channel pause state: %v", err)
+		http.Error(w, fmt.Sprintf("failed to update channel pause state: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Return success with new state.
+	var action string
+	if newPauseState {
+		action = "paused"
+	} else {
+		action = "resumed"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if _, err := fmt.Fprintf(w, `{"message": "Channel %s successfully.", "paused": %t}`, action, newPauseState); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
 	}
 }

@@ -54,7 +54,6 @@ type ChannelStore interface {
 	GetNewVideoURLs(key, val string) ([]string, error)
 
 	// Other channel database functions.
-	CheckOrUnlockChannel(c *models.Channel) (bool, error)
 	DisplaySettings(c *models.Channel)
 }
 

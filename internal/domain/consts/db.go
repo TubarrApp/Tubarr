@@ -2,12 +2,13 @@ package consts
 
 // Database table names.
 const (
-	DBProgram       = "program"
-	DBChannels      = "channels"
-	DBChannelURLs   = "channel_urls"
-	DBVideos        = "videos"
-	DBDownloads     = "downloads"
-	DBNotifications = "notifications"
+	DBProgram        = "program"
+	DBChannels       = "channels"
+	DBChannelURLs    = "channel_urls"
+	DBVideos         = "videos"
+	DBDownloads      = "downloads"
+	DBNotifications  = "notifications"
+	DBBlockedDomains = "blocked_domains"
 )
 
 // Program database entry keys.
@@ -168,6 +169,20 @@ var ValidNotificationKeys = map[string]struct{}{
 	QNotifyChanURL:   {},
 	QNotifyCreatedAt: {},
 	QNotifyUpdatedAt: {},
+}
+
+// Blocked domains database entry keys.
+const (
+	QBlockedDomain  = "domain"
+	QBlockedContext = "context"
+	QBlockedAt      = "blocked_at"
+)
+
+// ValidBlockedDomainKeys holds valid keys for the blocked domains database.
+var ValidBlockedDomainKeys = map[string]struct{}{
+	QBlockedDomain:  {},
+	QBlockedContext: {},
+	QBlockedAt:      {},
 }
 
 // Misc

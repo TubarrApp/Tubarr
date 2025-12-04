@@ -127,7 +127,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 }
 
 // ScrapeCustomSite scrapes custom sites for metadata.
-func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video, c *models.Channel) error {
+func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) error {
 	// Initialize collector with cookies.
 	collector, err := initializeCollector(urlStr, s.cookieManager)
 	if err != nil {
@@ -168,7 +168,7 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video, c 
 
 	// Write metadata to file.
 	filename := fmt.Sprintf("%s.json", sanitizeFilename(v.Title))
-	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v, c); err != nil {
+	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v); err != nil {
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}
 
@@ -440,7 +440,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 	}
 
 	// After scraping completes, populate the Video struct
-	collector.OnScraped(func(r *colly.Response) {
+	collector.OnScraped(func(_ *colly.Response) {
 		if title != "" {
 			v.Title = title
 			metadata[sharedtags.JTitle] = title

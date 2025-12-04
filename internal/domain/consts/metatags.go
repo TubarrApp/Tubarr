@@ -2,17 +2,20 @@ package consts
 
 import "github.com/TubarrApp/gocommon/sharedtags"
 
+// HTMLMetadataRule defines the metadata scraping elements.
 type HTMLMetadataRule struct {
 	Name     string
 	Selector string
 	Attr     string
 }
 
+// HTMLMetadataQuery holds the site name and metadata rules.
 type HTMLMetadataQuery struct {
 	Site  string
 	Rules []HTMLMetadataRule
 }
 
+// HTMLBitchute holds scraping elements for bitchute.com.
 var HTMLBitchute = HTMLMetadataQuery{
 	Site: "bitchute.com",
 	Rules: []HTMLMetadataRule{
@@ -23,6 +26,7 @@ var HTMLBitchute = HTMLMetadataQuery{
 	},
 }
 
+// HTMLCensored holds scraping elements for censored.tv.
 var HTMLCensored = HTMLMetadataQuery{
 	Site: "censored.tv",
 	Rules: []HTMLMetadataRule{
@@ -34,6 +38,7 @@ var HTMLCensored = HTMLMetadataQuery{
 	},
 }
 
+// HTMLOdysee holds scraping elements for odysee.com.
 var HTMLOdysee = HTMLMetadataQuery{
 	Site: "odysee.com",
 	Rules: []HTMLMetadataRule{
@@ -44,6 +49,7 @@ var HTMLOdysee = HTMLMetadataQuery{
 	},
 }
 
+// HTMLRumble holds scraping elements for rumble.com.
 var HTMLRumble = HTMLMetadataQuery{
 	Site: "rumble.com",
 	Rules: []HTMLMetadataRule{

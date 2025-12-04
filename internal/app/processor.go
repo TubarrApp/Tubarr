@@ -145,7 +145,7 @@ func InitProcess(
 		video.VideoDir = cu.ChanURLSettings.VideoDir
 
 		// Use custom scraper if needed.
-		if video.JSONFilePath, err = executeCustomScraper(scrape, video, c); err != nil {
+		if video.JSONFilePath, err = executeCustomScraper(scrape, video); err != nil {
 			logger.Pl.E("Custom scraper failed for %q: %v", video.URL, err)
 			errs = append(errs, err)
 			continue
@@ -193,13 +193,15 @@ func InitProcess(
 }
 
 // executeCustomScraper checks if a custom scraper should be used for this release.
-func executeCustomScraper(s *scraper.Scraper, v *models.Video, c *models.Channel) (customJSON string, err error) {
+func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON string, err error) {
 	if v == nil || s == nil {
 		return "", fmt.Errorf("invalid nil parameter (video: %v, scraper: %v)", v == nil, s == nil)
 	}
 
 	// Detect custom site.
-	s.ScrapeCustomSite(v.URL, v.JSONDir, v, c)
+	if err := s.ScrapeCustomSite(v.URL, v.JSONDir, v); err != nil {
+		return "", err
+	}
 
 	return v.JSONCustomFile, nil
 }
@@ -227,7 +229,7 @@ func videoJob(
 	// Process JSON metadata phase.
 	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
 	if err != nil {
-		handleBotBlock(cs, c, cu, botBlockChannel)
+		handleBotBlock(cs, cu, v.URL, botBlockChannel)
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
 	}
 	if !proceed {
@@ -238,7 +240,7 @@ func videoJob(
 	// Process video download phase.
 	botBlockChannel, err = processVideo(procCtx, v, cu, c, dlTracker)
 	if err != nil {
-		handleBotBlock(cs, c, cu, botBlockChannel)
+		handleBotBlock(cs, cu, v.URL, botBlockChannel)
 		return fmt.Errorf("video processing error for video URL %q: %w", v.URL, err)
 	}
 
@@ -429,11 +431,12 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 }
 
 // handleBotBlock handles cases where the program has been detected as a bot.
-func handleBotBlock(cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL, botBlock bool) {
+// videoURL should be the actual video URL that triggered the bot detection (important for manual downloads).
+func handleBotBlock(cs contracts.ChannelStore, cu *models.ChannelURL, videoURL string, botBlock bool) {
 	if !botBlock {
 		return
 	}
-	if err := blockChannelBotDetected(cs, c, cu); err != nil {
+	if err := blockChannelBotDetected(cs, cu, videoURL); err != nil {
 		logger.Pl.E("Failed to block channel: %v", err)
 	}
 }

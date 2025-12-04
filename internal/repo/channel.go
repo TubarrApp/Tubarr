@@ -81,7 +81,10 @@ func (cs *ChannelStore) GetNewVideoURLs(key, val string) ([]string, error) {
 	}
 
 	var urls []string
-	json.Unmarshal(raw, &urls)
+	if err := json.Unmarshal(raw, &urls); err != nil {
+		logger.Pl.E("Could not unmarshal JSON: %v", err)
+	}
+
 	return urls, nil
 }
 
@@ -821,109 +824,6 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 	}
 
 	return nil
-}
-
-// CheckOrUnlockChannel checks if a blocked channel has exceeded its timeout and unlocks it.
-//
-// Returns true if the channel was unlocked, false if still blocked.
-func (cs *ChannelStore) CheckOrUnlockChannel(c *models.Channel) (bool, error) {
-	if !c.IsBlocked() {
-		return true, nil // Not blocked, consider it "unlocked".
-	}
-	logger.Pl.W("Channel %q is currently blocked by %v", c.Name, c.ChanSettings.BotBlockedHostnames)
-	if len(c.ChanSettings.BotBlockedHostnames) == 0 {
-		return false, nil // Invalid state, keep blocked.
-	}
-
-	// Initialize timestamps map if nil.
-	if c.ChanSettings.BotBlockedTimestamps == nil {
-		c.ChanSettings.BotBlockedTimestamps = make(map[string]time.Time)
-	}
-
-	// Check each blocked hostname to see if any have exceeded timeout.
-	stillBlockedHostnames := make([]string, 0, len(c.ChanSettings.BotBlockedHostnames))
-	anyUnlocked := false
-
-	// Iterate over blocked hostnames.
-	for _, hostname := range c.ChanSettings.BotBlockedHostnames {
-
-		// Determine timeout for this hostname.
-		var timeoutMinutes float64
-		var exists bool
-		for k, v := range consts.BotTimeoutMap {
-			if strings.Contains(hostname, k) {
-				timeoutMinutes = v
-				exists = true
-				break
-			}
-		}
-
-		// If no specific timeout found, use default from settings.
-		if !exists {
-			timeoutMinutes = 720.0
-		}
-
-		// Get the timestamp for this specific hostname.
-		blockedTime, timestampExists := c.ChanSettings.BotBlockedTimestamps[hostname]
-
-		// Check if timeout has expired or if timestamp is missing/zero.
-		minutesSinceBlock := time.Since(blockedTime).Minutes()
-		if minutesSinceBlock >= timeoutMinutes || (!timestampExists || blockedTime.IsZero()) {
-			// This hostname's timeout has expired.
-			logger.Pl.S("Unlocking hostname %q for channel %d (%s) after timeout", hostname, c.ID, c.Name)
-			anyUnlocked = true
-			delete(c.ChanSettings.BotBlockedTimestamps, hostname)
-		} else {
-			// Still blocked.
-			stillBlockedHostnames = append(stillBlockedHostnames, hostname)
-
-			// Print time remaining until unlock.
-			blockedAt := c.ChanSettings.BotBlockedTimestamps[hostname]
-			timeout := time.Duration(timeoutMinutes) * time.Minute
-			unlockTime := blockedAt.Add(timeout)
-			remainingDuration := time.Until(unlockTime)
-
-			logger.Pl.W("%v remaining before channel unlocks for domain %q (Blocked on: %v)",
-				remainingDuration.Round(time.Second),
-				hostname,
-				blockedAt.Local().Format("Mon, Jan 2 2006, 15:04:05 MST"))
-		}
-	}
-
-	// Update the channel settings.
-	if anyUnlocked {
-
-		// Update in-memory copy.
-		c.ChanSettings.BotBlockedHostnames = stillBlockedHostnames
-
-		// If no hostnames remain blocked, clear the blocked state entirely.
-		if len(stillBlockedHostnames) == 0 {
-			c.ChanSettings.BotBlocked = false
-			c.ChanSettings.BotBlockedTimestamps = make(map[string]time.Time)
-		}
-
-		// Persist changes to database.
-		_, err := cs.UpdateChannelSettingsJSON(consts.QChanID, strconv.FormatInt(c.ID, 10), func(s *models.Settings) error {
-			s.BotBlocked = c.ChanSettings.BotBlocked
-			s.BotBlockedHostnames = c.ChanSettings.BotBlockedHostnames
-			s.BotBlockedTimestamps = c.ChanSettings.BotBlockedTimestamps
-			return nil
-		})
-		if err != nil {
-			return false, fmt.Errorf("failed to unlock channel: %w", err)
-		}
-	}
-
-	// Return true only if ALL hostnames are now unlocked.
-	if len(stillBlockedHostnames) == 0 {
-		logger.Pl.S("Channel %d (%s) fully unlocked - all hostnames cleared", c.ID, c.Name)
-		return true, nil
-	}
-
-	// Still some blocked hostnames remaining.
-	logger.Pl.W("Unlock channel %q manually for hostnames %v with:\n\ntubarr channel unblock -n %q\n",
-		c.Name, stillBlockedHostnames, c.Name)
-	return false, nil
 }
 
 // GetChannelModel fills the channel model from the database.

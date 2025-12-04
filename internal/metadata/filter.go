@@ -269,7 +269,7 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 }
 
 // loadFilterOpsFromFile loads filter operations from a file (one per line).
-func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.Filters {
+func loadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.Filters {
 	var err error
 
 	if cu.ChanURLSettings.FilterFile == "" {
@@ -313,7 +313,7 @@ func loadFilterOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.D
 }
 
 // loadFilteredMetaOpsFromFile loads filter operations from a file (one per line).
-func loadFilteredMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredMetaOps {
+func loadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredMetaOps {
 	var err error
 
 	if cu.ChanURLMetarrArgs.FilteredMetaOpsFile == "" {
@@ -357,7 +357,7 @@ func loadFilteredMetaOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *par
 }
 
 // loadFilteredFilenameOpsFromFile loads filtered filename operations from a file (one per line).
-func loadFilteredFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredFilenameOps {
+func loadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredFilenameOps {
 	var err error
 
 	if cu.ChanURLMetarrArgs.FilteredFilenameOpsFile == "" {
@@ -401,7 +401,7 @@ func loadFilteredFilenameOpsFromFile(v *models.Video, cu *models.ChannelURL, dp 
 }
 
 // loadMoveOpsFromFile loads move operations from a file (one per line).
-func loadMoveOpsFromFile(v *models.Video, cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaFilterMoveOps {
+func loadMoveOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaFilterMoveOps {
 	var err error
 
 	if cu.ChanURLSettings.MetaFilterMoveOpFile == "" {

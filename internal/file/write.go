@@ -10,7 +10,7 @@ import (
 )
 
 // WriteMetadataJSONFile writes the custom metadata file.
-func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, v *models.Video, c *models.Channel) error {
+func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, v *models.Video) error {
 	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
 
 	// Create the file.

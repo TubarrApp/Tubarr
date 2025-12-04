@@ -1,9 +1,5 @@
 package models
 
-import (
-	"time"
-)
-
 // Settings are the primary settings for a channel, affecting videos belonging to it.
 type Settings struct {
 	// Configurations.
@@ -34,11 +30,6 @@ type Settings struct {
 	// JSON and video directories.
 	JSONDir  string `json:"json_directory"`
 	VideoDir string `json:"video_directory"`
-
-	// Bot blocking elements.
-	BotBlocked           bool                 `json:"bot_blocked"`
-	BotBlockedHostnames  []string             `json:"bot_blocked_hostname"`
-	BotBlockedTimestamps map[string]time.Time `json:"bot_blocked_timestamps"`
 
 	// Channel toggles.
 	Paused bool `json:"paused"`
@@ -628,17 +619,6 @@ func SettingsAllZero(s *Settings) bool {
 		return false
 	}
 	if s.VideoDir != "" {
-		return false
-	}
-
-	// Bot blocking elements.
-	if s.BotBlocked {
-		return false
-	}
-	if len(s.BotBlockedHostnames) > 0 {
-		return false
-	}
-	if len(s.BotBlockedTimestamps) > 0 {
 		return false
 	}
 

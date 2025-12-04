@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 	"tubarr/internal/app"
+	"tubarr/internal/blocking"
 	"tubarr/internal/cfg"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -62,6 +63,11 @@ func main() {
 
 	// Load in Metarr logs.
 	vars.MetarrLogs = file.LoadMetarrLogs()
+
+	// Load blocked domains from database.
+	if err := blocking.LoadBlockedDomains(database); err != nil {
+		logger.Pl.W("Failed to load blocked domains: %v", err)
+	}
 
 	logger.Pl.I("Tubarr (PID: %d) started at: %v",
 		progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))

@@ -98,6 +98,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := initBlockedDomainsTable(tx); err != nil {
+		return err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}

@@ -58,9 +58,8 @@ func IsPrivateNetworkFallback(h string) bool {
 			}
 		}
 		return false
-	} else {
-		logger.Pl.E("Unable to perform DNS lookup for %q: %v", h, err)
 	}
+	logger.Pl.E("Unable to perform DNS lookup for %q: %v", h, err)
 
 	// If resolution fails, check if the input is a direct IP address.
 	parts := strings.Split(h, ".")
