@@ -1196,7 +1196,8 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
-			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1)",
+			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
+			"ORDER BY %s DESC",
 		consts.QVidID,
 		consts.QVidChanID,
 		consts.QVidChanURLID,
@@ -1214,6 +1215,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidChanID,
 		consts.QVidFinished,
 		consts.QVidIgnored,
+		consts.QVidUploadDate,
 	)
 
 	rows, err := cs.DB.Query(query, c.ID)

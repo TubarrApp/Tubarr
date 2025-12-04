@@ -456,7 +456,6 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 	}
 
 	// If not found in memory, check database directly.
-	// This handles cases where the channel was loaded before the manual entry was created.
 	existingCU, hasRows, err := cs.GetChannelURLModel(c.ID, consts.ManualDownloadsCol, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for existing manual downloads URL: %w", err)
@@ -489,11 +488,8 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 }
 
 // blockChannelBotDetected blocks a domain globally due to bot detection on the given URL.
-// Uses context-aware blocking based on the channel URL's authentication method.
-// videoURL should be the actual video URL that triggered the bot detection (important for manual downloads).
 func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, videoURL string) error {
 	// For manual downloads, use the actual video URL to extract the hostname.
-	// Otherwise, use the channel URL.
 	urlToBlock := cu.URL
 	if cu.URL == consts.ManualDownloadsCol {
 		urlToBlock = videoURL
@@ -506,10 +502,10 @@ func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, v
 		hostname = urlToBlock
 	}
 
-	// Determine the block context based on authentication
+	// Determine the block context based on authentication.
 	context := blocking.GetBlockContext(cu)
 
-	// Block the domain globally for this context
+	// Block the domain globally for this context.
 	db := cs.GetDB()
 	if err := blocking.BlockDomain(db, hostname, context); err != nil {
 		return fmt.Errorf("failed to block domain %q (context: %s): %w", hostname, context, err)

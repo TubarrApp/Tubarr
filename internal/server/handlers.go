@@ -1300,6 +1300,7 @@ func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, _ *http.Re
 }
 
 // handleUnblockDomain unblocks a domain for all contexts or a specific context.
+//
 // Context can be specified via query parameter: ?context=unauth|cookie|auth
 func (ss *serverStore) handleUnblockDomain(w http.ResponseWriter, r *http.Request) {
 	domain := chi.URLParam(r, "domain")

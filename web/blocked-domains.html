@@ -582,8 +582,8 @@
 
           init() {
             this.fetchBlockedDomains();
-            // Refresh every 30 seconds
-            setInterval(() => this.fetchBlockedDomains(), 30000);
+            // Refresh every 10 seconds
+            setInterval(() => this.fetchBlockedDomains(), 10000);
           },
 
           async fetchBlockedDomains() {
