@@ -25,6 +25,7 @@ metarr_default_output_dir = "/home/user/tubarr/{{channel_name}}/{{year}}"
 
 # Transcoding
 metarr_transcode_gpu = "auto"
+metarr_transcode_gpu_node = "/dev/dri/renderD128"
 metarr_transcode_video_codecs = [
   "h264:hevc",
   "webm:h264"

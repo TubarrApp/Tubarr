@@ -1479,7 +1479,8 @@ func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
 	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
 	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)
-	fmt.Printf("HW Acceleration: %s\n", m.TranscodeGPU)
+	fmt.Printf("HW Acceleration Type: %s\n", m.TranscodeGPU)
+	fmt.Printf("HW Acceleration Node: %s\n", m.TranscodeGPUNode)
 	fmt.Printf("Video Codec: %v\n", m.TranscodeVideoCodecs)
 	fmt.Printf("Audio Codec: %v\n", m.TranscodeAudioCodecs)
 	fmt.Printf("Transcode Quality: %s\n", m.TranscodeQuality)
@@ -1740,6 +1741,13 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	// Metarr GPU
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPU); ok {
 		gpuGot = v
+	}
+
+	// Metarr GPU node
+	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPUNode); ok {
+		if c.ChanMetarrArgs.TranscodeGPUNode, err = sharedvalidation.ValidateAccelTypeDeviceNode(gpuGot, v); err != nil {
+			return err
+		}
 	}
 
 	// Metarr video filter

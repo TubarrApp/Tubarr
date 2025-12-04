@@ -672,6 +672,10 @@
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_gpu || 'Not set'"></span>
                             </div>
                             <div>
+                              <span class="text-gray-500 dark:text-gray-400">GPU Node Path:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_transcode_gpu_node || 'Not set'"></span>
+                            </div>
+                            <div>
                               <span class="text-gray-500 dark:text-gray-400">Video Codecs:</span>
                               <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_transcode_video_transcode_codecs) && channel.metarr.metarr_transcode_video_transcode_codecs.length > 0 ? channel.metarr.metarr_transcode_video_transcode_codecs.join(', ') : (channel.metarr?.metarr_transcode_video_transcode_codecs || 'Copy')"></span>
                             </div>

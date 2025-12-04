@@ -48,6 +48,9 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 	if mArgs.TranscodeGPU != "" {
 		metarrMap[jsonkeys.MetarrGPU] = mArgs.TranscodeGPU
 	}
+	if mArgs.TranscodeGPUNode != "" {
+		metarrMap[jsonkeys.MetarrGPUNode] = mArgs.TranscodeGPUNode
+	}
 	if len(mArgs.TranscodeVideoCodecs) != 0 {
 		metarrMap[jsonkeys.MetarrVideoCodecs] = mArgs.TranscodeVideoCodecs
 	}
@@ -332,6 +335,9 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		}
 		metarr.TranscodeGPU = validGPU
 	}
+	if v, ok := data[jsonkeys.MetarrGPUNode].(string); ok {
+		metarr.TranscodeGPUNode = v
+	}
 	if v, ok := data[jsonkeys.MetarrOutputDirectory].(string); ok {
 		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
@@ -547,6 +553,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	renameStyle := r.FormValue(jsonkeys.MetarrRenameStyle)
 	minFreeMem := r.FormValue(jsonkeys.MetarrMinFreeMem)
 	transcodeGPUStr := r.FormValue(jsonkeys.MetarrGPU)
+	transcodeGPUNode := r.FormValue(jsonkeys.MetarrGPUNode)
 	outputDir := r.FormValue(jsonkeys.MetarrOutputDirectory)
 	transcodeVideoFilterStr := r.FormValue(jsonkeys.MetarrTranscodeVideoFilter)
 	transcodeCodecStr := r.FormValue(jsonkeys.MetarrVideoCodecs)
@@ -659,6 +666,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		MaxCPU:                  maxCPU,
 		MinFreeMem:              minFreeMem,
 		TranscodeGPU:            transcodeGPU,
+		TranscodeGPUNode:        transcodeGPUNode,
 		TranscodeVideoFilter:    transcodeVideoFilter,
 		TranscodeVideoCodecs:    transcodeVideoCodecs,
 		TranscodeAudioCodecs:    transcodeAudioCodecs,

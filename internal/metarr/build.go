@@ -121,6 +121,12 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.TranscodeGPU,
 		},
 		{
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeGPUNode},
+			valType:     str,
+			viperKey:    "",
+			cmdKey:      metkeys.TranscodeGPUNode,
+		},
+		{
 			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.TranscodeVideoCodecs},
 			valType:     strSlice,
 			viperKey:    "",

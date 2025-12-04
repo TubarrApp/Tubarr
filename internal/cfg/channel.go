@@ -815,7 +815,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	cmd.SetAuthFlags(addCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	cmd.SetTranscodeFlags(addCmd, &flags.TranscodeGPU,
+	cmd.SetTranscodeFlags(addCmd, &flags.TranscodeGPU, &flags.TranscodeGPUNode,
 		&flags.TranscodeVideoFilter, &flags.TranscodeQuality, &flags.TranscodeVideoCodec,
 		&flags.TranscodeAudioCodec)
 
@@ -1011,7 +1011,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 	cmd.SetAuthFlags(batchCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
-	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.TranscodeVideoFilter,
+	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.TranscodeGPUNode, &flags.TranscodeVideoFilter,
 		&flags.TranscodeQuality, &flags.TranscodeVideoCodec, &flags.TranscodeAudioCodec)
 
 	cmd.SetCustomYDLPArgFlags(batchCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
@@ -1245,6 +1245,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 		// Transcoding settings.
 		useGPU               string
+		gpuNode              string
 		transcodeQuality     string
 		transcodeVideoFilter string
 		videoCodec           []string
@@ -1423,6 +1424,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
 				useGPU:               useGPU,
+				gpuNode:              gpuNode,
 				transcodeVideoCodec:  videoCodec,
 				transcodeAudioCodec:  audioCodec,
 				transcodeQuality:     transcodeQuality,
@@ -1480,7 +1482,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metaOps, &filteredMetaOps)
 
 	// Transcoding.
-	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU,
+	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuNode,
 		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
 		&audioCodec)
 
@@ -1569,6 +1571,7 @@ type cobraMetarrArgs struct {
 	maxCPU               float64
 	minFreeMem           string
 	useGPU               string
+	gpuNode              string
 	transcodeVideoCodec  []string
 	transcodeAudioCodec  []string
 	transcodeQuality     string
@@ -1794,6 +1797,14 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.TranscodeGPU = validGPU
+			return nil
+		})
+	}
+
+	// GPU node path for transcoding.
+	if f.Changed(keys.TranscodeGPUNode) {
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.TranscodeGPUNode = c.gpuNode
 			return nil
 		})
 	}

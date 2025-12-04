@@ -35,6 +35,7 @@ const (
 	MetarrRenameStyle             = "metarr_rename_style"
 	MetarrMinFreeMem              = "metarr_min_free_mem"
 	MetarrGPU                     = "metarr_gpu"
+	MetarrGPUNode                 = "metarr_transcode_gpu_node"
 	MetarrOutputDirectory         = "metarr_output_directory"
 	MetarrTranscodeVideoFilter    = "metarr_transcode_video_filter"
 	MetarrVideoCodecs             = "metarr_transcode_video_transcode_codecs"

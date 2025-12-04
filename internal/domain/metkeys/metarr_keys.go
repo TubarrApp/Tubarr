@@ -34,6 +34,7 @@ const (
 const (
 	ExtraFFmpegArgs      = "--extra-ffmpeg-args"
 	TranscodeGPU         = "--transcode-gpu"
+	TranscodeGPUNode     = "--transcode-gpu-node"
 	TranscodeVideoCodecs = "--transcode-video-codecs"
 	TranscodeAudioCodecs = "--transcode-audio-codecs"
 	TranscodeQuality     = "--transcode-quality"

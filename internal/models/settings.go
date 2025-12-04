@@ -63,6 +63,7 @@ type MetarrArgs struct {
 
 	// FFmpeg transcoding operations.
 	TranscodeGPU         string   `json:"metarr_transcode_gpu"`
+	TranscodeGPUNode     string   `json:"metarr_transcode_gpu_node"`
 	TranscodeVideoFilter string   `json:"metarr_transcode_video_filter"`
 	TranscodeVideoCodecs []string `json:"metarr_transcode_video_codecs"`
 	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs"`
@@ -311,6 +312,11 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 			return false
 		}
 	}
+	if child.TranscodeGPUNode != "" {
+		if parent.TranscodeGPUNode != child.TranscodeGPUNode {
+			return false
+		}
+	}
 	if child.TranscodeVideoFilter != "" {
 		if parent.TranscodeVideoFilter != child.TranscodeVideoFilter {
 			return false
@@ -528,6 +534,9 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 
 	// FFmpeg transcoding operations.
 	if m.TranscodeGPU != "" {
+		return false
+	}
+	if m.TranscodeGPUNode != "" {
 		return false
 	}
 	if m.TranscodeVideoFilter != "" {

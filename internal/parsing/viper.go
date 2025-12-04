@@ -145,6 +145,14 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 		input.TranscodeGPU = &g
 	}
 
+	if input.TranscodeGPU != nil && input.TranscodeGPUNode != nil && *input.TranscodeGPUNode != "" {
+		n, err := sharedvalidation.ValidateAccelTypeDeviceNode(*input.TranscodeGPU, *input.TranscodeGPUNode)
+		if err != nil {
+			return nil, nil, err
+		}
+		input.TranscodeGPUNode = &n
+	}
+
 	if input.TranscodeVideoCodec != nil && len(*input.TranscodeVideoCodec) != 0 {
 		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.TranscodeVideoCodec, NilOrZeroValue(input.TranscodeGPU))
 		if err != nil {
@@ -296,6 +304,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 			URLOutputDirs:           NilOrZeroValue(input.URLOutputDirs),
 			Concurrency:             NilOrZeroValue(input.MetarrConcurrency),
 			TranscodeGPU:            NilOrZeroValue(input.TranscodeGPU),
+			TranscodeGPUNode:        NilOrZeroValue(input.TranscodeGPUNode),
 			TranscodeVideoCodecs:    NilOrZeroValue(input.TranscodeVideoCodec),
 			TranscodeAudioCodecs:    NilOrZeroValue(input.TranscodeAudioCodec),
 			TranscodeQuality:        NilOrZeroValue(input.TranscodeQuality),

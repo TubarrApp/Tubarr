@@ -33,6 +33,7 @@ const (
 // Transcoding.
 const (
 	TranscodeGPU         string = "metarr-transcode-gpu"
+	TranscodeGPUNode     string = "metarr-transcode-gpu-node"
 	TranscodeCodec       string = "metarr-transcode-video-codecs"
 	TranscodeAudioCodec  string = "metarr-transcode-audio-codecs"
 	TranscodeQuality     string = "metarr-transcode-quality"

@@ -148,9 +148,13 @@ func SetNotifyFlags(cmd *cobra.Command, notification *[]string) {
 }
 
 // SetTranscodeFlags sets flags related to video transcoding.
-func SetTranscodeFlags(cmd *cobra.Command, gpu, videoFilter, quality *string, videoCodec, audioCodec *[]string) {
+func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode, videoFilter, quality *string, videoCodec, audioCodec *[]string) {
 	if gpu != nil {
 		cmd.Flags().StringVar(gpu, keys.TranscodeGPU, "", "GPU for transcoding.")
+	}
+
+	if gpuNode != nil {
+		cmd.Flags().StringVar(gpuNode, keys.TranscodeGPUNode, "", "GPU node path for transcoding (e.g. '/dev/dri/renderD128')")
 	}
 
 	if videoFilter != nil {

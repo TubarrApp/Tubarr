@@ -129,6 +129,12 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
+	if m.TranscodeGPUNode != "" {
+		if _, err := sharedvalidation.ValidateAccelTypeDeviceNode(m.TranscodeGPU, m.TranscodeGPUNode); err != nil {
+			return fmt.Errorf("invalid GPU node config in Metarr Settings: %w", err)
+		}
+	}
+
 	m.MaxCPU = sharedvalidation.ValidateMaxCPU(m.MaxCPU, true)
 
 	if m.MetaOps != nil {
