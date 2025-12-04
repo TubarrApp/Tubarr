@@ -1215,7 +1215,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidChanID,
 		consts.QVidFinished,
 		consts.QVidIgnored,
-		consts.QVidUploadDate,
+		consts.QVidUpdatedAt,
 	)
 
 	rows, err := cs.DB.Query(query, c.ID)
