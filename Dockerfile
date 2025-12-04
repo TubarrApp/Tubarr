@@ -192,8 +192,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx265-199 \
     libvpx9 \
     libdav1d7 \
-    libsvtav1enc1d1 \
-    libsvtav1dec0 \
+    #libsvtav1enc1d1 \
+    #libsvtav1dec0 \
     \
     # Subtitle / text rendering (required by libass)
     libass9 \
