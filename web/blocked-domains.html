@@ -421,7 +421,7 @@
 
               <div class="hidden xl:block">
                 <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
-                  Blocked Domains
+                  Tubarr
                 </h2>
               </div>
             </div>
@@ -440,15 +440,18 @@
         <!-- ===== Main Content Start ===== -->
         <main class="p-4 md:p-6 2xl:p-10">
           <div class="mx-auto max-w-7xl">
+            <div class="mb-6">
+              <h2 class="text-title-md2 font-bold text-gray-900 dark:text-white">
+                Blocked Domains
+              </h2>
+            </div>
+
             <!-- Blocked Domains Content Start -->
             <div
               class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
             >
               <div class="border-b border-gray-200 p-5 sm:px-6 dark:border-gray-700">
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                  Blocked Domains
-                </h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
                   Domains blocked due to bot detection. Blocks are context-specific and expire automatically.
                 </p>
               </div>
@@ -487,54 +490,63 @@
                 <!-- Table -->
                 <div x-show="!loading && blockedDomains.length > 0" class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead class="bg-gray-50 dark:bg-gray-800/50">
+                    <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
                       <tr>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Domain
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Context
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Blocked At
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Time Remaining
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-400"
+                          class="px-4 py-3.5 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200 dark:bg-transparent dark:divide-gray-700">
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                       <template x-for="domain in blockedDomains" :key="domain.domain + domain.context">
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                        <tr>
                           <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                             <span x-text="domain.domain"></span>
                           </td>
                           <td class="px-4 py-4 whitespace-nowrap text-sm">
                             <span
-                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                              :class="{
-                                'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400': domain.context === 'unauth',
-                                'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400': domain.context === 'cookie',
-                                'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400': domain.context === 'auth'
-                              }"
+                              x-show="domain.context === 'unauth'"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30"
+                              x-bind:style="$root.classList.contains('dark') ? 'color: #fca5a5;' : 'color: #991b1b;'"
+                              x-text="domain.contextLabel"
+                            ></span>
+                            <span
+                              x-show="domain.context === 'cookie'"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30"
+                              x-bind:style="$root.classList.contains('dark') ? 'color: #fcd34d;' : 'color: #92400e;'"
+                              x-text="domain.contextLabel"
+                            ></span>
+                            <span
+                              x-show="domain.context === 'auth'"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30"
+                              x-bind:style="$root.classList.contains('dark') ? 'color: #4ade80;' : 'color: #166534;'"
                               x-text="domain.contextLabel"
                             ></span>
                           </td>
@@ -547,7 +559,9 @@
                           <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
                               @click="unblockDomain(domain.domain, domain.context)"
-                              class="text-brand-600 hover:text-brand-900 dark:text-brand-400 dark:hover:text-brand-300"
+                              x-bind:style="'color: #ef4444;'"
+                              @mouseover="$event.target.style.color = '#f87171'"
+                              @mouseout="$event.target.style.color = '#ef4444'"
                             >
                               Unblock
                             </button>
@@ -607,6 +621,21 @@
                     timeRemaining: item.time_remaining[context] || 'Calculating...'
                   });
                 });
+              });
+
+              // Sort by blocked time, most recent first, then alphabetically
+              this.blockedDomains.sort((a, b) => {
+                const timeCompare = new Date(b.blockedAt) - new Date(a.blockedAt);
+                if (timeCompare !== 0) {
+                  return timeCompare;
+                }
+                // If times are the same, sort alphabetically by domain
+                const domainCompare = a.domain.localeCompare(b.domain);
+                if (domainCompare !== 0) {
+                  return domainCompare;
+                }
+                // If domains are also the same, sort by context
+                return a.context.localeCompare(b.context);
               });
             } catch (error) {
               console.error('Error fetching blocked domains:', error);

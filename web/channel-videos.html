@@ -365,10 +365,10 @@
               </button>
               <!-- Hamburger Toggle BTN -->
 
-              <div class="hidden sm:block">
-                <h1 class="mb-0 text-xl font-semibold text-gray-900 dark:text-white sm:text-2xl">
-                  Channel Videos
-                </h1>
+              <div class="hidden xl:block">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
+                  Tubarr
+                </h2>
               </div>
             </div>
 
@@ -383,6 +383,12 @@
         <!-- ===== Main Content Start ===== -->
         <main class="h-full">
           <div class="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+            <div class="mb-6">
+              <h2 class="text-title-md2 font-bold text-gray-900 dark:text-white">
+                Channel Videos
+              </h2>
+            </div>
+
             <!-- Videos Container -->
             <div
               x-data="videosData()"
@@ -481,11 +487,11 @@
                               <img
                                 :src="video.thumbnail_url"
                                 :alt="video.title"
-                                class="h-16 w-28 object-cover rounded"
+                                class="w-32 aspect-video object-cover rounded"
                               />
                             </template>
                             <template x-if="!video.thumbnail_url">
-                              <div class="h-16 w-28 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                              <div class="w-32 aspect-video bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
                                 <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                                 </svg>

@@ -40,20 +40,7 @@ WORKDIR /build
 
 ############ FFmpeg build dependencies ############
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Video codecs
-    libx264-dev \
-    libx265-dev \
-    libvpx-dev \
-    libsvtav1-dev \
-    libdav1d-dev \
-    libmp3lame-dev \
-    libopus-dev \
-    libvorbis-dev \
-    libflac-dev \
-    libfdk-aac-dev \
-    libass-dev \
-    \
-    # Intel QSV / VPL (Arc-enabled)
+    # Intel QSV / VPL / VAAPI (Arc-enabled, MUST remain shared)
     libvpl-dev \
     libva-dev \
     libva-drm2 \
@@ -61,79 +48,196 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     intel-media-va-driver-non-free \
     libmfx-gen1.2 \
     \
-    # NVIDIA NVENC/NVDEC runtime libs
+    # NVIDIA NVENC/NVDEC (MUST be shared, provided by Ubuntu/NVIDIA)
     libnvidia-encode-550 \
     libnvidia-decode-550 \
     \
-    # FFprobe / misc
+    # Dependencies for FFprobe & FFmpeg core
     zlib1g-dev \
     libbz2-dev \
     libxml2-dev \
+    libx265-dev \
+    libnuma-dev \
+    \
+    # Font/text stack + libass
+    libass-dev \
+    libfreetype6-dev \
+    libfribidi-dev \
+    libharfbuzz-dev \
+    libfontconfig1-dev \
+    \
+    # Build essentials
+    build-essential \
+    pkg-config \
+    cmake \
+    ninja-build \
+    meson \
+    yasm \
+    nasm \
+    autoconf \
+    automake \
+    libtool \
+    libtool-bin \
+    gettext \
     && rm -rf /var/lib/apt/lists/*
 
 ############ NVENC headers ############
 RUN git clone https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
     make -C /tmp/nv install && rm -rf /tmp/nv
 
-############ Build SVT-AV1 ############
+############ Build SVT-AV1 (static) ############
 RUN git clone --depth 1 https://gitlab.com/AOMediaCodec/SVT-AV1.git /tmp/svtav1 && \
     cd /tmp/svtav1 && mkdir build && cd build && \
-    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && \
+    cmake -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        .. && \
     ninja -j"$(nproc)" && ninja install && ldconfig && \
     rm -rf /tmp/svtav1
 
-############ Build FFmpeg from source ############
+############ Build libx264 (static) ############
+RUN git clone --depth 1 https://code.videolan.org/videolan/x264.git /tmp/x264 && \
+    cd /tmp/x264 && \
+    ./configure --enable-static --disable-shared --prefix=/usr/local && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/x264
+
+############ Build libvpx (static) ############
+RUN git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git /tmp/vpx && \
+    cd /tmp/vpx && \
+    ./configure \
+        --prefix=/usr/local \
+        --disable-examples \
+        --disable-unit-tests \
+        --enable-vp9-highbitdepth \
+        --enable-static \
+        --disable-shared && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/vpx
+
+############ Build dav1d (static) ############
+RUN git clone --depth 1 https://code.videolan.org/videolan/dav1d.git /tmp/dav1d && \
+    cd /tmp/dav1d && \
+    meson setup build \
+        --default-library=static \
+        --buildtype=release \
+        --prefix=/usr/local && \
+    ninja -C build && ninja -C build install && \
+    rm -rf /tmp/dav1d
+
+############ Build fdk-aac (static) ############
+RUN git clone --depth 1 https://github.com/mstorsjo/fdk-aac.git /tmp/fdk && \
+    cd /tmp/fdk && \
+    autoreconf -fi && \
+    ./configure --enable-static --disable-shared --prefix=/usr/local && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/fdk
+
+############ Build LAME MP3 (static) ############
+RUN git clone --depth 1 https://github.com/rbrito/lame.git /tmp/lame && \
+    cd /tmp/lame && \
+    ./configure --enable-static --disable-shared --prefix=/usr/local && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/lame
+
+############ Build libopus (static) ############
+RUN git clone --depth 1 https://github.com/xiph/opus.git /tmp/opus && \
+    cd /tmp/opus && \
+    ./autogen.sh && \
+    ./configure --enable-static --disable-shared --prefix=/usr/local && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/opus
+
+############ Build libogg (static) ############
+RUN git clone --depth 1 https://github.com/xiph/ogg.git /tmp/ogg && \
+    cd /tmp/ogg && \
+    ./autogen.sh && \
+    ./configure --enable-static --disable-shared --prefix=/usr/local && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/ogg
+
+############ Build libvorbis (static) ############
+RUN git clone --depth 1 https://github.com/xiph/vorbis.git /tmp/vorbis && \
+    cd /tmp/vorbis && \
+    ./autogen.sh && \
+    ./configure --enable-static --disable-shared --prefix=/usr/local && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/vorbis
+
+############ Build libFLAC (static) ############
+RUN git clone --depth 1 https://github.com/xiph/flac.git /tmp/flac && \
+    cd /tmp/flac && \
+    ./autogen.sh && \
+    ./configure --enable-static --disable-shared --prefix=/usr/local && \
+    make -j"$(nproc)" && make install && \
+    rm -rf /tmp/flac
+
+############ Build FFmpeg from source (simplified, shared CLI) ############
 RUN set -e && \
     rm -rf /ffmpeg && \
     git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
     cd /ffmpeg && \
-    PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/local/lib/pkgconfig" ./configure \
+    \
+    PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig" \
+    ./configure \
         --prefix=/usr/local \
         --bindir=/usr/local/bin \
+        \
+        # Licensing + core
         --enable-gpl \
         --enable-nonfree \
-        --enable-shared \
         --disable-debug \
+        --enable-shared \
         \
+        # Codec libraries (using your static /usr/local builds where present)
         --enable-libx264 \
         --enable-libx265 \
         --enable-libvpx \
         --enable-libsvtav1 \
         --enable-libdav1d \
-        \
         --enable-libmp3lame \
         --enable-libopus \
         --enable-libvorbis \
         --enable-libfdk-aac \
-        --enable-libass \
         \
+        # Dynamic libraries (GPU stack + libass)
+        --enable-libass \
         --enable-vaapi \
         --enable-libdrm \
         --enable-libvpl \
-        \
         --enable-nvenc \
         --enable-nvdec \
-    && make -j"$(nproc)" \
-    && make install \
+        \
+        # Extra flags to see /usr/local and silence x264's stdint.h warning
+        --extra-cflags="-I/usr/local/include -include stdint.h" \
+        --extra-ldflags="-L/usr/local/lib" \
+    || { echo "=== CONFIGURE FAILED ==="; cat ffbuild/config.log; exit 1; } && \
     \
-    # In case ffmpeg/ffprobe are built as *_g, normalize names
-    && if [ -f /usr/local/bin/ffmpeg_g ]; then mv /usr/local/bin/ffmpeg_g /usr/local/bin/ffmpeg; fi \
-    && if [ -f /usr/local/bin/ffprobe_g ]; then mv /usr/local/bin/ffprobe_g /usr/local/bin/ffprobe; fi \
+    make -j"$(nproc)" && \
+    make install && \
     \
-    # Verify installation (fail early if missing)
-    && ls -la /usr/local/bin \
-    && test -f /usr/local/bin/ffmpeg \
-    && test -f /usr/local/bin/ffprobe \
+    # Normalize names if ffmpeg_g or ffprobe_g was produced
+    if [ -f /usr/local/bin/ffmpeg_g ]; then mv /usr/local/bin/ffmpeg_g /usr/local/bin/ffmpeg; fi && \
+    if [ -f /usr/local/bin/ffprobe_g ]; then mv /usr/local/bin/ffprobe_g /usr/local/bin/ffprobe; fi && \
     \
-    # Strip (optional) and refresh ld cache
-    && strip /usr/local/bin/ffmpeg /usr/local/bin/ffprobe || true \
-    && find /usr/local/lib -name "*.so" -exec strip --strip-unneeded {} + \; || true \
-    && ldconfig
+    # Verify installation
+    ls -la /usr/local/bin && \
+    test -f /usr/local/bin/ffmpeg && \
+    test -f /usr/local/bin/ffprobe && \
+    \
+    # Strip binaries and refresh linker cache
+    strip /usr/local/bin/ffmpeg /usr/local/bin/ffprobe || true && \
+    find /usr/local/lib -name "*.so" -exec strip --strip-unneeded {} + \; || true && \
+    ldconfig
 
-# Extra hard fail if somehow broken in a later cached layer
+# Extra hard fail in later cached layers
 RUN ls -la /usr/local/bin
 RUN test -f /usr/local/bin/ffmpeg
 RUN test -f /usr/local/bin/ffprobe
+
+# Remove static libraries (FFmpeg is already linked)
+RUN find /usr/local/lib -maxdepth 1 -name '*.a' -delete
 
 ############ Build Tubarr ############
 COPY go.mod go.sum ./
@@ -175,20 +279,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     wget \
     xz-utils \
-    # Runtime libraries matching FFmpeg build extras
-    # Audio codecs
-    libmp3lame0 \
-    libopus0 \
-    libvorbis0a \
-    libvorbisenc2 \
-    libfdk-aac2 \
-    libflac12 \
-    \
-    # Video codecs
-    libx264-164 \
-    libx265-199 \
-    libvpx9 \
-    libdav1d7 \
     \
     # Subtitle / text rendering (required by libass)
     libass9 \
@@ -217,6 +307,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
+# Delete unnecessary elements
+RUN rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/local/* || true
+
 # Fix /tmp permissions for non-root usage
 RUN chmod 1777 /tmp
 
@@ -237,7 +330,6 @@ COPY --from=builder /build/metarr /usr/local/bin/metarr
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
 
 ######## Auto-updater ########
-RUN chmod 755 /usr/local/bin/yt-dlp
 RUN printf '%s\n' \
 '#!/bin/sh' \
 'while true; do' \
@@ -251,20 +343,6 @@ WORKDIR /app
 COPY --from=builder /build/web /app/web
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-######## Cleanup ########
-# Delete unnecessary elements
-RUN apt-get purge -y python3-pip && \
-    apt-get autoremove -y && \
-    rm -rf /root/.cache
-RUN rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/local/* || true
-RUN find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name "en" -exec rm -rf {} +
-RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/cache/debconf/*-old
-RUN rm -rf /usr/share/icons /usr/share/pixmaps
-RUN rm -rf /usr/share/info /usr/share/lintian /usr/share/linda
-RUN rm -rf /usr/lib/python3*/test
-RUN rm -rf /usr/share/perl* /usr/lib/perl*
-RUN rm -rf /usr/share/ruby /usr/lib/ruby
 
 ######## User Logic ########
 RUN userdel -r ubuntu 2>/dev/null || true && \

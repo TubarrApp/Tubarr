@@ -440,20 +440,23 @@
         <!-- ===== Main Content Start ===== -->
         <main class="p-4 md:p-6 2xl:p-10">
           <div class="mx-auto max-w-4xl">
+            <div class="mb-6">
+              <h2 class="text-title-md2 font-bold text-gray-900 dark:text-white">
+                Add Channels from Files
+              </h2>
+            </div>
+
             <!-- Form Start -->
             <div
               x-data="addFromFilesForm()"
               class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
             >
               <div class="border-b border-gray-200 p-5 sm:px-6 dark:border-gray-700">
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                  Add Channels from Configuration Files
-                </h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   Add one or multiple channels using configuration files. Choose between a single file or a directory containing multiple config files.
                   <br>
                   <br>
-                  Example File: <a href="/src/files/example.toml" class="text-gray-400 hover:text-gray-600 font-medium">example.toml</a>
+                  Example File: <a href="/src/files/example.toml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example.toml</a>
                   <br>
                   <br>
                 </p>

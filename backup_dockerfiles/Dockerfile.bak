@@ -165,9 +165,7 @@ RUN sed -i 's/^# deb .*universe/deb &/' /etc/apt/sources.list \
  && apt-get update
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ##########################################################################
     # Core utilities
-    ##########################################################################
     aria2 \
     axel \
     ca-certificates \
@@ -177,9 +175,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     wget \
     xz-utils \
-    ##########################################################################
     # Runtime libraries matching FFmpeg build extras
-    ##########################################################################
     # Audio codecs
     libmp3lame0 \
     libopus0 \
@@ -193,8 +189,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libx265-199 \
     libvpx9 \
     libdav1d7 \
-    #libsvtav1enc1d1 \
-    #libsvtav1dec0 \
     \
     # Subtitle / text rendering (required by libass)
     libass9 \
@@ -207,70 +201,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     libbz2-1.0 \
     libxml2 \
-    ##########################################################################
     # Intel QSV / VAAPI runtime stack
-    ##########################################################################
     intel-media-va-driver-non-free \
     libigdgmm12 \
     libvpl2 \
-    onevpl-tools \
     libva2 \
     libva-drm2 \
-    libva-x11-2 \
     mesa-va-drivers \
     libdrm2 \
     libze-intel-gpu1 \
     libmfx-gen1.2 \
-    ##########################################################################
     # NVIDIA NVENC/NVDEC runtime stack
-    # (relies on NVIDIA container runtime on host)
-    ##########################################################################
     libnvidia-encode-550 \
     libnvidia-decode-550 \
-    ##########################################################################
     # Cleanup
-    ##########################################################################
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && for p in \
-    libmp3lame0 \
-    libopus0 \
-    libvorbis0a \
-    libvorbisenc2 \
-    libfdk-aac2 \
-    libflac12 \
-    libx264-164 \
-    libx265-199 \
-    libvpx9 \
-    libdav1d7 \
-    libsvtav1enc1d1 \
-    libsvtav1dec0 \
-    libass9 \
-    libfreetype6 \
-    libfribidi0 \
-    libharfbuzz0b \
-    libfontconfig1 \
-    zlib1g \
-    libbz2-1.0 \
-    libxml2 \
-    intel-media-va-driver-non-free \
-    libigdgmm12 \
-    libvpl2 \
-    onevpl-tools \
-    libva2 \
-    libva-drm2 \
-    libva-x11-2 \
-    mesa-va-drivers \
-    libdrm2 \
-    libze-intel-gpu1 \
-    libmfx-gen1.2 \
-    libnvidia-encode-550 \
-    libnvidia-decode-550; \
-do \
-    echo "CHECKING $p" ; \
-    apt-cache show "$p" >/dev/null 2>&1 && echo "FOUND $p" || echo "NOT FOUND $p" ; \
-done
-
+# Delete unnecessary elements
+RUN rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/local/* || true
 
 # Fix /tmp permissions for non-root usage
 RUN chmod 1777 /tmp
