@@ -134,16 +134,17 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 		return err
 	}
 
-	metadata := make(map[string]any, 5)
+	// Declare metadata variable.
+	var metadata map[string]any
 
 	// Determine which rule set to use based on URL.
 	switch {
 	case strings.Contains(v.URL, "censored.tv"):
 		if !dev.CensoredTVUseCustom {
 			logger.Pl.I("Using regular scraper for censored.tv ...")
-		} else {
-			metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLCensored)
+			return nil
 		}
+		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLCensored)
 	case strings.Contains(v.URL, "bitchute.com"):
 		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLBitchute)
 	case strings.Contains(v.URL, "odysee.com"):
@@ -151,7 +152,8 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 	case strings.Contains(v.URL, "rumble.com"):
 		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLRumble)
 	default:
-		logger.Pl.W("No custom scraping rules found for URL: %s", v.URL)
+		logger.Pl.D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
+		return nil // Not a custom site.
 	}
 
 	// Visit the webpage.
@@ -162,7 +164,7 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 
 	// Validate required fields.
 	if v.Title == "" {
-		logger.Pl.D(1, "Scraped metadata: %+v", metadata)
+		logger.Pl.D(3, "Scraped metadata: %+v", metadata)
 		return fmt.Errorf("missing required metadata fields (title: %q)", v.Title)
 	}
 

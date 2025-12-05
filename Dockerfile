@@ -213,10 +213,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     intel-media-va-driver-non-free \
     libigdgmm12 \
     libvpl2 \
-    onevpl-tools \
     libva2 \
     libva-drm2 \
-    libva-x11-2 \
     mesa-va-drivers \
     libdrm2 \
     libze-intel-gpu1 \
@@ -256,10 +254,8 @@ RUN apt-get update && for p in \
     intel-media-va-driver-non-free \
     libigdgmm12 \
     libvpl2 \
-    onevpl-tools \
     libva2 \
     libva-drm2 \
-    libva-x11-2 \
     mesa-va-drivers \
     libdrm2 \
     libze-intel-gpu1 \
@@ -271,6 +267,8 @@ do \
     apt-cache show "$p" >/dev/null 2>&1 && echo "FOUND $p" || echo "NOT FOUND $p" ; \
 done
 
+# Delete unnecessary elements
+RUN rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/local/* || true
 
 # Fix /tmp permissions for non-root usage
 RUN chmod 1777 /tmp
