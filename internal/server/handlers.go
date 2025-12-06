@@ -635,28 +635,32 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Update channel settings.
 	newSettings := getSettingsStrings(w, r)
-	if newSettings != nil {
-		_, err = ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
-			*s = *newSettings
-			return nil
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to update channel settings: %v", err), http.StatusInternalServerError)
-			return
-		}
+	if newSettings == nil {
+		// Validation error already written to response
+		return
+	}
+	_, err = ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+		*s = *newSettings
+		return nil
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to update channel settings: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	// Update channel Metarr args.
 	newMetarr := getMetarrArgsStrings(w, r)
-	if newMetarr != nil {
-		_, err = ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
-			*m = *newMetarr
-			return nil
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to update channel metarr args: %v", err), http.StatusInternalServerError)
-			return
-		}
+	if newMetarr == nil {
+		// Validation error already written to response
+		return
+	}
+	_, err = ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
+		*m = *newMetarr
+		return nil
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to update channel metarr args: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	// Handle URL updates.
