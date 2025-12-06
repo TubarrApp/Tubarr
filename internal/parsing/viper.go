@@ -859,6 +859,15 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.TranscodeGPU = g
 	}
 
+	// Validate and set GPU node path if provided.
+	if input.TranscodeGPUNode != nil {
+		n, err := sharedvalidation.ValidateAccelTypeDeviceNode(metarr.TranscodeGPU, *input.TranscodeGPUNode)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate GPU node path for per-URL settings: %w", err)
+		}
+		metarr.TranscodeGPUNode = n
+	}
+
 	// Validate and set video codecs if provided.
 	if input.TranscodeVideoCodec != nil {
 		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.TranscodeVideoCodec, metarr.TranscodeGPU)

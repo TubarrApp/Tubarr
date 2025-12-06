@@ -994,3 +994,52 @@ func TestValidateGPU(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateGPUNode(t *testing.T) {
+	// Create a temporary file to simulate a device node
+	tmpFile, err := os.CreateTemp("", "gpu-node-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	tests := []struct {
+		name         string
+		accelType    string
+		nodePath     string
+		expectedNode string
+		expectError  bool
+	}{
+		// Pass cases
+		{"auto with valid path", sharedconsts.AccelTypeAuto, tmpFile.Name(), tmpFile.Name(), false},
+		{"cuda with valid path", sharedconsts.AccelTypeCuda, tmpFile.Name(), tmpFile.Name(), false},
+		{"vaapi with valid path", sharedconsts.AccelTypeVAAPI, tmpFile.Name(), tmpFile.Name(), false},
+		{"empty type with valid path", "", tmpFile.Name(), tmpFile.Name(), false},
+		{"empty type with empty path", "", "", "", false},
+		{"auto with empty path", sharedconsts.AccelTypeAuto, "", "", false},
+		{"cuda with empty path", sharedconsts.AccelTypeCuda, "", "", false},
+
+		// Fail cases
+		{"vaapi with empty path", sharedconsts.AccelTypeVAAPI, "", "", true},
+		{"auto with non-existent path", sharedconsts.AccelTypeAuto, "/dev/nonexistent-gpu-12345", "", true},
+		{"vaapi with non-existent path", sharedconsts.AccelTypeVAAPI, "/dev/nonexistent-gpu-12345", "", true},
+		{"cuda with non-existent path", sharedconsts.AccelTypeCuda, "/dev/nonexistent-gpu-12345", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gpuNode, err := sharedvalidation.ValidateAccelTypeDeviceNode(tt.accelType, tt.nodePath)
+
+			if tt.expectError && err == nil {
+				t.Fatalf("Expected error, but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Fatalf("Expected pass, but got error: %q", err)
+			}
+			if !tt.expectError && gpuNode != tt.expectedNode {
+				t.Fatalf("Expected %q, got %q", tt.expectedNode, gpuNode)
+			}
+		})
+	}
+}

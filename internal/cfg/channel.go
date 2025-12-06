@@ -1787,11 +1787,9 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// Use GPU for transcoding.
 	if f.Changed(keys.TranscodeGPU) {
-		validGPU := c.useGPU
-
+		var validGPU string
 		if c.useGPU != "" {
-			validGPU, err = validation.ValidateGPUAcceleration(c.useGPU)
-			if err != nil {
+			if validGPU, err = validation.ValidateGPUAcceleration(c.useGPU); err != nil {
 				return nil, err
 			}
 		}
@@ -1803,8 +1801,12 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 	// GPU node path for transcoding.
 	if f.Changed(keys.TranscodeGPUNode) {
+		validGPUNode, err := sharedvalidation.ValidateAccelTypeDeviceNode(c.useGPU, c.gpuNode)
+		if err != nil {
+			return nil, err
+		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.TranscodeGPUNode = c.gpuNode
+			m.TranscodeGPUNode = validGPUNode
 			return nil
 		})
 	}

@@ -336,7 +336,11 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.TranscodeGPU = validGPU
 	}
 	if v, ok := data[jsonkeys.MetarrGPUNode].(string); ok {
-		metarr.TranscodeGPUNode = v
+		validGPUNode, err := sharedvalidation.ValidateAccelTypeDeviceNode(metarr.TranscodeGPU, v)
+		if err != nil {
+			return nil, err
+		}
+		metarr.TranscodeGPUNode = validGPUNode
 	}
 	if v, ok := data[jsonkeys.MetarrOutputDirectory].(string); ok {
 		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
@@ -553,7 +557,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	renameStyle := r.FormValue(jsonkeys.MetarrRenameStyle)
 	minFreeMem := r.FormValue(jsonkeys.MetarrMinFreeMem)
 	transcodeGPUStr := r.FormValue(jsonkeys.MetarrGPU)
-	transcodeGPUNode := r.FormValue(jsonkeys.MetarrGPUNode)
+	transcodeGPUNodeStr := r.FormValue(jsonkeys.MetarrGPUNode)
 	outputDir := r.FormValue(jsonkeys.MetarrOutputDirectory)
 	transcodeVideoFilterStr := r.FormValue(jsonkeys.MetarrTranscodeVideoFilter)
 	transcodeCodecStr := r.FormValue(jsonkeys.MetarrVideoCodecs)
@@ -583,6 +587,11 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	transcodeGPU, err := validation.ValidateGPUAcceleration(transcodeGPUStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid GPU type %q: %v", transcodeGPUStr, err), http.StatusBadRequest)
+		return nil
+	}
+	transcodeGPUNode, err := sharedvalidation.ValidateAccelTypeDeviceNode(transcodeGPU, transcodeGPUNodeStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid GPU node path %q for acceleration type %q: %v", transcodeGPUNodeStr, transcodeGPU, err), http.StatusBadRequest)
 		return nil
 	}
 	transcodeVideoFilter, err := validation.ValidateTranscodeVideoFilter(transcodeVideoFilterStr)
