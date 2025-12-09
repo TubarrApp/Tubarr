@@ -226,6 +226,15 @@ COPY --from=builder /usr/local/bin/ffprobe /usr/local/bin/ffprobe
 COPY --from=builder /usr/local/lib/ /usr/local/lib/
 RUN ldconfig
 
+######## Install Deno globally ########
+RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
+    wget -O /tmp/deno.zip \
+        https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip && \
+    unzip -o /tmp/deno.zip -d /usr/local/bin && \
+    chmod +x /usr/local/bin/deno && \
+    ln -sf /usr/local/bin/deno /usr/bin/deno && \
+    rm /tmp/deno.zip
+
 ######## Install yt-dlp ########
 RUN wget -O /usr/local/bin/yt-dlp \
         https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \

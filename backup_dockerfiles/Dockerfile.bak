@@ -217,9 +217,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
-# Delete unnecessary elements
-RUN rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/local/* || true
-
 # Fix /tmp permissions for non-root usage
 RUN chmod 1777 /tmp
 
@@ -240,6 +237,7 @@ COPY --from=builder /build/metarr /usr/local/bin/metarr
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
 
 ######## Auto-updater ########
+RUN chmod 755 /usr/local/bin/yt-dlp
 RUN printf '%s\n' \
 '#!/bin/sh' \
 'while true; do' \
@@ -253,6 +251,20 @@ WORKDIR /app
 COPY --from=builder /build/web /app/web
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+######## Cleanup ########
+# Delete unnecessary elements
+RUN apt-get purge -y python3-pip && \
+    apt-get autoremove -y && \
+    rm -rf /root/.cache
+RUN rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/local/* || true
+RUN find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name "en" -exec rm -rf {} +
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/cache/debconf/*-old
+RUN rm -rf /usr/share/icons /usr/share/pixmaps
+RUN rm -rf /usr/share/info /usr/share/lintian /usr/share/linda
+RUN rm -rf /usr/lib/python3*/test
+RUN rm -rf /usr/share/perl* /usr/lib/perl*
+RUN rm -rf /usr/share/ruby /usr/lib/ruby
 
 ######## User Logic ########
 RUN userdel -r ubuntu 2>/dev/null || true && \
