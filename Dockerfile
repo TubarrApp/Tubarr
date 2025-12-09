@@ -230,9 +230,8 @@ RUN ldconfig
 RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
     wget -O /tmp/deno.zip \
         https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip && \
-    unzip -o /tmp/deno.zip -d /usr/local/bin && \
-    chmod +x /usr/local/bin/deno && \
-    ln -sf /usr/local/bin/deno /usr/bin/deno && \
+    unzip -o /tmp/deno.zip -d /usr/bin && \
+    chmod +x /usr/bin/deno && \
     rm /tmp/deno.zip
 
 ######## Install yt-dlp ########
