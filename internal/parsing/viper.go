@@ -24,9 +24,8 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 ) {
 	// Validate required fields.
 	if input.VideoDir == nil || *input.VideoDir == "" ||
-		input.Name == nil || *input.Name == "" ||
-		input.URLs == nil || len(*input.URLs) == 0 {
-		return nil, nil, fmt.Errorf("channels require a video directory, name, and at least one channel URL")
+		input.Name == nil || *input.Name == "" {
+		return nil, nil, fmt.Errorf("channels require a video directory and name")
 	}
 
 	// Default JSONDir to VideoDir.
@@ -206,9 +205,12 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	// ===============================
 
 	now := time.Now()
-	chanURLs := make([]*models.ChannelURL, 0, len(*input.URLs))
+	var chanURLs []*models.ChannelURL
 
-	for _, u := range *input.URLs {
+	if input.URLs != nil && len(*input.URLs) > 0 {
+		chanURLs = make([]*models.ChannelURL, 0, len(*input.URLs))
+
+		for _, u := range *input.URLs {
 		if u == "" {
 			continue
 		}
@@ -252,6 +254,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 		}
 
 		chanURLs = append(chanURLs, chanURL)
+		}
 	}
 
 	// ===============================

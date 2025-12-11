@@ -160,6 +160,48 @@
                 </li>
                 <!-- Menu Item Active Downloads -->
 
+                <!-- Menu Item Manual Download -->
+                <li>
+                  <a
+                    href="manual-download.html"
+                    @click="selected = 'Manual Download'"
+                    class="menu-item group"
+                    :class="(selected === 'Manual Download') || (page === 'manualDownload') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Manual Download') || (page === 'manualDownload') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M5.5 3.25C4.25736 3.25 3.25 4.25736 3.25 5.5V18.5C3.25 19.7426 4.25736 20.75 5.5 20.75H18.5C19.7426 20.75 20.75 19.7426 20.75 18.5V8.62132C20.75 8.03651 20.5176 7.47572 20.1049 7.06307L16.9369 3.89508C16.5243 3.48243 15.9635 3.25 15.3787 3.25H5.5ZM4.75 5.5C4.75 5.08579 5.08579 4.75 5.5 4.75H7.25V9C7.25 9.41421 7.58579 9.75 8 9.75H14.5C14.9142 9.75 15.25 9.41421 15.25 9V4.75H15.3787C15.5626 4.75 15.7428 4.82067 15.8751 4.95301L19.0431 8.12099C19.1754 8.25332 19.25 8.43353 19.25 8.62132V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5V5.5ZM8.75 4.75H13.75V8.25H8.75V4.75Z"
+                        fill="currentColor"
+                      />
+
+                      <rect
+                        x="8.25"
+                        y="12.25"
+                        width="7.5"
+                        height="5.5"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        fill="none"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Manual Download
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Manual Download -->
+
                 <!-- Menu Item Channels -->
                 <li>
                   <a
@@ -511,8 +553,7 @@
                         <button
                           type="button"
                           @click="removeURL(index)"
-                          x-show="formData.urls.length > 1"
-                          class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm"
+                          class="text-gray-700 dark:text-gray-300 text-sm"
                         >
                           Remove
                         </button>
@@ -520,12 +561,11 @@
 
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          URL <span class="text-red-500">*</span>
+                          URL
                         </label>
                         <input
                           type="url"
                           x-model="urlEntry.url"
-                          required
                           placeholder="https://example.com/channel"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
@@ -1811,9 +1851,7 @@
           },
 
           removeURL(index) {
-            if (this.formData.urls.length > 1) {
-              this.formData.urls.splice(index, 1);
-            }
+            this.formData.urls.splice(index, 1);
           },
 
           async submitForm() {

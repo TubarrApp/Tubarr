@@ -1121,6 +1121,69 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 	}
 }
 
+// handleDownloadURLs downloads specified video URLs to a channel.
+func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body.
+	var requestBody struct {
+		URLs []string `json:"urls"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if len(requestBody.URLs) == 0 {
+		http.Error(w, "no URLs provided", http.StatusBadRequest)
+		return
+	}
+
+	// Get channel.
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found || c == nil {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
+	// Check crawl state.
+	if state.CrawlStateActive(c.Name) {
+		w.WriteHeader(http.StatusLocked)
+		w.Write([]byte(`Channel has an active crawl job running. Try again after it is completed.`))
+		return
+	}
+
+	// Lock crawl state.
+	state.LockCrawlState(c.Name)
+	defer state.UnlockCrawlState(c.Name)
+
+	// Start download in background.
+	go func(ctx context.Context) {
+		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.URLs), c.Name, id)
+
+		if err := app.DownloadVideosToChannel(ctx, ss.s, ss.cs, c, requestBody.URLs); err != nil {
+			logger.Pl.E("Encountered errors downloading URLs for channel %q: %v", c.Name, err)
+		} else {
+			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)
+		}
+	}(ss.ctx)
+
+	w.WriteHeader(http.StatusAccepted)
+	if _, err := w.Write([]byte(`Download started.`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
+}
+
 // handleLatestDownloads retrieves the latest downloads for a given channel.
 func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")

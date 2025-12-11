@@ -16,7 +16,7 @@ func SetPrimaryChannelFlags(cmd *cobra.Command, name *string, urls *[]string, id
 		cmd.Flags().StringVarP(name, keys.Name, "n", "", "Channel name")
 	}
 	if urls != nil {
-		cmd.Flags().StringSliceVarP(urls, keys.URL, "u", nil, "Channel URL")
+		cmd.Flags().StringSliceVarP(urls, keys.URL, "u", nil, "Channel URLs")
 	}
 }
 

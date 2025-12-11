@@ -267,7 +267,8 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 
 	// Check validity
 	if len(c.URLModels) == 0 {
-		return errors.New("no channel URLs")
+		logger.Pl.D(1, "Channel %q has no URLs configured for automatic crawling, skipping.", c.Name)
+		return nil
 	}
 	if c.ChanSettings.VideoDir == "" || c.ChanSettings.JSONDir == "" {
 		return errors.New("default channel output directories are blank")

@@ -63,6 +63,7 @@ func NewRouter(ss serverStore) http.Handler {
 			r.Delete("/{id}/cancel-download/{videoID}", ss.handleCancelDownload)
 			r.Post("/{id}/crawl", ss.handleCrawlChannel)
 			r.Post("/{id}/ignore-crawl", ss.handleIgnoreCrawlChannel)
+			r.Post("/{id}/download-urls", ss.handleDownloadURLs)
 			r.Post("/{id}/notification-seen", ss.handleNewVideoNotificationSeen)
 			r.Post("/{id}/toggle-pause", ss.handleTogglePauseChannel)
 		})

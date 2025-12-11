@@ -67,7 +67,8 @@ func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Chann
 // GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
 func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore, c *models.Channel) ([]*models.Video, error) {
 	if len(c.URLModels) == 0 {
-		return nil, fmt.Errorf("channel has no URLs (channel ID: %d)", c.ID)
+		logger.Pl.D(1, "Channel %q has no URLs configured, skipping automatic crawl", c.Name)
+		return []*models.Video{}, nil
 	}
 
 	existingMap, existingURLs, err := s.GetExistingReleases(cs, c)

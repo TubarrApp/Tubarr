@@ -613,10 +613,7 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 
 // AddChannel adds a new channel to the database.
 func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
-	switch {
-	case len(c.URLModels) == 0:
-		return 0, errors.New("must enter at least one URL for the channel")
-	case c.ChanSettings.VideoDir == "":
+	if c.ChanSettings.VideoDir == "" {
 		return 0, errors.New("must enter a video directory where downloads will be stored")
 	}
 
@@ -716,10 +713,12 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	for i, cu := range c.URLModels {
 		logger.Pl.D(1, "Inserting URL %d: %q", i+1, cu.URL)
 
-		// Validate URL format
-		if _, urlErr := url.ParseRequestURI(cu.URL); urlErr != nil {
-			err = fmt.Errorf("invalid URL %q: %w", cu.URL, urlErr)
-			return 0, err
+		// Validate URL format (skip empty URLs and the special "manual-downloads" URL)
+		if cu.URL != "" && cu.URL != "manual-downloads" {
+			if _, urlErr := url.ParseRequestURI(cu.URL); urlErr != nil {
+				err = fmt.Errorf("invalid URL %q: %w", cu.URL, urlErr)
+				return 0, err
+			}
 		}
 
 		if cu.EncryptedPassword == "" && cu.Password != "" {

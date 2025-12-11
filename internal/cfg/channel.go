@@ -265,10 +265,17 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 				return err
 			}
 
-			cURLs := c.GetURLs()
-			logger.Pl.D(1, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
+			// Check crawl state.
+			if state.CrawlStateActive(c.Name) {
+				logger.Pl.I("Crawl job is active for channel %q, please try again when it's complete.", c.Name)
+				return nil
+			}
 
-			// Download URLs - errors already logged, DON'T print here.
+			// Lock crawl state.
+			state.LockCrawlState(c.Name)
+			defer state.UnlockCrawlState(c.Name)
+
+			// Download URLs.
 			if err := app.DownloadVideosToChannel(ctx, s, cs, c, videoURLs); err != nil {
 				return err
 			}
@@ -708,7 +715,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	addCmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a channel.",
-		Long:  "Add channel adds a new channel to the database using inputted URLs, names, settings, etc.",
+		Long:  "Add channel adds a new channel to the database.",
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
 			if addFromFile != "" {
 				fileToUse = addFromFile

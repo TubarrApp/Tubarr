@@ -3,54 +3,16 @@
   <head>
     <style>
       [x-cloak] { display: none !important; }
-      .active-downloads-table {
-        width: 100%;
-      }
-      .active-downloads-table .video-col {
-        width: 32%;
-      }
-      .active-downloads-table .channel-col {
-        width: 12%;
-      }
-      .active-downloads-table .status-col {
-        width: 12%;
-      }
-      .active-downloads-table .progress-col {
-        width: 32%;
-      }
-      .video-text {
-        max-width: 100%;
-        overflow-x: auto;
-        scrollbar-width: thin;
-      }
-      .scrollable-text {
-        display: block;
-        max-width: 100%;
-        overflow-x: hidden;
-      }
-      .scrollable-text-content {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        min-width: 100%;
-        white-space: nowrap;
-      }
-      .video-text::-webkit-scrollbar {
-        height: 4px;
-      }
-      .scrollable-text::-webkit-scrollbar {
-        height: 4px;
-      }
     </style>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>Active Downloads | Tubarr</title>
+    <title>Manual Download | Tubarr</title>
     <link rel="icon" href="/src/images/favicon.ico">
     <link href="style.css" rel="stylesheet">
   </head>
   <body
-    x-data="{ page: 'activeDownloads', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+    x-data="{ page: 'manualDownload', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
     class="dark bg-gray-900"
   >
     <!-- ===== Preloader Start ===== -->
@@ -100,7 +62,7 @@
           class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear"
         >
           <!-- Sidebar Menu -->
-          <nav x-data="{selected: $persist('Active Downloads')}">
+          <nav x-data="{selected: $persist('Manual Download')}">
             <!-- Menu Group -->
             <div>
               <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
@@ -511,110 +473,89 @@
         <!-- ===== Header End ===== -->
 
         <!-- ===== Main Content Start ===== -->
-        <main x-data="downloadsData()" x-init="init()">
+        <main x-data="manualDownloadData()" x-init="init()">
           <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
-            <!-- Breadcrumb -->
-            <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="mb-6">
               <h2 class="text-title-md2 font-bold text-gray-900 dark:text-white">
-                Active Downloads
+                Manual Download
               </h2>
+              <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                Download video URLs directly to a channel. Enter URLs one per line.
+                <br>
+                <br>
+                NOTE: Use piped <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">channel-url|video-url</code> entries where authentication is needed. The channel-url component should correspond to a monitored URL for the selected channel which has authentication details attached.
+              </p>
             </div>
 
-            <!-- Error Message -->
-            <div x-show="error" class="mb-6 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-400">
-              <p x-text="error"></p>
-            </div>
-
-            <!-- Loading State -->
-            <div x-show="loading" class="flex justify-center items-center py-12">
-              <div class="h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
-            </div>
-
-            <!-- Active Downloads List -->
-            <div x-show="!loading && !error" class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
-              <!-- No Downloads Message -->
-              <div x-show="downloads.length === 0" class="p-8 text-center">
-                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No active downloads</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">All downloads are complete or no downloads are currently in progress.</p>
-              </div>
-
-              <!-- Downloads Table -->
-              <div x-show="downloads.length > 0" class="overflow-x-auto">
-                <table class="w-full active-downloads-table">
-                  <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
-                    <tr>
-                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 video-col">Video</th>
-                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 channel-col">Channel</th>
-                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 status-col">Status</th>
-                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 progress-col">Progress</th>
-                      <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-                    <template x-for="download in downloads" :key="download.id">
-                      <tr>
-                        <!-- Video Info -->
-                        <td class="px-4 py-3 video-col">
-                          <div class="flex items-center gap-3">
-                            <img x-show="download.thumbnail_url" :src="download.thumbnail_url" :alt="download.title" class="h-12 w-20 object-cover rounded" />
-                            <div class="flex-1 min-w-0 video-text">
-                              <div class="scrollable-text">
-                                <div class="scrollable-text-content">
-                                  <p class="text-sm font-medium text-brand-600 dark:text-brand-400" x-text="download.title || 'Unknown'"></p>
-                                  <p class="text-sm text-gray-500 dark:text-gray-400" x-text="download.url"></p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <!-- Channel -->
-                        <td class="px-4 py-3 channel-col">
-                          <span class="text-sm text-gray-900 dark:text-white" x-text="download.channel_name || 'Unknown'"></span>
-                        </td>
-                        <!-- Status -->
-                        <td class="px-4 py-3 status-col">
-                          <span x-show="download.download_status.status === 'Downloading'" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30" style="color: #1e40af;" x-bind:style="$root.classList.contains('dark') ? 'color: #93c5fd;' : 'color: #1e40af;'" x-text="download.download_status.status"></span>
-                          <span x-show="download.download_status.status === 'Queued'" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30" style="color: #92400e;" x-bind:style="$root.classList.contains('dark') ? 'color: #fcd34d;' : 'color: #92400e;'" x-text="download.download_status.status"></span>
-                          <span x-show="download.download_status.status === 'Failed'" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30" style="color: #991b1b;" x-bind:style="$root.classList.contains('dark') ? 'color: #fca5a5;' : 'color: #991b1b;'" x-text="download.download_status.status"></span>
-                        </td>
-                        <!-- Progress -->
-                        <td class="px-4 py-3 progress-col">
-                          <div class="flex items-center gap-2">
-                            <div class="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                              <div
-                                class="bg-brand-500 h-2 rounded-full transition-all duration-300"
-                                :style="`width: ${download.download_status.percentage}%`"
-                              ></div>
-                            </div>
-                            <span class="text-sm text-gray-600 dark:text-gray-400 w-[3.5rem] text-right" x-text="`${download.download_status.percentage.toFixed(1)}%`"></span>
-                          </div>
-                        </td>
-                        <!-- Actions -->
-                        <td class="px-4 py-3">
-                          <button
-                            @click="cancelDownload(download.id)"
-                            :disabled="cancelling === download.id"
-                            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
-                          >
-                            <svg x-show="cancelling !== download.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                            <svg x-show="cancelling === download.id" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span x-text="cancelling === download.id ? 'Cancelling...' : 'Cancel'"></span>
-                          </button>
-                        </td>
-                      </tr>
+            <!-- Form Content Start -->
+            <div
+              class="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]"
+            >
+              <form @submit.prevent="submitDownload()">
+                <!-- Channel Selection -->
+                <div class="mb-6">
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Channel
+                  </label>
+                  <select
+                    x-model="selectedChannelId"
+                    required
+                    class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  >
+                    <option value="" disabled>Select a channel...</option>
+                    <template x-for="channel in channels" :key="channel.id">
+                      <option :value="channel.id" x-text="channel.name"></option>
                     </template>
-                  </tbody>
-                </table>
-              </div>
+                  </select>
+                </div>
+
+                <!-- URLs Textarea -->
+                <div class="mb-6">
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Video URLs <span class="text-gray-400 text-xs">(one per line)</span>
+                  </label>
+                  <textarea
+                    x-model="urlsText"
+                    required
+                    rows="10"
+                    placeholder="https://example.com/video1&#10;https://example.com/video2&#10;channel-url|video-url"
+                    class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                  ></textarea>
+                  <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Supports pipe syntax: <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">channel-url|video-url</code>
+                  </p>
+                </div>
+
+                <!-- Error Message -->
+                <div x-show="error" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+                  <p class="text-sm text-red-800 dark:text-red-300" x-text="error"></p>
+                </div>
+
+                <!-- Success Message -->
+                <div x-show="success" class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
+                  <p class="text-sm text-green-800 dark:text-green-300" x-text="success"></p>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex justify-end">
+                  <button
+                    type="submit"
+                    :disabled="submitting"
+                    class="px-6 py-3 bg-brand-500 text-white rounded-lg font-medium hover:bg-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <span x-show="!submitting">Download URLs</span>
+                    <span x-show="submitting" class="flex items-center">
+                      <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Downloading...
+                    </span>
+                  </button>
+                </div>
+              </form>
             </div>
+            <!-- Form Content End -->
           </div>
         </main>
         <!-- ===== Main Content End ===== -->
@@ -625,88 +566,86 @@
 
     <script defer src="bundle.js"></script>
     <script>
-      function downloadsData() {
+      function manualDownloadData() {
         return {
-          downloads: [],
-          loading: true,
-          error: null,
-          cancelling: null,
-          pollInterval: null,
+          channels: [],
+          selectedChannelId: '',
+          urlsText: '',
+          submitting: false,
+          error: '',
+          success: '',
 
-          init() {
-            this.loadDownloads();
-
-            // Poll for updates every 2 seconds
-            this.pollInterval = setInterval(() => {
-              this.loadDownloads(true);
-            }, 2000);
+          async init() {
+            await this.fetchChannels();
           },
 
-          async loadDownloads(silent = false) {
-            if (!silent) {
-              this.loading = true;
-            }
-
+          async fetchChannels() {
             try {
-              const response = await fetch('/api/v1/downloads');
+              const response = await fetch('/api/v1/channels/all');
               if (!response.ok) {
-                throw new Error('Failed to fetch active downloads');
+                throw new Error('Failed to fetch channels');
               }
-
-              this.downloads = await response.json() || [];
-              this.error = null;
+              const data = await response.json();
+              this.channels = data || [];
             } catch (err) {
-              this.error = err.message;
-              // Stop polling if there's an error
-              if (this.pollInterval) {
-                clearInterval(this.pollInterval);
-              }
-            } finally {
-              this.loading = false;
+              this.error = 'Failed to load channels: ' + err.message;
             }
           },
 
-          async cancelDownload(videoId) {
-            if (this.cancelling) return;
+          async submitDownload() {
+            this.error = '';
+            this.success = '';
 
-            if (!confirm('Are you sure you want to cancel this download?')) {
+            if (!this.selectedChannelId) {
+              this.error = 'Please select a channel';
               return;
             }
 
-            this.cancelling = videoId;
-
-            // Find the download to get its channel ID
-            const download = this.downloads.find(d => d.id === videoId);
-            if (!download) {
-              alert('Download not found');
-              this.cancelling = null;
+            if (!this.urlsText.trim()) {
+              this.error = 'Please enter at least one URL';
               return;
             }
+
+            // Split URLs by newline and filter out empty lines
+            const urls = this.urlsText
+              .split('\n')
+              .map(url => url.trim())
+              .filter(url => url !== '');
+
+            if (urls.length === 0) {
+              this.error = 'Please enter at least one valid URL';
+              return;
+            }
+
+            this.submitting = true;
 
             try {
-              const response = await fetch(`/api/v1/channels/${download.channel_id}/cancel-download/${videoId}`, {
-                method: 'DELETE'
+              const response = await fetch(`/api/v1/channels/${this.selectedChannelId}/download-urls`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ urls }),
               });
 
               if (!response.ok) {
-                throw new Error('Failed to cancel download');
+                const errorText = await response.text();
+                throw new Error(errorText || 'Download request failed');
               }
 
-              // Reload downloads after cancelling
-              await this.loadDownloads();
+              this.success = `Successfully started downloading ${urls.length} URL(s) to the selected channel. Check Active Downloads for progress.`;
+              this.urlsText = '';
+
+              // Optional: Redirect to active downloads after a delay
+              setTimeout(() => {
+                window.location.href = 'active-downloads.html';
+              }, 2000);
             } catch (err) {
-              alert(`Failed to cancel download: ${err.message}`);
+              this.error = 'Download failed: ' + err.message;
             } finally {
-              this.cancelling = null;
+              this.submitting = false;
             }
           },
-
-          destroy() {
-            // Clean up polling interval when component is destroyed
-            if (this.pollInterval) {
-              clearInterval(this.pollInterval);
-            }
-          }
         };
       }
     </script>
