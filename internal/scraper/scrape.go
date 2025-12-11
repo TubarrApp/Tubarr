@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -381,7 +382,7 @@ func setupFieldScraping(c *colly.Collector, fieldName string, rules []consts.HTM
 						html = strings.ReplaceAll(html, "<br>", "\n")
 						html = strings.ReplaceAll(html, "<br/>", "\n")
 						html = strings.ReplaceAll(html, "<br />", "\n")
-						html = strings.ReplaceAll(html, "&nbsp", "\n")
+						html = strings.ReplaceAll(html, "&nbsp;", "\n")
 						html = strings.ReplaceAll(html, " \n", "\n")
 						html = strings.ReplaceAll(html, "\n ", "\n")
 						html = strings.TrimSpace(html)
@@ -393,7 +394,8 @@ func setupFieldScraping(c *colly.Collector, fieldName string, rules []consts.HTM
 					value = h.Text
 				}
 			}
-
+			// Unescape HTML entities like &#39; &quot; &amp; etc. and trim whitespace.
+			value = html.UnescapeString(value)
 			value = strings.TrimSpace(value)
 
 			if value != "" {
