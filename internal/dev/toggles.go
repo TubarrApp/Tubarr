@@ -3,5 +3,8 @@ package dev
 
 // Program toggles
 const (
-	CensoredTVUseCustom = true
+	CensoredTVUseCustom  = true
+	BitchuteComUseCustom = false
+	OdyseeComUseCustom   = false
+	RumbleComUseCustom   = false
 )

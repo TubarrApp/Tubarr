@@ -142,15 +142,27 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 	switch {
 	case strings.Contains(v.URL, "censored.tv"):
 		if !dev.CensoredTVUseCustom {
-			logger.Pl.I("Using regular scraper for censored.tv ...")
+			logger.Pl.I("Using regular scraper for %q...", v.URL)
 			return nil
 		}
 		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLCensored)
 	case strings.Contains(v.URL, "bitchute.com"):
+		if !dev.BitchuteComUseCustom {
+			logger.Pl.I("Using regular scraper for %q...", v.URL)
+			return nil
+		}
 		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLBitchute)
 	case strings.Contains(v.URL, "odysee.com"):
+		if !dev.OdyseeComUseCustom {
+			logger.Pl.I("Using regular scraper for %q...", v.URL)
+			return nil
+		}
 		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLOdysee)
 	case strings.Contains(v.URL, "rumble.com"):
+		if !dev.RumbleComUseCustom {
+			logger.Pl.I("Using regular scraper for %q...", v.URL)
+			return nil
+		}
 		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLRumble)
 	default:
 		logger.Pl.D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
