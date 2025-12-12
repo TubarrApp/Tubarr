@@ -345,7 +345,7 @@ func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, 
 	if cookies := cm.GetCachedAuthCookies(parsedURL.Host); cookies != nil {
 		jar.SetCookies(parsedURL, cookies)
 	} else {
-		logger.Pl.W("no authentication cookies available for %q", parsedURL.Host)
+		logger.Pl.W("No authentication cookies available for %q", parsedURL.Host)
 	}
 
 	// Create a Colly collector with the custom HTTP client
