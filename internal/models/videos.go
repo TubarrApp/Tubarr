@@ -1,7 +1,7 @@
 package models
 
 import (
-	"os"
+	"fmt"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -9,8 +9,6 @@ import (
 )
 
 // Video contains fields relating to a video, and a pointer to the channel it belongs to.
-//
-// Matches the order of the DB table, do not alter.
 type Video struct {
 	ID                  int64                 `json:"id" db:"id"`
 	ChannelID           int64                 `json:"channel_id" db:"channel_id"`
@@ -38,40 +36,42 @@ type Video struct {
 }
 
 // StoreFilenamesFromMetarr stores filenames after Metarr completion.
-func (v *Video) StoreFilenamesFromMetarr(cmdOut string) {
+func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 	lines := strings.Split(cmdOut, "\n")
-	if len(lines) < 2 {
-		logger.Pl.E("Metarr did not return expected lines for video %q. Got: %v", v.URL, lines)
-		return
+	if len(lines) == 0 {
+		return fmt.Errorf("metarr did not return any lines for %q, could not grab final file paths", v.URL)
 	}
 
-	// Find lines
+	// Find file path lines.
+	gotVideo := false
 	for _, l := range lines {
 		if l == "" {
 			continue
 		}
 
+		// Video path.
 		if after, ok := strings.CutPrefix(l, "final video path: "); ok {
-			mVPath := after
-			if mVPath != "" {
-				if _, err := os.Stat(mVPath); err != nil {
-					logger.Pl.E("Got invalid video path %q from Metarr: %v", mVPath, err)
-				}
-				v.VideoFilePath = mVPath
+			if after != "" {
+				v.VideoFilePath = after
+				gotVideo = true
 			}
 		}
 
+		// JSON path.
 		if after, ok := strings.CutPrefix(l, "final json path: "); ok {
-			mJPath := after
-			if mJPath != "" {
-				if _, err := os.Stat(mJPath); err != nil {
-					logger.Pl.E("Got invalid JSON path %q from Metarr: %v", mJPath, err)
-				}
-				v.JSONFilePath = mJPath
+			if after != "" {
+				v.JSONFilePath = after
 			}
 		}
 	}
-	logger.Pl.S("Video %q got filenames from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.VideoFilePath, v.JSONFilePath)
+
+	// Check video path was obtained.
+	if !gotVideo {
+		return fmt.Errorf("metarr did not return the final video path for %q. Got lines: %v", v.URL, lines)
+	}
+
+	logger.Pl.S("Video %q got file paths from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.VideoFilePath, v.JSONFilePath)
+	return nil
 }
 
 // MarkVideoAsIgnored marks the video as completed and ignored.

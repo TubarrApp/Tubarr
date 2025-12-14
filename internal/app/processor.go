@@ -267,12 +267,11 @@ func videoJob(
 		}
 
 		if err := metarr.InitMetarr(metarrCtx, video, channelURL, channel, dirParser); err != nil {
-			logger.Pl.E("Metarr processing error for video (ID: %d, URL: %s): %v", video.ID, video.URL, err)
-			return
+			logger.Pl.E("Metarr processing error for video %q: %v", video.URL, err)
 		}
 
 		if err := completeAndStoreVideo(cs, vs, video, channel); err != nil {
-			logger.Pl.E("Failed to complete video after metarr (ID: %d, URL: %s): %v", video.ID, video.URL, err)
+			logger.Pl.E("Failed to complete video %q after metarr: %v", video.URL, err)
 		}
 	}(v, cu, c)
 
