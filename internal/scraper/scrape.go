@@ -80,7 +80,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 	// Process each ChannelURL
 	for _, cu := range c.URLModels {
-		if cu.IsManual {
+		if cu.IsManual || cu.ChanURLSettings.Paused {
 			continue
 		}
 		logger.Pl.D(1, "Processing channel URL %q", cu.URL)

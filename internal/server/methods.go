@@ -23,7 +23,7 @@ import (
 // This function blocks until the stop channel is signaled or context is cancelled.
 func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Signal) {
 
-	const timeBetweenCheck = (1 * time.Minute)
+	const timeBetweenCheck = (30 * time.Second)
 
 	// Start ticker
 	ticker := time.NewTicker(timeBetweenCheck) // check every minute

@@ -1068,7 +1068,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			if err := app.CrawlChannel(ctx, ss.s, c); err != nil {
 				logger.Pl.E("Encountered errors crawling channel %q: %v", c.Name, err)
 			} else {
-				logger.Pl.S("Successfully completed crawl for channel %q", c.Name)
+				logger.Pl.S("Completed crawl for channel %q", c.Name)
 			}
 		}(ss.ctx)
 

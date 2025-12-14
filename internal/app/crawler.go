@@ -258,6 +258,24 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	if c == nil {
 		return fmt.Errorf("channel cannot be nil")
 	}
+
+	// Check URLs to crawl.
+	urlsToCrawl := 0
+	for _, cu := range c.URLModels {
+		if !cu.IsManual && !cu.ChanURLSettings.Paused {
+			urlsToCrawl++
+		}
+
+		if cu.ChanURLSettings.Paused {
+			logger.Pl.D(1, "Skipping paused channel URL %q...", cu.URL)
+		}
+	}
+	if urlsToCrawl == 0 {
+		logger.Pl.I("No monitored URLs for channel %q", c.Name)
+		return nil
+	}
+
+	// Get channel store.
 	cs := s.ChannelStore()
 
 	// Add random sleep before processing (added bot detection).
@@ -311,14 +329,8 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 
 	// Process channel URLs.
 	for _, cu := range c.URLModels {
-		// Skip manual channel entry.
-		if cu.IsManual {
-			continue
-		}
-
-		// Skip paused URL.
-		if cu.ChanURLSettings.Paused {
-			logger.Pl.I("Skipping unmonitored channel URL %q...", cu.URL)
+		// Skip manual or paused channel entry.
+		if cu.IsManual || cu.ChanURLSettings.Paused {
 			continue
 		}
 
