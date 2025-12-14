@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -372,7 +373,14 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	response := make(map[string]any)
 	response[consts.QChanID] = c.ID
 	response[consts.QChanName] = c.Name
-	response["urls"] = c.GetURLs()
+
+	// Filter out manual-downloads URL from the list.
+	urls := c.GetURLs()
+	urls = slices.DeleteFunc(urls, func(url string) bool {
+		return url == consts.ManualDownloadsCol
+	})
+	response["urls"] = urls
+
 	response[consts.QChanLastScan] = c.LastScan
 	response[consts.QChanCreatedAt] = c.CreatedAt
 	response[consts.QChanUpdatedAt] = c.UpdatedAt
@@ -389,9 +397,12 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		response[consts.QChanMetarr] = metarrMap
 	}
 
-	// Build auth_details array.
+	// Build auth_details array (excluding manual-downloads).
 	authDetails := make([]map[string]string, 0)
 	for _, urlModel := range c.URLModels {
+		if urlModel.URL == consts.ManualDownloadsCol {
+			continue
+		}
 		if urlModel.Username != "" || urlModel.LoginURL != "" {
 			authDetails = append(authDetails, map[string]string{
 				"channel_url": urlModel.URL,
@@ -403,9 +414,12 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	}
 	response["auth_details"] = authDetails
 
-	// Build url_settings map.
+	// Build url_settings map (excluding manual-downloads).
 	urlSettings := make(map[string]map[string]any)
 	for _, urlModel := range c.URLModels {
+		if urlModel.URL == consts.ManualDownloadsCol {
+			continue
+		}
 		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil {
 			urlSettings[urlModel.URL] = make(map[string]any)
 

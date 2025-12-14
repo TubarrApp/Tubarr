@@ -257,6 +257,9 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	if v, ok := data[jsonkeys.SettingsUseGlobalCookies].(bool); ok {
 		settings.UseGlobalCookies = v
 	}
+	if v, ok := data["paused"].(bool); ok {
+		settings.Paused = v
+	}
 
 	// Parse model fields from strings (newline-separated, not space-separated).
 	if filtersStr, ok := data[jsonkeys.SettingsFilters].(string); ok && filtersStr != "" {

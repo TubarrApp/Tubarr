@@ -630,6 +630,18 @@
                         </label>
                       </div>
 
+                      <!-- Do Not Monitor Toggle -->
+                      <div>
+                        <label class="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            x-model="urlEntry.Paused"
+                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-gray-300">Do Not Monitor</span>
+                        </label>
+                      </div>
+
                       <!-- Custom Settings (shown when hasCustomSettings is true) -->
                       <div x-show="urlEntry.hasCustomSettings" x-data="{ urlTab: 'overview' }" class="mt-4 p-4 border-2 border-brand-500 dark:border-brand-600 rounded-lg space-y-3 bg-blue-50 dark:bg-blue-900/20">
                         <div class="flex items-center justify-between">
@@ -1690,6 +1702,7 @@
               password: '',
               loginURL: '',
               hasCustomSettings: false,
+              Paused: false,
               custom: {
                 video_directory: '',
                 json_directory: '',
@@ -1865,11 +1878,19 @@
             const perURL = {};
 
             this.formData.urls.forEach(urlEntry => {
-              if (urlEntry.hasCustomSettings && urlEntry.url && urlEntry.custom) {
-                const channelURL = urlEntry.url;
-                const settings = {};
-                const metarr = {};
+              if (!urlEntry.url) return;
 
+              const channelURL = urlEntry.url;
+              const settings = {};
+              const metarr = {};
+
+              // Process Paused field (independent of hasCustomSettings)
+              if (urlEntry.Paused) {
+                settings.paused = true;
+              }
+
+              // Process custom settings if enabled
+              if (urlEntry.hasCustomSettings && urlEntry.custom) {
                 // Process basic/advanced settings
                 const settingsFields = [
                   'video_directory', 'json_directory', 'max_concurrency', 'crawl_freq',
@@ -1916,13 +1937,13 @@
                     }
                   }
                 });
+              }
 
-                // Only add if there are overrides
-                if (Object.keys(settings).length > 0 || Object.keys(metarr).length > 0) {
-                  perURL[channelURL] = {};
-                  if (Object.keys(settings).length > 0) perURL[channelURL].settings = settings;
-                  if (Object.keys(metarr).length > 0) perURL[channelURL].metarr = metarr;
-                }
+              // Only add if there are overrides
+              if (Object.keys(settings).length > 0 || Object.keys(metarr).length > 0) {
+                perURL[channelURL] = {};
+                if (Object.keys(settings).length > 0) perURL[channelURL].settings = settings;
+                if (Object.keys(metarr).length > 0) perURL[channelURL].metarr = metarr;
               }
             });
 

@@ -312,7 +312,13 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	// Process channel URLs.
 	for _, cu := range c.URLModels {
 		// Skip manual channel entry.
-		if cu.IsManual || cu.ChanURLSettings.Paused {
+		if cu.IsManual {
+			continue
+		}
+
+		// Skip paused URL.
+		if cu.ChanURLSettings.Paused {
+			logger.Pl.I("Skipping unmonitored channel URL %q...", cu.URL)
 			continue
 		}
 
@@ -468,9 +474,7 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 
 	// Get channel to inherit settings.
 	manualChanURL := &models.ChannelURL{
-		URL:               consts.ManualDownloadsCol,
-		ChanURLSettings:   c.ChanSettings,
-		ChanURLMetarrArgs: c.ChanMetarrArgs,
+		URL: consts.ManualDownloadsCol,
 	}
 
 	// Create it if it doesn't exist.
