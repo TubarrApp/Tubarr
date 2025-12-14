@@ -20,7 +20,6 @@ const (
 var (
 	MetarrLogs      [][]byte
 	MetarrLogsMutex sync.RWMutex
-	MetarrFinished  bool
 )
 
 // BlockContext represents the authentication context for domain blocking.

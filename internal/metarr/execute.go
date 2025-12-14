@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"syscall"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 )
@@ -47,9 +46,7 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 		logger.Pl.E("Encountered error running command %q: %v", cmd.String(), err)
 		return err
 	}
-
-	// Set Metarr finished (handler will reload file)
-	vars.MetarrFinished = true
+	logger.Pl.S("Finished Metarr processing for video %q", v.URL)
 
 	// Retrieve filenames
 	v.StoreFilenamesFromMetarr(string(metarrStdout))

@@ -1273,12 +1273,6 @@ func (ss *serverStore) handleGetTubarrLogs(w http.ResponseWriter, _ *http.Reques
 func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	// Reload file after Metarr exits.
-	if vars.MetarrFinished {
-		vars.MetarrLogs = file.LoadMetarrLogs()
-		vars.MetarrFinished = false
-	}
-
 	// Print logs from memory with read lock.
 	vars.MetarrLogsMutex.RLock()
 	defer vars.MetarrLogsMutex.RUnlock()
