@@ -22,8 +22,7 @@ import (
 //
 // This function blocks until the stop channel is signaled or context is cancelled.
 func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Signal) {
-
-	const timeBetweenCheck = (30 * time.Second)
+	const timeBetweenCheck = (10 * time.Second)
 
 	// Start ticker
 	ticker := time.NewTicker(timeBetweenCheck) // check every minute
@@ -108,7 +107,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						if err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {
 							logger.Pl.E("Crawl watchdog: error crawling channel %q: %v", ch.Name, err)
 						} else {
-							logger.Pl.S("Crawl watchdog: successfully completed crawl for channel %q", ch.Name)
+							logger.Pl.S("Crawl watchdog: completed crawl for channel %q", ch.Name)
 						}
 					}(c)
 				}
