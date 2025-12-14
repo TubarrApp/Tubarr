@@ -211,49 +211,49 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 		chanURLs = make([]*models.ChannelURL, 0, len(*input.URLs))
 
 		for _, u := range *input.URLs {
-		if u == "" {
-			continue
-		}
+			if u == "" {
+				continue
+			}
 
-		var parsedUsername, parsedPassword, parsedLoginURL string
-		if a, exists := authMap[u]; exists {
-			parsedUsername = a.Username
-			parsedPassword = a.Password
-			parsedLoginURL = a.LoginURL
-		}
+			var parsedUsername, parsedPassword, parsedLoginURL string
+			if a, exists := authMap[u]; exists {
+				parsedUsername = a.Username
+				parsedPassword = a.Password
+				parsedLoginURL = a.LoginURL
+			}
 
-		chanURL := &models.ChannelURL{
-			URL:       u,
-			Username:  parsedUsername,
-			Password:  parsedPassword,
-			LoginURL:  parsedLoginURL,
-			LastScan:  now,
-			CreatedAt: now,
-			UpdatedAt: now,
-		}
+			chanURL := &models.ChannelURL{
+				URL:       u,
+				Username:  parsedUsername,
+				Password:  parsedPassword,
+				LoginURL:  parsedLoginURL,
+				LastScan:  now,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
 
-		// Per-URL overrides
-		if input.URLSettings != nil {
-			nURL := strings.ToLower(u)
-			if override, ok := input.URLSettings[nURL]; ok {
-				if override.Settings != nil {
-					s, err := buildSettingsFromInput(override.Settings)
-					if err != nil {
-						return nil, nil, fmt.Errorf("per-URL settings error for %s: %w", u, err)
+			// Per-URL overrides
+			if input.URLSettings != nil {
+				nURL := strings.ToLower(u)
+				if override, ok := input.URLSettings[nURL]; ok {
+					if override.Settings != nil {
+						s, err := buildSettingsFromInput(override.Settings)
+						if err != nil {
+							return nil, nil, fmt.Errorf("per-URL settings error for %s: %w", u, err)
+						}
+						chanURL.ChanURLSettings = s
 					}
-					chanURL.ChanURLSettings = s
-				}
-				if override.Metarr != nil {
-					m, err := buildMetarrArgsFromInput(override.Metarr)
-					if err != nil {
-						return nil, nil, fmt.Errorf("per-URL metarr error for %s: %w", u, err)
+					if override.Metarr != nil {
+						m, err := buildMetarrArgsFromInput(override.Metarr)
+						if err != nil {
+							return nil, nil, fmt.Errorf("per-URL metarr error for %s: %w", u, err)
+						}
+						chanURL.ChanURLMetarrArgs = m
 					}
-					chanURL.ChanURLMetarrArgs = m
 				}
 			}
-		}
 
-		chanURLs = append(chanURLs, chanURL)
+			chanURLs = append(chanURLs, chanURL)
 		}
 	}
 

@@ -1173,7 +1173,9 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	// Check crawl state.
 	if state.CrawlStateActive(c.Name) {
 		w.WriteHeader(http.StatusLocked)
-		w.Write([]byte(`Channel has an active crawl job running. Try again after it is completed.`))
+		if _, err := w.Write([]byte(`Channel has an active crawl job running. Try again after it is completed.`)); err != nil {
+			logger.Pl.E("Could not write response: %v", err)
+		}
 		return
 	}
 
@@ -1182,6 +1184,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	defer state.UnlockCrawlState(c.Name)
 
 	// Start download in background.
+	//nolint:contextcheck
 	go func(ctx context.Context) {
 		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.URLs), c.Name, id)
 

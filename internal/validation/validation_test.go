@@ -1001,8 +1001,14 @@ func TestValidateGPUNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			fmt.Printf("Failed to remove temp file: %v", err)
+		}
+	}()
+	if err := tmpFile.Close(); err != nil {
+		fmt.Printf("Failed to close temp file: %v", err)
+	}
 
 	tests := []struct {
 		name         string
