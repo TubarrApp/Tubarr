@@ -164,7 +164,7 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 
 // GetAuth retrieves authentication details for a specific URL in a channel.
 func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password, loginURL string, err error) {
-	var u, p, l sql.NullString // Use sql.NullString to handle NULL values
+	var u, p, l sql.NullString // Use sql.NullString to handle NULL values.
 
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s FROM %s WHERE %s = ? AND %s = ?",
@@ -213,10 +213,10 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidURL,
-		strings.Join(placeholders, ","), // join only the placeholders, not values
+		strings.Join(placeholders, ","), // join only the placeholders, not values.
 	)
 
-	args = append([]any{channelID}, args...) // prepend channelID
+	args = append([]any{channelID}, args...) // prepend channelID.
 
 	rows, err := cs.DB.Query(query, args...)
 	if err != nil {
@@ -228,14 +228,14 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		}
 	}()
 
-	// Temp variable holder for file delete iteration
+	// Temp variable holder for file delete iteration.
 	type vPaths struct {
 		url   sql.NullString
 		vPath sql.NullString
 		jPath sql.NullString
 	}
 
-	// File deletion iterator
+	// File deletion iterator.
 	for rows.Next() {
 		var tmp vPaths
 
@@ -261,7 +261,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		}
 	}
 
-	// Remove videos from database
+	// Remove videos from database.
 	deletePlaceholders := make([]string, len(urls))
 	deleteArgs := make([]any, 0, len(urls)+1)
 
@@ -353,16 +353,16 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	// Use Viper to load in flags
+	// Use Viper to load in flags.
 	v := viper.New()
 	if err := file.LoadConfigFile(v, cfgFile); err != nil {
 		return err
 	}
 
-	// Make []byte copy of settings before
+	// Make []byte copy of settings before.
 	settingsBeforeJSON, metarrBeforeJSON := makeSettingsMetarrArgsCopy(c.ChanSettings, c.ChanMetarrArgs, c.Name)
 
-	// Apply changes to model
+	// Apply changes to model.
 	if err := cs.applyConfigChannelSettings(v, c); err != nil {
 		return err
 	}
@@ -371,17 +371,17 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	// []byte copy of settings after for comparison
+	// []byte copy of settings after for comparison.
 	settingsAfterJSON, metarrAfterJSON := makeSettingsMetarrArgsCopy(c.ChanSettings, c.ChanMetarrArgs, c.Name)
 
-	// Return early if unchanged
+	// Return early if unchanged.
 	if bytes.Equal(settingsBeforeJSON, settingsAfterJSON) &&
 		bytes.Equal(metarrBeforeJSON, metarrAfterJSON) {
 		logger.Pl.D(1, "No changes to channel from config file.")
 		return nil
 	}
 
-	// Propagate into database
+	// Propagate into database.
 	chanID := strconv.FormatInt(c.ID, 10)
 	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, chanID, func(s *models.Settings) error {
 		if c.ChanSettings == nil {
@@ -405,7 +405,7 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	// Reload URL models
+	// Reload URL models.
 	c.URLModels, err = cs.GetChannelURLModels(c, true)
 	if err != nil {
 		return fmt.Errorf("failed to reload URL models after cascade: %w", err)
@@ -449,7 +449,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 		consts.QNotifyChanID,
 	)
 
-	// Execute query to get rows
+	// Execute query to get rows.
 	rows, err := cs.DB.Query(query, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query notification URLs: %w", err)
@@ -460,7 +460,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 		}
 	}()
 
-	// Collect notification models
+	// Collect notification models.
 	var notificationModels []*models.Notification
 
 	for rows.Next() {
@@ -479,7 +479,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 		notificationModels = append(notificationModels, &nModel)
 	}
 
-	// Check for errors from iterating over rows
+	// Check for errors from iterating over rows.
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating notification URLs: %w", err)
 	}
@@ -621,12 +621,12 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("channel with name %q already exists", c.Name)
 	}
 
-	// JSON dir
+	// JSON dir.
 	if c.ChanSettings.JSONDir == "" {
 		c.ChanSettings.JSONDir = c.ChanSettings.VideoDir
 	}
 
-	// Validate complete models at DB write boundary
+	// Validate complete models at DB write boundary.
 	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
 		return 0, fmt.Errorf("cannot insert channel with invalid settings: %w", err)
 	}
@@ -634,31 +634,31 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("cannot insert channel with invalid metarr config: %w", err)
 	}
 
-	// Convert settings to JSON
+	// Convert settings to JSON.
 	settingsJSON, err := json.Marshal(c.ChanSettings)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
-	// Convert metarr settings to JSON
+	// Convert metarr settings to JSON.
 	metarrJSON, err := json.Marshal(c.ChanMetarrArgs)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal metarr settings: %w", err)
 	}
 
-	// Convert empty slice to JSON
+	// Convert empty slice to JSON.
 	newVideoURLs, err := json.Marshal([]string{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal empty new video URL slice: %w", err)
 	}
 
-	// Begin transaction
+	// Begin transaction.
 	tx, err := cs.DB.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	// Ensure rollback on error
+	// Ensure rollback on error.
 	defer func() {
 		if p := recover(); p != nil {
 			if rbErr := tx.Rollback(); rbErr != nil {
@@ -672,7 +672,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		}
 	}()
 
-	// Insert into the channels table
+	// Insert into the channels table.
 	now := time.Now()
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -702,18 +702,18 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("failed to insert channel: %w", err)
 	}
 
-	// Get the new channel ID
+	// Get the new channel ID.
 	id, err := result.LastInsertId()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
 
-	// Insert URLs into the channel_urls table
+	// Insert URLs into the channel_urls table.
 	logger.Pl.D(1, "Inserting %d channel URLs for channel ID %d", len(c.URLModels), id)
 	for i, cu := range c.URLModels {
 		logger.Pl.D(1, "Inserting URL %d: %q", i+1, cu.URL)
 
-		// Validate URL format (skip empty URLs and the special "manual-downloads" URL)
+		// Validate URL format (skip empty URLs and the special "manual-downloads" URL).
 		if cu.URL != "" && cu.URL != "manual-downloads" {
 			if _, urlErr := url.ParseRequestURI(cu.URL); urlErr != nil {
 				err = fmt.Errorf("invalid URL %q: %w", cu.URL, urlErr)
@@ -725,7 +725,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
 		}
 
-		// Check if custom args exist
+		// Check if custom args exist.
 		var (
 			customMetarrArgs []byte
 			customSettings   []byte
@@ -784,7 +784,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		logger.Pl.D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
 	}
 
-	// Commit transaction
+	// Commit transaction.
 	if err = tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -869,21 +869,21 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 	}
 
-	// Unmarshal settings
+	// Unmarshal settings.
 	if len(settings) > 0 {
 		if err := json.Unmarshal(settings, &c.ChanSettings); err != nil {
 			return nil, true, fmt.Errorf("failed to unmarshal channel settings: %w", err)
 		}
 	}
 
-	// Unmarshal metarr settings
+	// Unmarshal metarr settings.
 	if len(metarrJSON) > 0 {
 		if err := json.Unmarshal(metarrJSON, &c.ChanMetarrArgs); err != nil {
 			return nil, true, fmt.Errorf("failed to unmarshal metarr settings: %w", err)
 		}
 	}
 
-	// Validate models at DB read boundary
+	// Validate models at DB read boundary.
 	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
 		return nil, true, fmt.Errorf("invalid settings from database: %w", err)
 	}
@@ -891,7 +891,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		return nil, true, fmt.Errorf("invalid metarr config from database: %w", err)
 	}
 
-	// Get URL models
+	// Get URL models.
 	c.URLModels, err = cs.GetChannelURLModels(&c, mergeURLsWithParent)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to fetch URL models for channel: %w", err)
@@ -958,7 +958,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 			}
 		}
 
-		// Validate models at DB read boundary
+		// Validate models at DB read boundary.
 		if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
 			return nil, true, fmt.Errorf("invalid settings from database for channel %q: %w", c.Name, err)
 		}
@@ -972,9 +972,9 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		channels = append(channels, &c)
 	}
 
-	// Iterate all channels
+	// Iterate all channels.
 	for _, c := range channels {
-		// Check custom URL settings
+		// Check custom URL settings.
 		for _, cURL := range c.URLModels {
 			if !models.SettingsAllZero(cURL.ChanURLSettings) && !models.ChildSettingsMatchParent(c.ChanSettings, cURL.ChanURLSettings) {
 				if err := validation.ValidateSettingsModel(cURL.ChanURLSettings); err != nil {
@@ -1013,32 +1013,32 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 		return 0, fmt.Errorf("failed to get channel settings: %w", err)
 	}
 
-	// Unmarshal current settings
+	// Unmarshal current settings.
 	var args models.MetarrArgs
 	if err := json.Unmarshal(metarrArgs, &args); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
-	// Apply the update
+	// Apply the update.
 	if err := updateFn(&args); err != nil {
 		return 0, fmt.Errorf("failed to update settings: %w", err)
 	}
 
-	// Validate updated MetarrArgs at DB write boundary
+	// Validate updated MetarrArgs at DB write boundary.
 	if err := validation.ValidateMetarrArgsModel(&args); err != nil {
 		return 0, fmt.Errorf("updated metarr config is invalid: %w", err)
 	}
 
-	// Marshal updated settings
+	// Marshal updated settings.
 	updatedArgs, err := json.Marshal(args)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
-	// Print the updated settings
+	// Print the updated settings.
 	logger.Pl.S("Updated MetarrArgs: %s", string(updatedArgs))
 
-	// Update the database with the new settings
+	// Update the database with the new settings.
 	updateQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = ?",
 		consts.DBChannels,
@@ -1075,32 +1075,32 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 		return 0, fmt.Errorf("failed to get channel settings: %w", err)
 	}
 
-	// Unmarshal current settings
+	// Unmarshal current settings.
 	var settings models.Settings
 	if err := json.Unmarshal(settingsJSON, &settings); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal settings: %w", err)
 	}
 
-	// Apply the update
+	// Apply the update.
 	if err := updateFn(&settings); err != nil {
 		return 0, fmt.Errorf("failed to update settings: %w", err)
 	}
 
-	// Validate updated Settings at DB write boundary
+	// Validate updated Settings at DB write boundary.
 	if err := validation.ValidateSettingsModel(&settings); err != nil {
 		return 0, fmt.Errorf("updated settings are invalid: %w", err)
 	}
 
-	// Marshal updated settings
+	// Marshal updated settings.
 	updatedSettings, err := json.Marshal(settings)
 	if err != nil {
 		return 0, fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
-	// Print the updated settings
+	// Print the updated settings.
 	logger.Pl.S("Updated ChannelSettings: %s", string(updatedSettings))
 
-	// Update the database with the new settings
+	// Update the database with the new settings.
 	updateQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = ?",
 		consts.DBChannels,
@@ -1133,18 +1133,18 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 		key,
 	)
 
-	// Print SQL query
+	// Print SQL query.
 	if logging.Level > 1 {
 		logger.Pl.P("Executing SQL: %s with args: %v\n", query, []any{newVal, val})
 	}
 
-	// Execute query
+	// Execute query.
 	res, err := cs.DB.Exec(query, newVal, val)
 	if err != nil {
 		return err
 	}
 
-	// Ensure a row was updated
+	// Ensure a row was updated.
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
 		return err
@@ -1259,7 +1259,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 		}
 
-		// Handle nullable fields
+		// Handle nullable fields.
 		if channelURLID.Valid {
 			v.ChannelURLID = channelURLID.Int64
 		}
@@ -1350,14 +1350,14 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		return url == consts.ManualDownloadsCol
 	})
 
-	// Channel basic info
+	// Channel basic info.
 	fmt.Printf("\n%sBasic Info:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	fmt.Printf("ID: %d\n", c.ID)
 	fmt.Printf("Name: %s\n", c.Name)
 	fmt.Printf("Config File: %s\n", c.ChannelConfigFile)
 	fmt.Printf("URLs: %+v\n", cURLs)
 
-	// Channel settings
+	// Channel settings.
 	if s == nil {
 		logger.Pl.P("(Settings not configured)\n")
 		return
@@ -1367,7 +1367,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("\n%sChannel Settings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	displaySettingsStruct(c.ChanSettings)
 
-	// Metarr settings
+	// Metarr settings.
 	fmt.Printf("\n%sMetarr Settings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	if m == nil {
 		fmt.Printf("(Metarr arguments not configured)\n")
@@ -1387,7 +1387,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		}
 	}
 
-	// Notification URLs
+	// Notification URLs.
 	nURLs := make([]string, 0, len(notifyURLs))
 	for _, n := range notifyURLs {
 		newNUrl := n.NotifyURL
@@ -1401,7 +1401,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 
 	fmt.Printf("\n%sAuthentication:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 
-	// Auth details
+	// Auth details.
 	gotAuthModels := false
 	for _, cu := range c.URLModels {
 
@@ -1502,7 +1502,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChanSettings = &models.Settings{}
 	}
 
-	// Channel config file location
+	// Channel config file location.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ChannelConfigFile); ok {
 		if _, _, err = sharedvalidation.ValidateFile(v, false, sharedtemplates.NoTemplateTags); err != nil {
 			return err
@@ -1510,37 +1510,37 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChannelConfigFile = v
 	}
 
-	// Concurrency limit
+	// Concurrency limit.
 	if v, ok := parsing.GetConfigValue[int](vip, keys.ChanOrURLConcurrencyLimit); ok {
 		c.ChanSettings.Concurrency = sharedvalidation.ValidateConcurrencyLimit(v)
 	}
 
-	// Cookie source
+	// Cookie source.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.CookiesFromBrowser); ok {
 		c.ChanSettings.CookiesFromBrowser = v // No check for this currently! (cookies-from-browser)
 	}
 
-	// Crawl frequency
+	// Crawl frequency.
 	if v, ok := parsing.GetConfigValue[int](vip, keys.CrawlFreq); ok {
 		c.ChanSettings.CrawlFreq = max(v, 0)
 	}
 
-	// Download retries
+	// Download retries.
 	if v, ok := parsing.GetConfigValue[int](vip, keys.DLRetries); ok {
 		c.ChanSettings.Retries = v
 	}
 
-	// External downloader
+	// External downloader.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ExternalDownloader); ok {
 		c.ChanSettings.ExternalDownloader = v // No checks for this yet.
 	}
 
-	// External downloader arguments
+	// External downloader arguments.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ExternalDownloaderArgs); ok {
 		c.ChanSettings.ExternalDownloaderArgs = v // No checks for this yet.
 	}
 
-	// Filter ops file
+	// Filter ops file.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.FilterOpsFile); ok {
 		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
@@ -1548,14 +1548,14 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChanSettings.FilterFile = v
 	}
 
-	// From date
+	// From date.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.FromDate); ok {
 		if c.ChanSettings.FromDate, err = validation.ValidateToFromDate(v); err != nil {
 			return err
 		}
 	}
 
-	// JSON directory
+	// JSON directory.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.JSONDir); ok {
 		if _, _, err = sharedvalidation.ValidateDirectory(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
@@ -1563,12 +1563,12 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChanSettings.JSONDir = v
 	}
 
-	// Max filesize to download
+	// Max filesize to download.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MaxFilesize); ok {
 		c.ChanSettings.MaxFilesize = v
 	}
 
-	// Move ops file
+	// Move ops file.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MoveOpsFile); ok {
 		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
@@ -1576,12 +1576,12 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChanSettings.MetaFilterMoveOpFile = v
 	}
 
-	// Pause channel
+	// Pause channel.
 	if v, ok := parsing.GetConfigValue[bool](vip, keys.Pause); ok {
 		c.ChanSettings.Paused = v
 	}
 
-	// To date
+	// To date.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ToDate); ok {
 		if c.ChanSettings.ToDate, err = validation.ValidateToFromDate(v); err != nil {
 			return err
@@ -1593,7 +1593,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChanSettings.UseGlobalCookies = v
 	}
 
-	// Video directory
+	// Video directory.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.VideoDir); ok {
 		if _, _, err = sharedvalidation.ValidateDirectory(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return err
@@ -1601,7 +1601,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChanSettings.VideoDir = v
 	}
 
-	// YTDLP output format
+	// YTDLP output format.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.YtdlpOutputExt); ok {
 		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
 			return err
@@ -1609,17 +1609,17 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 		c.ChanSettings.YtdlpOutputExt = v
 	}
 
-	// Additional video download args
+	// Additional video download args.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ExtraYTDLPVideoArgs); ok {
 		c.ChanSettings.ExtraYTDLPVideoArgs = v
 	}
 
-	// Additional meta download args
+	// Additional meta download args.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ExtraYTDLPMetaArgs); ok {
 		c.ChanSettings.ExtraYTDLPMetaArgs = v
 	}
 
-	// Validate complete Settings model at config boundary
+	// Validate complete Settings model at config boundary.
 	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
 		return fmt.Errorf("invalid settings in config file %q: %w", c.ChannelConfigFile, err)
 	}
@@ -1629,14 +1629,14 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 // applyConfigChannelMetarrSettings applies the Metarr settings to the model.
 func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *models.Channel) (err error) {
-	// Initialize MetarrArgs model if nil
+	// Initialize MetarrArgs model if nil.
 	if c.ChanMetarrArgs == nil {
 		c.ChanMetarrArgs = &models.MetarrArgs{}
 	}
 
 	var gpuGot string
 
-	// Metarr output extension
+	// Metarr output extension.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MOutputExt); ok {
 		if _, err := sharedvalidation.ValidateFFmpegOutputExt(v); err != nil {
 			return fmt.Errorf("metarr output filetype %q in config file %q is invalid", v, c.ChannelConfigFile)
@@ -1644,43 +1644,43 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 		c.ChanMetarrArgs.OutputExt = v
 	}
 
-	// Filename ops
+	// Filename ops.
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MFilenameOps); ok {
 		if c.ChanMetarrArgs.FilenameOps, err = parsing.ParseFilenameOps(v); err != nil {
 			return fmt.Errorf("failed to parse filename ops: %w", err)
 		}
 	}
 
-	// Filename ops file
+	// Filename ops file.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MFilenameOpsFile); ok {
 		c.ChanMetarrArgs.FilenameOpsFile = v
 	}
 
-	// Meta ops
+	// Meta ops.
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MMetaOps); ok {
 		if c.ChanMetarrArgs.MetaOps, err = parsing.ParseMetaOps(v); err != nil {
 			return fmt.Errorf("failed to parse meta ops: %w", err)
 		}
 	}
 
-	// Meta ops file
+	// Meta ops file.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MMetaOpsFile); ok {
 		c.ChanMetarrArgs.MetaOpsFile = v
 	}
 
-	// Filtered meta ops
+	// Filtered meta ops.
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MFilteredMetaOps); ok {
 		if c.ChanMetarrArgs.FilteredMetaOps, err = parsing.ParseFilteredMetaOps(v); err != nil {
 			return fmt.Errorf("failed to parse filtered meta ops: %w", err)
 		}
 	}
 
-	// Meta ops file
+	// Meta ops file.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MFilteredMetaOpsFile); ok {
 		c.ChanMetarrArgs.FilteredMetaOpsFile = v
 	}
 
-	// Rename style
+	// Rename style.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MRenameStyle); ok {
 		if err := validation.ValidateRenameFlag(v); err != nil {
 			return err
@@ -1688,12 +1688,12 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 		c.ChanMetarrArgs.RenameStyle = v
 	}
 
-	// Extra FFmpeg arguments
+	// Extra FFmpeg arguments.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MExtraFFmpegArgs); ok {
 		c.ChanMetarrArgs.ExtraFFmpegArgs = v
 	}
 
-	// Default output directory
+	// Default output directory.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MOutputDir); ok {
 		if _, _, err := sharedvalidation.ValidateDirectory(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return err
@@ -1701,7 +1701,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 		c.ChanMetarrArgs.OutputDir = v
 	}
 
-	// Per-URL output directory
+	// Per-URL output directory.
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MURLOutputDirs); ok && len(v) != 0 {
 
 		valid := make([]string, 0, len(v))
@@ -1722,70 +1722,70 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 		}
 	}
 
-	// Metarr concurrency
+	// Metarr concurrency.
 	if v, ok := parsing.GetConfigValue[int](vip, keys.MConcurrency); ok {
 		c.ChanMetarrArgs.Concurrency = sharedvalidation.ValidateConcurrencyLimit(v)
 	}
 
-	// Metarr max CPU
+	// Metarr max CPU.
 	if v, ok := parsing.GetConfigValue[float64](vip, keys.MMaxCPU); ok {
-		c.ChanMetarrArgs.MaxCPU = v // Handled in Metarr
+		c.ChanMetarrArgs.MaxCPU = v // Handled in Metarr.
 	}
 
-	// Metarr minimum memory to reserve
+	// Metarr minimum memory to reserve.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MMinFreeMem); ok {
-		c.ChanMetarrArgs.MinFreeMem = v // Handled in Metarr
+		c.ChanMetarrArgs.MinFreeMem = v // Handled in Metarr.
 	}
 
-	// Metarr GPU
+	// Metarr GPU.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPU); ok {
 		gpuGot = v
 	}
 
-	// Metarr GPU node
+	// Metarr GPU node.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeGPUNode); ok {
 		if c.ChanMetarrArgs.TranscodeGPUNode, err = sharedvalidation.ValidateAccelTypeDeviceNode(gpuGot, v); err != nil {
 			return err
 		}
 	}
 
-	// Metarr video filter
+	// Metarr video filter.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.TranscodeVideoFilter); ok {
 		if c.ChanMetarrArgs.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(v); err != nil {
 			return err
 		}
 	}
 
-	// Metarr audio codec
+	// Metarr audio codec.
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.TranscodeAudioCodec); ok {
 		if c.ChanMetarrArgs.TranscodeAudioCodecs, err = validation.ValidateAudioTranscodeCodecSlice(v); err != nil {
 			return err
 		}
 	}
 
-	// Metarr transcode quality
+	// Metarr transcode quality.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MTranscodeQuality); ok {
 		if c.ChanMetarrArgs.TranscodeQuality, err = sharedvalidation.ValidateTranscodeQuality(v); err != nil {
 			return err
 		}
 	}
 
-	// Transcode GPU validation
+	// Transcode GPU validation.
 	if gpuGot != "" {
 		if c.ChanMetarrArgs.TranscodeGPU, err = validation.ValidateGPUAcceleration(gpuGot); err != nil {
 			return err
 		}
 	}
 
-	// Validate video codec against transcode GPU
-	// Metarr video codec
+	// Validate video codec against transcode GPU.
+	// Metarr video codec.
 	if v, ok := parsing.GetConfigValue[[]string](vip, keys.TranscodeCodec); ok {
 		if c.ChanMetarrArgs.TranscodeVideoCodecs, err = validation.ValidateVideoTranscodeCodecSlice(v, c.ChanMetarrArgs.TranscodeGPU); err != nil {
 			return err
 		}
 	}
 
-	// Validate complete MetarrArgs model at config boundary
+	// Validate complete MetarrArgs model at config boundary.
 	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs); err != nil {
 		return fmt.Errorf("invalid metarr config in config file %q: %w", c.ChannelConfigFile, err)
 	}
@@ -1814,7 +1814,7 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 		consts.QNotifyURL,
 		consts.QNotifyCreatedAt,
 		consts.QNotifyUpdatedAt,
-		querySuffix, // appended exactly like Squirrel's .Suffix()
+		querySuffix, // appended like Squirrel's .Suffix()
 	)
 
 	_, err := tx.Exec(

@@ -1250,7 +1250,7 @@ func (ss *serverStore) handleGetLogLevel(w http.ResponseWriter, _ *http.Request)
 }
 
 // handleGetTubarrLogs serves the log entries from memory.
-func (ss *serverStore) handleGetTubarrLogs(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetTubarrLogs(w http.ResponseWriter, r *http.Request) {
 	logs := logging.GetRecentLogsForProgram("Tubarr")
 	if logs == nil {
 		http.Error(w, "tubarr logger not initialized", http.StatusNotFound)
@@ -1263,14 +1263,21 @@ func (ss *serverStore) handleGetTubarrLogs(w http.ResponseWriter, _ *http.Reques
 		if len(line) == 0 {
 			continue
 		}
+
+		// Check if client disconnected.
+		if r.Context().Err() != nil {
+			return
+		}
+
 		if _, err := w.Write(line); err != nil {
-			logger.Pl.E("Failed to write Tubarr log line %q: %v", line, err)
+			// Client disconnected or network error.
+			return
 		}
 	}
 }
 
 // handleGetMetarrLogs serves the Metarr log entries from memory.
-func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 	// Print logs from memory with read lock.
@@ -1278,8 +1285,14 @@ func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, _ *http.Reques
 	defer vars.MetarrLogsMutex.RUnlock()
 
 	for _, line := range vars.MetarrLogs {
+		// Check if client disconnected.
+		if r.Context().Err() != nil {
+			return
+		}
+
 		if _, err := w.Write(line); err != nil {
-			logger.Pl.E("Failed to write Metarr log line %q: %v", line, err)
+			// Client disconnected or network error.
+			return
 		}
 	}
 }
