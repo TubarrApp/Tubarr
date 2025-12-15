@@ -33,7 +33,7 @@ var HTMLCensored = HTMLMetadataQuery{
 		{Name: sharedtags.JTitle, Selector: "#episode-container .episode-title"},
 		{Name: sharedtags.JDescription, Selector: "#about .raised-content"},
 		{Name: sharedtags.JReleaseDate, Selector: "#about time"},
-		{Name: sharedtags.JDirectVideoURL, Selector: "a.dropdown-item[href$='.mp4']", Attr: "href"},
+		{Name: sharedtags.JDirectVideoURL, Selector: "video-js source[type='application/x-mpegURL']", Attr: "src"},
 		{Name: sharedtags.JThumbnailURL, Selector: "video-js[poster]", Attr: "poster"},
 	},
 }

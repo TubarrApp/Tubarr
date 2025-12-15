@@ -262,11 +262,11 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	// Check URLs to crawl.
 	urlsToCrawl := 0
 	for _, cu := range c.URLModels {
-		if !cu.IsManual && !cu.ChanURLSettings.Paused {
+		if !cu.IsManual && (cu.ChanURLSettings != nil && !cu.ChanURLSettings.Paused) {
 			urlsToCrawl++
 		}
 
-		if cu.ChanURLSettings.Paused {
+		if cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused {
 			logger.Pl.D(1, "Skipping paused channel URL %q...", cu.URL)
 		}
 	}
@@ -330,7 +330,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	// Process channel URLs.
 	for _, cu := range c.URLModels {
 		// Skip manual or paused channel entry.
-		if cu.IsManual || cu.ChanURLSettings.Paused {
+		if cu.IsManual || (cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused) {
 			continue
 		}
 
