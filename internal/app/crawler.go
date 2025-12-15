@@ -306,7 +306,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 
 	// Get new releases for channel.
 	scrape := scraper.New()
-	videos, err := scrape.GetNewReleases(ctx, cs, c)
+	videos, err := scrape.GetNewReleases(ctx, cs, c, false)
 	if err != nil {
 		return err
 	}
@@ -401,7 +401,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 	// Get new releases.
 	scrape := scraper.New()
-	videos, err := scrape.GetNewReleases(ctx, cs, c)
+	videos, err := scrape.GetNewReleases(ctx, cs, c, true)
 	if err != nil {
 		return err
 	}
