@@ -304,7 +304,6 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 			MaxCPU:                  NilOrZeroValue(input.MaxCPU),
 			MinFreeMem:              NilOrZeroValue(input.MinFreeMem),
 			OutputDir:               NilOrZeroValue(input.OutDir),
-			URLOutputDirs:           NilOrZeroValue(input.URLOutputDirs),
 			Concurrency:             NilOrZeroValue(input.MetarrConcurrency),
 			TranscodeGPU:            NilOrZeroValue(input.TranscodeGPU),
 			TranscodeGPUNode:        NilOrZeroValue(input.TranscodeGPUNode),

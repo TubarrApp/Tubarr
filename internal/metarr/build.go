@@ -11,7 +11,6 @@ import (
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 )
@@ -271,18 +270,7 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 
 // parseMetarrOutputDir parses and returns the output directory.
 func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
-	var (
-		mArgs = cu.ChanURLMetarrArgs
-		err   error
-	)
-
-	// Parse and validate output directory mappings.
-	if mArgs.OutputDirMap, err = parsing.ParseMetarrOutputDirs(mArgs.OutputDir, mArgs.URLOutputDirs, c); err != nil {
-		logger.Pl.E("Could not parse output directory map: %v", err)
-	}
-	if err := validation.ValidateMetarrOutputDirs(mArgs.OutputDirMap); err != nil {
-		logger.Pl.E("Invalid output directory map: %v", err)
-	}
+	mArgs := cu.ChanURLMetarrArgs
 
 	switch {
 	// #1 Priority: Explicit Viper flag set.
@@ -307,16 +295,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Chan
 		}
 		return parsed
 
-	// #3 Priority: Channel default output directory.
-	case mArgs.OutputDirMap[cu.URL] != "":
-		parsed, err := dirParser.ParseDirectory(mArgs.OutputDirMap[cu.URL], "Metarr output directory")
-		if err != nil {
-			logger.Pl.E("Failed to parse directory %q for video with URL %q: %v", mArgs.OutputDirMap[cu.URL], v.URL, err)
-			break
-		}
-		return parsed
-
-	// #4 Priority: Use the output directory stored in channel directly.
+	// #3 Priority: Use the output directory stored in channel URL directly.
 	case mArgs.OutputDir != "":
 		parsed, err := dirParser.ParseDirectory(mArgs.OutputDir, "Metarr output directory")
 		if err != nil {

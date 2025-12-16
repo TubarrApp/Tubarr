@@ -123,9 +123,6 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	}
 
 	// Arrays
-	if urlOutDirs != nil {
-		cmd.Flags().StringSliceVar(urlOutDirs, keys.MURLOutputDirs, nil, "Metarr will move a channel URL's files to this location on completion (some {{}} templating commands available)")
-	}
 	if filenameOps != nil {
 		cmd.Flags().StringSliceVar(filenameOps, keys.MFilenameOps, nil, "Filename operations for Metarr (e.g. 'prefix:[CATEGORY] ' or 'date-tag:prefix:ymd')")
 	}

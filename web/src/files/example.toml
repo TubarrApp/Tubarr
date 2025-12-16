@@ -21,7 +21,7 @@ metarr_filename_ops = ["date-tag:prefix:ymd"]
 metarr_rename_style = "spaces"
 metarr_output_ext = "mp4"
 metarr_concurrency = 5
-metarr_default_output_dir = "/home/user/tubarr/{{channel_name}}/{{year}}"
+metarr_output_directory = "/home/user/tubarr/{{channel_name}}/{{year}}"
 
 # Transcoding
 metarr_transcode_gpu = "auto"

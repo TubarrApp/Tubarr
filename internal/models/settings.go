@@ -52,9 +52,7 @@ type MetarrArgs struct {
 	FilteredMetaOpsFile string            `json:"metarr_filtered_meta_ops_file"`
 
 	// Metarr output directories.
-	OutputDir     string `json:"metarr_output_directory"`
-	OutputDirMap  map[string]string
-	URLOutputDirs []string `json:"metarr_url_output_directories"`
+	OutputDir string `json:"metarr_output_directory"`
 
 	// Program operations.
 	Concurrency int     `json:"metarr_concurrency"`
@@ -422,17 +420,6 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 		}
 	}
 
-	if len(child.URLOutputDirs) > 0 {
-		if len(parent.URLOutputDirs) != len(child.URLOutputDirs) {
-			return false
-		}
-		for i := range parent.URLOutputDirs {
-			if parent.URLOutputDirs[i] != child.URLOutputDirs[i] {
-				return false
-			}
-		}
-	}
-
 	if len(child.TranscodeVideoCodecs) > 0 {
 		if len(parent.TranscodeVideoCodecs) != len(child.TranscodeVideoCodecs) {
 			return false
@@ -450,18 +437,6 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 		}
 		for i := range parent.TranscodeAudioCodecs {
 			if parent.TranscodeAudioCodecs[i] != child.TranscodeAudioCodecs[i] {
-				return false
-			}
-		}
-	}
-
-	// Map comparison
-	if len(child.OutputDirMap) > 0 {
-		if len(parent.OutputDirMap) != len(child.OutputDirMap) {
-			return false
-		}
-		for key, val := range parent.OutputDirMap {
-			if childVal, ok := child.OutputDirMap[key]; !ok || val != childVal {
 				return false
 			}
 		}
@@ -512,12 +487,6 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 
 	// Metarr output directories.
 	if m.OutputDir != "" {
-		return false
-	}
-	if len(m.OutputDirMap) > 0 {
-		return false
-	}
-	if len(m.URLOutputDirs) > 0 {
 		return false
 	}
 

@@ -178,9 +178,6 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.MFilteredFilenameOps) {
 		in.FilteredFilenameOps = &f.FilteredFilenameOps
 	}
-	if cmd.Flags().Changed(keys.MURLOutputDirs) {
-		in.URLOutputDirs = &f.URLOutputDirs
-	}
 	if cmd.Flags().Changed(keys.MOutputExt) {
 		in.MetarrExt = &f.MetarrExt
 	}

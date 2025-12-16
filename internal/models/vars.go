@@ -55,7 +55,7 @@ type ChannelInputPtrs struct {
 
 	// -- METARR --
 	// Output settings.
-	OutDir      *string `viper:"metarr-default-output-dir"`
+	OutDir      *string `viper:"metarr-output-directory"`
 	MetarrExt   *string `viper:"metarr-output-ext"`
 	RenameStyle *string `viper:"metarr-rename-style"`
 
@@ -71,7 +71,6 @@ type ChannelInputPtrs struct {
 	FilenameOps         *[]string `viper:"metarr-filename-ops"`
 	FilteredMetaOps     *[]string `viper:"metarr-filtered-meta-ops"`
 	FilteredFilenameOps *[]string `viper:"metarr-filtered-filename-ops"`
-	URLOutputDirs       *[]string `viper:"metarr-url-output-dirs"`
 
 	// Transcoding.
 	TranscodeGPU         *string   `viper:"metarr-transcode-gpu"`

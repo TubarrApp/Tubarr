@@ -69,66 +69,6 @@ func TestMaxCPU(t *testing.T) {
 	}
 }
 
-// TestValidateMetarrOutputDirs -------------------------------------------------------------------------------------------
-func TestValidateMetarrOutputDirs(t *testing.T) {
-	// Test 1: Empty map → no error
-	if err := validation.ValidateMetarrOutputDirs(nil); err != nil {
-		t.Fatalf("expected nil error for empty input, got: %v", err)
-	}
-
-	// Base temp directory
-	temp := t.TempDir()
-
-	// Valid URL + existing directory
-	goodMap := map[string]string{
-		"https://example.com/video": temp,
-	}
-
-	if err := validation.ValidateMetarrOutputDirs(goodMap); err != nil {
-		t.Fatalf("expected valid map to pass, got: %v", err)
-	}
-
-	// Invalid URL
-	badURL := map[string]string{
-		"::::::not-a-url": temp,
-	}
-
-	if err := validation.ValidateMetarrOutputDirs(badURL); err == nil {
-		t.Fatalf("expected error for invalid URL, got nil")
-	}
-
-	// Non-existent directory
-	missingDir := temp + "/does_not_exist"
-
-	missingMap := map[string]string{
-		"https://example.com/video": missingDir,
-	}
-
-	if err := validation.ValidateMetarrOutputDirs(missingMap); err == nil {
-		t.Fatalf("expected error for non-existent path, got nil")
-	}
-
-	// Duplicate directory paths
-	duplicateMap := map[string]string{
-		"https://example.com/a": temp,
-		"https://example.com/b": temp,
-	}
-
-	if err := validation.ValidateMetarrOutputDirs(duplicateMap); err != nil {
-		t.Fatalf("expected duplicates to pass (single stat), got: %v", err)
-	}
-
-	// Duplicate directory paths
-	missingMultiMap := map[string]string{
-		"https://example.com/c": temp,
-		"https://example.com/d": missingDir,
-	}
-
-	if err := validation.ValidateMetarrOutputDirs(missingMultiMap); err == nil {
-		t.Fatalf("expected second iteration to fail, got: %v", err)
-	}
-}
-
 // TestValidateDirectory runs checks for directory validation --------------------------------------------------------------------
 func TestValidateDirectory_ExistingDirectory(t *testing.T) {
 	tmp := t.TempDir()

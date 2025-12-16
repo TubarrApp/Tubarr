@@ -179,9 +179,9 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	if m.OutputDirMap != nil {
-		if err := ValidateMetarrOutputDirs(m.OutputDirMap); err != nil {
-			return fmt.Errorf("invalid output dir(s) in Metarr settings: %w", err)
+	if m.OutputDir != "" {
+		if _, _, err := sharedvalidation.ValidateDirectory(m.OutputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
+			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
 		}
 	}
 

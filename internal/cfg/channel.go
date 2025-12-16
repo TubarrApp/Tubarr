@@ -1706,23 +1706,6 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		})
 	}
 
-	// Output directory strings.
-	if f.Changed(keys.MURLOutputDirs) {
-		validOutDirs := make([]string, 0, len(c.urlOutputDirs))
-		if len(c.urlOutputDirs) != 0 {
-			for _, u := range c.urlOutputDirs {
-				if _, _, err = sharedvalidation.ValidateDirectory(u, false, sharedtemplates.AllTemplatesMap); err != nil {
-					return nil, err
-				}
-				validOutDirs = append(validOutDirs, u)
-			}
-		}
-		fns = append(fns, func(m *models.MetarrArgs) error {
-			m.URLOutputDirs = validOutDirs
-			return nil
-		})
-	}
-
 	// Meta operations (e.g. 'all-credits:set:author').
 	if f.Changed(keys.MMetaOps) {
 		parsed := []models.MetaOps{}

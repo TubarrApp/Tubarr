@@ -3,7 +3,6 @@ package parsing
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"net/url"
 	"strings"
 	"tubarr/internal/domain/logger"
@@ -427,56 +426,6 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 		})
 	}
 	return validFilteredFilenameOps, nil
-}
-
-// ParseMetarrOutputDirs parses output directory mappings for Metarr.
-//
-// Format: "url|directory" pairs with optional default directory.
-func ParseMetarrOutputDirs(defaultDir string, urlDirs []string, c *models.Channel) (map[string]string, error) {
-	if len(urlDirs) == 0 && defaultDir == "" {
-		return nil, nil
-	}
-	// Deduplicate.
-	urlDirs = validation.DeduplicateSliceEntries(urlDirs)
-
-	// Initialize map and fill from existing.
-	outDirMap := make(map[string]string)
-	if c.ChanMetarrArgs.OutputDirMap != nil {
-		maps.Copy(outDirMap, c.ChanMetarrArgs.OutputDirMap)
-	}
-
-	// Parse URL output directory pairs.
-	for _, pair := range urlDirs {
-		u, dir, err := parseURLDirPair(pair)
-		if err != nil {
-			return nil, err
-		}
-
-		// Check if this URL exists in the channel.
-		found := false
-		for _, cu := range c.URLModels {
-			if strings.EqualFold(strings.TrimSpace(cu.URL), strings.TrimSpace(u)) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return nil, fmt.Errorf("channel does not contain URL %q, provided in output directory mapping", u)
-		}
-
-		outDirMap[u] = dir
-	}
-
-	// Fill blank channel entries with channel default.
-	for _, cu := range c.URLModels {
-		if outDirMap[cu.URL] == "" && defaultDir != "" {
-			outDirMap[cu.URL] = defaultDir
-		}
-	}
-
-	logger.Pl.D(1, "Metarr output directories: %q", outDirMap)
-	return outDirMap, nil
 }
 
 // parseURLDirPair parses a 'url|output directory' pairing.

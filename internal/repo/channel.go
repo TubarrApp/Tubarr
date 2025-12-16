@@ -1473,7 +1473,6 @@ func displaySettingsStruct(s *models.Settings) {
 // displayMetarrArgsStruct prints the Metarr args structure.
 func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
-	fmt.Printf("URL-Specific Output Directories: %v\n", m.URLOutputDirs)
 	fmt.Printf("Output Filetype: %s\n", m.OutputExt)
 	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
 	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
@@ -1699,27 +1698,6 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 			return err
 		}
 		c.ChanMetarrArgs.OutputDir = v
-	}
-
-	// Per-URL output directory.
-	if v, ok := parsing.GetConfigValue[[]string](vip, keys.MURLOutputDirs); ok && len(v) != 0 {
-
-		valid := make([]string, 0, len(v))
-
-		for _, d := range v {
-			split := strings.Split(d, "|")
-			if len(split) == 2 && split[1] != "" {
-				valid = append(valid, d)
-			} else {
-				logger.Pl.W("Removed invalid per-URL output directory pair %q", d)
-			}
-		}
-
-		if len(valid) == 0 {
-			c.ChanMetarrArgs.URLOutputDirs = nil
-		} else {
-			c.ChanMetarrArgs.URLOutputDirs = valid
-		}
 	}
 
 	// Metarr concurrency.

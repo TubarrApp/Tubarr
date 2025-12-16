@@ -586,14 +586,7 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 	urlMetarr.MetaOps, c = mergeSliceSettings(urlMetarr.MetaOps, channelMetarr.MetaOps)
 	changed = changed || c
 
-	// Metarr output directories
-	urlMetarr.OutputDirMap, c = mergeMapSettings(urlMetarr.OutputDirMap, channelMetarr.OutputDirMap)
-	changed = changed || c
-
 	urlMetarr.OutputDir, c = mergeStringSettings(urlMetarr.OutputDir, channelMetarr.OutputDir)
-	changed = changed || c
-
-	urlMetarr.URLOutputDirs, c = mergeSliceSettings(urlMetarr.URLOutputDirs, channelMetarr.URLOutputDirs)
 	changed = changed || c
 
 	// Program operations

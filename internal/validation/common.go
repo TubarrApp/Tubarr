@@ -20,37 +20,6 @@ import (
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
-// ValidateMetarrOutputDirs validates Metarr output directory mappings.
-//
-// This function validates the directory map structure and ensures all directories exist.
-func ValidateMetarrOutputDirs(outDirMap map[string]string) error {
-	if len(outDirMap) == 0 {
-		return nil
-	}
-
-	logger.Pl.D(1, "Validating %d Metarr output directories...", len(outDirMap))
-
-	validatedDirs := make(map[string]bool, len(outDirMap))
-
-	// Validate directories.
-	for urlStr, dir := range outDirMap {
-		// Validate URL format.
-		if _, err := url.Parse(urlStr); err != nil {
-			return fmt.Errorf("output directory map has invalid URL %q: %w", urlStr, err)
-		}
-
-		// Validate directory exists (only check once per unique directory).
-		if !validatedDirs[dir] {
-			if _, _, err := sharedvalidation.ValidateDirectory(dir, false, sharedtemplates.AllTemplatesMap); err != nil {
-				return fmt.Errorf("output directory %q is invalid: %w", dir, err)
-			}
-			validatedDirs[dir] = true
-		}
-	}
-
-	return nil
-}
-
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {
 	// Meta purge.
