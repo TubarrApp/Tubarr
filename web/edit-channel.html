@@ -1096,17 +1096,6 @@
                           Paused channels will not be crawled automatically
                         </p>
                       </div>
-
-                      <div>
-                        <label class="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            x-model="formData.ignore_run"
-                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                          />
-                          <span class="text-sm text-gray-700 dark:text-gray-300">Ignore All Videos to Date</span>
-                        </label>
-                      </div>
                     </div>
                   </div>
 
@@ -1606,7 +1595,6 @@
           loading: true,
           formData: {
             name: '',
-            ignore_run: false,
             notifications: '',
             urls: [],
             settings: {
@@ -1700,8 +1688,7 @@
           populateFormData(data) {
             // Populate basic info
             this.formData.name = data.name || '';
-            this.formData.ignore_run = data.ignore_run === 'true' || data.ignore_run === true;
-            
+
             // Populate notifications (convert from space-separated to newline-separated)
             if (data.notifications) {
               this.formData.notifications = Array.isArray(data.notifications) 
@@ -1934,11 +1921,6 @@
 
               // Backend expects newline-separated operations to preserve values with spaces
               // No conversion needed - textareas already contain newline-separated values
-
-              // Add ignore_run if checked (backend expects "true" string or absence)
-              if (this.formData.ignore_run) {
-                payload.ignore_run = 'true';
-              }
 
               // Convert boolean to string for use_global_cookies
               if (this.formData.settings.use_global_cookies) {
