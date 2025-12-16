@@ -534,14 +534,21 @@
                       class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
                       <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="channel.name"></h3>
+                        <div class="flex items-center gap-2">
+                          <svg
+                            x-show="channel.settings?.paused"
+                            class="w-4 h-4 text-gray-500 dark:text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            title="Channel is paused"
+                          >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          </svg>
+                          <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="channel.name"></h3>
+                        </div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                           <span x-text="channel.url_models?.length || 0"></span> URL<span x-show="channel.url_models?.length !== 1">s</span>
-                          <template x-if="channel.settings?.paused">
-                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-                              Paused
-                            </span>
-                          </template>
                           <template x-if="channel.settings?.bot_blocked">
                             <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
                               Bot Blocked
@@ -588,7 +595,17 @@
                               <span class="text-gray-500 dark:text-gray-400">URLs:</span>
                               <ul class="ml-2 mt-1 space-y-1">
                                 <template x-for="urlModel in channel.url_models" :key="urlModel.id">
-                                  <li class="text-gray-900 dark:text-white break-all">
+                                  <li class="text-gray-900 dark:text-white break-all flex items-center gap-2">
+                                    <svg
+                                      x-show="urlModel.settings?.paused"
+                                      class="w-4 h-4 text-gray-500 dark:text-gray-400 flex-shrink-0"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                      title="URL is paused"
+                                    >
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
                                     <span x-text="urlModel.url"></span>
                                     <template x-if="urlModel.username">
                                       <span class="ml-2 text-xs text-green-600 dark:text-green-400">(authenticated)</span>

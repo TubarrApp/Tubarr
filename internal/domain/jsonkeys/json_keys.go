@@ -20,6 +20,7 @@ const (
 	SettingsCrawlFreq              = "crawl_freq"
 	SettingsDownloadRetries        = "download_retries"
 	SettingsUseGlobalCookies       = "use_global_cookies"
+	SettingsPaused                 = "paused"
 	SettingsFilters                = "filters"
 	SettingsMoveOps                = "move_ops"
 )

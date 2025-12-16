@@ -450,6 +450,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 
 	// Bools
 	useGlobalCookiesStr := r.FormValue(jsonkeys.SettingsUseGlobalCookies)
+	pausedStr := r.FormValue(jsonkeys.SettingsPaused)
 
 	// Models
 	filtersStr := r.FormValue(jsonkeys.SettingsFilters)
@@ -505,6 +506,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 
 	// Bools
 	useGlobalCookies := (useGlobalCookiesStr == "true")
+	paused := (pausedStr == "true")
 
 	// Model conversions (newline-separated, not space-separated)
 	filters, err := parsing.ParseFilterOps(splitNonEmptyLines(filtersStr))
@@ -531,6 +533,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 		MaxFilesize:            maxFilesize,
 		Retries:                retries,
 		UseGlobalCookies:       useGlobalCookies,
+		Paused:                 paused,
 		YtdlpOutputExt:         ytdlpOutExt,
 		ExtraYTDLPVideoArgs:    extraYtdlpVideoArgs,
 		ExtraYTDLPMetaArgs:     extraYtdlpMetaArgs,

@@ -1085,6 +1085,20 @@
                         <label class="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
+                            x-model="formData.settings.paused"
+                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-gray-300">Pause Channel</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Paused channels will not be crawled automatically
+                        </p>
+                      </div>
+
+                      <div>
+                        <label class="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
                             x-model="formData.ignore_run"
                             class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                           />
@@ -1658,6 +1672,7 @@
               extra_ytdlp_video_args: '',
               extra_ytdlp_meta_args: '',
               use_global_cookies: false,
+              paused: false,
               channel_config_file: '',
               from_date: '',
               to_date: '',
@@ -1826,6 +1841,13 @@
                 payload.use_global_cookies = 'true';
               } else {
                 delete payload.use_global_cookies; // Remove false value
+              }
+
+              // Convert boolean to string for paused
+              if (this.formData.settings.paused) {
+                payload.paused = 'true';
+              } else {
+                delete payload.paused; // Remove false value
               }
 
               const response = await fetch('/api/v1/channels/add', {
