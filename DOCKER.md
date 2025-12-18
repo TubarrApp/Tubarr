@@ -12,7 +12,7 @@ This guide explains how to run Tubarr in Docker or Podman containers.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/YourUsername/Tubarr.git
+   git clone https://github.com/TubarrApp/Tubarr.git
    cd Tubarr
    ```
 
@@ -58,9 +58,7 @@ podman build -t tubarr:latest .
 docker run -d \
   --name tubarr \
   -p 8827:8827 \
-  -v $(pwd)/tubarr-config:/config \
-  -v $(pwd)/tubarr-downloads:/downloads \
-  -v $(pwd)/tubarr-metadata:/metadata \
+  -v $(pwd)/.tubarr:/home/tubarr/.tubarr \
   -e TZ=America/New_York \
   --restart unless-stopped \
   tubarr:latest
@@ -71,9 +69,7 @@ docker run -d \
 podman run -d \
   --name tubarr \
   -p 8827:8827 \
-  -v $(pwd)/tubarr-config:/config:Z \
-  -v $(pwd)/tubarr-downloads:/downloads:Z \
-  -v $(pwd)/tubarr-metadata:/metadata:Z \
+  -v $(pwd)/.tubarr:/home/tubarr/.tubarr:Z \
   -e TZ=America/New_York \
   --restart unless-stopped \
   tubarr:latest
@@ -83,20 +79,21 @@ podman run -d \
 
 ## Volume Mounts
 
-The container uses three main volumes:
+The container requires one main volume for configuration and database:
 
 | Volume Path | Purpose | Required |
 |------------|---------|----------|
-| `/config` | Database, settings, and configuration files | Yes |
-| `/downloads` | Downloaded video files | Yes |
-| `/metadata` | JSON metadata files | Yes |
+| `/home/tubarr/.tubarr` | Database, settings, and configuration files | Yes |
+
+**Note:** Video and metadata directories are configured per-channel using the `--video-directory` and `--json-directory` flags when adding channels. You'll need to mount your desired host directories to matching paths inside the container. See the "Adding a Channel" section for examples.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TUBARR_HOME` | `/config` | Configuration directory path |
 | `TZ` | `UTC` | Timezone for logs and scheduling |
+| `PUID` | `1000` | User ID for running Tubarr (matches host user to avoid permission issues) |
+| `PGID` | `1000` | Group ID for running Tubarr (matches host group to avoid permission issues) |
 
 ## Port Mapping
 
@@ -181,7 +178,7 @@ podman logs tubarr
 
 Add `:Z` to volume mounts:
 ```bash
--v ./tubarr-config:/config:Z
+-v ./.tubarr:/home/tubarr/.tubarr:Z
 ```
 
 ### Port already in use
@@ -243,7 +240,7 @@ To run Tubarr with different flags:
 docker run -d \
   --name tubarr \
   -p 8827:8827 \
-  -v $(pwd)/tubarr-config:/config \
+  -v $(pwd)/.tubarr:/home/tubarr/.tubarr \
   tubarr:latest --web --some-other-flag
 ```
 
@@ -285,7 +282,7 @@ docker run -d \
 docker-compose down
 
 # Backup config directory (includes database)
-tar -czf tubarr-backup-$(date +%Y%m%d).tar.gz tubarr-config/
+tar -czf tubarr-backup-$(date +%Y%m%d).tar.gz .tubarr/
 
 # Restart
 docker-compose up -d
@@ -323,4 +320,4 @@ networks:
 For issues specific to Docker deployment, please check:
 - Container logs: `docker logs tubarr` or `podman logs tubarr`
 - Host system logs: `journalctl -u docker` or `journalctl --user -u tubarr`
-- GitHub Issues: https://github.com/YourUsername/Tubarr/issues
+- GitHub Issues: https://github.com/TubarrApp/Tubarr/issues

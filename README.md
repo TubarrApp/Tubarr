@@ -26,9 +26,17 @@ Tubarr is a Go-powered companion to Metarr that keeps long-form video libraries 
 
 ## Container Note
 
-It is recommended you do not impose resource limitations on the container. Tubarr/Metarr run heavy transcoding operations via FFmpeg so it is normal for CPU and RAM usage to spike during this process.
+The Tubarr container image is a little over a gigabyte, making it larger than images of similar applications like Sonarr. This is because of two factors:
 
-Setting limits is possible but could heavily impact transcode speed.
+1) Tubarr runs yt-dlp under the hood, which means Python and the Deno runtime must be included.
+
+2) Tubarr runs transcoding operations, with support for various types of hardware acceleration and codecs. This requires the inclusion of a very fully-featured FFmpeg build and a large number of media codecs and drivers to reliably work on different machines. Most of the image size comes from this!
+
+### Resources:
+
+It is recommended you do not impose heavy resource limitations on the container itself. Tubarr/Metarr run heavy transcoding operations via FFmpeg so it is normal for CPU and RAM usage to spike during this process. Cutting the resources can dramatically slow down the speed of these operations.
+
+Setting RAM and CPU limits is possible directly in a channel's settings and it is generally better to use this instead. These limits ensure the system has at least x amount of RAM remaining, or that CPU is operating below x%, before spawning a new transcoding operation.
 
 ---
 
@@ -37,6 +45,7 @@ Setting limits is possible but could heavily impact transcode speed.
 ```bash
 git clone https://github.com/TubarrApp/Tubarr.git
 cd Tubarr
+go build -o tubarr ./cmd/tubarr
 sudo mv tubarr /usr/local/bin/tubarr
 tubarr --help
 ```
@@ -54,8 +63,8 @@ tubarr channel add \
   --video-directory /home/user/Videos/{{channel_name}} \
   --json-directory /home/user/Videos/{{channel_name}}/meta \
   --metarr-meta-ops 'title:date-tag:prefix:ymd','fulltitle:date-tag:prefix:ymd' \
-  --metarr-default-output-dir /home/user/Videos/{{channel_name}}/{{year}} \
-  --notify 'https://plex.local:32400/library/...|Plex'
+  --metarr-output-directory /home/user/Videos/{{channel_name}}/{{year}} \
+  --notify 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE|Plex'
 ```
 
 Templates such as `{{channel_name}}`, `{{year}}`, and Metarr fields (e.g., `{{author}}`) are resolved per video. Use `tubarr channel add-batch --add-from-directory ./configs` to import multiple channels from config files.
@@ -105,13 +114,14 @@ The repo includes:
 Volumes:
 | Host path             | Container | Purpose                |
 |-----------------------|-----------|------------------------|
-| `./tubarr/config`     | `/config` | DB, configs, logs      |
-| `./tubarr/downloads`  | `/downloads` | Downloaded videos  |
-| `./tubarr/metadata`   | `/metadata` | JSON metadata files |
+| `./tubarr`     | `/home/tubarr/.tubarr` | DB, configs, logs      |
+
+**Note:** Video and metadata directories are configured per-channel. Mount your desired host directories and reference them when adding channels.
 
 Environment variables:
-- `TUBARR_HOME=/config`
 - `TZ=America/New_York` (change as needed)
+- `PUID=1000` (user ID, change to match your host user)
+- `PGID=1000` (group ID, change to match your host group)
 
 ---
 

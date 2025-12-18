@@ -1,0 +1,24 @@
+services:
+  tubarr:
+    build: .
+    container_name: tubarr
+    restart: unless-stopped
+    ports:
+      - "8827:8827"
+    volumes:
+      # Required: Database, settings, and configuration files
+      - ./tubarr:/home/tubarr/.tubarr
+      # Optional: Add your own volume mounts for video/metadata directories
+      # Examples:
+      # - /path/to/your/videos:/videos
+      # - /path/to/your/metadata:/metadata
+    environment:
+      - TZ=America/New_York
+      - PUID=1000
+      - PGID=1000
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8827/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
