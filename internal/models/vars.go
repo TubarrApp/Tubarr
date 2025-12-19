@@ -24,14 +24,16 @@ type ChannelInputPtrs struct {
 	Notification *[]string `viper:"notify"`
 
 	// Download settings.
-	CookiesFromBrowser     *string `viper:"cookies-from-browser"`
-	ExternalDownloader     *string `viper:"external-downloader"`
-	ExternalDownloaderArgs *string `viper:"external-downloader-args"`
-	MaxFilesize            *string `viper:"max-filesize"`
-	YTDLPOutputExt         *string `viper:"ytdlp-output-extension"`
-	FromDate               *string `viper:"from-date"`
-	ToDate                 *string `viper:"to-date"`
-	UseGlobalCookies       *bool   `viper:"use-global-cookies"`
+	CookiesFromBrowser        *string   `viper:"cookies-from-browser"`
+	ExternalDownloader        *string   `viper:"external-downloader"`
+	ExternalDownloaderArgs    *string   `viper:"external-downloader-args"`
+	MaxFilesize               *string   `viper:"max-filesize"`
+	YTDLPOutputExt            *string   `viper:"ytdlp-output-extension"`
+	FromDate                  *string   `viper:"from-date"`
+	ToDate                    *string   `viper:"to-date"`
+	YTDLPPreferredVideoCodecs *[]string `viper:"ytdlp-preferred-video-codecs"`
+	YTDLPPreferredAudioCodecs *[]string `viper:"ytdlp-preferred-audio-codecs"`
+	UseGlobalCookies          *bool     `viper:"use-global-cookies"`
 
 	// Filter and operation settings.
 	DLFilters *[]string `viper:"filter-ops"`
@@ -47,7 +49,7 @@ type ChannelInputPtrs struct {
 	Retries     *int `viper:"dl-retries"`
 
 	// Boolean flags.
-	Pause     *bool `viper:"pause-toggle"`
+	Pause     *bool `viper:"pause"`
 	IgnoreRun *bool `viper:"ignore-run"`
 
 	// Per-URL settings overrides (no viper tag - handled manually).

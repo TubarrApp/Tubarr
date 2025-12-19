@@ -40,7 +40,7 @@ func SetAuthFlags(cmd *cobra.Command, username, password, loginURL *string, auth
 }
 
 // SetDownloadFlags sets flags related to download tasks.
-func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookiesFromBrowser, maxFilesize, dlFilterFile *string, dlFilters *[]string) {
+func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookiesFromBrowser, maxFilesize, dlFilterFile *string, dlFilters, ytdlpPreferredVideoCodecs, ytdlpPreferredAudioCodecs *[]string) {
 
 	if fromDate != nil {
 		cmd.Flags().StringVar(fromDate, keys.FromDate, "", "Only grab videos uploaded on or after this date")
@@ -76,6 +76,14 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 
 	if dlFilterFile != nil {
 		cmd.Flags().StringVar(dlFilterFile, keys.FilterOpsFile, "", "Path to a filter operations file (one operation per line [Format is: 'field:contains/omits:VALUE:must/any'])")
+	}
+
+	if ytdlpPreferredVideoCodecs != nil {
+		cmd.Flags().StringSliceVar(ytdlpPreferredVideoCodecs, keys.YTDLPPreferredVideoCodecs, nil, "Preferred video codec(s) for downloads (comma-separated: vp9,av01,h264,hevc)")
+	}
+
+	if ytdlpPreferredAudioCodecs != nil {
+		cmd.Flags().StringSliceVar(ytdlpPreferredAudioCodecs, keys.YTDLPPreferredAudioCodecs, nil, "Preferred audio codec(s) for downloads (comma-separated: opus,aac,vorbis)")
 	}
 }
 

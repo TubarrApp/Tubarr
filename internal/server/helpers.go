@@ -162,7 +162,13 @@ func settingsJSONMap(settings *models.Settings) map[string]any {
 		settingsMap[jsonkeys.SettingsUseGlobalCookies] = true
 	}
 	if settings.Paused {
-		settingsMap["paused"] = true
+		settingsMap[jsonkeys.SettingsPaused] = true
+	}
+	if len(settings.YTDLPPreferredVideoCodecs) > 0 {
+		settingsMap[jsonkeys.SettingsYTDLPPreferredVideoCodecs] = settings.YTDLPPreferredVideoCodecs
+	}
+	if len(settings.YTDLPPreferredAudioCodecs) > 0 {
+		settingsMap[jsonkeys.SettingsYTDLPPreferredAudioCodecs] = settings.YTDLPPreferredAudioCodecs
 	}
 	return settingsMap
 }
@@ -257,7 +263,7 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	if v, ok := data[jsonkeys.SettingsUseGlobalCookies].(bool); ok {
 		settings.UseGlobalCookies = v
 	}
-	if v, ok := data["paused"].(bool); ok {
+	if v, ok := data[jsonkeys.SettingsPaused].(bool); ok {
 		settings.Paused = v
 	}
 
@@ -277,6 +283,34 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 			return nil, err
 		}
 		settings.MetaFilterMoveOps = moveOps
+	}
+
+	// Parse codec preferences.
+	if videoCodecs, ok := data[jsonkeys.SettingsYTDLPPreferredVideoCodecs].([]any); ok {
+		codecs := make([]string, 0, len(videoCodecs))
+		for _, v := range videoCodecs {
+			if codec, ok := v.(string); ok {
+				codecs = append(codecs, codec)
+			}
+		}
+		validCodecs, err := validation.ValidatePreferredVideoCodecs(codecs)
+		if err != nil {
+			return nil, err
+		}
+		settings.YTDLPPreferredVideoCodecs = validCodecs
+	}
+	if audioCodecs, ok := data[jsonkeys.SettingsYTDLPPreferredAudioCodecs].([]any); ok {
+		codecs := make([]string, 0, len(audioCodecs))
+		for _, v := range audioCodecs {
+			if codec, ok := v.(string); ok {
+				codecs = append(codecs, codec)
+			}
+		}
+		validCodecs, err := validation.ValidatePreferredAudioCodecs(codecs)
+		if err != nil {
+			return nil, err
+		}
+		settings.YTDLPPreferredAudioCodecs = validCodecs
 	}
 
 	return settings, nil
@@ -456,6 +490,10 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	filtersStr := r.FormValue(jsonkeys.SettingsFilters)
 	moveOpsStr := r.FormValue(jsonkeys.SettingsMoveOps)
 
+	// Codec preferences
+	ytdlpPreferredVideoCodecsStr := r.FormValue(jsonkeys.SettingsYTDLPPreferredVideoCodecs)
+	ytdlpPreferredAudioCodecsStr := r.FormValue(jsonkeys.SettingsYTDLPPreferredAudioCodecs)
+
 	// -- Validation --
 	// Strings
 	if _, _, err := sharedvalidation.ValidateDirectory(vDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
@@ -520,23 +558,37 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 		return nil
 	}
 
+	// Codec preferences.
+	ytdlpPreferredVideoCodecs, err := validation.ValidatePreferredVideoCodecs(splitNonEmptyLines(ytdlpPreferredVideoCodecsStr))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid preferred video codecs %q: %v", ytdlpPreferredVideoCodecsStr, err), http.StatusBadRequest)
+		return nil
+	}
+	ytdlpPreferredAudioCodecs, err := validation.ValidatePreferredAudioCodecs(splitNonEmptyLines(ytdlpPreferredAudioCodecsStr))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid preferred audio codecs %q: %v", ytdlpPreferredAudioCodecsStr, err), http.StatusBadRequest)
+		return nil
+	}
+
 	// Return Settings.
 	return &models.Settings{
 		JSONDir:  jDir,
 		VideoDir: vDir,
 
-		Concurrency:            maxConcurrency,
-		CookiesFromBrowser:     cookiesFromBrowser,
-		CrawlFreq:              crawlFreq,
-		ExternalDownloader:     externalDownloader,
-		ExternalDownloaderArgs: externalDownloaderArgs,
-		MaxFilesize:            maxFilesize,
-		Retries:                retries,
-		UseGlobalCookies:       useGlobalCookies,
-		Paused:                 paused,
-		YtdlpOutputExt:         ytdlpOutExt,
-		ExtraYTDLPVideoArgs:    extraYtdlpVideoArgs,
-		ExtraYTDLPMetaArgs:     extraYtdlpMetaArgs,
+		Concurrency:               maxConcurrency,
+		CookiesFromBrowser:        cookiesFromBrowser,
+		CrawlFreq:                 crawlFreq,
+		ExternalDownloader:        externalDownloader,
+		ExternalDownloaderArgs:    externalDownloaderArgs,
+		MaxFilesize:               maxFilesize,
+		Retries:                   retries,
+		UseGlobalCookies:          useGlobalCookies,
+		Paused:                    paused,
+		YtdlpOutputExt:            ytdlpOutExt,
+		ExtraYTDLPVideoArgs:       extraYtdlpVideoArgs,
+		ExtraYTDLPMetaArgs:        extraYtdlpMetaArgs,
+		YTDLPPreferredVideoCodecs: ytdlpPreferredVideoCodecs,
+		YTDLPPreferredAudioCodecs: ytdlpPreferredAudioCodecs,
 
 		Filters:              filters,
 		FilterFile:           filterFile,

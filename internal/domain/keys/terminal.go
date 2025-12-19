@@ -54,6 +54,8 @@ const (
 	UseGlobalCookies          string = "use-global-cookies"
 	ExternalDownloader        string = "external-downloader"
 	ExternalDownloaderArgs    string = "external-downloader-args"
+	YTDLPPreferredVideoCodecs string = "ytdlp-preferred-video-codecs"
+	YTDLPPreferredAudioCodecs string = "ytdlp-preferred-audio-codecs"
 )
 
 // Program inputs.

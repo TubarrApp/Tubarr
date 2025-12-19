@@ -30,14 +30,16 @@ type ChannelFlagValues struct {
 	Notification []string
 
 	// Download settings
-	CookiesFromBrowser     string
-	ExternalDownloader     string
-	ExternalDownloaderArgs string
-	MaxFilesize            string
-	YTDLPOutputExt         string
-	FromDate               string
-	ToDate                 string
-	UseGlobalCookies       bool
+	CookiesFromBrowser        string
+	ExternalDownloader        string
+	ExternalDownloaderArgs    string
+	MaxFilesize               string
+	YTDLPOutputExt            string
+	FromDate                  string
+	ToDate                    string
+	YTDLPPreferredVideoCodecs []string
+	YTDLPPreferredAudioCodecs []string
+	UseGlobalCookies          bool
 
 	// Filter and operation settings
 	DLFilters           []string

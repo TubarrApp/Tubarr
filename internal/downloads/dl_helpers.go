@@ -107,3 +107,39 @@ func checkIfAvoidURL(uri string) error {
 
 	return nil
 }
+
+// buildVideoCodecList builds the codec preference string for yt-dlp.
+func buildVideoCodecList(codecs []string) (arg string) {
+	if len(codecs) == 0 {
+		return ""
+	}
+
+	// Add video codecs in order.
+	for i, c := range codecs {
+		if i == 0 {
+			arg = "("
+		}
+		arg += "bv*[vcodec=" + c + "]/"
+	}
+	arg += "bv*)"
+
+	return arg
+}
+
+// buildAudioCodecList builds the codec preference string for yt-dlp.
+func buildAudioCodecList(codecs []string) (arg string) {
+	if len(codecs) == 0 {
+		return ""
+	}
+
+	// Add audio codecs in order.
+	for i, c := range codecs {
+		if i == 0 {
+			arg = "("
+		}
+		arg += "ba*[acodec=" + c + "]/"
+	}
+	arg += "ba*)"
+
+	return arg
+}

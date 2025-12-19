@@ -1434,6 +1434,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 			continue
 		}
 		fmt.Printf("%sURL %q%s\n", sharedconsts.ColorCyan, u.URL, sharedconsts.ColorReset)
+		fmt.Printf("Paused? %v\n", u.ChanURLSettings.Paused)
 
 		fmt.Printf("\n%sSettings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 		displaySettingsStruct(u.ChanURLSettings)

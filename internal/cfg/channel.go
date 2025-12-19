@@ -811,7 +811,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	cmd.SetDownloadFlags(addCmd, &flags.Retries, &flags.UseGlobalCookies,
 		&flags.YTDLPOutputExt, &flags.FromDate, &flags.ToDate,
 		&flags.CookiesFromBrowser, &flags.MaxFilesize, &flags.DLFilterFile,
-		&flags.DLFilters)
+		&flags.DLFilters, &flags.YTDLPPreferredVideoCodecs, &flags.YTDLPPreferredAudioCodecs)
 
 	cmd.SetMetarrFlags(addCmd, &flags.MaxCPU, &flags.MetarrConcurrency,
 		&flags.MetarrExt, &flags.ExtraFFmpegArgs, &flags.MinFreeMem,
@@ -1009,7 +1009,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 	cmd.SetDownloadFlags(batchCmd, &flags.Retries, &flags.UseGlobalCookies, &flags.YTDLPOutputExt,
 		&flags.FromDate, &flags.ToDate, &flags.CookiesFromBrowser, &flags.MaxFilesize,
-		&flags.DLFilterFile, &flags.DLFilters)
+		&flags.DLFilterFile, &flags.DLFilters, &flags.YTDLPPreferredVideoCodecs, &flags.YTDLPPreferredAudioCodecs)
 
 	cmd.SetMetarrFlags(batchCmd, &flags.MaxCPU, &flags.MetarrConcurrency, &flags.MetarrExt,
 		&flags.ExtraFFmpegArgs, &flags.MinFreeMem, &flags.OutDir, &flags.RenameStyle,
@@ -1228,14 +1228,16 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		authDetails []string
 
 		// Download settings.
-		cookiesFromBrowser     string
-		externalDownloader     string
-		externalDownloaderArgs string
-		maxFilesize            string
-		ytdlpOutExt            string
-		fromDate               string
-		toDate                 string
-		useGlobalCookies       bool
+		cookiesFromBrowser        string
+		externalDownloader        string
+		externalDownloaderArgs    string
+		maxFilesize               string
+		ytdlpOutExt               string
+		fromDate                  string
+		toDate                    string
+		ytdlpPreferredVideoCodecs []string
+		ytdlpPreferredAudioCodecs []string
+		useGlobalCookies          bool
 
 		// Filter and operation settings.
 		dlFilters           []string
@@ -1369,25 +1371,27 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Gather channel settings.
 			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
-				concurrency:            concurrency,
-				cookiesFromBrowser:     cookiesFromBrowser,
-				crawlFreq:              crawlFreq,
-				externalDownloader:     externalDownloader,
-				externalDownloaderArgs: externalDownloaderArgs,
-				filters:                dlFilters,
-				filterFile:             dlFilterFile,
-				fromDate:               fromDate,
-				maxFilesize:            maxFilesize,
-				metaFilterMoveOps:      moveOps,
-				metaFilterMoveOpsFile:  moveOpsFile,
-				paused:                 pause,
-				retries:                retries,
-				toDate:                 toDate,
-				videoDir:               vDir,
-				useGlobalCookies:       useGlobalCookies,
-				ytdlpOutputExt:         ytdlpOutExt,
-				extraYtdlpVideoArgs:    extraYTDLPVideoArgs,
-				extraYtdlpMetaArgs:     extraYTDLPMetaArgs,
+				concurrency:               concurrency,
+				cookiesFromBrowser:        cookiesFromBrowser,
+				crawlFreq:                 crawlFreq,
+				externalDownloader:        externalDownloader,
+				externalDownloaderArgs:    externalDownloaderArgs,
+				filters:                   dlFilters,
+				filterFile:                dlFilterFile,
+				fromDate:                  fromDate,
+				maxFilesize:               maxFilesize,
+				metaFilterMoveOps:         moveOps,
+				metaFilterMoveOpsFile:     moveOpsFile,
+				paused:                    pause,
+				retries:                   retries,
+				toDate:                    toDate,
+				videoDir:                  vDir,
+				useGlobalCookies:          useGlobalCookies,
+				ytdlpOutputExt:            ytdlpOutExt,
+				extraYtdlpVideoArgs:       extraYTDLPVideoArgs,
+				extraYtdlpMetaArgs:        extraYTDLPMetaArgs,
+				ytdlpPreferredVideoCodecs: ytdlpPreferredVideoCodecs,
+				ytdlpPreferredAudioCodecs: ytdlpPreferredAudioCodecs,
 			})
 			if err != nil {
 				return err
@@ -1478,7 +1482,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	cmd.SetDownloadFlags(updateSettingsCmd, &retries, &useGlobalCookies,
 		&ytdlpOutExt, &fromDate, &toDate,
 		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
-		&dlFilters)
+		&dlFilters, &ytdlpPreferredVideoCodecs, &ytdlpPreferredAudioCodecs)
 
 	// Metarr.
 	cmd.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
@@ -1869,26 +1873,28 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 
 // chanSettings holds local channel settings for updating.
 type chanSettings struct {
-	concurrency            int
-	cookiesFromBrowser     string
-	crawlFreq              int
-	externalDownloader     string
-	externalDownloaderArgs string
-	filters                []string
-	filterFile             string
-	fromDate               string
-	jsonDir                string
-	maxFilesize            string
-	metaFilterMoveOps      []string
-	metaFilterMoveOpsFile  string
-	paused                 bool
-	retries                int
-	toDate                 string
-	videoDir               string
-	useGlobalCookies       bool
-	ytdlpOutputExt         string
-	extraYtdlpVideoArgs    string
-	extraYtdlpMetaArgs     string
+	concurrency               int
+	cookiesFromBrowser        string
+	crawlFreq                 int
+	externalDownloader        string
+	externalDownloaderArgs    string
+	filters                   []string
+	filterFile                string
+	fromDate                  string
+	jsonDir                   string
+	maxFilesize               string
+	metaFilterMoveOps         []string
+	metaFilterMoveOpsFile     string
+	paused                    bool
+	retries                   int
+	toDate                    string
+	videoDir                  string
+	useGlobalCookies          bool
+	ytdlpOutputExt            string
+	extraYtdlpVideoArgs       string
+	extraYtdlpMetaArgs        string
+	ytdlpPreferredVideoCodecs []string
+	ytdlpPreferredAudioCodecs []string
 }
 
 // getSettingsArgsFns creates the functions to send in to update the database with new values.
@@ -2090,6 +2096,38 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	if f.Changed(keys.ExtraYTDLPMetaArgs) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.ExtraYTDLPMetaArgs = c.extraYtdlpMetaArgs
+			return nil
+		})
+	}
+
+	// Preferred video codecs.
+	if f.Changed(keys.YTDLPPreferredVideoCodecs) {
+		validCodecs := c.ytdlpPreferredVideoCodecs
+
+		if len(c.ytdlpPreferredVideoCodecs) > 0 {
+			validCodecs, err = validation.ValidatePreferredVideoCodecs(c.ytdlpPreferredVideoCodecs)
+			if err != nil {
+				return nil, err
+			}
+		}
+		fns = append(fns, func(s *models.Settings) error {
+			s.YTDLPPreferredVideoCodecs = validCodecs
+			return nil
+		})
+	}
+
+	// Preferred audio codecs.
+	if f.Changed(keys.YTDLPPreferredAudioCodecs) {
+		validCodecs := c.ytdlpPreferredAudioCodecs
+
+		if len(c.ytdlpPreferredAudioCodecs) > 0 {
+			validCodecs, err = validation.ValidatePreferredAudioCodecs(c.ytdlpPreferredAudioCodecs)
+			if err != nil {
+				return nil, err
+			}
+		}
+		fns = append(fns, func(s *models.Settings) error {
+			s.YTDLPPreferredAudioCodecs = validCodecs
 			return nil
 		})
 	}

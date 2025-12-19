@@ -17,7 +17,7 @@ func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
 		logger.Pl.D(4, "No filename operations to validate")
 		return nil
 	}
-	logger.Pl.D(1, "Validating %d filename operations...", len(filenameOps))
+	logger.Pl.D(3, "Validating %d filename operations...", len(filenameOps))
 
 	var validFilenameActions = map[string]struct{}{
 		sharedconsts.OpAppend:        {},
@@ -67,7 +67,7 @@ func ValidateMetaOps(metaOps []models.MetaOps) error {
 		logger.Pl.D(4, "No meta operations to validate")
 		return nil
 	}
-	logger.Pl.D(1, "Validating %d meta operations...", len(metaOps))
+	logger.Pl.D(3, "Validating %d meta operations...", len(metaOps))
 
 	var validMetaActions = map[string]struct{}{
 		sharedconsts.OpAppend:        {},
@@ -222,7 +222,7 @@ func ValidateAudioTranscodeCodecSlice(pairs []string) (validPairs []string, err 
 		validPairs = append(validPairs, p)
 	}
 
-	logger.Pl.D(1, "Got audio codec array: %v", validPairs)
+	logger.Pl.D(3, "Got audio codec array: %v", validPairs)
 	return validPairs, nil
 }
 
@@ -265,7 +265,7 @@ func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs 
 		validPairs = append(validPairs, p)
 	}
 
-	logger.Pl.D(1, "Got video codec array: %v", validPairs)
+	logger.Pl.D(3, "Got video codec array: %v", validPairs)
 	return validPairs, nil
 }
 

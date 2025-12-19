@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"strconv"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -193,7 +192,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 			return nil, fmt.Errorf("failed to scan channel URL: %w", err)
 		}
 
-		// Fill credentials
+		// Fill credentials.
 		cu.Username = nullString(username)
 		cu.EncryptedPassword = nullString(password)
 		cu.LoginURL = nullString(loginURL)
@@ -205,14 +204,14 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 			}
 		}
 
-		// Unmarshal settings
+		// Unmarshal settings.
 		if len(settingsJSON) > 0 {
 			if err := json.Unmarshal(settingsJSON, &cu.ChanURLSettings); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal channel URL settings: %w", err)
 			}
 		}
 
-		// Unmarshal metarr args
+		// Unmarshal metarr args.
 		if len(metarrJSON) > 0 {
 			if err := json.Unmarshal(metarrJSON, &cu.ChanURLMetarrArgs); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal channel URL metarr args: %w", err)
@@ -222,40 +221,50 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		urlModels = append(urlModels, cu)
 	}
 
-	// Apply fallback logic for nil settings
+	// Apply fallback logic for nil settings.
 	if len(urlModels) > 0 {
 		for _, cu := range urlModels {
 
-			// Merge settings with parent
+			// Merge Settings and MetarrArgs with parent.
 			if mergeWithParent {
-				// Settings
+				// Settings.
 				if cu.ChanURLSettings == nil {
 					if c.ChanSettings != nil {
-						cu.ChanURLSettings = c.ChanSettings
+						// Create a copy of parent Settings.
+						settingsCopy := *c.ChanSettings
+
+						// Don't inherit Paused/UseGlobalCookies bools.
+						settingsCopy.Paused = false
+						settingsCopy.UseGlobalCookies = false
+
+						// Set copy to ChanURLSettings.
+						cu.ChanURLSettings = &settingsCopy
 					} else {
 						cu.ChanURLSettings = &models.Settings{}
 					}
 				} else {
 					if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-						logger.Pl.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+						logger.Pl.D(3, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
 					}
 				}
 
-				// Metarr args
+				// Metarr args.
 				if cu.ChanURLMetarrArgs == nil {
 					if c.ChanMetarrArgs != nil {
-						cu.ChanURLMetarrArgs = c.ChanMetarrArgs
+						// Create a copy of parent MetarrArgs.
+						metarrCopy := *c.ChanMetarrArgs
+						cu.ChanURLMetarrArgs = &metarrCopy
 					} else {
 						cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 					}
 				} else {
 					if changed := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); changed {
-						logger.Pl.D(1, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
+						logger.Pl.D(3, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
 					}
 				}
 			}
 
-			// Initialize nil to empty
+			// Initialize nil to empty.
 			if cu.ChanURLSettings == nil {
 				cu.ChanURLSettings = &models.Settings{}
 			}
@@ -363,7 +372,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, merge
 			// Field-level inheritance: merge empty fields from channel
 			if c != nil && c.ChanSettings != nil {
 				if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-					logger.Pl.D(1, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
+					logger.Pl.D(3, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
 				}
 			}
 		}
@@ -509,9 +518,6 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.Retries, c = mergeNumSettings(urlSettings.Retries, channelSettings.Retries, 0)
 	changed = changed || c
 
-	urlSettings.UseGlobalCookies, c = mergeBoolSettings(urlSettings.UseGlobalCookies, channelSettings.UseGlobalCookies)
-	changed = changed || c
-
 	urlSettings.YtdlpOutputExt, c = mergeStringSettings(urlSettings.YtdlpOutputExt, channelSettings.YtdlpOutputExt)
 	changed = changed || c
 
@@ -546,10 +552,6 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	changed = changed || c
 
 	urlSettings.VideoDir, c = mergeStringSettings(urlSettings.VideoDir, channelSettings.VideoDir)
-	changed = changed || c
-
-	// Channel toggles
-	urlSettings.Paused, c = mergeBoolSettings(urlSettings.Paused, channelSettings.Paused)
 	changed = changed || c
 
 	// Note: BotBlocked fields are per-URL, not cascaded
@@ -645,22 +647,4 @@ func mergeNumSettings[T constraints.Integer | constraints.Float](urlNum, chanNum
 		return chanNum, true
 	}
 	return urlNum, false
-}
-
-// mergeBoolSettings checks and cascades bools to the URL model if false.
-func mergeBoolSettings(urlBool, chanBool bool) (bool, bool) {
-	if !urlBool && chanBool {
-		return chanBool, true
-	}
-	return urlBool, false
-}
-
-// mergeMapSettings checks and cascades maps to the URL model if empty.
-func mergeMapSettings[K comparable, V any](urlMap, chanMap map[K]V) (map[K]V, bool) {
-	if len(urlMap) == 0 && len(chanMap) > 0 {
-		newMap := make(map[K]V)
-		maps.Copy(newMap, chanMap)
-		return newMap, true
-	}
-	return urlMap, false
 }

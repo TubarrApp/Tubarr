@@ -42,7 +42,7 @@ func ValidateNotifications(notifications []*models.Notification) error {
 		return nil
 	}
 
-	logger.Pl.D(1, "Validating %d notifications...", len(notifications))
+	logger.Pl.D(3, "Validating %d notifications...", len(notifications))
 
 	for i, n := range notifications {
 		// Validate notify URL is not empty.
@@ -120,7 +120,7 @@ func ValidateFilterOps(filters []models.Filters) error {
 	if len(filters) == 0 {
 		return nil
 	}
-	logger.Pl.D(1, "Validating %d filter operations...", len(filters))
+	logger.Pl.D(3, "Validating %d filter operations...", len(filters))
 
 	// Validate filter parts.
 	for i, filter := range filters {
@@ -147,7 +147,7 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 	if len(moveOps) == 0 {
 		return nil
 	}
-	logger.Pl.D(1, "Validating %d meta filter move operations...", len(moveOps))
+	logger.Pl.D(3, "Validating %d meta filter move operations...", len(moveOps))
 
 	for i, op := range moveOps {
 		// Validate field is not empty
@@ -170,7 +170,7 @@ func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
 	if len(filteredMetaOps) == 0 {
 		return nil
 	}
-	logger.Pl.D(1, "Validating %d filtered meta operations...", len(filteredMetaOps))
+	logger.Pl.D(3, "Validating %d filtered meta operations...", len(filteredMetaOps))
 
 	// Validate filtered meta operations.
 	for i, fmo := range filteredMetaOps {
@@ -200,7 +200,7 @@ func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOp
 	if len(filteredFilenameOps) == 0 {
 		return nil
 	}
-	logger.Pl.D(1, "Validating %d filtered filename operations...", len(filteredFilenameOps))
+	logger.Pl.D(3, "Validating %d filtered filename operations...", len(filteredFilenameOps))
 
 	// Validate filtered filename operations.
 	for i, ffo := range filteredFilenameOps {
@@ -306,4 +306,48 @@ func ValidateToFromDate(d string) (string, error) {
 	logger.Pl.D(1, "Made from/to date %q", output)
 
 	return output, nil
+}
+
+// ValidatePreferredVideoCodecs validates video codec preferences.
+func ValidatePreferredVideoCodecs(codecs []string) ([]string, error) {
+	if len(codecs) == 0 {
+		return nil, nil
+	}
+
+	// Remove "copy" codec if present.
+	codecs = slices.DeleteFunc(codecs, func(c string) bool {
+		return c == sharedconsts.VCodecCopy
+	})
+
+	// Normalize strings.
+	for i := range codecs {
+		codecs[i] = strings.ToLower(strings.TrimSpace(codecs[i]))
+		if _, ok := sharedconsts.ValidVideoCodecs[codecs[i]]; !ok {
+			return nil, fmt.Errorf("invalid video codec preference %q", codecs[i])
+		}
+	}
+
+	return codecs, nil
+}
+
+// ValidatePreferredAudioCodecs validates audio codec preferences.
+func ValidatePreferredAudioCodecs(codecs []string) ([]string, error) {
+	if len(codecs) == 0 {
+		return nil, nil
+	}
+
+	// Remove "copy" codec if present.
+	codecs = slices.DeleteFunc(codecs, func(c string) bool {
+		return c == sharedconsts.ACodecCopy
+	})
+
+	// Normalize strings.
+	for i := range codecs {
+		codecs[i] = strings.ToLower(strings.TrimSpace(codecs[i]))
+		if _, ok := sharedconsts.ValidAudioCodecs[codecs[i]]; !ok {
+			return nil, fmt.Errorf("invalid audio codec preference %q", codecs[i])
+		}
+	}
+
+	return codecs, nil
 }

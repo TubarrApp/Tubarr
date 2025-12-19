@@ -116,6 +116,19 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPVideoArgs))...)
 	}
 
+	// Add preferred codecs.
+	switch {
+	case len(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) > 0 && len(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) > 0:
+		pref := buildVideoCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) + "+" + buildAudioCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs)
+		args = append(args, "-f", pref)
+	case len(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) > 0:
+		pref := buildVideoCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) + "+ba*"
+		args = append(args, "-f", pref)
+	case len(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) > 0:
+		pref := buildAudioCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) + "+bv*"
+		args = append(args, "-f", pref)
+	}
+
 	// Add target URL [ MUST GO LAST !! ]
 	if d.Video.DirectVideoURL != "" {
 		args = append(args, d.Video.DirectVideoURL)

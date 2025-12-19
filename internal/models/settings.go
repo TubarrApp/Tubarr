@@ -6,14 +6,16 @@ type Settings struct {
 	Concurrency int `json:"max_concurrency"`
 
 	// Download-related operations.
-	CookiesFromBrowser     string `json:"cookies_from_browser"`
-	CrawlFreq              int    `json:"crawl_freq"`
-	ExternalDownloader     string `json:"external_downloader"`
-	ExternalDownloaderArgs string `json:"external_downloader_args"`
-	MaxFilesize            string `json:"max_filesize"`
-	Retries                int    `json:"download_retries"`
-	UseGlobalCookies       bool   `json:"use_global_cookies"`
-	YtdlpOutputExt         string `json:"ytdlp_output_ext"`
+	CookiesFromBrowser        string   `json:"cookies_from_browser"`
+	CrawlFreq                 int      `json:"crawl_freq"`
+	ExternalDownloader        string   `json:"external_downloader"`
+	ExternalDownloaderArgs    string   `json:"external_downloader_args"`
+	MaxFilesize               string   `json:"max_filesize"`
+	Retries                   int      `json:"download_retries"`
+	UseGlobalCookies          bool     `json:"use_global_cookies"`
+	YtdlpOutputExt            string   `json:"ytdlp_output_ext"`
+	YTDLPPreferredVideoCodecs []string `json:"ytdlp_preferred_video_codecs"`
+	YTDLPPreferredAudioCodecs []string `json:"ytdlp_preferred_audio_codecs"`
 
 	// Custom args
 	ExtraYTDLPVideoArgs string `json:"extra_ytdlp_video_args"`
@@ -251,6 +253,29 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 				if parentmo != childmo {
 					return false
 				}
+			}
+		}
+	}
+
+	// Codec preferences.
+	if len(child.YTDLPPreferredVideoCodecs) > 0 {
+		if len(parent.YTDLPPreferredVideoCodecs) != len(child.YTDLPPreferredVideoCodecs) {
+			return false
+		}
+		for i := range parent.YTDLPPreferredVideoCodecs {
+			if parent.YTDLPPreferredVideoCodecs[i] != child.YTDLPPreferredVideoCodecs[i] {
+				return false
+			}
+		}
+	}
+
+	if len(child.YTDLPPreferredAudioCodecs) > 0 {
+		if len(parent.YTDLPPreferredAudioCodecs) != len(child.YTDLPPreferredAudioCodecs) {
+			return false
+		}
+		for i := range parent.YTDLPPreferredAudioCodecs {
+			if parent.YTDLPPreferredAudioCodecs[i] != child.YTDLPPreferredAudioCodecs[i] {
+				return false
 			}
 		}
 	}

@@ -1,0 +1,199 @@
+# syntax=docker/dockerfile:1
+
+###############################
+# 1. Builder stage
+###############################
+FROM debian:trixie-slim AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    wget \
+    build-essential \
+    tzdata \
+    sqlite3 libsqlite3-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Go manually
+RUN wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz \
+ && tar -C /usr/local -xzf go1.25.0.linux-amd64.tar.gz \
+ && rm go1.25.0.linux-amd64.tar.gz
+
+ENV PATH="/usr/local/go/bin:${PATH}"
+WORKDIR /build
+
+############ Build Tubarr ############
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
+    -o tubarr ./cmd/tubarr
+
+############ Build Metarr ############
+RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src \
+ && cd /build/metarr-src \
+ && go mod download \
+ && CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
+      -o /build/metarr ./cmd/metarr
+
+
+###############################
+# 2. Runtime stage
+###############################
+FROM debian:trixie-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+###############################
+# Base runtime deps
+###############################
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    wget \
+    gnupg \
+ && rm -rf /var/lib/apt/lists/*
+
+###############################
+# Tubarr runtime tools
+###############################
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    aria2 \
+    axel \
+    sqlite3 \
+    gosu \
+    tzdata \
+    xz-utils \
+ && rm -rf /var/lib/apt/lists/*
+
+###############################
+# Jellyfin repository
+###############################
+RUN curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key \
+    | gpg --dearmor -o /etc/apt/keyrings/jellyfin.gpg \
+ && cat <<EOF > /etc/apt/sources.list.d/jellyfin.sources
+Types: deb
+URIs: https://repo.jellyfin.org/debian
+Suites: trixie
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/jellyfin.gpg
+EOF
+
+###############################
+# Install FFmpeg + runtime deps
+###############################
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    jellyfin-ffmpeg7 \
+    openssl \
+    locales \
+    libicu76 \
+    libfontconfig1 \
+    libfreetype6 \
+    libjemalloc2 \
+ && rm -rf /var/lib/apt/lists/*
+
+###############################
+# NVIDIA runtime compatibility
+###############################
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+
+###############################
+# FFmpeg path
+###############################
+ENV FFMPEG_PATH=/usr/lib/jellyfin-ffmpeg/ffmpeg
+ENV PATH="/usr/lib/jellyfin-ffmpeg:${PATH}"
+
+###############################
+# Fix /tmp permissions
+###############################
+RUN chmod 1777 /tmp
+
+###############################
+# yt-dlp
+###############################
+RUN wget -O /usr/local/bin/yt-dlp \
+      https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \
+ && chmod +x /usr/local/bin/yt-dlp
+
+###############################
+# Deno
+###############################
+RUN apt-get update && apt-get install -y --no-install-recommends unzip \
+ && wget -O /tmp/deno.zip \
+      https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip \
+ && unzip /tmp/deno.zip -d /usr/local/bin \
+ && chmod +x /usr/local/bin/deno \
+ && ln -sf /usr/local/bin/deno /usr/bin/deno \
+ && rm -rf /tmp/deno.zip /var/lib/apt/lists/*
+
+###############################
+# Yt-dlp auto-updater
+###############################
+RUN chmod 755 /usr/local/bin/yt-dlp && \
+    printf '%s\n' \
+    '#!/bin/sh' \
+    'while true; do' \
+    '  yt-dlp -U > /dev/null 2>&1' \
+    '  sleep 86400' \
+    'done &' \
+    > /usr/local/bin/auto-updater && chmod +x /usr/local/bin/auto-updater
+
+###############################
+# Copy application binaries
+###############################
+COPY --from=builder /build/tubarr /app/tubarr
+COPY --from=builder /build/metarr /usr/local/bin/metarr
+RUN chmod +x /app/tubarr /usr/local/bin/metarr
+
+###############################
+# App files
+###############################
+WORKDIR /app
+COPY --from=builder /build/web /app/web
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+###############################
+# Cleanup
+###############################
+RUN apt-get purge -y gnupg \
+ && apt-get autoremove -y \
+ && rm -rf /root/.cache \
+           /usr/share/man/* \
+           /usr/share/doc/* \
+           /usr/share/icons \
+           /usr/share/pixmaps \
+           /usr/share/info \
+           /usr/lib/python3*/test \
+           /var/cache/apt/* \
+           /var/lib/apt/lists/*
+
+###############################
+# User
+###############################
+RUN groupadd -g 1000 tubarr \
+ && useradd -u 1000 -g tubarr -d /home/tubarr -s /bin/bash -m tubarr
+
+RUN mkdir -p /home/tubarr/.tubarr /downloads /metadata \
+ && chown -R tubarr:tubarr /home/tubarr /downloads /metadata
+
+ENV PUID=1000 PGID=1000
+ENV HOME=/home/tubarr
+ENV TZ=UTC
+
+###############################
+# Runtime config
+###############################
+EXPOSE 8827
+VOLUME ["/home/tubarr/.tubarr", "/downloads", "/metadata"]
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8827/ || exit 1
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

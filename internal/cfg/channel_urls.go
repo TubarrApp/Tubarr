@@ -29,6 +29,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		useGPU, gpuNode, transcodeQuality, transcodeVideoFilter                                               string
 		fromDate, toDate                                                                                      string
 		ytdlpOutExt                                                                                           string
+		ytdlpPreferredVideoCodecs, ytdlpPreferredAudioCodecs                                                  []string
 		useGlobalCookies, pause, resetSettings                                                                bool
 		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                              string
 	)
@@ -91,26 +92,28 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Gather settings update functions.
 			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
-				concurrency:            concurrency,
-				cookiesFromBrowser:     cookiesFromBrowser,
-				crawlFreq:              crawlFreq,
-				externalDownloader:     externalDownloader,
-				externalDownloaderArgs: externalDownloaderArgs,
-				filters:                dlFilters,
-				filterFile:             dlFilterFile,
-				fromDate:               fromDate,
-				maxFilesize:            maxFilesize,
-				metaFilterMoveOps:      moveOps,
-				metaFilterMoveOpsFile:  moveOpsFile,
-				paused:                 pause,
-				retries:                retries,
-				toDate:                 toDate,
-				videoDir:               vDir,
-				jsonDir:                jDir,
-				useGlobalCookies:       useGlobalCookies,
-				ytdlpOutputExt:         ytdlpOutExt,
-				extraYtdlpVideoArgs:    extraYTDLPVideoArgs,
-				extraYtdlpMetaArgs:     extraYTDLPMetaArgs,
+				concurrency:               concurrency,
+				cookiesFromBrowser:        cookiesFromBrowser,
+				crawlFreq:                 crawlFreq,
+				externalDownloader:        externalDownloader,
+				externalDownloaderArgs:    externalDownloaderArgs,
+				filters:                   dlFilters,
+				filterFile:                dlFilterFile,
+				fromDate:                  fromDate,
+				maxFilesize:               maxFilesize,
+				metaFilterMoveOps:         moveOps,
+				metaFilterMoveOpsFile:     moveOpsFile,
+				paused:                    pause,
+				retries:                   retries,
+				toDate:                    toDate,
+				videoDir:                  vDir,
+				jsonDir:                   jDir,
+				useGlobalCookies:          useGlobalCookies,
+				ytdlpOutputExt:            ytdlpOutExt,
+				extraYtdlpVideoArgs:       extraYTDLPVideoArgs,
+				extraYtdlpMetaArgs:        extraYTDLPMetaArgs,
+				ytdlpPreferredVideoCodecs: ytdlpPreferredVideoCodecs,
+				ytdlpPreferredAudioCodecs: ytdlpPreferredAudioCodecs,
 			})
 			if err != nil {
 				return err
@@ -208,7 +211,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	cmd.SetDownloadFlags(updateURLSettingsCmd, &retries, &useGlobalCookies,
 		&ytdlpOutExt, &fromDate, &toDate,
 		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
-		&dlFilters)
+		&dlFilters, &ytdlpPreferredVideoCodecs, &ytdlpPreferredAudioCodecs)
 
 	// Metarr.
 	cmd.SetMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,

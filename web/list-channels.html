@@ -617,9 +617,9 @@
                           </div>
                         </div>
 
-                        <!-- Channel Settings Section -->
+                        <!-- Basic Settings Section -->
                         <div x-show="channel.settings">
-                          <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Channel Settings</h4>
+                          <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Basic Settings</h4>
                           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Video Directory:</span>
@@ -646,15 +646,46 @@
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.max_filesize || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Output Extension:</span>
+                              <span class="text-gray-500 dark:text-gray-400">Channel Config File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.channel_config_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">From Date:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.from_date || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">To Date:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.to_date || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filters:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.filters?.length ? channel.settings.filters.length + ' filter(s)' : 'None'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filter File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.filter_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Paused:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.paused ? 'Yes' : 'No'"></span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Advanced Settings Section -->
+                        <div x-show="channel.settings">
+                          <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Advanced Settings</h4>
+                          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">YT-DLP Output Extension:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.ytdlp_output_ext || 'Default'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Cookies From Browser:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.cookies_from_browser || 'Not set'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.cookies_from_browser || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Use Use global Cookies:</span>
+                              <span class="text-gray-500 dark:text-gray-400">Use Global Cookies:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.use_global_cookies ? 'Yes' : 'No'"></span>
                             </div>
                             <div>
@@ -674,32 +705,20 @@
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.extra_ytdlp_meta_args || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">From Date:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.from_date || 'Not set'"></span>
+                              <span class="text-gray-500 dark:text-gray-400">Move Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.move_ops_file || 'Not set'"></span>
                             </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">To Date:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.to_date || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filters:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.filters?.length ? channel.settings.filters.length + ' filter(s)' : 'None'"></span>
-                            </div>
-                            <div>
+                            <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Move Operations:</span>
                               <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.settings?.move_ops ? (typeof channel.settings.move_ops === 'string' ? channel.settings.move_ops.split('\\n').join('<br>') : channel.settings.move_ops.map(op => typeof op === 'string' ? op : ((op.move_op_field || '') + ':' + (op.move_op_value || '') + ' → ' + (op.move_op_output_dir || ''))).join('<br>')) : 'None'"></span>
                             </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filter File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.filter_file || 'Not set'"></span>
+                            <div class="md:col-span-2">
+                              <span class="text-gray-500 dark:text-gray-400">YT-DLP Preferred Video Codecs:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="formatPreferredCodecs(channel.settings?.ytdlp_preferred_video_codecs)"></span>
                             </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Move Ops File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.move_ops_file || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Channel Config File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.channel_config_file || 'Not set'"></span>
+                            <div class="md:col-span-2">
+                              <span class="text-gray-500 dark:text-gray-400">YT-DLP Preferred Audio Codecs:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="formatPreferredCodecs(channel.settings?.ytdlp_preferred_audio_codecs)"></span>
                             </div>
                           </div>
                         </div>
@@ -919,6 +938,16 @@
             } catch (e) {
               return 'Invalid date';
             }
+          },
+
+          formatPreferredCodecs(codecs) {
+            if (Array.isArray(codecs)) {
+              return codecs.length ? codecs.join(', ') : 'Not set';
+            }
+            if (typeof codecs === 'string') {
+              return codecs.trim() || 'Not set';
+            }
+            return 'Not set';
           },
 
           editChannel(channelId) {

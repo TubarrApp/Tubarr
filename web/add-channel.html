@@ -630,15 +630,15 @@
                         </label>
                       </div>
 
-                      <!-- Do Not Monitor Toggle -->
+                      <!-- Pause State Toggle -->
                       <div>
-                        <label class="flex items-center cursor-pointer">
+                        <label class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                           <input
                             type="checkbox"
-                            x-model="urlEntry.Paused"
+                            x-model="urlEntry.custom.paused"
                             class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                           />
-                          <span class="text-sm text-gray-700 dark:text-gray-300">Do Not Monitor</span>
+                          <span>Pause this URL</span>
                         </label>
                       </div>
 
@@ -738,6 +738,14 @@
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Cookies From Browser</label>
                               <input type="text" x-model="urlEntry.custom.cookies_from_browser" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <label class="mt-2 mb-2.5 flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  x-model="urlEntry.custom.use_global_cookies"
+                                  class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                                />
+                                <span>Use global cookies (find cookies from all browsers)</span>
+                              </label>
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader</label>
@@ -763,6 +771,14 @@
                           <div>
                             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Move Operations (one per line)</label>
                             <textarea x-model="urlEntry.custom.move_ops" rows="2" placeholder="title:keyword:/path" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">YT-DLP Preferred Video Codecs (one per line, in order of priority)</label>
+                            <textarea x-model="urlEntry.custom.ytdlp_preferred_video_codecs" rows="2" placeholder="vp9&#10;av1&#10;h264" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">YT-DLP Preferred Audio Codecs (one per line, in order of priority)</label>
+                            <textarea x-model="urlEntry.custom.ytdlp_preferred_audio_codecs" rows="2" placeholder="opus&#10;aac&#10;vorbis" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600"></textarea>
                           </div>
                         </div>
 
@@ -1139,6 +1155,14 @@
                           placeholder="e.g. Firefox"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
+                        <label class="mt-2 mb-4 inline-flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer gap-2">
+                          <input
+                            type="checkbox"
+                            x-model="formData.settings.use_global_cookies"
+                            class="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span>Use global cookies (find cookies from all browsers)</span>
+                        </label>
                       </div>
 
                       <div>
@@ -1218,16 +1242,36 @@
                         </p>
                       </div>
 
-                      <div>
-                        <label class="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            x-model="formData.settings.use_global_cookies"
-                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                          />
-                          <span class="text-sm text-gray-700 dark:text-gray-300">Use Use global Cookies (find cookies from all browsers)</span>
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          YT-DLP Preferred Video Codecs
                         </label>
+                        <textarea
+                          x-model="formData.settings.ytdlp_preferred_video_codecs"
+                          rows="3"
+                          placeholder="vp9&#10;av1&#10;h264"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 font-mono focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Preferred video codecs (one per line, in order of priority). Examples: vp9, av1, h264, hevc, vp8
+                        </p>
                       </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          YT-DLP Preferred Audio Codecs
+                        </label>
+                        <textarea
+                          x-model="formData.settings.ytdlp_preferred_audio_codecs"
+                          rows="3"
+                          placeholder="opus&#10;aac&#10;vorbis"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 font-mono focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Preferred audio codecs (one per line, in order of priority). Examples: opus, aac, vorbis, mp3, flac
+                        </p>
+                      </div>
+
                     </div>
                   </div>
 
@@ -1599,6 +1643,7 @@
     <script>
       function channelForm() {
         return {
+          codecFields: ['ytdlp_preferred_video_codecs', 'ytdlp_preferred_audio_codecs'],
           formData: {
             name: '',
             ignore_run: false,
@@ -1612,6 +1657,8 @@
                 loginURL: '',
                 hasCustomSettings: false,
                 custom: {
+                  paused: undefined,
+                  use_global_cookies: undefined,
                   // Basic settings
                   video_directory: '',
                   json_directory: '',
@@ -1633,6 +1680,8 @@
                   extra_ytdlp_meta_args: '',
                   move_ops_file: '',
                   move_ops: '',
+                  ytdlp_preferred_video_codecs: '',
+                  ytdlp_preferred_audio_codecs: '',
                   // Metarr settings
                   metarr_output_directory: '',
                   metarr_output_ext: '',
@@ -1679,7 +1728,9 @@
               filter_file: '',
               filters: '',
               move_ops_file: '',
-              move_ops: ''
+              move_ops: '',
+              ytdlp_preferred_video_codecs: '',
+              ytdlp_preferred_audio_codecs: ''
             },
             metarr: {
               metarr_output_directory: '',
@@ -1719,6 +1770,8 @@
               hasCustomSettings: false,
               Paused: false,
               custom: {
+                paused: undefined,
+                use_global_cookies: undefined,
                 video_directory: '',
                 json_directory: '',
                 max_concurrency: null,
@@ -1738,6 +1791,8 @@
                 extra_ytdlp_meta_args: '',
                 move_ops_file: '',
                 move_ops: '',
+                ytdlp_preferred_video_codecs: '',
+                ytdlp_preferred_audio_codecs: '',
                 metarr_output_directory: '',
                 metarr_output_ext: '',
                 metarr_rename_style: '',
@@ -1898,6 +1953,39 @@
             // Build per-URL custom settings as structured JSON
             // Format: { "channel_url": { settings: {...}, metarr: {...} } }
             const perURL = {};
+            const normalizeBool = (val) => {
+              if (typeof val === 'boolean') {
+                return val;
+              }
+              if (val === 'true') return true;
+              if (val === 'false') return false;
+              return undefined;
+            };
+            const hasValue = (value) => {
+              if (value === null || value === undefined) {
+                return false;
+              }
+              if (typeof value === 'boolean') {
+                return true;
+              }
+              if (Array.isArray(value)) {
+                return value.length > 0;
+              }
+              return value !== '';
+            };
+            const codecFields = this.codecFields;
+            const toCodecArray = (value) => {
+              if (Array.isArray(value)) {
+                return value.map(v => (typeof v === 'string' ? v.trim() : v)).filter(Boolean);
+              }
+              if (typeof value === 'string') {
+                return value
+                  .split('\n')
+                  .map(v => v.trim())
+                  .filter(v => v);
+              }
+              return [];
+            };
 
             this.formData.urls.forEach(urlEntry => {
               if (!urlEntry.url) return;
@@ -1906,9 +1994,14 @@
               const settings = {};
               const metarr = {};
 
-              // Process Paused field (independent of hasCustomSettings)
-              if (urlEntry.Paused) {
-                settings.paused = true;
+              const pausedValue = normalizeBool(urlEntry.custom && urlEntry.custom.paused);
+              if (typeof pausedValue === 'boolean') {
+                settings.paused = pausedValue;
+              }
+
+              const cookiesValue = normalizeBool(urlEntry.custom && urlEntry.custom.use_global_cookies);
+              if (typeof cookiesValue === 'boolean') {
+                settings.use_global_cookies = cookiesValue;
               }
 
               // Process custom settings if enabled
@@ -1921,14 +2014,20 @@
                   'ytdlp_output_ext', 'cookies_from_browser',
                   'external_downloader', 'external_downloader_args',
                   'extra_ytdlp_video_args', 'extra_ytdlp_meta_args',
-                  'move_ops_file', 'move_ops'
+                  'move_ops_file', 'move_ops',
+                  'ytdlp_preferred_video_codecs', 'ytdlp_preferred_audio_codecs'
                 ];
 
                 settingsFields.forEach(field => {
                   const value = urlEntry.custom[field];
-                  if (value !== null && value !== undefined && value !== '') {
-                    // Convert newlines to space-separated for text areas
-                    if (typeof value === 'string' && value.includes('\n')) {
+                  if (hasValue(value)) {
+                    if (codecFields.includes(field)) {
+                      const codecs = toCodecArray(value);
+                      if (codecs.length > 0) {
+                        settings[field] = codecs;
+                      }
+                    } else if (typeof value === 'string' && value.includes('\n')) {
+                      // Convert newlines to space-separated for text areas
                       settings[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
                     } else {
                       settings[field] = value;
@@ -1950,7 +2049,7 @@
 
                 metarrFields.forEach(field => {
                   const value = urlEntry.custom[field];
-                  if (value !== null && value !== undefined && value !== '') {
+                  if (hasValue(value)) {
                     // Convert newlines to space-separated for text areas
                     if (typeof value === 'string' && value.includes('\n')) {
                       metarr[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
