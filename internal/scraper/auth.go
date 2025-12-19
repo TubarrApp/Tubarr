@@ -22,12 +22,12 @@ var globalAuthCookieCache sync.Map
 
 // channelAuth authenticates a user for a given channel, if login credentials are present.
 func channelAuth(ctx context.Context, channelURL string, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
-	// First check exact hostname
+	// First check exact hostname.
 	if cookies, found := tryLoadCachedCookies(channelURL); found {
 		return cookies, nil
 	}
 
-	// Check base domain as fallback
+	// Check base domain as fallback.
 	baseDomain, err := getBaseDomain(channelURL)
 	if err == nil {
 		if cookies, found := tryLoadCachedCookies(baseDomain); found {
@@ -35,7 +35,7 @@ func channelAuth(ctx context.Context, channelURL string, a *models.ChannelAccess
 		}
 	}
 
-	// If neither exists, login and store under exact hostname
+	// If neither exists, login and store under exact hostname.
 	cookies, err := login(ctx, a)
 	if err != nil {
 		return nil, err

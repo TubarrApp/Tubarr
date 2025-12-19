@@ -35,13 +35,13 @@ func NewCookieManager() *CookieManager {
 
 // GetChannelURLCookies returns channel access details for a given video.
 func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
-	// // Fetch auth details if this is a manual entry or not from DB.
-	// if cu.IsManual || cu.ID == 0 {
-	// 	cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
-	// 	if err != nil {
-	// 		logger.Pl.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
-	// 	}
-	// }
+	// Fetch auth details if this is a manual entry or not from DB. -- NEVER HAS AUTH? MAY BE UNNECESSARY CODE. --
+	if cu.IsManual || cu.ID == 0 {
+		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
+		if err != nil {
+			logger.Pl.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
+		}
+	}
 
 	// Should login?
 	doLogin := cu.NeedsAuth()
@@ -57,7 +57,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// Collect cookies...
 	var authCookies, regCookies []*http.Cookie
 
-	// Cookies from direct login.
+	// Cookies from direct login (NOTE: Do before global cookie store check, function returns already stored cookies before login).
 	if doLogin {
 		parsed, err := url.Parse(cu.URL)
 		if err != nil {
@@ -105,38 +105,56 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 
 // GetGlobalCookies retrieves cookies for a given URL.
 func (cm *CookieManager) GetGlobalCookies(u string) ([]*http.Cookie, error) {
+	logger.Pl.I("Retrieving global cookies for URL: %q", u)
 	baseDomain, err := getBaseDomain(u)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
 
 	// Check if cookies already exist for domain.
+	var cookies []*http.Cookie
 	cm.mu.RLock()
-	if cookies, ok := cm.cookies[baseDomain]; ok {
-		cm.mu.RUnlock()
-		return cookies, nil
+	if baseCookies, ok := cm.cookies[baseDomain]; ok {
+		cookies = mergeCookies(cookies, baseCookies)
 	}
 	cm.mu.RUnlock()
-
-	// Load cookies for domain.
-	cookies := cm.loadCookiesForDomain(baseDomain)
 	if len(cookies) > 0 {
-		for _, c := range cookies {
-			logger.Pl.S("Loaded global cookie for domain %s: %v", baseDomain, c)
-		}
+		return cookies, nil
 	}
 
+	// Load cookies for domain.
+	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(baseDomain))
+	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(u))
+
 	// Store cookies.
-	cm.mu.Lock()
-	cm.cookies[baseDomain] = cookies
-	cm.mu.Unlock()
+	if len(cookies) > 0 {
+		// Debug log.
+		for _, c := range cookies {
+			logger.Pl.D(2, "Loaded global cookie for %q: %v", baseDomain, c)
+		}
+
+		// Merge with any cookies already stored in global cache.
+		if alreadyStored, ok := globalAuthCookieCache.Load(baseDomain); ok {
+			if storedCookies, ok := alreadyStored.([]*http.Cookie); ok {
+				cookies = mergeCookies(cookies, storedCookies)
+			}
+		}
+
+		// Store in manager and global cache.
+		cm.mu.Lock()
+		logger.Pl.I("Storing %d cookies for domain %q", len(cookies), baseDomain)
+		cm.cookies[baseDomain] = cookies
+		globalAuthCookieCache.Store(baseDomain, cookies)
+		cm.mu.Unlock()
+	}
 
 	return cookies, nil
 }
 
 // GetCachedAuthCookies retrieves cookies from the global auth cache.
-func (cm *CookieManager) GetCachedAuthCookies(hostname string) []*http.Cookie {
-	if val, ok := globalAuthCookieCache.Load(hostname); ok {
+func (cm *CookieManager) GetCachedAuthCookies(d string) []*http.Cookie {
+	logger.Pl.D(1, "Retrieving cached auth cookies for domain: %q", d)
+	if val, ok := globalAuthCookieCache.Load(d); ok {
 		if cookies, ok := val.([]*http.Cookie); ok {
 			return cookies
 		}
@@ -234,10 +252,27 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 	// Log the cookies for debugging.
 	logger.Pl.D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
 
+	// Parse login URL to get hostname for default domain.
+	parsedLoginURL, err := url.Parse(loginURL)
+	if err != nil {
+		logger.Pl.E("Failed to parse login URL %q: %v", loginURL, err)
+	}
+
+	// Get login URL hostname.
+	loginHost := ""
+	if parsedLoginURL != nil {
+		loginHost = parsedLoginURL.Hostname()
+	}
+
+	// Write each cookie in Netscape format.
 	for _, cookie := range cookies {
 		domain := cookie.Domain
 		if domain == "" {
-			domain = loginURL
+			// Default to the hostname of the login URL when the cookie doesn't carry a domain.
+			domain = loginHost
+			if domain == "" {
+				domain = loginURL
+			}
 		}
 
 		if !strings.HasPrefix(domain, ".") && strings.Count(domain, ".") > 1 {
