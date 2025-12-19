@@ -158,8 +158,8 @@ func settingsJSONMap(settings *models.Settings) map[string]any {
 	if len(settings.MetaFilterMoveOps) > 0 {
 		settingsMap[jsonkeys.SettingsMoveOps] = strings.Join(models.MetaFilterMoveOpsArrayToSlice(settings.MetaFilterMoveOps), "\n")
 	}
-	if settings.UseGlobalCookies {
-		settingsMap[jsonkeys.SettingsUseGlobalCookies] = true
+	if settings.UseGlobalCookies != nil {
+		settingsMap[jsonkeys.SettingsUseGlobalCookies] = *settings.UseGlobalCookies
 	}
 	if settings.Paused {
 		settingsMap[jsonkeys.SettingsPaused] = true
@@ -261,7 +261,7 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 
 	// Extract boolean fields.
 	if v, ok := data[jsonkeys.SettingsUseGlobalCookies].(bool); ok {
-		settings.UseGlobalCookies = v
+		settings.UseGlobalCookies = &v
 	}
 	if v, ok := data[jsonkeys.SettingsPaused].(bool); ok {
 		settings.Paused = v
@@ -582,7 +582,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 		ExternalDownloaderArgs:    externalDownloaderArgs,
 		MaxFilesize:               maxFilesize,
 		Retries:                   retries,
-		UseGlobalCookies:          useGlobalCookies,
+		UseGlobalCookies:          &useGlobalCookies,
 		Paused:                    paused,
 		YtdlpOutputExt:            ytdlpOutExt,
 		ExtraYTDLPVideoArgs:       extraYtdlpVideoArgs,

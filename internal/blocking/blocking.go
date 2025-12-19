@@ -23,7 +23,7 @@ func GetBlockContext(cu *models.ChannelURL) vars.BlockContext {
 	}
 
 	// Priority #2: Cookie-based authentication.
-	if cu.ChanURLSettings != nil && (cu.ChanURLSettings.CookiesFromBrowser != "" || cu.ChanURLSettings.UseGlobalCookies) {
+	if cu.ChanURLSettings != nil && (cu.ChanURLSettings.CookiesFromBrowser != "" || (cu.ChanURLSettings.UseGlobalCookies != nil && *cu.ChanURLSettings.UseGlobalCookies)) {
 		return vars.BlockContextCookie
 	}
 

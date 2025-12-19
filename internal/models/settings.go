@@ -12,7 +12,7 @@ type Settings struct {
 	ExternalDownloaderArgs    string   `json:"external_downloader_args"`
 	MaxFilesize               string   `json:"max_filesize"`
 	Retries                   int      `json:"download_retries"`
-	UseGlobalCookies          bool     `json:"use_global_cookies"`
+	UseGlobalCookies          *bool    `json:"use_global_cookies,omitempty"`
 	YtdlpOutputExt            string   `json:"ytdlp_output_ext"`
 	YTDLPPreferredVideoCodecs []string `json:"ytdlp_preferred_video_codecs"`
 	YTDLPPreferredAudioCodecs []string `json:"ytdlp_preferred_audio_codecs"`
@@ -223,9 +223,9 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 		}
 	}
 
-	// Boolean comparisons
-	if child.UseGlobalCookies {
-		if parent.UseGlobalCookies != child.UseGlobalCookies {
+	// Boolean pointer comparisons
+	if child.UseGlobalCookies != nil {
+		if parent.UseGlobalCookies == nil || *parent.UseGlobalCookies != *child.UseGlobalCookies {
 			return false
 		}
 	}
@@ -582,7 +582,7 @@ func SettingsAllZero(s *Settings) bool {
 	if s.Retries != 0 {
 		return false
 	}
-	if s.UseGlobalCookies {
+	if s.UseGlobalCookies != nil && *s.UseGlobalCookies {
 		return false
 	}
 	if s.YtdlpOutputExt != "" {

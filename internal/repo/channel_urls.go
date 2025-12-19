@@ -233,9 +233,8 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 						// Create a copy of parent Settings.
 						settingsCopy := *c.ChanSettings
 
-						// Don't inherit Paused/UseGlobalCookies bools.
+						// Set settingsCopy bools to false if inheritance is unwanted.
 						settingsCopy.Paused = false
-						settingsCopy.UseGlobalCookies = false
 
 						// Set copy to ChanURLSettings.
 						cu.ChanURLSettings = &settingsCopy
@@ -554,7 +553,11 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.VideoDir, c = mergeStringSettings(urlSettings.VideoDir, channelSettings.VideoDir)
 	changed = changed || c
 
-	// Note: BotBlocked fields are per-URL, not cascaded
+	// Boolean pointer settings (nil will inherit from parent)
+	urlSettings.UseGlobalCookies, c = mergePtrBoolSettings(urlSettings.UseGlobalCookies, channelSettings.UseGlobalCookies)
+	changed = changed || c
+
+	// Note: Paused and BotBlocked fields are per-URL, not cascaded
 	return changed
 }
 
@@ -647,4 +650,13 @@ func mergeNumSettings[T constraints.Integer | constraints.Float](urlNum, chanNum
 		return chanNum, true
 	}
 	return urlNum, false
+}
+
+// mergePtrBoolSettings checks and cascades *bool pointers to the URL model if nil.
+func mergePtrBoolSettings(urlBool, chanBool *bool) (*bool, bool) {
+	if urlBool == nil && chanBool != nil {
+		val := *chanBool
+		return &val, true
+	}
+	return urlBool, false
 }

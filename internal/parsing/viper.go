@@ -282,7 +282,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 			Paused:                 NilOrZeroValue(input.Pause),
 			Retries:                NilOrZeroValue(input.Retries),
 			ToDate:                 NilOrZeroValue(input.ToDate),
-			UseGlobalCookies:       NilOrZeroValue(input.UseGlobalCookies),
+			UseGlobalCookies:       input.UseGlobalCookies,
 			VideoDir:               *input.VideoDir,
 			YtdlpOutputExt:         NilOrZeroValue(input.YTDLPOutputExt),
 			ExtraYTDLPVideoArgs:    NilOrZeroValue(input.ExtraYTDLPVideoArgs),
@@ -728,7 +728,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.Paused = *input.Pause
 	}
 	if input.UseGlobalCookies != nil {
-		settings.UseGlobalCookies = *input.UseGlobalCookies
+		settings.UseGlobalCookies = input.UseGlobalCookies
 	}
 
 	// Validate and set FromDate if provided.

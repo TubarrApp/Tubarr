@@ -89,7 +89,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.MinFreeMem,
 		},
 		{
-			metarrValue: metVals{str: parseMetarrOutputDir(v, cu, c, mOutDirParser)},
+			metarrValue: metVals{str: parseMetarrOutputDir(v, cu, mOutDirParser)},
 			valType:     str,
 			viperKey:    "", // Fallback logic already exists in parseMetarrOutputDir.
 			cmdKey:      metkeys.OutputDir,
@@ -269,7 +269,7 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 }
 
 // parseMetarrOutputDir parses and returns the output directory.
-func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
+func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
 	mArgs := cu.ChanURLMetarrArgs
 
 	switch {

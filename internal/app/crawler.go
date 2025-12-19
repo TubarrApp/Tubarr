@@ -116,8 +116,6 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		return err
 	}
 
-	// Global domain blocking is checked per-URL below
-
 	// Load config file settings.
 	file.UpdateFromConfigFile(s.ChannelStore(), c)
 
@@ -130,7 +128,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 
 	// Populate AccessDetails for all ChannelURLs upfront.
 	for _, cu := range c.URLModels {
-		cu.Cookies, cu.CookiePath, err = scrape.GetChannelCookies(ctx, cs, c, cu)
+		cu.Cookies, cu.CookiePath, err = scrape.ScraperURLCookies(ctx, cs, c, cu)
 		if err != nil {
 			return err
 		}
@@ -490,18 +488,23 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 	}
 
 	// Create it if it doesn't exist.
-	id, err := cs.AddChannelURL(c.ID, manualChanURL, true)
-	if err != nil {
+	if _, err = cs.AddChannelURL(c.ID, manualChanURL, true); err != nil {
 		return nil, fmt.Errorf("failed to create manual downloads channel URL: %w", err)
 	}
 
-	manualChanURL.ID = id
-	manualChanURL.IsManual = true
+	// Fetch the newly created ChannelURL with merged parent settings.
+	fetchedCU, hasRows, err := cs.GetChannelURLModel(c.ID, consts.ManualDownloadsCol, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch newly created manual downloads URL: %w", err)
+	}
+	if !hasRows || fetchedCU == nil {
+		return nil, fmt.Errorf("newly created manual downloads URL not found in database")
+	}
 
 	// Add to in-memory models.
-	c.URLModels = append(c.URLModels, manualChanURL)
+	c.URLModels = append(c.URLModels, fetchedCU)
 
-	return manualChanURL, nil
+	return fetchedCU, nil
 }
 
 // blockChannelBotDetected blocks a domain globally due to bot detection on the given URL.
@@ -562,7 +565,7 @@ func parseManualVideoURL(ctx context.Context, cs contracts.ChannelStore, c *mode
 	}
 
 	// Get access details for manual downloads.
-	targetChannelURLModel.Cookies, targetChannelURLModel.CookiePath, err = scrape.GetChannelCookies(ctx, cs, c, targetChannelURLModel)
+	targetChannelURLModel.Cookies, targetChannelURLModel.CookiePath, err = scrape.ScraperURLCookies(ctx, cs, c, targetChannelURLModel)
 	if err != nil {
 		return nil, "", err
 	}

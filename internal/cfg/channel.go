@@ -817,7 +817,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		&flags.MetarrExt, &flags.ExtraFFmpegArgs, &flags.MinFreeMem,
 		&flags.OutDir, &flags.RenameStyle, &flags.MetaOpsFile,
 		&flags.FilteredMetaOpsFile, &flags.FilenameOpsFile, &flags.FilteredFilenameOpsFile,
-		&flags.URLOutputDirs, &flags.FilenameOps, &flags.FilteredFilenameOps,
+		&flags.FilenameOps, &flags.FilteredFilenameOps,
 		&flags.MetaOps, &flags.FilteredMetaOps)
 
 	cmd.SetAuthFlags(addCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
@@ -1014,7 +1014,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 	cmd.SetMetarrFlags(batchCmd, &flags.MaxCPU, &flags.MetarrConcurrency, &flags.MetarrExt,
 		&flags.ExtraFFmpegArgs, &flags.MinFreeMem, &flags.OutDir, &flags.RenameStyle,
 		&flags.MetaOpsFile, &flags.FilteredMetaOpsFile, &flags.FilenameOpsFile, &flags.FilteredFilenameOpsFile,
-		&flags.URLOutputDirs, &flags.FilenameOps, &flags.FilteredFilenameOps, &flags.MetaOps, &flags.FilteredMetaOps)
+		&flags.FilenameOps, &flags.FilteredFilenameOps, &flags.MetaOps, &flags.FilteredMetaOps)
 
 	cmd.SetAuthFlags(batchCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
@@ -1204,8 +1204,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		newName string
 
 		// URLs.
-		urls       []string
-		urlOutDirs []string
+		urls []string
 
 		// Directory paths.
 		vDir   string
@@ -1430,7 +1429,6 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				filteredFilenameOpsFile: filteredFilenameOpsFile,
 
 				outputDir:            outDir,
-				urlOutputDirs:        urlOutDirs,
 				concurrency:          metarrConcurrency,
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
@@ -1489,8 +1487,8 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
 		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
-		&urlOutDirs, &filenameOps, &filteredFilenameOps,
-		&metaOps, &filteredMetaOps)
+		&filenameOps, &filteredFilenameOps, &metaOps,
+		&filteredMetaOps)
 
 	// Transcoding.
 	cmd.SetTranscodeFlags(updateSettingsCmd, &useGPU, &gpuNode,
@@ -1577,7 +1575,6 @@ type cobraMetarrArgs struct {
 	filteredFilenameOpsFile string
 
 	outputDir            string
-	urlOutputDirs        []string
 	concurrency          int
 	maxCPU               float64
 	minFreeMem           string
@@ -2065,7 +2062,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	// Use global cookies.
 	if f.Changed(keys.UseGlobalCookies) {
 		fns = append(fns, func(s *models.Settings) error {
-			s.UseGlobalCookies = c.useGlobalCookies
+			s.UseGlobalCookies = &c.useGlobalCookies
 			return nil
 		})
 	}

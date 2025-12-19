@@ -86,7 +86,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 
 				if attempt < d.Options.MaxRetries {
 					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
-					logger.Pl.I("Waiting %d seconds before retrying video download for %q...", d.Video.URL)
+					logger.Pl.I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
 
 					select {
 					case <-d.Context.Done():

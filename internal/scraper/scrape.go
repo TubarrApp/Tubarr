@@ -86,7 +86,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		logger.Pl.D(1, "Processing channel URL %q", cu.URL)
 
 		// Get access details once per ChannelURL - delegated to CookieManager
-		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelCookies(ctx, cs, c, cu)
+		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
 		if err != nil {
 			return nil, err
 		}
@@ -192,9 +192,9 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 	return nil
 }
 
-// GetChannelCookies is now just a wrapper that delegates to CookieManager
-func (s *Scraper) GetChannelCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
-	return s.cookieManager.GetChannelCookies(ctx, cs, c, cu)
+// ScraperURLCookies returns channel access details for a given video.
+func (s *Scraper) ScraperURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
+	return s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
 }
 
 // newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt

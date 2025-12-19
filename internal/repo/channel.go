@@ -1590,7 +1590,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 
 	// Use global cookies?
 	if v, ok := parsing.GetConfigValue[bool](vip, keys.UseGlobalCookies); ok {
-		c.ChanSettings.UseGlobalCookies = v
+		c.ChanSettings.UseGlobalCookies = &v
 	}
 
 	// Video directory.

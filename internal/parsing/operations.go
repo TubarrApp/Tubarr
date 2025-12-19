@@ -427,17 +427,3 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 	}
 	return validFilteredFilenameOps, nil
 }
-
-// parseURLDirPair parses a 'url|output directory' pairing.
-func parseURLDirPair(pair string) (u string, d string, err error) {
-	parts := strings.Split(pair, "|")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid URL|directory pair: %q", pair)
-	}
-	u = parts[0]
-	if _, err := url.ParseRequestURI(u); err != nil {
-		return "", "", fmt.Errorf("invalid URL format: %q", u)
-	}
-
-	return parts[0], parts[1], nil
-}

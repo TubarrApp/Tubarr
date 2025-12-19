@@ -19,7 +19,6 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		concurrency, crawlFreq, metarrConcurrency, retries                                                    int
 		maxCPU                                                                                                float64
 		vDir, jDir, outDir                                                                                    string
-		urlOutDirs                                                                                            []string
 		videoCodec, audioCodec                                                                                []string
 		cookiesFromBrowser                                                                                    string
 		minFreeMem, renameStyle, metarrExt                                                                    string
@@ -135,8 +134,8 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				filteredFilenameOps:     filteredFilenameOps,
 				filteredFilenameOpsFile: filteredFilenameOpsFile,
 
-				outputDir:            outDir,
-				urlOutputDirs:        urlOutDirs,
+				outputDir: outDir,
+
 				concurrency:          metarrConcurrency,
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
@@ -218,8 +217,8 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
 		&outDir, &renameStyle, &metaOpsFile,
 		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
-		&urlOutDirs, &filenameOps, &filteredFilenameOps,
-		&metaOps, &filteredMetaOps)
+		&filenameOps, &filteredFilenameOps, &metaOps,
+		&filteredMetaOps)
 
 	// Transcoding.
 	cmd.SetTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuNode,

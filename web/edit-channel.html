@@ -740,14 +740,14 @@
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Cookies From Browser</label>
                               <input type="text" x-model="urlEntry.custom.cookies_from_browser" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-                              <label class="mt-2 mb-2.5 flex items-center text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  x-model="urlEntry.custom.use_global_cookies"
-                                  class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                                />
-                                <span>Use global cookies (find cookies from all browsers)</span>
-                              </label>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Use Global Cookies</label>
+                              <select x-model="urlEntry.custom.use_global_cookies" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Inherit from channel</option>
+                                <option value="false">No</option>
+                                <option value="true">Yes</option>
+                              </select>
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader</label>
@@ -1789,10 +1789,14 @@
                             urlEntry.custom.paused = normalized;
                           }
                         } else if (key === 'use_global_cookies') {
+                          // Convert boolean to string for dropdown
                           const normalized = normalizeBool(value);
-                          if (typeof normalized === 'boolean') {
-                            urlEntry.custom.use_global_cookies = normalized;
+                          if (normalized === true) {
+                            urlEntry.custom.use_global_cookies = 'true';
+                          } else if (normalized === false) {
+                            urlEntry.custom.use_global_cookies = 'false';
                           }
+                          // If undefined/null, leave as undefined (will default to '' in dropdown)
                         } else if (codecFields.includes(key) && Array.isArray(value)) {
                           urlEntry.custom[key] = value.join('\n');
                         } else {
@@ -2092,13 +2096,20 @@
               const settings = {};
               const metarr = {};
 
+              // Process Paused field (checkbox - always set as boolean)
               const pausedValue = normalizeBool(urlEntry.custom && urlEntry.custom.paused);
               if (typeof pausedValue === 'boolean') {
                 settings.paused = pausedValue;
               }
-              const cookiesValue = normalizeBool(urlEntry.custom && urlEntry.custom.use_global_cookies);
-              if (typeof cookiesValue === 'boolean') {
-                settings.use_global_cookies = cookiesValue;
+
+              // Process Use Global Cookies field from dropdown (three states: inherit/''/true/false)
+              if (urlEntry.custom && urlEntry.custom.use_global_cookies !== undefined && urlEntry.custom.use_global_cookies !== '') {
+                if (urlEntry.custom.use_global_cookies === 'true') {
+                  settings.use_global_cookies = true;
+                } else if (urlEntry.custom.use_global_cookies === 'false') {
+                  settings.use_global_cookies = false;
+                }
+                // If empty string, don't set (will be nil in Go)
               }
 
               // Process custom settings if enabled

@@ -91,7 +91,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	outputExt, extraFFmpegargs, minFreeMem, outDir, renameStyle, metaOpsFile,
 	filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile *string,
-	urlOutDirs, filenameOps, filteredFilenameOps, metaOps, filteredMetaOps *[]string) {
+	filenameOps, filteredFilenameOps, metaOps, filteredMetaOps *[]string) {
 
 	// Numbers
 	if maxCPU != nil {
