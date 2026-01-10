@@ -6,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/times"
 )
 
 // NewJSONDownload creates a download operation with specified options.
-func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*JSONDownload, error) {
+func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker *DownloadTracker, opts *Options) (*JSONDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -23,6 +24,7 @@ func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *m
 		Video:      video,
 		Channel:    channel,
 		ChannelURL: channelURL,
+		DLStore:    dlStore,
 		DLTracker:  tracker,
 		Context:    procCtx,
 	}
@@ -62,17 +64,17 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 			return false, d.cancelJSONDownload()
 		default:
 			if err := d.jsonDLAttempt(); err != nil {
-				// Check bot detection IMMEDIATELY after each attempt
+				// Check bot detection after each attempt.
 				if botErr := checkBotDetection(d.Video.URL, err); botErr != nil {
 					return true, botErr // Abort immediately, no retries
 				}
 
-				// Check if URL should be avoided (set by previous videos)
-				if avoidErr := checkIfAvoidURL(d.Video.URL); avoidErr != nil {
+				// Check if URL should be avoided (set by previous videos or persistent blocks).
+				if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
 					return false, avoidErr
 				}
 
-				// Other errors - continue with retry logic
+				// Other errors - continue with retry logic.
 				lastErr = err
 				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
 

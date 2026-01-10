@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -13,7 +14,7 @@ import (
 )
 
 // NewVideoDownload creates a download operation with specified options.
-func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, tracker *DownloadTracker, opts *Options) (*VideoDownload, error) {
+func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker *DownloadTracker, opts *Options) (*VideoDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -22,6 +23,7 @@ func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *
 		Video:      video,
 		ChannelURL: channelURL,
 		Channel:    channel,
+		DLStore:    dlStore,
 		DLTracker:  tracker,
 		Context:    procCtx,
 	}
@@ -52,8 +54,8 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 
 	var lastErr error
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
-		// Check if URL should be avoided (set by previous videos).
-		if err := checkIfAvoidURL(d.Video.URL); err != nil {
+		// Check if URL should be avoided (set by previous videos or persistent blocks).
+		if err := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
 			return false, err
 		}
 
@@ -73,7 +75,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 				}
 
 				// Check if URL should be avoided (in case bot was just detected).
-				if avoidErr := checkIfAvoidURL(d.Video.URL); avoidErr != nil {
+				if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
 					return false, avoidErr
 				}
 

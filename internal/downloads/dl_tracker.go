@@ -32,6 +32,11 @@ func NewDownloadTracker(store contracts.DownloadStore, externalDler string) *Dow
 	}
 }
 
+// GetStore returns the DownloadStore for accessing database operations.
+func (t *DownloadTracker) GetStore() contracts.DownloadStore {
+	return t.dlStore
+}
+
 // Start starts download tracking.
 func (t *DownloadTracker) Start(ctx context.Context) {
 	go t.processUpdates(ctx)

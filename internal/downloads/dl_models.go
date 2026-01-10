@@ -96,6 +96,7 @@ type JSONDownload struct {
 	Video      *models.Video
 	Channel    *models.Channel
 	ChannelURL *models.ChannelURL
+	DLStore    contracts.DownloadStore
 	DLTracker  *DownloadTracker
 	Options    Options
 	Context    context.Context

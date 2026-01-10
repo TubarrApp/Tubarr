@@ -1,14 +1,17 @@
 package downloads
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+	"tubarr/internal/blocking"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/models"
 )
 
 // verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
@@ -26,7 +29,7 @@ func verifyJSONDownload(jsonPath string) error {
 
 // verifyVideoDownload checks if the specified video file exists and is not empty.
 func verifyVideoDownload(videoPath string) error {
-	// Check video file
+	// Check video file.
 	videoInfo, err := os.Stat(videoPath)
 	if err != nil {
 		return fmt.Errorf("video file verification failed: %w", err)
@@ -90,19 +93,29 @@ func checkBotDetection(uri string, inputErr error) error {
 }
 
 // checkIfAvoidURL checks if the hostname of the URL should be skipped.
-func checkIfAvoidURL(uri string) error {
+func checkIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
 	var siteHost string
 
 	parsedURL, err := url.Parse(uri)
 	if err != nil {
-		logger.Pl.E("Could not parse URL %q, will check against full URL instead")
+		logger.Pl.E("Could not parse URL %q, will check against full URL instead", uri)
 		siteHost = uri
 	} else {
 		siteHost = parsedURL.Hostname()
 	}
 
+	// Check in-memory avoidURLs map (for same-session blocks).
 	if _, exists := avoidURLs.Load(siteHost); exists {
 		return fmt.Errorf("skipping download for %q due to site %q detecting bot activity", uri, siteHost)
+	}
+
+	// Check persistent blocking system (for database-persisted blocks).
+	if cu != nil && db != nil {
+		context := blocking.GetBlockContext(cu)
+		if isBlocked, blockedAt, remainingTime := blocking.IsBlocked(siteHost, context); isBlocked {
+			return fmt.Errorf("skipping download for %q due to site %q blocked for context %q (blocked at %v, %v remaining)",
+				uri, siteHost, context, blockedAt, remainingTime)
+		}
 	}
 
 	return nil

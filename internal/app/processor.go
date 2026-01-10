@@ -345,7 +345,7 @@ func processJSON(
 
 	// ONLY download JSON if it's NOT a custom file (custom scraper already created it).
 	if v.JSONCustomFile == "" {
-		dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker, &downloads.Options{
+		dl, err := downloads.NewJSONDownload(procCtx, v, cu, c, dlTracker.GetStore(), dlTracker, &downloads.Options{
 			MaxRetries:       3,
 			RetryMaxInterval: 5,
 		})
@@ -415,7 +415,7 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 	downloads.RegisterDownloadContext(v.ID, v.URL, cancel)
 	defer downloads.UnregisterDownloadContext(v.ID, v.URL)
 
-	dl, err := downloads.NewVideoDownload(downloadCtx, v, cu, c, dlTracker, &downloads.Options{
+	dl, err := downloads.NewVideoDownload(downloadCtx, v, cu, c, dlTracker.GetStore(), dlTracker, &downloads.Options{
 		MaxRetries:       3,
 		RetryMaxInterval: 20,
 	})
