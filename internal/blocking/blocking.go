@@ -211,7 +211,7 @@ func CleanExpiredBlocks(db *sql.DB) error {
 		context vars.BlockContext
 	}, 0)
 
-	// Find expired blocks
+	// Find expired blocks.
 	for domain, contexts := range vars.BlockedDomains {
 		for context, blockedTime := range contexts {
 			timeoutMinutes := GetTimeoutForDomain(domain)

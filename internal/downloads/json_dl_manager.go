@@ -50,7 +50,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
-	// Ensure cleanup on exit
+	// Ensure cleanup on exit.
 	defer d.cleanup()
 
 	var lastErr error
@@ -91,7 +91,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 					}
 				}
 			} else {
-				// Success
+				// Success.
 				d.Video.UpdatedAt = time.Now()
 
 				logger.Pl.S("Successfully completed JSON download for URL: %s", d.Video.URL)

@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
 	"sync"
 	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
@@ -126,10 +125,6 @@ func InitProcess(
 					&metarrWg,
 					metarrIsExecutable)
 
-				// If bot was detected, cancel the context to stop other workers.
-				if err != nil && strings.Contains(err.Error(), consts.BotActivitySentinel) {
-					procCancel()
-				}
 				results <- err
 			}
 		})
