@@ -88,8 +88,10 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 			}()
 
 			// Initiate crawl.
-			if err := CrawlChannel(ctx, s, c); err != nil {
+			if performedCrawls, err := CrawlChannel(ctx, s, c); err != nil {
 				errChan <- err
+			} else if performedCrawls {
+				logger.Pl.S("Completed crawl for channel %q", c.Name)
 			}
 		}(c)
 	}
@@ -257,19 +259,19 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 }
 
 // CrawlChannel crawls a channel for new URLs.
-func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (err error) {
+func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (performedCrawls bool, err error) {
 	if c == nil {
-		return fmt.Errorf("channel cannot be nil")
+		return false, fmt.Errorf("channel cannot be nil")
 	}
 	if len(c.URLModels) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// Filter out any URLs that are blocked globally for their authentication context.
 	var hasAllowed bool
 	if c.URLModels, hasAllowed = filterAllowedValidURLs(c); !hasAllowed {
 		logger.Pl.D(4, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
-		return nil
+		return false, nil
 	}
 
 	// Check URLs to crawl.
@@ -285,7 +287,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	}
 	if urlsToCrawl == 0 {
 		logger.Pl.I("No monitored URLs for channel %q", c.Name)
-		return nil
+		return false, nil
 	}
 
 	// Get channel store.
@@ -293,12 +295,12 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 
 	// Add random sleep before processing (added bot detection).
 	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
-		return err
+		return false, err
 	}
 
 	// Check validity of default output directories.
 	if c.ChanSettings.VideoDir == "" || c.ChanSettings.JSONDir == "" {
-		return errors.New("default channel output directories are blank")
+		return false, errors.New("default channel output directories are blank")
 	}
 
 	fmt.Println()
@@ -308,15 +310,15 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	scrape := scraper.New()
 	videos, err := scrape.GetNewReleases(ctx, cs, c, false)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if len(videos) == 0 {
-		logger.Pl.S("No new releases found for channel %q", c.Name)
+		logger.Pl.I("No new releases found for channel %q", c.Name)
 		if err := cs.UpdateLastScan(c.ID); err != nil {
-			return fmt.Errorf("failed to update last scan time: %w", err)
+			return true, fmt.Errorf("failed to update last scan time: %w", err)
 		}
-		return nil
+		return true, nil
 	}
 
 	// Main process...
@@ -364,27 +366,27 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 
 	// Last scan time update.
 	if err := cs.UpdateLastScan(c.ID); err != nil {
-		return fmt.Errorf("failed to update last scan time: %w", err)
+		return true, fmt.Errorf("failed to update last scan time: %w", err)
 	}
 
 	// All videos failed.
 	if nSucceeded == 0 {
-		return fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procError)
+		return true, fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procError)
 	}
 
 	// Some succeeded, notify URLs.
 	if nDownloaded > 0 {
 		if err := NotifyServices(cs, c, channelURLsGotNew); err != nil {
-			return errors.Join(procError, err)
+			return true, errors.Join(procError, err)
 		}
 	}
 
 	// Some errors encountered.
 	if procError != nil {
-		return fmt.Errorf("channel %q encountered errors processing: %w", c.Name, procError)
+		return true, fmt.Errorf("channel %q encountered errors processing: %w", c.Name, procError)
 	}
 
-	return nil
+	return true, nil
 }
 
 // CrawlChannelIgnore gets the channel's currently displayed videos and marks them as complete without downloading.

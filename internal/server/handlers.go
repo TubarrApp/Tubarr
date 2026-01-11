@@ -1070,9 +1070,9 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			defer state.UnlockCrawlState(c.Name)
 			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
 
-			if err := app.CrawlChannel(ctx, ss.s, c); err != nil {
+			if performedCrawls, err := app.CrawlChannel(ctx, ss.s, c); err != nil {
 				logger.Pl.E("Encountered errors crawling channel %q: %v", c.Name, err)
-			} else {
+			} else if performedCrawls {
 				logger.Pl.S("Completed crawl for channel %q", c.Name)
 			}
 		}(ss.ctx)
