@@ -261,15 +261,15 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	}
 
 	// Filter out any URLs that are blocked globally for their authentication context.
-	allowedURLModels, hasAllowed := filterBlockedURLs(c)
-	if !hasAllowed {
+	var hasAllowed bool
+	if c.URLModels, hasAllowed = filterAllowedValidURLs(c); !hasAllowed {
 		logger.Pl.D(2, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
 		return nil
 	}
 
 	// Check URLs to crawl.
 	urlsToCrawl := 0
-	for _, cu := range allowedURLModels {
+	for _, cu := range c.URLModels {
 		if !cu.IsManual && (cu.ChanURLSettings != nil && !cu.ChanURLSettings.Paused) {
 			urlsToCrawl++
 		}
@@ -298,9 +298,6 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 
 	fmt.Println()
 	logger.Pl.I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
-
-	// Replace with filtered list (may be same as original if nothing blocked).
-	c.URLModels = allowedURLModels
 
 	// Get new releases for channel.
 	scrape := scraper.New()
@@ -428,8 +425,8 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 	return nil
 }
 
-// filterBlockedURLs filters out URLs blocked by the hostname of a given channel URL.
-func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
+// filterAllowedValidURLs returns only valid and unblocked URLs.
+func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 	// Filter out manual URLs and globally blocked URLs.
 	allowedURLModels := make([]*models.ChannelURL, 0, len(c.URLModels))
 	for _, cu := range c.URLModels {
