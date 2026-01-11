@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/app"
+	"tubarr/internal/blocking"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -38,6 +39,11 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 			logger.Pl.I("Crawl watchdog context cancelled, shutting down...")
 			return
 		case <-ticker.C:
+			// Clean expired blocks first.
+			if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
+				logger.Pl.W("Failed to clean expired blocks: %v", err)
+			}
+
 			// Reload channels from database to get updated LastScan times
 			freshChannels, hasRows, err := ss.s.ChannelStore().GetAllChannels(true)
 			if err != nil {

@@ -36,6 +36,11 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 		return err
 	}
 
+	// Clean expired blocks first.
+	if err := blocking.CleanExpiredBlocks(cs.GetDB()); err != nil {
+		logger.Pl.W("Failed to clean expired blocks: %v", err)
+	}
+
 	var (
 		conc    = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.GlobalConcurrency))
 		errChan = make(chan error, len(channels))
