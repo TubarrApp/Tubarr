@@ -316,7 +316,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	if len(videos) == 0 {
 		logger.Pl.I("No new releases found for channel %q", c.Name)
 		if err := cs.UpdateLastScan(c.ID); err != nil {
-			return true, fmt.Errorf("failed to update last scan time: %w", err)
+			return true, fmt.Errorf("no new releases found for channel %q. Failed to update last scan time: %w", c.Name, err)
 		}
 		return true, nil
 	}
