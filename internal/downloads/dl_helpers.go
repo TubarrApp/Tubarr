@@ -11,6 +11,7 @@ import (
 	"tubarr/internal/blocking"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 )
 
@@ -76,7 +77,7 @@ func (d *JSONDownload) cancelJSONDownload() error {
 }
 
 // checkBotDetection checks and handles detection of bot activity.
-func checkBotDetection(uri string, inputErr error) error {
+func checkBotDetection(uri string, cu *models.ChannelURL, inputErr error) error {
 	if strings.Contains(strings.ToLower(inputErr.Error()), "confirm you’re not a bot") || // Curly apostrophe (used by some tube sites)
 		strings.Contains(strings.ToLower(inputErr.Error()), "confirm you're not a bot") || // Straight apostrophe
 		strings.Contains(strings.ToLower(inputErr.Error()), "not a robot") {
@@ -86,7 +87,9 @@ func checkBotDetection(uri string, inputErr error) error {
 			logger.Pl.E("Failed to parse URL %q after bot detection", uri)
 		}
 
-		avoidURLs.Store(siteHost.Hostname(), true)
+		// Store hostname as key, context as value for context-aware blocking.
+		context := blocking.GetBlockContext(cu)
+		vars.AvoidURLs.Store(siteHost.Hostname(), context)
 		return fmt.Errorf("url %q %s. Aborting without retries. Error message: %w", uri, consts.BotActivitySentinel, inputErr)
 	}
 	return nil
@@ -104,9 +107,15 @@ func checkIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
 		siteHost = parsedURL.Hostname()
 	}
 
-	// Check in-memory avoidURLs map (for same-session blocks).
-	if _, exists := avoidURLs.Load(siteHost); exists {
-		return fmt.Errorf("skipping download for %q due to site %q detecting bot activity", uri, siteHost)
+	// Check in-memory vars.AvoidURLs map (for same-session blocks).
+	if val, exists := vars.AvoidURLs.Load(siteHost); exists {
+		if storedBlockContext, ok := val.(vars.BlockContext); ok {
+			if blocking.GetBlockContext(cu) == storedBlockContext {
+				return fmt.Errorf("skipping download for %q due to site %q detecting bot activity (context: %q)", uri, siteHost, storedBlockContext)
+			}
+		} else {
+			return fmt.Errorf("dev error: invalid block context type (%T) for hostname %q in AvoidURLs map", storedBlockContext, siteHost)
+		}
 	}
 
 	// Check persistent blocking system (for database-persisted blocks).

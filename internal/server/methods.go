@@ -103,11 +103,11 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						crawlCtx, cancel := context.WithCancel(ctx)
 						defer cancel()
 
-						logger.Pl.I("Crawl watchdog: triggering scheduled crawl for channel %q", ch.Name)
+						logger.Pl.D(2, "Crawl watchdog: triggering scheduled crawl for channel %q", ch.Name)
 						if err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {
 							logger.Pl.E("Crawl watchdog: error crawling channel %q: %v", ch.Name, err)
 						} else {
-							logger.Pl.S("Crawl watchdog: completed crawl for channel %q", ch.Name)
+							logger.Pl.D(2, "Crawl watchdog: completed crawl for channel %q", ch.Name)
 						}
 					}(c)
 				}

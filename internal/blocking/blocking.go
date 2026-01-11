@@ -249,6 +249,14 @@ func CleanExpiredBlocks(db *sql.DB) error {
 		} else {
 			logger.Pl.S("Removed expired block for domain %q (context: %s)", item.domain, item.context)
 		}
+
+		// Remove from in-memory AvoidURLs map if context matches.
+		if val, exists := vars.AvoidURLs.Load(item.domain); exists {
+			if storedContext, ok := val.(vars.BlockContext); ok && storedContext == item.context {
+				vars.AvoidURLs.Delete(item.domain)
+				logger.Pl.D(2, "Removed expired in-memory block for domain %q (context: %s)", item.domain, item.context)
+			}
+		}
 	}
 
 	return nil

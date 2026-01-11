@@ -70,7 +70,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 		default:
 			if err := d.videoDLAttempt(); err != nil {
 				// Check bot detection FIRST - abort immediately if detected.
-				if botErr := checkBotDetection(d.Video.URL, err); botErr != nil {
+				if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, err); botErr != nil {
 					return true, botErr // Only 'TRUE' path for bot detected.
 				}
 

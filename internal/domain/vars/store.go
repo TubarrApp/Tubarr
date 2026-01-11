@@ -11,6 +11,9 @@ import (
 // BenchmarkFiles holds the global pointer to BenchFiles.
 var BenchmarkFiles *benchmark.BenchFiles
 
+// Avoid attempting downloads for these URLs (e.g. when bot activity detection triggers).
+var AvoidURLs sync.Map
+
 // Metarr log constants.
 const (
 	MaxMetarrLogs = 2500

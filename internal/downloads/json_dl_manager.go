@@ -65,7 +65,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 		default:
 			if err := d.jsonDLAttempt(); err != nil {
 				// Check bot detection after each attempt.
-				if botErr := checkBotDetection(d.Video.URL, err); botErr != nil {
+				if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, err); botErr != nil {
 					return true, botErr // Abort immediately, no retries
 				}
 

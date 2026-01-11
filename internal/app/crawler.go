@@ -256,10 +256,20 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	if c == nil {
 		return fmt.Errorf("channel cannot be nil")
 	}
+	if len(c.URLModels) == 0 {
+		return nil
+	}
+
+	// Filter out any URLs that are blocked globally for their authentication context.
+	allowedURLModels, hasAllowed := filterBlockedURLs(c)
+	if !hasAllowed {
+		logger.Pl.D(2, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
+		return nil
+	}
 
 	// Check URLs to crawl.
 	urlsToCrawl := 0
-	for _, cu := range c.URLModels {
+	for _, cu := range allowedURLModels {
 		if !cu.IsManual && (cu.ChanURLSettings != nil && !cu.ChanURLSettings.Paused) {
 			urlsToCrawl++
 		}
@@ -281,11 +291,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 		return err
 	}
 
-	// Check validity
-	if len(c.URLModels) == 0 {
-		logger.Pl.D(1, "Channel %q has no URLs configured for automatic crawling, skipping.", c.Name)
-		return nil
-	}
+	// Check validity of default output directories.
 	if c.ChanSettings.VideoDir == "" || c.ChanSettings.JSONDir == "" {
 		return errors.New("default channel output directories are blank")
 	}
@@ -293,12 +299,6 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	fmt.Println()
 	logger.Pl.I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
 
-	// Filter out any URLs that are blocked globally for their authentication context.
-	allowedURLModels, hasAllowed := filterBlockedURLs(c)
-	if !hasAllowed {
-		logger.Pl.D(1, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
-		return nil
-	}
 	// Replace with filtered list (may be same as original if nothing blocked).
 	c.URLModels = allowedURLModels
 
@@ -452,8 +452,7 @@ func filterBlockedURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 		context := blocking.GetBlockContext(cu)
 		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, context)
 		if isBlocked {
-			logger.Pl.W("Skipping URL %q for channel %q. Domain %q is blocked for context %q (Blocked at: %v, Time remaining: %v)",
-				cu.URL, c.Name, hostname, context, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
+			logger.Pl.D(2, "Skipping URL %q for channel %q. Domain %q is blocked for context %q (Blocked at: %v, Time remaining: %v)", cu.URL, c.Name, hostname, context, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
 			continue
 		}
 

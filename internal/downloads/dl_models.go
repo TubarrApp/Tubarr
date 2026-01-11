@@ -12,10 +12,7 @@ import (
 	"tubarr/internal/models"
 )
 
-var ongoingDownloads sync.Map
-var avoidURLs sync.Map // Avoid attempting downloads for these URLs (e.g. when bot activity detection triggers).
-
-// activeDownloadContexts tracks cancellation functions for active downloads by video ID.
+var ongoingDownloads sync.Map       // map[int64]*VideoDownload.
 var activeDownloadContexts sync.Map // map[int64]context.CancelFunc.
 
 // isProcessNotExist checks if an error indicates a process doesn't exist.

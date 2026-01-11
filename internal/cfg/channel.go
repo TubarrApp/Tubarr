@@ -281,7 +281,6 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			}
 
 			// Success.
-			logger.Pl.S("Completed crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
