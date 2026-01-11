@@ -10,7 +10,7 @@ import (
 
 // initializeApplication sets up the application for the current run.
 func initializeApplication() (store *repo.Store, db *sql.DB, progControl *repo.ProgControl, err error) {
-	// Database & stores
+	// Database & stores.
 	database, err := database.InitDB()
 	if err != nil {
 		return nil, nil, nil, err
@@ -20,7 +20,7 @@ func initializeApplication() (store *repo.Store, db *sql.DB, progControl *repo.P
 		return nil, nil, nil, err
 	}
 
-	// Start controller
+	// Start controller.
 	progControl = repo.NewProgController(database.DB)
 	if progControl.ProcessID, err = progControl.StartTubarr(); err != nil {
 		if strings.HasPrefix(err.Error(), "failure:") {

@@ -506,10 +506,17 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			cURLs := c.GetURLs()
 			logger.Pl.D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
+			
+
 			// Run ignore crawl.
 			if !state.CrawlStateActive(c.Name) {
 				state.LockCrawlState(c.Name)
 				defer state.UnlockCrawlState(c.Name)
+
+				// Clean expired blocks first.
+			if err := blocking.CleanExpiredBlocks(cs.GetDB()); err != nil {
+				logger.Pl.W("Failed to clean expired blocks: %v", err)
+			}
 
 				if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
 					return err
@@ -1172,10 +1179,17 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 				return err
 			}
 
+			
+
 			// Crawl channel.
 			if !state.CrawlStateActive(c.Name) {
 				state.LockCrawlState(c.Name)
 				defer state.UnlockCrawlState(c.Name)
+
+				// Clean expired blocks first.
+			if err := blocking.CleanExpiredBlocks(cs.GetDB()); err != nil {
+				logger.Pl.W("Failed to clean expired blocks: %v", err)
+			}
 				if err := app.CrawlChannel(ctx, s, c); err != nil {
 					return err
 				}

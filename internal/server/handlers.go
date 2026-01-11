@@ -1060,6 +1060,11 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	if !state.CrawlStateActive(c.Name) {
 		state.LockCrawlState(c.Name)
 
+		// Clean expired blocks first.
+		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
+			logger.Pl.W("Failed to clean expired blocks: %v", err)
+		}
+
 		//nolint:contextcheck
 		go func(ctx context.Context) {
 			defer state.UnlockCrawlState(c.Name)
@@ -1108,6 +1113,11 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 	// Start crawl in background.
 	if !state.CrawlStateActive(c.Name) {
 		state.LockCrawlState(c.Name)
+
+		// Clean expired blocks first.
+		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
+			logger.Pl.W("Failed to clean expired blocks: %v", err)
+		}
 
 		//nolint:contextcheck
 		go func(ctx context.Context) {
