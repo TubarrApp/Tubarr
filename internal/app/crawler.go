@@ -268,7 +268,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	// Filter out any URLs that are blocked globally for their authentication context.
 	var hasAllowed bool
 	if c.URLModels, hasAllowed = filterAllowedValidURLs(c); !hasAllowed {
-		logger.Pl.D(2, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
+		logger.Pl.D(4, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
 		return nil
 	}
 
@@ -312,7 +312,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (er
 	}
 
 	if len(videos) == 0 {
-		logger.Pl.I("No new releases for channel %q", c.Name)
+		logger.Pl.S("No new releases found for channel %q", c.Name)
 		if err := cs.UpdateLastScan(c.ID); err != nil {
 			return fmt.Errorf("failed to update last scan time: %w", err)
 		}
