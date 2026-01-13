@@ -11,6 +11,7 @@ import (
 	"html"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -332,6 +333,20 @@ func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, 
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
+	}
+
+	// Set cookies for the domain from this crawl session.
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+
+	// Get cookies from cookie manager for this crawl session.
+	if cookies := cm.GetCachedCookies(parsedURL.Hostname()); cookies != nil {
+		jar.SetCookies(parsedURL, cookies)
+		logger.Pl.D(2, "Set %d cookies for scraper from this crawl session", len(cookies))
+	} else {
+		logger.Pl.D(2, "No cookies available for scraper for hostname %q", parsedURL.Hostname())
 	}
 
 	// Create a Colly collector with the custom HTTP client

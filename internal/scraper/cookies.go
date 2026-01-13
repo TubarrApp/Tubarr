@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
@@ -20,11 +21,16 @@ import (
 )
 
 // CookieManager handles cookie operations.
-type CookieManager struct{}
+type CookieManager struct {
+	mu      sync.RWMutex
+	cookies map[string][]*http.Cookie
+}
 
 // NewCookieManager creates a new cookie manager instance.
 func NewCookieManager() *CookieManager {
-	return &CookieManager{}
+	return &CookieManager{
+		cookies: make(map[string][]*http.Cookie),
+	}
 }
 
 // GetChannelURLCookies returns channel access details for a given video.
@@ -79,8 +85,22 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 		logger.Pl.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
 	}
 
-	// Save cookies to file.
+	// Store merged cookies in cookie manager.
 	if len(cookies) > 0 {
+		parsed, err := url.Parse(cu.URL)
+		if err == nil {
+			hostname := parsed.Hostname()
+			cm.mu.Lock()
+			// Merge with any existing cookies for this domain in the session
+			if existing, ok := cm.cookies[hostname]; ok {
+				cookies = mergeCookies(existing, cookies)
+			}
+			cm.cookies[hostname] = cookies
+			logger.Pl.D(2, "Stored %d cookies for hostname %q in this crawl session", len(cookies), hostname)
+			cm.mu.Unlock()
+		}
+
+		// Save cookies to file for yt-dlp.
 		err = saveCookiesToFile(cookies, cu.LoginURL, cu.CookiePath)
 		if err != nil {
 			return nil, "", err
@@ -91,28 +111,60 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	return cookies, "", nil
 }
 
-// GetGlobalCookies retrieves cookies for a given URL from browser stores (always fresh, no caching).
+// GetGlobalCookies retrieves cookies for a given URL from browser stores.
+// Caches within the current crawl session for performance, but fresh CookieManager per crawl.
 func (cm *CookieManager) GetGlobalCookies(u string) ([]*http.Cookie, error) {
-	logger.Pl.I("Retrieving fresh global cookies for URL: %q", u)
+	logger.Pl.I("Retrieving global cookies for URL: %q", u)
 	baseDomain, err := getBaseDomain(u)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
 
-	// Load cookies fresh from browser stores.
+	// Check if cookies already exist for domain in this session.
 	var cookies []*http.Cookie
+	cm.mu.RLock()
+	if baseCookies, ok := cm.cookies[baseDomain]; ok {
+		cookies = mergeCookies(cookies, baseCookies)
+	}
+	cm.mu.RUnlock()
+	if len(cookies) > 0 {
+		logger.Pl.D(2, "Using cached cookies for domain %q from this crawl session", baseDomain)
+		return cookies, nil
+	}
+
+	// Load cookies from browser stores.
 	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(baseDomain))
 	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(u))
 
+	// Store cookies for this crawl session.
 	if len(cookies) > 0 {
 		// Debug log.
 		for _, c := range cookies {
-			logger.Pl.D(2, "Loaded fresh global cookie for %q: %v", baseDomain, c)
+			logger.Pl.D(2, "Loaded global cookie for %q: %v", baseDomain, c)
 		}
-		logger.Pl.I("Loaded %d fresh cookies for domain %q", len(cookies), baseDomain)
+
+		// Cache in memory for this session.
+		cm.mu.Lock()
+		logger.Pl.I("Caching %d cookies for domain %q for this crawl session", len(cookies), baseDomain)
+		cm.cookies[baseDomain] = cookies
+		cm.mu.Unlock()
 	}
 
 	return cookies, nil
+}
+
+// GetCachedCookies retrieves cookies from the current crawl session for a domain.
+func (cm *CookieManager) GetCachedCookies(hostname string) []*http.Cookie {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+
+	if cookies, ok := cm.cookies[hostname]; ok {
+		logger.Pl.D(2, "Retrieved %d cached cookies for hostname %q from this crawl session", len(cookies), hostname)
+		return cookies
+	}
+
+	logger.Pl.D(2, "No cached cookies found for hostname %q in this crawl session", hostname)
+	return nil
 }
 
 // ******************************** Private ********************************

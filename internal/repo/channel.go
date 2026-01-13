@@ -1450,6 +1450,20 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 
 // displaySettingsStruct prints the settings structure.
 func displaySettingsStruct(s *models.Settings) {
+	if s == nil {
+		fmt.Printf("(Settings model is nil)\n")
+		return
+	}
+
+	// Handle UseGlobalCookies pointer bool.
+	var useGlobalCookies string
+	if s.UseGlobalCookies != nil {
+		useGlobalCookies = "False"
+		if *s.UseGlobalCookies {
+			useGlobalCookies = "True"
+		}
+	}
+
 	fmt.Printf("Video Directory: %s\n", s.VideoDir)
 	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
 	fmt.Printf("Crawl Frequency: %d minutes\n", s.CrawlFreq)
@@ -1465,7 +1479,7 @@ func displaySettingsStruct(s *models.Settings) {
 	fmt.Printf("Max Filesize: %s\n", s.MaxFilesize)
 	fmt.Printf("Move Ops: %v\n", s.MetaFilterMoveOps)
 	fmt.Printf("Move Ops File: %s\n", s.MetaFilterMoveOpFile)
-	fmt.Printf("Use Global Cookies: %v\n", s.UseGlobalCookies)
+	fmt.Printf("Use Global Cookies: %v\n", useGlobalCookies)
 	fmt.Printf("Yt-dlp Output Extension: %s\n", s.YtdlpOutputExt)
 	fmt.Printf("Yt-dlp Extra Video Args: %s\n", s.ExtraYTDLPVideoArgs)
 	fmt.Printf("Yt-dlp Extra Metadata Args: %s\n", s.ExtraYTDLPMetaArgs)
