@@ -11,7 +11,6 @@ import (
 	"html"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -333,19 +332,6 @@ func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, 
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
-	}
-
-	// Set cookies for the domain
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid URL: %w", err)
-	}
-
-	// Get cookies from auth cache via CookieManager
-	if cookies := cm.GetCachedAuthCookies(parsedURL.Host); cookies != nil {
-		jar.SetCookies(parsedURL, cookies)
-	} else {
-		logger.Pl.W("No authentication cookies available for %q", parsedURL.Host)
 	}
 
 	// Create a Colly collector with the custom HTTP client

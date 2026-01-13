@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
@@ -21,16 +20,11 @@ import (
 )
 
 // CookieManager handles cookie operations.
-type CookieManager struct {
-	mu      sync.RWMutex
-	cookies map[string][]*http.Cookie
-}
+type CookieManager struct{}
 
 // NewCookieManager creates a new cookie manager instance.
 func NewCookieManager() *CookieManager {
-	return &CookieManager{
-		cookies: make(map[string][]*http.Cookie),
-	}
+	return &CookieManager{}
 }
 
 // GetChannelURLCookies returns channel access details for a given video.
@@ -57,15 +51,9 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// Collect cookies...
 	var authCookies, regCookies []*http.Cookie
 
-	// Cookies from direct login (NOTE: Do before global cookie store check, function returns already stored cookies before login).
+	// Cookies from direct login (always fresh, no caching).
 	if doLogin {
-		parsed, err := url.Parse(cu.URL)
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to parse URL %q: %w", cu.URL, err)
-		}
-		hostname := parsed.Hostname()
-
-		authCookies, err = channelAuth(ctx, hostname, cu.ToChannelAccessDetails())
+		authCookies, err = login(ctx, cu.ToChannelAccessDetails())
 		if ctx.Err() != nil {
 			return nil, "", ctx.Err()
 		}
@@ -103,63 +91,28 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	return cookies, "", nil
 }
 
-// GetGlobalCookies retrieves cookies for a given URL.
+// GetGlobalCookies retrieves cookies for a given URL from browser stores (always fresh, no caching).
 func (cm *CookieManager) GetGlobalCookies(u string) ([]*http.Cookie, error) {
-	logger.Pl.I("Retrieving global cookies for URL: %q", u)
+	logger.Pl.I("Retrieving fresh global cookies for URL: %q", u)
 	baseDomain, err := getBaseDomain(u)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
 	}
 
-	// Check if cookies already exist for domain.
+	// Load cookies fresh from browser stores.
 	var cookies []*http.Cookie
-	cm.mu.RLock()
-	if baseCookies, ok := cm.cookies[baseDomain]; ok {
-		cookies = mergeCookies(cookies, baseCookies)
-	}
-	cm.mu.RUnlock()
-	if len(cookies) > 0 {
-		return cookies, nil
-	}
-
-	// Load cookies for domain.
 	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(baseDomain))
 	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(u))
 
-	// Store cookies.
 	if len(cookies) > 0 {
 		// Debug log.
 		for _, c := range cookies {
-			logger.Pl.D(2, "Loaded global cookie for %q: %v", baseDomain, c)
+			logger.Pl.D(2, "Loaded fresh global cookie for %q: %v", baseDomain, c)
 		}
-
-		// Merge with any cookies already stored in global cache.
-		if alreadyStored, ok := globalAuthCookieCache.Load(baseDomain); ok {
-			if storedCookies, ok := alreadyStored.([]*http.Cookie); ok {
-				cookies = mergeCookies(cookies, storedCookies)
-			}
-		}
-
-		// Store in manager and global cache.
-		cm.mu.Lock()
-		logger.Pl.I("Storing %d cookies for domain %q", len(cookies), baseDomain)
-		cm.cookies[baseDomain] = cookies
-		globalAuthCookieCache.Store(baseDomain, cookies)
-		cm.mu.Unlock()
+		logger.Pl.I("Loaded %d fresh cookies for domain %q", len(cookies), baseDomain)
 	}
 
 	return cookies, nil
-}
-
-// GetCachedAuthCookies retrieves cookies from the global auth cache.
-func (cm *CookieManager) GetCachedAuthCookies(d string) []*http.Cookie {
-	logger.Pl.D(1, "Retrieving cached auth cookies for domain: %q", d)
-	if val, ok := globalAuthCookieCache.Load(d); ok {
-		if cookies, ok := val.([]*http.Cookie); ok {
-			return cookies
-		}
-	}
-	return nil
 }
 
 // ******************************** Private ********************************
@@ -327,25 +280,4 @@ func mergeCookies(primary, secondary []*http.Cookie) []*http.Cookie {
 		merged = append(merged, c)
 	}
 	return merged
-}
-
-// tryLoadCachedCookies attempts to load cookies from cache for a given key.
-func tryLoadCachedCookies(key string) ([]*http.Cookie, bool) {
-	val, ok := globalAuthCookieCache.Load(key)
-	if !ok {
-		return nil, false
-	}
-
-	cookies, ok := val.([]*http.Cookie)
-	if !ok {
-		// Invalid type in cache, delete and re-auth.
-		globalAuthCookieCache.Delete(key)
-		return nil, false
-	}
-
-	if len(cookies) == 0 {
-		logger.Pl.W("Found cached auth for %q but cookie slice is empty", key)
-	}
-
-	return cookies, true
 }
