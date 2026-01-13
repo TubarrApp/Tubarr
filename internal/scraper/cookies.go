@@ -47,7 +47,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	doLogin := cu.NeedsAuth()
 
 	// Early return if no cookies needed.
-	if !doLogin && (cu.ChanURLSettings.UseGlobalCookies == nil || !*cu.ChanURLSettings.UseGlobalCookies) {
+	if !doLogin && (cu.ChanURLSettings == nil || cu.ChanURLSettings.UseGlobalCookies == nil || !*cu.ChanURLSettings.UseGlobalCookies) {
 		return nil, "", nil
 	}
 
@@ -75,7 +75,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	// Cookies from browser cookie stores.
-	if cu.ChanURLSettings.UseGlobalCookies != nil && *cu.ChanURLSettings.UseGlobalCookies {
+	if cu.ChanURLSettings != nil && cu.ChanURLSettings.UseGlobalCookies != nil && *cu.ChanURLSettings.UseGlobalCookies {
 		if cu.URL != "" && !cu.IsManual {
 			regCookies, err = cm.GetGlobalCookies(cu.URL)
 			if err != nil {
