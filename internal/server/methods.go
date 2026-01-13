@@ -51,16 +51,16 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 				continue
 			}
 			if !hasRows || len(freshChannels) == 0 {
-				logger.Pl.D(4, "Crawl watchdog: No channels found in database")
+				logger.Pl.D(3, "Crawl watchdog: No channels found in database")
 				continue
 			}
 
-			logger.Pl.D(4, "Crawl watchdog: Checking %d channel(s) for scheduled crawls", len(freshChannels))
+			logger.Pl.D(3, "Crawl watchdog: Checking %d channel(s) for scheduled crawls", len(freshChannels))
 			now := time.Now()
 			for _, c := range freshChannels {
 				// Skip paused channels
 				if c.ChanSettings.Paused {
-					logger.Pl.D(4, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
+					logger.Pl.D(3, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
 					continue
 				}
 
@@ -93,7 +93,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 
 				}
 
-				logger.Pl.D(4, "Crawl watchdog: channel %q - last scan: %s ago, interval: %s",
+				logger.Pl.D(4, " channel %q - last scan: %s ago, interval: %s",
 					c.Name, elapsed.Round(time.Second), interval)
 
 				if elapsed >= interval {
@@ -109,7 +109,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						crawlCtx, cancel := context.WithCancel(ctx)
 						defer cancel()
 
-						logger.Pl.D(4, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
+						logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
 						if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {
 							logger.Pl.E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
 						} else if performedCrawls {
