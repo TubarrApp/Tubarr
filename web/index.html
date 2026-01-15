@@ -632,6 +632,9 @@
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                       Tracking <span class="font-semibold text-brand-500 dark:text-brand-400" x-text="channels.length"></span> channel<span x-show="channels.length !== 1">s</span>
                     </p>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Blocking <span class="font-semibold text-brand-500 dark:text-brand-400" x-text="blockedDomainContextsCount"></span> domain context<span x-show="blockedDomainContextsCount !== 1">s</span>
+                    </p>
                   </div>
                   <div class="flex items-center gap-2">
                     <svg class="w-12 h-12 text-brand-500 dark:text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -962,6 +965,7 @@
           ignoring: null,
           togglingPause: null,
           actionsMenuOpen: null,
+          blockedDomainContextsCount: 0,
 
           async loadChannels() {
             try {
@@ -980,10 +984,38 @@
                 channel.videosLoaded = false;
               }
 
+              // Load blocked domains count
+              this.loadBlockedDomainsCount();
+
               this.loading = false;
             } catch (err) {
               this.error = err.message;
               this.loading = false;
+            }
+          },
+
+          async loadBlockedDomainsCount() {
+            try {
+              const response = await fetch('/api/v1/blocked-domains');
+              if (!response.ok) {
+                console.error('Failed to fetch blocked domains');
+                return;
+              }
+
+              const blockedDomains = await response.json();
+
+              // Count total contexts across all domains
+              let totalContexts = 0;
+              for (let domain of blockedDomains) {
+                if (domain.contexts) {
+                  totalContexts += Object.keys(domain.contexts).length;
+                }
+              }
+
+              this.blockedDomainContextsCount = totalContexts;
+            } catch (err) {
+              console.error('Error loading blocked domains count:', err);
+              this.blockedDomainContextsCount = 0;
             }
           },
 
