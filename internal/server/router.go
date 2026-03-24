@@ -80,6 +80,12 @@ func NewRouter(ss serverStore) http.Handler {
 		// Blocked Domains API.
 		r.Get("/blocked-domains", ss.handleGetBlockedDomains)
 		r.Delete("/blocked-domains/{domain}", ss.handleUnblockDomain)
+
+		// Settings API.
+		r.Get("/settings/crawl-concurrency", ss.handleGetCrawlConcurrency)
+		r.Put("/settings/crawl-concurrency", ss.handleSetCrawlConcurrency)
+		r.Get("/settings/global-download-concurrency", ss.handleGetGlobalDownloadConcurrency)
+		r.Put("/settings/global-download-concurrency", ss.handleSetGlobalDownloadConcurrency)
 	})
 
 	// --- Static Frontend ---

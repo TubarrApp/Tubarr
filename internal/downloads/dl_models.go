@@ -15,6 +15,38 @@ import (
 var ongoingDownloads sync.Map       // map[int64]*VideoDownload.
 var activeDownloadContexts sync.Map // map[int64]context.CancelFunc.
 
+// globalDownloadSem limits concurrent video downloads across all channels.
+// nil means no global limit (unlimited concurrent downloads).
+var globalDownloadSem chan struct{}
+
+// InitGlobalDownloadLimit sets up the global download concurrency limiter.
+// A limit of 0 means no limit (unlimited concurrent downloads, same as before).
+func InitGlobalDownloadLimit(limit int) {
+	if limit > 0 {
+		globalDownloadSem = make(chan struct{}, limit)
+		logger.Pl.I("Global download concurrency limit set to %d", limit)
+	}
+	// limit <= 0: globalDownloadSem stays nil, no limiting occurs
+}
+
+// AcquireGlobalDownloadSlot blocks until a download slot is available.
+// Returns immediately if no global limit is configured (limit=0).
+func AcquireGlobalDownloadSlot() {
+	if globalDownloadSem == nil {
+		return
+	}
+	globalDownloadSem <- struct{}{}
+}
+
+// ReleaseGlobalDownloadSlot releases a download slot.
+// Does nothing if no global limit is configured (limit=0).
+func ReleaseGlobalDownloadSlot() {
+	if globalDownloadSem == nil {
+		return
+	}
+	<-globalDownloadSem
+}
+
 // isProcessNotExist checks if an error indicates a process doesn't exist.
 func isProcessNotExist(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "no such process")

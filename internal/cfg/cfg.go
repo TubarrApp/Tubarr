@@ -12,6 +12,7 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/domain/vars"
+	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/validation"
 
@@ -28,6 +29,9 @@ var rootCmd = &cobra.Command{
 		if err := validation.ValidateViperFlags(); err != nil {
 			return
 		}
+
+		// Initialize global download concurrency limit (0 = unlimited).
+		downloads.InitGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
 
 		// Setup benchmarking if flag is set.
 		if viper.GetBool(keys.Benchmarking) {

@@ -97,8 +97,14 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 	}
 
 	// Global Concurrency
-	rootCmd.PersistentFlags().StringP(keys.GlobalConcurrency, "c", "", "Concurrency for this instance of Tubarr")
-	if err := viper.BindPFlag(keys.GlobalConcurrency, rootCmd.PersistentFlags().Lookup(keys.GlobalConcurrency)); err != nil {
+	rootCmd.PersistentFlags().StringP(keys.CrawlConcurrency, "c", "", "Concurrency for this instance of Tubarr")
+	if err := viper.BindPFlag(keys.CrawlConcurrency, rootCmd.PersistentFlags().Lookup(keys.CrawlConcurrency)); err != nil {
+		return err
+	}
+
+	// Global Download Concurrency
+	rootCmd.PersistentFlags().Int(keys.GlobalDownloadConcurrency, 0, "Maximum concurrent video downloads across all channels (0 = unlimited)")
+	if err := viper.BindPFlag(keys.GlobalDownloadConcurrency, rootCmd.PersistentFlags().Lookup(keys.GlobalDownloadConcurrency)); err != nil {
 		return err
 	}
 

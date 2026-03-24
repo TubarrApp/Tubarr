@@ -15,8 +15,10 @@ import (
 	"tubarr/internal/auth"
 	"tubarr/internal/blocking"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
+	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -1494,5 +1496,82 @@ func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.R
 	w.WriteHeader(http.StatusOK)
 	if _, err := fmt.Fprintf(w, `{"message": "Channel %s successfully.", "paused": %t}`, action, newPauseState); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
+	}
+}
+
+// handleGetCrawlConcurrency returns the current crawl concurrency limit.
+func (ss *serverStore) handleGetCrawlConcurrency(w http.ResponseWriter, _ *http.Request) {
+	limit := viper.GetInt(keys.CrawlConcurrency)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]int{"limit": limit}); err != nil {
+		logger.Pl.E("Failed to encode crawl concurrency: %v", err)
+	}
+}
+
+// handleSetCrawlConcurrency updates the crawl concurrency limit.
+func (ss *serverStore) handleSetCrawlConcurrency(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.FormValue("limit")
+	if limitStr == "" {
+		http.Error(w, "limit parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid limit value %q: %v", limitStr, err), http.StatusBadRequest)
+		return
+	}
+
+	if limit < 0 {
+		http.Error(w, "limit must be 0 or greater", http.StatusBadRequest)
+		return
+	}
+
+	// Update viper config (takes effect on next crawl cycle).
+	viper.Set(keys.CrawlConcurrency, limit)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Crawl concurrency updated", "limit": limit}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetGlobalDownloadConcurrency returns the current global download concurrency limit.
+func (ss *serverStore) handleGetGlobalDownloadConcurrency(w http.ResponseWriter, _ *http.Request) {
+	limit := viper.GetInt(keys.GlobalDownloadConcurrency)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]int{"limit": limit}); err != nil {
+		logger.Pl.E("Failed to encode global download concurrency: %v", err)
+	}
+}
+
+// handleSetGlobalDownloadConcurrency updates the global download concurrency limit.
+func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.FormValue("limit")
+	if limitStr == "" {
+		http.Error(w, "limit parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid limit value %q: %v", limitStr, err), http.StatusBadRequest)
+		return
+	}
+
+	if limit < 0 {
+		http.Error(w, "limit must be 0 or greater", http.StatusBadRequest)
+		return
+	}
+
+	// Update viper config and reinitialize the semaphore.
+	viper.Set(keys.GlobalDownloadConcurrency, limit)
+	downloads.InitGlobalDownloadLimit(limit)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Global download concurrency updated", "limit": limit}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }

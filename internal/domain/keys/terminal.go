@@ -60,14 +60,15 @@ const (
 
 // Program inputs.
 const (
-	GlobalConcurrency string = "global-concurrency"
-	MoveOnComplete    string = "move-on-complete"
-	URLFile           string = "url-file"
-	URLAdd            string = "add-url"
-	URLs              string = "urls"
-	Benchmarking      string = "benchmark"
-	SkipInitialWait   string = "skip-initial-wait"
-	SkipAllWaits      string = "skip-all-waits"
+	CrawlConcurrency          string = "crawl-concurrency"
+	GlobalDownloadConcurrency string = "global-download-concurrency"
+	MoveOnComplete            string = "move-on-complete"
+	URLFile                   string = "url-file"
+	URLAdd                    string = "add-url"
+	URLs                      string = "urls"
+	Benchmarking              string = "benchmark"
+	SkipInitialWait           string = "skip-initial-wait"
+	SkipAllWaits              string = "skip-all-waits"
 )
 
 // Settings.

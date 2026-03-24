@@ -644,6 +644,49 @@
                 </div>
               </div>
 
+              <!-- Global Settings Card -->
+              <div x-show="!loading && !error" class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-4">Global Settings</h3>
+
+                <!-- Crawl Concurrency -->
+                <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
+                  <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Crawl Concurrency</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Channels checking for new videos simultaneously (0 = unlimited)</p>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <input
+                      type="number"
+                      x-model.number="crawlConcurrency"
+                      min="0"
+                      class="w-20 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      @change="updateCrawlConcurrency()"
+                    />
+                    <span x-show="savingCrawl" class="text-xs text-gray-500 dark:text-gray-400">Saving...</span>
+                    <span x-show="crawlSaved" x-transition class="text-xs text-green-500">Saved!</span>
+                  </div>
+                </div>
+
+                <!-- Download Concurrency -->
+                <div class="flex items-center justify-between py-3">
+                  <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Download Concurrency</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total video downloads across all channels (0 = unlimited)</p>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <input
+                      type="number"
+                      x-model.number="globalDownloadLimit"
+                      min="0"
+                      class="w-20 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      @change="updateGlobalDownloadLimit()"
+                    />
+                    <span x-show="savingLimit" class="text-xs text-gray-500 dark:text-gray-400">Saving...</span>
+                    <span x-show="limitSaved" x-transition class="text-xs text-green-500">Saved!</span>
+                  </div>
+                </div>
+              </div>
+
               <!-- No Channels State -->
               <div x-show="!loading && !error && channels.length === 0" class="rounded-2xl border border-gray-200 bg-white px-5 py-12 dark:border-gray-800 dark:bg-white/[0.03] text-center">
                 <br>
@@ -966,6 +1009,12 @@
           togglingPause: null,
           actionsMenuOpen: null,
           blockedDomainContextsCount: 0,
+          crawlConcurrency: 0,
+          savingCrawl: false,
+          crawlSaved: false,
+          globalDownloadLimit: 0,
+          savingLimit: false,
+          limitSaved: false,
 
           async loadChannels() {
             try {
@@ -984,8 +1033,10 @@
                 channel.videosLoaded = false;
               }
 
-              // Load blocked domains count
+              // Load blocked domains count and global settings
               this.loadBlockedDomainsCount();
+              this.loadCrawlConcurrency();
+              this.loadGlobalDownloadLimit();
 
               this.loading = false;
             } catch (err) {
@@ -1016,6 +1067,76 @@
             } catch (err) {
               console.error('Error loading blocked domains count:', err);
               this.blockedDomainContextsCount = 0;
+            }
+          },
+
+          async loadCrawlConcurrency() {
+            try {
+              const response = await fetch('/api/v1/settings/crawl-concurrency');
+              if (!response.ok) {
+                console.error('Failed to fetch crawl concurrency');
+                return;
+              }
+              const data = await response.json();
+              this.crawlConcurrency = data.limit || 0;
+            } catch (err) {
+              console.error('Error loading crawl concurrency:', err);
+            }
+          },
+
+          async updateCrawlConcurrency() {
+            this.savingCrawl = true;
+            this.crawlSaved = false;
+            try {
+              const response = await fetch('/api/v1/settings/crawl-concurrency', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ limit: this.crawlConcurrency })
+              });
+              if (!response.ok) {
+                throw new Error('Failed to update');
+              }
+              this.crawlSaved = true;
+              setTimeout(() => { this.crawlSaved = false; }, 2000);
+            } catch (err) {
+              console.error('Error updating crawl concurrency:', err);
+            } finally {
+              this.savingCrawl = false;
+            }
+          },
+
+          async loadGlobalDownloadLimit() {
+            try {
+              const response = await fetch('/api/v1/settings/global-download-concurrency');
+              if (!response.ok) {
+                console.error('Failed to fetch global download limit');
+                return;
+              }
+              const data = await response.json();
+              this.globalDownloadLimit = data.limit || 0;
+            } catch (err) {
+              console.error('Error loading global download limit:', err);
+            }
+          },
+
+          async updateGlobalDownloadLimit() {
+            this.savingLimit = true;
+            this.limitSaved = false;
+            try {
+              const response = await fetch('/api/v1/settings/global-download-concurrency', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ limit: this.globalDownloadLimit })
+              });
+              if (!response.ok) {
+                throw new Error('Failed to update');
+              }
+              this.limitSaved = true;
+              setTimeout(() => { this.limitSaved = false; }, 2000);
+            } catch (err) {
+              console.error('Error updating global download limit:', err);
+            } finally {
+              this.savingLimit = false;
             }
           },
 

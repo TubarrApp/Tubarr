@@ -49,6 +49,10 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
+	// Acquire global download slot (blocks if limit reached, no-op if limit=0).
+	AcquireGlobalDownloadSlot()
+	defer ReleaseGlobalDownloadSlot()
+
 	// Ensure cleanup on exit.
 	defer d.cleanup()
 

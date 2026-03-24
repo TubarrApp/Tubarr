@@ -42,7 +42,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	}
 
 	var (
-		conc    = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.GlobalConcurrency))
+		conc    = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.CrawlConcurrency))
 		errChan = make(chan error, len(channels))
 		sem     = make(chan struct{}, conc)
 		wg      sync.WaitGroup
