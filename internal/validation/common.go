@@ -32,7 +32,6 @@ func ValidateViperFlags() error {
 
 	// Logging.
 	ValidateLoggingLevel()
-	abstractions.Set(keys.CrawlConcurrency, sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.CrawlConcurrency)))
 	return nil
 }
 

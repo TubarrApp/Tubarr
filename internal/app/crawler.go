@@ -20,7 +20,6 @@ import (
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
-	"github.com/TubarrApp/gocommon/sharedvalidation"
 
 	"golang.org/x/net/publicsuffix"
 )
@@ -41,8 +40,13 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 		logger.Pl.W("Failed to clean expired blocks: %v", err)
 	}
 
+	// Get crawl concurrency (0 = unlimited, meaning all channels can crawl simultaneously).
+	conc := abstractions.GetInt(keys.CrawlConcurrency)
+	if conc <= 0 {
+		conc = len(channels) // Unlimited: allow all channels to crawl at once.
+	}
+
 	var (
-		conc    = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.CrawlConcurrency))
 		errChan = make(chan error, len(channels))
 		sem     = make(chan struct{}, conc)
 		wg      sync.WaitGroup
