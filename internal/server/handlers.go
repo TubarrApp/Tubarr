@@ -568,12 +568,14 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 	// Get and validate settings.
 	c.ChanSettings = getSettingsStrings(w, r)
 	if c.ChanSettings == nil {
-		c.ChanSettings = &models.Settings{}
+		// Validation error already written to response.
+		return
 	}
 
 	c.ChanMetarrArgs = getMetarrArgsStrings(w, r)
 	if c.ChanMetarrArgs == nil {
-		c.ChanMetarrArgs = &models.MetarrArgs{}
+		// Validation error already written to response.
+		return
 	}
 
 	// Add to database.

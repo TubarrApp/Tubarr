@@ -1866,25 +1866,8 @@
                 payload.url_settings = JSON.stringify(perURLSettings);
               }
 
-              // Convert textarea content (newlines) to space-separated for backend
-              if (payload.filters && payload.filters.includes('\n')) {
-                payload.filters = payload.filters.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
-              if (payload.move_ops && payload.move_ops.includes('\n')) {
-                payload.move_ops = payload.move_ops.split('\n').map(m => m.trim()).filter(m => m).join(' ');
-              }
-              if (payload.metarr_meta_ops && payload.metarr_meta_ops.includes('\n')) {
-                payload.metarr_meta_ops = payload.metarr_meta_ops.split('\n').map(m => m.trim()).filter(m => m).join(' ');
-              }
-              if (payload.metarr_filename_ops && payload.metarr_filename_ops.includes('\n')) {
-                payload.metarr_filename_ops = payload.metarr_filename_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
-              if (payload.metarr_filtered_meta_ops && payload.metarr_filtered_meta_ops.includes('\n')) {
-                payload.metarr_filtered_meta_ops = payload.metarr_filtered_meta_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
-              if (payload.metarr_filtered_filename_ops && payload.metarr_filtered_filename_ops.includes('\n')) {
-                payload.metarr_filtered_filename_ops = payload.metarr_filtered_filename_ops.split('\n').map(f => f.trim()).filter(f => f).join(' ');
-              }
+              // Backend expects newline-separated operations to preserve values with spaces
+              // No conversion needed - textareas already contain newline-separated values
 
               // Add ignore_run if checked (backend expects "true" string or absence)
               if (this.formData.ignore_run) {

@@ -678,12 +678,15 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	}
 
 	// Integers & floats.
-	maxConcurrency, err := strconv.Atoi(maxConcurrencyStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
-		return nil
+	maxConcurrency := 0
+	if maxConcurrencyStr != "" {
+		maxConcurrency, err = strconv.Atoi(maxConcurrencyStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
+			return nil
+		}
+		maxConcurrency = sharedvalidation.ValidateConcurrencyLimit(maxConcurrency)
 	}
-	maxConcurrency = sharedvalidation.ValidateConcurrencyLimit(maxConcurrency)
 
 	maxCPU := 0.00
 	if maxCPUStr != "" {
