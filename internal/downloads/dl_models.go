@@ -18,33 +18,46 @@ var activeDownloadContexts sync.Map // map[int64]context.CancelFunc.
 // globalDownloadSem limits concurrent video downloads across all channels.
 // nil means no global limit (unlimited concurrent downloads).
 var globalDownloadSem chan struct{}
+var globalDownloadSemMu sync.RWMutex
 
 // InitGlobalDownloadLimit sets up the global download concurrency limiter.
 // A limit of 0 means no limit (unlimited concurrent downloads, same as before).
+// Note: Changes take effect for new downloads. In-progress downloads retain their slots.
 func InitGlobalDownloadLimit(limit int) {
+	globalDownloadSemMu.Lock()
+	defer globalDownloadSemMu.Unlock()
+
 	if limit > 0 {
 		globalDownloadSem = make(chan struct{}, limit)
 		logger.Pl.I("Global download concurrency limit set to %d", limit)
+	} else {
+		globalDownloadSem = nil
+		logger.Pl.I("Global download concurrency limit disabled (unlimited)")
 	}
-	// limit <= 0: globalDownloadSem stays nil, no limiting occurs
 }
 
 // AcquireGlobalDownloadSlot blocks until a download slot is available.
+// Returns the semaphore channel that was used (for proper release later).
 // Returns immediately if no global limit is configured (limit=0).
-func AcquireGlobalDownloadSlot() {
-	if globalDownloadSem == nil {
-		return
+func AcquireGlobalDownloadSlot() chan struct{} {
+	globalDownloadSemMu.RLock()
+	sem := globalDownloadSem
+	globalDownloadSemMu.RUnlock()
+
+	if sem == nil {
+		return nil
 	}
-	globalDownloadSem <- struct{}{}
+	sem <- struct{}{}
+	return sem
 }
 
-// ReleaseGlobalDownloadSlot releases a download slot.
-// Does nothing if no global limit is configured (limit=0).
-func ReleaseGlobalDownloadSlot() {
-	if globalDownloadSem == nil {
+// ReleaseGlobalDownloadSlot releases a download slot on the given semaphore.
+// Pass the same semaphore returned by AcquireGlobalDownloadSlot.
+func ReleaseGlobalDownloadSlot(sem chan struct{}) {
+	if sem == nil {
 		return
 	}
-	<-globalDownloadSem
+	<-sem
 }
 
 // isProcessNotExist checks if an error indicates a process doesn't exist.
