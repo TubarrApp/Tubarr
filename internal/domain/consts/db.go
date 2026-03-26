@@ -9,6 +9,13 @@ const (
 	DBDownloads      = "downloads"
 	DBNotifications  = "notifications"
 	DBBlockedDomains = "blocked_domains"
+	DBSettings       = "settings"
+)
+
+// Settings database entry keys.
+const (
+	QSettingsKey = "key"
+	QSettingsVal = "value"
 )
 
 // Program database entry keys.

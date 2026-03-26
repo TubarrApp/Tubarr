@@ -16,6 +16,7 @@ type Store struct {
 	videoStore    *VideoStore
 	channelStore  *ChannelStore
 	downloadStore *DownloadStore
+	settingsStore *SettingsStore
 }
 
 // InitStores injects databases into the store methods.
@@ -29,6 +30,7 @@ func InitStores(db *sql.DB) (*Store, error) {
 		videoStore:    GetVideoStore(db),
 		channelStore:  chanStore,
 		downloadStore: GetDownloadStore(db),
+		settingsStore: GetSettingsStore(db),
 	}, nil
 }
 
@@ -45,6 +47,11 @@ func (s *Store) VideoStore() contracts.VideoStore {
 // DownloadStore with pointer receiver.
 func (s *Store) DownloadStore() contracts.DownloadStore {
 	return s.downloadStore
+}
+
+// SettingsStore with pointer receiver.
+func (s *Store) SettingsStore() contracts.SettingsStore {
+	return s.settingsStore
 }
 
 // ******************************** Private ***************************************************************************************

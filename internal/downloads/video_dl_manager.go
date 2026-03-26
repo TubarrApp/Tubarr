@@ -49,6 +49,10 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	}
 	defer ongoingDownloads.Delete(d.Video.URL)
 
+	// Acquire per-domain slot first (blocks if domain limit reached, no-op if no limit).
+	domainSem := AcquireDomainDownloadSlot(d.Video.URL)
+	defer ReleaseDomainDownloadSlot(domainSem)
+
 	// Acquire global download slot (blocks if limit reached, no-op if limit=0).
 	// Store the semaphore to ensure we release on the same one we acquired.
 	dlSem := AcquireGlobalDownloadSlot()

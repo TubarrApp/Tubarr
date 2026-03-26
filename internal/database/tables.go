@@ -16,6 +16,7 @@ const (
 	downloadSQL       = "sql/downloads.sql"
 	notificationSQL   = "sql/notifications.sql"
 	programSQL        = "sql/program.sql"
+	settingsSQL       = "sql/settings.sql"
 	videoSQL          = "sql/videos.sql"
 )
 
@@ -52,6 +53,11 @@ func initDownloadsTable(tx *sql.Tx) error {
 // initBlockedDomainsTable initializes the blocked domains table.
 func initBlockedDomainsTable(tx *sql.Tx) error {
 	return executeSQLFile(tx, blockedDomainsSQL, "blocked domains table")
+}
+
+// initSettingsTable initializes the global settings table.
+func initSettingsTable(tx *sql.Tx) error {
+	return executeSQLFile(tx, settingsSQL, "settings table")
 }
 
 // readSQLFile reads the SQL file stored in memory from go:embed.

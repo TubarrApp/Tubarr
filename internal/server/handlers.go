@@ -1528,7 +1528,10 @@ func (ss *serverStore) handleSetCrawlConcurrency(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Update viper config (takes effect on next crawl cycle).
+	// Persist to DB and update viper (takes effect on next crawl cycle).
+	if err := ss.ss.SetSetting(keys.CrawlConcurrency, limitStr); err != nil {
+		logger.Pl.W("Failed to persist crawl concurrency to DB: %v", err)
+	}
 	viper.Set(keys.CrawlConcurrency, limit)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1566,12 +1569,80 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 		return
 	}
 
-	// Update viper config and reinitialize the semaphore.
+	// Persist to DB, update viper, and reinitialize the semaphore.
+	if err := ss.ss.SetSetting(keys.GlobalDownloadConcurrency, limitStr); err != nil {
+		logger.Pl.W("Failed to persist global download concurrency to DB: %v", err)
+	}
 	viper.Set(keys.GlobalDownloadConcurrency, limit)
 	downloads.InitGlobalDownloadLimit(limit)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Global download concurrency updated", "limit": limit}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetDomainDownloadLimits returns all per-domain download concurrency limits.
+func (ss *serverStore) handleGetDomainDownloadLimits(w http.ResponseWriter, _ *http.Request) {
+	limits, err := ss.ss.GetDomainLimits()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to get domain limits: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(limits); err != nil {
+		logger.Pl.E("Failed to encode domain limits: %v", err)
+	}
+}
+
+// handleSetDomainDownloadLimit sets the download concurrency limit for a specific domain.
+func (ss *serverStore) handleSetDomainDownloadLimit(w http.ResponseWriter, r *http.Request) {
+	hostname := r.FormValue("hostname")
+	if hostname == "" {
+		http.Error(w, "hostname parameter is required", http.StatusBadRequest)
+		return
+	}
+	limitStr := r.FormValue("limit")
+	if limitStr == "" {
+		http.Error(w, "limit parameter is required", http.StatusBadRequest)
+		return
+	}
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid limit value %q: %v", limitStr, err), http.StatusBadRequest)
+		return
+	}
+	if limit < 0 {
+		http.Error(w, "limit must be 0 or greater", http.StatusBadRequest)
+		return
+	}
+	if err := ss.ss.SetDomainLimit(hostname, limit); err != nil {
+		http.Error(w, fmt.Sprintf("failed to set domain limit: %v", err), http.StatusInternalServerError)
+		return
+	}
+	downloads.SetDomainDownloadLimit(hostname, limit)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit updated", "hostname": hostname, "limit": limit}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleDeleteDomainDownloadLimit removes the download concurrency limit for a specific domain.
+func (ss *serverStore) handleDeleteDomainDownloadLimit(w http.ResponseWriter, r *http.Request) {
+	hostname := chi.URLParam(r, "hostname")
+	if hostname == "" {
+		http.Error(w, "hostname is required", http.StatusBadRequest)
+		return
+	}
+	if err := ss.ss.DeleteDomainLimit(hostname); err != nil {
+		http.Error(w, fmt.Sprintf("failed to delete domain limit: %v", err), http.StatusInternalServerError)
+		return
+	}
+	downloads.SetDomainDownloadLimit(hostname, 0)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit removed", "hostname": hostname}); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }

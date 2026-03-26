@@ -12,6 +12,17 @@ type Store interface {
 	ChannelStore() ChannelStore
 	DownloadStore() DownloadStore
 	VideoStore() VideoStore
+	SettingsStore() SettingsStore
+}
+
+// SettingsStore allows access to global settings and domain download limit methods.
+type SettingsStore interface {
+	GetDB() *sql.DB
+	GetSetting(key string) (value string, found bool, err error)
+	SetSetting(key, value string) error
+	GetDomainLimits() (map[string]int, error)
+	SetDomainLimit(hostname string, concurrency int) error
+	DeleteDomainLimit(hostname string) error
 }
 
 // ChannelStore allows access to channel repo methods.

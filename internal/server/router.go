@@ -24,6 +24,7 @@ type serverStore struct {
 	cs     contracts.ChannelStore
 	ds     contracts.DownloadStore
 	vs     contracts.VideoStore
+	ss     contracts.SettingsStore
 	db     *sql.DB
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -86,6 +87,9 @@ func NewRouter(ss serverStore) http.Handler {
 		r.Put("/settings/crawl-concurrency", ss.handleSetCrawlConcurrency)
 		r.Get("/settings/global-download-concurrency", ss.handleGetGlobalDownloadConcurrency)
 		r.Put("/settings/global-download-concurrency", ss.handleSetGlobalDownloadConcurrency)
+		r.Get("/settings/domain-download-limits", ss.handleGetDomainDownloadLimits)
+		r.Put("/settings/domain-download-limits", ss.handleSetDomainDownloadLimit)
+		r.Delete("/settings/domain-download-limits/{hostname}", ss.handleDeleteDomainDownloadLimit)
 	})
 
 	// --- Static Frontend ---
@@ -103,6 +107,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		cs:     store.ChannelStore(),
 		ds:     store.DownloadStore(),
 		vs:     store.VideoStore(),
+		ss:     store.SettingsStore(),
 		db:     database,
 		ctx:    inputCtx,
 		cancel: inputCtxCancel,

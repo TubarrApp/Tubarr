@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
@@ -21,13 +22,39 @@ import (
 	"github.com/spf13/viper"
 )
 
+// settingsStore is set during InitCommands and used to load persisted settings.
+var settingsStore contracts.SettingsStore
+
 // rootCmd is the base command for Tubarr.
 var rootCmd = &cobra.Command{
 	Use:   "tubarr",
 	Short: "Tubarr is a video downloading and metatagging tool.",
-	PersistentPreRun: func(_ *cobra.Command, _ []string) {
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		if err := validation.ValidateViperFlags(); err != nil {
 			return
+		}
+
+		// Load persisted settings from DB, applying them only if the CLI flag was not explicitly set.
+		if settingsStore != nil {
+			intKeys := []string{keys.CrawlConcurrency, keys.GlobalDownloadConcurrency}
+			for _, k := range intKeys {
+				if !cmd.Flags().Changed(k) {
+					if val, found, err := settingsStore.GetSetting(k); err != nil {
+						logger.Pl.W("Failed to load setting %q from DB: %v", k, err)
+					} else if found {
+						if n, err := strconv.Atoi(val); err == nil {
+							viper.Set(k, n)
+						}
+					}
+				}
+			}
+
+			// Initialize domain download limits from DB.
+			if limits, err := settingsStore.GetDomainLimits(); err != nil {
+				logger.Pl.W("Failed to load domain download limits from DB: %v", err)
+			} else {
+				downloads.InitDomainDownloadLimits(limits)
+			}
 		}
 
 		// Initialize global download concurrency limit (0 = unlimited).
@@ -80,6 +107,7 @@ var rootCmd = &cobra.Command{
 
 // InitCommands initializes all commands and their flags.
 func InitCommands(ctx context.Context, s contracts.Store) error {
+	settingsStore = s.SettingsStore()
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory".
 

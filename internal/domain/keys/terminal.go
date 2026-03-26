@@ -62,6 +62,7 @@ const (
 const (
 	CrawlConcurrency          string = "crawl-concurrency"
 	GlobalDownloadConcurrency string = "global-download-concurrency"
+	DomainDownloadLimits      string = "domain-download-limits"
 	MoveOnComplete            string = "move-on-complete"
 	URLFile                   string = "url-file"
 	URLAdd                    string = "add-url"
