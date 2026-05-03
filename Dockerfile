@@ -170,9 +170,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     axel \
     ca-certificates \
     python3 python3-pip \
-    python3-requests \
-    python3-certifi \
-    python3-urllib3 \
     sqlite3 \
     gosu \
     tzdata \
@@ -234,6 +231,12 @@ RUN wget -O /usr/local/bin/yt-dlp \
         https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \
     && chmod +x /usr/local/bin/yt-dlp
 
+######## Install yt-dlp-related tools ########
+RUN pip3 install --no-cache-dir --break-system-packages \
+    requests \
+    certifi \
+    urllib3
+
 ######## Install Deno globally ########
 RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
     wget -O /tmp/deno.zip \
@@ -266,8 +269,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ######## Cleanup ########
 # Delete unnecessary elements
-RUN apt-get purge -y python3-pip && \
-    apt-get autoremove -y && \
+RUN apt-get autoremove -y && \
     rm -rf /root/.cache
 RUN rm -rf /usr/share/man/* /usr/share/doc/* /usr/share/local/* || true
 RUN find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name "en" -exec rm -rf {} +
