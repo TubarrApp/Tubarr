@@ -235,7 +235,8 @@ RUN wget -O /usr/local/bin/yt-dlp \
 RUN pip3 install --no-cache-dir --break-system-packages \
     requests \
     certifi \
-    urllib3
+    urllib3 \
+    curl-cffi
 
 ######## Install Deno globally ########
 RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
