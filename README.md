@@ -42,6 +42,12 @@ Setting RAM and CPU limits is possible directly in a channel's settings and it i
 
 ## Quick Start
 
+Since this is a Go (Golang) program you can just download the "tubarr" file and run it from terminal. If you put it in /usr/local/bin/ you can invoke it from terminal with the command "tubarr".
+
+If you want the web frontend you should use the container, or clone the entire repository (with terminal command "git clone https://github.com/TubarrApp/Tubarr.git") and place the full path to the "tubarr" file in your $PATH.
+
+To build manually from source:
+
 ```bash
 git clone https://github.com/TubarrApp/Tubarr.git
 cd Tubarr
@@ -49,6 +55,8 @@ go build -o tubarr ./cmd/tubarr
 sudo mv tubarr /usr/local/bin/tubarr
 tubarr --help
 ```
+
+(The "sudo mv tubarr /usr/local/bin/tubarr" line will stop the web frontend working as the program expects the HTML files in a location relative to itself. Omit this if you want to use the web frontend and add the Tubarr file location to $PATH).
 
 Tubarr stores its database and logs under `~/.tubarr`. Metarr logs live in `~/.metarr`.
 
