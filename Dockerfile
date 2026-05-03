@@ -170,6 +170,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     axel \
     ca-certificates \
     python3 python3-pip \
+    python3-requests \
+    python3-certifi \
+    python3-urllib3 \
     sqlite3 \
     gosu \
     tzdata \
