@@ -1483,6 +1483,7 @@ func displaySettingsStruct(s *models.Settings) {
 	fmt.Printf("Yt-dlp Output Extension: %s\n", s.YtdlpOutputExt)
 	fmt.Printf("Yt-dlp Extra Video Args: %s\n", s.ExtraYTDLPVideoArgs)
 	fmt.Printf("Yt-dlp Extra Metadata Args: %s\n", s.ExtraYTDLPMetaArgs)
+	fmt.Printf("Yt-dlp Extra Crawl Args: %s\n", s.ExtraYTDLPCrawlArgs)
 }
 
 // displayMetarrArgsStruct prints the Metarr args structure.
@@ -1631,6 +1632,11 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 	// Additional meta download args.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.ExtraYTDLPMetaArgs); ok {
 		c.ChanSettings.ExtraYTDLPMetaArgs = v
+	}
+
+	// Additional crawl args.
+	if v, ok := parsing.GetConfigValue[string](vip, keys.ExtraYTDLPCrawlArgs); ok {
+		c.ChanSettings.ExtraYTDLPCrawlArgs = v
 	}
 
 	// Validate complete Settings model at config boundary.

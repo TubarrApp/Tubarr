@@ -527,6 +527,9 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.ExtraYTDLPMetaArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPMetaArgs, channelSettings.ExtraYTDLPMetaArgs)
 	changed = changed || c
 
+	urlSettings.ExtraYTDLPCrawlArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPCrawlArgs, channelSettings.ExtraYTDLPCrawlArgs)
+	changed = changed || c
+
 	// Metadata operations
 	urlSettings.Filters, c = mergeSliceSettings(urlSettings.Filters, channelSettings.Filters)
 	changed = changed || c

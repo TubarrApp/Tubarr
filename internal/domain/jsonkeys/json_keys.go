@@ -8,6 +8,7 @@ const (
 	SettingsExternalDownloaderArgs    = "external_downloader_args"
 	SettingsExtraYtdlpVideoArgs       = "extra_ytdlp_video_args"
 	SettingsExtraYtdlpMetaArgs        = "extra_ytdlp_meta_args"
+	SettingsExtraYtdlpCrawlArgs       = "extra_ytdlp_crawl_args"
 	SettingsFilterFile                = "filter_file"
 	SettingsMoveOpsFile               = "move_ops_file"
 	SettingsJSONDirectory             = "json_directory"

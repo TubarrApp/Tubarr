@@ -121,6 +121,7 @@ const (
 const (
 	ExtraYTDLPVideoArgs = "extra-ytdlp-video-args" // applied only to video downloads.
 	ExtraYTDLPMetaArgs  = "extra-ytdlp-meta-args"  // applies only to metadata downloads.
+	ExtraYTDLPCrawlArgs = "extra-ytdlp-crawl-args" // applies only to crawling.
 )
 
 // Web interface or terminal.

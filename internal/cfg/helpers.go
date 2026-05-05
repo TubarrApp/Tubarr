@@ -208,6 +208,9 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.ExtraYTDLPMetaArgs) {
 		in.ExtraYTDLPMetaArgs = &f.ExtraYTDLPMetaArgs
 	}
+	if cmd.Flags().Changed(keys.ExtraYTDLPCrawlArgs) {
+		in.ExtraYTDLPCrawlArgs = &f.ExtraYTDLPCrawlArgs
+	}
 	if cmd.Flags().Changed(keys.MExtraFFmpegArgs) {
 		in.ExtraFFmpegArgs = &f.ExtraFFmpegArgs
 	}

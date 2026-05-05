@@ -92,7 +92,11 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Fetch new episode URLs
-		newEpisodeURLs, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath)
+		var chanCrawlArgs string
+		if cu.ChanURLSettings != nil {
+			chanCrawlArgs = cu.ChanURLSettings.ExtraYTDLPCrawlArgs
+		}
+		newEpisodeURLs, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, chanCrawlArgs)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +206,8 @@ func (s *Scraper) newEpisodeURLs(
 	ctx context.Context,
 	channelName, channelURL string,
 	existingURLs, fileURLs []string,
-	cookies []*http.Cookie, cookiePath string) ([]string, error) {
+	cookies []*http.Cookie, cookiePath string,
+	crawlArgs string) ([]string, error) {
 	// Episode map to avoid deduplication
 	uniqueEpisodeURLs := make(map[string]struct{})
 
@@ -241,7 +246,7 @@ func (s *Scraper) newEpisodeURLs(
 		s.collector.Wait()
 	} else {
 		var err error
-		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, uniqueEpisodeURLs, cookiePath); err != nil {
+		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, uniqueEpisodeURLs, cookiePath, crawlArgs); err != nil {
 			return nil, err
 		}
 	}
@@ -289,7 +294,7 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 }
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string) (map[string]struct{}, error) {
+func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string, crawlArgs string) (map[string]struct{}, error) {
 	if uniqueEpisodeURLs == nil {
 		uniqueEpisodeURLs = make(map[string]struct{})
 	}
@@ -297,10 +302,11 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	// Build argument
 	args := []string{command.YtDLPFlatPlaylist}
 
-	// Add custom meta arguments if set
-	if abstractions.IsSet(keys.ExtraYTDLPMetaArgs) {
-		metaArgs := abstractions.GetStringSlice(keys.ExtraYTDLPMetaArgs)
-		args = append(args, metaArgs...)
+	// Add custom crawl arguments: CLI flag takes precedence over per-channel setting.
+	if abstractions.IsSet(keys.ExtraYTDLPCrawlArgs) {
+		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPCrawlArgs))...)
+	} else if crawlArgs != "" {
+		args = append(args, strings.Fields(crawlArgs)...)
 	}
 
 	// Cookies

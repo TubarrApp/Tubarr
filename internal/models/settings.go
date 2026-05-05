@@ -20,6 +20,7 @@ type Settings struct {
 	// Custom args
 	ExtraYTDLPVideoArgs string `json:"extra_ytdlp_video_args"`
 	ExtraYTDLPMetaArgs  string `json:"extra_ytdlp_meta_args"`
+	ExtraYTDLPCrawlArgs string `json:"extra_ytdlp_crawl_args"`
 
 	// Metadata operations.
 	Filters              []Filters           `json:"filters"`
@@ -179,6 +180,11 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 	}
 	if child.ExtraYTDLPVideoArgs != "" {
 		if parent.ExtraYTDLPVideoArgs != child.ExtraYTDLPVideoArgs {
+			return false
+		}
+	}
+	if child.ExtraYTDLPCrawlArgs != "" {
+		if parent.ExtraYTDLPCrawlArgs != child.ExtraYTDLPCrawlArgs {
 			return false
 		}
 	}
@@ -594,6 +600,9 @@ func SettingsAllZero(s *Settings) bool {
 		return false
 	}
 	if s.ExtraYTDLPMetaArgs != "" {
+		return false
+	}
+	if s.ExtraYTDLPCrawlArgs != "" {
 		return false
 	}
 

@@ -287,6 +287,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 			YtdlpOutputExt:         NilOrZeroValue(input.YTDLPOutputExt),
 			ExtraYTDLPVideoArgs:    NilOrZeroValue(input.ExtraYTDLPVideoArgs),
 			ExtraYTDLPMetaArgs:     NilOrZeroValue(input.ExtraYTDLPMetaArgs),
+			ExtraYTDLPCrawlArgs:    NilOrZeroValue(input.ExtraYTDLPCrawlArgs),
 		},
 
 		ChanMetarrArgs: &models.MetarrArgs{
@@ -706,6 +707,11 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 	// Set ExtraYTDLPMetaArgs.
 	if input.ExtraYTDLPMetaArgs != nil {
 		settings.ExtraYTDLPMetaArgs = *input.ExtraYTDLPMetaArgs
+	}
+
+	// Set ExtraYTDLPCrawlArgs.
+	if input.ExtraYTDLPCrawlArgs != nil {
+		settings.ExtraYTDLPCrawlArgs = *input.ExtraYTDLPCrawlArgs
 	}
 
 	// Validate and set Concurrency if provided.

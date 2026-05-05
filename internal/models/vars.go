@@ -42,6 +42,7 @@ type ChannelInputPtrs struct {
 	// Extra arguments.
 	ExtraYTDLPVideoArgs *string `viper:"extra-ytdlp-video-args"`
 	ExtraYTDLPMetaArgs  *string `viper:"extra-ytdlp-meta-args"`
+	ExtraYTDLPCrawlArgs *string `viper:"extra-ytdlp-crawl-args"`
 
 	// Concurrency and performance settings.
 	CrawlFreq   *int `viper:"crawl-freq"`

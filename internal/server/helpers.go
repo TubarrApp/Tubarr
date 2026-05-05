@@ -152,6 +152,9 @@ func settingsJSONMap(settings *models.Settings) map[string]any {
 	if settings.ExtraYTDLPMetaArgs != "" {
 		settingsMap[jsonkeys.SettingsExtraYtdlpMetaArgs] = settings.ExtraYTDLPMetaArgs
 	}
+	if settings.ExtraYTDLPCrawlArgs != "" {
+		settingsMap[jsonkeys.SettingsExtraYtdlpCrawlArgs] = settings.ExtraYTDLPCrawlArgs
+	}
 	if settings.MetaFilterMoveOpFile != "" {
 		settingsMap[jsonkeys.SettingsMoveOpsFile] = settings.MetaFilterMoveOpFile
 	}
@@ -194,6 +197,9 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	}
 	if v, ok := data[jsonkeys.SettingsExtraYtdlpMetaArgs].(string); ok {
 		settings.ExtraYTDLPMetaArgs = v
+	}
+	if v, ok := data[jsonkeys.SettingsExtraYtdlpCrawlArgs].(string); ok {
+		settings.ExtraYTDLPCrawlArgs = v
 	}
 	if v, ok := data[jsonkeys.SettingsFilterFile].(string); ok {
 		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
@@ -466,6 +472,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	externalDownloaderArgs := r.FormValue(jsonkeys.SettingsExternalDownloaderArgs)
 	extraYtdlpVideoArgs := r.FormValue(jsonkeys.SettingsExtraYtdlpVideoArgs)
 	extraYtdlpMetaArgs := r.FormValue(jsonkeys.SettingsExtraYtdlpMetaArgs)
+	extraYtdlpCrawlArgs := r.FormValue(jsonkeys.SettingsExtraYtdlpCrawlArgs)
 	filterFile := r.FormValue(jsonkeys.SettingsFilterFile)
 	moveOpFile := r.FormValue(jsonkeys.SettingsMoveOpsFile)
 
@@ -587,6 +594,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 		YtdlpOutputExt:            ytdlpOutExt,
 		ExtraYTDLPVideoArgs:       extraYtdlpVideoArgs,
 		ExtraYTDLPMetaArgs:        extraYtdlpMetaArgs,
+		ExtraYTDLPCrawlArgs:       extraYtdlpCrawlArgs,
 		YTDLPPreferredVideoCodecs: ytdlpPreferredVideoCodecs,
 		YTDLPPreferredAudioCodecs: ytdlpPreferredAudioCodecs,
 

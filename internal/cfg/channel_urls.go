@@ -30,7 +30,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		ytdlpOutExt                                                                                           string
 		ytdlpPreferredVideoCodecs, ytdlpPreferredAudioCodecs                                                  []string
 		useGlobalCookies, pause, resetSettings                                                                bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraFFmpegArgs                                              string
+		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraYTDLPCrawlArgs, extraFFmpegArgs                         string
 	)
 
 	updateURLSettingsCmd := &cobra.Command{
@@ -111,6 +111,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				ytdlpOutputExt:            ytdlpOutExt,
 				extraYtdlpVideoArgs:       extraYTDLPVideoArgs,
 				extraYtdlpMetaArgs:        extraYTDLPMetaArgs,
+				extraYtdlpCrawlArgs:       extraYTDLPCrawlArgs,
 				ytdlpPreferredVideoCodecs: ytdlpPreferredVideoCodecs,
 				ytdlpPreferredAudioCodecs: ytdlpPreferredAudioCodecs,
 			})
@@ -226,7 +227,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&audioCodec)
 
 	// Additional YTDLP args.
-	cmd.SetCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
+	cmd.SetCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs, &extraYTDLPCrawlArgs)
 
 	// Reset flag.
 	updateURLSettingsCmd.Flags().BoolVar(&resetSettings, "clear-settings", false, "Clear all URL-specific settings and inherit from channel defaults")

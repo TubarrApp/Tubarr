@@ -830,7 +830,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		&flags.TranscodeVideoFilter, &flags.TranscodeQuality, &flags.TranscodeVideoCodec,
 		&flags.TranscodeAudioCodec)
 
-	cmd.SetCustomYDLPArgFlags(addCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
+	cmd.SetCustomYDLPArgFlags(addCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs, &flags.ExtraYTDLPCrawlArgs)
 
 	cmd.SetNotifyFlags(addCmd, &flags.Notification)
 
@@ -1025,7 +1025,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 	cmd.SetTranscodeFlags(batchCmd, &flags.TranscodeGPU, &flags.TranscodeGPUNode, &flags.TranscodeVideoFilter,
 		&flags.TranscodeQuality, &flags.TranscodeVideoCodec, &flags.TranscodeAudioCodec)
 
-	cmd.SetCustomYDLPArgFlags(batchCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs)
+	cmd.SetCustomYDLPArgFlags(batchCmd, &flags.ExtraYTDLPVideoArgs, &flags.ExtraYTDLPMetaArgs, &flags.ExtraYTDLPCrawlArgs)
 	cmd.SetNotifyFlags(batchCmd, &flags.Notification)
 
 	batchCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
@@ -1272,6 +1272,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		// Extra arguments.
 		extraYTDLPVideoArgs string
 		extraYTDLPMetaArgs  string
+		extraYTDLPCrawlArgs string
 		extraFFmpegArgs     string
 
 		// Concurrency and performance settings.
@@ -1399,6 +1400,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				ytdlpOutputExt:            ytdlpOutExt,
 				extraYtdlpVideoArgs:       extraYTDLPVideoArgs,
 				extraYtdlpMetaArgs:        extraYTDLPMetaArgs,
+				extraYtdlpCrawlArgs:       extraYTDLPCrawlArgs,
 				ytdlpPreferredVideoCodecs: ytdlpPreferredVideoCodecs,
 				ytdlpPreferredAudioCodecs: ytdlpPreferredAudioCodecs,
 			})
@@ -1510,7 +1512,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&loginURL, &authDetails)
 
 	// Additional YTDLP args.
-	cmd.SetCustomYDLPArgFlags(updateSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs)
+	cmd.SetCustomYDLPArgFlags(updateSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs, &extraYTDLPCrawlArgs)
 
 	updateSettingsCmd.Flags().StringVar(&newName, "change-name-to", "", "Change the channel name to this value")
 	updateSettingsCmd.Flags().BoolVar(&deleteAuth, "delete-auth", false, "Clear all authentication details for this channel and its URLs")
@@ -1900,6 +1902,7 @@ type chanSettings struct {
 	ytdlpOutputExt            string
 	extraYtdlpVideoArgs       string
 	extraYtdlpMetaArgs        string
+	extraYtdlpCrawlArgs       string
 	ytdlpPreferredVideoCodecs []string
 	ytdlpPreferredAudioCodecs []string
 }
@@ -2103,6 +2106,14 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	if f.Changed(keys.ExtraYTDLPMetaArgs) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.ExtraYTDLPMetaArgs = c.extraYtdlpMetaArgs
+			return nil
+		})
+	}
+
+	// Additional yt-dlp crawl arguments.
+	if f.Changed(keys.ExtraYTDLPCrawlArgs) {
+		fns = append(fns, func(s *models.Settings) error {
+			s.ExtraYTDLPCrawlArgs = c.extraYtdlpCrawlArgs
 			return nil
 		})
 	}

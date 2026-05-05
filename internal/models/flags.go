@@ -66,6 +66,7 @@ type ChannelFlagValues struct {
 	// Extra arguments
 	ExtraYTDLPVideoArgs string
 	ExtraYTDLPMetaArgs  string
+	ExtraYTDLPCrawlArgs string
 	ExtraFFmpegArgs     string
 
 	// Concurrency and performance settings

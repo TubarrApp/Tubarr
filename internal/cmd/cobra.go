@@ -224,11 +224,14 @@ func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 }
 
 // SetCustomYDLPArgFlags sets flags for custom additional YTDLP download arguments.
-func SetCustomYDLPArgFlags(cmd *cobra.Command, extraVideoArgs, extraMetaArgs *string) {
+func SetCustomYDLPArgFlags(cmd *cobra.Command, extraVideoArgs, extraMetaArgs, extraCrawlArgs *string) {
 	if extraVideoArgs != nil {
 		cmd.Flags().StringVar(extraVideoArgs, keys.ExtraYTDLPVideoArgs, "", "Additional commands to pass to yt-dlp when downloading videos")
 	}
 	if extraMetaArgs != nil {
 		cmd.Flags().StringVar(extraMetaArgs, keys.ExtraYTDLPMetaArgs, "", "Additional commands to pass to yt-dlp when downloading metadata")
+	}
+	if extraCrawlArgs != nil {
+		cmd.Flags().StringVar(extraCrawlArgs, keys.ExtraYTDLPCrawlArgs, "", "Additional commands to pass to yt-dlp when crawling for videos")
 	}
 }
