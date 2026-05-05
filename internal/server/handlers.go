@@ -816,7 +816,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			}
 
 			// Add the new URL to the channel.
-			if _, err := ss.cs.AddChannelURL(channelID, chanURL, true); err != nil {
+			if _, err := ss.cs.AddChannelURL(channelID, chanURL, false); err != nil {
 				http.Error(w, fmt.Sprintf("failed to add URL %q: %v", u, err), http.StatusInternalServerError)
 				return
 			}
