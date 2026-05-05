@@ -516,17 +516,17 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 
 // blockChannelBotDetected blocks a domain globally due to bot detection on the given URL.
 func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, videoURL string) error {
-	// For manual downloads, use the actual video URL to extract the hostname.
-	urlToBlock := cu.URL
-	if cu.URL == consts.ManualDownloadsCol {
-		urlToBlock = videoURL
-	}
-
-	parsedURL, err := url.Parse(urlToBlock)
+	// Fall back to the channel URL if the video URL can't be parsed.
+	parsedURL, err := url.Parse(videoURL)
 	hostname := parsedURL.Hostname()
-	if err != nil {
-		logger.Pl.E("Could not parse %q, will use full domain", urlToBlock)
-		hostname = urlToBlock
+	if err != nil || hostname == "" {
+		// Fall back to channel URL if video URL is invalid.
+		logger.Pl.E("Could not parse video URL %q, falling back to channel URL", videoURL)
+		parsedURL, err = url.Parse(cu.URL)
+		if err != nil {
+			return fmt.Errorf("failed to parse channel URL %q for blocking: %w", cu.URL, err)
+		}
+		hostname = parsedURL.Hostname()
 	}
 
 	// Determine the block context based on authentication.
