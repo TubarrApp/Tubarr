@@ -295,15 +295,21 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	}
 
 	// Build argument
-	args := []string{command.YtDLPFlatPlaylist, command.OutputJSON}
+	args := []string{command.YtDLPFlatPlaylist}
+
+	// Add custom meta arguments if set
+	if abstractions.IsSet(keys.ExtraYTDLPMetaArgs) {
+		metaArgs := abstractions.GetStringSlice(keys.ExtraYTDLPMetaArgs)
+		args = append(args, metaArgs...)
+	}
 
 	// Cookies
 	if cookiePath != "" {
 		args = append(args, command.CookiePath, cookiePath)
 	}
 
-	// Create command
-	args = append(args, channelURL)
+	// Add -J and URL to finalize command
+	args = append(args, command.OutputJSON, channelURL)
 	cmd := exec.CommandContext(ctx, command.YTDLP, args...)
 
 	logger.Pl.I("Executing YTDLP playlist fetch command for channel %q URL %q:\n\n%s\n", channelName, channelURL, cmd.String())
