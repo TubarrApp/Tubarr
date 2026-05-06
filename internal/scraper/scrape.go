@@ -333,26 +333,20 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		return uniqueEpisodeURLs, err
 	}
 
+	// Process entries and add to map.
 	for _, entry := range result.Entries {
 		// Filter out the channel URL itself if it appears in the entries list.
 		if normalizeURL(entry.URL) == normalizeURL(channelURL) {
-			logger.Pl.D(3, "Skipping entry (is the channel URL: %q)", entry.URL)
+			logger.Pl.D(3, "Skipping entry (entry %q is the exact channel URL: %q)", entry.URL, channelURL)
 			continue
 		}
-		// Fix Rumble returned results.
+		// Normalize Rumble URLs.
 		if strings.Contains(channelURL, "rumble.com") {
-			// Filter non-video URLs (e.g. list pages, user pages, other)
-			if strings.Contains(entry.URL, "/videos") ||
-				strings.Contains(entry.URL, "/user/") ||
-				!strings.Contains(entry.URL, patterns["rumble"].pattern) {
-				logger.Pl.D(1, "Skipping entry with URL not matching Rumble pattern (%s): %q", patterns["rumble"].pattern, entry.URL)
+			if isValidRumbleVideoURL(entry.URL) {
+				entry.URL = removeQueryParams(entry.URL)
+			} else {
+				logger.Pl.D(2, "Rumble URL %q is not a valid video link, skipping...", entry.URL)
 				continue
-			}
-			// Remove query parameters from Rumble URLs.
-			if idx := strings.Index(entry.URL, "?"); idx != -1 {
-				previousURL := entry.URL
-				entry.URL = entry.URL[:idx]
-				logger.Pl.D(3, "Processed Rumble URL to remove query parameters: %s -> %q", previousURL, entry.URL)
 			}
 		}
 		// Add to map to ensure uniqueness.

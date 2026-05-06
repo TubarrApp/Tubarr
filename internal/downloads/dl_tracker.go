@@ -64,6 +64,7 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 			VideoTitle:   v.Title,
 			ChannelID:    v.ChannelID,
 			ChannelURLID: v.ChannelURLID,
+			ChannelURL:   v.ChannelURL,
 			VideoURL:     v.URL,
 			Status:       v.DownloadStatus.Status,
 			Percent:      v.DownloadStatus.Percent,

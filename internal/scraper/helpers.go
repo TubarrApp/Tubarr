@@ -3,6 +3,7 @@ package scraper
 import (
 	"net/url"
 	"strings"
+	"tubarr/internal/domain/logger"
 
 	"golang.org/x/net/publicsuffix"
 )
@@ -53,4 +54,30 @@ func normalizeURL(inputURL string) string {
 	cleanURL := strings.TrimPrefix(inputURL, "https://")
 	cleanURL = strings.TrimPrefix(cleanURL, "http://")
 	return strings.TrimSuffix(cleanURL, "/")
+}
+
+// isValidRumbleVideoURL returns true only for direct video URLs of the
+// form rumble.com/v<slug>.html, excluding channel, user, and listing pages.
+func isValidRumbleVideoURL(videoURL string) bool {
+	parsed, err := url.Parse(videoURL)
+	if err != nil {
+		return false
+	}
+	// Valid video paths look like /v79e41g-some-title.html
+	// Reject channel pages (/c/...), user pages (/user/...), listing pages (/videos/...)
+	path := parsed.Path
+	return strings.HasPrefix(path, "/v") &&
+		!strings.HasPrefix(path, "/videos") &&
+		!strings.HasPrefix(path, "/user/")
+}
+
+// removeQueryParams removes query parameters from a URL for cleaner comparison.
+func removeQueryParams(inputURL string) string {
+	u, err := url.Parse(inputURL)
+	if err != nil {
+		logger.Pl.E("Failed to parse URL %q for query parameter removal: %v", inputURL, err)
+		return inputURL // Return original if parsing fails
+	}
+	u.RawQuery = "" // Clear query parameters
+	return u.String()
 }

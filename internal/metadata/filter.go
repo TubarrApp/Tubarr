@@ -21,7 +21,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 	anyTotal, anyPassed := 0, 0
 
 	for _, filter := range filters {
-		if filter.ChannelURL != "" && !strings.Contains(v.ChannelURL, filter.ChannelURL) {
+		if v.ChannelURL != "" && filter.ChannelURL != "" && !strings.Contains(v.ChannelURL, filter.ChannelURL) {
 			logger.Pl.D(2, "Skipping filter %s:%s:%s:%s for video %q because filter channel URL %q does not match...", filter.Field, filter.ContainsOmits, filter.Value, filter.MustAny, v.URL, filter.ChannelURL)
 			continue
 		}
