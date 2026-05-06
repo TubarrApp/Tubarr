@@ -335,14 +335,14 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	for _, entry := range result.Entries {
 		// Filter out the channel URL itself if it appears in the entries list.
 		if normalizeURL(entry.URL) == normalizeURL(channelURL) {
-			logger.Pl.D(3, "Skipping entry with URL matching channel URL: %q", entry.URL)
+			logger.Pl.D(3, "Skipping entry (is the channel URL: %q)", entry.URL)
 			continue
 		}
 		// Fix Rumble returned results.
 		if strings.Contains(channelURL, "rumble.com") {
 			// Filter non-video URLs.
 			if !strings.Contains(entry.URL, patterns["rumble"].pattern) {
-				logger.Pl.D(3, "Skipping entry with URL not matching Rumble pattern: %q", entry.URL)
+				logger.Pl.D(3, "Skipping entry with URL not matching Rumble pattern (%s): %q", patterns["rumble"].pattern, entry.URL)
 				continue
 			}
 			// Remove query parameters from Rumble URLs.

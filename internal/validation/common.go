@@ -41,7 +41,7 @@ func ValidateNotifications(notifications []*models.Notification) error {
 		return nil
 	}
 
-	logger.Pl.D(3, "Validating %d notifications...", len(notifications))
+	logger.Pl.D(5, "Validating %d notifications...", len(notifications))
 
 	for i, n := range notifications {
 		// Validate notify URL is not empty.
@@ -119,7 +119,7 @@ func ValidateFilterOps(filters []models.Filters) error {
 	if len(filters) == 0 {
 		return nil
 	}
-	logger.Pl.D(3, "Validating %d filter operations...", len(filters))
+	logger.Pl.D(5, "Validating %d filter operations...", len(filters))
 
 	// Validate filter parts.
 	for i, filter := range filters {
@@ -146,7 +146,7 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 	if len(moveOps) == 0 {
 		return nil
 	}
-	logger.Pl.D(3, "Validating %d meta filter move operations...", len(moveOps))
+	logger.Pl.D(5, "Validating %d meta filter move operations...", len(moveOps))
 
 	for i, op := range moveOps {
 		// Validate field is not empty
@@ -169,7 +169,7 @@ func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
 	if len(filteredMetaOps) == 0 {
 		return nil
 	}
-	logger.Pl.D(3, "Validating %d filtered meta operations...", len(filteredMetaOps))
+	logger.Pl.D(5, "Validating %d filtered meta operations...", len(filteredMetaOps))
 
 	// Validate filtered meta operations.
 	for i, fmo := range filteredMetaOps {
@@ -199,7 +199,7 @@ func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOp
 	if len(filteredFilenameOps) == 0 {
 		return nil
 	}
-	logger.Pl.D(3, "Validating %d filtered filename operations...", len(filteredFilenameOps))
+	logger.Pl.D(5, "Validating %d filtered filename operations...", len(filteredFilenameOps))
 
 	// Validate filtered filename operations.
 	for i, ffo := range filteredFilenameOps {
