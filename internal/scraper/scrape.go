@@ -342,6 +342,9 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		return uniqueEpisodeURLs, err
 	}
 
+	// Retrieve base domain for comparisons.
+	chanBaseDomain, _ := getBaseDomain(channelURL)
+
 	// Process entries and add to map.
 	for _, entry := range result.Entries {
 		// Filter out the channel URL itself if it appears in the entries list.
@@ -350,7 +353,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 			continue
 		}
 		// Normalize Rumble URLs.
-		if strings.Contains(channelURL, "rumble.com") {
+		if chanBaseDomain == rumble {
 			if isValidRumbleVideoURL(entry.URL) {
 				entry.URL = removeQueryParams(entry.URL)
 			} else {
