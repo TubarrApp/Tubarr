@@ -107,6 +107,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 				video := &models.Video{
 					ChannelID:    c.ID,
 					ChannelURLID: cu.ID,
+					ChannelURL:   cu.URL,
 					URL:          newURL,
 				}
 				cu.Videos = append(cu.Videos, video)
@@ -340,9 +341,11 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		}
 		// Fix Rumble returned results.
 		if strings.Contains(channelURL, "rumble.com") {
-			// Filter non-video URLs.
-			if !strings.Contains(entry.URL, patterns["rumble"].pattern) {
-				logger.Pl.D(3, "Skipping entry with URL not matching Rumble pattern (%s): %q", patterns["rumble"].pattern, entry.URL)
+			// Filter non-video URLs (e.g. list pages, user pages, other)
+			if strings.Contains(entry.URL, "/videos") ||
+				strings.Contains(entry.URL, "/user/") ||
+				!strings.Contains(entry.URL, patterns["rumble"].pattern) {
+				logger.Pl.D(1, "Skipping entry with URL not matching Rumble pattern (%s): %q", patterns["rumble"].pattern, entry.URL)
 				continue
 			}
 			// Remove query parameters from Rumble URLs.

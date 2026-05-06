@@ -15,6 +15,7 @@ type StatusUpdate struct {
 	VideoTitle   string
 	ChannelID    int64
 	ChannelURLID int64
+	ChannelURL   string
 	VideoURL     string
 	Status       consts.DownloadStatus
 	Percent      float64

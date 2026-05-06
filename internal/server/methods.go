@@ -125,7 +125,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 // getHomepageCarouselVideos returns the latest 'n' downloaded videos.
 func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) (videos []models.Video, err error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s "+
 			"WHERE %s = ? AND %s = 1 "+ // Only finished downloads.
 			"ORDER BY %s DESC "+
@@ -133,6 +133,7 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 		consts.QVidID,
 		consts.QVidChanID,
 		consts.QVidChanURLID,
+		consts.QVidChanURL,
 		consts.QVidThumbnailURL,
 		consts.QVidFinished,
 		consts.QVidURL,
@@ -165,11 +166,13 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 		var description sql.NullString
 		var uploadDate sql.NullTime
 		var channelURLID sql.NullInt64
+		var channelURL sql.NullString
 
 		err := rows.Scan(
 			&video.ID,
 			&video.ChannelID,
 			&channelURLID,
+			&channelURL,
 			&thumbnailURL,
 			&video.Finished,
 			&video.URL,
@@ -186,6 +189,9 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 		// Handle nullable fields
 		if channelURLID.Valid {
 			video.ChannelURLID = channelURLID.Int64
+		}
+		if channelURL.Valid {
+			video.ChannelURL = channelURL.String
 		}
 		if thumbnailURL.Valid {
 			video.ThumbnailURL = thumbnailURL.String
@@ -239,6 +245,7 @@ func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Vide
 				Title:        statusUpdate.VideoTitle,
 				ChannelID:    statusUpdate.ChannelID,
 				ChannelURLID: statusUpdate.ChannelURLID,
+				ChannelURL:   statusUpdate.ChannelURL,
 				URL:          statusUpdate.VideoURL,
 				DownloadStatus: models.DLStatus{
 					Status:  statusUpdate.Status,

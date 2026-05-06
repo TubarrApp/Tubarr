@@ -21,6 +21,10 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 	anyTotal, anyPassed := 0, 0
 
 	for _, filter := range filters {
+		if filter.ChannelURL != "" && !strings.Contains(v.ChannelURL, filter.ChannelURL) {
+			logger.Pl.D(2, "Skipping filter %s:%s:%s:%s for video %q because filter channel URL %q does not match...", filter.Field, filter.ContainsOmits, filter.Value, filter.MustAny, v.URL, filter.ChannelURL)
+			continue
+		}
 		switch filter.MustAny {
 		case sharedconsts.OpMust:
 			mustTotal++
@@ -55,9 +59,11 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 	}
 
 	if mustPassed != mustTotal {
+		logger.Pl.D(2, "%s mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", filterType, v.URL, mustPassed, mustTotal)
 		return false
 	}
 	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
+		logger.Pl.D(2, "%s mismatch: Video %q did not pass any 'any' filters (passed %d out of %d)", filterType, v.URL, anyPassed, anyTotal)
 		return false
 	}
 

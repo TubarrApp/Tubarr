@@ -202,6 +202,7 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 		customVideoRequests = append(customVideoRequests, &models.Video{
 			ChannelID:    c.ID,
 			ChannelURLID: targetChannelURLModel.ID,
+			ChannelURL:   targetChannelURLModel.URL,
 			URL:          actualVideoURL,
 		})
 	}

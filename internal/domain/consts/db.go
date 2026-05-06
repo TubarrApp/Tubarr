@@ -103,6 +103,7 @@ const (
 	QVidID           = "id"
 	QVidChanID       = "channel_id"
 	QVidChanURLID    = "channel_url_id"
+	QVidChanURL      = "channel_url"
 	QVidFinished     = "finished"
 	QVidIgnored      = "ignored"
 	QVidThumbnailURL = "thumbnail_url"
@@ -124,6 +125,7 @@ var ValidVideoKeys = map[string]struct{}{
 	QVidID:           {},
 	QVidChanID:       {},
 	QVidChanURLID:    {},
+	QVidChanURL:      {},
 	QVidFinished:     {},
 	QVidIgnored:      {},
 	QVidThumbnailURL: {},

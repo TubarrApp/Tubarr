@@ -1194,12 +1194,13 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
 			"ORDER BY %s DESC",
 		consts.QVidID,
 		consts.QVidChanID,
 		consts.QVidChanURLID,
+		consts.QVidChanURL,
 		consts.QVidThumbnailURL,
 		consts.QVidFinished,
 		consts.QVidIgnored,
@@ -1239,12 +1240,14 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			uploadDate   sql.NullTime
 			metadataStr  sql.NullString
 			channelURLID sql.NullInt64
+			channelURL   sql.NullString
 		)
 
 		if err := rows.Scan(
 			&v.ID,
 			&v.ChannelID,
 			&channelURLID,
+			&channelURL,
 			&thumbnailURL,
 			&v.Finished,
 			&v.Ignored,
@@ -1262,6 +1265,9 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		// Handle nullable fields.
 		if channelURLID.Valid {
 			v.ChannelURLID = channelURLID.Int64
+		}
+		if channelURL.Valid {
+			v.ChannelURL = channelURL.String
 		}
 		if url.Valid {
 			v.URL = url.String

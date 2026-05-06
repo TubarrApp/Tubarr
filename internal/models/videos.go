@@ -13,6 +13,7 @@ type Video struct {
 	ID                  int64                 `json:"id" db:"id"`
 	ChannelID           int64                 `json:"channel_id" db:"channel_id"`
 	ChannelURLID        int64                 `json:"channel_url_id" db:"channel_url_id"`
+	ChannelURL          string                `json:"channel_url" db:"channel_url"`
 	ThumbnailURL        string                `json:"thumbnail_url" db:"thumbnail_url"`
 	VideoFilePath       string                `json:"video_path" db:"video_path"`
 	VideoDir            string                `json:"-" db:"-"`

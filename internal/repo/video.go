@@ -96,11 +96,12 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 
 			// Insert new video with all fields
 			insertQuery := fmt.Sprintf(
-				"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
-					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 				consts.DBVideos,
 				consts.QVidChanID,
 				consts.QVidChanURLID,
+				consts.QVidChanURL,
 				consts.QVidThumbnailURL,
 				consts.QVidURL,
 				consts.QVidTitle,
@@ -117,6 +118,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 				insertQuery,
 				channelID,
 				v.ChannelURLID,
+				v.ChannelURL,
 				v.ThumbnailURL,
 				v.URL,
 				v.Title,
@@ -223,11 +225,12 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 
 	// Insert into videos table
 	vidQuery := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidChanURLID,
+		consts.QVidChanURL,
 		consts.QVidThumbnailURL,
 		consts.QVidURL,
 		consts.QVidTitle,
@@ -244,6 +247,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		vidQuery,
 		channelID,
 		channelURLID,
+		v.ChannelURL,
 		v.ThumbnailURL,
 		v.URL,
 		v.Title,
