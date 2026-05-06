@@ -235,9 +235,18 @@ func (s *Scraper) newEpisodeURLs(
 
 	s.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if strings.Contains(link, pattern.pattern) {
-			uniqueEpisodeURLs[link] = struct{}{}
+		if !strings.Contains(link, pattern.pattern) {
+			return
 		}
+		// For Rumble, ensure it's a valid video URL and remove query parameters for cleaner comparison.
+		if pattern.name == rumble {
+			if !isValidRumbleVideoURL(link) {
+				logger.Pl.D(2, "Rumble URL %q is not a valid video link, skipping...", link)
+				return
+			}
+			link = removeQueryParams(link)
+		}
+		uniqueEpisodeURLs[link] = struct{}{}
 	})
 
 	if customDom {
