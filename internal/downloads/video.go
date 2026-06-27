@@ -179,6 +179,9 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 				return
 			}
 		}
+		if err := scanner.Err(); err != nil {
+			logger.Pl.E("Scanner error reading yt-dlp output: %v", err)
+		}
 	}()
 
 	// Start parser.
