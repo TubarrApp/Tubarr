@@ -250,10 +250,20 @@ func (s *Scraper) newEpisodeURLs(
 	})
 
 	if customDom {
-		if err := s.collector.Visit(channelURL); err != nil {
-			return nil, fmt.Errorf("error visiting webpage %q: %w", channelURL, err)
+		if pattern.name == rumble {
+			rumbleURLs, err := scrapeRumbleChannelURLs(channelURL, cookies)
+			if err != nil {
+				return nil, err
+			}
+			for u := range rumbleURLs {
+				uniqueEpisodeURLs[u] = struct{}{}
+			}
+		} else {
+			if err := s.collector.Visit(channelURL); err != nil {
+				return nil, fmt.Errorf("error visiting webpage %q: %w", channelURL, err)
+			}
+			s.collector.Wait()
 		}
-		s.collector.Wait()
 	} else {
 		var err error
 		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, uniqueEpisodeURLs, cookiePath, crawlArgs); err != nil {
