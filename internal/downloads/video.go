@@ -175,7 +175,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 			select {
 			case lineChan <- scanner.Text():
 			case <-d.Context.Done():
-				logger.Pl.W("Download cancelled: %v", d.Context.Err())
+				logger.Pl.W("Download canceled: %v", d.Context.Err())
 				return
 			}
 		}
