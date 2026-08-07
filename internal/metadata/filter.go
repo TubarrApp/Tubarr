@@ -21,10 +21,13 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 	anyTotal, anyPassed := 0, 0
 
 	for _, filter := range filters {
+		// Check if the filter has a channel URL and if it matches the video's channel URL.
 		if v.ChannelURL != "" && filter.ChannelURL != "" && !strings.Contains(v.ChannelURL, filter.ChannelURL) {
 			logger.Pl.D(2, "Skipping filter %s:%s:%s:%s for video %q because filter channel URL %q does not match...", filter.Field, filter.FilterType, filter.Value, filter.MustAny, v.URL, filter.ChannelURL)
 			continue
 		}
+
+		// Add to must/any.
 		switch filter.MustAny {
 		case sharedconsts.OpMust:
 			mustTotal++
@@ -32,6 +35,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 			anyTotal++
 		}
 
+		// Retrieve the metadata value for the filter's field.
 		val, exists := v.MetadataMap[filter.Field]
 		strVal := strings.ToLower(fmt.Sprint(val))
 		filterVal := strings.ToLower(filter.Value)
@@ -44,6 +48,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 			} else {
 				logger.Pl.D(1, "%s skip: Video %q has an empty value for field %q, skipping numerical filter", filterType, v.URL, filter.Field)
 			}
+			// Decrement must/any since this filter is skipped.
 			switch filter.MustAny {
 			case sharedconsts.OpMust:
 				mustTotal--
@@ -53,6 +58,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 			continue
 		}
 
+		// Check the filter against the video's metadata value.
 		var passed, failHard bool
 		switch filter.Value {
 		case "":
