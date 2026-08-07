@@ -204,6 +204,7 @@ func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL strin
 			return false, true
 		}
 		return !exists, false
+		// Dead branch (should not be reached due to isNumericalFilter check in checkFilters).
 	case consts.FilterMoreThan, consts.FilterLessThan, consts.FilterEquals, consts.FilterNotEquals:
 		logger.Pl.I("%s mismatch: Video %q has no value for field %q to compare against, skipping check.", filterType, videoURL, filter.Field)
 	}
@@ -229,7 +230,23 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			logger.Pl.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
-		// More than
+	case consts.FilterEquals:
+		if strVal == filterVal {
+			return true, false
+		}
+		if filter.MustAny == sharedconsts.OpMust {
+			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which does not equal %q", filterType, videoURL, strVal, filter.Field, filterVal)
+			return false, true
+		}
+	case consts.FilterNotEquals:
+		if strVal != filterVal {
+			return true, false
+		}
+		if filter.MustAny == sharedconsts.OpMust {
+			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which equals %q", filterType, videoURL, strVal, filter.Field, filterVal)
+			return false, true
+		}
+		// Numerical comparisons (morethan/lessthan) are handled below since they require parsing the values as floats.
 	case consts.FilterMoreThan:
 		videoNum, err1 := strconv.ParseFloat(strVal, 64)
 		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
@@ -244,7 +261,6 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			logger.Pl.I("%s mismatch: Video %q has value %g for field %q which is not more than %g", filterType, videoURL, videoNum, filter.Field, filterNum)
 			return false, true
 		}
-		// Less than
 	case consts.FilterLessThan:
 		videoNum, err1 := strconv.ParseFloat(strVal, 64)
 		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
@@ -257,24 +273,6 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 		}
 		if filter.MustAny == sharedconsts.OpMust {
 			logger.Pl.I("%s mismatch: Video %q has value %g for field %q which is not less than %g", filterType, videoURL, videoNum, filter.Field, filterNum)
-			return false, true
-		}
-		// Equals
-	case consts.FilterEquals:
-		if strVal == filterVal {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which does not equal %q", filterType, videoURL, strVal, filter.Field, filterVal)
-			return false, true
-		}
-		// Not equals
-	case consts.FilterNotEquals:
-		if strVal != filterVal {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which equals %q", filterType, videoURL, strVal, filter.Field, filterVal)
 			return false, true
 		}
 	default:
