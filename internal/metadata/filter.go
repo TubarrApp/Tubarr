@@ -20,6 +20,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
+	// Filter loop.
 	for _, filter := range filters {
 		// Check if the filter has a channel URL and if it matches the video's channel URL.
 		if v.ChannelURL != "" && filter.ChannelURL != "" && !strings.Contains(v.ChannelURL, filter.ChannelURL) {
@@ -59,9 +60,11 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 		}
 
 		// Check the filter against the video's metadata value.
+		// equals/notequals with an empty filter value compare the field against "".
 		var passed, failHard bool
-		switch filter.Value {
-		case "":
+		switch {
+		case filter.Value == "" &&
+			(filter.FilterType != consts.FilterEquals && filter.FilterType != consts.FilterNotEquals):
 			passed, failHard = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
 		default:
 			passed, failHard = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
@@ -81,6 +84,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 		}
 	}
 
+	// Post-loop evaluation of must/any filters.
 	if mustPassed != mustTotal {
 		logger.Pl.D(2, "%s mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", filterType, v.URL, mustPassed, mustTotal)
 		return false
