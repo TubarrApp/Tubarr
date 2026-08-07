@@ -29,7 +29,7 @@ func FiltersToString(f Filters) string {
 		op = f.ChannelURL + "|"
 	}
 	// Reconstruct operation
-	op += f.Field + ":" + f.ContainsOmits + ":" + f.Value + ":" + f.MustAny
+	op += f.Field + ":" + f.FilterType + ":" + f.Value + ":" + f.MustAny
 	return op
 }
 

@@ -98,11 +98,11 @@ type FilteredFilenameOps struct {
 
 // Filters are used to filter in or out videos (download, or operations) by metafields.
 type Filters struct {
-	ChannelURL    string `json:"filter_url_specific"`
-	Field         string `json:"filter_field"`
-	ContainsOmits string `json:"filter_type"`
-	Value         string `json:"filter_value"`
-	MustAny       string `json:"filter_must_any"`
+	ChannelURL string `json:"filter_url_specific"`
+	Field      string `json:"filter_field"`
+	FilterType string `json:"filter_type"`
+	Value      string `json:"filter_value"`
+	MustAny    string `json:"filter_must_any"`
 }
 
 // MetaFilterMoveOps are used to set an output directory in Metarr based on matching metadata fields.

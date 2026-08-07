@@ -192,7 +192,8 @@ func ParseFilterOps(ops []string) ([]models.Filters, error) {
 	const formatErrorMsg = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\n" +
 		"'title:omits:frogs:must' ignores all videos with frogs in the metatitle.\n" +
 		"'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n" +
-		"'date:omits:must' omits videos only when the metafile contains a date field"
+		"'date:omits:must' omits videos only when the metafile contains a date field." +
+		"'duration:morethan:3600:must' only includes videos with a duration field more than 3600 (one hour in seconds).\n"
 
 	var filters = make([]models.Filters, 0, len(ops))
 	for _, op := range ops {
@@ -200,27 +201,36 @@ func ParseFilterOps(ops []string) ([]models.Filters, error) {
 		chanURL, op := validation.CheckForOpURL(op)
 		split := validation.EscapedSplit(op, ':')
 
-		if len(split) < 3 {
+		if len(split) < 3 || len(split) > 4 {
 			logger.Pl.E(formatErrorMsg)
 			return nil, errors.New("filter format error")
 		}
 
 		// Normalize values.
 		field := strings.ToLower(strings.TrimSpace(split[0]))
-		containsOmits := strings.ToLower(strings.TrimSpace(split[1]))
+		filterType := strings.ToLower(strings.TrimSpace(split[1]))
 		mustAny := strings.ToLower(strings.TrimSpace(split[len(split)-1]))
 		var value string
 		if len(split) == 4 {
 			value = strings.ToLower(split[2])
 		}
 
+		// 3 length split means no value, e.g. "date:omits:must" (only omits if date field exists)
+		if len(split) == 3 {
+			if (filterType != sharedconsts.OpContains && filterType != sharedconsts.OpOmits) ||
+				(mustAny != sharedconsts.OpMust && mustAny != sharedconsts.OpAny) {
+				logger.Pl.E(formatErrorMsg)
+				return nil, errors.New("filter format error")
+			}
+		}
+
 		// Append filter.
 		filters = append(filters, models.Filters{
-			Field:         field,
-			ContainsOmits: containsOmits,
-			Value:         value,
-			MustAny:       mustAny,
-			ChannelURL:    chanURL,
+			Field:      field,
+			FilterType: filterType,
+			Value:      value,
+			MustAny:    mustAny,
+			ChannelURL: chanURL,
 		})
 	}
 	return filters, nil

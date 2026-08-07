@@ -403,17 +403,23 @@ func TestValidateFilterOps_EmptySliceOK(t *testing.T) {
 func TestValidateFilterOps_Valid(t *testing.T) {
 	filters := []models.Filters{
 		{
-			ChannelURL:    "",
-			Field:         "title",
-			ContainsOmits: "contains",
-			MustAny:       "must",
-			Value:         "foo",
+			ChannelURL: "",
+			Field:      "title",
+			FilterType: "contains",
+			MustAny:    "must",
+			Value:      "foo",
 		},
 		{
-			Field:         "channel",
-			ContainsOmits: "omits",
-			MustAny:       "any",
-			Value:         "bar",
+			Field:      "channel",
+			FilterType: "omits",
+			MustAny:    "any",
+			Value:      "bar",
+		},
+		{
+			Field:      "duration",
+			FilterType: "morethan",
+			MustAny:    "must",
+			Value:      "60",
 		},
 	}
 
@@ -422,19 +428,19 @@ func TestValidateFilterOps_Valid(t *testing.T) {
 	}
 }
 
-func TestValidateFilterOps_InvalidContainsOmits(t *testing.T) {
+func TestValidateFilterOps_InvalidFilterType(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "bad-type",
-			MustAny:       "must",
-			Value:         "foo",
+			Field:      "title",
+			FilterType: "bad-type",
+			MustAny:    "must",
+			Value:      "foo",
 		},
 	}
 
 	err := validation.ValidateFilterOps(filters)
 	if err == nil {
-		t.Fatalf("expected error for invalid ContainsOmits")
+		t.Fatalf("expected error for invalid FilterType")
 	}
 	if !strings.Contains(err.Error(), "invalid type") {
 		t.Fatalf("unexpected error message: %v", err)
@@ -444,10 +450,10 @@ func TestValidateFilterOps_InvalidContainsOmits(t *testing.T) {
 func TestValidateFilterOps_InvalidMustAny(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "contains",
-			MustAny:       "wrong",
-			Value:         "foo",
+			Field:      "title",
+			FilterType: "contains",
+			MustAny:    "wrong",
+			Value:      "foo",
 		},
 	}
 
@@ -463,10 +469,10 @@ func TestValidateFilterOps_InvalidMustAny(t *testing.T) {
 func TestValidateFilterOps_EmptyField(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "",
-			ContainsOmits: "contains",
-			MustAny:       "must",
-			Value:         "foo",
+			Field:      "",
+			FilterType: "contains",
+			MustAny:    "must",
+			Value:      "foo",
 		},
 	}
 
@@ -557,10 +563,10 @@ func TestValidateFilteredMetaOps_EmptySliceOK(t *testing.T) {
 func TestValidateFilteredMetaOps_Valid(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "contains",
-			MustAny:       "must",
-			Value:         "foo",
+			Field:      "title",
+			FilterType: "contains",
+			MustAny:    "must",
+			Value:      "foo",
 		},
 	}
 	metaOps := []models.MetaOps{
@@ -583,12 +589,12 @@ func TestValidateFilteredMetaOps_Valid(t *testing.T) {
 }
 
 func TestValidateFilteredMetaOps_InvalidFilters(t *testing.T) {
-	// invalid filter: bad ContainsOmits
+	// invalid filter: bad FilterType
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "bad",
-			MustAny:       "must",
+			Field:      "title",
+			FilterType: "bad",
+			MustAny:    "must",
 		},
 	}
 	metaOps := []models.MetaOps{
@@ -641,9 +647,9 @@ func TestValidateFilteredMetaOps_NoFilters(t *testing.T) {
 func TestValidateFilteredMetaOps_NoMetaOps(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "contains",
-			MustAny:       "must",
+			Field:      "title",
+			FilterType: "contains",
+			MustAny:    "must",
 		},
 	}
 
@@ -673,10 +679,10 @@ func TestValidateFilteredFilenameOps_EmptySliceOK(t *testing.T) {
 func TestValidateFilteredFilenameOps_Valid(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "contains",
-			MustAny:       "must",
-			Value:         "foo",
+			Field:      "title",
+			FilterType: "contains",
+			MustAny:    "must",
+			Value:      "foo",
 		},
 	}
 	filenameOps := []models.FilenameOps{
@@ -700,9 +706,9 @@ func TestValidateFilteredFilenameOps_Valid(t *testing.T) {
 func TestValidateFilteredFilenameOps_InvalidFilters(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "bad",
-			MustAny:       "must",
+			Field:      "title",
+			FilterType: "bad",
+			MustAny:    "must",
 		},
 	}
 	filenameOps := []models.FilenameOps{
@@ -753,9 +759,9 @@ func TestValidateFilteredFilenameOps_NoFilters(t *testing.T) {
 func TestValidateFilteredFilenameOps_NoFilenameOps(t *testing.T) {
 	filters := []models.Filters{
 		{
-			Field:         "title",
-			ContainsOmits: "contains",
-			MustAny:       "must",
+			Field:      "title",
+			FilterType: "contains",
+			MustAny:    "must",
 		},
 	}
 

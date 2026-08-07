@@ -22,7 +22,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 	for _, filter := range filters {
 		if v.ChannelURL != "" && filter.ChannelURL != "" && !strings.Contains(v.ChannelURL, filter.ChannelURL) {
-			logger.Pl.D(2, "Skipping filter %s:%s:%s:%s for video %q because filter channel URL %q does not match...", filter.Field, filter.ContainsOmits, filter.Value, filter.MustAny, v.URL, filter.ChannelURL)
+			logger.Pl.D(2, "Skipping filter %s:%s:%s:%s for video %q because filter channel URL %q does not match...", filter.Field, filter.FilterType, filter.Value, filter.MustAny, v.URL, filter.ChannelURL)
 			continue
 		}
 		switch filter.MustAny {
@@ -163,26 +163,28 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 
 // checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
 func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL string, exists bool) (passed, failHard bool) {
-	switch filter.ContainsOmits {
+	switch filter.FilterType {
 	case consts.FilterContains:
 		if !exists {
-			logger.Pl.I("%s mismatch: Video %q does not contain desired field %q", filterType, videoURL, filter.Field)
+			logger.Pl.I("%s mismatch: Video %q does not contain desired field %q.", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return true, false
 	case consts.FilterOmits:
 		if exists && filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q contains unwanted field %q", filterType, videoURL, filter.Field)
+			logger.Pl.I("%s mismatch: Video %q contains unwanted field %q.", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return !exists, false
+	case consts.FilterMoreThan, consts.FilterLessThan, consts.FilterEquals, consts.FilterNotEquals:
+		logger.Pl.I("%s mismatch: Video %q has no value for field %q to compare against, skipping check.", filterType, videoURL, filter.Field)
 	}
 	return false, false
 }
 
 // checkFilterWithValue checks a filter's value against its matching metadata field.
 func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, filterVal string) (passed, failHard bool) {
-	switch filter.ContainsOmits {
+	switch filter.FilterType {
 	case consts.FilterContains:
 		if strings.Contains(strVal, filterVal) {
 			return true, false
@@ -199,6 +201,57 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			logger.Pl.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
+		// More than
+	case consts.FilterMoreThan:
+		videoNum, err1 := strconv.ParseFloat(strVal, 64)
+		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
+		if err1 != nil || err2 != nil {
+			logger.Pl.E("%s filter error: Video %q has non-numeric value for field %q (video: %q, filter: %q), skipping check", filterType, videoURL, filter.Field, strVal, filter.Value)
+			break
+		}
+		if videoNum > filterNum {
+			return true, false
+		}
+		if filter.MustAny == sharedconsts.OpMust {
+			logger.Pl.I("%s mismatch: Video %q has value %g for field %q which is not more than %g", filterType, videoURL, videoNum, filter.Field, filterNum)
+			return false, true
+		}
+		// Less than
+	case consts.FilterLessThan:
+		videoNum, err1 := strconv.ParseFloat(strVal, 64)
+		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
+		if err1 != nil || err2 != nil {
+			logger.Pl.E("%s filter error: Video %q has non-numeric value for field %q (video: %q, filter: %q), skipping check", filterType, videoURL, filter.Field, strVal, filter.Value)
+			break
+		}
+		if videoNum < filterNum {
+			return true, false
+		}
+		if filter.MustAny == sharedconsts.OpMust {
+			logger.Pl.I("%s mismatch: Video %q has value %g for field %q which is not less than %g", filterType, videoURL, videoNum, filter.Field, filterNum)
+			return false, true
+		}
+		// Equals
+	case consts.FilterEquals:
+		if strVal == filterVal {
+			return true, false
+		}
+		if filter.MustAny == sharedconsts.OpMust {
+			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which does not equal %q", filterType, videoURL, strVal, filter.Field, filterVal)
+			return false, true
+		}
+		// Not equals
+	case consts.FilterNotEquals:
+		if strVal != filterVal {
+			return true, false
+		}
+		if filter.MustAny == sharedconsts.OpMust {
+			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which equals %q", filterType, videoURL, strVal, filter.Field, filterVal)
+			return false, true
+		}
+	default:
+		logger.Pl.E("%s mismatch: Video %q has unknown filter type %q for field %q", filterType, videoURL, filter.FilterType, filter.Field)
+		return false, true
 	}
 	return false, false
 }
