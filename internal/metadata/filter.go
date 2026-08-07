@@ -36,6 +36,23 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 		strVal := strings.ToLower(fmt.Sprint(val))
 		filterVal := strings.ToLower(filter.Value)
 
+		// Numerical filters with an absent or empty field are skipped rather than failed,
+		// since there is nothing meaningful to compare against.
+		if isNumericalFilter(filter.FilterType) && (!exists || strVal == "" || strVal == "<nil>") {
+			if !exists {
+				logger.Pl.D(1, "%s skip: Video %q does not have field %q in its metadata, skipping numerical filter", filterType, v.URL, filter.Field)
+			} else {
+				logger.Pl.D(1, "%s skip: Video %q has an empty value for field %q, skipping numerical filter", filterType, v.URL, filter.Field)
+			}
+			switch filter.MustAny {
+			case sharedconsts.OpMust:
+				mustTotal--
+			case sharedconsts.OpAny:
+				anyTotal--
+			}
+			continue
+		}
+
 		var passed, failHard bool
 		switch filter.Value {
 		case "":
@@ -159,6 +176,11 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		}
 	}
 	return result
+}
+
+// isNumericalFilter reports whether the filter type requires numeric comparison.
+func isNumericalFilter(filterType string) bool {
+	return filterType == consts.FilterMoreThan || filterType == consts.FilterLessThan
 }
 
 // checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
