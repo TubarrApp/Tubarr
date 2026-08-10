@@ -236,7 +236,7 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     requests \
     certifi \
     urllib3 \
-    curl-cffi
+    "curl-cffi==0.15.0"
 
 ######## Install Deno globally ########
 RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
