@@ -74,12 +74,14 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 }
 
 // processUpdates processes download status updates.
+//
+//nolint:contextcheck
 func (t *DownloadTracker) processUpdates(ctx context.Context) {
 	for {
 		select {
 		case <-t.done:
-			// Use a fresh context for the drain — the original ctx may already be
-			// canceled by the time Stop() is called.
+			// Fresh context for download status drain. Original ctx may already be
+			// canceled when Stop() is called.
 			drainCtx := context.Background()
 			state.StatusUpdateCache.Range(func(_, v any) bool {
 				update, ok := v.(models.StatusUpdate)

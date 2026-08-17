@@ -260,6 +260,9 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 			}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed while retrieving videos: %w", err)
+	}
 
 	// Remove videos from database.
 	deletePlaceholders := make([]string, len(urls))
@@ -971,6 +974,9 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		}
 		channels = append(channels, &c)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, true, fmt.Errorf("failed while retrieving videos: %w", err)
+	}
 
 	// Iterate all channels.
 	for _, c := range channels {
@@ -1291,6 +1297,9 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		}
 
 		videos = append(videos, &v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, true, fmt.Errorf("failed while retrieving videos: %w", err)
 	}
 
 	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(videos), c.Name)
