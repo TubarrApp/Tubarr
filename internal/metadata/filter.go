@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -64,7 +63,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 		var passed, failHard bool
 		switch {
 		case filter.Value == "" &&
-			(filter.FilterType != consts.FilterEquals && filter.FilterType != consts.FilterNotEquals):
+			(filter.FilterType != sharedconsts.OpEquals && filter.FilterType != sharedconsts.OpNotEquals):
 			passed, failHard = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
 		default:
 			passed, failHard = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
@@ -101,6 +100,10 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMetaOps []models.FilteredMetaOps, channelName string) []models.FilteredMetaOps {
 	if len(filteredMetaOps) == 0 {
 		return nil
+	}
+
+	if cu.IsManual {
+		logger.Pl.I("Skipping filter check for channel %q: Video %q is a manual download.", channelName, v.URL)
 	}
 
 	result := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
@@ -149,6 +152,10 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		return nil
 	}
 
+	if cu.IsManual {
+		logger.Pl.I("Skipping filter check for channel %q: Video %q is a manual download.", channelName, v.URL)
+	}
+
 	result := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
 	dedupFilenameOpsMap := make(map[string]bool)
 
@@ -190,26 +197,26 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 
 // isNumericalFilter reports whether the filter type requires numeric comparison.
 func isNumericalFilter(filterType string) bool {
-	return filterType == consts.FilterMoreThan || filterType == consts.FilterLessThan
+	return filterType == sharedconsts.OpMoreThan || filterType == sharedconsts.OpLessThan
 }
 
 // checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
 func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL string, exists bool) (passed, failHard bool) {
 	switch filter.FilterType {
-	case consts.FilterContains:
+	case sharedconsts.OpContains:
 		if !exists {
 			logger.Pl.I("%s mismatch: Video %q does not contain desired field %q.", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return true, false
-	case consts.FilterOmits:
+	case sharedconsts.OpOmits:
 		if exists && filter.MustAny == sharedconsts.OpMust {
 			logger.Pl.I("%s mismatch: Video %q contains unwanted field %q.", filterType, videoURL, filter.Field)
 			return false, true
 		}
 		return !exists, false
 		// Dead branch (should not be reached due to isNumericalFilter check in checkFilters).
-	case consts.FilterMoreThan, consts.FilterLessThan, consts.FilterEquals, consts.FilterNotEquals:
+	case sharedconsts.OpMoreThan, sharedconsts.OpLessThan, sharedconsts.OpEquals, sharedconsts.OpNotEquals:
 		logger.Pl.I("%s mismatch: Video %q has no value for field %q to compare against, skipping check.", filterType, videoURL, filter.Field)
 	}
 	return false, false
@@ -218,7 +225,7 @@ func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL strin
 // checkFilterWithValue checks a filter's value against its matching metadata field.
 func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, filterVal string) (passed, failHard bool) {
 	switch filter.FilterType {
-	case consts.FilterContains:
+	case sharedconsts.OpContains:
 		if strings.Contains(strVal, filterVal) {
 			return true, false
 		}
@@ -226,7 +233,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			logger.Pl.I("%s mismatch: Video %q does not contain desired %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
-	case consts.FilterOmits:
+	case sharedconsts.OpOmits:
 		if !strings.Contains(strVal, filterVal) {
 			return true, false
 		}
@@ -234,7 +241,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			logger.Pl.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
 			return false, true
 		}
-	case consts.FilterEquals:
+	case sharedconsts.OpEquals:
 		if strVal == filterVal {
 			return true, false
 		}
@@ -242,7 +249,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which does not equal %q", filterType, videoURL, strVal, filter.Field, filterVal)
 			return false, true
 		}
-	case consts.FilterNotEquals:
+	case sharedconsts.OpNotEquals:
 		if strVal != filterVal {
 			return true, false
 		}
@@ -251,7 +258,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			return false, true
 		}
 		// Numerical comparisons (morethan/lessthan) are handled below since they require parsing the values as floats.
-	case consts.FilterMoreThan:
+	case sharedconsts.OpMoreThan:
 		videoNum, err1 := strconv.ParseFloat(strVal, 64)
 		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
 		if err1 != nil || err2 != nil {
@@ -265,7 +272,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 			logger.Pl.I("%s mismatch: Video %q has value %g for field %q which is not more than %g", filterType, videoURL, videoNum, filter.Field, filterNum)
 			return false, true
 		}
-	case consts.FilterLessThan:
+	case sharedconsts.OpLessThan:
 		videoNum, err1 := strconv.ParseFloat(strVal, 64)
 		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
 		if err1 != nil || err2 != nil {

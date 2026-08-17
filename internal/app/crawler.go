@@ -116,8 +116,8 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 	return nil
 }
 
-// DownloadVideosToChannel downloads custom video URLs sent in to the channel.
-func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, videoURLs []string) (err error) {
+// ManualDownloadToChannel downloads custom video URLs sent in to the channel.
+func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, videoURLs []string) (err error) {
 	if c == nil || c.ChanSettings == nil {
 		return fmt.Errorf("invalid nil parameters (channel: %v, channel settings: %v)", c == nil, c.ChanSettings == nil)
 	}
@@ -130,12 +130,14 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 	// Load config file settings.
 	file.UpdateFromConfigFile(s.ChannelStore(), c)
 
-	// Grab existing releases.
+	// Spawn scraper.
 	scrape := scraper.New()
-	existingVideoURLsMap, _, err := scrape.GetExistingReleases(cs, c)
-	if err != nil {
-		return err
-	}
+
+	// Grab existing releases.
+	// existingVideoURLsMap, _, err := scrape.GetExistingReleases(cs, c)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// Populate AccessDetails for all ChannelURLs upfront.
 	for _, cu := range c.URLModels {
@@ -191,10 +193,10 @@ func DownloadVideosToChannel(ctx context.Context, s contracts.Store, cs contract
 			continue
 		}
 
-		// Check if already downloaded.
-		if _, exists := existingVideoURLsMap[actualVideoURL]; exists {
-			return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-videos' first if you wish to re-download it", actualVideoURL)
-		}
+		// // Check if already downloaded.
+		// if _, exists := existingVideoURLsMap[actualVideoURL]; exists {
+		// 	return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-videos' first if you wish to re-download it", actualVideoURL)
+		// }
 
 		// Store the model for later use.
 		channelURLModels[targetChannelURLModel.ID] = targetChannelURLModel
@@ -315,6 +317,9 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	scrape := scraper.New()
 	videos, err := scrape.GetNewReleases(ctx, cs, c, false)
 	if err != nil {
+		if updateErr := cs.UpdateLastScan(c.ID); updateErr != nil {
+			logger.Pl.E("Failed to update channel %q last scan time after failure to crawl channel: %v", c.Name, updateErr)
+		}
 		return false, err
 	}
 

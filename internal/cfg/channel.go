@@ -47,7 +47,7 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 	channelCmd.AddCommand(addChannelCmd(ctx, cs, s))
 	channelCmd.AddCommand(addBatchChannelsCmd(ctx, cs, s))
 	channelCmd.AddCommand(unblockChannelCmd(cs))
-	channelCmd.AddCommand(downloadVideoURLs(ctx, cs, s))
+	channelCmd.AddCommand(manualDownloadVideoURLs(ctx, cs, s))
 	channelCmd.AddCommand(crawlChannelCmd(ctx, cs, s))
 	channelCmd.AddCommand(ignoreCrawl(ctx, cs, s))
 	channelCmd.AddCommand(addVideoURLToIgnore(cs))
@@ -187,8 +187,8 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 	return deleteURLsCmd
 }
 
-// downloadVideoURLs downloads a list of URLs inputted by the user.
-func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+// manualDownloadVideoURLs downloads a list of URLs inputted by the user.
+func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
 		// Channel identifiers.
 		channelID   int
@@ -276,7 +276,7 @@ func downloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contrac
 			defer state.UnlockCrawlState(c.Name)
 
 			// Download URLs.
-			if err := app.DownloadVideosToChannel(ctx, s, cs, c, videoURLs); err != nil {
+			if err := app.ManualDownloadToChannel(ctx, s, cs, c, videoURLs); err != nil {
 				return err
 			}
 

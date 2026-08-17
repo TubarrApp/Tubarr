@@ -8,16 +8,6 @@ const (
 	IDTag   = "id_"
 )
 
-// Op types
-const (
-	FilterContains  = "contains"
-	FilterOmits     = "omits"
-	FilterMoreThan  = "morethan"
-	FilterLessThan  = "lessthan"
-	FilterEquals    = "equals"
-	FilterNotEquals = "notequals"
-)
-
 // BotTimeoutMap holds the cooldown times in minutes for popular domains (used if a domain blocks Tubarr).
 var BotTimeoutMap = map[string]float64{
 

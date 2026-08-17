@@ -1202,7 +1202,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	go func(ctx context.Context) {
 		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.URLs), c.Name, id)
 
-		if err := app.DownloadVideosToChannel(ctx, ss.s, ss.cs, c, requestBody.URLs); err != nil {
+		if err := app.ManualDownloadToChannel(ctx, ss.s, ss.cs, c, requestBody.URLs); err != nil {
 			logger.Pl.E("Encountered errors downloading URLs for channel %q: %v", c.Name, err)
 		} else {
 			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)
