@@ -102,10 +102,6 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		return nil
 	}
 
-	if cu.IsManual {
-		logger.Pl.I("Skipping filter check for channel %q: Video %q is a manual download.", channelName, v.URL)
-	}
-
 	result := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
 	dedupMetaOpsMap := make(map[string]bool)
 
@@ -150,10 +146,6 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filteredFilenameOps []models.FilteredFilenameOps, channelName string) []models.FilteredFilenameOps {
 	if len(filteredFilenameOps) == 0 {
 		return nil
-	}
-
-	if cu.IsManual {
-		logger.Pl.I("Skipping filter check for channel %q: Video %q is a manual download.", channelName, v.URL)
 	}
 
 	result := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))

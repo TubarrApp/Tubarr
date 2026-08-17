@@ -234,6 +234,9 @@ func videoJob(
 		return nil
 	}
 
+	// Check move operations.
+	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, dirParser)
+
 	// Process video download phase.
 	botBlockChannel, err = processVideo(procCtx, v, cu, c, dlTracker)
 	if err != nil {

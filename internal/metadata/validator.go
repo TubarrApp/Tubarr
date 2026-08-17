@@ -27,16 +27,17 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Apply filters.
-	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
-	if err != nil {
-		logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
+	if !cu.IsManual {
+		passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
+		if err != nil {
+			logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
+		}
+		if !jsonValid || !passedFilters {
+			return false, useFilteredMetaOps, useFilteredFilenameOps, nil
+		}
+	} else {
+		logger.Pl.I("Skipped filter checks for channel %q: Video %q is a manual download.", c.Name, v.URL)
 	}
-	if !jsonValid || !passedFilters {
-		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
-	}
-
-	// Check move operations.
-	v.MoveOpOutputDir = handleMoveOps(v, cu, dirParser)
 
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
@@ -279,8 +280,8 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 	return relevantFilteredFilenameOps
 }
 
-// handleMoveOps checks if Metarr should use an output directory based on existent metadata.
-func handleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
+// HandleMoveOps checks if Metarr should use an output directory based on existent metadata.
+func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
 	// Work with a copy of database move ops.
 	allMoveOps := make([]models.MetaFilterMoveOps, len(cu.ChanURLSettings.MetaFilterMoveOps))
 	copy(allMoveOps, cu.ChanURLSettings.MetaFilterMoveOps)
