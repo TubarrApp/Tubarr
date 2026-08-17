@@ -36,7 +36,7 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 		}
 	} else {
-		logger.Pl.I("Skipped filter checks for channel %q: Video %q is a manual download.", c.Name, v.URL)
+		logger.Pl.I("Skipped filter checks for %q in channel %q: Video is a manual download.", v.URL, c.Name)
 	}
 
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
