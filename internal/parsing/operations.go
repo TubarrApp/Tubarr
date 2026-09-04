@@ -219,8 +219,7 @@ func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error)
 		split := validation.EscapedSplit(op, ':')
 
 		if len(split) < minParts || len(split) > maxParts {
-			logger.Pl.E(formatErrorMsg)
-			return nil, errors.New("filter format error")
+			return nil, fmt.Errorf("%s", formatErrorMsg)
 		}
 
 		// Normalize values. Declared per entry so no part carries over from the last filter.
@@ -233,8 +232,7 @@ func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error)
 		if requireMustAny {
 			mustAny = strings.ToLower(strings.TrimSpace(split[len(split)-1]))
 			if mustAny != sharedconsts.OpMust && mustAny != sharedconsts.OpAny {
-				logger.Pl.E(formatErrorMsg)
-				return nil, errors.New("filter format error")
+				return nil, fmt.Errorf("%s:\nInvalid must/any value %q", formatErrorMsg, mustAny)
 			}
 		}
 
@@ -248,7 +246,7 @@ func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error)
 		if len(split) == minParts &&
 			filterType != sharedconsts.OpContains && filterType != sharedconsts.OpOmits {
 			logger.Pl.E(formatErrorMsg)
-			return nil, errors.New("filter format error")
+			return nil, fmt.Errorf("%s", formatErrorMsg)
 		}
 
 		// Append filter.
