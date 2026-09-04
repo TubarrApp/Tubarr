@@ -124,17 +124,24 @@ func ValidateFilterOps(filters []models.Filters) error {
 	// Validate filter parts.
 	for i, filter := range filters {
 		// Validate contains/omits.
-		if filter.FilterType != sharedconsts.OpContains && filter.FilterType != sharedconsts.OpOmits && filter.FilterType != sharedconsts.OpMoreThan && filter.FilterType != sharedconsts.OpLessThan && filter.FilterType != sharedconsts.OpEquals && filter.FilterType != sharedconsts.OpNotEquals {
+		if (filter.FilterType != sharedconsts.OpContains) &&
+			(filter.FilterType != sharedconsts.OpOmits) &&
+			(filter.FilterType != sharedconsts.OpMoreThan) &&
+			(filter.FilterType != sharedconsts.OpLessThan) &&
+			(filter.FilterType != sharedconsts.OpEquals) &&
+			(filter.FilterType != sharedconsts.OpNotEquals) {
 			return fmt.Errorf("filter at position %d has invalid type %q (must be 'contains', 'omits', 'equals', 'notequals', 'morethan', or 'lessthan')", i, filter.FilterType)
 		}
 		// Validate numerical values for morethan/lessthan.
-		if filter.FilterType == sharedconsts.OpMoreThan || filter.FilterType == sharedconsts.OpLessThan {
+		if (filter.FilterType == sharedconsts.OpMoreThan) ||
+			(filter.FilterType == sharedconsts.OpLessThan) {
 			if _, err := strconv.ParseFloat(filter.Value, 64); err != nil {
 				return fmt.Errorf("filter at position %d has invalid value %q for type %q (must be a number)", i, filter.Value, filter.FilterType)
 			}
 		}
 		// Validate must/any.
-		if filter.MustAny != sharedconsts.OpMust && filter.MustAny != sharedconsts.OpAny {
+		if (filter.MustAny != sharedconsts.OpMust) &&
+			(filter.MustAny != sharedconsts.OpAny) {
 			return fmt.Errorf("filter at position %d has invalid condition %q (must be 'must' or 'any')", i, filter.MustAny)
 		}
 

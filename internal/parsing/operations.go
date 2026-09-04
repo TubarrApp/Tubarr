@@ -182,18 +182,35 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 // ParseFilterOps parses filter operation strings into models.
 //
 // Format: "title:omits:frogs:must" or "title:contains:cat:any"
-func ParseFilterOps(ops []string) ([]models.Filters, error) {
+//
+// When requireMustAny is false, must is added automatically to each filter.
+func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
 	// Deduplicate.
 	ops = validation.DeduplicateSliceEntries(ops)
 
-	const formatErrorMsg = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\n" +
-		"'title:omits:frogs:must' ignores all videos with frogs in the metatitle.\n" +
-		"'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n" +
-		"'date:omits:must' omits videos only when the metafile contains a date field." +
-		"'duration:morethan:3600:must' only includes videos with a duration field more than 3600 (one hour in seconds).\n"
+	var formatErrorMsg string
+	// The shortest form omits the 'value', the longest includes it. A must/any condition adds
+	// one part to each (:must or :any). The min and max number of parts should be set accordingly.
+	minParts, maxParts := 2, 3
+	if requireMustAny {
+		minParts, maxParts = 3, 4
+
+		formatErrorMsg = "please enter filters in the format 'field:filter_type:value:must_or_any'.\n\n" +
+			"'title:omits:frogs:must' ignores all videos with frogs in the metatitle.\n" +
+			"'title:contains:cat:any','title:contains:dog:any' only includes videos with EITHER cat and dog in the title (use 'must' to require both).\n" +
+			"'date:omits:must' omits videos only when the metafile contains a date field." +
+			"'duration:morethan:3600:must' only includes videos with a duration field more than 3600 (one hour in seconds).\n"
+	} else {
+		formatErrorMsg = "please enter filters in the format 'field:filter_type:value'.\n" +
+			"('must'/'any' is not used here, as each entry holds a single filter).\n\n" +
+			"'title:contains:cat' applies the operations to videos with cat in the metatitle.\n" +
+			"'title:omits:frogs' skips the operations for videos with frogs in the metatitle.\n" +
+			"'date:omits' applies the operations only when the metafile has no date field.\n" +
+			"'duration:morethan:3600' applies the operations to videos with a duration field more than 3600 (one hour in seconds).\n"
+	}
 
 	var filters = make([]models.Filters, 0, len(ops))
 	for _, op := range ops {
@@ -201,27 +218,37 @@ func ParseFilterOps(ops []string) ([]models.Filters, error) {
 		chanURL, op := validation.CheckForOpURL(op)
 		split := validation.EscapedSplit(op, ':')
 
-		if len(split) < 3 || len(split) > 4 {
+		if len(split) < minParts || len(split) > maxParts {
 			logger.Pl.E(formatErrorMsg)
 			return nil, errors.New("filter format error")
 		}
 
-		// Normalize values.
+		// Normalize values. Declared per entry so no part carries over from the last filter.
 		field := strings.ToLower(strings.TrimSpace(split[0]))
 		filterType := strings.ToLower(strings.TrimSpace(split[1]))
-		mustAny := strings.ToLower(strings.TrimSpace(split[len(split)-1]))
+		mustAny := sharedconsts.OpMust
 		var value string
-		if len(split) == 4 {
-			value = strings.ToLower(split[2])
-		}
 
-		// 3 length split means no value, e.g. "date:omits:must" (only omits if date field exists)
-		if len(split) == 3 {
-			if (filterType != sharedconsts.OpContains && filterType != sharedconsts.OpOmits) ||
-				(mustAny != sharedconsts.OpMust && mustAny != sharedconsts.OpAny) {
+		// If must/any is required, it is always the last part and must be either "must" or "any".
+		if requireMustAny {
+			mustAny = strings.ToLower(strings.TrimSpace(split[len(split)-1]))
+			if mustAny != sharedconsts.OpMust && mustAny != sharedconsts.OpAny {
 				logger.Pl.E(formatErrorMsg)
 				return nil, errors.New("filter format error")
 			}
+		}
+
+		// A value is only present in the longest form, and is always the third part.
+		if len(split) == maxParts {
+			value = strings.ToLower(split[2])
+		}
+
+		// The shortest form has no value, e.g. "date:omits:must" or "date:omits" (only acts
+		// when the date field exists), which only contains/omits can make use of.
+		if len(split) == minParts &&
+			filterType != sharedconsts.OpContains && filterType != sharedconsts.OpOmits {
+			logger.Pl.E(formatErrorMsg)
+			return nil, errors.New("filter format error")
 		}
 
 		// Append filter.
@@ -346,7 +373,7 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 
 // ParseFilteredMetaOps parses filter-based meta operation strings into models.
 //
-// Format: "title:contains:cat:any|director:set:Mr. Cat"
+// Format: "title:contains:cat|director:set:Mr. Cat"
 func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, error) {
 	if len(filteredMetaOps) == 0 {
 		return nil, nil
@@ -369,7 +396,7 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 		metaRules := split[1:]
 
 		// Parse both filter and meta operations.
-		filterOps, err := ParseFilterOps(filterRule)
+		filterOps, err := ParseFilterOps(filterRule, false)
 		if err != nil {
 			return nil, err
 		}
@@ -393,7 +420,7 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 
 // ParseFilteredFilenameOps parses filter-based filename operation strings into models.
 //
-// Format: "title:contains:cat:any|prefix:[CATS] "
+// Format: "title:contains:cat|prefix:[CATS] "
 func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFilenameOps, error) {
 	if len(filteredFilenameOps) == 0 {
 		return nil, nil
@@ -416,7 +443,7 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 		filenameRules := split[1:]
 
 		// Parse both filter and filename operations.
-		filterOps, err := ParseFilterOps(filterRule)
+		filterOps, err := ParseFilterOps(filterRule, false)
 		if err != nil {
 			return nil, err
 		}

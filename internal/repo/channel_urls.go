@@ -220,6 +220,9 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 
 		urlModels = append(urlModels, cu)
 	}
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("error occurred getting channel URL models: %w", rows.Err())
+	}
 
 	// Apply fallback logic for nil settings.
 	if len(urlModels) > 0 {

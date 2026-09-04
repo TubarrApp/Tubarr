@@ -132,7 +132,7 @@ func settingsJSONMap(settings *models.Settings) map[string]any {
 		settingsMap[jsonkeys.SettingsFilterFile] = settings.FilterFile
 	}
 	if len(settings.Filters) > 0 {
-		settingsMap[jsonkeys.SettingsFilters] = strings.Join(models.FiltersArrayToSlice(settings.Filters), "\n")
+		settingsMap[jsonkeys.SettingsFilters] = strings.Join(models.FiltersArrayToSlice(settings.Filters, true), "\n")
 	}
 	if settings.YtdlpOutputExt != "" {
 		settingsMap[jsonkeys.SettingsYtdlpOutputExt] = settings.YtdlpOutputExt
@@ -276,7 +276,7 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	// Parse model fields from strings (newline-separated, not space-separated).
 	if filtersStr, ok := data[jsonkeys.SettingsFilters].(string); ok && filtersStr != "" {
 		lines := splitNonEmptyLines(filtersStr)
-		filters, err := parsing.ParseFilterOps(lines)
+		filters, err := parsing.ParseFilterOps(lines, true)
 		if err != nil {
 			return nil, err
 		}
@@ -554,7 +554,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	paused := (pausedStr == "true")
 
 	// Model conversions (newline-separated, not space-separated)
-	filters, err := parsing.ParseFilterOps(splitNonEmptyLines(filtersStr))
+	filters, err := parsing.ParseFilterOps(splitNonEmptyLines(filtersStr), true)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid download filters %q: %v", filtersStr, err), http.StatusBadRequest)
 		return nil

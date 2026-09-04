@@ -9,27 +9,33 @@ import (
 // ------ Filters -----------------------------------------------------------------
 
 // FiltersArrayToSlice converts filter models back into slice form.
-func FiltersArrayToSlice(fModels []Filters) []string {
+func FiltersArrayToSlice(fModels []Filters, withMustAny bool) []string {
 	if len(fModels) == 0 {
 		return []string{}
 	}
 	filters := make([]string, 0, len(fModels))
 
 	for _, f := range fModels {
-		filters = append(filters, FiltersToString(f))
+		filters = append(filters, FiltersToString(f, withMustAny))
 	}
 	return filters
 }
 
 // FiltersToString converts a filter model back into string form.
-func FiltersToString(f Filters) string {
+//
+// withMustAny must match what the filter's context accepts when parsed back in, i.e. false
+// for filtered meta/filename ops, which carry no condition.
+func FiltersToString(f Filters, withMustAny bool) string {
 	var op string
 	// Add channel URL if present
 	if f.ChannelURL != "" {
 		op = f.ChannelURL + "|"
 	}
 	// Reconstruct operation
-	op += f.Field + ":" + f.FilterType + ":" + f.Value + ":" + f.MustAny
+	op += f.Field + ":" + f.FilterType + ":" + f.Value
+	if withMustAny {
+		op += ":" + f.MustAny
+	}
 	return op
 }
 
@@ -139,7 +145,7 @@ func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
 func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	slice := make([]string, 0, len(f.Filters))
 
-	filterStrings := FiltersArrayToSlice(f.Filters)
+	filterStrings := FiltersArrayToSlice(f.Filters, false)
 	metaOpStrings := MetaOpsArrayToSlice(f.MetaOps)
 
 	if len(filterStrings) != len(metaOpStrings) {
@@ -159,7 +165,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	slice := make([]string, 0, len(f.Filters))
 
-	filterStrings := FiltersArrayToSlice(f.Filters)
+	filterStrings := FiltersArrayToSlice(f.Filters, false)
 	filenameOpStrings := FilenameOpsArrayToSlice(f.FilenameOps)
 
 	if len(filterStrings) != len(filenameOpStrings) {

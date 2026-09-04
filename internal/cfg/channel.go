@@ -1961,7 +1961,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 
 	// Filter ops ('field:contains:frogs:must').
 	if f.Changed(keys.FilterOpsInput) {
-		dlFilters, err := parsing.ParseFilterOps(c.filters)
+		dlFilters, err := parsing.ParseFilterOps(c.filters, true)
 		if err != nil {
 			return nil, err
 		}

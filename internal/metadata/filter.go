@@ -115,18 +115,20 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		// Check if filters match.
 		filtersMatched := checkFilters(v, "Filtered meta ops", fmo.Filters)
 
-		// Deduplicate meta ops using buildKey.
-		dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
-		for _, mo := range fmo.MetaOps {
-			key := models.MetaOpToString(mo, true)
-			if !dedupMetaOpsMap[key] {
-				dedupMetaOpsMap[key] = true
-				dedupMetaOps = append(dedupMetaOps, mo)
+		// Only deduplicate entries whose filters matched.
+		if filtersMatched {
+			dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
+			for _, mo := range fmo.MetaOps {
+				key := models.MetaOpToString(mo, true)
+				if !dedupMetaOpsMap[key] {
+					dedupMetaOpsMap[key] = true
+					dedupMetaOps = append(dedupMetaOps, mo)
+				}
 			}
+			fmo.MetaOps = dedupMetaOps
 		}
 
 		// Add to result, mark failures.
-		fmo.MetaOps = dedupMetaOps
 		fmo.FiltersMatched = filtersMatched
 		result = append(result, fmo)
 	}
@@ -160,18 +162,20 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		// Check if filters match.
 		filtersMatched := checkFilters(v, "Filtered filename ops", ffo.Filters)
 
-		// Deduplicate filename ops using buildKey.
-		dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
-		for _, fo := range ffo.FilenameOps {
-			key := models.FilenameOpToString(fo, true)
-			if !dedupFilenameOpsMap[key] {
-				dedupFilenameOpsMap[key] = true
-				dedupFilenameOps = append(dedupFilenameOps, fo)
+		// Only deduplicate entries whose filters matched.
+		if filtersMatched {
+			dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
+			for _, fo := range ffo.FilenameOps {
+				key := models.FilenameOpToString(fo, true)
+				if !dedupFilenameOpsMap[key] {
+					dedupFilenameOpsMap[key] = true
+					dedupFilenameOps = append(dedupFilenameOps, fo)
+				}
 			}
+			ffo.FilenameOps = dedupFilenameOps
 		}
 
 		// Add to result, mark failures.
-		ffo.FilenameOps = dedupFilenameOps
 		ffo.FiltersMatched = filtersMatched
 		result = append(result, ffo)
 	}
@@ -383,7 +387,7 @@ func loadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) [
 	}
 
 	// Parse filters from strings
-	parsedFilters, err := parsing.ParseFilterOps(filters)
+	parsedFilters, err := parsing.ParseFilterOps(filters, true)
 	if err != nil {
 		logger.Pl.E("Error parsing filters from file %v: %v", filterFile, err)
 		return nil

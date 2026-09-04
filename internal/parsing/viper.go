@@ -56,7 +56,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 
 	var dlFilterModels []models.Filters
 	if input.DLFilters != nil {
-		m, err := ParseFilterOps(*input.DLFilters)
+		m, err := ParseFilterOps(*input.DLFilters, true)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -766,7 +766,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Parse filter ops if provided.
 	if input.DLFilters != nil {
-		m, err := ParseFilterOps(*input.DLFilters)
+		m, err := ParseFilterOps(*input.DLFilters, true)
 		if err != nil {
 			return nil, fmt.Errorf("invalid filter ops for per-URL settings: %w", err)
 		}
