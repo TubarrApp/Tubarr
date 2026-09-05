@@ -1,5 +1,7 @@
 package models
 
+import "github.com/TubarrApp/gocommon/sharedmodels"
+
 // Settings are the primary settings for a channel, affecting videos belonging to it.
 type Settings struct {
 	// Configurations.
@@ -83,27 +85,13 @@ type ChannelAccessDetails struct {
 }
 
 // FilteredMetaOps allows meta operation entry based on filter matching.
-type FilteredMetaOps struct {
-	Filters        []Filters
-	MetaOps        []MetaOps
-	FiltersMatched bool
-}
+type FilteredMetaOps = sharedmodels.FilteredMetaOps
 
 // FilteredFilenameOps allows file operation entry based on filter matching.
-type FilteredFilenameOps struct {
-	Filters        []Filters
-	FilenameOps    []FilenameOps
-	FiltersMatched bool
-}
+type FilteredFilenameOps = sharedmodels.FilteredFilenameOps
 
 // Filters are used to filter in or out videos (download, or operations) by metafields.
-type Filters struct {
-	ChannelURL string `json:"filter_url_specific"`
-	Field      string `json:"filter_field"`
-	FilterType string `json:"filter_type"`
-	Value      string `json:"filter_value"`
-	MustAny    string `json:"filter_must_any"`
-}
+type Filters = sharedmodels.Filters
 
 // MetaFilterMoveOps are used to set an output directory in Metarr based on matching metadata fields.
 type MetaFilterMoveOps struct {
@@ -114,25 +102,12 @@ type MetaFilterMoveOps struct {
 }
 
 // FilenameOps are applied to fields by Metarr.
-type FilenameOps struct {
-	ChannelURL   string `json:"filename_op_channel_url"`
-	OpType       string `json:"filename_op_type"`
-	OpFindString string `json:"filename_op_find_string"`
-	OpValue      string `json:"filename_op_value"`
-	OpLoc        string `json:"filename_op_loc"`
-	DateFormat   string `json:"filename_op_date_format"`
-}
+//
+// Aliased to gocommon so Metarr and Tubarr share one grammar and one model.
+type FilenameOps = sharedmodels.FilenameOps
 
 // MetaOps are applied to fields by Metarr.
-type MetaOps struct {
-	ChannelURL   string `json:"meta_op_channel_url"`
-	Field        string `json:"meta_op_field"`
-	OpFindString string `json:"meta_op_find_string"`
-	OpType       string `json:"meta_op_type"`
-	OpValue      string `json:"meta_op_value"`
-	OpLoc        string `json:"meta_op_loc"`
-	DateFormat   string `json:"meta_op_date_format"`
-}
+type MetaOps = sharedmodels.MetaOps
 
 // ChildSettingsMatchParent checks if the child Settings are empty/mismatch the parent on each entry.
 func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {

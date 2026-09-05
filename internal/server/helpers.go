@@ -12,6 +12,8 @@ import (
 
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
+
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // fillChannelFromConfigFile parses a Channel and its access details from a config file input.
@@ -79,10 +81,10 @@ func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
 		metarrMap[jsonkeys.MetarrFilteredMetaOpsFile] = mArgs.FilteredMetaOpsFile
 	}
 	if len(mArgs.MetaOps) > 0 {
-		metarrMap[jsonkeys.MetarrMetaOps] = strings.Join(models.MetaOpsArrayToSlice(mArgs.MetaOps), "\n")
+		metarrMap[jsonkeys.MetarrMetaOps] = strings.Join(sharedparsing.FormatMetaOps(mArgs.MetaOps, "", true), "\n")
 	}
 	if len(mArgs.FilenameOps) > 0 {
-		metarrMap[jsonkeys.MetarrFilenameOps] = strings.Join(models.FilenameOpsArrayToSlice(mArgs.FilenameOps), "\n")
+		metarrMap[jsonkeys.MetarrFilenameOps] = strings.Join(sharedparsing.FormatFilenameOps(mArgs.FilenameOps, "", true), "\n")
 	}
 	if len(mArgs.FilteredMetaOps) > 0 {
 		filteredMetaStrings := make([]string, 0)

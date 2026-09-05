@@ -8,114 +8,20 @@ import (
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedenums"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // ValidateFilenameOps validates filename transformation operation models.
 func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
-	if len(filenameOps) == 0 {
-		logger.Pl.D(4, "No filename operations to validate")
-		return nil
-	}
 	logger.Pl.D(5, "Validating %d filename operations...", len(filenameOps))
-
-	var validFilenameActions = map[string]struct{}{
-		sharedconsts.OpAppend:        {},
-		sharedconsts.OpPrefix:        {},
-		sharedconsts.OpReplacePrefix: {},
-		sharedconsts.OpReplaceSuffix: {},
-		sharedconsts.OpReplace:       {},
-		sharedconsts.OpDateTag:       {},
-		sharedconsts.OpDeleteDateTag: {},
-		sharedconsts.OpSet:           {},
-	}
-
-	// Validate each filename operation
-	for i, op := range filenameOps {
-		// Validate operation type is valid
-		if _, ok := validFilenameActions[op.OpType]; !ok {
-			return fmt.Errorf("invalid filename operation type %q at position %d (valid: append, prefix, replace-prefix, replace-suffix, replace, date-tag, delete-date-tag, set)", op.OpType, i)
-		}
-
-		// Validate date-tag operations
-		if op.OpType == sharedconsts.OpDateTag {
-			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix {
-				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
-			}
-			if !ValidateDateFormat(op.DateFormat) {
-				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
-			}
-		}
-
-		// Validate delete-date-tag operations
-		if op.OpType == sharedconsts.OpDeleteDateTag {
-			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix && op.OpLoc != sharedconsts.OpLocAll {
-				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
-			}
-			if !ValidateDateFormat(op.DateFormat) {
-				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
-			}
-		}
-	}
-
-	return nil
+	return sharedvalidation.ValidateFilenameOps(filenameOps)
 }
 
 // ValidateMetaOps validates meta transformation operation models.
 func ValidateMetaOps(metaOps []models.MetaOps) error {
-	if len(metaOps) == 0 {
-		logger.Pl.D(4, "No meta operations to validate")
-		return nil
-	}
 	logger.Pl.D(5, "Validating %d meta operations...", len(metaOps))
-
-	var validMetaActions = map[string]struct{}{
-		sharedconsts.OpAppend:        {},
-		sharedconsts.OpCopyTo:        {},
-		sharedconsts.OpPasteFrom:     {},
-		sharedconsts.OpPrefix:        {},
-		sharedconsts.OpReplacePrefix: {},
-		sharedconsts.OpReplaceSuffix: {},
-		sharedconsts.OpReplace:       {},
-		sharedconsts.OpSet:           {},
-		sharedconsts.OpDateTag:       {},
-		sharedconsts.OpDeleteDateTag: {},
-	}
-
-	// Validate each meta operation
-	for i, op := range metaOps {
-		// Validate operation type is valid
-		if _, ok := validMetaActions[op.OpType]; !ok {
-			return fmt.Errorf("invalid meta operation type %q at position %d (valid: append, copy-to, paste-from, prefix, replace-prefix, replace-suffix, replace, set, date-tag, delete-date-tag)", op.OpType, i)
-		}
-
-		// Validate date-tag operations
-		if op.OpType == sharedconsts.OpDateTag {
-			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix {
-				return fmt.Errorf("invalid date tag location %q at position %d, use prefix or suffix", op.OpLoc, i)
-			}
-			if !ValidateDateFormat(op.DateFormat) {
-				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
-			}
-		}
-
-		// Validate delete-date-tag operations
-		if op.OpType == sharedconsts.OpDeleteDateTag {
-			if op.OpLoc != sharedconsts.OpLocPrefix && op.OpLoc != sharedconsts.OpLocSuffix && op.OpLoc != sharedconsts.OpLocAll {
-				return fmt.Errorf("invalid date tag location %q at position %d, use prefix, suffix, or all", op.OpLoc, i)
-			}
-			if !ValidateDateFormat(op.DateFormat) {
-				return fmt.Errorf("invalid date tag format %q at position %d", op.DateFormat, i)
-			}
-		}
-
-		// Validate field is not empty for all operations
-		if op.Field == "" {
-			return fmt.Errorf("meta operation at position %d has empty field", i)
-		}
-	}
-
-	return nil
+	return sharedvalidation.ValidateMetaOps(metaOps)
 }
 
 // ValidateRenameFlag validates the rename style to apply.
@@ -135,16 +41,13 @@ func ValidateRenameFlag(flag string) error {
 	}
 }
 
-// ValidateDateFormat returns the date format enum type.
+// ValidateDateFormat reports whether dateFmt is a date format directive Metarr accepts.
 func ValidateDateFormat(dateFmt string) bool {
-	if len(dateFmt) > 2 {
-		switch dateFmt {
-		case "Ymd", "ymd", "Ydm", "ydm", "dmY", "dmy", "mdY", "mdy", "md", "dm":
-			return true
-		}
+	if _, err := sharedenums.ParseDateFormat(dateFmt); err != nil {
+		logger.Pl.E("%v", err)
+		return false
 	}
-	logger.Pl.E("Invalid date format entered as %q, please enter up to three characters (where 'Y' is yyyy and 'y' is yy)", dateFmt)
-	return false
+	return true
 }
 
 // ValidatePurgeMetafiles checks and sets the type of metafile purge to perform.

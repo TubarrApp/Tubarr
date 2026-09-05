@@ -116,41 +116,8 @@ func ValidateMaxFilesize(input string) (string, error) {
 
 // ValidateFilterOps validates filter operation models.
 func ValidateFilterOps(filters []models.Filters) error {
-	if len(filters) == 0 {
-		return nil
-	}
 	logger.Pl.D(5, "Validating %d filter operations...", len(filters))
-
-	// Validate filter parts.
-	for i, filter := range filters {
-		// Validate contains/omits.
-		if (filter.FilterType != sharedconsts.OpContains) &&
-			(filter.FilterType != sharedconsts.OpOmits) &&
-			(filter.FilterType != sharedconsts.OpMoreThan) &&
-			(filter.FilterType != sharedconsts.OpLessThan) &&
-			(filter.FilterType != sharedconsts.OpEquals) &&
-			(filter.FilterType != sharedconsts.OpNotEquals) {
-			return fmt.Errorf("filter at position %d has invalid type %q (must be 'contains', 'omits', 'equals', 'notequals', 'morethan', or 'lessthan')", i, filter.FilterType)
-		}
-		// Validate numerical values for morethan/lessthan.
-		if (filter.FilterType == sharedconsts.OpMoreThan) ||
-			(filter.FilterType == sharedconsts.OpLessThan) {
-			if _, err := strconv.ParseFloat(filter.Value, 64); err != nil {
-				return fmt.Errorf("filter at position %d has invalid value %q for type %q (must be a number)", i, filter.Value, filter.FilterType)
-			}
-		}
-		// Validate must/any.
-		if (filter.MustAny != sharedconsts.OpMust) &&
-			(filter.MustAny != sharedconsts.OpAny) {
-			return fmt.Errorf("filter at position %d has invalid condition %q (must be 'must' or 'any')", i, filter.MustAny)
-		}
-
-		// Validate field is not empty.
-		if filter.Field == "" {
-			return fmt.Errorf("filter at position %d has empty field", i)
-		}
-	}
-	return nil
+	return sharedvalidation.ValidateFilterOps(filters)
 }
 
 // ValidateMetaFilterMoveOps validates meta filter move operation models.
@@ -178,62 +145,14 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 
 // ValidateFilteredMetaOps validates filtered meta operation models.
 func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
-	if len(filteredMetaOps) == 0 {
-		return nil
-	}
 	logger.Pl.D(5, "Validating %d filtered meta operations...", len(filteredMetaOps))
-
-	// Validate filtered meta operations.
-	for i, fmo := range filteredMetaOps {
-		// Validate filters.
-		if err := ValidateFilterOps(fmo.Filters); err != nil {
-			return fmt.Errorf("filtered meta operation at position %d has invalid filters: %w", i, err)
-		}
-
-		// Validate meta operations.
-		if err := ValidateMetaOps(fmo.MetaOps); err != nil {
-			return fmt.Errorf("filtered meta operation at position %d has invalid meta operations: %w", i, err)
-		}
-
-		// Ensure both filters and meta ops are present.
-		if len(fmo.Filters) == 0 {
-			return fmt.Errorf("filtered meta operation at position %d has no filters", i)
-		}
-		if len(fmo.MetaOps) == 0 {
-			return fmt.Errorf("filtered meta operation at position %d has no meta operations", i)
-		}
-	}
-	return nil
+	return sharedvalidation.ValidateFilteredMetaOps(filteredMetaOps)
 }
 
 // ValidateFilteredFilenameOps validates filtered filename operation models.
 func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps) error {
-	if len(filteredFilenameOps) == 0 {
-		return nil
-	}
 	logger.Pl.D(5, "Validating %d filtered filename operations...", len(filteredFilenameOps))
-
-	// Validate filtered filename operations.
-	for i, ffo := range filteredFilenameOps {
-		// Validate filters.
-		if err := ValidateFilterOps(ffo.Filters); err != nil {
-			return fmt.Errorf("filtered filename operation at position %d has invalid filters: %w", i, err)
-		}
-
-		// Validate filename operations.
-		if err := ValidateFilenameOps(ffo.FilenameOps); err != nil {
-			return fmt.Errorf("filtered filename operation at position %d has invalid filename operations: %w", i, err)
-		}
-
-		// Ensure both filters and filename ops are present.
-		if len(ffo.Filters) == 0 {
-			return fmt.Errorf("filtered filename operation at position %d has no filters", i)
-		}
-		if len(ffo.FilenameOps) == 0 {
-			return fmt.Errorf("filtered filename operation at position %d has no filename operations", i)
-		}
-	}
-	return nil
+	return sharedvalidation.ValidateFilteredFilenameOps(filteredFilenameOps)
 }
 
 // ValidateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".

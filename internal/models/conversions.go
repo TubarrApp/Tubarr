@@ -3,7 +3,7 @@ package models
 import (
 	"tubarr/internal/domain/logger"
 
-	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // ------ Filters -----------------------------------------------------------------
@@ -26,91 +26,15 @@ func FiltersArrayToSlice(fModels []Filters, withMustAny bool) []string {
 // withMustAny must match what the filter's context accepts when parsed back in, i.e. false
 // for filtered meta/filename ops, which carry no condition.
 func FiltersToString(f Filters, withMustAny bool) string {
-	var op string
-	// Add channel URL if present
-	if f.ChannelURL != "" {
-		op = f.ChannelURL + "|"
-	}
-	// Reconstruct operation
-	op += f.Field + ":" + f.FilterType + ":" + f.Value
+	fields := []string{f.Field, f.FilterType, f.Value}
 	if withMustAny {
-		op += ":" + f.MustAny
+		fields = append(fields, f.MustAny)
 	}
-	return op
-}
 
-// ------ Meta Ops -----------------------------------------------------------------
-
-// MetaOpsArrayToSlice converts meta ops models back into slice form.
-func MetaOpsArrayToSlice(moModels []MetaOps) []string {
-	if len(moModels) == 0 {
-		return []string{}
-	}
-	metaOps := make([]string, 0, len(moModels))
-
-	for _, m := range moModels {
-		metaOps = append(metaOps, MetaOpToString(m, true))
-	}
-	return metaOps
-}
-
-// MetaOpToString converts a meta ops model back to a string.
-func MetaOpToString(m MetaOps, addURLPart bool) string {
-	var op string
-	// Add channel URL if present
-	if addURLPart && m.ChannelURL != "" {
-		op = m.ChannelURL + "|"
-	}
-	// Reconstruct operations
-	switch m.OpType {
-	case sharedconsts.OpDateTag, sharedconsts.OpDeleteDateTag:
-		op += m.Field + ":" + m.OpType + ":" + m.OpLoc + ":" + m.DateFormat
-
-	case sharedconsts.OpReplace, sharedconsts.OpReplaceSuffix, sharedconsts.OpReplacePrefix:
-		op += m.Field + ":" + m.OpType + ":" + m.OpFindString + ":" + m.OpValue
-
-	default:
-		op += m.Field + ":" + m.OpType + ":" + m.OpValue
-	}
-	return op
-}
-
-// ------ Filename Ops -----------------------------------------------------------------
-
-// FilenameOpsArrayToSlice converts filename ops models back into slice form.
-func FilenameOpsArrayToSlice(foModels []FilenameOps) []string {
-	if len(foModels) == 0 {
-		return []string{}
-	}
-	filenameOps := make([]string, 0, len(foModels))
-
-	for _, f := range foModels {
-		filenameOps = append(filenameOps, FilenameOpToString(f, true))
-	}
-	return filenameOps
-}
-
-// FilenameOpToString converts a filename ops model back to a string.
-//
-// date-tag:prefix:ymd
-// replace:_:
-// prefix:[Video]
-func FilenameOpToString(f FilenameOps, addURLPart bool) string {
-	var op string
-	// Add channel URL if present.
-	if addURLPart && f.ChannelURL != "" {
-		op = f.ChannelURL + "|"
-	}
-	// Reconstruct operations.
-	switch f.OpType {
-	case sharedconsts.OpDateTag, sharedconsts.OpDeleteDateTag:
-		op += f.OpType + ":" + f.OpLoc + ":" + f.DateFormat
-
-	case sharedconsts.OpReplace, sharedconsts.OpReplaceSuffix, sharedconsts.OpReplacePrefix:
-		op += f.OpType + ":" + f.OpFindString + ":" + f.OpValue
-
-	default:
-		op += f.OpType + ":" + f.OpValue
+	op := sharedparsing.JoinEscaped(fields, ':')
+	// Add channel URL if present. A URL cannot hold an unescaped separator.
+	if f.ChannelURL != "" {
+		op = f.ChannelURL + "|" + op
 	}
 	return op
 }
@@ -130,12 +54,12 @@ func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 //
 // url|title:dog:/dogs
 func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
-	var op string
+	// OutputDir is a path, so it is the field most likely to hold a separator.
+	op := sharedparsing.JoinEscaped([]string{m.Field, m.ContainsValue, m.OutputDir}, ':')
 	// Add channel URL if present.
 	if m.ChannelURL != "" {
-		op = m.ChannelURL + "|"
+		op = m.ChannelURL + "|" + op
 	}
-	op += m.Field + ":" + m.ContainsValue + ":" + m.OutputDir
 	return op
 }
 
@@ -146,7 +70,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	slice := make([]string, 0, len(f.Filters))
 
 	filterStrings := FiltersArrayToSlice(f.Filters, false)
-	metaOpStrings := MetaOpsArrayToSlice(f.MetaOps)
+	metaOpStrings := sharedparsing.FormatMetaOps(f.MetaOps, "", true)
 
 	if len(filterStrings) != len(metaOpStrings) {
 		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
@@ -166,7 +90,7 @@ func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	slice := make([]string, 0, len(f.Filters))
 
 	filterStrings := FiltersArrayToSlice(f.Filters, false)
-	filenameOpStrings := FilenameOpsArrayToSlice(f.FilenameOps)
+	filenameOpStrings := sharedparsing.FormatFilenameOps(f.FilenameOps, "", true)
 
 	if len(filterStrings) != len(filenameOpStrings) {
 		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))

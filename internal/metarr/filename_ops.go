@@ -8,6 +8,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // conflictingFilenameOp contains conflicting filename operations.
@@ -94,7 +95,7 @@ func filterConflictingFilenameOps(fileOps, dbOps []models.FilenameOps) []models.
 		if !fileOpKeys[op.OpType] || !conflicts {
 			result = append(result, op)
 		} else {
-			logger.Pl.D(2, "File filename op overrides DB op: %s", models.FilenameOpToString(op, false))
+			logger.Pl.D(2, "File filename op overrides DB op: %s", sharedparsing.FormatFilenameOp(op, false))
 		}
 	}
 	return result
@@ -108,7 +109,7 @@ func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.Fil
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.FilenameOps, 0, len(ops))
 	for _, op := range ops {
-		key := models.FilenameOpToString(op, false)
+		key := sharedparsing.FormatFilenameOp(op, false)
 		if !matchedFilteredKeys[key] {
 			logger.Pl.D(2, "Added filename operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -138,7 +139,7 @@ func buildFilenameOpKeySet(ops []models.FilenameOps, includeNonConflicting bool)
 	for _, op := range ops {
 		_, conflicts := conflictingFilenameOp[op.OpType]
 		if includeNonConflicting || !conflicts {
-			filenameOpsKeys[models.FilenameOpToString(op, false)] = true
+			filenameOpsKeys[sharedparsing.FormatFilenameOp(op, false)] = true
 		}
 	}
 	return filenameOpsKeys
@@ -162,7 +163,7 @@ func getDedupedFilenameOpStrings(ops []models.FilenameOps) []string {
 
 	// Make deduplicated filename op slice
 	for _, op := range ops {
-		opStr := models.FilenameOpToString(op, false)
+		opStr := sharedparsing.FormatFilenameOp(op, false)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)

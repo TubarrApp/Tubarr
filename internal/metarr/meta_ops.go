@@ -8,6 +8,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // nonConflictingMetaOp contains keys which do not conflict with other writes.
@@ -95,7 +96,7 @@ func filterConflictingMetaOps(fileOps, dbOps []models.MetaOps) []models.MetaOps 
 		if !fileOpKeys[op.Field+":"+op.OpType] || nonConflicting {
 			result = append(result, op)
 		} else {
-			logger.Pl.D(2, "File meta op overrides DB op: %s", models.MetaOpToString(op, false))
+			logger.Pl.D(2, "File meta op overrides DB op: %s", sharedparsing.FormatMetaOp(op, false))
 		}
 	}
 	return result
@@ -109,7 +110,7 @@ func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMet
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.MetaOps, 0, len(ops))
 	for _, op := range ops {
-		key := models.MetaOpToString(op, false)
+		key := sharedparsing.FormatMetaOp(op, false)
 		if !matchedFilteredKeys[key] {
 			logger.Pl.D(2, "Added operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -139,7 +140,7 @@ func buildMetaOpKeySet(ops []models.MetaOps, includeNonConflicting bool) map[str
 	for _, op := range ops {
 		_, nonConflicting := nonConflictingMetaOp[op.OpType]
 		if includeNonConflicting || !nonConflicting {
-			metaOpsKeys[models.MetaOpToString(op, false)] = true
+			metaOpsKeys[sharedparsing.FormatMetaOp(op, false)] = true
 		}
 	}
 	return metaOpsKeys
@@ -162,7 +163,7 @@ func getDedupedMetaOpStrings(ops []models.MetaOps) []string {
 	result := make([]string, 0, len(ops))
 
 	for _, op := range ops {
-		opStr := models.MetaOpToString(op, false)
+		opStr := sharedparsing.FormatMetaOp(op, false)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)
