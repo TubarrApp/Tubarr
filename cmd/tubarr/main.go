@@ -20,6 +20,7 @@ import (
 	"tubarr/internal/times"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/buildinfo"
 	"github.com/TubarrApp/gocommon/logging"
 )
 
@@ -69,6 +70,7 @@ func main() {
 		logger.Pl.W("Failed to load blocked domains: %v", err)
 	}
 
+	logger.Pl.I("Tubarr binary %s", buildinfo.Get())
 	logger.Pl.I("Tubarr (PID: %d) started at: %v",
 		progControl.ProcessID, startTime.Format("2006-01-02 15:04:05.00 MST"))
 
