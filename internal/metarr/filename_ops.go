@@ -149,7 +149,7 @@ func buildFilenameOpKeySet(ops []models.FilenameOps, includeNonConflicting bool)
 func filterFilenameOpsByChannel(ops []models.FilenameOps, cURL string) []models.FilenameOps {
 	valid := make([]models.FilenameOps, 0, len(ops))
 	for _, op := range ops {
-		if op.ChannelURL == "" || op.ChannelURL == cURL {
+		if sharedparsing.AppliesToChannel(op.ChannelURL, cURL) {
 			valid = append(valid, op)
 		}
 	}

@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/net"
+
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // notifyHTTPClients returns HTTP clients for non-LAN and LAN use.
@@ -43,7 +44,7 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 	// Create lookup map for new channels.
 	channelsWithNewMap := make(map[string]bool, len(channelURLsWithNew))
 	for _, u := range channelURLsWithNew {
-		channelsWithNewMap[strings.ToLower(u)] = true
+		channelsWithNewMap[sharedparsing.NormalizeChannelURL(u)] = true
 	}
 
 	// Append valid URLs.
@@ -57,7 +58,7 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 		}
 
 		logger.Pl.D(3, "Checking %q exists in notification", n.ChannelURL)
-		if channelsWithNewMap[strings.ToLower(n.ChannelURL)] {
+		if channelsWithNewMap[sharedparsing.NormalizeChannelURL(n.ChannelURL)] {
 			logger.Pl.D(3, "Found %q in notification  adding to notification list", n.ChannelURL)
 			urls = append(urls, n.NotifyURL)
 		}

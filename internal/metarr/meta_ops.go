@@ -150,7 +150,7 @@ func buildMetaOpKeySet(ops []models.MetaOps, includeNonConflicting bool) map[str
 func filterMetaOpsByChannel(ops []models.MetaOps, cURL string) []models.MetaOps {
 	valid := make([]models.MetaOps, 0, len(ops))
 	for _, op := range ops {
-		if op.ChannelURL == "" || op.ChannelURL == cURL {
+		if sharedparsing.AppliesToChannel(op.ChannelURL, cURL) {
 			valid = append(valid, op)
 		}
 	}

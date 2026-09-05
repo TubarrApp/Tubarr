@@ -22,12 +22,6 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 	// Filter loop.
 	for _, filter := range filters {
-		// Check if the filter has a channel URL and if it matches the video's channel URL.
-		if v.ChannelURL != "" && filter.ChannelURL != "" && !strings.Contains(v.ChannelURL, filter.ChannelURL) {
-			logger.Pl.D(2, "Skipping filter %s:%s:%s:%s for video %q because filter channel URL %q does not match...", filter.Field, filter.FilterType, filter.Value, filter.MustAny, v.URL, filter.ChannelURL)
-			continue
-		}
-
 		// Add to must/any.
 		switch filter.MustAny {
 		case sharedconsts.OpMust:

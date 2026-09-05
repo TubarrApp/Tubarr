@@ -13,6 +13,8 @@ import (
 	"tubarr/internal/parsing"
 
 	"github.com/TubarrApp/gocommon/sharedtags"
+
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
@@ -222,8 +224,7 @@ func getRelevantFilters(filters []models.Filters, currentURL string) []models.Fi
 
 	for _, filter := range filters {
 		// Include if no specific URL specified, or if it matches current URL.
-		if filter.ChannelURL == "" ||
-			strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
+		if sharedparsing.AppliesToChannel(filter.ChannelURL, currentURL) {
 			relevant = append(relevant, filter)
 		} else {
 			logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
@@ -243,8 +244,7 @@ func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, curren
 
 		for _, filter := range fmo.Filters {
 			// Include if no specific URL specified, or if it matches current URL.
-			if filter.ChannelURL == "" ||
-				strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
+			if sharedparsing.AppliesToChannel(filter.ChannelURL, currentURL) {
 				relevantFilters = append(relevantFilters, filter)
 			} else {
 				logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
@@ -266,8 +266,7 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 		relevantFilters := make([]models.Filters, 0, len(ffo.Filters))
 		for _, filter := range ffo.Filters {
 			// Include if no specific URL specified, or if it matches current URL.
-			if filter.ChannelURL == "" ||
-				strings.EqualFold(strings.TrimSpace(filter.ChannelURL), strings.TrimSpace(currentURL)) {
+			if sharedparsing.AppliesToChannel(filter.ChannelURL, currentURL) {
 				relevantFilters = append(relevantFilters, filter)
 			} else {
 				logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
@@ -316,8 +315,7 @@ func getRelevantMoveOps(moveOps []models.MetaFilterMoveOps, currentURL string) [
 
 	for _, op := range moveOps {
 		// Include if no specific URL specified, or if it matches current URL.
-		if op.ChannelURL == "" ||
-			strings.EqualFold(strings.TrimSpace(op.ChannelURL), strings.TrimSpace(currentURL)) {
+		if sharedparsing.AppliesToChannel(op.ChannelURL, currentURL) {
 			relevant = append(relevant, op)
 		} else {
 			logger.Pl.D(2, "Skipping move op for different URL: %q != %q", op.ChannelURL, currentURL)
