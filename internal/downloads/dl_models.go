@@ -172,12 +172,11 @@ type VideoDownload struct {
 	Context    context.Context
 
 	// Private
-	cmd      *exec.Cmd
-	tempFile string
-	mu       sync.Mutex
+	cmd *exec.Cmd
+	mu  sync.Mutex
 }
 
-// cleanup safely terminates any running command and cleans up temp files.
+// cleanup safely terminates any running command.
 func (d *VideoDownload) cleanup() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -198,14 +197,6 @@ func (d *VideoDownload) cleanup() {
 		}
 		d.cmd = nil
 	}
-
-	// Clean up temp file if exists.
-	if d.tempFile != "" {
-		if err := os.Remove(d.tempFile); err != nil && !os.IsNotExist(err) {
-			logger.Pl.W("Failed to remove temp file %s: %v", d.tempFile, err)
-		}
-		d.tempFile = ""
-	}
 }
 
 // JSONDownload encapsulates a JSON download operation.
@@ -219,12 +210,11 @@ type JSONDownload struct {
 	Context    context.Context
 
 	// Private
-	cmd      *exec.Cmd
-	tempFile string
-	mu       sync.Mutex
+	cmd *exec.Cmd
+	mu  sync.Mutex
 }
 
-// cleanup safely terminates any running command and cleans up temp files.
+// cleanup safely terminates any running command.
 func (d *JSONDownload) cleanup() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -244,14 +234,6 @@ func (d *JSONDownload) cleanup() {
 			}
 		}
 		d.cmd = nil
-	}
-
-	// Clean up temp file if exists
-	if d.tempFile != "" {
-		if err := os.Remove(d.tempFile); err != nil && !os.IsNotExist(err) {
-			logger.Pl.W("Failed to remove temp file %s: %v", d.tempFile, err)
-		}
-		d.tempFile = ""
 	}
 }
 
