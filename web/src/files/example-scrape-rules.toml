@@ -79,7 +79,7 @@ domain = "odysee.com"
 
 [[sites]]
 domain = "rumble.com"
-impersonate = "opera"
+impersonate = "chrome"
 
   [[sites.selectors]]
   field = "title"
