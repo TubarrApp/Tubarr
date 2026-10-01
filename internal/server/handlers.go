@@ -1731,8 +1731,9 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		Attr     string `json:"attr,omitempty"`
 	}
 	type siteResp struct {
-		Domain    string         `json:"domain"`
-		Selectors []selectorResp `json:"selectors"`
+		Domain      string         `json:"domain"`
+		Selectors   []selectorResp `json:"selectors"`
+		Impersonate string         `json:"impersonate,omitempty"`
 	}
 
 	resp := make([]siteResp, 0, len(sites))
@@ -1741,7 +1742,7 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		for _, rule := range site.Rules {
 			selectors = append(selectors, selectorResp{Field: rule.Name, Selector: rule.Selector, Attr: rule.Attr})
 		}
-		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors})
+		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors, Impersonate: site.Impersonate})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

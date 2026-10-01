@@ -660,6 +660,9 @@
                       <option :value="site.domain" x-text="site.domain"></option>
                     </template>
                   </select>
+                  <p x-show="selectedSiteImpersonate" class="text-xs text-gray-500 dark:text-gray-400">
+                    Impersonate: <span x-text="selectedSiteImpersonate" class="font-mono text-gray-700 dark:text-gray-300"></span>
+                  </p>
                   <textarea
                     readonly
                     rows="6"
@@ -752,6 +755,11 @@
           testUrl: '',
           testingUrl: false,
           testResult: '',
+
+          get selectedSiteImpersonate() {
+            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
+            return site?.impersonate || '';
+          },
 
           get selectedSiteSelectorsText() {
             const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
