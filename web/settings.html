@@ -593,6 +593,9 @@
               <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Path to a config file (YAML/TOML/JSON) defining custom scraping selectors for additional sites. Applies to all channels. Clear the path to go back to built-in defaults only.
                 <br>
                 <br>
+                Example File: <a href="/src/files/example-scrape-rules.toml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example-scrape-rules.toml</a>
+                <br>
+                <br>
                 <strong>Recognized 'string' fields:</strong><br>title, description, thumbnail, direct_video_url
                 <br>
                 <br>
@@ -600,6 +603,9 @@
                 <br>
                 <br>
                 <strong>Recognized 'year' fields:</strong><br>year, release_year
+                <br>
+                <br>
+                Other fields are added into the metadata JSON as-is, without special handling.
               </p>
 
               <div class="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
