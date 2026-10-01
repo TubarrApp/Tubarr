@@ -79,6 +79,7 @@ domain = "odysee.com"
 
 [[sites]]
 domain = "rumble.com"
+impersonate = "opera"
 
   [[sites.selectors]]
   field = "title"
@@ -96,5 +97,5 @@ domain = "rumble.com"
 
   [[sites.selectors]]
   field = "release_date"
-  selector = "time"
-  attr = "datetime"
+  selector = ".media-description-info-stream-time [title]"
+  attr = "title"

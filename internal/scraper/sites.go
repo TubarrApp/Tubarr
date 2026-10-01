@@ -57,8 +57,9 @@ func RegisterCustomSites(sites []models.SiteScraper) {
 			})
 		}
 		customSites[strings.ToLower(s.Domain)] = consts.HTMLMetadataQuery{
-			Site:  s.Domain,
-			Rules: rules,
+			Site:        s.Domain,
+			Rules:       rules,
+			Impersonate: string(s.Impersonate),
 		}
 	}
 

@@ -11,8 +11,9 @@ type HTMLMetadataRule struct {
 
 // HTMLMetadataQuery holds the site name and metadata rules.
 type HTMLMetadataQuery struct {
-	Site  string
-	Rules []HTMLMetadataRule
+	Site        string
+	Rules       []HTMLMetadataRule
+	Impersonate string // Browser TLS fingerprint to impersonate ("" for none).
 }
 
 // HTMLBitchute holds scraping elements for bitchute.com.
@@ -51,7 +52,8 @@ var HTMLOdysee = HTMLMetadataQuery{
 
 // HTMLRumble holds scraping elements for rumble.com.
 var HTMLRumble = HTMLMetadataQuery{
-	Site: "rumble.com",
+	Site:        "rumble.com",
+	Impersonate: "chrome", // Rumble blocks non-Chrome TLS fingerprints.
 	Rules: []HTMLMetadataRule{
 		{Name: sharedtags.JTitle, Selector: "title"},
 		{Name: sharedtags.JDescription, Selector: `meta[name="description"]`, Attr: "content"},

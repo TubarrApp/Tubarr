@@ -1,9 +1,12 @@
 package models
 
+import "tubarr/internal/domain/consts"
+
 // SiteScraper holds selectors for scraping each site.
 type SiteScraper struct {
-	Domain    string
-	Selectors []ScrapeSelectors
+	Domain      string
+	Selectors   []ScrapeSelectors
+	Impersonate consts.Impersonate
 }
 
 // ScrapeSelectors holds the field name and HTML selector for grabbing desired metadata.

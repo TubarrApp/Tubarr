@@ -134,17 +134,17 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 // ScrapeCustomSite scrapes custom sites for metadata.
 func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) error {
-	// Initialize collector with cookies.
-	collector, err := initializeCollector(urlStr, s.cookieManager)
-	if err != nil {
-		return err
-	}
-
 	// Find a registered rule set (built-in or user-supplied) based on URL domain.
 	query, ok := matchCustomSite(v.URL)
 	if !ok {
 		logger.Pl.D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
 		return nil // Not a custom site.
+	}
+
+	// Initialize collector with cookies.
+	collector, err := initializeCollector(urlStr, s.cookieManager, consts.Impersonate(query.Impersonate))
+	if err != nil {
+		return err
 	}
 
 	metadata := s.ScrapeWithRules(urlStr, collector, v, query)
@@ -182,7 +182,7 @@ func TestScrapeSite(urlStr string) (matched bool, site string, metadata map[stri
 	}
 
 	s := New()
-	collector, err := initializeCollector(urlStr, s.cookieManager)
+	collector, err := initializeCollector(urlStr, s.cookieManager, consts.Impersonate(query.Impersonate))
 	if err != nil {
 		return true, query.Site, nil, err
 	}
@@ -380,8 +380,8 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	return uniqueEpisodeURLs, nil
 }
 
-// initializeCollector initializes Colly with any cookies.
-func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, err error) {
+// initializeCollector initializes Colly with any cookies, using a TLS-impersonating transport if requested.
+func initializeCollector(urlStr string, cm *CookieManager, impersonate consts.Impersonate) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
@@ -406,9 +406,18 @@ func initializeCollector(urlStr string, cm *CookieManager) (c *colly.Collector, 
 		colly.Async(true),
 	)
 	collector.SetRequestTimeout(60 * time.Second)
-	collector.WithTransport(&http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Adjust if necessary
-	})
+	if impersonate != consts.ImpersonateNone {
+		rt, userAgent, err := newTLSRoundTripper(impersonate)
+		if err != nil {
+			return nil, err
+		}
+		collector.WithTransport(rt)
+		collector.UserAgent = userAgent
+	} else {
+		collector.WithTransport(&http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Adjust if necessary
+		})
+	}
 	collector.SetCookieJar(jar)
 
 	return collector, nil
