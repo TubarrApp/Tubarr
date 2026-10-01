@@ -99,3 +99,8 @@ impersonate = "opera"
   field = "release_date"
   selector = ".media-description-info-stream-time [title]"
   attr = "title"
+
+  [[sites.selectors]]
+  field = "thumbnail"
+  selector = "meta[property='og:image']"
+  attr = "content"

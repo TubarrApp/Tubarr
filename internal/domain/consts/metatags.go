@@ -59,5 +59,6 @@ var HTMLRumble = HTMLMetadataQuery{
 		{Name: sharedtags.JDescription, Selector: `meta[name="description"]`, Attr: "content"},
 		{Name: sharedtags.JDescription, Selector: `meta[property="og:description"]`, Attr: "content"},
 		{Name: sharedtags.JReleaseDate, Selector: "time", Attr: "datetime"},
+		{Name: sharedtags.JThumbnailURL, Selector: `meta[property="og:image"]`, Attr: "content"},
 	},
 }
