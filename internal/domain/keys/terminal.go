@@ -24,6 +24,7 @@ const (
 // Files and directories.
 const (
 	ChannelConfigFile string = "channel-config-file"
+	ScrapeConfigFile  string = "scrape-config-file"
 	VideoDir          string = "video-directory"
 	JSONDir           string = "json-directory"
 	MetarrPreset      string = "metarr-preset"

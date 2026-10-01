@@ -15,6 +15,8 @@ import (
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
+	"tubarr/internal/parsing"
+	"tubarr/internal/scraper"
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/benchmark"
@@ -55,6 +57,17 @@ var rootCmd = &cobra.Command{
 			} else {
 				downloads.InitDomainDownloadLimits(limits)
 			}
+
+			// Scrape config file path.
+			if cmd.Flags().Changed(keys.ScrapeConfigFile) {
+				if err := settingsStore.SetSetting(keys.ScrapeConfigFile, viper.GetString(keys.ScrapeConfigFile)); err != nil {
+					logger.Pl.W("Failed to persist setting %q to DB: %v", keys.ScrapeConfigFile, err)
+				}
+			} else if val, found, err := settingsStore.GetSetting(keys.ScrapeConfigFile); err != nil {
+				logger.Pl.W("Failed to load setting %q from DB: %v", keys.ScrapeConfigFile, err)
+			} else if found {
+				viper.Set(keys.ScrapeConfigFile, val)
+			}
 		}
 
 		// Initialize global download concurrency limit (0 = unlimited).
@@ -90,6 +103,29 @@ var rootCmd = &cobra.Command{
 					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
 					os.Exit(1)
 				}
+			}
+		}
+
+		// Load custom scrape site selectors from a global config file, if provided.
+		// Reset first so a cleared or changed path doesn't retain stale entries from a prior run.
+		scraper.ResetCustomSites()
+		if scrapeConfigFile := viper.GetString(keys.ScrapeConfigFile); scrapeConfigFile != "" {
+			if _, statErr := os.Stat(scrapeConfigFile); os.IsNotExist(statErr) {
+				// File not found (could have been moved or deleted).
+				logger.Pl.W("Scrape config file %q no longer exists, clearing setting and falling back to built-in scrape rules", scrapeConfigFile)
+				viper.Set(keys.ScrapeConfigFile, "")
+				if settingsStore != nil {
+					if err := settingsStore.SetSetting(keys.ScrapeConfigFile, ""); err != nil {
+						logger.Pl.W("Failed to clear setting %q in DB: %v", keys.ScrapeConfigFile, err)
+					}
+				}
+			} else {
+				sites, err := parsing.ParseScrapeSelectorsFile(scrapeConfigFile)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed loading scrape config file: %v\n", err)
+					os.Exit(1)
+				}
+				scraper.RegisterCustomSites(sites)
 			}
 		}
 	},

@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
-	"tubarr/internal/dev"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -141,39 +140,14 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 		return err
 	}
 
-	// Declare metadata variable.
-	var metadata map[string]any
-
-	// Determine which rule set to use based on URL.
-	switch {
-	case strings.Contains(v.URL, "censored.tv"):
-		if !dev.CensoredTVUseCustom {
-			logger.Pl.I("Using regular scraper for %q...", v.URL)
-			return nil
-		}
-		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLCensored)
-	case strings.Contains(v.URL, "bitchute.com"):
-		if !dev.BitchuteComUseCustom {
-			logger.Pl.I("Using regular scraper for %q...", v.URL)
-			return nil
-		}
-		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLBitchute)
-	case strings.Contains(v.URL, "odysee.com"):
-		if !dev.OdyseeComUseCustom {
-			logger.Pl.I("Using regular scraper for %q...", v.URL)
-			return nil
-		}
-		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLOdysee)
-	case strings.Contains(v.URL, "rumble.com"):
-		if !dev.RumbleComUseCustom {
-			logger.Pl.I("Using regular scraper for %q...", v.URL)
-			return nil
-		}
-		metadata = s.ScrapeWithRules(urlStr, collector, v, consts.HTMLRumble)
-	default:
+	// Find a registered rule set (built-in or user-supplied) based on URL domain.
+	query, ok := matchCustomSite(v.URL)
+	if !ok {
 		logger.Pl.D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
 		return nil // Not a custom site.
 	}
+
+	metadata := s.ScrapeWithRules(urlStr, collector, v, query)
 
 	// Visit the webpage.
 	if err := collector.Visit(urlStr); err != nil {
@@ -195,6 +169,33 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 
 	logger.Pl.S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
 	return nil
+}
+
+// TestScrapeSite runs the registered custom scraping rules (if any) against a URL and returns
+// the discovered metadata.
+//
+// Used by the web UI to preview whether a custom scraper matches a given URL and retrieves the correct data.
+func TestScrapeSite(urlStr string) (matched bool, site string, metadata map[string]any, err error) {
+	query, ok := matchCustomSite(urlStr)
+	if !ok {
+		return false, "", nil, nil
+	}
+
+	s := New()
+	collector, err := initializeCollector(urlStr, s.cookieManager)
+	if err != nil {
+		return true, query.Site, nil, err
+	}
+
+	v := &models.Video{URL: urlStr}
+	metadata = s.ScrapeWithRules(urlStr, collector, v, query)
+
+	if err := collector.Visit(urlStr); err != nil {
+		return true, query.Site, nil, fmt.Errorf("failed to visit URL: %w", err)
+	}
+	collector.Wait()
+
+	return true, query.Site, metadata, nil
 }
 
 // ScraperURLCookies returns channel access details for a given video.
@@ -471,6 +472,65 @@ func setupFieldScraping(c *colly.Collector, fieldName string, rules []consts.HTM
 	}
 }
 
+// parseScrapedDate attempts to normalize a scraped date string to "2006-01-02" format.
+//
+// Returns the normalized string and the parsed time; if parsing fails, returns the
+// original (trimmed) string and a zero time.Time.
+func parseScrapedDate(raw string) (string, time.Time) {
+	raw = strings.TrimSpace(raw)
+
+	var t time.Time
+	var err error
+
+	// Plain digit date, e.g. yt-dlp's YYYYMMDD upload_date format.
+	if _, parseErr := strconv.ParseInt(raw, 10, 64); parseErr == nil {
+		if len(raw) == 8 {
+			t, err = time.Parse("20060102", raw)
+		} else {
+			err = fmt.Errorf("unrecognized plain numeric date length: %q", raw)
+		}
+	}
+
+	// Hyphenated date, e.g. "2020-12-07".
+	if (err != nil || t.IsZero()) && strings.Contains(raw, "-") {
+		num := strings.ReplaceAll(raw, "-", "")
+		if _, parseErr := strconv.ParseInt(num, 10, 64); parseErr == nil {
+			t, err = time.Parse("2006-01-02", raw)
+		}
+	}
+
+	// RFC3339 timestamp.
+	if (err != nil || t.IsZero()) && strings.Contains(raw, "T") {
+		t, err = time.Parse(time.RFC3339, raw)
+	}
+
+	// Word date, e.g. "December 7, 2020".
+	if err != nil || t.IsZero() {
+		if parsedDate, parseErr := parsing.ParseWordDate(raw); parseErr == nil {
+			t, err = time.Parse("2006-01-02", parsedDate)
+		}
+	}
+
+	if err != nil || t.IsZero() {
+		return raw, time.Time{}
+	}
+	return t.Format("2006-01-02"), t
+}
+
+// parseScrapedYear validates a scraped string as a bare year.
+//
+// Returns the cleaned year string and whether it looked valid; on failure, returns
+// the original (trimmed) string and false.
+func parseScrapedYear(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1880 || n > time.Now().Year()+1 {
+		return raw, false
+	}
+	return strconv.Itoa(n), true
+}
+
 // ScrapeWithRules scrapes metadata using HTMLMetadataQuery rules.
 func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *models.Video, query consts.HTMLMetadataQuery) map[string]any {
 	metadata := make(map[string]any)
@@ -478,7 +538,6 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 	var (
 		title          string
 		description    string
-		releaseDate    string
 		directVideoURL string
 		thumbnailURL   string
 	)
@@ -491,21 +550,76 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		rulesByField[rule.Name] = append(rulesByField[rule.Name], rule)
 	}
 
-	// Setup scraping for each field
+	// Known fields: Do not merge with the below.
+	knownFields := map[string]bool{
+		sharedtags.JTitle:          true,
+		sharedtags.JDescription:    true,
+		sharedtags.JDirectVideoURL: true,
+		sharedtags.JThumbnailURL:   true,
+	}
+
+	// Recognized date fields, each validated as a full date string. Includes an order of preference for v.UploadDate.
+	dateFields := map[string]bool{
+		sharedtags.JUploadDate:  true,
+		sharedtags.JReleaseDate: true,
+		sharedtags.JDate:        true,
+	}
+	uploadDatePrecedence := []string{sharedtags.JUploadDate, sharedtags.JReleaseDate, sharedtags.JDate}
+
+	// Additional recognized fields validated as a bare year instead of a full date.
+	yearFields := map[string]bool{
+		sharedtags.JYear:        true,
+		sharedtags.JReleaseYear: true,
+	}
+
+	// Setup scraping for each known field
 	if rules, ok := rulesByField[sharedtags.JTitle]; ok {
 		setupFieldScraping(collector, sharedtags.JTitle, rules, &title)
 	}
 	if rules, ok := rulesByField[sharedtags.JDescription]; ok {
 		setupFieldScraping(collector, sharedtags.JDescription, rules, &description)
 	}
-	if rules, ok := rulesByField[sharedtags.JReleaseDate]; ok {
-		setupFieldScraping(collector, sharedtags.JReleaseDate, rules, &releaseDate)
-	}
 	if rules, ok := rulesByField[sharedtags.JDirectVideoURL]; ok {
 		setupFieldScraping(collector, sharedtags.JDirectVideoURL, rules, &directVideoURL)
 	}
 	if rules, ok := rulesByField[sharedtags.JThumbnailURL]; ok {
 		setupFieldScraping(collector, sharedtags.JThumbnailURL, rules, &thumbnailURL)
+	}
+
+	// Setup scraping for recognized date fields. Each is written into the metadata JSON
+	// under its own key; v.UploadDate is resolved from these afterward, by precedence.
+	dateValues := make(map[string]*string, len(dateFields))
+	for fieldName := range dateFields {
+		rules, ok := rulesByField[fieldName]
+		if !ok {
+			continue
+		}
+		value := new(string)
+		setupFieldScraping(collector, fieldName, rules, value)
+		dateValues[fieldName] = value
+	}
+	yearValues := make(map[string]*string, len(yearFields))
+	for fieldName := range yearFields {
+		rules, ok := rulesByField[fieldName]
+		if !ok {
+			continue
+		}
+		value := new(string)
+		setupFieldScraping(collector, fieldName, rules, value)
+		yearValues[fieldName] = value
+	}
+
+	// Setup scraping for any remaining user-defined fields outside all the sets above.
+	// These get written into the metadata JSON as-is (raw matched text/attr), with no
+	// field-specific parsing or validation (no date parsing, no HTML cleanup, etc).
+	extraFields := make(map[string]*string, len(rulesByField))
+	for fieldName, rules := range rulesByField {
+		if knownFields[fieldName] || dateFields[fieldName] || yearFields[fieldName] {
+			continue
+		}
+		value := new(string)
+		setupFieldScraping(collector, fieldName, rules, value)
+		extraFields[fieldName] = value
 	}
 
 	// After scraping completes, populate the Video struct
@@ -520,45 +634,6 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			metadata[sharedtags.JDescription] = description
 		}
 
-		if releaseDate != "" {
-			// Parse the date
-			var t time.Time
-			var err error
-
-			// Plain number.
-			if _, parseErr := strconv.ParseInt(releaseDate, 10, 64); parseErr == nil { // if err IS nil.
-				t, err = time.Parse("2006-01-02", releaseDate)
-			}
-			// Plain number and hyphens.
-			if strings.Contains(releaseDate, "-") {
-				num := strings.ReplaceAll(releaseDate, "-", "")
-				if _, parseErr := strconv.ParseInt(num, 10, 64); parseErr == nil { // if err IS nil.
-					t, err = time.Parse("2006-01-02", releaseDate)
-				}
-			}
-			if err != nil || t.IsZero() {
-				if strings.Contains(releaseDate, "T") {
-					t, err = time.Parse(time.RFC3339, releaseDate)
-				}
-			}
-			if err != nil || t.IsZero() {
-				parsedDate, parseErr := parsing.ParseWordDate(releaseDate)
-				if parseErr == nil {
-					t, err = time.Parse("2006-01-02", parsedDate)
-				}
-			}
-
-			releaseDateValue := releaseDate
-			if !t.IsZero() && err == nil {
-				v.UploadDate = t
-				releaseDateValue = t.Format("2006-01-02")
-				logger.Pl.I("Extracted upload date %q from metadata", v.UploadDate.String())
-			} else {
-				logger.Pl.E("Failed to parse upload date %q: %v", releaseDate, err)
-			}
-			metadata[sharedtags.JReleaseDate] = releaseDateValue
-		}
-
 		if directVideoURL != "" {
 			v.DirectVideoURL = directVideoURL
 			metadata[sharedtags.JDirectVideoURL] = directVideoURL
@@ -567,6 +642,47 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		if thumbnailURL != "" {
 			v.ThumbnailURL = thumbnailURL
 			metadata[sharedtags.JThumbnailURL] = thumbnailURL
+		}
+
+		parsedDates := make(map[string]time.Time, len(dateValues))
+		for fieldName, value := range dateValues {
+			if *value == "" {
+				continue
+			}
+			normalized, t := parseScrapedDate(*value)
+			if t.IsZero() {
+				logger.Pl.W("Failed to parse date for field %q: %q", fieldName, *value)
+			} else {
+				parsedDates[fieldName] = t
+			}
+			metadata[fieldName] = normalized
+		}
+
+		// v.UploadDate is resolved from whichever recognized date field parsed
+		// successfully, preferring upload_date, then release_date, then date.
+		for _, fieldName := range uploadDatePrecedence {
+			if t, ok := parsedDates[fieldName]; ok {
+				v.UploadDate = t
+				logger.Pl.I("Extracted upload date %q from field %q", v.UploadDate.String(), fieldName)
+				break
+			}
+		}
+
+		for fieldName, value := range yearValues {
+			if *value == "" {
+				continue
+			}
+			normalized, ok := parseScrapedYear(*value)
+			if !ok {
+				logger.Pl.W("Scraped value for field %q does not look like a valid year: %q", fieldName, *value)
+			}
+			metadata[fieldName] = normalized
+		}
+
+		for fieldName, value := range extraFields {
+			if *value != "" {
+				metadata[fieldName] = *value
+			}
 		}
 	})
 

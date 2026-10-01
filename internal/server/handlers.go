@@ -22,6 +22,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/scraper"
 	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/logging"
@@ -1644,5 +1645,129 @@ func (ss *serverStore) handleDeleteDomainDownloadLimit(w http.ResponseWriter, r 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit removed", "hostname": hostname}); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetScrapeConfigFile returns the currently configured custom scrape site config file path.
+func (ss *serverStore) handleGetScrapeConfigFile(w http.ResponseWriter, _ *http.Request) {
+	path := viper.GetString(keys.ScrapeConfigFile)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"path": path}); err != nil {
+		logger.Pl.E("Failed to encode scrape config file path: %v", err)
+	}
+}
+
+// handleSetScrapeConfigFile updates (or, given an empty path, clears) the custom scrape site config file.
+func (ss *serverStore) handleSetScrapeConfigFile(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimSpace(r.FormValue("path"))
+
+	// Parse before touching any global state, so a bad path can't wipe out a working config.
+	var sites []models.SiteScraper
+	if path != "" {
+		var err error
+		sites, err = parsing.ParseScrapeSelectorsFile(path)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to load scrape config file: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+
+	scraper.ResetCustomSites()
+	if len(sites) > 0 {
+		scraper.RegisterCustomSites(sites)
+	}
+
+	if err := ss.ss.SetSetting(keys.ScrapeConfigFile, path); err != nil {
+		logger.Pl.W("Failed to persist scrape config file path to DB: %v", err)
+	}
+	viper.Set(keys.ScrapeConfigFile, path)
+
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{"message": "Scrape config file updated", "path": path, "sites": len(sites)}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleReloadScrapeConfigFile re-parses the currently configured scrape config file from disk,
+// without changing which file is configured. Useful if the file was edited and saved while Tubarr is running.
+func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, _ *http.Request) {
+	path := viper.GetString(keys.ScrapeConfigFile)
+	if path == "" {
+		scraper.ResetCustomSites()
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]any{"message": "No scrape config file set; using built-in defaults", "sites": 0}); err != nil {
+			logger.Pl.E("Failed to encode response: %v", err)
+		}
+		return
+	}
+
+	// Parse before touching any global state, so a bad edit can't wipe out a working config.
+	sites, err := parsing.ParseScrapeSelectorsFile(path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to reload scrape config file: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	scraper.ResetCustomSites()
+	scraper.RegisterCustomSites(sites)
+
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{"message": "Scrape config file reloaded", "path": path, "sites": len(sites)}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetScrapeSites returns every currently registered scrape site (built-in and custom)
+// along with its selectors, for display in the web UI.
+func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Request) {
+	sites := scraper.ListRegisteredSites()
+
+	type selectorResp struct {
+		Field    string `json:"field"`
+		Selector string `json:"selector"`
+		Attr     string `json:"attr,omitempty"`
+	}
+	type siteResp struct {
+		Domain    string         `json:"domain"`
+		Selectors []selectorResp `json:"selectors"`
+	}
+
+	resp := make([]siteResp, 0, len(sites))
+	for _, site := range sites {
+		selectors := make([]selectorResp, 0, len(site.Rules))
+		for _, rule := range site.Rules {
+			selectors = append(selectors, selectorResp{Field: rule.Name, Selector: rule.Selector, Attr: rule.Attr})
+		}
+		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode scrape sites: %v", err)
+	}
+}
+
+// handleTestScrapeSite tests the currently registered custom scraping rules against a URL
+// and returns whatever metadata gets discovered, for previewing a scrape config file.
+func (ss *serverStore) handleTestScrapeSite(w http.ResponseWriter, r *http.Request) {
+	testURL := strings.TrimSpace(r.FormValue("url"))
+	if testURL == "" {
+		http.Error(w, "url parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	matched, site, metadata, err := scraper.TestScrapeSite(testURL)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to scrape URL: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{"matched": matched, "site": site, "metadata": metadata}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode scrape test response: %v", err)
 	}
 }

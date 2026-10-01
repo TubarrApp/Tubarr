@@ -24,7 +24,7 @@ var globalDownloadSem chan struct{}
 var globalDownloadSemMu sync.RWMutex
 
 // InitGlobalDownloadLimit sets up the global download concurrency limiter.
-// A limit of 0 means no limit (unlimited concurrent downloads, same as before).
+// A limit of 0 means no limit (unlimited concurrent downloads).
 // Note: Changes take effect for new downloads. In-progress downloads retain their slots.
 func InitGlobalDownloadLimit(limit int) {
 	globalDownloadSemMu.Lock()

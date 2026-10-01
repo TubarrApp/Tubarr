@@ -1,0 +1,100 @@
+# Domain is the base domain of the video site the scraper should come into effect for.
+#
+# Field represents the keys that will be added into the video's metadata JSON (e.g. title, fulltitle).
+#
+# Selector is the element containing the desired metadata. For example the contents of a <p> tag with class
+# "title" could be selected with "p.title".
+#
+# "attr" is optional. Omit it to read the element's text content instead of an attribute.
+
+[[sites]]
+domain = "bitchute.com"
+
+  [[sites.selectors]]
+  field = "title"
+  selector = 'meta[itemprop="name"]'
+  attr = "content"
+
+  [[sites.selectors]]
+  field = "description"
+  selector = 'meta[name="description"]'
+  attr = "content"
+
+  [[sites.selectors]]
+  field = "description"
+  selector = 'meta[property="og:description"]'
+  attr = "content"
+
+  [[sites.selectors]]
+  field = "release_date"
+  selector = "span[data-v-3c3cf957]"
+  attr = "data-v-3c3cf957"
+
+[[sites]]
+domain = "censored.tv"
+
+  [[sites.selectors]]
+  field = "title"
+  selector = "#episode-container .episode-title"
+
+  [[sites.selectors]]
+  field = "description"
+  selector = "#about .raised-content"
+
+  [[sites.selectors]]
+  field = "release_date"
+  selector = "#about time"
+
+  [[sites.selectors]]
+  field = "direct_video_url"
+  selector = "source[src*='master.m3u8']"
+  attr = "src"
+
+  [[sites.selectors]]
+  field = "thumbnail"
+  selector = "video-js[poster]"
+  attr = "poster"
+
+[[sites]]
+domain = "odysee.com"
+
+  [[sites.selectors]]
+  field = "title"
+  selector = "title"
+
+  [[sites.selectors]]
+  field = "description"
+  selector = 'meta[name="description"]'
+  attr = "content"
+
+  [[sites.selectors]]
+  field = "description"
+  selector = 'meta[property="og:description"]'
+  attr = "content"
+
+  [[sites.selectors]]
+  field = "release_date"
+  selector = 'meta[property="og:video:release_date"]'
+  attr = "content"
+
+[[sites]]
+domain = "rumble.com"
+
+  [[sites.selectors]]
+  field = "title"
+  selector = "title"
+
+  [[sites.selectors]]
+  field = "description"
+  selector = 'meta[name="description"]'
+  attr = "content"
+
+  [[sites.selectors]]
+  field = "description"
+  selector = 'meta[property="og:description"]'
+  attr = "content"
+
+  [[sites.selectors]]
+  field = "release_date"
+  selector = "time"
+  attr = "datetime"

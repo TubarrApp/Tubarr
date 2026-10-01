@@ -587,6 +587,118 @@
               </div>
             </div>
 
+            <!-- Custom Scrape Sites Card -->
+            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Custom Scrape Sites</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Path to a config file (YAML/TOML/JSON) defining custom scraping selectors for additional sites. Applies to all channels. Clear the path to go back to built-in defaults only.
+                <br>
+                <br>
+                <strong>Recognized 'string' fields:</strong><br>title, description, thumbnail, direct_video_url
+                <br>
+                <br>
+                <strong>Recognized 'full date' fields:</strong><br>upload_date, release_date, date
+                <br>
+                <br>
+                <strong>Recognized 'year' fields:</strong><br>year, release_year
+              </p>
+
+              <div class="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
+                <input
+                  type="text"
+                  x-model="scrapeConfigPath"
+                  placeholder="/path/to/scrape-sites.yaml"
+                  class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  @keydown.enter="saveScrapeConfigPath()"
+                />
+                <button
+                  @click="saveScrapeConfigPath()"
+                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                >
+                  Save
+                </button>
+                <button
+                  @click="scrapeConfigPath = ''; saveScrapeConfigPath()"
+                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  Clear
+                </button>
+                <button
+                  @click="reloadScrapeConfig()"
+                  :disabled="reloadingConfig"
+                  title="Re-read the scrape config file from disk, in case it was edited since Tubarr started"
+                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  <span x-show="!reloadingConfig">Refresh</span>
+                  <span x-show="reloadingConfig">Refreshing...</span>
+                </button>
+                <span x-show="savingScrapeConfig" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
+                <span x-show="scrapeConfigSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+              </div>
+              <p x-show="scrapeConfigError" x-text="scrapeConfigError" class="text-xs mt-2" style="color: #ef4444;"></p>
+
+              <!-- Registered Sites -->
+              <div class="py-4 space-y-3 border-b border-gray-100 dark:border-gray-800">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Registered Site Scrapers</p>
+                  <span x-show="loadingSites" class="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
+                </div>
+                <div x-show="!loadingSites && scrapeSites.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                  No sites registered (built-in rules are currently disabled and no config file is set).
+                </div>
+                <div x-show="scrapeSites.length > 0" class="space-y-3">
+                  <select
+                    x-model="selectedSite"
+                    class="w-full h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  >
+                    <template x-for="site in scrapeSites" :key="site.domain">
+                      <option :value="site.domain" x-text="site.domain"></option>
+                    </template>
+                  </select>
+                  <textarea
+                    readonly
+                    rows="6"
+                    :value="selectedSiteSelectorsText"
+                    class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  ></textarea>
+                </div>
+              </div>
+
+              <!-- Test Scraper -->
+              <div class="pt-4 space-y-3">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Test a URL</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Paste a video URL containing the metadata you want to scrape. This will show you the results of the scraping selectors for that URL, if any are found.
+                  <br>
+                  <br>
+                  <strong>Note:</strong> This could fail to retrieve results if the content is behind a login or if the site has anti-bot measures.
+                </p>
+
+                <div class="flex items-center gap-3">
+                  <input
+                    type="text"
+                    x-model="testUrl"
+                    placeholder="https://example.com/video/123"
+                    class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    @keydown.enter="testScrapeUrl()"
+                  />
+                  <button
+                    @click="testScrapeUrl()"
+                    :disabled="!testUrl || testingUrl"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                  >
+                    <span x-show="!testingUrl">Test</span>
+                    <span x-show="testingUrl">Testing...</span>
+                  </button>
+                </div>
+                <textarea
+                  readonly
+                  rows="10"
+                  x-model="testResult"
+                  placeholder="Results will appear here..."
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                ></textarea>
+              </div>
+            </div>
+
           </div>
         </main>
         <!-- ===== Main Content End ===== -->
@@ -622,10 +734,33 @@
           newLimit: 1,
           addError: '',
 
+          // Custom scrape sites
+          scrapeConfigPath: '',
+          savingScrapeConfig: false,
+          scrapeConfigSaved: false,
+          scrapeConfigError: '',
+          reloadingConfig: false,
+          scrapeSites: [],
+          selectedSite: '',
+          loadingSites: false,
+          testUrl: '',
+          testingUrl: false,
+          testResult: '',
+
+          get selectedSiteSelectorsText() {
+            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
+            if (!site || site.selectors.length === 0) return '(no selectors)';
+            return site.selectors
+              .map(s => `${s.field}: ${s.selector}${s.attr ? '  [attr=' + s.attr + ']' : ''}`)
+              .join('\n');
+          },
+
           init() {
             this.loadCrawlConcurrency();
             this.loadGlobalDownloadLimit();
             this.loadDomainLimits();
+            this.loadScrapeConfigPath();
+            this.loadScrapeSites();
           },
 
           async loadCrawlConcurrency() {
@@ -740,6 +875,113 @@
               this.domainLimits = updated;
             } catch (err) {
               console.error('Error removing domain limit:', err);
+            }
+          },
+
+          async loadScrapeConfigPath() {
+            try {
+              const response = await fetch('/api/v1/settings/scrape-config-file');
+              if (!response.ok) return;
+              const data = await response.json();
+              this.scrapeConfigPath = data.path ?? '';
+            } catch (err) {
+              console.error('Error loading scrape config file path:', err);
+            }
+          },
+
+          async saveScrapeConfigPath() {
+            this.savingScrapeConfig = true;
+            this.scrapeConfigSaved = false;
+            this.scrapeConfigError = '';
+            try {
+              const response = await fetch('/api/v1/settings/scrape-config-file', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ path: this.scrapeConfigPath })
+              });
+              if (!response.ok) {
+                this.scrapeConfigError = await response.text() || 'Failed to update scrape config file';
+                return;
+              }
+              this.scrapeConfigSaved = true;
+              setTimeout(() => { this.scrapeConfigSaved = false; }, 2000);
+              await this.loadScrapeSites();
+            } catch (err) {
+              this.scrapeConfigError = 'Failed to update scrape config file';
+              console.error('Error saving scrape config file path:', err);
+            } finally {
+              this.savingScrapeConfig = false;
+            }
+          },
+
+          async loadScrapeSites() {
+            this.loadingSites = true;
+            try {
+              const response = await fetch('/api/v1/settings/scrape-config-file/sites');
+              if (!response.ok) return;
+              this.scrapeSites = await response.json();
+              if (!this.scrapeSites.find(s => s.domain === this.selectedSite)) {
+                this.selectedSite = this.scrapeSites.length > 0 ? this.scrapeSites[0].domain : '';
+              }
+            } catch (err) {
+              console.error('Error loading scrape sites:', err);
+            } finally {
+              this.loadingSites = false;
+            }
+          },
+
+          async reloadScrapeConfig() {
+            this.reloadingConfig = true;
+            this.scrapeConfigError = '';
+            try {
+              const response = await fetch('/api/v1/settings/scrape-config-file/reload', { method: 'POST' });
+              if (!response.ok) {
+                this.scrapeConfigError = await response.text() || 'Failed to reload scrape config file';
+                return;
+              }
+              await this.loadScrapeSites();
+            } catch (err) {
+              this.scrapeConfigError = 'Failed to reload scrape config file';
+              console.error('Error reloading scrape config file:', err);
+            } finally {
+              this.reloadingConfig = false;
+            }
+          },
+
+          async testScrapeUrl() {
+            if (!this.testUrl) return;
+            this.testingUrl = true;
+            this.testResult = '';
+            try {
+              const response = await fetch('/api/v1/settings/scrape-config-file/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ url: this.testUrl })
+              });
+              if (!response.ok) {
+                this.testResult = `Error: ${await response.text()}`;
+                return;
+              }
+              const data = await response.json();
+              if (!data.matched) {
+                this.testResult = 'No custom scraper matches this URL (yt-dlp will be used instead).';
+                return;
+              }
+              const lines = [`Matched site: ${data.site}`, ''];
+              const metadata = data.metadata || {};
+              if (Object.keys(metadata).length === 0) {
+                lines.push('No fields were discovered on the page.');
+              } else {
+                for (const [field, value] of Object.entries(metadata)) {
+                  lines.push(`${field}: ${value}`);
+                }
+              }
+              this.testResult = lines.join('\n');
+            } catch (err) {
+              this.testResult = 'Failed to test URL.';
+              console.error('Error testing scrape URL:', err);
+            } finally {
+              this.testingUrl = false;
             }
           }
         };
