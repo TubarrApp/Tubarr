@@ -99,7 +99,7 @@ impersonate = "chrome"
 
 # FlareSolverr flag can route requests through FlareSolverr. Will do this instead of making
 # its own requests with or without "impersonate". Uncomment the flag below to use.
-
+#
 # flaresolverr = true
 
   [[sites.selectors]]
