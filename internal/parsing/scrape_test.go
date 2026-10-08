@@ -74,3 +74,71 @@ func TestParseExampleScrapeRules(t *testing.T) {
 	}
 	t.Error("expected a crawl rule for rumble.com")
 }
+
+// TestParseScrapeSelectorsFileImpersonate tests that an unset impersonate value is distinguished from an explicit "" or "none".
+func TestParseScrapeSelectorsFileImpersonate(t *testing.T) {
+	files := map[string]string{
+		"rules.toml": `
+[[sites]]
+domain = "unset.com"
+  [sites.crawl]
+  selector = "a"
+[[sites]]
+domain = "empty.com"
+impersonate = ""
+  [sites.crawl]
+  selector = "a"
+[[sites]]
+domain = "none.com"
+impersonate = "none"
+  [sites.crawl]
+  selector = "a"
+[[sites]]
+domain = "firefox.com"
+impersonate = "Firefox"
+  [sites.crawl]
+  selector = "a"
+`,
+		"rules.yaml": `
+sites:
+  - domain: unset.com
+    crawl: {selector: a}
+  - domain: empty.com
+    impersonate: ""
+    crawl: {selector: a}
+  - domain: none.com
+    impersonate: none
+    crawl: {selector: a}
+  - domain: firefox.com
+    impersonate: Firefox
+    crawl: {selector: a}
+`,
+		"rules.json": `{"sites": [
+  {"domain": "unset.com", "crawl": {"selector": "a"}},
+  {"domain": "empty.com", "impersonate": "", "crawl": {"selector": "a"}},
+  {"domain": "none.com", "impersonate": "none", "crawl": {"selector": "a"}},
+  {"domain": "firefox.com", "impersonate": "Firefox", "crawl": {"selector": "a"}}
+]}`,
+	}
+	want := map[string]string{"empty.com": "", "none.com": "", "firefox.com": "firefox"}
+
+	for name, content := range files {
+		t.Run(name, func(t *testing.T) {
+			sites, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, name, content))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, s := range sites {
+				w, explicit := want[s.Domain]
+				switch {
+				case !explicit && s.Impersonate != nil:
+					t.Errorf("%s: expected unset impersonate, got %q", s.Domain, *s.Impersonate)
+				case explicit && s.Impersonate == nil:
+					t.Errorf("%s: expected impersonate %q, got unset", s.Domain, w)
+				case explicit && string(*s.Impersonate) != w:
+					t.Errorf("%s: expected impersonate %q, got %q", s.Domain, w, *s.Impersonate)
+				}
+			}
+		})
+	}
+}

@@ -97,3 +97,10 @@ func TestCrawlWithRuleRequestError(t *testing.T) {
 		t.Error("expected an error for a 403 channel page")
 	}
 }
+
+// TestCrawlWithRuleNilRule tests that crawlWithRule returns an error rather than panicking when a site has no crawl rule.
+func TestCrawlWithRuleNilRule(t *testing.T) {
+	if _, err := New().crawlWithRule("https://example.com", nil, consts.HTMLMetadataQuery{Site: "example.com"}); err == nil {
+		t.Error("expected an error for a site with no crawl rule")
+	}
+}

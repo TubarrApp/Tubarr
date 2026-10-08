@@ -17,18 +17,28 @@ var (
 
 // builtinSites returns the compile-time default scraping rules, gated by dev toggles.
 func builtinSites() map[string]consts.HTMLMetadataQuery {
-	sites := make(map[string]consts.HTMLMetadataQuery, 4)
-	if dev.CensoredTVUseCustom {
-		sites[consts.HTMLCensored.Site] = consts.HTMLCensored
+	builtins := []struct {
+		query  consts.HTMLMetadataQuery
+		toggle dev.BuiltinScraper
+	}{
+		{consts.HTMLCensored, dev.CensoredTV},
+		{consts.HTMLBitchute, dev.BitchuteCom},
+		{consts.HTMLOdysee, dev.OdyseeCom},
+		{consts.HTMLRumble, dev.RumbleCom},
 	}
-	if dev.BitchuteComUseCustom {
-		sites[consts.HTMLBitchute.Site] = consts.HTMLBitchute
-	}
-	if dev.OdyseeComUseCustom {
-		sites[consts.HTMLOdysee.Site] = consts.HTMLOdysee
-	}
-	if dev.RumbleComUseCustom {
-		sites[consts.HTMLRumble.Site] = consts.HTMLRumble
+
+	sites := make(map[string]consts.HTMLMetadataQuery, len(builtins))
+	for _, b := range builtins {
+		q := b.query
+		if !b.toggle.Metadata {
+			q.Rules = nil
+		}
+		if !b.toggle.Crawl {
+			q.Crawl = nil
+		}
+		if len(q.Rules) > 0 || q.Crawl != nil {
+			sites[q.Site] = q
+		}
 	}
 	return sites
 }
@@ -42,26 +52,33 @@ func ResetCustomSites() {
 
 // RegisterCustomSites loads user-defined scrape site selectors into the global registry.
 //
-// User-defined sites take priority over built-in rules for the same domain.
+// User-defined metadata selectors and crawl rules each replace the built-in ones for the same domain.
 func RegisterCustomSites(sites []models.SiteScraper) {
 	customSitesMu.Lock()
 	defer customSitesMu.Unlock()
 
 	for _, s := range sites {
-		rules := make([]consts.HTMLMetadataRule, 0, len(s.Selectors))
-		for _, sel := range s.Selectors {
-			rules = append(rules, consts.HTMLMetadataRule{
-				Name:     sel.Field,
-				Selector: sel.Selector,
-				Attr:     sel.Attr,
-			})
+		domain := strings.ToLower(s.Domain)
+		query := customSites[domain]
+		query.Site = s.Domain
+
+		if len(s.Selectors) > 0 {
+			query.Rules = make([]consts.HTMLMetadataRule, 0, len(s.Selectors))
+			for _, sel := range s.Selectors {
+				query.Rules = append(query.Rules, consts.HTMLMetadataRule{
+					Name:     sel.Field,
+					Selector: sel.Selector,
+					Attr:     sel.Attr,
+				})
+			}
 		}
-		customSites[strings.ToLower(s.Domain)] = consts.HTMLMetadataQuery{
-			Site:        s.Domain,
-			Rules:       rules,
-			Crawl:       s.Crawl,
-			Impersonate: string(s.Impersonate),
+		if s.Crawl != nil {
+			query.Crawl = s.Crawl
 		}
+		if s.Impersonate != nil {
+			query.Impersonate = string(*s.Impersonate)
+		}
+		customSites[domain] = query
 	}
 
 	logger.Pl.I("Registered %d custom scrape site(s)", len(sites))

@@ -15,7 +15,7 @@ import (
 // scrapeSiteConfig mirrors a single site entry in a user-supplied scrape config file.
 type scrapeSiteConfig struct {
 	Domain      string                 `mapstructure:"domain"`
-	Impersonate string                 `mapstructure:"impersonate"`
+	Impersonate *string                `mapstructure:"impersonate"`
 	Selectors   []scrapeSelectorConfig `mapstructure:"selectors"`
 	Crawl       *scrapeCrawlConfig     `mapstructure:"crawl"`
 }
@@ -75,17 +75,22 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 			return nil, fmt.Errorf("scrape config file %q: site entry missing domain", f)
 		}
 
-		// Impersonate is optional and intended to simulate a real browser if provided. It must be one of the supported values.
-		impersonate := consts.Impersonate(strings.ToLower(strings.TrimSpace(s.Impersonate)))
-		if impersonate == "none" {
-			impersonate = consts.ImpersonateNone
-		}
-		if impersonate == consts.ImpersonateOpera {
-			logger.Pl.W("Scrape config file %q: Site %q uses impersonate value %q which is unstable. Using %q instead.", f, domain, impersonate, consts.ImpersonateChrome)
-			impersonate = consts.ImpersonateChrome
-		}
-		if _, valid := consts.ValidImpersonateValues[impersonate]; !valid {
-			return nil, fmt.Errorf("scrape config file %q: site %q has invalid impersonate value %q", f, domain, impersonate)
+		// Impersonate is optional and intended to simulate a real browser if provided.
+		// Unset keeps any built-in value, while "" or "none" explicitly disables impersonation.
+		var impersonate *consts.Impersonate
+		if s.Impersonate != nil {
+			imp := consts.Impersonate(strings.ToLower(strings.TrimSpace(*s.Impersonate)))
+			if imp == "none" {
+				imp = consts.ImpersonateNone
+			}
+			if imp == consts.ImpersonateOpera {
+				logger.Pl.W("Scrape config file %q: Site %q uses impersonate value %q which is unstable. Using %q instead.", f, domain, imp, consts.ImpersonateChrome)
+				imp = consts.ImpersonateChrome
+			}
+			if _, valid := consts.ValidImpersonateValues[imp]; !valid {
+				return nil, fmt.Errorf("scrape config file %q: site %q has invalid impersonate value %q", f, domain, imp)
+			}
+			impersonate = &imp
 		}
 
 		// A site needs metadata selectors, a crawl rule, or both. Each selector must have a non-empty field and selector value.
@@ -118,7 +123,7 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 			Domain:      domain,
 			Selectors:   selectors,
 			Crawl:       crawl,
-			Impersonate: consts.Impersonate(impersonate),
+			Impersonate: impersonate,
 		})
 	}
 

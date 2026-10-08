@@ -7,7 +7,7 @@ type SiteScraper struct {
 	Domain      string
 	Selectors   []ScrapeSelectors
 	Crawl       *consts.HTMLCrawlRule
-	Impersonate consts.Impersonate
+	Impersonate *consts.Impersonate // nil keeps any built-in value.
 }
 
 // ScrapeSelectors holds the field name and HTML selector for grabbing desired metadata.

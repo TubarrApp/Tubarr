@@ -33,7 +33,8 @@ type HTMLMetadataQuery struct {
 
 // HTMLBitchute holds scraping elements for bitchute.com.
 var HTMLBitchute = HTMLMetadataQuery{
-	Site: "bitchute.com",
+	Site:  "bitchute.com",
+	Crawl: &HTMLCrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile(`/video/`)},
 	Rules: []HTMLMetadataRule{
 		{Name: sharedtags.JTitle, Selector: `meta[itemprop="name"]`, Attr: "content"},
 		{Name: sharedtags.JDescription, Selector: `meta[name="description"]`, Attr: "content"},
@@ -44,7 +45,8 @@ var HTMLBitchute = HTMLMetadataQuery{
 
 // HTMLCensored holds scraping elements for censored.tv.
 var HTMLCensored = HTMLMetadataQuery{
-	Site: "censored.tv",
+	Site:  "censored.tv",
+	Crawl: &HTMLCrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile(`/episodes/`)},
 	Rules: []HTMLMetadataRule{
 		{Name: sharedtags.JTitle, Selector: "#episode-container .episode-title"},
 		{Name: sharedtags.JDescription, Selector: "#about .raised-content"},
@@ -56,7 +58,8 @@ var HTMLCensored = HTMLMetadataQuery{
 
 // HTMLOdysee holds scraping elements for odysee.com.
 var HTMLOdysee = HTMLMetadataQuery{
-	Site: "odysee.com",
+	Site:  "odysee.com",
+	Crawl: &HTMLCrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile(`@`)},
 	Rules: []HTMLMetadataRule{
 		{Name: sharedtags.JTitle, Selector: "title"},
 		{Name: sharedtags.JDescription, Selector: `meta[name="description"]`, Attr: "content"},
@@ -69,6 +72,13 @@ var HTMLOdysee = HTMLMetadataQuery{
 var HTMLRumble = HTMLMetadataQuery{
 	Site:        "rumble.com",
 	Impersonate: "chrome", // Rumble blocks non-Chrome TLS fingerprints.
+	Crawl: &HTMLCrawlRule{
+		Selector:   `rum-videos-grid script[type="application/json"]`,
+		JSONPath:   `items.#(object_type=="video")#.url`,
+		Include:    regexp.MustCompile(`^https?://([^/]+\.)?rumble\.com/v`),
+		Exclude:    regexp.MustCompile(`^https?://([^/]+\.)?rumble\.com/videos`),
+		StripQuery: true,
+	},
 	Rules: []HTMLMetadataRule{
 		{Name: sharedtags.JTitle, Selector: "title"},
 		{Name: sharedtags.JDescription, Selector: `meta[name="description"]`, Attr: "content"},

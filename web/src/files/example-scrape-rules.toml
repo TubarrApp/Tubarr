@@ -8,6 +8,7 @@
 # "attr" is optional. Omit it to read the element's text content instead of an attribute.
 #
 # "impersonate" is optional and makes requests look like a real browser (chrome, firefox, safari, brave).
+# Leave it out to keep a built-in site's setting, or set it to "none" (or "") to turn impersonation off.
 #
 # [sites.crawl] is optional and tells Tubarr how to find new videos on a channel page, instead of
 # using the built-in scraper or yt-dlp. It uses the site's impersonate setting.
@@ -120,5 +121,6 @@ impersonate = "chrome"
   [sites.crawl]
   selector = 'rum-videos-grid script[type="application/json"]'
   json_path = 'items.#(object_type=="video")#.url'
-  include = '^https://rumble\.com/v[^/]+\.html$'
+  include = '^https?://([^/]+\.)?rumble\.com/v'
+  exclude = '^https?://([^/]+\.)?rumble\.com/videos'
   strip_query = true
