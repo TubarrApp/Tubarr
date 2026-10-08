@@ -93,16 +93,10 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 
 	// Viper supported extensions.
 	validExts := map[string]bool{
-		".yaml":       true,
-		".yml":        true,
-		".toml":       true,
-		".json":       true,
-		".hcl":        true,
-		".tfvars":     true,
-		".properties": true,
-		".props":      true,
-		".prop":       true,
-		".ini":        true,
+		".yaml": true,
+		".yml":  true,
+		".toml": true,
+		".json": true,
 	}
 
 	var configFiles []string

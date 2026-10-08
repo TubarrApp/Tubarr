@@ -836,7 +836,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	addCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
 	addCmd.Flags().BoolVar(&flags.IgnoreRun, keys.IgnoreRun, false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
-	addCmd.Flags().StringVar(&addFromFile, "add-channel-from-file", "", "Add a channel using a prewritten file (.toml, .yaml, etc.).\nFile contents example:\n\nchannel-name: 'Cool Channel'\nchannel-urls:\n  - 'https://www.coolchannel.com/'\n")
+	addCmd.Flags().StringVar(&addFromFile, "add-channel-from-file", "", "Add a channel using a prewritten file (.json, .toml, .yml/.yaml).\nFile contents example:\n\nchannel-name: 'Cool Channel'\nchannel-urls:\n  - 'https://www.coolchannel.com/'\n")
 
 	return addCmd
 }
@@ -1003,7 +1003,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 		},
 	}
 
-	batchCmd.Flags().StringVar(&configDirectory, "add-from-directory", "", "Directory containing channel config files (.yaml, .yml, .toml, .json, etc.)")
+	batchCmd.Flags().StringVar(&configDirectory, "add-from-directory", "", "Directory containing channel config files (.json, .toml, .yaml/.yml)")
 
 	cmd.SetPrimaryChannelFlags(batchCmd, &flags.Name, &flags.URLs, nil)
 	cmd.SetFileDirFlags(batchCmd, &flags.ChannelConfigFile, &flags.JSONDir, &flags.VideoDir)

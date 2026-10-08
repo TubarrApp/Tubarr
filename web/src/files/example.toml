@@ -28,7 +28,7 @@ metarr_transcode_gpu = "auto"
 metarr_transcode_gpu_node = "/dev/dri/renderD128"
 metarr_transcode_video_codecs = [
   "h264:hevc",
-  "webm:h264"
+  "vp9:h264"
 ]
 metarr_transcode_audio_codecs = [
   "aac:ac3",
@@ -41,4 +41,10 @@ notify = ["https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refr
 
 # Ignore videos to date (only download new videos after now)
 ignore_run = true
+
+# URL-specific settings apply specifically to a given URL belonging to this channel
+[url-settings."https://www.tubesite.com/@CoolChannel".settings]
+  crawl_freq = 60
+[url-settings."https://www.tubesite.com/@CoolChannel".metarr]
+  metarr_output_directory = "/home/user/tubarr/{{channel_name}}/Custom/{{year}}"
 

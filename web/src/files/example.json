@@ -1,0 +1,38 @@
+{
+  "channel_name": "Cool Channel",
+  "channel_urls": ["https://www.tubesite.com/@CoolChannel"],
+  "video_directory": "/home/user/tubarr/{{channel_name}}",
+  "json_directory": "/home/user/tubarr/{{channel_name}}",
+
+  "external_downloader": "aria2c",
+  "external_downloader_args": "-x 16 -s 16",
+  "concurrency": 3,
+  "crawl_freq": 30,
+
+  "metarr_meta_ops": [
+    "title:date-tag:prefix:ymd",
+    "fulltitle:date-tag:prefix:ymd",
+    "all-credits:set:Cool Guy"
+  ],
+  "metarr_filename_ops": ["date-tag:prefix:ymd"],
+  "metarr_rename_style": "spaces",
+  "metarr_output_ext": "mp4",
+  "metarr_concurrency": 5,
+  "metarr_output_directory": "/home/user/tubarr/{{channel_name}}/{{year}}",
+
+  "metarr_transcode_gpu": "auto",
+  "metarr_transcode_gpu_node": "/dev/dri/renderD128",
+  "metarr_transcode_video_codecs": ["h264:hevc", "vp9:h264"],
+  "metarr_transcode_audio_codecs": ["aac:ac3", "dts:eac3", "flac:mp3"],
+
+  "notify": ["https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh?X-Plex-Token=< YOUR PLEX TOKEN >|Plex"],
+
+  "ignore_run": true,
+
+  "url-settings": {
+    "https://www.tubesite.com/@CoolChannel": {
+      "settings": { "crawl_freq": 60 },
+      "metarr": { "metarr_output_directory": "/home/user/tubarr/{{channel_name}}/Custom/{{year}}" }
+    }
+  }
+}

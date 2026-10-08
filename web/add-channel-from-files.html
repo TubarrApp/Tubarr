@@ -529,7 +529,14 @@
                   Add one or multiple channels using configuration files. Choose between a single file or a directory containing multiple config files.
                   <br>
                   <br>
-                  Example File: <a href="/src/files/example.toml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example.toml</a>
+                  Example Files:
+                  <br>
+                  <br>
+                  <a href="/src/files/example.toml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example.toml</a>
+                  <br>
+                  <a href="/src/files/example.yaml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example.yaml</a>
+                  <br>
+                  <a href="/src/files/example.json" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example.json</a>
                   <br>
                   <br>
                 </p>
@@ -592,7 +599,7 @@
                     class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                   />
                   <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    Absolute path to a YAML or TOML configuration file containing channel settings.
+                    Absolute path to a YAML (.yaml/.yml), TOML (.toml) or JSON (.json) configuration file containing channel settings.
                   </p>
                 </div>
 
@@ -633,10 +640,9 @@
                           <li>Channel name</li>
                           <li>Channel URLs</li>
                           <li>Video and JSON directories</li>
-                          <li>Optional: Download settings, filters, transcoding options</li>
                         </ul>
                         <p class="mt-2" x-show="mode === 'directory'">
-                          <strong>Directory mode:</strong> All .yaml, .yml, .toml, .json, and other supported config files in the directory will be processed. Each file should define one complete channel configuration.
+                          <strong>Directory mode:</strong> All .yaml, .yml, .toml and .json files in the directory will be processed. Each file should define one complete channel configuration.
                         </p>
                       </div>
                     </div>
