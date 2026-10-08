@@ -6,6 +6,7 @@ import "tubarr/internal/domain/consts"
 type SiteScraper struct {
 	Domain      string
 	Selectors   []ScrapeSelectors
+	Crawl       *consts.HTMLCrawlRule
 	Impersonate consts.Impersonate
 }
 

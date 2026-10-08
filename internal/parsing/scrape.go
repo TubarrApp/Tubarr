@@ -2,6 +2,7 @@ package parsing
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -16,6 +17,17 @@ type scrapeSiteConfig struct {
 	Domain      string                 `mapstructure:"domain"`
 	Impersonate string                 `mapstructure:"impersonate"`
 	Selectors   []scrapeSelectorConfig `mapstructure:"selectors"`
+	Crawl       *scrapeCrawlConfig     `mapstructure:"crawl"`
+}
+
+// scrapeCrawlConfig mirrors a site's channel page crawl rule in a scrape config file.
+type scrapeCrawlConfig struct {
+	Selector   string `mapstructure:"selector"`
+	Attr       string `mapstructure:"attr"`
+	JSONPath   string `mapstructure:"json_path"`
+	Include    string `mapstructure:"include"`
+	Exclude    string `mapstructure:"exclude"`
+	StripQuery bool   `mapstructure:"strip_query"`
 }
 
 // scrapeSelectorConfig mirrors a single selector entry for a site in a scrape config file.
@@ -38,6 +50,10 @@ type scrapeSelectorConfig struct {
 //	      - field: description
 //	        selector: "meta[name=description]"
 //	        attr: content
+//	    crawl:
+//	      selector: "a[href]"
+//	      attr: href
+//	      include: "/video/"
 func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 	v := viper.New()
 	if err := file.LoadConfigFile(v, f); err != nil {
@@ -72,9 +88,14 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 			return nil, fmt.Errorf("scrape config file %q: site %q has invalid impersonate value %q", f, domain, impersonate)
 		}
 
-		// Selectors are required and must have at least one entry. Each selector must have a non-empty field and selector value.
-		if len(s.Selectors) == 0 {
-			return nil, fmt.Errorf("scrape config file %q: site %q has no selectors", f, domain)
+		// A site needs metadata selectors, a crawl rule, or both. Each selector must have a non-empty field and selector value.
+		if len(s.Selectors) == 0 && s.Crawl == nil {
+			return nil, fmt.Errorf("scrape config file %q: site %q has no selectors or crawl rule", f, domain)
+		}
+
+		crawl, err := parseCrawlConfig(s.Crawl)
+		if err != nil {
+			return nil, fmt.Errorf("scrape config file %q: site %q: %w", f, domain, err)
 		}
 
 		// Build the list of selectors for this site, validating each one.
@@ -96,10 +117,41 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 		sites = append(sites, models.SiteScraper{
 			Domain:      domain,
 			Selectors:   selectors,
+			Crawl:       crawl,
 			Impersonate: consts.Impersonate(impersonate),
 		})
 	}
 
 	logger.Pl.I("Loaded %d custom scrape site(s) from %q", len(sites), f)
 	return sites, nil
+}
+
+// parseCrawlConfig validates a crawl rule and compiles its URL filters.
+func parseCrawlConfig(c *scrapeCrawlConfig) (*consts.HTMLCrawlRule, error) {
+	if c == nil {
+		return nil, nil
+	}
+
+	rule := &consts.HTMLCrawlRule{
+		Selector:   strings.TrimSpace(c.Selector),
+		Attr:       strings.TrimSpace(c.Attr),
+		JSONPath:   strings.TrimSpace(c.JSONPath),
+		StripQuery: c.StripQuery,
+	}
+	if rule.Selector == "" {
+		return nil, fmt.Errorf("crawl rule is missing a selector")
+	}
+
+	var err error
+	if include := strings.TrimSpace(c.Include); include != "" {
+		if rule.Include, err = regexp.Compile(include); err != nil {
+			return nil, fmt.Errorf("invalid crawl include pattern %q: %w", include, err)
+		}
+	}
+	if exclude := strings.TrimSpace(c.Exclude); exclude != "" {
+		if rule.Exclude, err = regexp.Compile(exclude); err != nil {
+			return nil, fmt.Errorf("invalid crawl exclude pattern %q: %w", exclude, err)
+		}
+	}
+	return rule, nil
 }

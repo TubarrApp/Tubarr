@@ -663,12 +663,16 @@
                   <p x-show="selectedSiteImpersonate" class="text-xs text-gray-500 dark:text-gray-400">
                     Impersonate: <span x-text="selectedSiteImpersonate" class="font-mono text-gray-700 dark:text-gray-300"></span>
                   </p>
-                  <textarea
-                    readonly
-                    rows="6"
-                    :value="selectedSiteSelectorsText"
-                    class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  ></textarea>
+                  <div class="w-full max-h-64 overflow-auto rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 space-y-3 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                    <template x-for="section in selectedSiteSections" :key="section.title">
+                      <div>
+                        <strong class="block mb-4" x-text="section.title"></strong>
+                        <template x-for="(line, i) in section.lines" :key="i">
+                          <div class="pl-4 whitespace-pre-wrap break-all" x-text="line"></div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
                 </div>
               </div>
 
@@ -761,12 +765,26 @@
             return site?.impersonate || '';
           },
 
-          get selectedSiteSelectorsText() {
+          get selectedSiteSections() {
             const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
-            if (!site || site.selectors.length === 0) return '(no selectors)';
-            return site.selectors
-              .map(s => `${s.field}: ${s.selector}${s.attr ? '  [attr=' + s.attr + ']' : ''}`)
-              .join('\n');
+            if (!site) return [];
+            const sections = [{
+              title: 'Metadata selectors:',
+              lines: site.selectors.length === 0
+                ? ['(none)']
+                : site.selectors.map(s => `${s.field}: ${s.selector}${s.attr ? '  [attr=' + s.attr + ']' : ''}`),
+            }];
+            const c = site.crawl;
+            if (c) {
+              const lines = [`selector: ${c.selector}`];
+              if (c.attr) lines.push(`attr: ${c.attr}`);
+              if (c.json_path) lines.push(`json_path: ${c.json_path}`);
+              if (c.include) lines.push(`include: ${c.include}`);
+              if (c.exclude) lines.push(`exclude: ${c.exclude}`);
+              if (c.strip_query) lines.push('strip_query: true');
+              sections.push({ title: 'Crawl settings:', lines });
+            }
+            return sections;
           },
 
           init() {

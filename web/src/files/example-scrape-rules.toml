@@ -6,6 +6,18 @@
 # "title" could be selected with "p.title".
 #
 # "attr" is optional. Omit it to read the element's text content instead of an attribute.
+#
+# "impersonate" is optional and makes requests look like a real browser (chrome, firefox, safari, brave).
+#
+# [sites.crawl] is optional and tells Tubarr how to find new videos on a channel page, instead of
+# using the built-in scraper or yt-dlp. It uses the site's impersonate setting.
+#   selector    - elements holding the video links (e.g. "a[href]").
+#   attr        - attribute holding the link. Omit it to read the element's text content.
+#   json_path   - optional. If the value is JSON (e.g. a <script> tag), the path to the video URLs.
+#                 Uses gjson syntax: https://github.com/tidwall/gjson/blob/master/SYNTAX.md
+#   include     - optional. Regular expression video URLs must match.
+#   exclude     - optional. Regular expression video URLs must not match.
+#   strip_query - optional. Removes "?..." from video URLs so the same video isn't added twice.
 
 [[sites]]
 domain = "bitchute.com"
@@ -104,3 +116,9 @@ impersonate = "chrome"
   field = "thumbnail"
   selector = "meta[property='og:image']"
   attr = "content"
+
+  [sites.crawl]
+  selector = 'rum-videos-grid script[type="application/json"]'
+  json_path = 'items.#(object_type=="video")#.url'
+  include = '^https://rumble\.com/v[^/]+\.html$'
+  strip_query = true

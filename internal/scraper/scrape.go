@@ -35,14 +35,12 @@ import (
 
 // Scraper handles web scraping operations.
 type Scraper struct {
-	collector     *colly.Collector
 	cookieManager *CookieManager
 }
 
 // New returns a new Scraper instance.
 func New() *Scraper {
 	return &Scraper{
-		collector:     colly.NewCollector(),
 		cookieManager: NewCookieManager(),
 	}
 }
@@ -213,15 +211,6 @@ func (s *Scraper) newEpisodeURLs(
 	// Episode map to avoid deduplication
 	uniqueEpisodeURLs := make(map[string]struct{})
 
-	// Set cookies
-	if len(cookies) > 0 {
-		for _, cookie := range cookies {
-			if err := s.collector.SetCookies(channelURL, []*http.Cookie{cookie}); err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	// Check if domain matches any custom Tubarr domains
 	var customDom bool
 	pattern := patterns["default"]
@@ -234,39 +223,30 @@ func (s *Scraper) newEpisodeURLs(
 		}
 	}
 
-	s.collector.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		link := e.Request.AbsoluteURL(e.Attr("href"))
-		if !strings.Contains(link, pattern.pattern) {
-			return
+	// User-defined crawl rules take priority over built-in scrapers and yt-dlp.
+	var err error
+	if query, ok := matchCrawlSite(channelURL); ok {
+		logger.Pl.I("Using custom crawl rule for %q", query.Site)
+		if uniqueEpisodeURLs, err = s.crawlWithRule(channelURL, cookies, query); err != nil {
+			return nil, err
 		}
-		// For Rumble, ensure it's a valid video URL and remove query parameters for cleaner comparison.
-		if pattern.name == rumble {
-			if !isValidRumbleVideoURL(link) {
-				logger.Pl.D(2, "Rumble URL %q is not a valid video link, skipping...", link)
-				return
-			}
-			link = removeQueryParams(link)
+	} else if customDom && pattern.name == rumble {
+		if uniqueEpisodeURLs, err = s.scrapeRumbleChannelURLs(channelURL, cookies); err != nil {
+			return nil, err
 		}
-		uniqueEpisodeURLs[link] = struct{}{}
-	})
-
-	if customDom {
-		if pattern.name == rumble {
-			rumbleURLs, err := scrapeRumbleChannelURLs(channelURL, cookies)
-			if err != nil {
-				return nil, err
+	} else if customDom {
+		var impersonate consts.Impersonate
+		if query, ok := matchSite(channelURL, func(consts.HTMLMetadataQuery) bool { return true }); ok {
+			impersonate = consts.Impersonate(query.Impersonate)
+		}
+		if err := s.crawlChannelPage(channelURL, cookies, impersonate, "a[href]", func(e *colly.HTMLElement) {
+			if link := e.Request.AbsoluteURL(e.Attr("href")); strings.Contains(link, pattern.pattern) {
+				uniqueEpisodeURLs[link] = struct{}{}
 			}
-			for u := range rumbleURLs {
-				uniqueEpisodeURLs[u] = struct{}{}
-			}
-		} else {
-			if err := s.collector.Visit(channelURL); err != nil {
-				return nil, fmt.Errorf("error visiting webpage %q: %w", channelURL, err)
-			}
-			s.collector.Wait()
+		}); err != nil {
+			return nil, err
 		}
 	} else {
-		var err error
 		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, uniqueEpisodeURLs, cookiePath, crawlArgs); err != nil {
 			return nil, err
 		}

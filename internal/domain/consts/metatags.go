@@ -1,6 +1,10 @@
 package consts
 
-import "github.com/TubarrApp/gocommon/sharedtags"
+import (
+	"regexp"
+
+	"github.com/TubarrApp/gocommon/sharedtags"
+)
 
 // HTMLMetadataRule defines the metadata scraping elements.
 type HTMLMetadataRule struct {
@@ -9,11 +13,22 @@ type HTMLMetadataRule struct {
 	Attr     string
 }
 
+// HTMLCrawlRule defines how video URLs are extracted from a channel page.
+type HTMLCrawlRule struct {
+	Selector   string
+	Attr       string         // Attribute to read ("" reads element text).
+	JSONPath   string         // gjson path applied to the value, if it holds JSON.
+	Include    *regexp.Regexp // URLs must match, if set.
+	Exclude    *regexp.Regexp // URLs must not match, if set.
+	StripQuery bool
+}
+
 // HTMLMetadataQuery holds the site name and metadata rules.
 type HTMLMetadataQuery struct {
 	Site        string
 	Rules       []HTMLMetadataRule
-	Impersonate string // Browser TLS fingerprint to impersonate ("" for none).
+	Crawl       *HTMLCrawlRule // Channel page crawl rule (nil to use built-in or yt-dlp).
+	Impersonate string         // Browser TLS fingerprint to impersonate ("" for none).
 }
 
 // HTMLBitchute holds scraping elements for bitchute.com.

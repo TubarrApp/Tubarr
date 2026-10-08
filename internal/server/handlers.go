@@ -1730,9 +1730,18 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		Selector string `json:"selector"`
 		Attr     string `json:"attr,omitempty"`
 	}
+	type crawlResp struct {
+		Selector   string `json:"selector"`
+		Attr       string `json:"attr,omitempty"`
+		JSONPath   string `json:"json_path,omitempty"`
+		Include    string `json:"include,omitempty"`
+		Exclude    string `json:"exclude,omitempty"`
+		StripQuery bool   `json:"strip_query,omitempty"`
+	}
 	type siteResp struct {
 		Domain      string         `json:"domain"`
 		Selectors   []selectorResp `json:"selectors"`
+		Crawl       *crawlResp     `json:"crawl,omitempty"`
 		Impersonate string         `json:"impersonate,omitempty"`
 	}
 
@@ -1742,7 +1751,17 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		for _, rule := range site.Rules {
 			selectors = append(selectors, selectorResp{Field: rule.Name, Selector: rule.Selector, Attr: rule.Attr})
 		}
-		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors, Impersonate: site.Impersonate})
+		var crawl *crawlResp
+		if c := site.Crawl; c != nil {
+			crawl = &crawlResp{Selector: c.Selector, Attr: c.Attr, JSONPath: c.JSONPath, StripQuery: c.StripQuery}
+			if c.Include != nil {
+				crawl.Include = c.Include.String()
+			}
+			if c.Exclude != nil {
+				crawl.Exclude = c.Exclude.String()
+			}
+		}
+		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors, Crawl: crawl, Impersonate: site.Impersonate})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -59,6 +59,7 @@ func RegisterCustomSites(sites []models.SiteScraper) {
 		customSites[strings.ToLower(s.Domain)] = consts.HTMLMetadataQuery{
 			Site:        s.Domain,
 			Rules:       rules,
+			Crawl:       s.Crawl,
 			Impersonate: string(s.Impersonate),
 		}
 	}
@@ -80,13 +81,23 @@ func ListRegisteredSites() []consts.HTMLMetadataQuery {
 	return sites
 }
 
-// matchCustomSite finds registered scraping rules for a URL based on domain match.
+// matchCustomSite finds registered metadata scraping rules for a URL based on domain match.
 func matchCustomSite(url string) (consts.HTMLMetadataQuery, bool) {
+	return matchSite(url, func(q consts.HTMLMetadataQuery) bool { return len(q.Rules) > 0 })
+}
+
+// matchCrawlSite finds a registered channel page crawl rule for a URL based on domain match.
+func matchCrawlSite(url string) (consts.HTMLMetadataQuery, bool) {
+	return matchSite(url, func(q consts.HTMLMetadataQuery) bool { return q.Crawl != nil })
+}
+
+// matchSite finds a registered site for a URL whose rules satisfy the filter.
+func matchSite(url string, filter func(consts.HTMLMetadataQuery) bool) (consts.HTMLMetadataQuery, bool) {
 	customSitesMu.RLock()
 	defer customSitesMu.RUnlock()
 
 	for domain, query := range customSites {
-		if strings.Contains(url, domain) {
+		if strings.Contains(url, domain) && filter(query) {
 			return query, true
 		}
 	}
