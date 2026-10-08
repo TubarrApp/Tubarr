@@ -43,8 +43,8 @@ func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (s
 }
 
 // crawlChannelPage visits a channel page and passes each element matching the selector to onMatch.
-func (s *Scraper) crawlChannelPage(channelURL string, cookies []*http.Cookie, impersonate consts.Impersonate, selector string, onMatch colly.HTMLCallback) error {
-	c, err := initializeCollector(channelURL, s.cookieManager, impersonate)
+func (s *Scraper) crawlChannelPage(channelURL string, cookies []*http.Cookie, query consts.HTMLMetadataQuery, selector string, onMatch colly.HTMLCallback) error {
+	c, err := initializeCollector(channelURL, s.cookieManager, query)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query
 	}
 	urls := make(map[string]struct{})
 
-	err := s.crawlChannelPage(channelURL, cookies, consts.Impersonate(query.Impersonate), rule.Selector, func(e *colly.HTMLElement) {
+	err := s.crawlChannelPage(channelURL, cookies, query, rule.Selector, func(e *colly.HTMLElement) {
 		value := e.Text
 		if rule.Attr != "" {
 			value = e.Attr(rule.Attr)

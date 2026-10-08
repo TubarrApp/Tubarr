@@ -24,7 +24,7 @@ type serverStore struct {
 	cs     contracts.ChannelStore
 	ds     contracts.DownloadStore
 	vs     contracts.VideoStore
-	ss     contracts.SettingsStore
+	tss    contracts.TubarrSettingsStore
 	db     *sql.DB
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -90,6 +90,9 @@ func NewRouter(ss serverStore) http.Handler {
 		r.Get("/settings/domain-download-limits", ss.handleGetDomainDownloadLimits)
 		r.Put("/settings/domain-download-limits", ss.handleSetDomainDownloadLimit)
 		r.Delete("/settings/domain-download-limits/{hostname}", ss.handleDeleteDomainDownloadLimit)
+		r.Get("/settings/flaresolverr-url", ss.handleGetFlareSolverrURL)
+		r.Put("/settings/flaresolverr-url", ss.handleSetFlareSolverrURL)
+		r.Post("/settings/flaresolverr-url/test", ss.handleTestFlareSolverr)
 		r.Get("/settings/scrape-config-file", ss.handleGetScrapeConfigFile)
 		r.Put("/settings/scrape-config-file", ss.handleSetScrapeConfigFile)
 		r.Post("/settings/scrape-config-file/reload", ss.handleReloadScrapeConfigFile)
@@ -113,7 +116,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		cs:     store.ChannelStore(),
 		ds:     store.DownloadStore(),
 		vs:     store.VideoStore(),
-		ss:     store.SettingsStore(),
+		tss:    store.TubarrSettingsStore(),
 		db:     database,
 		ctx:    inputCtx,
 		cancel: inputCtxCancel,

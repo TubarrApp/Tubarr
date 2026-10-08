@@ -587,6 +587,50 @@
               </div>
             </div>
 
+            <!-- FlareSolverr Card -->
+            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">FlareSolverr</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">URL of a <a href="https://github.com/FlareSolverr/FlareSolverr" target="_blank" rel="noopener" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">FlareSolverr</a> instance, used to get past Cloudflare challenges. Only sites with <code>flaresolverr = true</code> in the scrape rules file use it, for both crawling channel pages and scraping metadata.
+                <br>
+                <br>
+                Pages fetched through FlareSolverr load in a real browser, so they can take several seconds each. FlareSolverr also returns the page after its JavaScript has run, which can differ from the page's original HTML, so a site's selectors and crawl rule may need adjusting when FlareSolverr is turned on.
+              </p>
+
+              <div class="flex items-center gap-3 py-3">
+                <input
+                  type="text"
+                  x-model="flareSolverrURL"
+                  placeholder="http://localhost:8191"
+                  class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  @keydown.enter="saveFlareSolverrURL()"
+                />
+                <button
+                  @click="saveFlareSolverrURL()"
+                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                >
+                  Save
+                </button>
+                <button
+                  @click="flareSolverrURL = ''; saveFlareSolverrURL()"
+                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  Clear
+                </button>
+                <button
+                  @click="testFlareSolverr()"
+                  :disabled="!flareSolverrURL || testingFlareSolverr"
+                  title="Load https://example.com through FlareSolverr to check it works"
+                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                >
+                  <span x-show="!testingFlareSolverr">Test</span>
+                  <span x-show="testingFlareSolverr">Testing...</span>
+                </button>
+                <span x-show="flareSolverrSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+              </div>
+              <p x-show="flareSolverrMessage" x-text="flareSolverrMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
+              <p x-show="flareSolverrError" x-text="flareSolverrError" class="text-xs mt-1" style="color: #ef4444;"></p>
+            </div>
+
             <!-- Custom Scrape Sites Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Custom Scrape Sites</h3>
@@ -662,6 +706,9 @@
                   </select>
                   <p x-show="selectedSiteImpersonate" class="text-xs text-gray-500 dark:text-gray-400">
                     Impersonate: <span x-text="selectedSiteImpersonate" class="font-mono text-gray-700 dark:text-gray-300"></span>
+                  </p>
+                  <p x-show="selectedSiteFlareSolverr" class="text-xs text-gray-500 dark:text-gray-400">
+                    Fetched through FlareSolverr<span x-show="!flareSolverrURL" style="color: #ef4444;"> (no FlareSolverr URL is set)</span>
                   </p>
                   <div class="w-full max-h-64 overflow-auto rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 space-y-3 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                     <template x-for="section in selectedSiteSections" :key="section.title">
@@ -767,6 +814,13 @@
           newLimit: 1,
           addError: '',
 
+          // FlareSolverr
+          flareSolverrURL: '',
+          flareSolverrSaved: false,
+          flareSolverrMessage: '',
+          flareSolverrError: '',
+          testingFlareSolverr: false,
+
           // Custom scrape sites
           scrapeConfigPath: '',
           savingScrapeConfig: false,
@@ -785,6 +839,11 @@
           get selectedSiteImpersonate() {
             const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
             return site?.impersonate || '';
+          },
+
+          get selectedSiteFlareSolverr() {
+            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
+            return site?.flaresolverr || false;
           },
 
           get selectedSiteSections() {
@@ -813,6 +872,7 @@
             this.loadCrawlConcurrency();
             this.loadGlobalDownloadLimit();
             this.loadDomainLimits();
+            this.loadFlareSolverrURL();
             this.loadScrapeConfigPath();
             this.loadScrapeSites();
           },
@@ -929,6 +989,63 @@
               this.domainLimits = updated;
             } catch (err) {
               console.error('Error removing domain limit:', err);
+            }
+          },
+
+          async loadFlareSolverrURL() {
+            try {
+              const response = await fetch('/api/v1/settings/flaresolverr-url');
+              if (!response.ok) return;
+              const data = await response.json();
+              this.flareSolverrURL = data.url ?? '';
+            } catch (err) {
+              console.error('Error loading FlareSolverr URL:', err);
+            }
+          },
+
+          async saveFlareSolverrURL() {
+            this.flareSolverrSaved = false;
+            this.flareSolverrMessage = '';
+            this.flareSolverrError = '';
+            try {
+              const response = await fetch('/api/v1/settings/flaresolverr-url', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ url: this.flareSolverrURL })
+              });
+              if (!response.ok) {
+                this.flareSolverrError = await response.text() || 'Failed to update FlareSolverr URL';
+                return;
+              }
+              this.flareSolverrSaved = true;
+              setTimeout(() => { this.flareSolverrSaved = false; }, 2000);
+            } catch (err) {
+              this.flareSolverrError = 'Failed to update FlareSolverr URL';
+              console.error('Error saving FlareSolverr URL:', err);
+            }
+          },
+
+          async testFlareSolverr() {
+            this.testingFlareSolverr = true;
+            this.flareSolverrMessage = '';
+            this.flareSolverrError = '';
+            try {
+              const response = await fetch('/api/v1/settings/flaresolverr-url/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ url: this.flareSolverrURL })
+              });
+              if (!response.ok) {
+                this.flareSolverrError = await response.text() || 'FlareSolverr test failed';
+                return;
+              }
+              const data = await response.json();
+              this.flareSolverrMessage = `FlareSolverr loaded https://example.com (HTTP ${data.status}) in ${data.seconds.toFixed(1)}s.`;
+            } catch (err) {
+              this.flareSolverrError = 'FlareSolverr test failed';
+              console.error('Error testing FlareSolverr:', err);
+            } finally {
+              this.testingFlareSolverr = false;
             }
           },
 

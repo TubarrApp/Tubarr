@@ -12,11 +12,11 @@ import (
 
 // Store holds the database variable and sub-stores like ChannelStore etc.
 type Store struct {
-	db            *sql.DB
-	videoStore    *VideoStore
-	channelStore  *ChannelStore
-	downloadStore *DownloadStore
-	settingsStore *SettingsStore
+	db                  *sql.DB
+	videoStore          *VideoStore
+	channelStore        *ChannelStore
+	downloadStore       *DownloadStore
+	tubarrSettingsStore *TubarrSettingsStore
 }
 
 // InitStores injects databases into the store methods.
@@ -26,11 +26,11 @@ func InitStores(db *sql.DB) (*Store, error) {
 		return nil, err
 	}
 	return &Store{
-		db:            db,
-		videoStore:    GetVideoStore(db),
-		channelStore:  chanStore,
-		downloadStore: GetDownloadStore(db),
-		settingsStore: GetSettingsStore(db),
+		db:                  db,
+		videoStore:          GetVideoStore(db),
+		channelStore:        chanStore,
+		downloadStore:       GetDownloadStore(db),
+		tubarrSettingsStore: GetTubarrSettingsStore(db),
 	}, nil
 }
 
@@ -49,9 +49,9 @@ func (s *Store) DownloadStore() contracts.DownloadStore {
 	return s.downloadStore
 }
 
-// SettingsStore with pointer receiver.
-func (s *Store) SettingsStore() contracts.SettingsStore {
-	return s.settingsStore
+// TubarrSettingsStore with pointer receiver.
+func (s *Store) TubarrSettingsStore() contracts.TubarrSettingsStore {
+	return s.tubarrSettingsStore
 }
 
 // ******************************** Private ***************************************************************************************

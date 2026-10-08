@@ -140,7 +140,7 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 	}
 
 	// Initialize collector with cookies.
-	collector, err := initializeCollector(urlStr, s.cookieManager, consts.Impersonate(query.Impersonate))
+	collector, err := initializeCollector(urlStr, s.cookieManager, query)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func TestScrapeSite(urlStr string) (matched bool, site string, metadata map[stri
 	}
 
 	s := New()
-	collector, err := initializeCollector(urlStr, s.cookieManager, consts.Impersonate(query.Impersonate))
+	collector, err := initializeCollector(urlStr, s.cookieManager, query)
 	if err != nil {
 		return true, query.Site, nil, err
 	}
@@ -327,8 +327,8 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	return uniqueEpisodeURLs, nil
 }
 
-// initializeCollector initializes Colly with any cookies, using a TLS-impersonating transport if requested.
-func initializeCollector(urlStr string, cm *CookieManager, impersonate consts.Impersonate) (c *colly.Collector, err error) {
+// initializeCollector initializes Colly with any cookies, fetching through FlareSolverr or a TLS-impersonating transport if the site requests it.
+func initializeCollector(urlStr string, cm *CookieManager, query consts.HTMLMetadataQuery) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
@@ -353,14 +353,26 @@ func initializeCollector(urlStr string, cm *CookieManager, impersonate consts.Im
 		colly.Async(true),
 	)
 	collector.SetRequestTimeout(60 * time.Second)
-	if impersonate != consts.ImpersonateNone {
+	switch impersonate := consts.Impersonate(query.Impersonate); {
+	case query.FlareSolverr:
+		baseURL := abstractions.GetString(keys.FlareSolverrURL)
+		if baseURL == "" {
+			return nil, fmt.Errorf("site %q is set to use FlareSolverr, but no FlareSolverr URL is set in settings", query.Site)
+		}
+		rt, err := newFlareSolverrRoundTripper(baseURL)
+		if err != nil {
+			return nil, err
+		}
+		collector.WithTransport(rt)
+		collector.SetRequestTimeout(flareSolverrRequestTimeout)
+	case impersonate != consts.ImpersonateNone:
 		rt, userAgent, err := newTLSRoundTripper(impersonate)
 		if err != nil {
 			return nil, err
 		}
 		collector.WithTransport(rt)
 		collector.UserAgent = userAgent
-	} else {
+	default:
 		collector.WithTransport(&http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Adjust if necessary
 		})

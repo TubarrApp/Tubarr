@@ -1530,7 +1530,7 @@ func (ss *serverStore) handleSetCrawlConcurrency(w http.ResponseWriter, r *http.
 	}
 
 	// Persist to DB and update viper (takes effect on next crawl cycle).
-	if err := ss.ss.SetSetting(keys.CrawlConcurrency, limitStr); err != nil {
+	if err := ss.tss.SetSetting(keys.CrawlConcurrency, limitStr); err != nil {
 		logger.Pl.W("Failed to persist crawl concurrency to DB: %v", err)
 	}
 	viper.Set(keys.CrawlConcurrency, limit)
@@ -1571,7 +1571,7 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 	}
 
 	// Persist to DB, update viper, and reinitialize the semaphore.
-	if err := ss.ss.SetSetting(keys.GlobalDownloadConcurrency, limitStr); err != nil {
+	if err := ss.tss.SetSetting(keys.GlobalDownloadConcurrency, limitStr); err != nil {
 		logger.Pl.W("Failed to persist global download concurrency to DB: %v", err)
 	}
 	viper.Set(keys.GlobalDownloadConcurrency, limit)
@@ -1585,7 +1585,7 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 
 // handleGetDomainDownloadLimits returns all per-domain download concurrency limits.
 func (ss *serverStore) handleGetDomainDownloadLimits(w http.ResponseWriter, _ *http.Request) {
-	limits, err := ss.ss.GetDomainLimits()
+	limits, err := ss.tss.GetDomainLimits()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to get domain limits: %v", err), http.StatusInternalServerError)
 		return
@@ -1617,7 +1617,7 @@ func (ss *serverStore) handleSetDomainDownloadLimit(w http.ResponseWriter, r *ht
 		http.Error(w, "limit must be 0 or greater", http.StatusBadRequest)
 		return
 	}
-	if err := ss.ss.SetDomainLimit(hostname, limit); err != nil {
+	if err := ss.tss.SetDomainLimit(hostname, limit); err != nil {
 		http.Error(w, fmt.Sprintf("failed to set domain limit: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -1636,7 +1636,7 @@ func (ss *serverStore) handleDeleteDomainDownloadLimit(w http.ResponseWriter, r 
 		http.Error(w, "hostname is required", http.StatusBadRequest)
 		return
 	}
-	if err := ss.ss.DeleteDomainLimit(hostname); err != nil {
+	if err := ss.tss.DeleteDomainLimit(hostname); err != nil {
 		http.Error(w, fmt.Sprintf("failed to delete domain limit: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -1678,13 +1678,67 @@ func (ss *serverStore) handleSetScrapeConfigFile(w http.ResponseWriter, r *http.
 		scraper.RegisterCustomSites(sites)
 	}
 
-	if err := ss.ss.SetSetting(keys.ScrapeConfigFile, path); err != nil {
+	if err := ss.tss.SetSetting(keys.ScrapeConfigFile, path); err != nil {
 		logger.Pl.W("Failed to persist scrape config file path to DB: %v", err)
 	}
 	viper.Set(keys.ScrapeConfigFile, path)
 
 	w.Header().Set("Content-Type", "application/json")
 	resp := map[string]any{"message": "Scrape config file updated", "path": path, "sites": len(sites)}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetFlareSolverrURL returns the currently configured FlareSolverr URL.
+func (ss *serverStore) handleGetFlareSolverrURL(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"url": viper.GetString(keys.FlareSolverrURL)}); err != nil {
+		logger.Pl.E("Failed to encode FlareSolverr URL: %v", err)
+	}
+}
+
+// handleSetFlareSolverrURL updates (or, given an empty URL, clears) the FlareSolverr URL.
+func (ss *serverStore) handleSetFlareSolverrURL(w http.ResponseWriter, r *http.Request) {
+	fsURL := strings.TrimSpace(r.FormValue("url"))
+	if fsURL != "" {
+		if err := scraper.ValidateFlareSolverrURL(fsURL); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	if err := ss.tss.SetSetting(keys.FlareSolverrURL, fsURL); err != nil {
+		logger.Pl.W("Failed to persist FlareSolverr URL to DB: %v", err)
+	}
+	viper.Set(keys.FlareSolverrURL, fsURL)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]string{"message": "FlareSolverr URL updated", "url": fsURL}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleTestFlareSolverr loads a simple page through FlareSolverr to check it works.
+// Uses the URL in the request if given, so it can be tested before saving.
+func (ss *serverStore) handleTestFlareSolverr(w http.ResponseWriter, r *http.Request) {
+	fsURL := strings.TrimSpace(r.FormValue("url"))
+	if fsURL == "" {
+		fsURL = viper.GetString(keys.FlareSolverrURL)
+	}
+	if fsURL == "" {
+		http.Error(w, "no FlareSolverr URL entered", http.StatusBadRequest)
+		return
+	}
+
+	status, elapsed, err := scraper.TestFlareSolverr(fsURL)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("FlareSolverr test failed: %v", err), http.StatusBadGateway)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{"status": status, "seconds": elapsed.Seconds()}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
@@ -1739,10 +1793,11 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		StripQuery bool   `json:"strip_query,omitempty"`
 	}
 	type siteResp struct {
-		Domain      string         `json:"domain"`
-		Selectors   []selectorResp `json:"selectors"`
-		Crawl       *crawlResp     `json:"crawl,omitempty"`
-		Impersonate string         `json:"impersonate,omitempty"`
+		Domain       string         `json:"domain"`
+		Selectors    []selectorResp `json:"selectors"`
+		Crawl        *crawlResp     `json:"crawl,omitempty"`
+		Impersonate  string         `json:"impersonate,omitempty"`
+		FlareSolverr bool           `json:"flaresolverr,omitempty"`
 	}
 
 	resp := make([]siteResp, 0, len(sites))
@@ -1761,7 +1816,7 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 				crawl.Exclude = c.Exclude.String()
 			}
 		}
-		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors, Crawl: crawl, Impersonate: site.Impersonate})
+		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors, Crawl: crawl, Impersonate: site.Impersonate, FlareSolverr: site.FlareSolverr})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

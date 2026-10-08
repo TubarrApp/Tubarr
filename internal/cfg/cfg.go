@@ -25,7 +25,7 @@ import (
 )
 
 // settingsStore is set during InitCommands and used to load persisted settings.
-var settingsStore contracts.SettingsStore
+var settingsStore contracts.TubarrSettingsStore
 
 // rootCmd is the base command for Tubarr.
 var rootCmd = &cobra.Command{
@@ -58,15 +58,17 @@ var rootCmd = &cobra.Command{
 				downloads.InitDomainDownloadLimits(limits)
 			}
 
-			// Scrape config file path.
-			if cmd.Flags().Changed(keys.ScrapeConfigFile) {
-				if err := settingsStore.SetSetting(keys.ScrapeConfigFile, viper.GetString(keys.ScrapeConfigFile)); err != nil {
-					logger.Pl.W("Failed to persist setting %q to DB: %v", keys.ScrapeConfigFile, err)
+			// Scrape config file path and FlareSolverr URL.
+			for _, k := range []string{keys.ScrapeConfigFile, keys.FlareSolverrURL} {
+				if cmd.Flags().Changed(k) {
+					if err := settingsStore.SetSetting(k, viper.GetString(k)); err != nil {
+						logger.Pl.W("Failed to persist setting %q to DB: %v", k, err)
+					}
+				} else if val, found, err := settingsStore.GetSetting(k); err != nil {
+					logger.Pl.W("Failed to load setting %q from DB: %v", k, err)
+				} else if found {
+					viper.Set(k, val)
 				}
-			} else if val, found, err := settingsStore.GetSetting(keys.ScrapeConfigFile); err != nil {
-				logger.Pl.W("Failed to load setting %q from DB: %v", keys.ScrapeConfigFile, err)
-			} else if found {
-				viper.Set(keys.ScrapeConfigFile, val)
 			}
 		}
 
@@ -143,7 +145,7 @@ var rootCmd = &cobra.Command{
 
 // InitCommands initializes all commands and their flags.
 func InitCommands(ctx context.Context, s contracts.Store) error {
-	settingsStore = s.SettingsStore()
+	settingsStore = s.TubarrSettingsStore()
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory".
 

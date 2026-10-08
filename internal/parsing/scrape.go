@@ -14,10 +14,11 @@ import (
 
 // scrapeSiteConfig mirrors a single site entry in a user-supplied scrape config file.
 type scrapeSiteConfig struct {
-	Domain      string                 `mapstructure:"domain"`
-	Impersonate *string                `mapstructure:"impersonate"`
-	Selectors   []scrapeSelectorConfig `mapstructure:"selectors"`
-	Crawl       *scrapeCrawlConfig     `mapstructure:"crawl"`
+	Domain       string                 `mapstructure:"domain"`
+	Impersonate  *string                `mapstructure:"impersonate"`
+	FlareSolverr bool                   `mapstructure:"flaresolverr"`
+	Selectors    []scrapeSelectorConfig `mapstructure:"selectors"`
+	Crawl        *scrapeCrawlConfig     `mapstructure:"crawl"`
 }
 
 // scrapeCrawlConfig mirrors a site's channel page crawl rule in a scrape config file.
@@ -120,10 +121,11 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 
 		// Add the validated site to the list of sites to return.
 		sites = append(sites, models.SiteScraper{
-			Domain:      domain,
-			Selectors:   selectors,
-			Crawl:       crawl,
-			Impersonate: impersonate,
+			Domain:       domain,
+			Selectors:    selectors,
+			Crawl:        crawl,
+			Impersonate:  impersonate,
+			FlareSolverr: s.FlareSolverr,
 		})
 	}
 

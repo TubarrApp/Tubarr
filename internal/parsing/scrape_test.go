@@ -142,3 +142,17 @@ sites:
 		})
 	}
 }
+
+// TestParseScrapeSelectorsFileFlareSolverr tests that the flaresolverr key is read from a scrape config file.
+func TestParseScrapeSelectorsFileFlareSolverr(t *testing.T) {
+	p := writeScrapeConfig(t, "rules.toml", "[[sites]]\ndomain = \"on.com\"\nflaresolverr = true\n  [sites.crawl]\n  selector = \"a\"\n[[sites]]\ndomain = \"off.com\"\n  [sites.crawl]\n  selector = \"a\"\n")
+	sites, err := ParseScrapeSelectorsFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range sites {
+		if s.FlareSolverr != (s.Domain == "on.com") {
+			t.Errorf("%s: FlareSolverr = %v", s.Domain, s.FlareSolverr)
+		}
+	}
+}

@@ -114,6 +114,12 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 		return err
 	}
 
+	// FlareSolverr instance for scrape sites set to use it (global, applies to all channels)
+	rootCmd.PersistentFlags().String(keys.FlareSolverrURL, "", "URL of a FlareSolverr instance (e.g. http://localhost:8191) for scrape sites set to use it")
+	if err := viper.BindPFlag(keys.FlareSolverrURL, rootCmd.PersistentFlags().Lookup(keys.FlareSolverrURL)); err != nil {
+		return err
+	}
+
 	// Cookies
 	rootCmd.PersistentFlags().String(keys.CookiesFromBrowser, "", "Cookie source for web operations (e.g. 'Firefox')")
 	if err := viper.BindPFlag(keys.CookiesFromBrowser, rootCmd.PersistentFlags().Lookup(keys.CookiesFromBrowser)); err != nil {

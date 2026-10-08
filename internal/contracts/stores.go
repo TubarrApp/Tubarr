@@ -12,11 +12,11 @@ type Store interface {
 	ChannelStore() ChannelStore
 	DownloadStore() DownloadStore
 	VideoStore() VideoStore
-	SettingsStore() SettingsStore
+	TubarrSettingsStore() TubarrSettingsStore
 }
 
-// SettingsStore allows access to global settings and domain download limit methods.
-type SettingsStore interface {
+// TubarrSettingsStore allows access to global settings and domain download limit methods.
+type TubarrSettingsStore interface {
 	GetDB() *sql.DB
 	GetSetting(key string) (value string, found bool, err error)
 	SetSetting(key, value string) error

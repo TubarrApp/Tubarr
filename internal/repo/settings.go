@@ -9,23 +9,23 @@ import (
 	"tubarr/internal/domain/logger"
 )
 
-// SettingsStore holds a pointer to the sql.DB.
-type SettingsStore struct {
+// TubarrSettingsStore holds a pointer to the sql.DB.
+type TubarrSettingsStore struct {
 	DB *sql.DB
 }
 
-// GetSettingsStore returns a settings store instance with injected database.
-func GetSettingsStore(db *sql.DB) *SettingsStore {
-	return &SettingsStore{DB: db}
+// GetTubarrSettingsStore returns a settings store instance with injected database.
+func GetTubarrSettingsStore(db *sql.DB) *TubarrSettingsStore {
+	return &TubarrSettingsStore{DB: db}
 }
 
 // GetDB returns the database.
-func (ss *SettingsStore) GetDB() *sql.DB {
+func (ss *TubarrSettingsStore) GetDB() *sql.DB {
 	return ss.DB
 }
 
 // GetSetting retrieves a setting value by key.
-func (ss *SettingsStore) GetSetting(key string) (string, bool, error) {
+func (ss *TubarrSettingsStore) GetSetting(key string) (string, bool, error) {
 	var val string
 	err := ss.DB.QueryRow(
 		fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QSettingsVal, consts.DBSettings, consts.QSettingsKey),
@@ -41,7 +41,7 @@ func (ss *SettingsStore) GetSetting(key string) (string, bool, error) {
 }
 
 // SetSetting upserts a setting value by key.
-func (ss *SettingsStore) SetSetting(key, value string) error {
+func (ss *TubarrSettingsStore) SetSetting(key, value string) error {
 	_, err := ss.DB.Exec(
 		fmt.Sprintf("INSERT OR REPLACE INTO %s (%s, %s) VALUES (?, ?)", consts.DBSettings, consts.QSettingsKey, consts.QSettingsVal),
 		key, value,
@@ -53,7 +53,7 @@ func (ss *SettingsStore) SetSetting(key, value string) error {
 }
 
 // GetDomainLimits returns the domain download limits map from the settings table.
-func (ss *SettingsStore) GetDomainLimits() (map[string]int, error) {
+func (ss *TubarrSettingsStore) GetDomainLimits() (map[string]int, error) {
 	val, found, err := ss.GetSetting(keys.DomainDownloadLimits)
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func (ss *SettingsStore) GetDomainLimits() (map[string]int, error) {
 
 // SetDomainLimit sets the download concurrency limit for a specific hostname.
 // A concurrency of 0 removes the limit for that hostname.
-func (ss *SettingsStore) SetDomainLimit(hostname string, concurrency int) error {
+func (ss *TubarrSettingsStore) SetDomainLimit(hostname string, concurrency int) error {
 	limits, err := ss.GetDomainLimits()
 	if err != nil {
 		return err
@@ -89,6 +89,6 @@ func (ss *SettingsStore) SetDomainLimit(hostname string, concurrency int) error 
 }
 
 // DeleteDomainLimit removes the download concurrency limit for a specific hostname.
-func (ss *SettingsStore) DeleteDomainLimit(hostname string) error {
+func (ss *TubarrSettingsStore) DeleteDomainLimit(hostname string) error {
 	return ss.SetDomainLimit(hostname, 0)
 }

@@ -78,6 +78,9 @@ func RegisterCustomSites(sites []models.SiteScraper) {
 		if s.Impersonate != nil {
 			query.Impersonate = string(*s.Impersonate)
 		}
+		if s.FlareSolverr {
+			query.FlareSolverr = true
+		}
 		customSites[domain] = query
 	}
 

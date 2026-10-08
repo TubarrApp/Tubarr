@@ -25,6 +25,7 @@ const (
 const (
 	ChannelConfigFile string = "channel-config-file"
 	ScrapeConfigFile  string = "scrape-config-file"
+	FlareSolverrURL   string = "flaresolverr-url"
 	VideoDir          string = "video-directory"
 	JSONDir           string = "json-directory"
 	MetarrPreset      string = "metarr-preset"

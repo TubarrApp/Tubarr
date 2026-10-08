@@ -10,6 +10,9 @@
 # "impersonate" is optional and makes requests look like a real browser (chrome, firefox, safari, brave).
 # Leave it out to keep a built-in site's setting, or set it to "none" (or "") to turn impersonation off.
 #
+# "flaresolverr" is optional. Set it to true to fetch the site's pages through the FlareSolverr instance set on the
+# settings page, to get past Cloudflare challenges. It takes priority over "impersonate" and is slower.
+#
 # [sites.crawl] is optional and tells Tubarr how to find new videos on a channel page, instead of
 # using the built-in scraper or yt-dlp. It uses the site's impersonate setting.
 #   selector    - elements holding the video links (e.g. "a[href]").
@@ -94,6 +97,11 @@ domain = "odysee.com"
 domain = "rumble.com"
 impersonate = "chrome"
 
+# FlareSolverr flag can route requests through FlareSolverr. Will do this instead of making
+# its own requests with or without "impersonate". Uncomment the flag below to use.
+
+# flaresolverr = true
+
   [[sites.selectors]]
   field = "title"
   selector = "title"
@@ -118,9 +126,22 @@ impersonate = "chrome"
   selector = "meta[property='og:image']"
   attr = "content"
 
+  # Crawl rule for normal requests (with or without "impersonate") when FlareSolverr is not in use.
+  # As of October 2026, Rumble lists a channel's videos as JSON inside the page's <rum-videos-grid> element.
   [sites.crawl]
   selector = 'rum-videos-grid script[type="application/json"]'
   json_path = 'items.#(object_type=="video")#.url'
   include = '^https?://([^/]+\.)?rumble\.com/v'
   exclude = '^https?://([^/]+\.)?rumble\.com/videos'
   strip_query = true
+
+  # Crawl rule for use with "flaresolverr = true". FlareSolverr returns the page after its JavaScript
+  # has run, which turns that JSON into video cards with ordinary links. To use it, comment out the
+  # crawl rule above and uncomment this one.
+  #
+  # [sites.crawl]
+  # selector = "rum-videos-grid a[href]"
+  # attr = "href"
+  # include = '^https?://([^/]+\.)?rumble\.com/v'
+  # exclude = '^https?://([^/]+\.)?rumble\.com/videos'
+  # strip_query = true

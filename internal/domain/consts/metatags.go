@@ -25,10 +25,11 @@ type HTMLCrawlRule struct {
 
 // HTMLMetadataQuery holds the site name and metadata rules.
 type HTMLMetadataQuery struct {
-	Site        string
-	Rules       []HTMLMetadataRule
-	Crawl       *HTMLCrawlRule // Channel page crawl rule (nil to use built-in or yt-dlp).
-	Impersonate string         // Browser TLS fingerprint to impersonate ("" for none).
+	Site         string
+	Rules        []HTMLMetadataRule
+	Crawl        *HTMLCrawlRule // Channel page crawl rule (nil to use built-in or yt-dlp).
+	Impersonate  string         // Browser TLS fingerprint to impersonate ("" for none).
+	FlareSolverr bool           // Fetch pages through FlareSolverr (takes priority over Impersonate).
 }
 
 // HTMLBitchute holds scraping elements for bitchute.com.
