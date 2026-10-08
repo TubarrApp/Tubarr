@@ -13,6 +13,8 @@ import (
 )
 
 // TestMain sets up the test environment for the scraper package.
+//
+// Will not throw page errors if deleted but will throw errors on the tests if not present as "logger" is used in the scraper package and needs to be initialized.
 func TestMain(m *testing.M) {
 	logger.Pl.Console = io.Discard
 	os.Exit(m.Run())

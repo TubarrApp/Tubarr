@@ -60,7 +60,7 @@ func TestRegisterCustomSitesMerge(t *testing.T) {
 // TestRegisterCustomSitesImpersonate tests that only an explicitly set impersonate value overrides the built-in one.
 func TestRegisterCustomSitesImpersonate(t *testing.T) {
 	t.Cleanup(ResetCustomSites)
-	none, firefox := consts.ImpersonateNone, consts.ImpersonateFirefox
+	none, firefox, chrome := consts.ImpersonateNone, consts.ImpersonateFirefox, consts.ImpersonateChrome
 	tests := []struct {
 		name        string
 		impersonate *consts.Impersonate
@@ -69,6 +69,7 @@ func TestRegisterCustomSitesImpersonate(t *testing.T) {
 		{"unset keeps built-in", nil, consts.HTMLRumble.Impersonate},
 		{"explicit none disables", &none, ""},
 		{"explicit value replaces", &firefox, "firefox"},
+		{"explicit value replaces", &chrome, "chrome"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
