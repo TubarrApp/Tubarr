@@ -208,46 +208,13 @@ func (s *Scraper) newEpisodeURLs(
 	existingURLs, fileURLs []string,
 	cookies []*http.Cookie, cookiePath string,
 	crawlArgs string) ([]string, error) {
-	// Episode map to avoid deduplication
-	uniqueEpisodeURLs := make(map[string]struct{})
-
-	// Check if domain matches any custom Tubarr domains
-	var customDom bool
-	pattern := patterns["default"]
-	for domain, p := range patterns {
-		if strings.Contains(channelURL, domain) {
-			pattern = p
-			logger.Pl.I("Detected %s link", p.name)
-			customDom = true
-			break
-		}
+	// Custom crawl rules and built-in scrapers take priority over yt-dlp.
+	_, uniqueEpisodeURLs, crawled, err := s.crawlChannelURLs(channelURL, cookies)
+	if err != nil {
+		return nil, err
 	}
-
-	// User-defined crawl rules take priority over built-in scrapers and yt-dlp.
-	var err error
-	if query, ok := matchCrawlSite(channelURL); ok {
-		logger.Pl.I("Using custom crawl rule for %q", query.Site)
-		if uniqueEpisodeURLs, err = s.crawlWithRule(channelURL, cookies, query); err != nil {
-			return nil, err
-		}
-	} else if customDom && pattern.name == rumble {
-		if uniqueEpisodeURLs, err = s.scrapeRumbleChannelURLs(channelURL, cookies); err != nil {
-			return nil, err
-		}
-	} else if customDom {
-		var impersonate consts.Impersonate
-		if query, ok := matchSite(channelURL, func(consts.HTMLMetadataQuery) bool { return true }); ok {
-			impersonate = consts.Impersonate(query.Impersonate)
-		}
-		if err := s.crawlChannelPage(channelURL, cookies, impersonate, "a[href]", func(e *colly.HTMLElement) {
-			if link := e.Request.AbsoluteURL(e.Attr("href")); strings.Contains(link, pattern.pattern) {
-				uniqueEpisodeURLs[link] = struct{}{}
-			}
-		}); err != nil {
-			return nil, err
-		}
-	} else {
-		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, uniqueEpisodeURLs, cookiePath, crawlArgs); err != nil {
+	if !crawled {
+		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, nil, cookiePath, crawlArgs); err != nil {
 			return nil, err
 		}
 	}

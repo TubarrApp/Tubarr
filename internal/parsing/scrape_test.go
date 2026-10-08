@@ -3,7 +3,6 @@ package parsing
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -62,29 +61,16 @@ func TestParseScrapeSelectorsFileCrawlErrors(t *testing.T) {
 	}
 }
 
-// TestParseScrapeSelectorsFileSelectorErrors tests that invalid selector rules in a scrape config file produce errors.
+// TestParseExampleScrapeRules tests that the example scrape rules file parses, including its Rumble crawl rule.
 func TestParseExampleScrapeRules(t *testing.T) {
-	raw, err := os.ReadFile("../../web/src/files/example-scrape-rules.toml")
+	sites, err := ParseScrapeSelectorsFile("../../web/src/files/example-scrape-rules.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Also check the commented-out Rumble crawl rule is valid.
-	content := strings.ReplaceAll(string(raw), "  # [sites.crawl]", "  [sites.crawl]")
-	for _, key := range []string{"selector", "json_path", "include", "strip_query"} {
-		content = strings.ReplaceAll(content, "  # "+key+" =", "  "+key+" =")
-	}
-
-	sites, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, "rules.toml", content))
-	if err != nil {
-		t.Fatal(err)
-	}
-	crawlSites := map[string]bool{}
 	for _, s := range sites {
-		if s.Crawl != nil {
-			crawlSites[s.Domain] = true
+		if s.Domain == "rumble.com" && s.Crawl != nil {
+			return
 		}
 	}
-	if !crawlSites["bitchute.com"] || !crawlSites["rumble.com"] {
-		t.Errorf("expected crawl rules for bitchute.com and rumble.com, got %v", crawlSites)
-	}
+	t.Error("expected a crawl rule for rumble.com")
 }

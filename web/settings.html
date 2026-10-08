@@ -679,12 +679,12 @@
               <!-- Test Scraper -->
               <div class="pt-4 space-y-3">
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Test a URL</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Paste a video URL containing the metadata you want to scrape. This will show you the results of the scraping selectors for that URL, if any are found.
-                  <br>
-                  <br>
-                  <strong>Note:</strong> This could fail to retrieve results if the content is behind a login or if the site has anti-bot measures.
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                  <strong>Note:</strong> Tests could fail to retrieve results if the content is behind a login or if the site has anti-bot measures.
                 </p>
 
+                <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Metadata scraping</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Paste a video URL containing the metadata you want to scrape. This will show you the results of the scraping selectors for that URL, if any are found.</p>
                 <div class="flex items-center gap-3">
                   <input
                     type="text"
@@ -695,11 +695,31 @@
                   />
                   <button
                     @click="testScrapeUrl()"
-                    :disabled="!testUrl || testingUrl"
+                    :disabled="!testUrl || testingUrl || testingCrawl"
                     class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
                   >
                     <span x-show="!testingUrl">Test</span>
                     <span x-show="testingUrl">Testing...</span>
+                  </button>
+                </div>
+
+                <p class="text-xs font-medium text-gray-700 dark:text-gray-300 pt-2">Channel crawling</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Paste a channel URL. This will show you the video URLs found by the crawl rule or built-in crawler for that site, if there is one.</p>
+                <div class="flex items-center gap-3">
+                  <input
+                    type="text"
+                    x-model="testCrawlUrl"
+                    placeholder="https://example.com/c/channel"
+                    class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    @keydown.enter="testCrawlChannelUrl()"
+                  />
+                  <button
+                    @click="testCrawlChannelUrl()"
+                    :disabled="!testCrawlUrl || testingUrl || testingCrawl"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                  >
+                    <span x-show="!testingCrawl">Test</span>
+                    <span x-show="testingCrawl">Testing...</span>
                   </button>
                 </div>
                 <textarea
@@ -757,7 +777,9 @@
           selectedSite: '',
           loadingSites: false,
           testUrl: '',
+          testCrawlUrl: '',
           testingUrl: false,
+          testingCrawl: false,
           testResult: '',
 
           get selectedSiteImpersonate() {
@@ -1014,6 +1036,37 @@
               console.error('Error testing scrape URL:', err);
             } finally {
               this.testingUrl = false;
+            }
+          },
+
+          async testCrawlChannelUrl() {
+            if (!this.testCrawlUrl) return;
+            this.testingCrawl = true;
+            this.testResult = '';
+            try {
+              const response = await fetch('/api/v1/settings/scrape-config-file/test-crawl', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ url: this.testCrawlUrl })
+              });
+              if (!response.ok) {
+                this.testResult = `Error: ${await response.text()}`;
+                return;
+              }
+              const data = await response.json();
+              if (!data.matched) {
+                this.testResult = 'No crawl rule or built-in crawler matches this URL (yt-dlp will be used instead).';
+                return;
+              }
+              const urls = data.urls || [];
+              const lines = [`Crawled with: ${data.source}`, `Found ${urls.length} video URL(s)`, ''];
+              lines.push(...urls);
+              this.testResult = lines.join('\n');
+            } catch (err) {
+              this.testResult = 'Failed to test URL.';
+              console.error('Error testing crawl URL:', err);
+            } finally {
+              this.testingCrawl = false;
             }
           }
         };

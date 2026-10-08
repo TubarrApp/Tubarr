@@ -3,6 +3,7 @@ package scraper
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -10,6 +11,65 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/tidwall/gjson"
 )
+
+// TestCrawlSite runs the crawler Tubarr would use for a channel URL and returns the video URLs found.
+//
+// Used by the web UI to preview crawl rules. matched is false if the URL would be crawled with yt-dlp.
+func TestCrawlSite(channelURL string) (matched bool, source string, urls []string, err error) {
+	source, found, matched, err := New().crawlChannelURLs(channelURL, nil)
+	if !matched || err != nil {
+		return matched, source, nil, err
+	}
+
+	urls = make([]string, 0, len(found))
+	for u := range found {
+		urls = append(urls, u)
+	}
+	slices.Sort(urls)
+	return true, source, urls, nil
+}
+
+// crawlChannelURLs extracts video URLs from a channel page using a custom crawl rule or built-in scraper.
+//
+// crawled is false if neither applies to the URL, and yt-dlp should be used instead.
+func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (source string, urls map[string]struct{}, crawled bool, err error) {
+	// User-defined crawl rules take priority over built-in scrapers.
+	if query, ok := matchCrawlSite(channelURL); ok {
+		logger.Pl.I("Using custom crawl rule for %q", query.Site)
+		urls, err = s.crawlWithRule(channelURL, cookies, query)
+		return "custom crawl rule for " + query.Site, urls, true, err
+	}
+
+	var pattern urlPattern
+	for domain, p := range patterns {
+		if domain != defaultDom && strings.Contains(channelURL, domain) {
+			pattern = p
+			break
+		}
+	}
+	if pattern.name == "" {
+		return "", nil, false, nil
+	}
+	logger.Pl.I("Detected %s link", pattern.name)
+	source = "built-in " + pattern.name + " crawler"
+
+	if pattern.name == rumble {
+		urls, err = s.scrapeRumbleChannelURLs(channelURL, cookies)
+		return source, urls, true, err
+	}
+
+	var impersonate consts.Impersonate
+	if query, ok := matchSite(channelURL, func(consts.HTMLMetadataQuery) bool { return true }); ok {
+		impersonate = consts.Impersonate(query.Impersonate)
+	}
+	urls = make(map[string]struct{})
+	err = s.crawlChannelPage(channelURL, cookies, impersonate, "a[href]", func(e *colly.HTMLElement) {
+		if link := e.Request.AbsoluteURL(e.Attr("href")); strings.Contains(link, pattern.pattern) {
+			urls[link] = struct{}{}
+		}
+	})
+	return source, urls, true, err
+}
 
 // crawlChannelPage visits a channel page and passes each element matching the selector to onMatch.
 func (s *Scraper) crawlChannelPage(channelURL string, cookies []*http.Cookie, impersonate consts.Impersonate, selector string, onMatch colly.HTMLCallback) error {

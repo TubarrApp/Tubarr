@@ -1791,3 +1791,24 @@ func (ss *serverStore) handleTestScrapeSite(w http.ResponseWriter, r *http.Reque
 		logger.Pl.E("Failed to encode scrape test response: %v", err)
 	}
 }
+
+// handleTestCrawlSite runs the crawler Tubarr would use for a channel URL and returns the video URLs found.
+func (ss *serverStore) handleTestCrawlSite(w http.ResponseWriter, r *http.Request) {
+	testURL := strings.TrimSpace(r.FormValue("url"))
+	if testURL == "" {
+		http.Error(w, "url parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	matched, source, urls, err := scraper.TestCrawlSite(testURL)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to crawl URL: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{"matched": matched, "source": source, "urls": urls}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode crawl test response: %v", err)
+	}
+}

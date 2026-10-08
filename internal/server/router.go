@@ -95,6 +95,7 @@ func NewRouter(ss serverStore) http.Handler {
 		r.Post("/settings/scrape-config-file/reload", ss.handleReloadScrapeConfigFile)
 		r.Get("/settings/scrape-config-file/sites", ss.handleGetScrapeSites)
 		r.Post("/settings/scrape-config-file/test", ss.handleTestScrapeSite)
+		r.Post("/settings/scrape-config-file/test-crawl", ss.handleTestCrawlSite)
 	})
 
 	// --- Static Frontend ---
