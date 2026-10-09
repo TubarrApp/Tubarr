@@ -9,6 +9,8 @@ const (
 	ExternalDLer         = "--external-downloader"
 	ExternalDLArgs       = "--external-downloader-args"
 	FilenameSyntax       = "%(title)s.%(ext)s"
+	Impersonate          = "--impersonate"
+	UserAgent            = "--user-agent"
 	MaxFilesize          = "--max-filesize"
 	Output               = "-o"
 	P                    = "-P"

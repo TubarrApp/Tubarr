@@ -61,7 +61,10 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	// Ensure cleanup on exit.
 	defer d.cleanup()
 
-	var lastErr error
+	var (
+		lastErr     error
+		fsRefreshed bool
+	)
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
 		// Check if URL should be avoided (set by previous videos or persistent blocks).
 		if err := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
@@ -96,6 +99,10 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 				d.DLTracker.sendUpdate(d.Video)
 
 				if attempt < d.Options.MaxRetries {
+					if !fsRefreshed {
+						fsRefreshed = refreshFlareSolverr(d.ChannelURL, d.Video.URL, d.fsGen, err)
+					}
+
 					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
 					logger.Pl.I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
 

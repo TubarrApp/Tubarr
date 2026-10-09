@@ -172,8 +172,9 @@ type VideoDownload struct {
 	Context    context.Context
 
 	// Private
-	cmd *exec.Cmd
-	mu  sync.Mutex
+	cmd   *exec.Cmd
+	mu    sync.Mutex
+	fsGen int // FlareSolverr solution generation the last command used.
 }
 
 // cleanup safely terminates any running command.
@@ -210,8 +211,9 @@ type JSONDownload struct {
 	Context    context.Context
 
 	// Private
-	cmd *exec.Cmd
-	mu  sync.Mutex
+	cmd   *exec.Cmd
+	mu    sync.Mutex
+	fsGen int // FlareSolverr solution generation the last command used.
 }
 
 // cleanup safely terminates any running command.

@@ -3,6 +3,7 @@ package scraper
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,9 @@ import (
 	"github.com/bogdanfinn/tls-client/profiles"
 )
 
+// userAgentVersionRegex matches the major version in a Chrome or Firefox user agent.
+var userAgentVersionRegex = regexp.MustCompile(`(?:Chrome|Firefox)/(\d+)`)
+
 // tlsRoundTripper adapts a tls-client HttpClient to the net/http RoundTripper interface used by Colly.
 type tlsRoundTripper struct {
 	client tlsclient.HttpClient
@@ -21,9 +25,10 @@ type tlsRoundTripper struct {
 
 // newTLSRoundTripper returns a RoundTripper which impersonates the given browser's TLS fingerprint, plus a matching User-Agent.
 //
+// If userAgent is set (e.g. from FlareSolverr), it is returned as-is, and the profile closest to its browser version is used.
 // Redirects and cookies are left to the wrapping net/http client (Colly's), so tls-client neither follows redirects nor keeps a jar.
-func newTLSRoundTripper(impersonate consts.Impersonate) (rt *tlsRoundTripper, userAgent string, err error) {
-	profile, version := clientProfile(impersonate)
+func newTLSRoundTripper(impersonate consts.Impersonate, userAgent string) (rt *tlsRoundTripper, ua string, err error) {
+	profile, version := clientProfile(impersonate, userAgentMajorVersion(userAgent))
 	client, err := tlsclient.NewHttpClient(tlsclient.NewNoopLogger(),
 		tlsclient.WithClientProfile(profile),
 		tlsclient.WithNotFollowRedirects(),
@@ -32,7 +37,20 @@ func newTLSRoundTripper(impersonate consts.Impersonate) (rt *tlsRoundTripper, us
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to create TLS client for impersonation type %q: %w", impersonate, err)
 	}
-	return &tlsRoundTripper{client: client}, browserUserAgent(impersonate, version), nil
+	if userAgent == "" {
+		userAgent = browserUserAgent(impersonate, version)
+	}
+	return &tlsRoundTripper{client: client}, userAgent, nil
+}
+
+// userAgentMajorVersion returns the major browser version in a Chrome or Firefox user agent, or 0 if there is none.
+func userAgentMajorVersion(userAgent string) int {
+	m := userAgentVersionRegex.FindStringSubmatch(userAgent)
+	if m == nil {
+		return 0
+	}
+	major, _ := strconv.Atoi(m[1])
+	return major
 }
 
 // RoundTrip converts the request to fhttp, sends it through tls-client, and converts the response back.
@@ -65,8 +83,11 @@ func (t *tlsRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-// clientProfile returns the most recent TLS client profile for the given impersonation type, and its version.
-func clientProfile(impersonate consts.Impersonate) (profiles.ClientProfile, []int) {
+// clientProfile returns the TLS client profile for the given impersonation type, and its version.
+//
+// Uses the most recent profile, or if maxMajor is set, the most recent with a major version no higher than it
+// (the oldest profile if none are).
+func clientProfile(impersonate consts.Impersonate, maxMajor int) (profiles.ClientProfile, []int) {
 	prefix := string(impersonate) + "_"
 
 	var profileNames []string
@@ -94,8 +115,19 @@ func clientProfile(impersonate consts.Impersonate) (profiles.ClientProfile, []in
 		return profiles.DefaultClientProfile, nil
 	}
 
-	logger.Pl.I("Using TLS client profile %q for impersonation type %q", profileNames[0], impersonate)
-	return profiles.MappedTLSClients[profileNames[0]], profileVersion(profileNames[0], prefix)
+	chosen := profileNames[0]
+	if maxMajor > 0 {
+		chosen = profileNames[len(profileNames)-1]
+		for _, name := range profileNames {
+			if v := profileVersion(name, prefix); len(v) > 0 && v[0] <= maxMajor {
+				chosen = name
+				break
+			}
+		}
+	}
+
+	logger.Pl.I("Using TLS client profile %q for impersonation type %q", chosen, impersonate)
+	return profiles.MappedTLSClients[chosen], profileVersion(chosen, prefix)
 }
 
 // profileVersion extracts the leading numeric version components from a TLS client profile name (e.g. "safari_16_0" -> [16 0]).

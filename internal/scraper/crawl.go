@@ -42,58 +42,36 @@ func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (s
 	return "crawl rule for " + query.Site, urls, true, err
 }
 
-// crawlChannelPage visits a channel page and passes each element matching the selector to onMatch.
-func (s *Scraper) crawlChannelPage(channelURL string, cookies []*http.Cookie, query consts.HTMLMetadataQuery, selector string, onMatch colly.HTMLCallback) error {
-	c, err := initializeCollector(channelURL, s.cookieManager, query)
-	if err != nil {
-		return err
-	}
-	if len(cookies) > 0 {
-		if err := c.SetCookies(channelURL, cookies); err != nil {
-			return fmt.Errorf("failed to set cookies for channel page %q: %w", channelURL, err)
-		}
-	}
-
-	var reqErr error
-	c.OnError(func(r *colly.Response, err error) {
-		reqErr = fmt.Errorf("channel page %q request failed (HTTP %d): %w", channelURL, r.StatusCode, err)
-	})
-	c.OnHTML(selector, onMatch)
-
-	if err := c.Visit(channelURL); err != nil {
-		return fmt.Errorf("error visiting channel page %q: %w", channelURL, err)
-	}
-	c.Wait()
-	return reqErr
-}
-
 // crawlWithRule extracts video URLs from a channel page using a user-defined crawl rule.
 func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query consts.HTMLMetadataQuery) (map[string]struct{}, error) {
 	rule := query.Crawl
 	if rule == nil {
 		return nil, fmt.Errorf("site %q has no crawl rule", query.Site)
 	}
-	urls := make(map[string]struct{})
+	var urls map[string]struct{}
 
-	err := s.crawlChannelPage(channelURL, cookies, query, rule.Selector, func(e *colly.HTMLElement) {
-		value := e.Text
-		if rule.Attr != "" {
-			value = e.Attr(rule.Attr)
-		}
-		for _, raw := range crawlRuleValues(value, rule.JSONPath) {
-			link := e.Request.AbsoluteURL(strings.TrimSpace(raw))
-			if link == "" {
-				continue
+	err := s.visitPage(channelURL, cookies, query, func(c *colly.Collector) {
+		urls = make(map[string]struct{}) // Reset per attempt, so a challenged attempt can't leave URLs behind.
+		c.OnHTML(rule.Selector, func(e *colly.HTMLElement) {
+			value := e.Text
+			if rule.Attr != "" {
+				value = e.Attr(rule.Attr)
 			}
-			if rule.StripQuery {
-				link = removeQueryParams(link)
+			for _, raw := range crawlRuleValues(value, rule.JSONPath) {
+				link := e.Request.AbsoluteURL(strings.TrimSpace(raw))
+				if link == "" {
+					continue
+				}
+				if rule.StripQuery {
+					link = removeQueryParams(link)
+				}
+				if (rule.Include != nil && !rule.Include.MatchString(link)) || (rule.Exclude != nil && rule.Exclude.MatchString(link)) {
+					logger.Pl.D(3, "Crawl rule for %q filtered out URL %q", query.Site, link)
+					continue
+				}
+				urls[link] = struct{}{}
 			}
-			if (rule.Include != nil && !rule.Include.MatchString(link)) || (rule.Exclude != nil && rule.Exclude.MatchString(link)) {
-				logger.Pl.D(3, "Crawl rule for %q filtered out URL %q", query.Site, link)
-				continue
-			}
-			urls[link] = struct{}{}
-		}
+		})
 	})
 	if err != nil {
 		return nil, err

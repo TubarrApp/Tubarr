@@ -354,6 +354,38 @@
                 </li>
                 <!-- Menu Item Logs -->
 
+                <!-- Menu Item Site Rules -->
+                <li>
+                  <a
+                    href="site-rules.html"
+                    @click="selected = 'Site Rules'"
+                    class="menu-item group"
+                    :class="(selected === 'Site Rules') || (page === 'site-rules') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Site Rules') || (page === 'site-rules') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4 6.25C4.69 6.25 5.25 5.69 5.25 5C5.25 4.31 4.69 3.75 4 3.75C3.31 3.75 2.75 4.31 2.75 5C2.75 5.69 3.31 6.25 4 6.25ZM8 4.25H21V5.75H8V4.25ZM4 13.25C4.69 13.25 5.25 12.69 5.25 12C5.25 11.31 4.69 10.75 4 10.75C3.31 10.75 2.75 11.31 2.75 12C2.75 12.69 3.31 13.25 4 13.25ZM8 11.25H21V12.75H8V11.25ZM4 20.25C4.69 20.25 5.25 19.69 5.25 19C5.25 18.31 4.69 17.75 4 17.75C3.31 17.75 2.75 18.31 2.75 19C2.75 19.69 3.31 20.25 4 20.25ZM8 18.25H21V19.75H8V18.25Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Site Rules
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Site Rules -->
+
                 <!-- Menu Item Settings -->
                 <li>
                   <a
@@ -590,10 +622,10 @@
             <!-- FlareSolverr Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">FlareSolverr</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">URL of a <a href="https://github.com/FlareSolverr/FlareSolverr" target="_blank" rel="noopener" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">FlareSolverr</a> instance, used to get past Cloudflare challenges. Only sites with <code>flaresolverr = true</code> in the scrape rules file use it, for both crawling channel pages and scraping metadata.
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">URL of a <a href="https://github.com/FlareSolverr/FlareSolverr" target="_blank" rel="noopener" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">FlareSolverr</a> instance, used to get past Cloudflare challenges. Only sites with <code>flaresolverr = true</code> on the <a href="site-rules.html" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">Site Rules</a> page use it.
                 <br>
                 <br>
-                Pages fetched through FlareSolverr load in a real browser, so they can take several seconds each. FlareSolverr also returns the page after its JavaScript has run, which can differ from the page's original HTML, so a site's selectors and crawl rule may need adjusting when FlareSolverr is turned on.
+                Tubarr asks FlareSolverr to solve the challenge once per crawl, then uses its cookies and user agent while impersonating Chrome, for its own requests and for yt-dlp. yt-dlp needs <code>curl_cffi</code> installed for this. If Cloudflare challenges again, Tubarr asks FlareSolverr for a fresh solve and retries once. If FlareSolverr isn't set or can't be reached, Tubarr logs a warning and makes its requests without it.
               </p>
 
               <div class="flex items-center gap-3 py-3">
@@ -619,7 +651,7 @@
                 <button
                   @click="testFlareSolverr()"
                   :disabled="!flareSolverrURL || testingFlareSolverr"
-                  title="Load https://example.com through FlareSolverr to check it works"
+                  title="Solve https://example.com through FlareSolverr to check it works"
                   class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
                 >
                   <span x-show="!testingFlareSolverr">Test</span>
@@ -629,154 +661,6 @@
               </div>
               <p x-show="flareSolverrMessage" x-text="flareSolverrMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
               <p x-show="flareSolverrError" x-text="flareSolverrError" class="text-xs mt-1" style="color: #ef4444;"></p>
-            </div>
-
-            <!-- Custom Scrape Sites Card -->
-            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Custom Scrape Sites</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Path to a config file (YAML/TOML/JSON) defining custom scraping selectors for additional sites. Applies to all channels. Clear the path to go back to built-in defaults only.
-                <br>
-                <br>
-                Example File: <a href="/src/files/example-scrape-rules.toml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example-scrape-rules.toml</a>
-                <br>
-                <br>
-                <strong>Recognized 'string' fields:</strong><br>title, description, thumbnail, direct_video_url
-                <br>
-                <br>
-                <strong>Recognized 'full date' fields:</strong><br>upload_date, release_date, date
-                <br>
-                <br>
-                <strong>Recognized 'year' fields:</strong><br>year, release_year
-                <br>
-                <br>
-                Other fields are added into the metadata JSON as-is, without special handling.
-              </p>
-
-              <div class="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
-                <input
-                  type="text"
-                  x-model="scrapeConfigPath"
-                  placeholder="/path/to/scrape-sites.yaml"
-                  class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  @keydown.enter="saveScrapeConfigPath()"
-                />
-                <button
-                  @click="saveScrapeConfigPath()"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                >
-                  Save
-                </button>
-                <button
-                  @click="scrapeConfigPath = ''; saveScrapeConfigPath()"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                  Clear
-                </button>
-                <button
-                  @click="reloadScrapeConfig()"
-                  :disabled="reloadingConfig"
-                  title="Re-read the scrape config file from disk, in case it was edited since Tubarr started"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                  <span x-show="!reloadingConfig">Refresh</span>
-                  <span x-show="reloadingConfig">Refreshing...</span>
-                </button>
-                <span x-show="savingScrapeConfig" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
-                <span x-show="scrapeConfigSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
-              </div>
-              <p x-show="scrapeConfigError" x-text="scrapeConfigError" class="text-xs mt-2" style="color: #ef4444;"></p>
-
-              <!-- Registered Sites -->
-              <div class="py-4 space-y-3 border-b border-gray-100 dark:border-gray-800">
-                <div class="flex items-center justify-between">
-                  <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Registered Site Scrapers</p>
-                  <span x-show="loadingSites" class="text-xs text-gray-500 dark:text-gray-400">Loading...</span>
-                </div>
-                <div x-show="!loadingSites && scrapeSites.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
-                  No sites registered (built-in rules are currently disabled and no config file is set).
-                </div>
-                <div x-show="scrapeSites.length > 0" class="space-y-3">
-                  <select
-                    x-model="selectedSite"
-                    class="w-full h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  >
-                    <template x-for="site in scrapeSites" :key="site.domain">
-                      <option :value="site.domain" x-text="site.domain"></option>
-                    </template>
-                  </select>
-                  <p x-show="selectedSiteImpersonate" class="text-xs text-gray-500 dark:text-gray-400">
-                    Impersonate: <span x-text="selectedSiteImpersonate" class="font-mono text-gray-700 dark:text-gray-300"></span>
-                  </p>
-                  <p x-show="selectedSiteFlareSolverr" class="text-xs text-gray-500 dark:text-gray-400">
-                    Fetched through FlareSolverr<span x-show="!flareSolverrURL" style="color: #ef4444;"> (no FlareSolverr URL is set)</span>
-                  </p>
-                  <div class="w-full max-h-64 overflow-auto rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 space-y-3 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                    <template x-for="section in selectedSiteSections" :key="section.title">
-                      <div>
-                        <strong class="block mb-4" x-text="section.title"></strong>
-                        <template x-for="(line, i) in section.lines" :key="i">
-                          <div class="pl-4 whitespace-pre-wrap break-all" x-text="line"></div>
-                        </template>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Test Scraper -->
-              <div class="pt-4 space-y-3">
-                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Test a URL</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                  <strong>Note:</strong> Tests could fail to retrieve results if the content is behind a login or if the site has anti-bot measures.
-                </p>
-
-                <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Metadata scraping</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Paste a video URL containing the metadata you want to scrape. This will show you the results of the scraping selectors for that URL, if any are found.</p>
-                <div class="flex items-center gap-3">
-                  <input
-                    type="text"
-                    x-model="testUrl"
-                    placeholder="https://example.com/video/123"
-                    class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                    @keydown.enter="testScrapeUrl()"
-                  />
-                  <button
-                    @click="testScrapeUrl()"
-                    :disabled="!testUrl || testingUrl || testingCrawl"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                  >
-                    <span x-show="!testingUrl">Test</span>
-                    <span x-show="testingUrl">Testing...</span>
-                  </button>
-                </div>
-
-                <p class="text-xs font-medium text-gray-700 dark:text-gray-300 pt-2">Channel crawling</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Paste a channel URL. This will show you the video URLs found by the crawl rule or built-in crawler for that site, if there is one.</p>
-                <div class="flex items-center gap-3">
-                  <input
-                    type="text"
-                    x-model="testCrawlUrl"
-                    placeholder="https://example.com/c/channel"
-                    class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                    @keydown.enter="testCrawlChannelUrl()"
-                  />
-                  <button
-                    @click="testCrawlChannelUrl()"
-                    :disabled="!testCrawlUrl || testingUrl || testingCrawl"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                  >
-                    <span x-show="!testingCrawl">Test</span>
-                    <span x-show="testingCrawl">Testing...</span>
-                  </button>
-                </div>
-                <textarea
-                  readonly
-                  rows="10"
-                  x-model="testResult"
-                  placeholder="Results will appear here..."
-                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                ></textarea>
-              </div>
             </div>
 
           </div>
@@ -821,60 +705,11 @@
           flareSolverrError: '',
           testingFlareSolverr: false,
 
-          // Custom scrape sites
-          scrapeConfigPath: '',
-          savingScrapeConfig: false,
-          scrapeConfigSaved: false,
-          scrapeConfigError: '',
-          reloadingConfig: false,
-          scrapeSites: [],
-          selectedSite: '',
-          loadingSites: false,
-          testUrl: '',
-          testCrawlUrl: '',
-          testingUrl: false,
-          testingCrawl: false,
-          testResult: '',
-
-          get selectedSiteImpersonate() {
-            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
-            return site?.impersonate || '';
-          },
-
-          get selectedSiteFlareSolverr() {
-            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
-            return site?.flaresolverr || false;
-          },
-
-          get selectedSiteSections() {
-            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
-            if (!site) return [];
-            const sections = [{
-              title: 'Metadata selectors:',
-              lines: site.selectors.length === 0
-                ? ['(none)']
-                : site.selectors.map(s => `${s.field}: ${s.selector}${s.attr ? '  [attr=' + s.attr + ']' : ''}`),
-            }];
-            const c = site.crawl;
-            if (c) {
-              const lines = [`selector: ${c.selector}`];
-              if (c.attr) lines.push(`attr: ${c.attr}`);
-              if (c.json_path) lines.push(`json_path: ${c.json_path}`);
-              if (c.include) lines.push(`include: ${c.include}`);
-              if (c.exclude) lines.push(`exclude: ${c.exclude}`);
-              if (c.strip_query) lines.push('strip_query: true');
-              sections.push({ title: 'Crawl settings:', lines });
-            }
-            return sections;
-          },
-
           init() {
             this.loadCrawlConcurrency();
             this.loadGlobalDownloadLimit();
             this.loadDomainLimits();
             this.loadFlareSolverrURL();
-            this.loadScrapeConfigPath();
-            this.loadScrapeSites();
           },
 
           async loadCrawlConcurrency() {
@@ -1040,150 +875,12 @@
                 return;
               }
               const data = await response.json();
-              this.flareSolverrMessage = `FlareSolverr loaded https://example.com (HTTP ${data.status}) in ${data.seconds.toFixed(1)}s.`;
+              this.flareSolverrMessage = `FlareSolverr loaded https://example.com (HTTP ${data.status}) in ${data.seconds.toFixed(1)}s, returning ${data.cookies} cookie(s) and user agent: ${data.user_agent}`;
             } catch (err) {
               this.flareSolverrError = 'FlareSolverr test failed';
               console.error('Error testing FlareSolverr:', err);
             } finally {
               this.testingFlareSolverr = false;
-            }
-          },
-
-          async loadScrapeConfigPath() {
-            try {
-              const response = await fetch('/api/v1/settings/scrape-config-file');
-              if (!response.ok) return;
-              const data = await response.json();
-              this.scrapeConfigPath = data.path ?? '';
-            } catch (err) {
-              console.error('Error loading scrape config file path:', err);
-            }
-          },
-
-          async saveScrapeConfigPath() {
-            this.savingScrapeConfig = true;
-            this.scrapeConfigSaved = false;
-            this.scrapeConfigError = '';
-            try {
-              const response = await fetch('/api/v1/settings/scrape-config-file', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ path: this.scrapeConfigPath })
-              });
-              if (!response.ok) {
-                this.scrapeConfigError = await response.text() || 'Failed to update scrape config file';
-                return;
-              }
-              this.scrapeConfigSaved = true;
-              setTimeout(() => { this.scrapeConfigSaved = false; }, 2000);
-              await this.loadScrapeSites();
-            } catch (err) {
-              this.scrapeConfigError = 'Failed to update scrape config file';
-              console.error('Error saving scrape config file path:', err);
-            } finally {
-              this.savingScrapeConfig = false;
-            }
-          },
-
-          async loadScrapeSites() {
-            this.loadingSites = true;
-            try {
-              const response = await fetch('/api/v1/settings/scrape-config-file/sites');
-              if (!response.ok) return;
-              this.scrapeSites = await response.json();
-              if (!this.scrapeSites.find(s => s.domain === this.selectedSite)) {
-                this.selectedSite = this.scrapeSites.length > 0 ? this.scrapeSites[0].domain : '';
-              }
-            } catch (err) {
-              console.error('Error loading scrape sites:', err);
-            } finally {
-              this.loadingSites = false;
-            }
-          },
-
-          async reloadScrapeConfig() {
-            this.reloadingConfig = true;
-            this.scrapeConfigError = '';
-            try {
-              const response = await fetch('/api/v1/settings/scrape-config-file/reload', { method: 'POST' });
-              if (!response.ok) {
-                this.scrapeConfigError = await response.text() || 'Failed to reload scrape config file';
-                return;
-              }
-              await this.loadScrapeSites();
-            } catch (err) {
-              this.scrapeConfigError = 'Failed to reload scrape config file';
-              console.error('Error reloading scrape config file:', err);
-            } finally {
-              this.reloadingConfig = false;
-            }
-          },
-
-          async testScrapeUrl() {
-            if (!this.testUrl) return;
-            this.testingUrl = true;
-            this.testResult = '';
-            try {
-              const response = await fetch('/api/v1/settings/scrape-config-file/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ url: this.testUrl })
-              });
-              if (!response.ok) {
-                this.testResult = `Error: ${await response.text()}`;
-                return;
-              }
-              const data = await response.json();
-              if (!data.matched) {
-                this.testResult = 'No custom scraper matches this URL (yt-dlp will be used instead).';
-                return;
-              }
-              const lines = [`Matched site: ${data.site}`, ''];
-              const metadata = data.metadata || {};
-              if (Object.keys(metadata).length === 0) {
-                lines.push('No fields were discovered on the page.');
-              } else {
-                for (const [field, value] of Object.entries(metadata)) {
-                  lines.push(`${field}: ${value}`);
-                }
-              }
-              this.testResult = lines.join('\n');
-            } catch (err) {
-              this.testResult = 'Failed to test URL.';
-              console.error('Error testing scrape URL:', err);
-            } finally {
-              this.testingUrl = false;
-            }
-          },
-
-          async testCrawlChannelUrl() {
-            if (!this.testCrawlUrl) return;
-            this.testingCrawl = true;
-            this.testResult = '';
-            try {
-              const response = await fetch('/api/v1/settings/scrape-config-file/test-crawl', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ url: this.testCrawlUrl })
-              });
-              if (!response.ok) {
-                this.testResult = `Error: ${await response.text()}`;
-                return;
-              }
-              const data = await response.json();
-              if (!data.matched) {
-                this.testResult = 'No crawl rule or built-in crawler matches this URL (yt-dlp will be used instead).';
-                return;
-              }
-              const urls = data.urls || [];
-              const lines = [`Crawled with: ${data.source}`, `Found ${urls.length} video URL(s)`, ''];
-              lines.push(...urls);
-              this.testResult = lines.join('\n');
-            } catch (err) {
-              this.testResult = 'Failed to test URL.';
-              console.error('Error testing crawl URL:', err);
-            } finally {
-              this.testingCrawl = false;
             }
           }
         };

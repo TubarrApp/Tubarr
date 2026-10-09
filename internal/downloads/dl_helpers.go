@@ -165,3 +165,18 @@ func buildAudioCodecList(codecs []string) (arg string) {
 
 	return arg
 }
+
+// refreshFlareSolverr solves through FlareSolverr again if Cloudflare blocked a download for a FlareSolverr site,
+// so the next attempt uses fresh cookies. Reports whether it tried.
+func refreshFlareSolverr(cu *models.ChannelURL, videoURL string, fsGen int, dlErr error) bool {
+	fs := cu.FlareSolverr
+	if fs == nil || !models.IsCloudflareBlock(dlErr.Error()) {
+		return false
+	}
+
+	logger.Pl.W("Cloudflare blocked the download of %q, solving through FlareSolverr again...", videoURL)
+	if err := fs.Refresh(fsGen); err != nil {
+		logger.Pl.E("FlareSolverr solve failed for %q: %v", videoURL, err)
+	}
+	return true
+}

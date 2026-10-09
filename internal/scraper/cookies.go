@@ -24,12 +24,20 @@ import (
 type CookieManager struct {
 	mu      sync.RWMutex
 	cookies map[string][]*http.Cookie
+
+	// FlareSolverr solutions by hostname for this crawl session.
+	fsMu        sync.Mutex
+	fsSolutions map[string]*flareSolverrSolution
+	fsFailures  map[string]error
+	fsGen       int
 }
 
 // NewCookieManager creates a new cookie manager instance.
 func NewCookieManager() *CookieManager {
 	return &CookieManager{
-		cookies: make(map[string][]*http.Cookie),
+		cookies:     make(map[string][]*http.Cookie),
+		fsSolutions: make(map[string]*flareSolverrSolution),
+		fsFailures:  make(map[string]error),
 	}
 }
 
@@ -43,11 +51,13 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 		}
 	}
 
-	// Should login?
+	// Should login, use browser cookies, or use FlareSolverr?
 	doLogin := cu.NeedsAuth()
+	useGlobal := cu.ChanURLSettings != nil && cu.ChanURLSettings.UseGlobalCookies != nil && *cu.ChanURLSettings.UseGlobalCookies
+	useFlareSolverr := siteUsesFlareSolverr(cu.URL)
 
 	// Early return if no cookies needed.
-	if !doLogin && (cu.ChanURLSettings == nil || cu.ChanURLSettings.UseGlobalCookies == nil || !*cu.ChanURLSettings.UseGlobalCookies) {
+	if !doLogin && !useGlobal && !useFlareSolverr {
 		return nil, "", nil
 	}
 
@@ -69,7 +79,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	// Cookies from browser cookie stores.
-	if cu.ChanURLSettings != nil && cu.ChanURLSettings.UseGlobalCookies != nil && *cu.ChanURLSettings.UseGlobalCookies {
+	if useGlobal {
 		if cu.URL != "" && !cu.IsManual {
 			regCookies, err = cm.GetGlobalCookies(cu.URL)
 			if err != nil {
@@ -80,6 +90,17 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 
 	// Combine cookies.
 	cookies = mergeCookies(authCookies, regCookies)
+
+	// Cookies from FlareSolverr (override others, e.g. stale Cloudflare cookies from a browser store).
+	// If FlareSolverr is unavailable, carries on without it (the failure is already logged).
+	if useFlareSolverr {
+		if sol, err := cm.flareSolverrSolution(ctx, cu.URL, 0); err == nil {
+			cu.FlareSolverr = models.NewFlareSolverrSolution(sol.userAgent, sol.gen, cm.flareSolverrResolver(cu, cookies))
+			cookies = mergeCookies(sol.cookies, cookies)
+		} else if ctx.Err() != nil {
+			return nil, "", ctx.Err()
+		}
+	}
 
 	for i := range cookies {
 		logger.Pl.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
@@ -238,18 +259,11 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 		return nil
 	}
 
-	file, err := os.Create(cookieFilePath)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			logger.Pl.E("failed to close file %q due to error: %v", cookieFilePath, err)
-		}
-	}()
+	// Built in memory then renamed into place, so yt-dlp never reads a half-written file.
+	var file strings.Builder
 
 	// Write the header for the Netscape cookies file.
-	_, err = file.WriteString("# Netscape HTTP Cookie File\n# https://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n")
+	_, err := file.WriteString("# Netscape HTTP Cookie File\n# https://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n")
 	if err != nil {
 		return err
 	}
@@ -301,13 +315,18 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 			expires = cookie.Expires.Unix()
 		}
 
-		_, err := fmt.Fprintf(file, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+		_, err := fmt.Fprintf(&file, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
 			domain, domainSpecified, cookie.Path, secure, expires, cookie.Name, cookie.Value)
 		if err != nil {
 			return err
 		}
 	}
-	return nil
+
+	tmpPath := cookieFilePath + ".tmp"
+	if err := os.WriteFile(tmpPath, []byte(file.String()), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, cookieFilePath)
 }
 
 // mergeCookies merges cookies so that directly input authorization cookies take precedent (last in file).

@@ -362,6 +362,38 @@
                   </a>
                 </li>
                 <!-- Menu Item Logs -->
+                <!-- Menu Item Site Rules -->
+                <li>
+                  <a
+                    href="site-rules.html"
+                    @click="selected = 'Site Rules'"
+                    class="menu-item group"
+                    :class="(selected === 'Site Rules') || (page === 'site-rules') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Site Rules') || (page === 'site-rules') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4 6.25C4.69 6.25 5.25 5.69 5.25 5C5.25 4.31 4.69 3.75 4 3.75C3.31 3.75 2.75 4.31 2.75 5C2.75 5.69 3.31 6.25 4 6.25ZM8 4.25H21V5.75H8V4.25ZM4 13.25C4.69 13.25 5.25 12.69 5.25 12C5.25 11.31 4.69 10.75 4 10.75C3.31 10.75 2.75 11.31 2.75 12C2.75 12.69 3.31 13.25 4 13.25ZM8 11.25H21V12.75H8V11.25ZM4 20.25C4.69 20.25 5.25 19.69 5.25 19C5.25 18.31 4.69 17.75 4 17.75C3.31 17.75 2.75 18.31 2.75 19C2.75 19.69 3.31 20.25 4 20.25ZM8 18.25H21V19.75H8V18.25Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Site Rules
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Site Rules -->
+
                 <!-- Menu Item Settings -->
                 <li>
                   <a

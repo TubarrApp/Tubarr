@@ -53,7 +53,10 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 	// Ensure cleanup on exit.
 	defer d.cleanup()
 
-	var lastErr error
+	var (
+		lastErr     error
+		fsRefreshed bool
+	)
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
 		logger.Pl.I("Starting JSON download attempt %d/%d for URL: %s",
 			attempt, d.Options.MaxRetries, d.Video.URL)
@@ -79,6 +82,10 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
 
 				if attempt < d.Options.MaxRetries {
+					if !fsRefreshed {
+						fsRefreshed = refreshFlareSolverr(d.ChannelURL, d.Video.URL, d.fsGen, err)
+					}
+
 					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
 					logger.Pl.I("Waiting %.0f seconds before retrying JSON download for %q...", randWait.Seconds(), d.Video.URL)
 

@@ -3,6 +3,7 @@ package parsing
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -154,5 +155,35 @@ func TestParseScrapeSelectorsFileFlareSolverr(t *testing.T) {
 		if s.FlareSolverr != (s.Domain == "on.com") {
 			t.Errorf("%s: FlareSolverr = %v", s.Domain, s.FlareSolverr)
 		}
+	}
+}
+
+// TestSaveScrapeSelectorsFile tests that only valid content replaces a scrape config file, leaving no temporary files.
+func TestSaveScrapeSelectorsFile(t *testing.T) {
+	original := "[[sites]]\ndomain = \"a.com\"\n  [sites.crawl]\n  selector = \"a\"\n"
+	p := writeScrapeConfig(t, "rules.toml", original)
+
+	// Invalid content is rejected, naming the real file, and the original is untouched.
+	_, err := SaveScrapeSelectorsFile(p, "[[sites]]\ndomain = \"b.com\"\n")
+	if err == nil || !strings.Contains(err.Error(), p) {
+		t.Errorf("expected a validation error naming %q, got %v", p, err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != original {
+		t.Errorf("expected the original file to be untouched, got %q", got)
+	}
+
+	// Valid content replaces the file and returns its sites.
+	updated := "[[sites]]\ndomain = \"c.com\"\n  [sites.crawl]\n  selector = \"a\"\n"
+	sites, err := SaveScrapeSelectorsFile(p, updated)
+	if err != nil || len(sites) != 1 || sites[0].Domain != "c.com" {
+		t.Fatalf("expected 1 site c.com, got %+v, %v", sites, err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != updated {
+		t.Errorf("expected the file to be replaced, got %q", got)
+	}
+
+	entries, _ := os.ReadDir(filepath.Dir(p))
+	if len(entries) != 1 {
+		t.Errorf("expected only the rules file to remain, got %d entries", len(entries))
 	}
 }

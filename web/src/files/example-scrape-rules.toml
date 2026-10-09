@@ -10,8 +10,12 @@
 # "impersonate" is optional and makes requests look like a real browser (chrome, firefox, safari, brave).
 # Leave it out to keep a built-in site's setting, or set it to "none" (or "") to turn impersonation off.
 #
-# "flaresolverr" is optional. Set it to true to fetch the site's pages through the FlareSolverr instance set on the
-# settings page, to get past Cloudflare challenges. It takes priority over "impersonate" and is slower.
+# "flaresolverr" is optional. Set it to true to get past Cloudflare challenges using the FlareSolverr instance set on
+# the settings page. Tubarr asks FlareSolverr to solve the challenge once, then uses its cookies and user agent while
+# impersonating Chrome, for its own requests and for yt-dlp (which needs curl_cffi installed for --impersonate).
+# If Cloudflare challenges again, Tubarr asks FlareSolverr for a fresh solve and retries once. It takes priority over
+# "impersonate". If FlareSolverr isn't set up or can't be reached, Tubarr logs a warning and falls back to "impersonate"
+# (or normal requests) for the rest of that crawl.
 #
 # [sites.crawl] is optional and tells Tubarr how to find new videos on a channel page, instead of
 # using the built-in scraper or yt-dlp. It uses the site's impersonate setting.
@@ -97,8 +101,7 @@ domain = "odysee.com"
 domain = "rumble.com"
 impersonate = "chrome"
 
-# FlareSolverr flag can route requests through FlareSolverr. Will do this instead of making
-# its own requests with or without "impersonate". Uncomment the flag below to use.
+# Uses FlareSolverr to grab cookies and user agent data for a given site.
 #
 # flaresolverr = true
 
@@ -126,7 +129,6 @@ impersonate = "chrome"
   selector = "meta[property='og:image']"
   attr = "content"
 
-  # Crawl rule for normal requests (with or without "impersonate") when FlareSolverr is not in use.
   # As of October 2026, Rumble lists a channel's videos as JSON inside the page's <rum-videos-grid> element.
   [sites.crawl]
   selector = 'rum-videos-grid script[type="application/json"]'
@@ -134,14 +136,3 @@ impersonate = "chrome"
   include = '^https?://([^/]+\.)?rumble\.com/v'
   exclude = '^https?://([^/]+\.)?rumble\.com/videos'
   strip_query = true
-
-  # Crawl rule for use with "flaresolverr = true". FlareSolverr returns the page after its JavaScript
-  # has run, which turns that JSON into video cards with ordinary links. To use it, comment out the
-  # crawl rule above and uncomment this one.
-  #
-  # [sites.crawl]
-  # selector = "rum-videos-grid a[href]"
-  # attr = "href"
-  # include = '^https?://([^/]+\.)?rumble\.com/v'
-  # exclude = '^https?://([^/]+\.)?rumble\.com/videos'
-  # strip_query = true

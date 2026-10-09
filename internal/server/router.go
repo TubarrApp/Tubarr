@@ -96,6 +96,8 @@ func NewRouter(ss serverStore) http.Handler {
 		r.Get("/settings/scrape-config-file", ss.handleGetScrapeConfigFile)
 		r.Put("/settings/scrape-config-file", ss.handleSetScrapeConfigFile)
 		r.Post("/settings/scrape-config-file/reload", ss.handleReloadScrapeConfigFile)
+		r.Get("/settings/scrape-config-file/content", ss.handleGetScrapeConfigContent)
+		r.Put("/settings/scrape-config-file/content", ss.handleSetScrapeConfigContent)
 		r.Get("/settings/scrape-config-file/sites", ss.handleGetScrapeSites)
 		r.Post("/settings/scrape-config-file/test", ss.handleTestScrapeSite)
 		r.Post("/settings/scrape-config-file/test-crawl", ss.handleTestCrawlSite)

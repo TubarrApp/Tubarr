@@ -1,7 +1,10 @@
 package parsing
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"tubarr/internal/domain/consts"
@@ -130,6 +133,39 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 	}
 
 	logger.Pl.I("Loaded %d custom scrape site(s) from %q", len(sites), f)
+	return sites, nil
+}
+
+// SaveScrapeSelectorsFile validates content as a scrape config file, and if valid, replaces the file at path with it.
+//
+// Validated as a temporary file beside path (with the same extension, so it is read as the same format), then renamed
+// into place, so an invalid edit never touches the existing file.
+func SaveScrapeSelectorsFile(path, content string) ([]models.SiteScraper, error) {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*"+filepath.Ext(path))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary file for %q: %w", path, err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // No-op once renamed into place.
+
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		return nil, fmt.Errorf("failed to write temporary file for %q: %w", path, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, fmt.Errorf("failed to write temporary file for %q: %w", path, err)
+	}
+	if info, err := os.Stat(path); err == nil {
+		_ = os.Chmod(tmpPath, info.Mode().Perm())
+	}
+
+	sites, err := ParseScrapeSelectorsFile(tmpPath)
+	if err != nil {
+		return nil, errors.New(strings.ReplaceAll(err.Error(), tmpPath, path))
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return nil, fmt.Errorf("failed to save %q: %w", path, err)
+	}
 	return sites, nil
 }
 

@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -1719,7 +1722,7 @@ func (ss *serverStore) handleSetFlareSolverrURL(w http.ResponseWriter, r *http.R
 	}
 }
 
-// handleTestFlareSolverr loads a simple page through FlareSolverr to check it works.
+// handleTestFlareSolverr solves a simple page through FlareSolverr to check it works.
 // Uses the URL in the request if given, so it can be tested before saving.
 func (ss *serverStore) handleTestFlareSolverr(w http.ResponseWriter, r *http.Request) {
 	fsURL := strings.TrimSpace(r.FormValue("url"))
@@ -1731,14 +1734,14 @@ func (ss *serverStore) handleTestFlareSolverr(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	status, elapsed, err := scraper.TestFlareSolverr(fsURL)
+	status, userAgent, cookies, elapsed, err := scraper.TestFlareSolverr(fsURL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("FlareSolverr test failed: %v", err), http.StatusBadGateway)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"status": status, "seconds": elapsed.Seconds()}
+	resp := map[string]any{"status": status, "user_agent": userAgent, "cookies": cookies, "seconds": elapsed.Seconds()}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
@@ -1772,6 +1775,69 @@ func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, _ *ht
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
+}
+
+// handleGetScrapeConfigContent returns the configured scrape config file's contents, for editing in the web UI.
+//
+// Includes a version (hash of the contents), so a later save can detect edits made elsewhere in the meantime.
+func (ss *serverStore) handleGetScrapeConfigContent(w http.ResponseWriter, _ *http.Request) {
+	path := viper.GetString(keys.ScrapeConfigFile)
+	resp := map[string]any{"path": path, "content": "", "version": ""}
+	if path != "" {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to read scrape config file: %v", err), http.StatusInternalServerError)
+			return
+		}
+		resp["content"], resp["version"] = string(content), contentVersion(content)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode scrape config file content: %v", err)
+	}
+}
+
+// handleSetScrapeConfigContent validates new contents for the configured scrape config file, then saves and loads them.
+//
+// An invalid edit is rejected without touching the file. So is a save of a file changed on disk since it was loaded.
+func (ss *serverStore) handleSetScrapeConfigContent(w http.ResponseWriter, r *http.Request) {
+	path := viper.GetString(keys.ScrapeConfigFile)
+	if path == "" {
+		http.Error(w, "no scrape config file is set", http.StatusBadRequest)
+		return
+	}
+
+	current, err := os.ReadFile(path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to read scrape config file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if r.FormValue("version") != contentVersion(current) {
+		http.Error(w, "the scrape config file has changed on disk since it was loaded. Reload it before saving.", http.StatusConflict)
+		return
+	}
+
+	content := r.FormValue("content")
+	sites, err := parsing.SaveScrapeSelectorsFile(path, content)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	scraper.ResetCustomSites()
+	scraper.RegisterCustomSites(sites)
+
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{"message": "Scrape config file saved", "sites": len(sites), "version": contentVersion([]byte(content))}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// contentVersion returns a version string for file contents, which changes whenever the contents do.
+func contentVersion(content []byte) string {
+	sum := sha256.Sum256(content)
+	return hex.EncodeToString(sum[:])
 }
 
 // handleGetScrapeSites returns every currently registered scrape site (built-in and custom)

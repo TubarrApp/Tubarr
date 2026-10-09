@@ -91,6 +91,13 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPMetaArgs))...)
 	}
 
+	// FlareSolverr user agent and impersonation (its cookies are in the cookie file).
+	if fs := d.ChannelURL.FlareSolverr; fs != nil {
+		var fsArgs []string
+		fsArgs, d.fsGen = fs.YtDLPArgs(args)
+		args = append(args, fsArgs...)
+	}
+
 	// Add target URL [ MUST GO LAST !! ].
 	args = append(args, d.Video.URL)
 

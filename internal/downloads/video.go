@@ -129,6 +129,13 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		args = append(args, "-f", pref)
 	}
 
+	// FlareSolverr user agent and impersonation (its cookies are in the cookie file).
+	if fs := d.ChannelURL.FlareSolverr; fs != nil {
+		var fsArgs []string
+		fsArgs, d.fsGen = fs.YtDLPArgs(args)
+		args = append(args, fsArgs...)
+	}
+
 	// Add target URL [ MUST GO LAST !! ]
 	if d.Video.DirectVideoURL != "" {
 		args = append(args, d.Video.DirectVideoURL)
