@@ -625,7 +625,7 @@
               <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">URL of a <a href="https://github.com/FlareSolverr/FlareSolverr" target="_blank" rel="noopener" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">FlareSolverr</a> instance, used to get past Cloudflare challenges. Only sites with <code>flaresolverr = true</code> on the <a href="site-rules.html" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">Site Rules</a> page use it.
                 <br>
                 <br>
-                Tubarr asks FlareSolverr to solve the challenge once per crawl, then uses its cookies and user agent while impersonating Chrome, for its own requests and for yt-dlp. yt-dlp needs <code>curl_cffi</code> installed for this. If Cloudflare challenges again, Tubarr asks FlareSolverr for a fresh solve and retries once. If FlareSolverr isn't set or can't be reached, Tubarr logs a warning and makes its requests without it.
+                Ensure <code>curl_cffi</code> is installed on the machine and available to yt-dlp.
               </p>
 
               <div class="flex items-center gap-3 py-3">
