@@ -1,26 +1,9 @@
 package models
 
 import (
-	"slices"
 	"sync"
 	"testing"
 )
-
-// TestFlareSolverrSolutionYtDLPArgs tests that yt-dlp gets the solution's user agent and Chrome impersonation,
-// without overriding the user's own arguments.
-func TestFlareSolverrSolutionYtDLPArgs(t *testing.T) {
-	s := NewFlareSolverrSolution("UA/1", 3, nil)
-
-	args, gen := s.YtDLPArgs([]string{"--flat-playlist"})
-	if want := []string{"--user-agent", "UA/1", "--impersonate", "chrome"}; !slices.Equal(args, want) || gen != 3 {
-		t.Errorf("got %v (gen %d), want %v (gen 3)", args, gen, want)
-	}
-
-	args, _ = s.YtDLPArgs([]string{"--impersonate=firefox", "--user-agent", "Mine"})
-	if len(args) != 0 {
-		t.Errorf("expected no added arguments when the user set their own, got %v", args)
-	}
-}
 
 // TestFlareSolverrSolutionRefresh tests that concurrent refreshes after the same stale generation solve only once.
 func TestFlareSolverrSolutionRefresh(t *testing.T) {
@@ -50,8 +33,8 @@ func TestFlareSolverrSolutionRefresh(t *testing.T) {
 	if solves != 1 {
 		t.Errorf("expected 1 solve for 5 refreshes of the same generation, got %d", solves)
 	}
-	if args, gen := s.YtDLPArgs(nil); args[1] != "UA/2" || gen != 2 {
-		t.Errorf("expected the refreshed user agent and generation, got %v (gen %d)", args, gen)
+	if userAgent, gen := s.Current(); userAgent != "UA/2" || gen != 2 {
+		t.Errorf("expected the refreshed user agent and generation, got %q (gen %d)", userAgent, gen)
 	}
 }
 

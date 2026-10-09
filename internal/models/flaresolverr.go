@@ -3,7 +3,6 @@ package models
 import (
 	"strings"
 	"sync"
-	"tubarr/internal/domain/command"
 )
 
 // FlareSolverrSolution holds the user agent of a channel URL's FlareSolverr solve, for yt-dlp to use. Safe for concurrent use.
@@ -21,20 +20,11 @@ func NewFlareSolverrSolution(userAgent string, gen int, resolve func(staleGen in
 	return &FlareSolverrSolution{userAgent: userAgent, gen: gen, resolve: resolve}
 }
 
-// YtDLPArgs returns the yt-dlp arguments for using the solution, and its generation for a later Refresh.
-//
-// Skips any argument already in existing (e.g. a user's own --impersonate).
-func (s *FlareSolverrSolution) YtDLPArgs(existing []string) (args []string, gen int) {
+// Current returns the solution's user agent, and its generation for a later Refresh.
+func (s *FlareSolverrSolution) Current() (userAgent string, gen int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if !hasArg(existing, command.UserAgent) {
-		args = append(args, command.UserAgent, s.userAgent)
-	}
-	if !hasArg(existing, command.Impersonate) {
-		args = append(args, command.Impersonate, "chrome")
-	}
-	return args, s.gen
+	return s.userAgent, s.gen
 }
 
 // Refresh solves through FlareSolverr again, unless the solution has already been refreshed since generation staleGen.
@@ -57,14 +47,4 @@ func (s *FlareSolverrSolution) Refresh(staleGen int) error {
 func IsCloudflareBlock(output string) bool {
 	o := strings.ToLower(output)
 	return strings.Contains(o, "cloudflare") || strings.Contains(o, "just a moment") || strings.Contains(o, "403")
-}
-
-// hasArg reports whether args contains flag, either alone or as flag=value.
-func hasArg(args []string, flag string) bool {
-	for _, a := range args {
-		if a == flag || strings.HasPrefix(a, flag+"=") {
-			return true
-		}
-	}
-	return false
 }

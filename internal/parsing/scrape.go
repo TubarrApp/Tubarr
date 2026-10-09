@@ -97,9 +97,10 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 			impersonate = &imp
 		}
 
-		// A site needs metadata selectors, a crawl rule, or both. Each selector must have a non-empty field and selector value.
-		if len(s.Selectors) == 0 && s.Crawl == nil {
-			return nil, fmt.Errorf("scrape config file %q: site %q has no selectors or crawl rule", f, domain)
+		// A site needs at least one of metadata selectors, a crawl rule, impersonate, or flaresolverr.
+		// Each selector must have a non-empty field and selector value.
+		if len(s.Selectors) == 0 && s.Crawl == nil && s.Impersonate == nil && !s.FlareSolverr {
+			return nil, fmt.Errorf("scrape config file %q: site %q sets nothing (needs selectors, a crawl rule, impersonate, or flaresolverr)", f, domain)
 		}
 
 		crawl, err := parseCrawlConfig(s.Crawl)

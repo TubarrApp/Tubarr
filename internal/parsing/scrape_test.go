@@ -49,7 +49,7 @@ sites:
 // TestParseScrapeSelectorsFileCrawlErrors tests that invalid crawl rules in a scrape config file produce errors.
 func TestParseScrapeSelectorsFileCrawlErrors(t *testing.T) {
 	tests := map[string]string{
-		"no selectors or crawl":  "sites:\n  - domain: example.com\n",
+		"sets nothing":           "sites:\n  - domain: example.com\n",
 		"missing crawl selector": "sites:\n  - domain: example.com\n    crawl:\n      include: '/v'\n",
 		"bad include regex":      "sites:\n  - domain: example.com\n    crawl:\n      selector: a\n      include: '('\n",
 	}
@@ -185,5 +185,17 @@ func TestSaveScrapeSelectorsFile(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Dir(p))
 	if len(entries) != 1 {
 		t.Errorf("expected only the rules file to remain, got %d entries", len(entries))
+	}
+}
+
+// TestParseScrapeSelectorsFileSettingsOnly tests that a site may set only impersonate or flaresolverr.
+func TestParseScrapeSelectorsFileSettingsOnly(t *testing.T) {
+	p := writeScrapeConfig(t, "rules.toml", "[[sites]]\ndomain = \"rumble.com\"\nflaresolverr = true\n\n[[sites]]\ndomain = \"b.com\"\nimpersonate = \"firefox\"\n")
+	sites, err := ParseScrapeSelectorsFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sites) != 2 || !sites[0].FlareSolverr || sites[1].Impersonate == nil || *sites[1].Impersonate != "firefox" {
+		t.Errorf("unexpected sites: %+v", sites)
 	}
 }

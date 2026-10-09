@@ -1,5 +1,12 @@
 # Domain is the base domain of the video site the scraper should come into effect for.
 #
+# A site only needs the parts it changes. Anything left out keeps Tubarr's built-in rules for that site (if any),
+# and yt-dlp is used for anything with no rules. For example, this turns FlareSolverr on for Rumble and keeps the rest:
+#
+#   [[sites]]
+#   domain = "rumble.com"
+#   flaresolverr = true
+#
 # Field represents the keys that will be added into the video's metadata JSON (e.g. title, fulltitle).
 #
 # Selector is the element containing the desired metadata. For example the contents of a <p> tag with class

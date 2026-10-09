@@ -274,13 +274,9 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 			args = append(args, command.CookiePath, cookiePath)
 		}
 
-		// FlareSolverr user agent and impersonation (its cookies are in the cookie file).
-		var fsGen int
-		if fs != nil {
-			var fsArgs []string
-			fsArgs, fsGen = fs.YtDLPArgs(args)
-			args = append(args, fsArgs...)
-		}
+		// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
+		siteArgs, fsGen := YtDLPSiteArgs(channelURL, fs, args)
+		args = append(args, siteArgs...)
 
 		// Add -J and URL to finalize command
 		args = append(args, command.OutputJSON, channelURL)
