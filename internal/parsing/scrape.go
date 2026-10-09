@@ -59,16 +59,22 @@ type scrapeSelectorConfig struct {
 //	      attr: href
 //	      include: "/video/"
 func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
+	return parseScrapeSelectorsFile(f, f)
+}
+
+// parseScrapeSelectorsFile loads scrape rules from file f, naming it as name in messages (e.g. the file a temporary
+// copy is being checked for).
+func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 	v := viper.New()
 	if err := file.LoadConfigFile(v, f); err != nil {
-		return nil, fmt.Errorf("failed to load scrape config file %q: %w", f, err)
+		return nil, fmt.Errorf("failed to load scrape config file %q: %w", name, err)
 	}
 
 	var raw struct {
 		Sites []scrapeSiteConfig `mapstructure:"sites"`
 	}
 	if err := v.Unmarshal(&raw); err != nil {
-		return nil, fmt.Errorf("failed to parse scrape config file %q: %w", f, err)
+		return nil, fmt.Errorf("failed to parse scrape config file %q: %w", name, err)
 	}
 
 	sites := make([]models.SiteScraper, 0, len(raw.Sites))
@@ -76,7 +82,7 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 		// Domain is the site's hostname (e.g., "example.com"). It is required and must be unique.
 		domain := strings.ToLower(strings.TrimSpace(s.Domain))
 		if domain == "" {
-			return nil, fmt.Errorf("scrape config file %q: site entry missing domain", f)
+			return nil, fmt.Errorf("scrape config file %q: site entry missing domain", name)
 		}
 
 		// Impersonate is optional and intended to simulate a real browser if provided.
@@ -88,11 +94,11 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 				imp = consts.ImpersonateNone
 			}
 			if imp == consts.ImpersonateOpera {
-				logger.Pl.W("Scrape config file %q: Site %q uses impersonate value %q which is unstable. Using %q instead.", f, domain, imp, consts.ImpersonateChrome)
+				logger.Pl.W("Scrape config file %q: Site %q uses impersonate value %q which is unstable. Using %q instead.", name, domain, imp, consts.ImpersonateChrome)
 				imp = consts.ImpersonateChrome
 			}
 			if _, valid := consts.ValidImpersonateValues[imp]; !valid {
-				return nil, fmt.Errorf("scrape config file %q: site %q has invalid impersonate value %q", f, domain, imp)
+				return nil, fmt.Errorf("scrape config file %q: site %q has invalid impersonate value %q", name, domain, imp)
 			}
 			impersonate = &imp
 		}
@@ -100,12 +106,12 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 		// A site needs at least one of metadata selectors, a crawl rule, impersonate, or flaresolverr.
 		// Each selector must have a non-empty field and selector value.
 		if len(s.Selectors) == 0 && s.Crawl == nil && s.Impersonate == nil && !s.FlareSolverr {
-			return nil, fmt.Errorf("scrape config file %q: site %q sets nothing (needs selectors, a crawl rule, impersonate, or flaresolverr)", f, domain)
+			return nil, fmt.Errorf("scrape config file %q: site %q sets nothing (needs selectors, a crawl rule, impersonate, or flaresolverr)", name, domain)
 		}
 
 		crawl, err := parseCrawlConfig(s.Crawl)
 		if err != nil {
-			return nil, fmt.Errorf("scrape config file %q: site %q: %w", f, domain, err)
+			return nil, fmt.Errorf("scrape config file %q: site %q: %w", name, domain, err)
 		}
 
 		// Build the list of selectors for this site, validating each one.
@@ -114,7 +120,7 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 			field := strings.TrimSpace(sel.Field)
 			selector := strings.TrimSpace(sel.Selector)
 			if field == "" || selector == "" {
-				return nil, fmt.Errorf("scrape config file %q: site %q has a selector missing field or selector value", f, domain)
+				return nil, fmt.Errorf("scrape config file %q: site %q has a selector missing field or selector value", name, domain)
 			}
 			selectors = append(selectors, models.ScrapeSelectors{
 				Field:    field,
@@ -133,7 +139,7 @@ func ParseScrapeSelectorsFile(f string) ([]models.SiteScraper, error) {
 		})
 	}
 
-	logger.Pl.I("Loaded %d custom scrape site(s) from %q", len(sites), f)
+	logger.Pl.I("Loaded %d custom scrape site(s) from %q", len(sites), name)
 	return sites, nil
 }
 
@@ -160,7 +166,7 @@ func SaveScrapeSelectorsFile(path, content string) ([]models.SiteScraper, error)
 		_ = os.Chmod(tmpPath, info.Mode().Perm())
 	}
 
-	sites, err := ParseScrapeSelectorsFile(tmpPath)
+	sites, err := parseScrapeSelectorsFile(tmpPath, path)
 	if err != nil {
 		return nil, errors.New(strings.ReplaceAll(err.Error(), tmpPath, path))
 	}
