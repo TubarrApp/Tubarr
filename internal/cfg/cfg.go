@@ -16,7 +16,7 @@ import (
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/parsing"
-	"tubarr/internal/scraper"
+	"tubarr/internal/siterules"
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/benchmark"
@@ -110,7 +110,7 @@ var rootCmd = &cobra.Command{
 
 		// Load custom scrape site selectors from a global config file, if provided.
 		// Reset first so a cleared or changed path doesn't retain stale entries from a prior run.
-		scraper.ResetCustomSites()
+		siterules.Reset()
 		if scrapeConfigFile := viper.GetString(keys.ScrapeConfigFile); scrapeConfigFile != "" {
 			if _, statErr := os.Stat(scrapeConfigFile); os.IsNotExist(statErr) {
 				// File not found (could have been moved or deleted).
@@ -127,7 +127,7 @@ var rootCmd = &cobra.Command{
 					fmt.Fprintf(os.Stderr, "failed loading scrape config file: %v\n", err)
 					os.Exit(1)
 				}
-				scraper.RegisterCustomSites(sites)
+				siterules.Register(sites)
 			}
 		}
 	},

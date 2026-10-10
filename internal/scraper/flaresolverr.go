@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -196,12 +195,6 @@ func (cm *CookieManager) flareSolverrResolver(cu *models.ChannelURL, baseCookies
 		}
 		return sol.userAgent, sol.gen, nil
 	}
-}
-
-// siteUsesFlareSolverr reports whether the registered site for a URL is set to use FlareSolverr.
-func siteUsesFlareSolverr(u string) bool {
-	_, ok := matchSite(u, func(q consts.HTMLMetadataQuery) bool { return q.FlareSolverr })
-	return ok
 }
 
 // isCloudflareChallenge reports whether a response is a Cloudflare challenge page.

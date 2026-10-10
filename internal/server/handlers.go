@@ -26,6 +26,7 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
+	"tubarr/internal/siterules"
 	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/logging"
@@ -1676,9 +1677,9 @@ func (ss *serverStore) handleSetScrapeConfigFile(w http.ResponseWriter, r *http.
 		}
 	}
 
-	scraper.ResetCustomSites()
+	siterules.Reset()
 	if len(sites) > 0 {
-		scraper.RegisterCustomSites(sites)
+		siterules.Register(sites)
 	}
 
 	if err := ss.tss.SetSetting(keys.ScrapeConfigFile, path); err != nil {
@@ -1752,7 +1753,7 @@ func (ss *serverStore) handleTestFlareSolverr(w http.ResponseWriter, r *http.Req
 func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, _ *http.Request) {
 	path := viper.GetString(keys.ScrapeConfigFile)
 	if path == "" {
-		scraper.ResetCustomSites()
+		siterules.Reset()
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(map[string]any{"message": "No scrape config file set; using built-in defaults", "sites": 0}); err != nil {
 			logger.Pl.E("Failed to encode response: %v", err)
@@ -1767,8 +1768,8 @@ func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, _ *ht
 		return
 	}
 
-	scraper.ResetCustomSites()
-	scraper.RegisterCustomSites(sites)
+	siterules.Reset()
+	siterules.Register(sites)
 
 	w.Header().Set("Content-Type", "application/json")
 	resp := map[string]any{"message": "Scrape config file reloaded", "path": path, "sites": len(sites)}
@@ -1824,8 +1825,8 @@ func (ss *serverStore) handleSetScrapeConfigContent(w http.ResponseWriter, r *ht
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	scraper.ResetCustomSites()
-	scraper.RegisterCustomSites(sites)
+	siterules.Reset()
+	siterules.Register(sites)
 
 	w.Header().Set("Content-Type", "application/json")
 	resp := map[string]any{"message": "Scrape config file saved", "sites": len(sites), "version": contentVersion([]byte(content))}
@@ -1843,7 +1844,7 @@ func contentVersion(content []byte) string {
 // handleGetScrapeSites returns every currently registered scrape site (built-in and custom)
 // along with its selectors, for display in the web UI.
 func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Request) {
-	sites := scraper.ListRegisteredSites()
+	sites := siterules.List()
 
 	type selectorResp struct {
 		Field    string `json:"field"`
@@ -1868,8 +1869,8 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 
 	resp := make([]siteResp, 0, len(sites))
 	for _, site := range sites {
-		selectors := make([]selectorResp, 0, len(site.Rules))
-		for _, rule := range site.Rules {
+		selectors := make([]selectorResp, 0, len(site.Metadata))
+		for _, rule := range site.Metadata {
 			selectors = append(selectors, selectorResp{Field: rule.Name, Selector: rule.Selector, Attr: rule.Attr})
 		}
 		var crawl *crawlResp

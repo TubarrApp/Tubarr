@@ -24,6 +24,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -133,7 +134,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 // ScrapeCustomSite scrapes custom sites for metadata.
 func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) error {
 	// Find a registered rule set (built-in or user-supplied) based on URL domain.
-	query, ok := matchCustomSite(v.URL)
+	query, ok := siterules.MatchMetadata(v.URL)
 	if !ok {
 		logger.Pl.D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
 		return nil // Not a custom site.
@@ -168,7 +169,7 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 //
 // Used by the web UI to preview whether a custom scraper matches a given URL and retrieves the correct data.
 func TestScrapeSite(urlStr string) (matched bool, site string, metadata map[string]any, err error) {
-	query, ok := matchCustomSite(urlStr)
+	query, ok := siterules.MatchMetadata(urlStr)
 	if !ok {
 		return false, "", nil, nil
 	}
@@ -275,7 +276,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		}
 
 		// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
-		siteArgs, fsGen := YtDLPSiteArgs(channelURL, fs, args)
+		siteArgs, fsGen := siterules.YtDLPArgs(channelURL, fs, args)
 		args = append(args, siteArgs...)
 
 		// Add -J and URL to finalize command
@@ -343,7 +344,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 // For FlareSolverr sites, requests use the solved cookies and user agent, and a Cloudflare challenge
 // triggers one fresh FlareSolverr solve and retry. If FlareSolverr is unavailable, falls back to the
 // site's normal requests.
-func (s *Scraper) visitPage(urlStr string, cookies []*http.Cookie, query consts.HTMLMetadataQuery, setup func(c *colly.Collector)) error {
+func (s *Scraper) visitPage(urlStr string, cookies []*http.Cookie, query models.SiteRules, setup func(c *colly.Collector)) error {
 	var (
 		sol   *flareSolverrSolution
 		fsErr error
@@ -373,7 +374,7 @@ func (s *Scraper) visitPage(urlStr string, cookies []*http.Cookie, query consts.
 }
 
 // visitPageOnce makes a single visitPage attempt, reporting whether Cloudflare challenged it.
-func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query consts.HTMLMetadataQuery, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
+func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query models.SiteRules, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
 	c, err := initializeCollector(urlStr, s.cookieManager, query, sol)
 	if err != nil {
 		return false, err
@@ -408,7 +409,7 @@ func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query con
 // initializeCollector initializes Colly with any cookies, using a TLS-impersonating transport if the site requests it.
 //
 // For FlareSolverr sites (sol set), impersonates Chrome with the solution's cookies and user agent.
-func initializeCollector(urlStr string, cm *CookieManager, query consts.HTMLMetadataQuery, sol *flareSolverrSolution) (c *colly.Collector, err error) {
+func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
@@ -470,7 +471,7 @@ func sanitizeFilename(name string) string {
 }
 
 // setupFieldScraping applies scraping rules for a specific field.
-func setupFieldScraping(c *colly.Collector, fieldName string, rules []consts.HTMLMetadataRule, result *string) {
+func setupFieldScraping(c *colly.Collector, fieldName string, rules []models.MetadataRule, result *string) {
 	if result == nil {
 		return
 	}
@@ -576,8 +577,8 @@ func parseScrapedYear(raw string) (string, bool) {
 	return strconv.Itoa(n), true
 }
 
-// ScrapeWithRules scrapes metadata using HTMLMetadataQuery rules.
-func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *models.Video, query consts.HTMLMetadataQuery) map[string]any {
+// ScrapeWithRules scrapes metadata using a site's metadata rules.
+func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *models.Video, query models.SiteRules) map[string]any {
 	metadata := make(map[string]any)
 
 	var (
@@ -590,8 +591,8 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 	logger.Pl.I("Scraping %q using rules for %s...", urlStr, query.Site)
 
 	// Group rules by field name
-	rulesByField := make(map[string][]consts.HTMLMetadataRule)
-	for _, rule := range query.Rules {
+	rulesByField := make(map[string][]models.MetadataRule)
+	for _, rule := range query.Metadata {
 		rulesByField[rule.Name] = append(rulesByField[rule.Name], rule)
 	}
 

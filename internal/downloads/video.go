@@ -15,7 +15,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads/downloaders"
-	"tubarr/internal/scraper"
+	"tubarr/internal/siterules"
 	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/abstractions"
@@ -132,7 +132,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
 	var siteArgs []string
-	siteArgs, d.fsGen = scraper.YtDLPSiteArgs(d.Video.URL, d.ChannelURL.FlareSolverr, args)
+	siteArgs, d.fsGen = siterules.YtDLPArgs(d.Video.URL, d.ChannelURL.FlareSolverr, args)
 	args = append(args, siteArgs...)
 
 	// Add target URL [ MUST GO LAST !! ]

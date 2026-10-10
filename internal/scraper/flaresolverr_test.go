@@ -12,6 +12,7 @@ import (
 	"testing"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
+	"tubarr/internal/models"
 
 	"github.com/spf13/viper"
 )
@@ -69,11 +70,11 @@ func fakeCloudflareSite(t *testing.T, minClearance int) *httptest.Server {
 }
 
 // flareSolverrQuery returns a FlareSolverr site query with a link crawl rule.
-func flareSolverrQuery() consts.HTMLMetadataQuery {
-	return consts.HTMLMetadataQuery{
+func flareSolverrQuery() models.SiteRules {
+	return models.SiteRules{
 		Site:         "cf.example",
 		FlareSolverr: true,
-		Crawl:        &consts.HTMLCrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile("/video/")},
+		Crawl:        &models.CrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile("/video/")},
 	}
 }
 

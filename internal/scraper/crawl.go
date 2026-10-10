@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/models"
+	"tubarr/internal/siterules"
 
 	"github.com/gocolly/colly"
 	"github.com/tidwall/gjson"
@@ -33,7 +34,7 @@ func TestCrawlSite(channelURL string) (matched bool, source string, urls []strin
 //
 // crawled is false if no crawl rule applies to the URL, and yt-dlp should be used instead.
 func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (source string, urls map[string]struct{}, crawled bool, err error) {
-	query, ok := matchCrawlSite(channelURL)
+	query, ok := siterules.MatchCrawl(channelURL)
 	if !ok {
 		return "", nil, false, nil
 	}
@@ -43,7 +44,7 @@ func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (s
 }
 
 // crawlWithRule extracts video URLs from a channel page using a user-defined crawl rule.
-func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query consts.HTMLMetadataQuery) (map[string]struct{}, error) {
+func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query models.SiteRules) (map[string]struct{}, error) {
 	rule := query.Crawl
 	if rule == nil {
 		return nil, fmt.Errorf("site %q has no crawl rule", query.Site)

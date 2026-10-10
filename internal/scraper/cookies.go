@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/models"
+	"tubarr/internal/siterules"
 
 	"github.com/browserutils/kooky"
 	// Use all browsers for Kooky:
@@ -54,7 +55,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// Should login, use browser cookies, or use FlareSolverr?
 	doLogin := cu.NeedsAuth()
 	useGlobal := cu.ChanURLSettings != nil && cu.ChanURLSettings.UseGlobalCookies != nil && *cu.ChanURLSettings.UseGlobalCookies
-	useFlareSolverr := siteUsesFlareSolverr(cu.URL)
+	useFlareSolverr := siterules.UsesFlareSolverr(cu.URL)
 
 	// Early return if no cookies needed.
 	if !doLogin && !useGlobal && !useFlareSolverr {

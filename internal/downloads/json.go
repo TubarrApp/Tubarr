@@ -9,7 +9,7 @@ import (
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/scraper"
+	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 )
@@ -94,7 +94,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
 	var siteArgs []string
-	siteArgs, d.fsGen = scraper.YtDLPSiteArgs(d.Video.URL, d.ChannelURL.FlareSolverr, args)
+	siteArgs, d.fsGen = siterules.YtDLPArgs(d.Video.URL, d.ChannelURL.FlareSolverr, args)
 	args = append(args, siteArgs...)
 
 	// Add target URL [ MUST GO LAST !! ].

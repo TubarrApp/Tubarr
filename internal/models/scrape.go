@@ -6,7 +6,7 @@ import "tubarr/internal/domain/consts"
 type SiteScraper struct {
 	Domain       string
 	Selectors    []ScrapeSelectors
-	Crawl        *consts.HTMLCrawlRule
+	Crawl        *CrawlRule
 	Impersonate  *consts.Impersonate // nil keeps any built-in value.
 	FlareSolverr bool
 }

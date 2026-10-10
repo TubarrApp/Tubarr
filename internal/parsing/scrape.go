@@ -177,12 +177,12 @@ func SaveScrapeSelectorsFile(path, content string) ([]models.SiteScraper, error)
 }
 
 // parseCrawlConfig validates a crawl rule and compiles its URL filters.
-func parseCrawlConfig(c *scrapeCrawlConfig) (*consts.HTMLCrawlRule, error) {
+func parseCrawlConfig(c *scrapeCrawlConfig) (*models.CrawlRule, error) {
 	if c == nil {
 		return nil, nil
 	}
 
-	rule := &consts.HTMLCrawlRule{
+	rule := &models.CrawlRule{
 		Selector:   strings.TrimSpace(c.Selector),
 		Attr:       strings.TrimSpace(c.Attr),
 		JSONPath:   strings.TrimSpace(c.JSONPath),

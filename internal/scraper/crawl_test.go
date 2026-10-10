@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"slices"
 	"testing"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/models"
 )
 
 // TestMain sets up the test environment for the scraper package.
@@ -43,22 +43,22 @@ func TestCrawlWithRule(t *testing.T) {
 
 	tests := []struct {
 		name string
-		rule consts.HTMLCrawlRule
+		rule models.CrawlRule
 		want []string
 	}{
 		{
 			name: "links",
-			rule: consts.HTMLCrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile("/video/"), StripQuery: true},
+			rule: models.CrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile("/video/"), StripQuery: true},
 			want: []string{srv.URL + "/video/abc", srv.URL + "/video/def"},
 		},
 		{
 			name: "links exclude",
-			rule: consts.HTMLCrawlRule{Selector: "a[href]", Attr: "href", Exclude: regexp.MustCompile("/about|abc")},
+			rule: models.CrawlRule{Selector: "a[href]", Attr: "href", Exclude: regexp.MustCompile("/about|abc")},
 			want: []string{srv.URL + "/video/def"},
 		},
 		{
 			name: "json",
-			rule: consts.HTMLCrawlRule{
+			rule: models.CrawlRule{
 				Selector:   `rum-videos-grid script[type="application/json"]`,
 				JSONPath:   `items.#(object_type=="video")#.url`,
 				Include:    regexp.MustCompile(`^https://rumble\.com/v[^/]+\.html$`),
@@ -70,7 +70,7 @@ func TestCrawlWithRule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			query := consts.HTMLMetadataQuery{Site: "test", Crawl: &tt.rule}
+			query := models.SiteRules{Site: "test", Crawl: &tt.rule}
 			got, err := New().crawlWithRule(srv.URL+"/channel", nil, query)
 			if err != nil {
 				t.Fatal(err)
@@ -94,7 +94,7 @@ func TestCrawlWithRuleRequestError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	query := consts.HTMLMetadataQuery{Site: "test", Crawl: &consts.HTMLCrawlRule{Selector: "a[href]", Attr: "href"}}
+	query := models.SiteRules{Site: "test", Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
 	if _, err := New().crawlWithRule(srv.URL, nil, query); err == nil {
 		t.Error("expected an error for a 403 channel page")
 	}
@@ -102,7 +102,7 @@ func TestCrawlWithRuleRequestError(t *testing.T) {
 
 // TestCrawlWithRuleNilRule tests that crawlWithRule returns an error rather than panicking when a site has no crawl rule.
 func TestCrawlWithRuleNilRule(t *testing.T) {
-	if _, err := New().crawlWithRule("https://example.com", nil, consts.HTMLMetadataQuery{Site: "example.com"}); err == nil {
+	if _, err := New().crawlWithRule("https://example.com", nil, models.SiteRules{Site: "example.com"}); err == nil {
 		t.Error("expected an error for a site with no crawl rule")
 	}
 }
