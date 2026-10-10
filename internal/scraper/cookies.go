@@ -31,6 +31,10 @@ type CookieManager struct {
 	fsSolutions map[string]*flareSolverrSolution
 	fsFailures  map[string]error
 	fsGen       int
+
+	// Request headers FlareSolverr's browser sends, copied once per crawl session.
+	fsHeaders      [][2]string
+	fsHeadersTried bool
 }
 
 // NewCookieManager creates a new cookie manager instance.

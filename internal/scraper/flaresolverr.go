@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/gocolly/colly"
 )
 
 const (
@@ -27,7 +28,8 @@ const (
 type flareSolverrSolution struct {
 	cookies   []*http.Cookie
 	userAgent string
-	gen       int // Higher for each solve, so stale solutions can be told apart.
+	headers   [][2]string // Request headers FlareSolverr's browser sends, in order (nil if they couldn't be copied).
+	gen       int         // Higher for each solve, so stale solutions can be told apart.
 }
 
 // flareSolverrRequest is the body of a FlareSolverr API request.
@@ -44,6 +46,7 @@ type flareSolverrResponse struct {
 	Solution struct {
 		Status    int    `json:"status"`
 		UserAgent string `json:"userAgent"`
+		Response  string `json:"response"`
 		Cookies   []struct {
 			Name     string  `json:"name"`
 			Value    string  `json:"value"`
@@ -80,36 +83,9 @@ func flareSolverrEndpoint(baseURL string) (string, error) {
 //
 // FlareSolverr may spend up to timeout solving the challenge and loading the page.
 func solveFlareSolverr(ctx context.Context, baseURL, pageURL string, timeout time.Duration) (sol *flareSolverrSolution, status int, err error) {
-	endpoint, err := flareSolverrEndpoint(baseURL)
+	fsResp, err := flareSolverrGet(ctx, baseURL, pageURL, timeout)
 	if err != nil {
 		return nil, 0, err
-	}
-
-	payload, err := json.Marshal(flareSolverrRequest{Cmd: "request.get", URL: pageURL, MaxTimeout: timeout.Milliseconds()})
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to build FlareSolverr request: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, timeout+flareSolverrResponseHeadroom)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to build FlareSolverr request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("FlareSolverr request to %q failed: %w", endpoint, err)
-	}
-	defer resp.Body.Close()
-
-	var fsResp flareSolverrResponse
-	if err := json.NewDecoder(resp.Body).Decode(&fsResp); err != nil {
-		return nil, 0, fmt.Errorf("failed to decode FlareSolverr response (HTTP %d): %w", resp.StatusCode, err)
-	}
-	if fsResp.Status != "ok" {
-		return nil, 0, fmt.Errorf("FlareSolverr could not load %q: %s", pageURL, fsResp.Message)
 	}
 	if fsResp.Solution.UserAgent == "" {
 		return nil, 0, fmt.Errorf("FlareSolverr returned no user agent for %q", pageURL)
@@ -124,6 +100,42 @@ func solveFlareSolverr(ctx context.Context, baseURL, pageURL string, timeout tim
 		sol.cookies = append(sol.cookies, cookie)
 	}
 	return sol, fsResp.Solution.Status, nil
+}
+
+// flareSolverrGet has FlareSolverr's browser load pageURL, taking up to timeout, and returns FlareSolverr's response.
+func flareSolverrGet(ctx context.Context, baseURL, pageURL string, timeout time.Duration) (*flareSolverrResponse, error) {
+	endpoint, err := flareSolverrEndpoint(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := json.Marshal(flareSolverrRequest{Cmd: "request.get", URL: pageURL, MaxTimeout: timeout.Milliseconds()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to build FlareSolverr request: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout+flareSolverrResponseHeadroom)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("failed to build FlareSolverr request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("FlareSolverr request to %q failed: %w", endpoint, err)
+	}
+	defer resp.Body.Close()
+
+	var fsResp flareSolverrResponse
+	if err := json.NewDecoder(resp.Body).Decode(&fsResp); err != nil {
+		return nil, fmt.Errorf("failed to decode FlareSolverr response (HTTP %d): %w", resp.StatusCode, err)
+	}
+	if fsResp.Status != "ok" {
+		return nil, fmt.Errorf("FlareSolverr could not load %q: %s", pageURL, fsResp.Message)
+	}
+	return &fsResp, nil
 }
 
 // flareSolverrSolution returns the cached FlareSolverr solution for pageURL's hostname, solving through FlareSolverr
@@ -169,6 +181,16 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 		}
 		return nil, cm.flareSolverrFailed(host, err)
 	}
+	if !cm.fsHeadersTried {
+		cm.fsHeadersTried = true
+		if cm.fsHeaders, err = flareSolverrBrowserHeaders(ctx, baseURL); err != nil {
+			logger.Pl.W("Could not copy FlareSolverr's browser headers, so Tubarr will send its own Chrome headers: %v", err)
+		} else {
+			logger.Pl.I("Copied %d request headers from FlareSolverr's browser", len(cm.fsHeaders))
+		}
+	}
+	sol.headers = cm.fsHeaders
+
 	cm.fsGen++
 	sol.gen = cm.fsGen
 	cm.fsSolutions[host] = sol
@@ -212,6 +234,12 @@ func isCloudflareChallenge(status int, header http.Header, body []byte) bool {
 		return false
 	}
 	return bytes.Contains(body, []byte("challenge-platform")) || bytes.Contains(body, []byte("Just a moment"))
+}
+
+// logCloudflareChallenge logs the details of a Cloudflare challenge response, to help diagnose why it was challenged.
+func logCloudflareChallenge(urlStr string, r *colly.Response) {
+	logger.Pl.I("Cloudflare challenge for %q: HTTP %d, cf-mitigated %q, cf-ray %q",
+		urlStr, r.StatusCode, r.Headers.Get("Cf-Mitigated"), r.Headers.Get("Cf-Ray"))
 }
 
 // TestFlareSolverr solves a simple page through the FlareSolverr instance at baseURL, to check it works.

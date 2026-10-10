@@ -388,11 +388,13 @@ func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query mod
 	c.OnResponse(func(r *colly.Response) {
 		if isCloudflareChallenge(r.StatusCode, *r.Headers, r.Body) {
 			challenged = true
+			logCloudflareChallenge(urlStr, r)
 		}
 	})
 	c.OnError(func(r *colly.Response, err error) {
 		if r.Headers != nil && isCloudflareChallenge(r.StatusCode, *r.Headers, r.Body) {
 			challenged = true
+			logCloudflareChallenge(urlStr, r)
 		}
 		reqErr = fmt.Errorf("request for %q failed (HTTP %d): %w", urlStr, r.StatusCode, err)
 	})
@@ -440,6 +442,7 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 		if err != nil {
 			return nil, err
 		}
+		rt.headers = sol.headers
 		collector.WithTransport(rt)
 		collector.UserAgent = userAgent
 		jar.SetCookies(parsedURL, sol.cookies) // Set last, to replace any stale Cloudflare cookies.

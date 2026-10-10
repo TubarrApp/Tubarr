@@ -20,7 +20,9 @@ var userAgentVersionRegex = regexp.MustCompile(`(?:Chrome|Firefox)/(\d+)`)
 
 // tlsRoundTripper adapts a tls-client HttpClient to the net/http RoundTripper interface used by Colly.
 type tlsRoundTripper struct {
-	client tlsclient.HttpClient
+	client  tlsclient.HttpClient
+	browser consts.Impersonate // Browser whose page load headers are sent (Brave and Opera send Chrome's).
+	headers [][2]string        // Headers copied from a real browser, sent instead of generated ones (e.g. FlareSolverr's).
 }
 
 // newTLSRoundTripper returns a RoundTripper which impersonates the given browser's TLS fingerprint, plus a matching User-Agent.
@@ -40,7 +42,11 @@ func newTLSRoundTripper(impersonate consts.Impersonate, userAgent string) (rt *t
 	if userAgent == "" {
 		userAgent = browserUserAgent(impersonate, version)
 	}
-	return &tlsRoundTripper{client: client}, userAgent, nil
+	browser := impersonate
+	if browser == consts.ImpersonateBrave || browser == consts.ImpersonateOpera {
+		browser = consts.ImpersonateChrome
+	}
+	return &tlsRoundTripper{client: client, browser: browser}, userAgent, nil
 }
 
 // userAgentMajorVersion returns the major browser version in a Chrome or Firefox user agent, or 0 if there is none.
@@ -60,6 +66,7 @@ func (t *tlsRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	freq.Header = fhttp.Header(req.Header.Clone())
+	setRequestHeaders(freq.Header, t.browser, t.headers)
 	freq.Host = req.Host
 	freq.ContentLength = req.ContentLength
 

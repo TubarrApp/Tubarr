@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -27,6 +28,26 @@ var (
 	lastMaxTimeout atomic.Int64
 )
 
+// echoRequests counts fakeFlareSolverr's header echo page loads.
+var echoRequests atomic.Int32
+
+// testEchoHeaders are the headers fakeFlareSolverr's "browser" sends, as the header echo page shows them.
+var testEchoHeaders = []string{
+	":method: GET", ":authority: tls.peet.ws", ":scheme: https", ":path: /api/all",
+	`sec-ch-ua: "Not?A_Brand";v="24", "Chromium";v="131"`, "sec-ch-ua-mobile: ?0", `sec-ch-ua-platform: "Linux"`,
+	"upgrade-insecure-requests: 1", "user-agent: " + testFlareSolverrUA, "accept: text/html,*/*;q=0.8",
+	"sec-fetch-site: none", "sec-fetch-mode: navigate", "accept-language: C.UTF-8,C.UTF;q=0.9", "priority: u=0, i",
+}
+
+// testEchoPage returns the header echo page as a browser renders it: its JSON, HTML-escaped inside a <pre>.
+func testEchoPage() string {
+	echo, _ := json.Marshal(map[string]any{"http2": map[string]any{"sent_frames": []map[string]any{
+		{"frame_type": "SETTINGS"},
+		{"frame_type": "HEADERS", "headers": testEchoHeaders},
+	}}})
+	return "<html><head></head><body><pre>" + html.EscapeString(string(echo)) + "</pre></body></html>"
+}
+
 // fakeFlareSolverr starts a server answering FlareSolverr API requests. Each solve returns a cf_clearance cookie
 // numbered by solve count ("1", "2", ...), and the number of solves so far is kept in solves.
 func fakeFlareSolverr(t *testing.T, solves *atomic.Int32) *httptest.Server {
@@ -35,6 +56,11 @@ func fakeFlareSolverr(t *testing.T, solves *atomic.Int32) *httptest.Server {
 		var req flareSolverrRequest
 		if r.Method != http.MethodPost || r.URL.Path != "/v1" || json.NewDecoder(r.Body).Decode(&req) != nil || req.Cmd != "request.get" {
 			http.Error(w, "unexpected request", http.StatusBadRequest)
+			return
+		}
+		if req.URL == flareSolverrHeaderEchoURL {
+			echoRequests.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "solution": map[string]any{"status": 200, "userAgent": testFlareSolverrUA, "response": testEchoPage()}})
 			return
 		}
 		lastSolvedURL.Store(req.URL)
@@ -301,5 +327,57 @@ func TestFlareSolverrSiteTimeout(t *testing.T) {
 	}
 	if got, want := lastMaxTimeout.Load(), consts.FlareSolverrDefaultTimeout.Milliseconds(); got != want {
 		t.Errorf("site with no timeout: FlareSolverr got maxTimeout %d, want %d", got, want)
+	}
+}
+
+// TestParseHeaderEcho tests reading the headers a browser sent from the header echo page, in order.
+func TestParseHeaderEcho(t *testing.T) {
+	got, err := parseHeaderEcho(testEchoPage())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != len(testEchoHeaders)-4 || got[0] != [2]string{"sec-ch-ua", `"Not?A_Brand";v="24", "Chromium";v="131"`} {
+		t.Errorf("expected the headers without pseudo-headers, in order, got %v", got)
+	}
+
+	// HTTP/1.1 echoes, and the host and cookies (which differ per request), are handled too.
+	h1, err := parseHeaderEcho(`{"http1": {"headers": ["Host: tls.peet.ws", "User-Agent: x", "Cookie: a=b", "Accept-Language: en"]}}`)
+	if err != nil || len(h1) != 2 || h1[0] != [2]string{"user-agent", "x"} || h1[1] != [2]string{"accept-language", "en"} {
+		t.Errorf("HTTP/1.1 echo: got %v, %v", h1, err)
+	}
+
+	if _, err := parseHeaderEcho("<html><body>Blocked</body></html>"); err == nil {
+		t.Error("expected an error for a page with no echoed headers")
+	}
+}
+
+// TestFlareSolverrCopiesBrowserHeaders tests that requests for FlareSolverr sites send the headers FlareSolverr's
+// browser sends, copied once per crawl session.
+func TestFlareSolverrCopiesBrowserHeaders(t *testing.T) {
+	var solves atomic.Int32
+	echoRequests.Store(0)
+	useFlareSolverr(t, fakeFlareSolverr(t, &solves))
+
+	var got http.Header
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		_, _ = w.Write([]byte(`<a href="/video/1">One</a>`))
+	}))
+	defer site.Close()
+
+	s := New()
+	for range 2 {
+		if _, err := s.crawlWithRule(site.URL+"/channel", nil, flareSolverrQuery()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got.Get("Accept-Language") != "C.UTF-8,C.UTF;q=0.9" || got.Get("Sec-Ch-Ua") != `"Not?A_Brand";v="24", "Chromium";v="131"` {
+		t.Errorf("expected FlareSolverr's browser headers, got Accept-Language %q, Sec-Ch-Ua %q", got.Get("Accept-Language"), got.Get("Sec-Ch-Ua"))
+	}
+	if !strings.Contains(got.Get("Cookie"), "cf_clearance=") {
+		t.Errorf("expected FlareSolverr's cookies to be kept, got %q", got.Get("Cookie"))
+	}
+	if echoRequests.Load() != 1 {
+		t.Errorf("expected the headers to be copied once, got %d echo requests", echoRequests.Load())
 	}
 }
