@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
 )
 
 // flareSolverrHeaderEchoURL is a public page that echoes back the request headers it received, in the order sent.
@@ -32,11 +33,21 @@ type headerEcho struct {
 // flareSolverrBrowserHeaders has FlareSolverr's browser load the header echo page, and returns the headers it sent,
 // in order (leaving out ones that differ per request, like the host and cookies).
 func flareSolverrBrowserHeaders(ctx context.Context, baseURL string) ([][2]string, error) {
+	logger.Pl.I("Requesting FlareSolverr's browser headers from %q...", flareSolverrHeaderEchoURL)
 	fsResp, err := flareSolverrGet(ctx, baseURL, flareSolverrHeaderEchoURL, consts.FlareSolverrDefaultTimeout)
 	if err != nil {
 		return nil, err
 	}
-	return parseHeaderEcho(fsResp.Solution.Response)
+
+	// Parse the headers from the header echo page's response, as rendered by a browser.
+	headers, err := parseHeaderEcho(fsResp.Solution.Response)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log the copied headers.
+	logger.Pl.I("Got FlareSolverr's browser headers from FlareSolverr at %q:\n\n%v", baseURL, headers)
+	return headers, nil
 }
 
 // parseHeaderEcho returns the headers in the header echo page's response, as rendered by a browser.

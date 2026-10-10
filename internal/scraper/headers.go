@@ -12,18 +12,20 @@ import (
 
 // setRequestHeaders adds browser headers to an impersonated request: headers copied from a real browser if there are
 // any (e.g. FlareSolverr's), or otherwise ones generated for the impersonated browser. Other browsers are left as is.
-func setRequestHeaders(h fhttp.Header, impersonate consts.Impersonate, copied [][2]string) {
+func setRequestHeaders(h fhttp.Header, impersonate consts.Impersonate, fsHeaders [][2]string) {
 	switch {
-	case len(copied) > 0:
-		setBrowserHeaders(h, copied)
+	case len(fsHeaders) > 0:
+		setBrowserHeaders(h, fsHeaders)
+		logger.Pl.D(1, "Sending FlareSolverr's browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
 	case impersonate == consts.ImpersonateChrome:
 		setChromeHeaders(h)
+		logger.Pl.D(1, "Sending built in Chrome browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
 	case impersonate == consts.ImpersonateFirefox:
 		setFirefoxHeaders(h)
+		logger.Pl.D(1, "Sending built in Firefox browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
 	default:
-		logger.Pl.I("No browser headers for impersonate %q, sending only the user agent and Colly's defaults", impersonate)
+		logger.Pl.D(1, "No browser headers for impersonate %q, sending only the user agent and Colly's defaults:\n\n%s", impersonate, describeHeaders(h))
 	}
-	logger.Pl.I("Sending headers: %s", describeHeaders(h))
 }
 
 // describeHeaders returns the headers in the order they'll be sent, as "name: value", with cookie values left out.
