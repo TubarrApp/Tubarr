@@ -30,6 +30,7 @@ type flareSolverrSolution struct {
 	userAgent string
 	headers   [][2]string // Request headers FlareSolverr's browser sends, in order (nil if they couldn't be copied).
 	gen       int         // Higher for each solve, so stale solutions can be told apart.
+	solvedAt  time.Time
 }
 
 // flareSolverrRequest is the body of a FlareSolverr API request.
@@ -158,6 +159,9 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 	defer cm.fsMu.Unlock()
 
 	if sol, ok := cm.fsSolutions[host]; ok && sol.gen > staleGen {
+		if staleGen > 0 {
+			logger.Pl.I("Using the FlareSolverr solve from %s for %q (newer than the one that was blocked)", sol.solvedAt.Format(time.TimeOnly), host)
+		}
 		return sol, nil
 	}
 	if err, failed := cm.fsFailures[host]; failed {
@@ -192,7 +196,7 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 	sol.headers = cm.fsHeaders
 
 	cm.fsGen++
-	sol.gen = cm.fsGen
+	sol.gen, sol.solvedAt = cm.fsGen, time.Now()
 	cm.fsSolutions[host] = sol
 
 	logger.Pl.S("FlareSolverr solved %q (%d cookies, user agent %q)", homeURL, len(sol.cookies), sol.userAgent)
@@ -222,6 +226,30 @@ func (cm *CookieManager) flareSolverrResolver(cu *models.ChannelURL, baseCookies
 			return models.FlareSolverrSolve{}, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
 		}
 		return sol.ytDLPSolve(), nil
+	}
+}
+
+// flareSolverrNewer returns a function that, if a solve newer than gen has been made for cu's URL (e.g. by Tubarr's own
+// requests), rewrites cu's cookie file with its cookies on top of baseCookies and returns it. It never contacts FlareSolverr.
+func (cm *CookieManager) flareSolverrNewer(cu *models.ChannelURL, baseCookies []*http.Cookie) func(gen int) (models.FlareSolverrSolve, bool, error) {
+	pageURL, loginURL, cookiePath := cu.URL, cu.LoginURL, cu.CookiePath
+	return func(gen int) (models.FlareSolverrSolve, bool, error) {
+		u, err := url.Parse(pageURL)
+		if err != nil {
+			return models.FlareSolverrSolve{}, false, fmt.Errorf("invalid URL %q: %w", pageURL, err)
+		}
+		cm.fsMu.Lock()
+		sol, ok := cm.fsSolutions[u.Hostname()]
+		cm.fsMu.Unlock()
+		if !ok || sol.gen <= gen {
+			return models.FlareSolverrSolve{}, false, nil
+		}
+
+		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), loginURL, cookiePath); err != nil {
+			return models.FlareSolverrSolve{}, false, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
+		}
+		logger.Pl.I("Using the newer FlareSolverr solve from %s for %q", sol.solvedAt.Format(time.TimeOnly), u.Hostname())
+		return sol.ytDLPSolve(), true, nil
 	}
 }
 

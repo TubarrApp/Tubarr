@@ -16,7 +16,7 @@ func TestFlareSolverrSolutionRefresh(t *testing.T) {
 		defer mu.Unlock()
 		solves++
 		return FlareSolverrSolve{UserAgent: "UA/2", Gen: staleGen + 1}, nil
-	})
+	}, nil)
 
 	var wg sync.WaitGroup
 	for range 5 {
@@ -52,5 +52,21 @@ func TestIsCloudflareBlock(t *testing.T) {
 	}
 	if IsCloudflareBlock("ERROR: Unsupported URL: https://example.com") {
 		t.Error("expected an unsupported URL error not to be a Cloudflare block")
+	}
+}
+
+// TestFlareSolverrSolutionCurrentNewer tests that Current switches to a newer solve made meanwhile, and keeps its own otherwise.
+func TestFlareSolverrSolutionCurrentNewer(t *testing.T) {
+	latest := FlareSolverrSolve{UserAgent: "UA/1", Gen: 1}
+	s := NewFlareSolverrSolution(latest, nil, func(gen int) (FlareSolverrSolve, bool, error) {
+		return latest, latest.Gen > gen, nil
+	})
+
+	if got := s.Current(); got.Gen != 1 {
+		t.Errorf("expected solve 1, got %+v", got)
+	}
+	latest = FlareSolverrSolve{UserAgent: "UA/2", Gen: 2}
+	if got := s.Current(); got.Gen != 2 || got.UserAgent != "UA/2" {
+		t.Errorf("expected to switch to the newer solve 2, got %+v", got)
 	}
 }

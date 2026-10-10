@@ -257,7 +257,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		uniqueEpisodeURLs = make(map[string]struct{})
 	}
 
-	// Run yt-dlp, solving through FlareSolverr again and retrying once if Cloudflare blocks a FlareSolverr site.
+	// Run yt-dlp, refreshing the FlareSolverr solve and retrying once if Cloudflare blocks a FlareSolverr site.
 	var j []byte
 	for retried := false; ; retried = true {
 		// Build argument
@@ -276,7 +276,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		}
 
 		// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
-		args, fsGen := siterules.YtDLPArgs(channelURL, fs, args)
+		args, fsGen := siterules.AddSiteRulesToYTDLP(channelURL, fs, args)
 
 		// Add -J and URL to finalize command
 		args = append(args, command.OutputJSON, channelURL)
@@ -298,7 +298,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 			return uniqueEpisodeURLs, fmt.Errorf("yt-dlp command failed: %w: %s", err, stderr)
 		}
 
-		logger.Pl.W("Cloudflare blocked yt-dlp for %q, solving through FlareSolverr again...", channelURL)
+		logger.Pl.W("Cloudflare blocked yt-dlp for %q, refreshing its FlareSolverr solve...", channelURL)
 		if err := fs.Refresh(fsGen); err != nil {
 			return uniqueEpisodeURLs, fmt.Errorf("yt-dlp was blocked by Cloudflare (%s), and a fresh FlareSolverr solve failed: %w", stderr, err)
 		}
@@ -365,7 +365,7 @@ func (s *Scraper) visitPage(urlStr string, cookies []*http.Cookie, query models.
 			return fmt.Errorf("cloudflare challenged the request for %q again after a fresh FlareSolverr solve", urlStr)
 		}
 
-		logger.Pl.W("Cloudflare challenged the request for %q, solving through FlareSolverr again...", urlStr)
+		logger.Pl.W("Cloudflare challenged the request for %q, refreshing its FlareSolverr solve...", urlStr)
 		if sol, err = s.cookieManager.flareSolverrSolution(context.Background(), urlStr, sol.gen); err != nil {
 			return fmt.Errorf("cloudflare challenged the request for %q, and a fresh FlareSolverr solve failed: %w", urlStr, err)
 		}
@@ -374,14 +374,9 @@ func (s *Scraper) visitPage(urlStr string, cookies []*http.Cookie, query models.
 
 // visitPageOnce makes a single visitPage attempt, reporting whether Cloudflare challenged it.
 func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query models.SiteRules, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
-	c, err := initializeCollector(urlStr, s.cookieManager, query, sol)
+	c, err := initializeCollector(urlStr, s.cookieManager, query, sol, cookies)
 	if err != nil {
 		return false, err
-	}
-	if len(cookies) > 0 {
-		if err := c.SetCookies(urlStr, cookies); err != nil {
-			return false, fmt.Errorf("failed to set cookies for %q: %w", urlStr, err)
-		}
 	}
 
 	var reqErr error
@@ -410,8 +405,10 @@ func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query mod
 // initializeCollector initializes Colly with any cookies, using a TLS-impersonating transport and user agent if the site
 // sets them.
 //
-// For FlareSolverr sites (sol set), impersonates Chrome with the solution's cookies and user agent.
-func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution) (c *colly.Collector, err error) {
+// Cookies are set in order, later ones replacing earlier ones with the same name: this crawl session's, then the caller's
+// (e.g. the channel URL's), then for FlareSolverr sites (sol set), the solution's, so a refreshed solve isn't undone by
+// older Cloudflare cookies. FlareSolverr sites impersonate Chrome with the solution's user agent.
+func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
@@ -424,11 +421,14 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 	}
 
 	// Get cookies from cookie manager for this crawl session.
-	if cookies := cm.GetCachedCookies(parsedURL.Hostname()); cookies != nil {
-		jar.SetCookies(parsedURL, cookies)
-		logger.Pl.D(2, "Set %d cookies for scraper from this crawl session", len(cookies))
+	if cached := cm.GetCachedCookies(parsedURL.Hostname()); cached != nil {
+		jar.SetCookies(parsedURL, cached)
+		logger.Pl.D(2, "Set %d cookies for scraper from this crawl session", len(cached))
 	} else {
 		logger.Pl.D(2, "No cookies available for scraper for hostname %q", parsedURL.Hostname())
+	}
+	if len(cookies) > 0 {
+		jar.SetCookies(parsedURL, cookies)
 	}
 
 	// Create a Colly collector with the custom HTTP client

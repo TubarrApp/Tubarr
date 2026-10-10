@@ -174,7 +174,7 @@ func refreshFlareSolverr(cu *models.ChannelURL, videoURL string, fsGen int, dlEr
 		return false
 	}
 
-	logger.Pl.W("Cloudflare blocked the download of %q, solving through FlareSolverr again...", videoURL)
+	logger.Pl.W("Cloudflare blocked the download of %q, refreshing its FlareSolverr solve...", videoURL)
 	if err := fs.Refresh(fsGen); err != nil {
 		logger.Pl.E("FlareSolverr solve failed for %q: %v", videoURL, err)
 	}

@@ -139,7 +139,7 @@ func TestYtDLPArgs(t *testing.T) {
 		{Domain: "brave.example", Impersonate: &brave},
 		{Domain: "plain.example", Impersonate: &none, FlareSolverr: true},
 	})
-	fs := models.NewFlareSolverrSolution(models.FlareSolverrSolve{UserAgent: "UA/1", Gen: 3}, nil)
+	fs := models.NewFlareSolverrSolution(models.FlareSolverrSolve{UserAgent: "UA/1", Gen: 3}, nil, nil)
 
 	tests := []struct {
 		name     string
@@ -164,7 +164,7 @@ func TestYtDLPArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			before := slices.Clone(tt.existing)
-			got, gen := YtDLPArgs(tt.url, tt.fs, tt.existing)
+			got, gen := AddSiteRulesToYTDLP(tt.url, tt.fs, tt.existing)
 			if !slices.Equal(got, tt.want) || gen != tt.wantGen {
 				t.Errorf("got %v (gen %d), want %v (gen %d)", got, gen, tt.want, tt.wantGen)
 			}
@@ -203,7 +203,7 @@ func TestStripArg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := stripArg(tt.args, "--impersonate"); !slices.Equal(got, tt.want) {
+			if got := stripFlagArgs(tt.args, "--impersonate", "https://example.com/v"); !slices.Equal(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
@@ -244,7 +244,7 @@ func TestYtDLPArgsUserAgent(t *testing.T) {
 	Reset()
 	chrome := consts.ImpersonateChrome
 	Register([]models.SiteScraper{{Domain: "ua.example", Impersonate: &chrome, UserAgent: "Site/1 Chrome/130"}})
-	fs := models.NewFlareSolverrSolution(models.FlareSolverrSolve{UserAgent: "UA/1", Gen: 3}, nil)
+	fs := models.NewFlareSolverrSolution(models.FlareSolverrSolve{UserAgent: "UA/1", Gen: 3}, nil, nil)
 
 	tests := []struct {
 		name     string
@@ -258,16 +258,16 @@ func TestYtDLPArgsUserAgent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got, _ := YtDLPArgs("https://ua.example/v", tt.fs, tt.existing); !slices.Equal(got, tt.want) {
+			if got, _ := AddSiteRulesToYTDLP("https://ua.example/v", tt.fs, tt.existing); !slices.Equal(got, tt.want) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-// TestYtDLPArgsFlareSolverrHeaders tests that yt-dlp gets FlareSolverr's browser headers (not the user agent or encoding,
+// TestAddSiteRulesToYTDLPArgsFlareSolverrHeaders tests that yt-dlp gets FlareSolverr's browser headers (not the user agent or encoding,
 // which are handled separately), replacing the user's own for the same headers but keeping others.
-func TestYtDLPArgsFlareSolverrHeaders(t *testing.T) {
+func TestAddSiteRulesToYTDLPArgsFlareSolverrHeaders(t *testing.T) {
 	t.Cleanup(Reset)
 	Reset()
 	Register([]models.SiteScraper{{Domain: "cf.example", FlareSolverr: true}})
@@ -280,10 +280,10 @@ func TestYtDLPArgsFlareSolverrHeaders(t *testing.T) {
 			{"accept-language", "C.UTF-8"},
 		},
 		Gen: 3,
-	}, nil)
+	}, nil, nil)
 
 	existing := []string{"--add-headers", "Accept-Language:en", "--add-headers=Referer:x", "--add-header=SEC-CH-UA:old"}
-	got, _ := YtDLPArgs("https://cf.example/v", fs, existing)
+	got, _ := AddSiteRulesToYTDLP("https://cf.example/v", fs, existing)
 	want := []string{
 		"--add-headers=Referer:x",
 		"--impersonate", "chrome", "--user-agent", "UA/1",

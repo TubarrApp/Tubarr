@@ -100,7 +100,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// If FlareSolverr is unavailable, carries on without it (the failure is already logged).
 	if useFlareSolverr {
 		if sol, err := cm.flareSolverrSolution(ctx, cu.URL, 0); err == nil {
-			cu.FlareSolverr = models.NewFlareSolverrSolution(sol.ytDLPSolve(), cm.flareSolverrResolver(cu, cookies))
+			cu.FlareSolverr = models.NewFlareSolverrSolution(sol.ytDLPSolve(), cm.flareSolverrResolver(cu, cookies), cm.flareSolverrNewer(cu, cookies))
 			cookies = mergeCookies(sol.cookies, cookies)
 		} else if ctx.Err() != nil {
 			return nil, "", ctx.Err()

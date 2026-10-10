@@ -3,6 +3,7 @@ package models
 import (
 	"strings"
 	"sync"
+	"tubarr/internal/domain/logger"
 )
 
 // FlareSolverrSolve is what a FlareSolverr solve gives yt-dlp: its browser's user agent and request headers.
@@ -19,17 +20,30 @@ type FlareSolverrSolution struct {
 	mu      sync.Mutex
 	solve   FlareSolverrSolve
 	resolve func(staleGen int) (FlareSolverrSolve, error)
+	newer   func(gen int) (solve FlareSolverrSolve, ok bool, err error)
 }
 
-// NewFlareSolverrSolution returns a solution holding solve, which resolve solves again (rewriting the cookie file).
-func NewFlareSolverrSolution(solve FlareSolverrSolve, resolve func(staleGen int) (FlareSolverrSolve, error)) *FlareSolverrSolution {
-	return &FlareSolverrSolution{solve: solve, resolve: resolve}
+// NewFlareSolverrSolution returns a solution holding solve.
+//
+// resolve solves again, and newer returns any newer solve made meanwhile (e.g. by Tubarr's own requests) without
+// solving. Both rewrite the cookie file with the solve they return. newer may be nil.
+func NewFlareSolverrSolution(solve FlareSolverrSolve, resolve func(staleGen int) (FlareSolverrSolve, error), newer func(gen int) (FlareSolverrSolve, bool, error)) *FlareSolverrSolution {
+	return &FlareSolverrSolution{solve: solve, resolve: resolve, newer: newer}
 }
 
-// Current returns the latest solve.
+// Current returns the latest solve, switching to any newer one made since.
 func (s *FlareSolverrSolution) Current() FlareSolverrSolve {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.newer != nil {
+		solve, ok, err := s.newer(s.solve.Gen)
+		if err != nil {
+			logger.Pl.W("Could not switch to a newer FlareSolverr solve: %v", err)
+		} else if ok {
+			s.solve = solve
+		}
+	}
 	return s.solve
 }
 

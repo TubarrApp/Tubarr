@@ -131,7 +131,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
-	args, d.fsGen = siterules.YtDLPArgs(d.Video.URL, d.ChannelURL.FlareSolverr, args)
+	args, d.fsGen = siterules.AddSiteRulesToYTDLP(d.Video.URL, d.ChannelURL.FlareSolverr, args)
 
 	// Add target URL [ MUST GO LAST !! ]
 	if d.Video.DirectVideoURL != "" {

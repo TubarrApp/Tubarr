@@ -7,6 +7,8 @@ import (
 	"html"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -379,5 +381,58 @@ func TestFlareSolverrCopiesBrowserHeaders(t *testing.T) {
 	}
 	if echoRequests.Load() != 1 {
 		t.Errorf("expected the headers to be copied once, got %d echo requests", echoRequests.Load())
+	}
+}
+
+// TestFlareSolverrNewerSolveForDownloads tests that a channel URL's solution switches to a newer solve made by Tubarr's
+// own requests, rewriting the cookie file for yt-dlp, without asking FlareSolverr again.
+func TestFlareSolverrNewerSolveForDownloads(t *testing.T) {
+	var solves atomic.Int32
+	useFlareSolverr(t, fakeFlareSolverr(t, &solves))
+	cm := NewCookieManager()
+	ctx := context.Background()
+	cu := &models.ChannelURL{URL: "https://cf.example/channel", CookiePath: filepath.Join(t.TempDir(), "cookies.txt")}
+
+	first, err := cm.flareSolverrSolution(ctx, cu.URL, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs := models.NewFlareSolverrSolution(first.ytDLPSolve(), cm.flareSolverrResolver(cu, nil), cm.flareSolverrNewer(cu, nil))
+	if got := fs.Current(); got.Gen != first.gen {
+		t.Errorf("expected the first solve with nothing newer, got gen %d", got.Gen)
+	}
+
+	// Tubarr's own request is challenged and solves again.
+	if _, err := cm.flareSolverrSolution(ctx, cu.URL, first.gen); err != nil {
+		t.Fatal(err)
+	}
+	if got := fs.Current(); got.Gen <= first.gen {
+		t.Errorf("expected the solution to switch to the newer solve, got gen %d (first was %d)", got.Gen, first.gen)
+	}
+	if cookies, _ := os.ReadFile(cu.CookiePath); !strings.Contains(string(cookies), "cf_clearance\t2") {
+		t.Errorf("expected the cookie file to have the newer solve's cookie, got:\n%s", cookies)
+	}
+	if solves.Load() != 2 {
+		t.Errorf("expected 2 FlareSolverr solves (none from switching), got %d", solves.Load())
+	}
+}
+
+// TestCrawlWithRuleFlareSolverrResolveWithChannelCookies tests that a refreshed solve's cookies aren't replaced by the
+// channel URL's older ones (which hold the first solve's cookies) when retrying a channel crawl.
+func TestCrawlWithRuleFlareSolverrResolveWithChannelCookies(t *testing.T) {
+	var solves atomic.Int32
+	useFlareSolverr(t, fakeFlareSolverr(t, &solves))
+	site := fakeCloudflareSite(t, 2) // Only accepts the second solve's cookie.
+
+	s := New()
+	first, err := s.cookieManager.flareSolverrSolution(context.Background(), site.URL+"/channel", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.crawlWithRule(site.URL+"/channel", first.cookies, flareSolverrQuery()); err != nil {
+		t.Errorf("expected the retry to use the refreshed solve's cookies, got %v", err)
+	}
+	if solves.Load() != 2 {
+		t.Errorf("expected 2 FlareSolverr solves, got %d", solves.Load())
 	}
 }
