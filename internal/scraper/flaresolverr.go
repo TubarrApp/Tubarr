@@ -211,18 +211,23 @@ func (cm *CookieManager) flareSolverrFailed(host string, err error) error {
 
 // flareSolverrResolver returns a function that solves cu's URL through FlareSolverr again (unless already solved since
 // staleGen), and rewrites cu's cookie file with the new cookies on top of baseCookies.
-func (cm *CookieManager) flareSolverrResolver(cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (string, int, error) {
+func (cm *CookieManager) flareSolverrResolver(cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
 	pageURL, loginURL, cookiePath := cu.URL, cu.LoginURL, cu.CookiePath
-	return func(staleGen int) (string, int, error) {
+	return func(staleGen int) (models.FlareSolverrSolve, error) {
 		sol, err := cm.flareSolverrSolution(context.Background(), pageURL, staleGen)
 		if err != nil {
-			return "", 0, err
+			return models.FlareSolverrSolve{}, err
 		}
 		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), loginURL, cookiePath); err != nil {
-			return "", 0, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
+			return models.FlareSolverrSolve{}, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
 		}
-		return sol.userAgent, sol.gen, nil
+		return sol.ytDLPSolve(), nil
 	}
+}
+
+// ytDLPSolve returns the parts of the solution yt-dlp uses (its cookies go in the cookie file).
+func (sol *flareSolverrSolution) ytDLPSolve() models.FlareSolverrSolve {
+	return models.FlareSolverrSolve{UserAgent: sol.userAgent, Headers: sol.headers, Gen: sol.gen}
 }
 
 // isCloudflareChallenge reports whether a response is a Cloudflare challenge page.

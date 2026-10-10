@@ -139,7 +139,7 @@ func TestYtDLPArgs(t *testing.T) {
 		{Domain: "brave.example", Impersonate: &brave},
 		{Domain: "plain.example", Impersonate: &none, FlareSolverr: true},
 	})
-	fs := models.NewFlareSolverrSolution("UA/1", 3, nil)
+	fs := models.NewFlareSolverrSolution(models.FlareSolverrSolve{UserAgent: "UA/1", Gen: 3}, nil)
 
 	tests := []struct {
 		name     string
@@ -244,7 +244,7 @@ func TestYtDLPArgsUserAgent(t *testing.T) {
 	Reset()
 	chrome := consts.ImpersonateChrome
 	Register([]models.SiteScraper{{Domain: "ua.example", Impersonate: &chrome, UserAgent: "Site/1 Chrome/130"}})
-	fs := models.NewFlareSolverrSolution("UA/1", 3, nil)
+	fs := models.NewFlareSolverrSolution(models.FlareSolverrSolve{UserAgent: "UA/1", Gen: 3}, nil)
 
 	tests := []struct {
 		name     string
@@ -262,5 +262,48 @@ func TestYtDLPArgsUserAgent(t *testing.T) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestYtDLPArgsFlareSolverrHeaders tests that yt-dlp gets FlareSolverr's browser headers (not the user agent or encoding,
+// which are handled separately), replacing the user's own for the same headers but keeping others.
+func TestYtDLPArgsFlareSolverrHeaders(t *testing.T) {
+	t.Cleanup(Reset)
+	Reset()
+	Register([]models.SiteScraper{{Domain: "cf.example", FlareSolverr: true}})
+	fs := models.NewFlareSolverrSolution(models.FlareSolverrSolve{
+		UserAgent: "UA/1",
+		Headers: [][2]string{
+			{"sec-ch-ua", `"Chromium";v="152"`},
+			{"user-agent", "UA/1"},
+			{"accept-encoding", "gzip"},
+			{"accept-language", "C.UTF-8"},
+		},
+		Gen: 3,
+	}, nil)
+
+	existing := []string{"--add-headers", "Accept-Language:en", "--add-headers=Referer:x", "--add-header=SEC-CH-UA:old"}
+	got, _ := YtDLPArgs("https://cf.example/v", fs, existing)
+	want := []string{
+		"--add-headers=Referer:x",
+		"--impersonate", "chrome", "--user-agent", "UA/1",
+		"--add-headers", `sec-ch-ua:"Chromium";v="152"`,
+		"--add-headers", "accept-language:C.UTF-8",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// TestStripHeaderArg tests removing --add-headers arguments for one header only, in either form and with either flag
+// spelling, keeping the rest.
+func TestStripHeaderArg(t *testing.T) {
+	args := []string{"-t", "sleep", "--add-headers", "Accept-Language:en", "--add-headers", "Referer:x", "--add-header=accept-language:fr", "--add-headers"}
+	got, found := stripHeaderArg(args, "accept-language")
+	if want := []string{"-t", "sleep", "--add-headers", "Referer:x", "--add-headers"}; !found || !slices.Equal(got, want) {
+		t.Errorf("got %v (found %v), want %v", got, found, want)
+	}
+	if _, found := stripHeaderArg([]string{"--add-headers", "Referer:x"}, "accept-language"); found {
+		t.Error("expected no match for a different header")
 	}
 }

@@ -5,6 +5,8 @@ package command
 const (
 	AfterMove            = "after_move:%(filepath)s"
 	CookiesFromBrowser   = "--cookies-from-browser"
+	AddHeader            = "--add-header" // Accepted shortening of AddHeaders.
+	AddHeaders           = "--add-headers"
 	CookiePath           = "--cookies"
 	ExternalDLer         = "--external-downloader"
 	ExternalDLArgs       = "--external-downloader-args"

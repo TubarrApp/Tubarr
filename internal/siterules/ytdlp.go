@@ -18,6 +18,7 @@ func YtDLPArgs(pageURL string, fs *models.FlareSolverrSolution, args []string) (
 	var (
 		impersonate consts.Impersonate
 		userAgent   string
+		headers     [][2]string
 	)
 	if rules, ok := MatchAny(pageURL); ok {
 		impersonate, userAgent = consts.Impersonate(rules.Impersonate), rules.UserAgent
@@ -25,7 +26,8 @@ func YtDLPArgs(pageURL string, fs *models.FlareSolverrSolution, args []string) (
 
 	// FlareSolverr's user agent is used for the download, so yt-dlp's --impersonate is set to Chrome to match it.
 	if fs != nil {
-		userAgent, fsGen = fs.Current()
+		solve := fs.Current()
+		userAgent, headers, fsGen = solve.UserAgent, solve.Headers, solve.Gen
 		impersonate = consts.ImpersonateChrome
 	}
 
@@ -60,7 +62,28 @@ func YtDLPArgs(pageURL string, fs *models.FlareSolverrSolution, args []string) (
 			args = append(args, command.UserAgent, userAgent)
 		}
 	}
+
+	// Add FlareSolverr's browser headers, which replace the impersonated browser's own (keeping their order), and the
+	// user's own for the same headers. The user agent is set above, and yt-dlp manages the encoding it accepts.
+	for _, kv := range headers {
+		if kv[0] == "user-agent" || kv[0] == "accept-encoding" {
+			continue
+		}
+
+		if stripped, found := stripHeaderArg(args, kv[0]); found {
+			logger.Pl.W("Overriding custom yt-dlp --add-headers %q for %q with FlareSolverr's", kv[0], pageURL)
+			args = stripped
+		}
+		args = append(args, command.AddHeaders, kv[0]+":"+kv[1])
+	}
 	return args, fsGen
+}
+
+// headerArgName returns the lowercased header name in an --add-headers value (e.g. "Accept-Language:en" gives
+// "accept-language").
+func headerArgName(value string) string {
+	name, _, _ := strings.Cut(value, ":")
+	return strings.ToLower(strings.TrimSpace(name))
 }
 
 // hasArg reports whether args contains flag, either alone or as flag=value.
@@ -96,4 +119,28 @@ func stripArg(args []string, flag string) []string {
 		newArgs = append(newArgs, a)
 	}
 	return newArgs
+}
+
+// stripHeaderArg removes --add-headers (or --add-header) arguments setting the header name from args, either as
+// "flag name:value" or "flag=name:value". Other headers are kept. Returns the new slice, and whether any were removed.
+func stripHeaderArg(args []string, name string) (newArgs []string, found bool) {
+	for i := 0; i < len(args); i++ {
+		flag, value, joined := strings.Cut(args[i], "=")
+		if flag != command.AddHeaders && flag != command.AddHeader {
+			newArgs = append(newArgs, args[i])
+			continue
+		}
+		if !joined && i+1 < len(args) {
+			value = args[i+1]
+		}
+		if headerArgName(value) != name {
+			newArgs = append(newArgs, args[i])
+			continue
+		}
+		found = true
+		if !joined {
+			i++ // Skip the value too.
+		}
+	}
+	return newArgs, found
 }

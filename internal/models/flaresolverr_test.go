@@ -11,11 +11,11 @@ func TestFlareSolverrSolutionRefresh(t *testing.T) {
 		mu     sync.Mutex
 		solves int
 	)
-	s := NewFlareSolverrSolution("UA/1", 1, func(staleGen int) (string, int, error) {
+	s := NewFlareSolverrSolution(FlareSolverrSolve{UserAgent: "UA/1", Gen: 1}, func(staleGen int) (FlareSolverrSolve, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		solves++
-		return "UA/2", staleGen + 1, nil
+		return FlareSolverrSolve{UserAgent: "UA/2", Gen: staleGen + 1}, nil
 	})
 
 	var wg sync.WaitGroup
@@ -33,8 +33,8 @@ func TestFlareSolverrSolutionRefresh(t *testing.T) {
 	if solves != 1 {
 		t.Errorf("expected 1 solve for 5 refreshes of the same generation, got %d", solves)
 	}
-	if userAgent, gen := s.Current(); userAgent != "UA/2" || gen != 2 {
-		t.Errorf("expected the refreshed user agent and generation, got %q (gen %d)", userAgent, gen)
+	if solve := s.Current(); solve.UserAgent != "UA/2" || solve.Gen != 2 {
+		t.Errorf("expected the refreshed user agent and generation, got %+v", solve)
 	}
 }
 
