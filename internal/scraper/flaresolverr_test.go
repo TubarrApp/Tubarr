@@ -10,17 +10,22 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
+	"tubarr/internal/siterules"
 
 	"github.com/spf13/viper"
 )
 
 const testFlareSolverrUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
-// lastSolvedURL is the URL of the most recent fakeFlareSolverr solve.
-var lastSolvedURL atomic.Value
+// lastSolvedURL and lastMaxTimeout are the URL and time limit (ms) of the most recent fakeFlareSolverr solve.
+var (
+	lastSolvedURL  atomic.Value
+	lastMaxTimeout atomic.Int64
+)
 
 // fakeFlareSolverr starts a server answering FlareSolverr API requests. Each solve returns a cf_clearance cookie
 // numbered by solve count ("1", "2", ...), and the number of solves so far is kept in solves.
@@ -33,6 +38,7 @@ func fakeFlareSolverr(t *testing.T, solves *atomic.Int32) *httptest.Server {
 			return
 		}
 		lastSolvedURL.Store(req.URL)
+		lastMaxTimeout.Store(req.MaxTimeout)
 		n := solves.Add(1)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": "ok",
@@ -271,5 +277,29 @@ func TestClientProfileForUserAgent(t *testing.T) {
 	}
 	if newest[0] > 131 && matched[0] > 131 {
 		t.Logf("no Chrome profile at or below 131; using the oldest (%v)", matched)
+	}
+}
+
+// TestFlareSolverrSiteTimeout tests that a site's flaresolverr_timeout is passed to FlareSolverr, with the default otherwise.
+func TestFlareSolverrSiteTimeout(t *testing.T) {
+	var solves atomic.Int32
+	useFlareSolverr(t, fakeFlareSolverr(t, &solves))
+	t.Cleanup(siterules.Reset)
+	siterules.Reset()
+	siterules.Register([]models.SiteScraper{{Domain: "slow.example", FlareSolverr: true, FlareSolverrTimeout: 120 * time.Second}})
+
+	cm := NewCookieManager()
+	if _, err := cm.flareSolverrSolution(context.Background(), "https://slow.example/channel", 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := lastMaxTimeout.Load(); got != 120000 {
+		t.Errorf("site with a 120s timeout: FlareSolverr got maxTimeout %d, want 120000", got)
+	}
+
+	if _, err := cm.flareSolverrSolution(context.Background(), "https://other.example/channel", 0); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := lastMaxTimeout.Load(), consts.FlareSolverrDefaultTimeout.Milliseconds(); got != want {
+		t.Errorf("site with no timeout: FlareSolverr got maxTimeout %d, want %d", got, want)
 	}
 }

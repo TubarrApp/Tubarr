@@ -1860,11 +1860,12 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		StripQuery bool   `json:"strip_query,omitempty"`
 	}
 	type siteResp struct {
-		Domain       string         `json:"domain"`
-		Selectors    []selectorResp `json:"selectors"`
-		Crawl        *crawlResp     `json:"crawl,omitempty"`
-		Impersonate  string         `json:"impersonate,omitempty"`
-		FlareSolverr bool           `json:"flaresolverr,omitempty"`
+		Domain              string         `json:"domain"`
+		Selectors           []selectorResp `json:"selectors"`
+		Crawl               *crawlResp     `json:"crawl,omitempty"`
+		Impersonate         string         `json:"impersonate,omitempty"`
+		FlareSolverr        bool           `json:"flaresolverr,omitempty"`
+		FlareSolverrTimeout int            `json:"flaresolverr_timeout,omitempty"` // Seconds.
 	}
 
 	resp := make([]siteResp, 0, len(sites))
@@ -1883,7 +1884,18 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 				crawl.Exclude = c.Exclude.String()
 			}
 		}
-		resp = append(resp, siteResp{Domain: site.Site, Selectors: selectors, Crawl: crawl, Impersonate: site.Impersonate, FlareSolverr: site.FlareSolverr})
+		fsTimeout := site.FlareSolverrTimeout
+		if site.FlareSolverr && fsTimeout == 0 {
+			fsTimeout = consts.FlareSolverrDefaultTimeout
+		}
+		resp = append(resp, siteResp{
+			Domain:              site.Site,
+			Selectors:           selectors,
+			Crawl:               crawl,
+			Impersonate:         site.Impersonate,
+			FlareSolverr:        site.FlareSolverr,
+			FlareSolverrTimeout: int(fsTimeout.Seconds()),
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

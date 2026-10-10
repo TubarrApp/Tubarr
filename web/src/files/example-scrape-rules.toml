@@ -24,6 +24,9 @@
 # "impersonate". If FlareSolverr isn't set up or can't be reached, Tubarr logs a warning and falls back to "impersonate"
 # (or normal requests) for the rest of that crawl.
 #
+# "flaresolverr_timeout" is optional: how many seconds FlareSolverr may take to solve the site's challenge (default 60,
+# allowed 10 to 300). Some sites need 120 or 180.
+#
 # [sites.crawl] is optional and tells Tubarr how to find new videos on a channel page, instead of
 # using the built-in scraper or yt-dlp. It uses the site's impersonate setting.
 #   selector    - elements holding the video links (e.g. "a[href]").

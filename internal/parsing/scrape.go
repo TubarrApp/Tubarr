@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -17,11 +18,12 @@ import (
 
 // scrapeSiteConfig mirrors a single site entry in a user-supplied scrape config file.
 type scrapeSiteConfig struct {
-	Domain       string                 `mapstructure:"domain"`
-	Impersonate  *string                `mapstructure:"impersonate"`
-	FlareSolverr bool                   `mapstructure:"flaresolverr"`
-	Selectors    []scrapeSelectorConfig `mapstructure:"selectors"`
-	Crawl        *scrapeCrawlConfig     `mapstructure:"crawl"`
+	Domain              string                 `mapstructure:"domain"`
+	Impersonate         *string                `mapstructure:"impersonate"`
+	FlareSolverr        bool                   `mapstructure:"flaresolverr"`
+	FlareSolverrTimeout *int                   `mapstructure:"flaresolverr_timeout"`
+	Selectors           []scrapeSelectorConfig `mapstructure:"selectors"`
+	Crawl               *scrapeCrawlConfig     `mapstructure:"crawl"`
 }
 
 // scrapeCrawlConfig mirrors a site's channel page crawl rule in a scrape config file.
@@ -105,7 +107,7 @@ func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 
 		// A site needs at least one of metadata selectors, a crawl rule, impersonate, or flaresolverr.
 		// Each selector must have a non-empty field and selector value.
-		if len(s.Selectors) == 0 && s.Crawl == nil && s.Impersonate == nil && !s.FlareSolverr {
+		if len(s.Selectors) == 0 && s.Crawl == nil && s.Impersonate == nil && !s.FlareSolverr && s.FlareSolverrTimeout == nil {
 			return nil, fmt.Errorf("scrape config file %q: site %q sets nothing (needs selectors, a crawl rule, impersonate, or flaresolverr)", name, domain)
 		}
 
@@ -129,18 +131,37 @@ func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 			})
 		}
 
+		// FlareSolverr time limit is optional, in seconds, and clamped to the allowed range.
+		var fsTimeout time.Duration
+		if s.FlareSolverrTimeout != nil {
+			fsTimeout = clampFlareSolverrTimeout(name, domain, *s.FlareSolverrTimeout)
+		}
+
 		// Add the validated site to the list of sites to return.
 		sites = append(sites, models.SiteScraper{
-			Domain:       domain,
-			Selectors:    selectors,
-			Crawl:        crawl,
-			Impersonate:  impersonate,
-			FlareSolverr: s.FlareSolverr,
+			Domain:              domain,
+			Selectors:           selectors,
+			Crawl:               crawl,
+			Impersonate:         impersonate,
+			FlareSolverr:        s.FlareSolverr,
+			FlareSolverrTimeout: fsTimeout,
 		})
 	}
 
 	logger.Pl.I("Loaded %d custom scrape site(s) from %q", len(sites), name)
 	return sites, nil
+}
+
+// clampFlareSolverrTimeout converts a site's flaresolverr_timeout (seconds) to a time limit within the allowed range,
+// warning if it had to be changed.
+func clampFlareSolverrTimeout(name, domain string, seconds int) time.Duration {
+	timeout := time.Duration(seconds) * time.Second
+	clamped := min(max(timeout, consts.FlareSolverrMinTimeout), consts.FlareSolverrMaxTimeout)
+	if clamped != timeout {
+		logger.Pl.W("Scrape config file %q: site %q flaresolverr_timeout of %ds is outside %s to %s, using %s",
+			name, domain, seconds, consts.FlareSolverrMinTimeout, consts.FlareSolverrMaxTimeout, clamped)
+	}
+	return clamped
 }
 
 // SaveScrapeSelectorsFile validates content as a scrape config file, and if valid, replaces the file at path with it.

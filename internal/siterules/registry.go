@@ -53,6 +53,9 @@ func Register(scrapers []models.SiteScraper) {
 		if s.FlareSolverr {
 			rules.FlareSolverr = true
 		}
+		if s.FlareSolverrTimeout > 0 {
+			rules.FlareSolverrTimeout = s.FlareSolverrTimeout
+		}
 		sites[domain] = rules
 	}
 

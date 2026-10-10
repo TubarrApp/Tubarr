@@ -9,18 +9,18 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 const (
-	// flareSolverrMaxTimeout is how long FlareSolverr may spend solving a challenge and loading a page.
-	flareSolverrMaxTimeout = 60 * time.Second
-	// flareSolverrRequestTimeout leaves headroom over flareSolverrMaxTimeout for FlareSolverr to respond.
-	flareSolverrRequestTimeout = flareSolverrMaxTimeout + 30*time.Second
+	// flareSolverrResponseHeadroom is how much longer than its solve time limit FlareSolverr is given to respond.
+	flareSolverrResponseHeadroom = 30 * time.Second
 )
 
 // flareSolverrSolution holds the cookies and user agent FlareSolverr's browser got past Cloudflare with.
@@ -77,18 +77,20 @@ func flareSolverrEndpoint(baseURL string) (string, error) {
 
 // solveFlareSolverr has FlareSolverr load pageURL, and returns the cookies and user agent its browser ended up with,
 // plus the page's HTTP status.
-func solveFlareSolverr(ctx context.Context, baseURL, pageURL string) (sol *flareSolverrSolution, status int, err error) {
+//
+// FlareSolverr may spend up to timeout solving the challenge and loading the page.
+func solveFlareSolverr(ctx context.Context, baseURL, pageURL string, timeout time.Duration) (sol *flareSolverrSolution, status int, err error) {
 	endpoint, err := flareSolverrEndpoint(baseURL)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	payload, err := json.Marshal(flareSolverrRequest{Cmd: "request.get", URL: pageURL, MaxTimeout: flareSolverrMaxTimeout.Milliseconds()})
+	payload, err := json.Marshal(flareSolverrRequest{Cmd: "request.get", URL: pageURL, MaxTimeout: timeout.Milliseconds()})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to build FlareSolverr request: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, flareSolverrRequestTimeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout+flareSolverrResponseHeadroom)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
@@ -156,7 +158,11 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 	}
 
 	logger.Pl.I("Solving %q through FlareSolverr at %q...", homeURL, baseURL)
-	sol, _, err := solveFlareSolverr(ctx, baseURL, homeURL)
+	timeout := consts.FlareSolverrDefaultTimeout
+	if rules, ok := siterules.MatchAny(pageURL); ok && rules.FlareSolverrTimeout > 0 {
+		timeout = rules.FlareSolverrTimeout
+	}
+	sol, _, err := solveFlareSolverr(ctx, baseURL, homeURL, timeout)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, err // Cancelled, not a FlareSolverr failure.
@@ -211,7 +217,7 @@ func isCloudflareChallenge(status int, header http.Header, body []byte) bool {
 // TestFlareSolverr solves a simple page through the FlareSolverr instance at baseURL, to check it works.
 func TestFlareSolverr(baseURL string) (status int, userAgent string, cookies int, elapsed time.Duration, err error) {
 	start := time.Now()
-	sol, status, err := solveFlareSolverr(context.Background(), baseURL, "https://example.com")
+	sol, status, err := solveFlareSolverr(context.Background(), baseURL, "https://example.com", consts.FlareSolverrDefaultTimeout)
 	if err != nil {
 		return 0, "", 0, time.Since(start), err
 	}

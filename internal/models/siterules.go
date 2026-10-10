@@ -1,14 +1,18 @@
 package models
 
-import "regexp"
+import (
+	"regexp"
+	"time"
+)
 
 // SiteRules holds a site's registered rules: metadata selectors, a channel page crawl rule, and request settings.
 type SiteRules struct {
-	Site         string
-	Metadata     []MetadataRule
-	Crawl        *CrawlRule // Channel page crawl rule (nil to use yt-dlp).
-	Impersonate  string     // Browser TLS fingerprint to impersonate ("" for none).
-	FlareSolverr bool       // Get past Cloudflare with FlareSolverr's cookies and user agent (takes priority over Impersonate).
+	Site                string
+	Metadata            []MetadataRule
+	Crawl               *CrawlRule    // Channel page crawl rule (nil to use yt-dlp).
+	Impersonate         string        // Browser TLS fingerprint to impersonate ("" for none).
+	FlareSolverr        bool          // Get past Cloudflare with FlareSolverr's cookies and user agent (takes priority over Impersonate).
+	FlareSolverrTimeout time.Duration // Time limit for FlareSolverr to solve the site's challenge (0 for the default).
 }
 
 // MetadataRule defines how a metadata field is scraped from a video page.

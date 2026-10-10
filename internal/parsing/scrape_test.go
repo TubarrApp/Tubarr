@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+	"tubarr/internal/domain/consts"
 )
 
 // writeScrapeConfig writes the given content to a temporary file with the given name, returning the full path.
@@ -197,5 +199,39 @@ func TestParseScrapeSelectorsFileSettingsOnly(t *testing.T) {
 	}
 	if len(sites) != 2 || !sites[0].FlareSolverr || sites[1].Impersonate == nil || *sites[1].Impersonate != "firefox" {
 		t.Errorf("unexpected sites: %+v", sites)
+	}
+}
+
+// TestParseScrapeSelectorsFileFlareSolverrTimeout tests that flaresolverr_timeout is read in seconds and clamped.
+func TestParseScrapeSelectorsFileFlareSolverrTimeout(t *testing.T) {
+	p := writeScrapeConfig(t, "rules.toml", `
+[[sites]]
+domain = "unset.com"
+flaresolverr = true
+[[sites]]
+domain = "ok.com"
+flaresolverr = true
+flaresolverr_timeout = 120
+[[sites]]
+domain = "low.com"
+flaresolverr_timeout = 5
+[[sites]]
+domain = "high.com"
+flaresolverr_timeout = 1000
+`)
+	sites, err := ParseScrapeSelectorsFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]time.Duration{
+		"unset.com": 0,
+		"ok.com":    120 * time.Second,
+		"low.com":   consts.FlareSolverrMinTimeout,
+		"high.com":  consts.FlareSolverrMaxTimeout,
+	}
+	for _, s := range sites {
+		if s.FlareSolverrTimeout != want[s.Domain] {
+			t.Errorf("%s: got %s, want %s", s.Domain, s.FlareSolverrTimeout, want[s.Domain])
+		}
 	}
 }

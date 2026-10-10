@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"testing"
+	"time"
 	"tubarr/internal/dev"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -163,5 +164,17 @@ func TestYtDLPArgs(t *testing.T) {
 				t.Errorf("got %v (gen %d), want %v (gen %d)", got, gen, tt.want, tt.wantGen)
 			}
 		})
+	}
+}
+
+// TestRegisterFlareSolverrTimeout tests that a site's FlareSolverr time limit is registered, and kept by a later entry that doesn't set one.
+func TestRegisterFlareSolverrTimeout(t *testing.T) {
+	t.Cleanup(Reset)
+	Reset()
+	Register([]models.SiteScraper{{Domain: "slow.example", FlareSolverr: true, FlareSolverrTimeout: 180 * time.Second}})
+	Register([]models.SiteScraper{{Domain: "slow.example", FlareSolverr: true}})
+
+	if rules, _ := MatchAny("https://slow.example/v"); rules.FlareSolverrTimeout != 180*time.Second {
+		t.Errorf("got %s, want 3m0s", rules.FlareSolverrTimeout)
 	}
 }

@@ -618,7 +618,7 @@
                     Impersonate: <span x-text="selectedSiteImpersonate" class="font-mono text-gray-700 dark:text-gray-300"></span>
                   </p>
                   <p x-show="selectedSiteFlareSolverr" class="text-xs text-gray-500 dark:text-gray-400">
-                    Fetched through FlareSolverr<span x-show="!flareSolverrURL" style="color: #ef4444;"> (no FlareSolverr URL is set)</span>
+                    Uses FlareSolverr<span x-show="selectedSiteFlareSolverrTimeout" x-text="' (' + selectedSiteFlareSolverrTimeout + 's time limit)'"></span><span x-show="!flareSolverrURL" style="color: #ef4444;"> (no FlareSolverr URL is set)</span>
                   </p>
                   <div class="w-full max-h-64 overflow-auto rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 space-y-3 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                     <template x-for="section in selectedSiteSections" :key="section.title">
@@ -730,6 +730,11 @@
           get selectedSiteImpersonate() {
             const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
             return site?.impersonate || '';
+          },
+
+          get selectedSiteFlareSolverrTimeout() {
+            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
+            return site?.flaresolverr_timeout || 0;
           },
 
           get selectedSiteFlareSolverr() {
