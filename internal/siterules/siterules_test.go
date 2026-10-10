@@ -130,7 +130,7 @@ func TestRegisterSettingsOnly(t *testing.T) {
 }
 
 // TestYtDLPArgs tests yt-dlp getting the impersonate target from the URL's site rule (Chrome with FlareSolverr,
-// plus its user agent). The user's own arguments are kept, except for FlareSolverr sites.
+// plus its user agent). The user's own arguments are kept, except for FlareSolverr sites, where they're replaced.
 func TestYtDLPArgs(t *testing.T) {
 	t.Cleanup(Reset)
 	Reset()
@@ -154,14 +154,22 @@ func TestYtDLPArgs(t *testing.T) {
 		{"no rule", "https://norules.example/v", nil, nil, nil, 0},
 		{"FlareSolverr", "https://plain.example/v", fs, nil, []string{"--impersonate", "chrome", "--user-agent", "UA/1"}, 3},
 		{"FlareSolverr unavailable", "https://plain.example/v", nil, nil, nil, 0},
-		{"user's own arguments", "https://brave.example/v", nil, []string{"--impersonate=safari", "--user-agent", "Mine"}, nil, 0},
-		{"FlareSolverr overrides user's own", "https://plain.example/v", fs, []string{"--impersonate=safari", "--user-agent", "Mine"}, []string{"--impersonate", "chrome", "--user-agent", "UA/1"}, 3},
+		{"user's own arguments", "https://brave.example/v", nil, []string{"--impersonate=safari", "--user-agent", "Mine"}, []string{"--impersonate=safari", "--user-agent", "Mine"}, 0},
+		{
+			"FlareSolverr replaces user's own", "https://plain.example/v", fs,
+			[]string{"-t", "sleep", "--impersonate", "firefox", "--retries", "3", "--user-agent=Mine"},
+			[]string{"-t", "sleep", "--retries", "3", "--impersonate", "chrome", "--user-agent", "UA/1"}, 3,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			before := slices.Clone(tt.existing)
 			got, gen := YtDLPArgs(tt.url, tt.fs, tt.existing)
 			if !slices.Equal(got, tt.want) || gen != tt.wantGen {
 				t.Errorf("got %v (gen %d), want %v (gen %d)", got, gen, tt.want, tt.wantGen)
+			}
+			if !slices.Equal(tt.existing, before) {
+				t.Errorf("caller's args were modified: %v, was %v", tt.existing, before)
 			}
 		})
 	}
@@ -176,5 +184,83 @@ func TestRegisterFlareSolverrTimeout(t *testing.T) {
 
 	if rules, _ := MatchAny("https://slow.example/v"); rules.FlareSolverrTimeout != 180*time.Second {
 		t.Errorf("got %s, want 3m0s", rules.FlareSolverrTimeout)
+	}
+}
+
+// TestStripArg tests removing a flag and its value, including a flag given with no value before another flag.
+func TestStripArg(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"separate value", []string{"-t", "sleep", "--impersonate", "chrome", "--retries", "3"}, []string{"-t", "sleep", "--retries", "3"}},
+		{"joined value", []string{"--impersonate=chrome", "--retries", "3"}, []string{"--retries", "3"}},
+		{"no value before another flag", []string{"--impersonate", "--retries", "3"}, []string{"--retries", "3"}},
+		{"repeated, first with no value", []string{"--impersonate", "--impersonate", "chrome", "-x"}, []string{"-x"}},
+		{"no value at the end", []string{"--retries", "3", "--impersonate"}, []string{"--retries", "3"}},
+		{"not present", []string{"--retries", "3"}, []string{"--retries", "3"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripArg(tt.args, "--impersonate"); !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestUserAgentMatches tests recognising whether a user agent is from the impersonated browser.
+func TestUserAgentMatches(t *testing.T) {
+	const (
+		chrome  = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+		firefox = "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0"
+		safari  = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15"
+	)
+	tests := []struct {
+		userAgent   string
+		impersonate consts.Impersonate
+		want        bool
+	}{
+		{chrome, consts.ImpersonateChrome, true},
+		{chrome, consts.ImpersonateBrave, true},
+		{firefox, consts.ImpersonateFirefox, true},
+		{safari, consts.ImpersonateSafari, true},
+		{firefox, consts.ImpersonateChrome, false},
+		{chrome, consts.ImpersonateSafari, false},
+		{chrome, consts.ImpersonateFirefox, false},
+		{firefox, consts.ImpersonateNone, true},
+	}
+	for _, tt := range tests {
+		if got := userAgentMatches(tt.userAgent, tt.impersonate); got != tt.want {
+			t.Errorf("userAgentMatches(%q, %q) = %v, want %v", tt.userAgent, tt.impersonate, got, tt.want)
+		}
+	}
+}
+
+// TestYtDLPArgsUserAgent tests yt-dlp getting a site's user agent, unless the user set their own or FlareSolverr is used.
+func TestYtDLPArgsUserAgent(t *testing.T) {
+	t.Cleanup(Reset)
+	Reset()
+	chrome := consts.ImpersonateChrome
+	Register([]models.SiteScraper{{Domain: "ua.example", Impersonate: &chrome, UserAgent: "Site/1 Chrome/130"}})
+	fs := models.NewFlareSolverrSolution("UA/1", 3, nil)
+
+	tests := []struct {
+		name     string
+		fs       *models.FlareSolverrSolution
+		existing []string
+		want     []string
+	}{
+		{"site user agent", nil, nil, []string{"--impersonate", "chrome", "--user-agent", "Site/1 Chrome/130"}},
+		{"user's own kept", nil, []string{"--user-agent", "Mine"}, []string{"--user-agent", "Mine", "--impersonate", "chrome"}},
+		{"FlareSolverr's replaces both", fs, []string{"--user-agent", "Mine"}, []string{"--impersonate", "chrome", "--user-agent", "UA/1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, _ := YtDLPArgs("https://ua.example/v", tt.fs, tt.existing); !slices.Equal(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

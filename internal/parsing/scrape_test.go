@@ -235,3 +235,15 @@ flaresolverr_timeout = 1000
 		}
 	}
 }
+
+// TestParseScrapeSelectorsFileUserAgent tests that user_agent is read, and is enough for a site on its own.
+func TestParseScrapeSelectorsFileUserAgent(t *testing.T) {
+	p := writeScrapeConfig(t, "rules.toml", "[[sites]]\ndomain = \"ua.example\"\nuser_agent = \"  Site/1 Chrome/130  \"\n")
+	sites, err := ParseScrapeSelectorsFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sites) != 1 || sites[0].UserAgent != "Site/1 Chrome/130" {
+		t.Errorf("unexpected sites: %+v", sites)
+	}
+}

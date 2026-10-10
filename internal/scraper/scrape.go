@@ -276,8 +276,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		}
 
 		// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
-		siteArgs, fsGen := siterules.YtDLPArgs(channelURL, fs, args)
-		args = append(args, siteArgs...)
+		args, fsGen := siterules.YtDLPArgs(channelURL, fs, args)
 
 		// Add -J and URL to finalize command
 		args = append(args, command.OutputJSON, channelURL)
@@ -406,7 +405,8 @@ func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query mod
 	return challenged, reqErr
 }
 
-// initializeCollector initializes Colly with any cookies, using a TLS-impersonating transport if the site requests it.
+// initializeCollector initializes Colly with any cookies, using a TLS-impersonating transport and user agent if the site
+// sets them.
 //
 // For FlareSolverr sites (sol set), impersonates Chrome with the solution's cookies and user agent.
 func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution) (c *colly.Collector, err error) {
@@ -444,7 +444,7 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 		collector.UserAgent = userAgent
 		jar.SetCookies(parsedURL, sol.cookies) // Set last, to replace any stale Cloudflare cookies.
 	case impersonate != consts.ImpersonateNone:
-		rt, userAgent, err := newTLSRoundTripper(impersonate, "")
+		rt, userAgent, err := newTLSRoundTripper(impersonate, query.UserAgent)
 		if err != nil {
 			return nil, err
 		}
@@ -454,6 +454,9 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 		collector.WithTransport(&http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Adjust if necessary
 		})
+		if query.UserAgent != "" {
+			collector.UserAgent = query.UserAgent
+		}
 	}
 	collector.SetCookieJar(jar)
 

@@ -21,6 +21,7 @@ type scrapeSiteConfig struct {
 	Domain              string                 `mapstructure:"domain"`
 	Impersonate         *string                `mapstructure:"impersonate"`
 	FlareSolverr        bool                   `mapstructure:"flaresolverr"`
+	UserAgent           string                 `mapstructure:"user_agent"`
 	FlareSolverrTimeout *int                   `mapstructure:"flaresolverr_timeout"`
 	Selectors           []scrapeSelectorConfig `mapstructure:"selectors"`
 	Crawl               *scrapeCrawlConfig     `mapstructure:"crawl"`
@@ -107,7 +108,7 @@ func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 
 		// A site needs at least one of metadata selectors, a crawl rule, impersonate, or flaresolverr.
 		// Each selector must have a non-empty field and selector value.
-		if len(s.Selectors) == 0 && s.Crawl == nil && s.Impersonate == nil && !s.FlareSolverr && s.FlareSolverrTimeout == nil {
+		if len(s.Selectors) == 0 && s.Crawl == nil && s.Impersonate == nil && !s.FlareSolverr && s.FlareSolverrTimeout == nil && strings.TrimSpace(s.UserAgent) == "" {
 			return nil, fmt.Errorf("scrape config file %q: site %q sets nothing (needs selectors, a crawl rule, impersonate, or flaresolverr)", name, domain)
 		}
 
@@ -143,6 +144,7 @@ func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 			Selectors:           selectors,
 			Crawl:               crawl,
 			Impersonate:         impersonate,
+			UserAgent:           strings.TrimSpace(s.UserAgent),
 			FlareSolverr:        s.FlareSolverr,
 			FlareSolverrTimeout: fsTimeout,
 		})

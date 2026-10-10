@@ -11,6 +11,7 @@ type SiteScraper struct {
 	Selectors           []ScrapeSelectors
 	Crawl               *CrawlRule
 	Impersonate         *consts.Impersonate // nil keeps any built-in value.
+	UserAgent           string              // "" keeps any built-in value.
 	FlareSolverr        bool
 	FlareSolverrTimeout time.Duration // 0 keeps any built-in value.
 }

@@ -106,3 +106,24 @@ func TestCrawlWithRuleNilRule(t *testing.T) {
 		t.Error("expected an error for a site with no crawl rule")
 	}
 }
+
+// TestCrawlWithRuleUserAgent tests that a site's user agent is sent, with and without impersonation.
+func TestCrawlWithRuleUserAgent(t *testing.T) {
+	const userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.UserAgent() != userAgent {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		_, _ = w.Write([]byte(`<a href="/video/1">One</a>`))
+	}))
+	defer srv.Close()
+
+	for _, impersonate := range []string{"", "chrome"} {
+		query := models.SiteRules{Site: "test", Impersonate: impersonate, UserAgent: userAgent, Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
+		got, err := New().crawlWithRule(srv.URL, nil, query)
+		if err != nil || len(got) != 1 {
+			t.Errorf("impersonate %q: expected the site's user agent to be sent, got %v, %v", impersonate, got, err)
+		}
+	}
+}

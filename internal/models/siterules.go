@@ -11,6 +11,7 @@ type SiteRules struct {
 	Metadata            []MetadataRule
 	Crawl               *CrawlRule    // Channel page crawl rule (nil to use yt-dlp).
 	Impersonate         string        // Browser TLS fingerprint to impersonate ("" for none).
+	UserAgent           string        // User agent to send ("" to match Impersonate, or the HTTP client's default).
 	FlareSolverr        bool          // Get past Cloudflare with FlareSolverr's cookies and user agent (takes priority over Impersonate).
 	FlareSolverrTimeout time.Duration // Time limit for FlareSolverr to solve the site's challenge (0 for the default).
 }

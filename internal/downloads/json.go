@@ -93,9 +93,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
-	var siteArgs []string
-	siteArgs, d.fsGen = siterules.YtDLPArgs(d.Video.URL, d.ChannelURL.FlareSolverr, args)
-	args = append(args, siteArgs...)
+	args, d.fsGen = siterules.YtDLPArgs(d.Video.URL, d.ChannelURL.FlareSolverr, args)
 
 	// Add target URL [ MUST GO LAST !! ].
 	args = append(args, d.Video.URL)

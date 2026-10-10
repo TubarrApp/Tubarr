@@ -617,6 +617,9 @@
                   <p x-show="selectedSiteImpersonate" class="text-xs text-gray-500 dark:text-gray-400">
                     Impersonate: <span x-text="selectedSiteImpersonate" class="font-mono text-gray-700 dark:text-gray-300"></span>
                   </p>
+                  <p x-show="selectedSiteUserAgent" class="text-xs text-gray-500 dark:text-gray-400 break-all">
+                    User agent: <span x-text="selectedSiteUserAgent" class="font-mono text-gray-700 dark:text-gray-300"></span>
+                  </p>
                   <p x-show="selectedSiteFlareSolverr" class="text-xs text-gray-500 dark:text-gray-400">
                     Uses FlareSolverr<span x-show="selectedSiteFlareSolverrTimeout" x-text="' (' + selectedSiteFlareSolverrTimeout + 's time limit)'"></span><span x-show="!flareSolverrURL" style="color: #ef4444;"> (no FlareSolverr URL is set)</span>
                   </p>
@@ -730,6 +733,11 @@
           get selectedSiteImpersonate() {
             const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
             return site?.impersonate || '';
+          },
+
+          get selectedSiteUserAgent() {
+            const site = this.scrapeSites.find(s => s.domain === this.selectedSite);
+            return site?.user_agent || '';
           },
 
           get selectedSiteFlareSolverrTimeout() {

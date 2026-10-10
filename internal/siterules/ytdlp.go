@@ -8,19 +8,22 @@ import (
 	"tubarr/internal/models"
 )
 
-// YtDLPArgs returns the yt-dlp arguments for the site rule matching pageURL: its impersonate target (Chrome when
-// using FlareSolverr, to match its browser), and FlareSolverr's user agent if fs is set (its cookies are in the cookie
-// file). Also returns fs's generation, for a later Refresh.
+// YtDLPArgs returns args with the yt-dlp arguments for the site rule matching pageURL added: its impersonate target and
+// user agent, or Chrome and FlareSolverr's user agent if fs is set (its cookies are in the cookie file). Also returns
+// fs's generation, for a later Refresh.
 //
-// Skips any already existent argument (e.g. a user's own --impersonate).
-func YtDLPArgs(pageURL string, fs *models.FlareSolverrSolution, existing []string) (args []string, fsGen int) {
-	var impersonate consts.Impersonate
+// The user's own --impersonate and --user-agent in args are kept, except for FlareSolverr sites, where they are removed
+// and replaced, since FlareSolverr's cookies only work with its user agent and a Chrome fingerprint.
+func YtDLPArgs(pageURL string, fs *models.FlareSolverrSolution, args []string) (_ []string, fsGen int) {
+	var (
+		impersonate consts.Impersonate
+		userAgent   string
+	)
 	if rules, ok := MatchAny(pageURL); ok {
-		impersonate = consts.Impersonate(rules.Impersonate)
+		impersonate, userAgent = consts.Impersonate(rules.Impersonate), rules.UserAgent
 	}
 
 	// FlareSolverr's user agent is used for the download, so yt-dlp's --impersonate is set to Chrome to match it.
-	var userAgent string
 	if fs != nil {
 		userAgent, fsGen = fs.Current()
 		impersonate = consts.ImpersonateChrome
@@ -38,19 +41,24 @@ func YtDLPArgs(pageURL string, fs *models.FlareSolverrSolution, existing []strin
 		target = string(impersonate)
 	}
 
-	// Add the target and user agent, unless the user set their own. For FlareSolverr sites, these replace the user's
-	// own, since its cookies only work with its user agent and a Chrome fingerprint (yt-dlp uses the last value given).
-	if target != "" && (fs != nil || !hasArg(existing, command.Impersonate)) {
-		if fs != nil && hasArg(existing, command.Impersonate) {
+	// Add the target and user agent, replacing the user's own for FlareSolverr sites.
+	if target != "" {
+		if fs != nil && hasArg(args, command.Impersonate) {
 			logger.Pl.W("Overriding custom yt-dlp --impersonate for %q with %q, to match FlareSolverr's user agent", pageURL, target)
+			args = stripArg(args, command.Impersonate)
 		}
-		args = append(args, command.Impersonate, target)
+		if !hasArg(args, command.Impersonate) {
+			args = append(args, command.Impersonate, target)
+		}
 	}
-	if userAgent != "" && (fs != nil || !hasArg(existing, command.UserAgent)) {
-		if fs != nil && hasArg(existing, command.UserAgent) {
+	if userAgent != "" {
+		if fs != nil && hasArg(args, command.UserAgent) {
 			logger.Pl.W("Overriding custom yt-dlp --user-agent for %q with FlareSolverr's %q", pageURL, userAgent)
+			args = stripArg(args, command.UserAgent)
 		}
-		args = append(args, command.UserAgent, userAgent)
+		if !hasArg(args, command.UserAgent) {
+			args = append(args, command.UserAgent, userAgent)
+		}
 	}
 	return args, fsGen
 }
@@ -63,4 +71,29 @@ func hasArg(args []string, flag string) bool {
 		}
 	}
 	return false
+}
+
+// stripArg removes flag from args, either alone or as flag=value. Returns the new slice.
+func stripArg(args []string, flag string) []string {
+	var newArgs []string
+
+	var deleteNext bool
+	for _, a := range args {
+		if deleteNext {
+			deleteNext = false
+			if !strings.HasPrefix(a, "-") {
+				// This arg is the value for the flag, so delete it.
+				continue
+			}
+		}
+		if strings.HasPrefix(a, flag+"=") {
+			continue
+		}
+		if a == flag {
+			deleteNext = true
+			continue
+		}
+		newArgs = append(newArgs, a)
+	}
+	return newArgs
 }

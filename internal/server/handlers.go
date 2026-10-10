@@ -1864,6 +1864,7 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		Selectors           []selectorResp `json:"selectors"`
 		Crawl               *crawlResp     `json:"crawl,omitempty"`
 		Impersonate         string         `json:"impersonate,omitempty"`
+		UserAgent           string         `json:"user_agent,omitempty"`
 		FlareSolverr        bool           `json:"flaresolverr,omitempty"`
 		FlareSolverrTimeout int            `json:"flaresolverr_timeout,omitempty"` // Seconds.
 	}
@@ -1893,6 +1894,7 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 			Selectors:           selectors,
 			Crawl:               crawl,
 			Impersonate:         site.Impersonate,
+			UserAgent:           site.UserAgent,
 			FlareSolverr:        site.FlareSolverr,
 			FlareSolverrTimeout: int(fsTimeout.Seconds()),
 		})

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 )
@@ -50,11 +51,18 @@ func Register(scrapers []models.SiteScraper) {
 		if s.Impersonate != nil {
 			rules.Impersonate = string(*s.Impersonate)
 		}
+		if s.UserAgent != "" {
+			rules.UserAgent = s.UserAgent
+		}
 		if s.FlareSolverr {
 			rules.FlareSolverr = true
 		}
 		if s.FlareSolverrTimeout > 0 {
 			rules.FlareSolverrTimeout = s.FlareSolverrTimeout
+		}
+		if rules.UserAgent != "" && !userAgentMatches(rules.UserAgent, consts.Impersonate(rules.Impersonate)) {
+			logger.Pl.W("Site %q has user_agent %q, which doesn't look like the impersonated browser %q. Sites may block the mismatch.",
+				rules.Site, rules.UserAgent, rules.Impersonate)
 		}
 		sites[domain] = rules
 	}
@@ -107,4 +115,18 @@ func MatchCrawl(url string) (models.SiteRules, bool) {
 func UsesFlareSolverr(url string) bool {
 	_, ok := Match(url, func(r models.SiteRules) bool { return r.FlareSolverr })
 	return ok
+}
+
+// userAgentMatches reports whether userAgent looks like it's from the impersonated browser (always true with none).
+func userAgentMatches(userAgent string, impersonate consts.Impersonate) bool {
+	switch impersonate {
+	case consts.ImpersonateNone:
+		return true
+	case consts.ImpersonateFirefox:
+		return strings.Contains(userAgent, "Firefox/")
+	case consts.ImpersonateSafari:
+		return strings.Contains(userAgent, "Safari/") && !strings.Contains(userAgent, "Chrome/")
+	default: // Chrome, and Brave and Opera, which send Chrome user agents.
+		return strings.Contains(userAgent, "Chrome/")
+	}
 }
