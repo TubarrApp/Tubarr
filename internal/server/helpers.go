@@ -216,13 +216,13 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 		settings.MetaFilterMoveOpFile = v
 	}
 	if v, ok := data[jsonkeys.SettingsJSONDirectory].(string); ok {
-		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err := validation.CheckDirectory(v, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		settings.JSONDir = v
 	}
 	if v, ok := data[jsonkeys.SettingsVideoDirectory].(string); ok {
-		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err := validation.CheckDirectory(v, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		settings.VideoDir = v
@@ -388,7 +388,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.TranscodeGPUNode = validGPUNode
 	}
 	if v, ok := data[jsonkeys.MetarrOutputDirectory].(string); ok {
-		if _, _, err := sharedvalidation.ValidateDirectory(v, true, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(v, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		metarr.OutputDir = v
@@ -505,11 +505,11 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 
 	// -- Validation --
 	// Strings
-	if _, _, err := sharedvalidation.ValidateDirectory(vDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+	if err := validation.CheckDirectory(vDir, sharedtemplates.TubarrTemplateTags); err != nil {
 		http.Error(w, fmt.Sprintf("video directory %q is invalid: %v", vDir, err), http.StatusBadRequest)
 		return nil
 	}
-	if _, _, err := sharedvalidation.ValidateDirectory(jDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+	if err := validation.CheckDirectory(jDir, sharedtemplates.TubarrTemplateTags); err != nil {
 		http.Error(w, fmt.Sprintf("JSON directory %q is invalid: %v", jDir, err), http.StatusBadRequest)
 		return nil
 	}

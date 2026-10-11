@@ -34,12 +34,12 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 	}
 
 	// Validate the video directory exists.
-	if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+	if err := validation.CheckDirectory(*input.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
 		return nil, nil, err
 	}
 
 	// Validate the JSON directory exists.
-	if _, _, err := sharedvalidation.ValidateDirectory(*input.JSONDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+	if err := validation.CheckDirectory(*input.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
 		return nil, nil, err
 	}
 
@@ -337,6 +337,9 @@ func convertConfigValue[T any](v any) (T, bool) {
 			val := any(s).(T)
 			return val, true
 		}
+		if !isScalar(v) {
+			return zero, false
+		}
 		str := fmt.Sprintf("%v", v)
 		val := any(str).(T)
 		return val, true
@@ -382,6 +385,9 @@ func convertConfigValue[T any](v any) (T, bool) {
 		if slice, ok := v.([]any); ok {
 			strSlice := make([]string, len(slice))
 			for i, item := range slice {
+				if !isScalar(item) {
+					return zero, false
+				}
 				strSlice[i] = fmt.Sprintf("%v", item)
 			}
 			val := any(strSlice).(T)
@@ -390,6 +396,19 @@ func convertConfigValue[T any](v any) (T, bool) {
 	}
 
 	return zero, false
+}
+
+// isScalar reports whether a config value is a single value (e.g. a number or bool) which can stand in for a string,
+// rather than a map or list, which would otherwise be turned into text like "map[a:1]".
+func isScalar(v any) bool {
+	if v == nil {
+		return false
+	}
+	switch reflect.ValueOf(v).Kind() {
+	case reflect.Map, reflect.Slice, reflect.Array, reflect.Struct:
+		return false
+	}
+	return true
 }
 
 // LoadViperIntoStruct loads values from a local Viper instance into a struct of variables.
@@ -497,6 +516,14 @@ func GetConfigValue[T any](v interface {
 	if kebabKey != key && v.IsSet(kebabKey) {
 		if val, ok := convertConfigValue[T](v.Get(kebabKey)); ok {
 			return val, true
+		}
+	}
+
+	// Set, but not as a usable value.
+	for _, k := range []string{key, snakeKey, kebabKey} {
+		if v.IsSet(k) {
+			logger.Pl.W("Ignoring config key %q: expected a %T value, got %T", k, zero, v.Get(k))
+			break
 		}
 	}
 	return zero, false
@@ -668,7 +695,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Validate and set JSONDir if provided.
 	if input.JSONDir != nil && *input.JSONDir != "" {
-		if _, _, err := sharedvalidation.ValidateDirectory(*input.JSONDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err := validation.CheckDirectory(*input.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid JSON directory for per-URL settings: %w", err)
 		}
 		settings.JSONDir = *input.JSONDir
@@ -693,7 +720,7 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 
 	// Validate and set VideoDir if provided.
 	if input.VideoDir != nil && *input.VideoDir != "" {
-		if _, _, err := sharedvalidation.ValidateDirectory(*input.VideoDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err := validation.CheckDirectory(*input.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, fmt.Errorf("invalid video directory for per-URL settings: %w", err)
 		}
 		settings.VideoDir = *input.VideoDir
@@ -823,7 +850,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.FilteredFilenameOpsFile = *input.FilteredFilenameOpsFile
 	}
 	if input.OutDir != nil {
-		if _, _, err := sharedvalidation.ValidateDirectory(*input.OutDir, true, sharedtemplates.AllTemplatesMap); err != nil {
+		if _, _, err := sharedvalidation.ValidateDirectory(*input.OutDir, false, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, fmt.Errorf("invalid Metarr output directory for per-URL settings: %w", err)
 		}
 		metarr.OutputDir = *input.OutDir

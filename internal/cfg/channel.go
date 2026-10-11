@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"tubarr/internal/app"
@@ -13,7 +15,6 @@ import (
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
@@ -336,7 +337,7 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success.
-			logger.Pl.S("Deleted notify URLs for channel with %s %q: %v", key, val, notifyURLs)
+			logger.Pl.S("Deleted %d notify URL(s) for channel with %s %q", len(notifyURLs)+len(notifyNames), key, val)
 			return nil
 		},
 	}
@@ -396,11 +397,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success.
-			pairSlice := make([]string, 0, len(validPairs))
-			for _, vp := range validPairs {
-				pairSlice = append(pairSlice, (vp.ChannelURL + "|" + vp.NotifyURL + "|" + vp.Name))
-			}
-			logger.Pl.S("Added notify URLs for channel with %s %q: %v", key, val, pairSlice)
+			logger.Pl.S("Added %d notify URL(s) for channel with %s %q", len(validPairs), key, val)
 			return nil
 		},
 	}
@@ -1563,8 +1560,10 @@ func updateChannelValue(cs contracts.ChannelStore) *cobra.Command {
 	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(updateRowCmd, &name, nil, &id)
 
-	updateRowCmd.Flags().StringVar(&col, "column-name", "", "The name of the column in the table (e.g. video_directory)")
-	updateRowCmd.Flags().StringVar(&newVal, "set-value", "", "The value to set in the column (e.g. /my-directory)")
+	ColNameMessage := fmt.Sprintf("The name of the column in the table. Valid options: %v", slices.Sorted(maps.Keys(consts.ChannelTextColumns)))
+
+	updateRowCmd.Flags().StringVar(&col, "column-name", "", ColNameMessage)
+	updateRowCmd.Flags().StringVar(&newVal, "set-value", "", "The value to set in the column (e.g. My Channel)")
 	return updateRowCmd
 }
 
@@ -2169,13 +2168,11 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 
 // verifyChanRowUpdateValid verifies that your update operation is valid.
 func verifyChanRowUpdateValid(col, val string) error {
-	switch col {
-	case "name", jsonkeys.SettingsVideoDirectory, jsonkeys.SettingsJSONDirectory:
-		if val == "" {
-			return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
-		}
-	default:
-		return errors.New("cannot set a custom value for internal DB elements")
+	if _, ok := consts.ChannelTextColumns[col]; !ok {
+		return fmt.Errorf("column %q can't be set directly (valid options: %v), use 'update-channel' for channel settings", col, slices.Sorted(maps.Keys(consts.ChannelTextColumns)))
+	}
+	if col == consts.QChanName && val == "" {
+		return fmt.Errorf("cannot set %s blank, please use the 'delete' function if you want to remove this channel entirely", col)
 	}
 	return nil
 }

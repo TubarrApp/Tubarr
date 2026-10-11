@@ -2,8 +2,11 @@
 package validation
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,6 +22,52 @@ import (
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
+
+// CheckDirectory validates a directory path like sharedvalidation.ValidateDirectory, but without creating it or
+// requiring it to exist (whether it's available is checked before downloading, by CheckDestination).
+func CheckDirectory(dir string, templateMap map[string]struct{}) error {
+	hasTemplating, _, err := sharedvalidation.ValidateDirectory(dir, false, templateMap)
+	if err != nil && !hasTemplating {
+		if _, statErr := os.Stat(filepath.Clean(dir)); errors.Is(statErr, os.ErrNotExist) {
+			return nil
+		}
+	}
+	return err
+}
+
+// CheckDestination returns an error if a download destination isn't available (e.g. its drive isn't mounted).
+//
+// A plain path must exist. For a templated path, which can't exist until its tags are filled in, the directory holding
+// the fixed part before the first tag must exist (e.g. "/media" for "/media/{{year}}").
+func CheckDestination(dir string) error {
+	if dir == "" {
+		return nil
+	}
+	base := dir
+	if i := strings.Index(dir, "{{"); i >= 0 {
+		base = filepath.Dir(dir[:i])
+	}
+	info, err := os.Stat(base)
+	if err != nil {
+		return fmt.Errorf("destination %q isn't available: %w", base, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("destination %q isn't available: it's a file, not a directory", base)
+	}
+	return nil
+}
+
+// ValidateChannelURL checks a channel URL is an absolute http(s) URL, so it can't be read as a yt-dlp option or local file.
+func ValidateChannelURL(u string) error {
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return fmt.Errorf("invalid channel URL %q: %w", u, err)
+	}
+	if (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return fmt.Errorf("invalid channel URL %q: must be a full http:// or https:// URL", u)
+	}
+	return nil
+}
 
 // ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
 func ValidateViperFlags() error {
@@ -135,7 +184,7 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 
 		// Validate output directory exists
 		if op.OutputDir != "" {
-			if _, _, err := sharedvalidation.ValidateDirectory(op.OutputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
+			if err := CheckDirectory(op.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
 				return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 			}
 		}

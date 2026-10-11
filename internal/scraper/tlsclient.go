@@ -55,7 +55,10 @@ func userAgentMajorVersion(userAgent string) int {
 	if m == nil {
 		return 0
 	}
-	major, _ := strconv.Atoi(m[1])
+	major, err := strconv.Atoi(m[1])
+	if err != nil || major > 9999 { // No real browser version; also keeps chromeBrands' index math from overflowing.
+		return 0
+	}
 	return major
 }
 

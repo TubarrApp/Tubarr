@@ -42,6 +42,7 @@ func NewRouter(ss serverStore) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(http.NewCrossOriginProtection().Handler) // Blocks other websites' pages from sending changes (CSRF).
 
 	// --- Metarr Log ---
 	// POST endpoint for Metarr instances to send logs.
@@ -128,8 +129,9 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 	addr := ":" + tubarrPort
 
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: r,
+		Addr:              addr,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second, // Stops slow clients holding connections open; bodies and responses are unaffected.
 	}
 
 	// Start server in a goroutine

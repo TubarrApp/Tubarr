@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"tubarr/internal/app"
 	"tubarr/internal/auth"
 	"tubarr/internal/blocking"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -28,6 +30,7 @@ import (
 	"tubarr/internal/scraper"
 	"tubarr/internal/siterules"
 	"tubarr/internal/state"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/logging"
 	"github.com/go-chi/chi/v5"
@@ -530,8 +533,8 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 	var chanURLs = make([]*models.ChannelURL, 0, len(urls))
 	for _, u := range urls {
 		if u != "" {
-			if _, err := url.Parse(u); err != nil {
-				http.Error(w, fmt.Sprintf("invalid channel URL %q: %v", u, err), http.StatusBadRequest)
+			if err := validation.ValidateChannelURL(u); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 			// Get auth details for this URL if they exist.
@@ -587,7 +590,11 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Add to database.
 	if c.ID, err = ss.cs.AddChannel(c); err != nil {
-		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), http.StatusInternalServerError)
+		status := http.StatusInternalServerError
+		if errors.Is(err, contracts.ErrInvalidChannel) {
+			status = http.StatusBadRequest
+		}
+		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), status)
 		return
 	}
 
@@ -646,48 +653,31 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Update channel name if provided.
+	// -- Parse and validate everything before writing, so a rejected update changes nothing. --
 	name := r.FormValue("name")
-	if name != "" && name != existingChannel.Name {
-		if err := ss.cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
-			http.Error(w, fmt.Sprintf("failed to update channel name: %v", err), http.StatusInternalServerError)
-			return
-		}
-		existingChannel.Name = name
-	}
 
-	// Update channel settings.
 	newSettings := getSettingsStrings(w, r)
 	if newSettings == nil {
 		// Validation error already written to response
 		return
 	}
-	_, err = ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
-		*s = *newSettings
-		return nil
-	})
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to update channel settings: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Update channel Metarr args.
 	newMetarr := getMetarrArgsStrings(w, r)
 	if newMetarr == nil {
 		// Validation error already written to response
 		return
 	}
-	_, err = ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
-		*m = *newMetarr
-		return nil
-	})
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to update channel metarr args: %v", err), http.StatusInternalServerError)
+
+	urls := strings.Fields(r.FormValue("urls"))
+	if len(urls) == 0 {
+		http.Error(w, "at least one channel URL is required", http.StatusBadRequest)
 		return
 	}
-
-	// Handle URL updates.
-	urls := strings.Fields(r.FormValue("urls"))
+	for _, u := range urls {
+		if err := validation.ValidateChannelURL(u); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	authDetails := strings.Fields(r.FormValue("auth_details"))
 	username := r.FormValue("username")
 	loginURL := r.FormValue("login_url")
@@ -737,6 +727,29 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		urlSettingsMap[channelURL] = parsed
 	}
 
+	// -- Write. --
+	if name != "" && name != existingChannel.Name {
+		if err := ss.cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
+			http.Error(w, fmt.Sprintf("failed to update channel name: %v", err), http.StatusInternalServerError)
+			return
+		}
+		existingChannel.Name = name
+	}
+	if _, err := ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+		*s = *newSettings
+		return nil
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("failed to update channel settings: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if _, err := ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
+		*m = *newMetarr
+		return nil
+	}); err != nil {
+		http.Error(w, fmt.Sprintf("failed to update channel metarr args: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	// Build map of existing URLs.
 	existingURLMap := make(map[string]*models.ChannelURL)
 	for _, urlModel := range existingChannel.URLModels {
@@ -763,15 +776,6 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Add or update URLs.
 	for _, u := range urls {
-		if u == "" {
-			continue
-		}
-
-		if _, err := url.Parse(u); err != nil {
-			http.Error(w, fmt.Sprintf("invalid channel URL %q: %v", u, err), http.StatusBadRequest)
-			return
-		}
-
 		// Get auth details for this URL if they exist.
 		var parsedUsername, parsedPassword, parsedLoginURL string
 		if _, exists := authMap[u]; exists {
@@ -892,10 +896,21 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 // handleDeleteChannel deletes a channel from Tubarr.
 func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	_, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
 
 	// Delete associated downloads from state manager.
 	if err := ss.cs.DeleteChannel(consts.QChanID, id); err != nil {
-		logger.Pl.E("Failed to delete channel %d: %v", id, err)
+		logger.Pl.E("Failed to delete channel %q: %v", id, err)
+		http.Error(w, fmt.Sprintf("failed to delete channel %q: %v", id, err), http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -1026,7 +1041,11 @@ func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Reque
 
 	// Update database status first.
 	if err := ss.cancelDownload(videoID); err != nil {
-		http.Error(w, fmt.Sprintf("failed to cancel download: %v", err), http.StatusInternalServerError)
+		status := http.StatusInternalServerError
+		if errors.Is(err, errNoActiveDownload) {
+			status = http.StatusNotFound
+		}
+		http.Error(w, fmt.Sprintf("failed to cancel download: %v", err), status)
 		return
 	}
 
@@ -1446,6 +1465,16 @@ func (ss *serverStore) handleUnblockDomain(w http.ResponseWriter, r *http.Reques
 // handleNewVideoNotificationSeen marks a new video notification as seen.
 func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	_, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
 	// Set notification to false.
 	if err := ss.cs.UpdateChannelValue(consts.QChanID, id, consts.QChanNewVideoNotification, false); err != nil {
 		http.Error(w, fmt.Sprintf("failed to mark new video notification as seen for channel ID %q: %v", id, err), http.StatusInternalServerError)
@@ -1461,23 +1490,26 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 		http.Error(w, fmt.Sprintf("failed to empty new video URL slice for channel with ID %q: %v", id, err), http.StatusInternalServerError)
 		return
 	}
-
-	// Parse form data.
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
-		return
-	}
 }
 
 // handleTogglePauseChannel toggles the pause state of a channel.
 func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
+	_, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
 
 	// Track the new pause state (set inside the update function).
 	var newPauseState bool
 
 	// Update channel settings with toggled pause state.
-	_, err := ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+	_, err = ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
 		// Toggle the current pause state.
 		newPauseState = !s.Paused
 		s.Paused = newPauseState

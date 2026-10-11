@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads/downloaders"
+	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 	"tubarr/internal/state"
 
@@ -111,10 +112,10 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Additional user arguments.
 	if !abstractions.IsSet(keys.ExtraYTDLPVideoArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs != "" {
-		args = append(args, strings.Fields(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs)...)
+		args = append(args, parsing.SplitArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs)...)
 	}
 	if abstractions.IsSet(keys.ExtraYTDLPVideoArgs) {
-		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPVideoArgs))...)
+		args = append(args, parsing.SplitArgs(abstractions.GetString(keys.ExtraYTDLPVideoArgs))...)
 	}
 
 	// Add preferred codecs.
@@ -135,9 +136,9 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Add target URL [ MUST GO LAST !! ]
 	if d.Video.DirectVideoURL != "" {
-		args = append(args, d.Video.DirectVideoURL)
+		args = append(args, command.EndOfOptions, d.Video.DirectVideoURL)
 	} else {
-		args = append(args, d.Video.URL)
+		args = append(args, command.EndOfOptions, d.Video.URL)
 	}
 
 	// Combine command...

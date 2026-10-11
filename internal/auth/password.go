@@ -98,7 +98,7 @@ func (pm *PasswordManager) Decrypt(encoded string) (plaintextPassword string, er
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("saved password doesn't match the encryption key in %q (the key file was likely replaced, or deleted and regenerated), please re-enter the password: %w", pm.aesFilepath, err)
 	}
 
 	return string(plaintext), nil
@@ -136,7 +136,7 @@ func (pm *PasswordManager) ensureAESKey(homeDir string) (hashed []byte, err erro
 			return nil, fmt.Errorf("failed to write encryption key: %w", err)
 		}
 
-		logger.Pl.S("Generated new encryption key at: %s", pm.aesFilepath)
+		logger.Pl.S("Generated new encryption key at: %s (any passwords saved under a previous key will need re-entering)", pm.aesFilepath)
 		return key, nil
 
 	} else if err != nil { // Some other error checking the file

@@ -4,8 +4,12 @@ package contracts
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"tubarr/internal/models"
 )
+
+// ErrInvalidChannel wraps errors for channels rejected for their content (not storage failures), e.g. by AddChannel.
+var ErrInvalidChannel = errors.New("invalid channel")
 
 // Store allows access to the main store repo methods.
 type Store interface {

@@ -391,6 +391,7 @@ func loadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) [
 	// Validate the parsed filters
 	if err := validation.ValidateFilterOps(parsedFilters); err != nil {
 		logger.Pl.E("Error validating filters from file %v: %v", filterFile, err)
+		return nil
 	}
 	if len(parsedFilters) > 0 {
 		logger.Pl.D(1, "Found following filters in file:\n\n%v", parsedFilters)
@@ -435,6 +436,7 @@ func loadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryPar
 	// Validate the parsed ops
 	if err := validation.ValidateFilteredMetaOps(parsedFilters); err != nil {
 		logger.Pl.E("Error validating filtered meta ops from file %v: %v", filterFile, err)
+		return nil
 	}
 	if len(parsedFilters) > 0 {
 		logger.Pl.D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
@@ -479,6 +481,7 @@ func loadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.Director
 	// Validate the parsed ops
 	if err := validation.ValidateFilteredFilenameOps(parsedFilters); err != nil {
 		logger.Pl.E("Error validating filtered filename ops from file %v: %v", filterFile, err)
+		return nil
 	}
 	if len(parsedFilters) > 0 {
 		logger.Pl.D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
@@ -523,6 +526,7 @@ func loadMoveOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []m
 	// Validate the parsed ops
 	if err := validation.ValidateMetaFilterMoveOps(parsedMoves); err != nil {
 		logger.Pl.E("Error validating filter move operations from file %q: %v", moveOpFile, err)
+		return nil
 	}
 	if len(parsedMoves) > 0 {
 		logger.Pl.D(1, "Found following filter move operations in file:\n\n%v", parsedMoves)

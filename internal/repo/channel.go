@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/auth"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -530,14 +531,10 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 		return err
 	}
 
-	switch {
-	case len(urls) > 0 && len(names) == 0:
-		logger.Pl.S("Deleted notify URLs %v for channel with ID '%d'.", urls, channelID)
-	case len(urls) == 0 && len(names) > 0:
-		logger.Pl.S("Deleted notify URLs with friendly names %v for channel with ID '%d'.", names, channelID)
-	case len(urls) > 0 && len(names) > 0:
-		logger.Pl.S("Deleted notify URLs: %v and notify URLs with friendly names %v for channel with ID '%d'.", urls, names, channelID)
-	default:
+	// Counts only, since notification URLs (and names, which default to them) can hold tokens.
+	if len(urls) > 0 || len(names) > 0 {
+		logger.Pl.S("Deleted notifications for channel with ID '%d' (%d by URL, %d by name).", channelID, len(urls), len(names))
+	} else {
 		logger.Pl.S("No notify URLs to delete.")
 	}
 	return nil
@@ -614,14 +611,36 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 	return nil
 }
 
+// createDownloadDirs creates plain (untemplated) video and JSON directories when settings are saved. They're never created
+// when channels load, so a missing destination (e.g. an unmounted drive) is reported before downloading, not recreated.
+func createDownloadDirs(s *models.Settings) error {
+	if s == nil {
+		return nil
+	}
+	for _, dir := range []string{s.VideoDir, s.JSONDir} {
+		if dir == "" || strings.Contains(dir, "{{") {
+			continue
+		}
+		if err := os.MkdirAll(dir, sharedconsts.PermsGenericDir); err != nil {
+			return fmt.Errorf("failed to create directory %q: %w", dir, err)
+		}
+	}
+	return nil
+}
+
 // AddChannel adds a new channel to the database.
 func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	if c.ChanSettings.VideoDir == "" {
-		return 0, errors.New("must enter a video directory where downloads will be stored")
+		return 0, fmt.Errorf("%w: must enter a video directory where downloads will be stored", contracts.ErrInvalidChannel)
+	}
+	for _, cu := range c.URLModels {
+		if err := validation.ValidateChannelURL(cu.URL); err != nil {
+			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+		}
 	}
 
 	if cs.channelExists(consts.QChanName, c.Name) {
-		return 0, fmt.Errorf("channel with name %q already exists", c.Name)
+		return 0, fmt.Errorf("%w: channel with name %q already exists", contracts.ErrInvalidChannel, c.Name)
 	}
 
 	// JSON dir.
@@ -631,10 +650,20 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 	// Validate complete models at DB write boundary.
 	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
-		return 0, fmt.Errorf("cannot insert channel with invalid settings: %w", err)
+		return 0, fmt.Errorf("%w: invalid settings: %w", contracts.ErrInvalidChannel, err)
 	}
 	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs); err != nil {
-		return 0, fmt.Errorf("cannot insert channel with invalid metarr config: %w", err)
+		return 0, fmt.Errorf("%w: invalid metarr config: %w", contracts.ErrInvalidChannel, err)
+	}
+
+	// Everything is valid, so create the destination directories.
+	if err := createDownloadDirs(c.ChanSettings); err != nil {
+		return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+	}
+	for _, cu := range c.URLModels {
+		if err := createDownloadDirs(cu.ChanURLSettings); err != nil {
+			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+		}
 	}
 
 	// Convert settings to JSON.
@@ -1088,6 +1117,7 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 	}
 
 	// Apply the update.
+	oldVideoDir, oldJSONDir := settings.VideoDir, settings.JSONDir
 	if err := updateFn(&settings); err != nil {
 		return 0, fmt.Errorf("failed to update settings: %w", err)
 	}
@@ -1095,6 +1125,13 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 	// Validate updated Settings at DB write boundary.
 	if err := validation.ValidateSettingsModel(&settings); err != nil {
 		return 0, fmt.Errorf("updated settings are invalid: %w", err)
+	}
+
+	// Create changed destination directories (only changed ones, so e.g. pausing never recreates a missing destination).
+	if settings.VideoDir != oldVideoDir || settings.JSONDir != oldJSONDir {
+		if err := createDownloadDirs(&settings); err != nil {
+			return 0, err
+		}
 	}
 
 	// Marshal updated settings.
@@ -1126,6 +1163,9 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) error {
 	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
+	}
+	if _, ok := consts.ValidChannelKeys[col]; !ok { // Column names can't be SQL parameters, so only known ones are allowed.
+		return fmt.Errorf("column %q is not valid for table. Valid columns: %v", col, consts.ValidChannelKeys)
 	}
 
 	if !cs.channelExists(key, val) {
@@ -1423,7 +1463,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		if cu.Password == "" && cu.EncryptedPassword != "" {
 			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
 			if err != nil {
-				logger.Pl.W("Failed to decrypt password (encrypted: %s) for channel %q", cu.EncryptedPassword, c.Name)
+				logger.Pl.W("Failed to decrypt password for channel %q URL %q: %v", c.Name, cu.URL, err)
 			}
 		}
 
@@ -1844,7 +1884,11 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 		return err
 	}
 
-	logger.Pl.S("Added notification URL %q to channel with ID: %d", notifyURL, id)
+	host := ""
+	if u, err := url.Parse(notifyURL); err == nil {
+		host = u.Host
+	}
+	logger.Pl.S("Added notification for %q to channel with ID: %d", host, id)
 	return nil
 }
 

@@ -36,7 +36,7 @@ func ValidateSettingsModel(s *models.Settings) error {
 	}
 
 	if s.JSONDir != "" {
-		if _, _, err = sharedvalidation.ValidateDirectory(s.JSONDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err = CheckDirectory(s.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid JSON directory %q in settings: %w", s.JSONDir, err)
 		}
 	}
@@ -67,7 +67,7 @@ func ValidateSettingsModel(s *models.Settings) error {
 	}
 
 	if s.VideoDir != "" {
-		if _, _, err = sharedvalidation.ValidateDirectory(s.VideoDir, true, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err = CheckDirectory(s.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid video directory %q in settings: %w", s.VideoDir, err)
 		}
 	}
@@ -180,7 +180,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 	}
 
 	if m.OutputDir != "" {
-		if _, _, err := sharedvalidation.ValidateDirectory(m.OutputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if err := CheckDirectory(m.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
 			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
 		}
 	}

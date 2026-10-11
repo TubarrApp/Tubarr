@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/validation"
 
 	"golang.org/x/exp/constraints"
 )
@@ -18,6 +19,14 @@ import (
 func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error) {
 	if !cs.channelExistsID(channelID) {
 		return 0, fmt.Errorf("channel with ID %d does not exist", channelID)
+	}
+	if !isManual {
+		if err := validation.ValidateChannelURL(cu.URL); err != nil {
+			return 0, err
+		}
+		if err := createDownloadDirs(cu.ChanURLSettings); err != nil {
+			return 0, err
+		}
 	}
 
 	var settingsJSON, metarrJSON []byte
@@ -88,6 +97,9 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 
 // UpdateChannelURLSettings updates the settings of a single ChannelURL model.
 func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
+	if err := createDownloadDirs(cu.ChanURLSettings); err != nil {
+		return err
+	}
 	metarrJSON, err := json.Marshal(cu.ChanURLMetarrArgs)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metarr args: %w", err)
@@ -198,9 +210,8 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		cu.LoginURL = nullString(loginURL)
 
 		if cu.Password == "" && cu.EncryptedPassword != "" {
-			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
-			if err != nil {
-				return nil, err
+			if cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword); err != nil {
+				logger.Pl.W("Failed to decrypt password for channel URL %q: %v", cu.URL, err)
 			}
 		}
 
@@ -332,9 +343,8 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, merge
 	cu.LoginURL = nullString(loginURL)
 
 	if cu.Password == "" && cu.EncryptedPassword != "" {
-		cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
-		if err != nil {
-			return nil, true, err
+		if cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword); err != nil {
+			logger.Pl.W("Failed to decrypt password for channel URL %q: %v", cu.URL, err)
 		}
 	}
 

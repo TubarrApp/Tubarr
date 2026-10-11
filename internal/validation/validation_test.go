@@ -527,19 +527,18 @@ func TestValidateMetaFilterMoveOps_EmptyField(t *testing.T) {
 }
 
 func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
-	// Non-existent directory to trigger ValidateDirectory error
+	// A file where a directory should be is invalid. (A missing directory is fine here: whether it's available is
+	// checked before downloading.)
 	tmp := t.TempDir()
-	missingDir := filepath.Join(tmp, "fake_dir")
-	t.Cleanup(func() {
-		if err := os.RemoveAll(missingDir); err != nil {
-			fmt.Printf("Could not remove %q: %v", missingDir, err)
-		}
-	})
+	file := filepath.Join(tmp, "file.txt")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	moveOps := []models.MetaFilterMoveOps{
 		{
 			Field:     "channel",
-			OutputDir: missingDir,
+			OutputDir: file,
 		},
 	}
 
@@ -548,8 +547,13 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 		t.Fatalf("expected error for invalid directory")
 	}
 	// Don't assert too tightly on the message; just ensure it's about directory
-	if !strings.Contains(err.Error(), "invalid directory") && !strings.Contains(err.Error(), "does not exist") {
+	if !strings.Contains(err.Error(), "invalid directory") && !strings.Contains(err.Error(), "not a directory") {
 		t.Fatalf("unexpected error message: %v", err)
+	}
+
+	moveOps[0].OutputDir = filepath.Join(tmp, "missing_dir")
+	if err := validation.ValidateMetaFilterMoveOps(moveOps); err != nil {
+		t.Fatalf("expected a missing directory to be accepted, got %v", err)
 	}
 }
 

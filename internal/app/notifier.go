@@ -84,8 +84,11 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 	notifyFunc := func(client *http.Client, notifyURL string) error {
 		resp, err := client.Post(notifyURL, "application/json", nil)
 		if err != nil {
-			return fmt.Errorf("failed to send notification to URL %q for channel %q (ID: %d): %w",
-				notifyURL, c.Name, c.ID, err)
+			// Drop net/http's copy of the full URL, which can hold tokens.
+			if ue, ok := err.(*url.Error); ok {
+				err = ue.Err
+			}
+			return fmt.Errorf("failed to send notification for channel %q (ID: %d): %w", c.Name, c.ID, err)
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
@@ -100,15 +103,17 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 	}
 
 	// Notify for each URL.
+	// Only hosts are logged, since notification URLs often hold tokens.
 	errs := make([]error, 0, len(notifyURLs))
+	notified := make([]string, 0, len(notifyURLs))
 
 	for _, notifyURL := range notifyURLs {
-		logger.Pl.D(1, "Notifying %q for channel %q", notifyURL, c.Name)
 		parsed, err := url.Parse(notifyURL)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("invalid notification URL %q: %w", notifyURL, err))
+			errs = append(errs, fmt.Errorf("invalid notification URL for channel %q", c.Name))
 			continue
 		}
+		logger.Pl.D(1, "Notifying %q for channel %q", parsed.Host, c.Name)
 
 		regClient, lanClient := newNotifyHTTPClients((30 * time.Second), (10 * time.Second))
 		client := regClient
@@ -117,14 +122,15 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 		}
 
 		if err := notifyFunc(client, notifyURL); err != nil {
-			errs = append(errs, fmt.Errorf("failed to notify URL %q: %w", notifyURL, err))
+			errs = append(errs, fmt.Errorf("failed to notify %q: %w", parsed.Host, err))
 			continue
 		}
-		logger.Pl.S("Successfully notified URL %q for channel %q", notifyURL, c.Name)
+		logger.Pl.S("Successfully notified %q for channel %q", parsed.Host, c.Name)
+		notified = append(notified, parsed.Host)
 	}
 
 	if len(errs) == 0 {
-		logger.Pl.S("Successfully notified all URLs for channel %q: %v", c.Name, notifyURLs)
+		logger.Pl.S("Successfully notified all URLs for channel %q: %v", c.Name, notified)
 		return nil
 	}
 

@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -45,6 +46,7 @@ type flareSolverrResponse struct {
 	Status   string `json:"status"`
 	Message  string `json:"message"`
 	Solution struct {
+		URL       string `json:"url"` // Final page URL, after any redirects.
 		Status    int    `json:"status"`
 		UserAgent string `json:"userAgent"`
 		Response  string `json:"response"`
@@ -92,9 +94,15 @@ func solveFlareSolverr(ctx context.Context, baseURL, pageURL string, timeout tim
 		return nil, 0, fmt.Errorf("FlareSolverr returned no user agent for %q", pageURL)
 	}
 
+	// A cookie without a domain belongs to the host of the page that set it.
+	var pageHost string
+	if u, err := url.Parse(cmp.Or(fsResp.Solution.URL, pageURL)); err == nil {
+		pageHost = u.Hostname()
+	}
+
 	sol = &flareSolverrSolution{userAgent: fsResp.Solution.UserAgent}
 	for _, c := range fsResp.Solution.Cookies {
-		cookie := &http.Cookie{Name: c.Name, Value: c.Value, Domain: c.Domain, Path: c.Path, HttpOnly: c.HTTPOnly, Secure: c.Secure}
+		cookie := &http.Cookie{Name: c.Name, Value: c.Value, Domain: cmp.Or(c.Domain, pageHost), Path: c.Path, HttpOnly: c.HTTPOnly, Secure: c.Secure}
 		if c.Expires > 0 {
 			cookie.Expires = time.Unix(int64(c.Expires), 0)
 		}
@@ -216,13 +224,13 @@ func (cm *CookieManager) flareSolverrFailed(host string, err error) error {
 // flareSolverrResolver returns a function that solves cu's URL through FlareSolverr again (unless already solved since
 // staleGen), and rewrites cu's cookie file with the new cookies on top of baseCookies.
 func (cm *CookieManager) flareSolverrResolver(cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
-	pageURL, loginURL, cookiePath := cu.URL, cu.LoginURL, cu.CookiePath
+	pageURL, cookiePath := cu.URL, cu.CookiePath
 	return func(staleGen int) (models.FlareSolverrSolve, error) {
 		sol, err := cm.flareSolverrSolution(context.Background(), pageURL, staleGen)
 		if err != nil {
 			return models.FlareSolverrSolve{}, err
 		}
-		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), loginURL, cookiePath); err != nil {
+		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), cookiePath); err != nil {
 			return models.FlareSolverrSolve{}, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
 		}
 		return sol.ytDLPSolve(), nil
@@ -232,7 +240,7 @@ func (cm *CookieManager) flareSolverrResolver(cu *models.ChannelURL, baseCookies
 // flareSolverrNewer returns a function that, if a solve newer than gen has been made for cu's URL (e.g. by Tubarr's own
 // requests), rewrites cu's cookie file with its cookies on top of baseCookies and returns it. It never contacts FlareSolverr.
 func (cm *CookieManager) flareSolverrNewer(cu *models.ChannelURL, baseCookies []*http.Cookie) func(gen int) (models.FlareSolverrSolve, bool, error) {
-	pageURL, loginURL, cookiePath := cu.URL, cu.LoginURL, cu.CookiePath
+	pageURL, cookiePath := cu.URL, cu.CookiePath
 	return func(gen int) (models.FlareSolverrSolve, bool, error) {
 		u, err := url.Parse(pageURL)
 		if err != nil {
@@ -245,7 +253,7 @@ func (cm *CookieManager) flareSolverrNewer(cu *models.ChannelURL, baseCookies []
 			return models.FlareSolverrSolve{}, false, nil
 		}
 
-		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), loginURL, cookiePath); err != nil {
+		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), cookiePath); err != nil {
 			return models.FlareSolverrSolve{}, false, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
 		}
 		logger.Pl.I("Using the newer FlareSolverr solve from %s for %q", sol.solvedAt.Format(time.TimeOnly), u.Hostname())

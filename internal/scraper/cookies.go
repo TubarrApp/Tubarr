@@ -127,7 +127,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 		}
 
 		// Save cookies to file for yt-dlp.
-		err = saveCookiesToFile(cookies, cu.LoginURL, cu.CookiePath)
+		err = saveCookiesToFile(cookies, cu.CookiePath)
 		if err != nil {
 			return nil, "", err
 		}
@@ -243,24 +243,29 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 	return httpCookies
 }
 
+// cookieFileNameReplacer turns a channel name into a single file name, so names like "AC/DC" can't point into other folders.
+var cookieFileNameReplacer = strings.NewReplacer(" ", "-", "/", "-", "\\", "-")
+
 // generateCookieFilePath generates a unique authentication file path per channel and URL.
 func generateCookieFilePath(channelName, videoURL string) string {
+	name := cookieFileNameReplacer.Replace(channelName)
+
 	// If no specific URL is provided, return the default per-channel auth file.
 	if videoURL == "" {
-		return filepath.Join(paths.HomeTubarrDir, strings.ReplaceAll(channelName, " ", "-")+".txt")
+		return filepath.Join(paths.HomeTubarrDir, name+".txt")
 	}
 
 	// Generate a short hash for the URL to ensure uniqueness.
 	urlHash := sha256.Sum256([]byte(videoURL))
-	hashString := fmt.Sprintf("%x", urlHash[:8]) // Use first 8 hex characters.
+	hashString := fmt.Sprintf("%x", urlHash[:8]) // First 8 bytes (16 hex characters).
 
-	return filepath.Join(paths.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", strings.ReplaceAll(channelName, " ", "-"), hashString))
+	return filepath.Join(paths.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", name, hashString))
 }
 
 // saveCookiesToFile saves the cookies to a file in Netscape format.
-func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) error {
+func saveCookiesToFile(cookies []*http.Cookie, cookieFilePath string) error {
 	if len(cookies) == 0 {
-		logger.Pl.D(2, "No cookies to write, skipping cookie file creation for login URL %q and generated path %q", loginURL, cookieFilePath)
+		logger.Pl.D(2, "No cookies to write, skipping cookie file creation at %q", cookieFilePath)
 		return nil
 	}
 
@@ -276,27 +281,13 @@ func saveCookiesToFile(cookies []*http.Cookie, loginURL, cookieFilePath string) 
 	// Log the cookies for debugging.
 	logger.Pl.D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
 
-	// Parse login URL to get hostname for default domain.
-	parsedLoginURL, err := url.Parse(loginURL)
-	if err != nil {
-		logger.Pl.E("Failed to parse login URL %q: %v", loginURL, err)
-	}
-
-	// Get login URL hostname.
-	loginHost := ""
-	if parsedLoginURL != nil {
-		loginHost = parsedLoginURL.Hostname()
-	}
-
 	// Write each cookie in Netscape format.
 	for _, cookie := range cookies {
+		// Domains are set where cookies are obtained (from the host that sent them), so a missing one can't be guessed here.
 		domain := cookie.Domain
 		if domain == "" {
-			// Default to the hostname of the login URL when the cookie doesn't carry a domain.
-			domain = loginHost
-			if domain == "" {
-				domain = loginURL
-			}
+			logger.Pl.D(2, "Skipping cookie %q: it has no domain", cookie.Name)
+			continue
 		}
 
 		if !strings.HasPrefix(domain, ".") && strings.Count(domain, ".") > 1 {

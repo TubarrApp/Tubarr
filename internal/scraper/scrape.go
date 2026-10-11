@@ -3,7 +3,6 @@ package scraper
 
 import (
 	"context"
-	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -265,9 +264,9 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 
 		// Add custom crawl arguments: CLI flag takes precedence over per-channel setting.
 		if abstractions.IsSet(keys.ExtraYTDLPCrawlArgs) {
-			args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPCrawlArgs))...)
+			args = append(args, parsing.SplitArgs(abstractions.GetString(keys.ExtraYTDLPCrawlArgs))...)
 		} else if crawlArgs != "" {
-			args = append(args, strings.Fields(crawlArgs)...)
+			args = append(args, parsing.SplitArgs(crawlArgs)...)
 		}
 
 		// Cookies
@@ -279,7 +278,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		args, fsGen := siterules.AddSiteRulesToYTDLP(channelURL, fs, args)
 
 		// Add -J and URL to finalize command
-		args = append(args, command.OutputJSON, channelURL)
+		args = append(args, command.OutputJSON, command.EndOfOptions, channelURL)
 		cmd := exec.CommandContext(ctx, command.YTDLP, args...)
 
 		logger.Pl.I("Executing YTDLP playlist fetch command for channel %q URL %q:\n\n%s\n", channelName, channelURL, cmd.String())
@@ -453,10 +452,7 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 		}
 		collector.WithTransport(rt)
 		collector.UserAgent = userAgent
-	default:
-		collector.WithTransport(&http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Adjust if necessary
-		})
+	default: // Colly's default transport, which verifies certificates.
 		if query.UserAgent != "" {
 			collector.UserAgent = query.UserAgent
 		}

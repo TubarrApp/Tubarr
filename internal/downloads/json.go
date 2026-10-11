@@ -9,6 +9,7 @@ import (
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/abstractions"
@@ -86,17 +87,17 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	// Additional user arguments.
 	if !abstractions.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {
-		args = append(args, strings.Fields(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs)...)
+		args = append(args, parsing.SplitArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs)...)
 	}
 	if abstractions.IsSet(keys.ExtraYTDLPMetaArgs) {
-		args = append(args, strings.Fields(abstractions.GetString(keys.ExtraYTDLPMetaArgs))...)
+		args = append(args, parsing.SplitArgs(abstractions.GetString(keys.ExtraYTDLPMetaArgs))...)
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
 	args, d.fsGen = siterules.AddSiteRulesToYTDLP(d.Video.URL, d.ChannelURL.FlareSolverr, args)
 
 	// Add target URL [ MUST GO LAST !! ].
-	args = append(args, d.Video.URL)
+	args = append(args, command.EndOfOptions, d.Video.URL)
 
 	// Build command with context.
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)

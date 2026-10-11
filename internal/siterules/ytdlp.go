@@ -1,7 +1,6 @@
 package siterules
 
 import (
-	"fmt"
 	"strings"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
@@ -96,10 +95,11 @@ func AddSiteRulesToYTDLP(pageURL string, fs *models.FlareSolverrSolution, args [
 // stripFlagArgs removes flag from args, either alone or as flag=value. Returns the new slice.
 func stripFlagArgs(args []string, flag, pageURL string) (newArgs []string) {
 	var (
-		deleteNext           bool
-		lastFlag             string
-		valuelessFlagWarning = fmt.Sprintf("Flag %q for %q had no value.", flag, pageURL)
+		deleteNext bool
+		lastFlag   string
 	)
+
+	const valuelessFlagWarning = "Flag %q for %q had no value."
 
 	// Iterate through args, keeping all except the flag and its value (if any).
 	for _, a := range args {
@@ -113,7 +113,7 @@ func stripFlagArgs(args []string, flag, pageURL string) (newArgs []string) {
 				lastFlag = ""
 				continue
 			}
-			logger.Pl.W(valuelessFlagWarning)
+			logger.Pl.W(valuelessFlagWarning, flag, pageURL)
 			lastFlag = ""
 		}
 
@@ -133,7 +133,7 @@ func stripFlagArgs(args []string, flag, pageURL string) (newArgs []string) {
 
 	// If the last arg was the flag, it had no value, so warn.
 	if deleteNext {
-		logger.Pl.W(valuelessFlagWarning)
+		logger.Pl.W(valuelessFlagWarning, flag, pageURL)
 	}
 
 	// Return the new args slice without the unwanted flag/its value.

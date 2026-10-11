@@ -28,23 +28,15 @@ func IsPrivateNetwork(host string) bool {
 	if ip == nil {
 		return IsPrivateNetworkFallback(h)
 	}
+	return isPrivateIP(ip)
+}
 
-	// IPv4
-	if ip4 := ip.To4(); ip4 != nil {
-		if ip4.IsPrivate() || ip4.IsLoopback() {
-			return true
-		}
-	}
+// cgnatNet is the shared address range (100.64.0.0/10) used by carrier-grade NAT and Tailscale, unreachable from the internet.
+var cgnatNet = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)}
 
-	// IPv6
-	if ip.IsPrivate() || ip.IsLoopback() {
-		return true
-	}
-	// Link-local: fe80::/10
-	if ip.IsLinkLocalUnicast() {
-		return true
-	}
-	return false
+// isPrivateIP reports whether an IP is on a private, loopback, link-local or CGNAT/Tailscale network.
+func isPrivateIP(ip net.IP) bool {
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || cgnatNet.Contains(ip)
 }
 
 // IsPrivateNetworkFallback resolves the hostname and checks if the IP is private.
@@ -53,10 +45,12 @@ func IsPrivateNetworkFallback(h string) bool {
 	ips, err := net.LookupIP(h)
 	if err == nil { // If err IS nil.
 		for _, ip := range ips {
-			if IsPrivateIP(ip.String(), h) {
+			if isPrivateIP(ip) {
+				logger.Pl.I("Host %q resolved to private IP address %q.", h, ip)
 				return true
 			}
 		}
+		logger.Pl.I("Host %q resolved to public IP address(es) %v.", h, ips)
 		return false
 	}
 	logger.Pl.E("Unable to perform DNS lookup for %q: %v", h, err)
@@ -80,45 +74,9 @@ func IsPrivateNetworkFallback(h string) bool {
 			return octets[1] >= 16 && octets[1] <= 31
 		case 10, 127:
 			return true
+		case 100:
+			return octets[1] >= 64 && octets[1] <= 127 // CGNAT/Tailscale.
 		}
 	}
-	return false
-}
-
-// IsPrivateIP checks if a given IP is in the private range.
-func IsPrivateIP(ip, h string) bool {
-	var isPrivate bool
-
-	parts := strings.Split(ip, ".")
-	if len(parts) == 4 {
-		octets := make([]int, 4)
-		for i, p := range parts {
-			n, err := strconv.Atoi(p)
-			if err != nil || n < 0 || n > 255 {
-				return false
-			}
-			octets[i] = n
-		}
-
-		switch octets[0] {
-		case 192:
-			if octets[1] == 168 {
-				isPrivate = true
-			}
-		case 172:
-			if octets[1] >= 16 && octets[1] <= 31 {
-				isPrivate = true
-			}
-		case 10, 127:
-			isPrivate = true
-		}
-	}
-
-	if isPrivate {
-		logger.Pl.I("Host %q resolved to private IP address %q.", h, ip)
-		return true
-	}
-
-	logger.Pl.I("Host %q resolved to public IP address %q.", h, ip)
 	return false
 }

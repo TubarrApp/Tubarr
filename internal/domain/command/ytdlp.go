@@ -8,6 +8,7 @@ const (
 	AddHeader            = "--add-header" // Accepted shortening of AddHeaders.
 	AddHeaders           = "--add-headers"
 	CookiePath           = "--cookies"
+	EndOfOptions         = "--" // Placed before the URL, so a URL starting with "-" can't be read as an option.
 	ExternalDLer         = "--external-downloader"
 	ExternalDLArgs       = "--external-downloader-args"
 	FilenameSyntax       = "%(title)s.%(ext)s"

@@ -777,7 +777,7 @@
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Move Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.settings?.move_ops ? (typeof channel.settings.move_ops === 'string' ? channel.settings.move_ops.split('\\n').join('<br>') : channel.settings.move_ops.map(op => typeof op === 'string' ? op : ((op.move_op_field || '') + ':' + (op.move_op_value || '') + ' → ' + (op.move_op_output_dir || ''))).join('<br>')) : 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.settings?.move_ops ? (typeof channel.settings.move_ops === 'string' ? channel.settings.move_ops.split('\\n').join('\n') : channel.settings.move_ops.map(op => typeof op === 'string' ? op : ((op.move_op_field || '') + ':' + (op.move_op_value || '') + ' → ' + (op.move_op_output_dir || ''))).join('\n')) : 'None'"></span>
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">YT-DLP Preferred Video Codecs:</span>
@@ -848,11 +848,11 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Meta Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_meta_ops?.split('\n').join('<br>') || 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_meta_ops || 'None'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filename Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_filename_ops?.split('\n').join('<br>') || 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_filename_ops || 'None'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Meta Ops File:</span>
@@ -868,7 +868,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Meta Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_filtered_meta_ops?.split('\n').join('<br>') || 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_filtered_meta_ops || 'None'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Filename Ops File:</span>
@@ -876,7 +876,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Filename Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" x-html="channel.metarr?.metarr_filtered_filename_ops?.split('\n').join('<br>') || 'None'"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_filtered_filename_ops || 'None'"></span>
                             </div>
                           </div>
                         </div>

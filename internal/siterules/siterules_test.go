@@ -7,7 +7,6 @@ import (
 	"slices"
 	"testing"
 	"time"
-	"tubarr/internal/dev"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -24,20 +23,20 @@ func TestBuiltinSitesToggles(t *testing.T) {
 	builtins := builtinSites()
 	checks := []struct {
 		query  models.SiteRules
-		toggle dev.BuiltinScraper
+		toggle builtinScraper
 	}{
-		{Censored, dev.CensoredTV},
-		{Bitchute, dev.BitchuteCom},
-		{Odysee, dev.OdyseeCom},
-		{Rumble, dev.RumbleCom},
+		{censored, censoredTV},
+		{bitchute, bitchuteCom},
+		{odysee, odyseeCom},
+		{rumble, rumbleCom},
 	}
 	for _, c := range checks {
 		got := builtins[c.query.Site]
-		if hasRules := len(got.Metadata) > 0; hasRules != c.toggle.Metadata {
-			t.Errorf("%s: metadata rules registered = %v, toggle = %v", c.query.Site, hasRules, c.toggle.Metadata)
+		if hasRules := len(got.Metadata) > 0; hasRules != c.toggle.metadata {
+			t.Errorf("%s: metadata rules registered = %v, toggle = %v", c.query.Site, hasRules, c.toggle.metadata)
 		}
-		if hasCrawl := got.Crawl != nil; hasCrawl != c.toggle.Crawl {
-			t.Errorf("%s: crawl rule registered = %v, toggle = %v", c.query.Site, hasCrawl, c.toggle.Crawl)
+		if hasCrawl := got.Crawl != nil; hasCrawl != c.toggle.crawl {
+			t.Errorf("%s: crawl rule registered = %v, toggle = %v", c.query.Site, hasCrawl, c.toggle.crawl)
 		}
 	}
 }
@@ -54,17 +53,17 @@ func TestRegisterMerge(t *testing.T) {
 	})
 
 	sitesMu.RLock()
-	censored, bitchute := sites["censored.tv"], sites["bitchute.com"]
+	gotCensored, gotBitchute := sites["censored.tv"], sites["bitchute.com"]
 	sitesMu.RUnlock()
 
-	if len(censored.Metadata) != 1 || censored.Metadata[0].Selector != "h1" {
-		t.Errorf("censored.tv: expected user metadata selectors, got %+v", censored.Metadata)
+	if len(gotCensored.Metadata) != 1 || gotCensored.Metadata[0].Selector != "h1" {
+		t.Errorf("censored.tv: expected user metadata selectors, got %+v", gotCensored.Metadata)
 	}
-	if dev.CensoredTV.Crawl && censored.Crawl != Censored.Crawl {
-		t.Errorf("censored.tv: expected built-in crawl rule to be kept, got %+v", censored.Crawl)
+	if censoredTV.crawl && gotCensored.Crawl != censored.Crawl {
+		t.Errorf("censored.tv: expected built-in crawl rule to be kept, got %+v", gotCensored.Crawl)
 	}
-	if bitchute.Crawl != userCrawl {
-		t.Errorf("bitchute.com: expected user crawl rule, got %+v", bitchute.Crawl)
+	if gotBitchute.Crawl != userCrawl {
+		t.Errorf("bitchute.com: expected user crawl rule, got %+v", gotBitchute.Crawl)
 	}
 }
 
@@ -77,7 +76,7 @@ func TestRegisterImpersonate(t *testing.T) {
 		impersonate *consts.Impersonate
 		want        string
 	}{
-		{"unset keeps built-in", nil, Rumble.Impersonate},
+		{"unset keeps built-in", nil, rumble.Impersonate},
 		{"explicit none disables", &none, ""},
 		{"explicit value replaces", &firefox, "firefox"},
 		{"explicit value replaces", &chrome, "chrome"},
@@ -108,13 +107,13 @@ func TestRegisterSettingsOnly(t *testing.T) {
 	})
 
 	sitesMu.RLock()
-	rumble := sites["rumble.com"]
+	gotRumble := sites["rumble.com"]
 	sitesMu.RUnlock()
-	if !rumble.FlareSolverr || rumble.Impersonate != Rumble.Impersonate {
-		t.Errorf("rumble.com: expected FlareSolverr on and built-in impersonation kept, got %+v", rumble)
+	if !gotRumble.FlareSolverr || gotRumble.Impersonate != rumble.Impersonate {
+		t.Errorf("rumble.com: expected FlareSolverr on and built-in impersonation kept, got %+v", gotRumble)
 	}
-	if dev.RumbleCom.Crawl && rumble.Crawl != Rumble.Crawl {
-		t.Errorf("rumble.com: expected the built-in crawl rule to be kept, got %+v", rumble.Crawl)
+	if rumbleCom.crawl && gotRumble.Crawl != rumble.Crawl {
+		t.Errorf("rumble.com: expected the built-in crawl rule to be kept, got %+v", gotRumble.Crawl)
 	}
 
 	u := "https://norules.example/channel"
@@ -149,7 +148,7 @@ func TestYtDLPArgs(t *testing.T) {
 		want     []string
 		wantGen  int
 	}{
-		{"built-in rule", "https://rumble.com/v1-a.html", nil, nil, []string{"--impersonate", Rumble.Impersonate}, 0},
+		{"built-in rule", "https://rumble.com/v1-a.html", nil, nil, []string{"--impersonate", rumble.Impersonate}, 0},
 		{"no yt-dlp target for brave", "https://brave.example/v", nil, nil, []string{"--impersonate", "chrome"}, 0},
 		{"no rule", "https://norules.example/v", nil, nil, nil, 0},
 		{"FlareSolverr", "https://plain.example/v", fs, nil, []string{"--impersonate", "chrome", "--user-agent", "UA/1"}, 3},

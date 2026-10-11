@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -263,6 +264,9 @@ func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Vide
 	return videos
 }
 
+// errNoActiveDownload is returned when there is no download to cancel.
+var errNoActiveDownload = errors.New("no active download found")
+
 // cancelDownload marks a download as cancelled in the database.
 func (ss *serverStore) cancelDownload(videoID int64) error {
 	query := fmt.Sprintf(
@@ -284,7 +288,7 @@ func (ss *serverStore) cancelDownload(videoID int64) error {
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("no active download found for video ID %d", videoID)
+		return fmt.Errorf("%w for video ID %d", errNoActiveDownload, videoID)
 	}
 
 	return nil

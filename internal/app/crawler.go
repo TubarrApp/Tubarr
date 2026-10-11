@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
 	"tubarr/internal/times"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -192,6 +194,10 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 				actualVideoURL, c.Name, context, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
 			continue
 		}
+		if err := checkDestinations(c, targetChannelURLModel); err != nil {
+			logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, err)
+			continue
+		}
 
 		// // Check if already downloaded.
 		// if _, exists := existingVideoURLsMap[actualVideoURL]; exists {
@@ -277,7 +283,11 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	// Filter out any URLs that are blocked globally for their authentication context.
 	var hasAllowed bool
 	if c.URLModels, hasAllowed = filterAllowedValidURLs(c); !hasAllowed {
-		logger.Pl.D(4, "All URLs for channel %q are blocked globally, skipping crawl", c.Name)
+		logger.Pl.D(4, "No URLs for channel %q can be crawled (blocked, or destination unavailable), skipping crawl", c.Name)
+		// Counts as a scan, so the channel waits for its next crawl instead of being retried every check.
+		if err := s.ChannelStore().UpdateLastScan(c.ID); err != nil {
+			return false, fmt.Errorf("failed to update last scan time: %w", err)
+		}
 		return false, nil
 	}
 
@@ -470,10 +480,37 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 			continue
 		}
 
+		// Don't download anywhere unexpected (e.g. onto the local disk under an unmounted drive's mount point).
+		if err := checkDestinations(c, cu); err != nil {
+			logger.Pl.E("Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
+			continue
+		}
+
 		// Hostname not blocked, safe to proceed.
 		allowedURLModels = append(allowedURLModels, cu)
 	}
 	return allowedURLModels, len(allowedURLModels) > 0
+}
+
+// checkDestinations returns an error if any of a channel URL's download destinations isn't available.
+func checkDestinations(c *models.Channel, cu *models.ChannelURL) error {
+	s, m := cmp.Or(cu.ChanURLSettings, c.ChanSettings), cmp.Or(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
+	var dirs []string
+	if s != nil {
+		dirs = append(dirs, s.VideoDir, s.JSONDir)
+		for _, op := range s.MetaFilterMoveOps {
+			dirs = append(dirs, op.OutputDir)
+		}
+	}
+	if m != nil {
+		dirs = append(dirs, m.OutputDir)
+	}
+	for _, dir := range dirs {
+		if err := validation.CheckDestination(dir); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureManualDownloadsChannelURL ensures a special "manual-downloads" ChannelURL exists for the channel.

@@ -87,14 +87,18 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 		}
 	}()
 
-	// Log the cookies for debugging
-	if logging.Level > 1 {
-		for _, cookie := range postResp.Cookies() {
-			logger.Pl.I("Cookie received: %s=%s; Expires=%s", cookie.Name, cookie.Value, cookie.Expires)
+	// A cookie without a domain belongs to the host that sent it.
+	cookies := postResp.Cookies()
+	for _, cookie := range cookies {
+		if cookie.Domain == "" {
+			cookie.Domain = postResp.Request.URL.Hostname()
+		}
+		if logging.Level > 1 {
+			logger.Pl.I("Cookie received: %s; Expires=%s", cookie.Name, cookie.Expires) // Value omitted, it's a session secret.
 		}
 	}
 
-	return postResp.Cookies(), nil
+	return cookies, nil
 }
 
 // parseToken parses the HTML body to find the value of the token field.

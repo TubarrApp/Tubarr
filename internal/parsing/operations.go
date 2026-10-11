@@ -118,7 +118,7 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 
 		// Append to collection.
 		notificationModels = append(notificationModels, &newNotificationModel)
-		logger.Pl.D(3, "Added notification model: %+v", newNotificationModel)
+		logger.Pl.D(3, "Added notification model for channel URL %q", chanURL)
 	}
 	return notificationModels, nil
 }

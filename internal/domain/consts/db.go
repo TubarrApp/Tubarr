@@ -66,6 +66,12 @@ var ValidChannelKeys = map[string]struct{}{
 	QChanNewVideoURLs:         {},
 }
 
+// ChannelTextColumns holds channel columns which users may set to plain text (the rest are JSON or managed by Tubarr).
+var ChannelTextColumns = map[string]struct{}{
+	QChanName:       {},
+	QChanConfigFile: {},
+}
+
 // Channel URL database entry keys.
 const (
 	QChanURLID        = "id"
