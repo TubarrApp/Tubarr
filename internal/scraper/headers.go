@@ -15,7 +15,7 @@ import (
 func setRequestHeaders(h fhttp.Header, impersonate consts.Impersonate, fsHeaders [][2]string) {
 	switch {
 	case len(fsHeaders) > 0:
-		setBrowserHeaders(h, fsHeaders)
+		setFlareSolverrHeaders(h, fsHeaders)
 		logger.Pl.D(1, "Sending FlareSolverr's browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
 	case impersonate == consts.ImpersonateChrome:
 		setChromeHeaders(h)
@@ -62,27 +62,4 @@ func cookieNamesOnly(cookie string) string {
 		parts[i] = name
 	}
 	return strings.Join(parts, "; ")
-}
-
-// setBrowserHeaders adds headers copied from a real browser's request (e.g. FlareSolverr's), in the browser's order.
-// Headers already set (e.g. the user agent and cookies) are kept, except Colly's default "Accept: */*".
-func setBrowserHeaders(h fhttp.Header, browser [][2]string) {
-	if h.Get("Accept") == "*/*" {
-		h.Del("Accept")
-	}
-
-	order := []string{"host"}
-	for _, kv := range browser {
-		if h.Get(kv[0]) == "" {
-			h.Set(kv[0], kv[1])
-		}
-		if kv[0] == "priority" {
-			order = append(order, "cookie") // Chrome sends cookies just before priority.
-		}
-		order = append(order, kv[0])
-	}
-	if !slices.Contains(order, "cookie") {
-		order = append(order, "cookie")
-	}
-	h[fhttp.HeaderOrderKey] = order
 }

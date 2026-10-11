@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"html"
 	"regexp"
+	"slices"
 	"strings"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+
+	fhttp "github.com/bogdanfinn/fhttp"
 )
 
 // flareSolverrHeaderEchoURL is a public page that echoes back the request headers it received, in the order sent.
@@ -87,4 +90,27 @@ func parseHeaderEcho(page string) ([][2]string, error) {
 		return nil, fmt.Errorf("no headers found in %q's response", flareSolverrHeaderEchoURL)
 	}
 	return headers, nil
+}
+
+// setFlareSolverrHeaders adds headers copied from FlareSolverr's browser request, in the browser's order.
+// Headers already set (e.g. user agent and cookies) are kept, except Colly's default "Accept: */*".
+func setFlareSolverrHeaders(h fhttp.Header, browser [][2]string) {
+	if h.Get("Accept") == "*/*" {
+		h.Del("Accept")
+	}
+
+	order := []string{"host"}
+	for _, kv := range browser {
+		if h.Get(kv[0]) == "" {
+			h.Set(kv[0], kv[1])
+		}
+		if kv[0] == "priority" {
+			order = append(order, "cookie") // Chrome sends cookies just before priority.
+		}
+		order = append(order, kv[0])
+	}
+	if !slices.Contains(order, "cookie") {
+		order = append(order, "cookie")
+	}
+	h[fhttp.HeaderOrderKey] = order
 }
