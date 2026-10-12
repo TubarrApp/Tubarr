@@ -227,8 +227,10 @@ COPY --from=builder /usr/local/lib/ /usr/local/lib/
 RUN ldconfig
 
 ######## Install yt-dlp (nightly) with a compatible curl_cffi ########
-# The curl-cffi extra installs the newest curl_cffi in yt-dlp's supported range, so the two can't drift apart.
-RUN pip3 install --no-cache-dir --break-system-packages --pre -U "yt-dlp[default,curl-cffi]"
+# The curl-cffi extra installs the newest stable curl_cffi in yt-dlp's supported range, so the two can't drift apart.
+# Then yt-dlp alone is moved to its nightly build ('--pre' would otherwise take beta dependencies too).
+RUN pip3 install --root-user-action=ignore --no-cache-dir --break-system-packages -U "yt-dlp[default,curl-cffi]" \
+    && pip3 install --root-user-action=ignore --no-cache-dir --break-system-packages -U --pre --no-deps yt-dlp
 
 ######## Install Deno globally ########
 RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
@@ -245,15 +247,9 @@ COPY --from=builder /build/metarr /usr/local/bin/metarr
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
 
 ######## Auto-updater ########
-# Updates yt-dlp and curl_cffi together at start and daily (pip, as 'yt-dlp -U' can't update a pip install).
-RUN printf '%s\n' \
-'#!/bin/sh' \
-'while true; do' \
-'  pip3 install -q --no-cache-dir --break-system-packages --pre -U "yt-dlp[default,curl-cffi]" \' \
-'    || echo "auto-updater: failed to update yt-dlp/curl_cffi" >&2' \
-'  sleep 86400' \
-'done' \
-> /usr/local/bin/auto-updater && chmod +x /usr/local/bin/auto-updater
+# Updates yt-dlp and curl_cffi together at start and daily.
+COPY auto-updater.sh /usr/local/bin/auto-updater
+RUN chmod +x /usr/local/bin/auto-updater
 
 ######## App files ########
 WORKDIR /app
