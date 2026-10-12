@@ -226,17 +226,9 @@ COPY --from=builder /usr/local/bin/ffprobe /usr/local/bin/ffprobe
 COPY --from=builder /usr/local/lib/ /usr/local/lib/
 RUN ldconfig
 
-######## Install yt-dlp ########
-RUN wget -O /usr/local/bin/yt-dlp \
-        https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp \
-    && chmod +x /usr/local/bin/yt-dlp
-
-######## Install yt-dlp-related tools ########
-RUN pip3 install --no-cache-dir --break-system-packages \
-    requests \
-    certifi \
-    urllib3 \
-    "curl-cffi==0.15.0"
+######## Install yt-dlp (nightly) with a compatible curl_cffi ########
+# The curl-cffi extra installs the newest curl_cffi in yt-dlp's supported range, so the two can't drift apart.
+RUN pip3 install --no-cache-dir --break-system-packages --pre -U "yt-dlp[default,curl-cffi]"
 
 ######## Install Deno globally ########
 RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
@@ -253,13 +245,14 @@ COPY --from=builder /build/metarr /usr/local/bin/metarr
 RUN chmod +x /app/tubarr /usr/local/bin/metarr
 
 ######## Auto-updater ########
-RUN chmod 755 /usr/local/bin/yt-dlp
+# Updates yt-dlp and curl_cffi together at start and daily (pip, as 'yt-dlp -U' can't update a pip install).
 RUN printf '%s\n' \
 '#!/bin/sh' \
 'while true; do' \
-'  yt-dlp -U > /dev/null 2>&1' \
+'  pip3 install -q --no-cache-dir --break-system-packages --pre -U "yt-dlp[default,curl-cffi]" \' \
+'    || echo "auto-updater: failed to update yt-dlp/curl_cffi" >&2' \
 '  sleep 86400' \
-'done &' \
+'done' \
 > /usr/local/bin/auto-updater && chmod +x /usr/local/bin/auto-updater
 
 ######## App files ########
