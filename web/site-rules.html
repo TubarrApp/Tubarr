@@ -499,6 +499,8 @@
                 <br>
                 <br>
                 Example File: <a href="/src/files/example-scrape-rules.toml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example-scrape-rules.toml</a>
+                &nbsp;|&nbsp;
+                Documentation: <a href="/src/files/site-rules-documentation.html" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">site-rules-documentation.html</a>
                 <br>
                 <br>
                 <strong>Recognized 'string' fields:</strong><br>title, description, thumbnail, direct_video_url
@@ -757,7 +759,11 @@
               title: 'Metadata selectors:',
               lines: site.selectors.length === 0
                 ? ['(none)']
-                : site.selectors.map(s => `${s.field}: ${s.selector}${s.attr ? '  [attr=' + s.attr + ']' : ''}`),
+                : site.selectors.map(s => {
+                    const extract = x => `${x.attr ? '  [attr=' + x.attr + ']' : ''}${x.json_path ? '  [json_path=' + x.json_path + ']' : ''}${x.regex ? '  [regex=' + x.regex + ']' : ''}`;
+                    const fetch = (s.fetch || []).map(f => `  → fetch ${f.url}${f.selector ? '  [selector=' + f.selector + ']' : ''}${extract(f)}`).join('');
+                    return `${s.field}: ${s.selector}${extract(s)}${fetch}`;
+                  }),
             }];
             const c = site.crawl;
             if (c) {

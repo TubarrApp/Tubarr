@@ -20,7 +20,19 @@ type SiteRules struct {
 type MetadataRule struct {
 	Name     string
 	Selector string
-	Attr     string
+	Attr     string         // Attribute to read ("" reads element text).
+	JSONPath string         // gjson path applied to the value, if set.
+	Regex    *regexp.Regexp // Applied to the value, keeping capture group 1 (or the whole match), if set.
+	Fetch    []FetchStep    // Follow-up requests made with the value, in order.
+}
+
+// FetchStep defines a follow-up request built from a scraped value, and how the next value is read from its response.
+type FetchStep struct {
+	URL      string         // URL template, with {value} replaced by the current value.
+	Selector string         // CSS selector applied to an HTML response, if set.
+	Attr     string         // Attribute of the selected element to read ("" reads element text).
+	JSONPath string         // gjson path applied to the value, if set.
+	Regex    *regexp.Regexp // Applied to the value, keeping capture group 1 (or the whole match), if set.
 }
 
 // CrawlRule defines how video URLs are extracted from a channel page.

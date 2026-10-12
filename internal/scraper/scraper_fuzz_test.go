@@ -42,7 +42,7 @@ func FuzzCrawlRuleValues(f *testing.F) {
 	f.Add(`{"a":{"b":[{"c":1}]}}`, `a.b.#.c`)
 	f.Add(`{}`, ``)
 	f.Fuzz(func(_ *testing.T, value, jsonPath string) {
-		_ = crawlRuleValues(value, jsonPath)
+		_ = jsonPathValues(value, jsonPath)
 	})
 }
 

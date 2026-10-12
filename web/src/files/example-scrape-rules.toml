@@ -1,45 +1,4 @@
-# Domain is the base domain of the video site the scraper should come into effect for.
-#
-# A site only needs the parts it changes. Anything left out keeps Tubarr's built-in rules for that site (if any),
-# and yt-dlp is used for anything with no rules. For example, this turns FlareSolverr on for Rumble and keeps the rest:
-#
-#   [[sites]]
-#   domain = "rumble.com"
-#   flaresolverr = true
-#
-# Field represents the keys that will be added into the video's metadata JSON (e.g. title, fulltitle).
-#
-# Selector is the element containing the desired metadata. For example the contents of a <p> tag with class
-# "title" could be selected with "p.title".
-#
-# "attr" is optional. Omit it to read the element's text content instead of an attribute.
-#
-# "impersonate" is optional and makes requests look like a real browser (chrome, firefox, safari, brave).
-# Leave it out to keep a built-in site's setting, or set it to "none" (or "") to turn impersonation off.
-#
-# "user_agent" is optional and sets the user agent sent to the site, by Tubarr and by yt-dlp (your own custom yt-dlp
-# --user-agent takes priority). It should match the "impersonate" browser, as some sites block a mismatch. Leave it out
-# to use one matching "impersonate". FlareSolverr sites always use FlareSolverr's user agent.
-#
-# "flaresolverr" is optional. Set it to true to get past Cloudflare challenges using the FlareSolverr instance set on
-# the settings page. Tubarr asks FlareSolverr to solve the challenge once, then uses its cookies and user agent while
-# impersonating Chrome, for its own requests and for yt-dlp (which needs curl_cffi installed for --impersonate).
-# If Cloudflare challenges again, Tubarr asks FlareSolverr for a fresh solve and retries once. It takes priority over
-# "impersonate". If FlareSolverr isn't set up or can't be reached, Tubarr logs a warning and falls back to "impersonate"
-# (or normal requests) for the rest of that crawl.
-#
-# "flaresolverr_timeout" is optional: how many seconds FlareSolverr may take to solve the site's challenge (default 60,
-# allowed 10 to 300). Some sites need 120 or 180.
-#
-# [sites.crawl] is optional and tells Tubarr how to find new videos on a channel page, instead of
-# using the built-in scraper or yt-dlp. It uses the site's impersonate setting.
-#   selector    - elements holding the video links (e.g. "a[href]").
-#   attr        - attribute holding the link. Omit it to read the element's text content.
-#   json_path   - optional. If the value is JSON (e.g. a <script> tag), the path to the video URLs.
-#                 Uses gjson syntax: https://github.com/tidwall/gjson/blob/master/SYNTAX.md
-#   include     - optional. Regular expression video URLs must match.
-#   exclude     - optional. Regular expression video URLs must not match.
-#   strip_query - optional. Removes "?..." from video URLs so the same video isn't added twice.
+# Example site rules. Every setting is explained in site-rules-documentation.html (linked on the Site Rules page).
 
 [[sites]]
 domain = "bitchute.com"
@@ -142,6 +101,18 @@ impersonate = "chrome"
   field = "thumbnail"
   selector = "meta[property='og:image']"
   attr = "content"
+
+  # As of October 2026, a Rumble video page holds its embed ID (e.g. "v7egj9a") in the JSON-LD's embedUrl, and the
+  # player gets the HLS playlist from Rumble's embedJS API using that ID.
+  [[sites.selectors]]
+  field = "direct_video_url"
+  selector = 'script[type="application/ld+json"]'
+  json_path = "#.embedUrl"
+  regex = 'embed/([a-z0-9]+)'
+
+    [[sites.selectors.fetch]]
+    url = "https://rumble.com/embedJS/u3/?request=video&ver=2&v={value}"
+    json_path = "u.hls.url"
 
   # As of October 2026, Rumble lists a channel's videos as JSON inside the page's <rum-videos-grid> element.
   [sites.crawl]

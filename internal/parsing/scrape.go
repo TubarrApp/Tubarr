@@ -39,9 +39,21 @@ type scrapeCrawlConfig struct {
 
 // scrapeSelectorConfig mirrors a single selector entry for a site in a scrape config file.
 type scrapeSelectorConfig struct {
-	Field    string `mapstructure:"field"`
+	Field    string              `mapstructure:"field"`
+	Selector string              `mapstructure:"selector"`
+	Attr     string              `mapstructure:"attr"`
+	JSONPath string              `mapstructure:"json_path"`
+	Regex    string              `mapstructure:"regex"`
+	Fetch    []scrapeFetchConfig `mapstructure:"fetch"`
+}
+
+// scrapeFetchConfig mirrors a selector's follow-up request in a scrape config file.
+type scrapeFetchConfig struct {
+	URL      string `mapstructure:"url"`
 	Selector string `mapstructure:"selector"`
 	Attr     string `mapstructure:"attr"`
+	JSONPath string `mapstructure:"json_path"`
+	Regex    string `mapstructure:"regex"`
 }
 
 // ParseScrapeSelectorsFile loads custom site scraping rules from a user-supplied config file.
@@ -125,10 +137,21 @@ func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 			if field == "" || selector == "" {
 				return nil, fmt.Errorf("scrape config file %q: site %q has a selector missing field or selector value", name, domain)
 			}
+			re, err := compileOptionalRegex(sel.Regex)
+			if err != nil {
+				return nil, fmt.Errorf("scrape config file %q: site %q field %q: %w", name, domain, field, err)
+			}
+			fetch, err := parseFetchConfigs(sel.Fetch)
+			if err != nil {
+				return nil, fmt.Errorf("scrape config file %q: site %q field %q: %w", name, domain, field, err)
+			}
 			selectors = append(selectors, models.ScrapeSelectors{
 				Field:    field,
 				Selector: selector,
 				Attr:     strings.TrimSpace(sel.Attr),
+				JSONPath: strings.TrimSpace(sel.JSONPath),
+				Regex:    re,
+				Fetch:    fetch,
 			})
 		}
 
@@ -197,6 +220,46 @@ func SaveScrapeSelectorsFile(path, content string) ([]models.SiteScraper, error)
 		return nil, fmt.Errorf("failed to save %q: %w", path, err)
 	}
 	return sites, nil
+}
+
+// compileOptionalRegex compiles a selector or fetch step regex, returning nil if none is set.
+func compileOptionalRegex(pattern string) (*regexp.Regexp, error) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return nil, nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex %q: %w", pattern, err)
+	}
+	return re, nil
+}
+
+// parseFetchConfigs validates a selector's follow-up requests and compiles their regexes.
+func parseFetchConfigs(configs []scrapeFetchConfig) ([]models.FetchStep, error) {
+	if len(configs) == 0 {
+		return nil, nil
+	}
+
+	steps := make([]models.FetchStep, 0, len(configs))
+	for i, c := range configs {
+		u := strings.TrimSpace(c.URL)
+		if u == "" {
+			return nil, fmt.Errorf("fetch step %d is missing a url", i+1)
+		}
+		re, err := compileOptionalRegex(c.Regex)
+		if err != nil {
+			return nil, fmt.Errorf("fetch step %d: %w", i+1, err)
+		}
+		steps = append(steps, models.FetchStep{
+			URL:      u,
+			Selector: strings.TrimSpace(c.Selector),
+			Attr:     strings.TrimSpace(c.Attr),
+			JSONPath: strings.TrimSpace(c.JSONPath),
+			Regex:    re,
+		})
+	}
+	return steps, nil
 }
 
 // parseCrawlConfig validates a crawl rule and compiles its URL filters.

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"regexp"
 	"time"
 	"tubarr/internal/domain/consts"
 )
@@ -21,4 +22,7 @@ type ScrapeSelectors struct {
 	Field    string
 	Selector string
 	Attr     string
+	JSONPath string
+	Regex    *regexp.Regexp
+	Fetch    []FetchStep
 }

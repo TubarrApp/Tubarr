@@ -42,6 +42,9 @@ func Register(scrapers []models.SiteScraper) {
 					Name:     sel.Field,
 					Selector: sel.Selector,
 					Attr:     sel.Attr,
+					JSONPath: sel.JSONPath,
+					Regex:    sel.Regex,
+					Fetch:    sel.Fetch,
 				})
 			}
 		}

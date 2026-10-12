@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Site Rules Documentation | Tubarr</title>
+    <link rel="icon" href="/src/images/favicon.ico">
+    <style>
+      :root {
+        --bg: #101828;
+        --panel: #1d2939;
+        --text: #d0d5dd;
+        --muted: #98a2b3;
+        --heading: #ffffff;
+        --accent: #e04d43;
+        --border: #344054;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+      h1, h2, h3 { color: var(--heading); line-height: 1.3; }
+      h1 { font-size: 1.75rem; margin: 0 0 8px; }
+      h2 { font-size: 1.3rem; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+      h3 { font-size: 1.1rem; margin: 28px 0 8px; }
+      a { color: var(--accent); }
+      code {
+        font: 0.9em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--panel);
+        padding: 1px 5px;
+        border-radius: 4px;
+        color: var(--heading);
+      }
+      pre {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        overflow-x: auto;
+      }
+      pre code { background: none; padding: 0; }
+      dl { margin: 0; }
+      dt { margin-top: 14px; }
+      dt code { font-weight: 600; }
+      dt .opt { color: var(--muted); font-size: 0.85em; margin-left: 6px; }
+      dd { margin: 4px 0 0 20px; }
+      ul { padding-left: 22px; }
+      .back { display: inline-block; margin-bottom: 20px; color: var(--muted); text-decoration: none; }
+      .back:hover { color: var(--text); }
+      .warning {
+        border-left: 3px solid var(--accent);
+        background: var(--panel);
+        padding: 10px 14px;
+        border-radius: 0 8px 8px 0;
+      }
+      .toc { color: var(--muted); }
+      .toc a { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="/site-rules.html">&larr; Back to Site Rules</a>
+      <h1>Site Rules</h1>
+      <p>
+        A site rules file tells Tubarr how to handle specific video sites: which metadata to scrape from a video page,
+        how to find new videos on a channel page, and how to make requests the site will accept. It can be YAML, TOML,
+        or JSON. See <a href="/src/files/example-scrape-rules.toml">example-scrape-rules.toml</a> for a full example.
+      </p>
+      <p>
+        A site only needs the parts it changes. Anything left out keeps Tubarr's built-in rules for that site (if any),
+        and yt-dlp is used for anything with no rules. For example, this turns FlareSolverr on for Rumble and keeps the
+        rest:
+      </p>
+      <pre><code>[[sites]]
+domain = "rumble.com"
+flaresolverr = true</code></pre>
+      <p class="toc">
+        On this page:
+        <a href="#site-settings">Site settings</a> &middot;
+        <a href="#selectors">Metadata selectors</a> &middot;
+        <a href="#fetch">Follow-up requests</a> &middot;
+        <a href="#crawl">Channel crawl rule</a>
+      </p>
+
+      <h2 id="site-settings">Site settings</h2>
+      <dl>
+        <dt><code>domain</code><span class="opt">required</span></dt>
+        <dd>The base domain of the video site the rules apply to (e.g. <code>example.com</code>).</dd>
+
+        <dt><code>impersonate</code><span class="opt">optional</span></dt>
+        <dd>
+          Makes requests look like a real browser: <code>chrome</code>, <code>firefox</code>, <code>safari</code>, or
+          <code>brave</code>. Leave it out to keep a built-in site's setting, or set it to <code>none</code> (or
+          <code>""</code>) to turn impersonation off.
+        </dd>
+
+        <dt><code>user_agent</code><span class="opt">optional</span></dt>
+        <dd>
+          The user agent sent to the site, by Tubarr and by yt-dlp (your own custom yt-dlp <code>--user-agent</code>
+          takes priority). It should match the <code>impersonate</code> browser, as some sites block a mismatch. Leave
+          it out to use one matching <code>impersonate</code>. FlareSolverr sites always use FlareSolverr's user agent.
+        </dd>
+
+        <dt><code>flaresolverr</code><span class="opt">optional</span></dt>
+        <dd>
+          Set it to <code>true</code> to get past Cloudflare challenges using the FlareSolverr instance set on the
+          settings page. Tubarr asks FlareSolverr to solve the challenge once, then uses its cookies and user agent
+          while impersonating Chrome, for its own requests and for yt-dlp (which needs curl_cffi installed for
+          <code>--impersonate</code>). If Cloudflare challenges again, Tubarr asks FlareSolverr for a fresh solve and
+          retries once. It takes priority over <code>impersonate</code>. If FlareSolverr isn't set up or can't be
+          reached, Tubarr logs a warning and falls back to <code>impersonate</code> (or normal requests) for the rest
+          of that crawl.
+        </dd>
+
+        <dt><code>flaresolverr_timeout</code><span class="opt">optional</span></dt>
+        <dd>
+          How many seconds FlareSolverr may take to solve the site's challenge (default 60, allowed 10 to 300). Some
+          sites need 120 or 180.
+        </dd>
+      </dl>
+
+      <h2 id="selectors">Metadata selectors: <code>[[sites.selectors]]</code></h2>
+      <p>
+        Each selector scrapes one metadata field from a video page. A field can have several selectors; they are tried
+        in order, and the first to give a value is used.
+      </p>
+      <dl>
+        <dt><code>field</code><span class="opt">required</span></dt>
+        <dd>
+          The key added to the video's metadata JSON (e.g. <code>title</code>, <code>description</code>). Recognized
+          fields:
+          <ul>
+            <li>Strings: <code>title</code>, <code>description</code>, <code>thumbnail</code>, <code>direct_video_url</code></li>
+            <li>Full dates: <code>upload_date</code>, <code>release_date</code>, <code>date</code></li>
+            <li>Years: <code>year</code>, <code>release_year</code></li>
+            <li>Any other field is written to the metadata JSON as is.</li>
+          </ul>
+        </dd>
+
+        <dt><code>selector</code><span class="opt">required</span></dt>
+        <dd>
+          A CSS selector for the element holding the value. For example, the contents of a <code>&lt;p&gt;</code> tag
+          with class <code>title</code> can be selected with <code>p.title</code>.
+        </dd>
+
+        <dt><code>attr</code><span class="opt">optional</span></dt>
+        <dd>The attribute to read. Leave it out to read the element's text content.</dd>
+
+        <dt><code>json_path</code><span class="opt">optional</span></dt>
+        <dd>
+          If the value is JSON (e.g. a <code>&lt;script type="application/ld+json"&gt;</code> tag), the path to the
+          wanted value, in <a href="https://github.com/tidwall/gjson/blob/master/SYNTAX.md">gjson syntax</a>. If the
+          JSON is an array (JSON-LD often is, e.g. <code>[{"embedUrl": ...}]</code>), start the path with
+          <code>#.</code> (e.g. <code>#.embedUrl</code>).
+        </dd>
+
+        <dt><code>regex</code><span class="opt">optional</span></dt>
+        <dd>
+          A regular expression applied to the value (after <code>json_path</code>). The first capture group is kept if
+          there is one, otherwise the whole match. Elements that don't match are skipped.
+        </dd>
+      </dl>
+
+      <h3 id="fetch">Follow-up requests: <code>[[sites.selectors.fetch]]</code></h3>
+      <p>
+        Some sites don't put a value (often the video's <code>direct_video_url</code>) in the page. Their player
+        requests it separately, e.g. from a JSON API, using an ID that is in the page. Fetch steps let a selector follow
+        the same requests.
+      </p>
+      <p>
+        A selector can have any number of fetch steps, run in order. Each one requests a URL built from the value so
+        far, and reads the next value from the response:
+      </p>
+      <dl>
+        <dt><code>url</code><span class="opt">required</span></dt>
+        <dd>
+          The URL to request. <code>{value}</code> is replaced with the value so far, as is (use <code>regex</code> to
+          trim it first). Relative URLs are resolved against the previous URL, so <code>url = "{value}"</code> follows
+          a scraped link.
+        </dd>
+
+        <dt><code>selector</code><span class="opt">optional</span></dt>
+        <dd>For an HTML response, the element holding the value.</dd>
+
+        <dt><code>attr</code><span class="opt">optional</span></dt>
+        <dd>The attribute of that element to read. Leave it out to read its text content.</dd>
+
+        <dt><code>json_path</code><span class="opt">optional</span></dt>
+        <dd>For a JSON response (or value), the path to the value.</dd>
+
+        <dt><code>regex</code><span class="opt">optional</span></dt>
+        <dd>As above.</dd>
+      </dl>
+      <p>
+        Requests use the site's <code>impersonate</code>, <code>user_agent</code>, <code>flaresolverr</code>, and
+        cookie settings, and send the previous URL as the Referer.
+      </p>
+      <p>
+        To find the requests a site makes, open a video page with your browser's developer tools on the Network tab,
+        start the video, and look for the request returning the <code>.m3u8</code> or <code>.mp4</code> (or a JSON
+        response containing it). Then look for a part of that request's URL (often an ID) in the video page's source.
+      </p>
+      <p class="warning">
+        <strong>Warning:</strong> every element matching <code>selector</code> (and <code>regex</code>) is tried in
+        turn until one gives a value, and each one makes the fetch requests. Keep <code>selector</code> and
+        <code>regex</code> specific, so a broad selector like <code>script</code> doesn't send a request for every
+        match.
+      </p>
+      <p>For example, if a video page holds its embed link in JSON-LD and the stream URL comes from a JSON API:</p>
+      <pre><code>[[sites.selectors]]
+field = "direct_video_url"
+selector = 'script[type="application/ld+json"]'
+json_path = "#.embedUrl"
+regex = 'embed/([a-z0-9]+)'
+
+  [[sites.selectors.fetch]]
+  url = "https://example.com/api/video?id={value}"
+  json_path = "streams.hls.url"</code></pre>
+      <p>Or, if the page embeds a player page with a <code>&lt;source&gt;</code> tag:</p>
+      <pre><code>[[sites.selectors]]
+field = "direct_video_url"
+selector = "iframe[src*='/player/']"
+attr = "src"
+
+  [[sites.selectors.fetch]]
+  url = "{value}"
+  selector = "video source[src]"
+  attr = "src"</code></pre>
+      <p>Fetch steps can't handle sites whose requests need tokens generated by the page's JavaScript.</p>
+
+      <h2 id="crawl">Channel crawl rule: <code>[sites.crawl]</code></h2>
+      <p>
+        Optional. Tells Tubarr how to find new videos on a channel page, instead of using the built-in scraper or
+        yt-dlp. It uses the site's <code>impersonate</code> setting.
+      </p>
+      <dl>
+        <dt><code>selector</code><span class="opt">required</span></dt>
+        <dd>The elements holding the video links (e.g. <code>a[href]</code>).</dd>
+
+        <dt><code>attr</code><span class="opt">optional</span></dt>
+        <dd>The attribute holding the link. Leave it out to read the element's text content.</dd>
+
+        <dt><code>json_path</code><span class="opt">optional</span></dt>
+        <dd>
+          If the value is JSON (e.g. a <code>&lt;script&gt;</code> tag), the path to the video URLs, in
+          <a href="https://github.com/tidwall/gjson/blob/master/SYNTAX.md">gjson syntax</a>.
+        </dd>
+
+        <dt><code>include</code><span class="opt">optional</span></dt>
+        <dd>A regular expression video URLs must match.</dd>
+
+        <dt><code>exclude</code><span class="opt">optional</span></dt>
+        <dd>A regular expression video URLs must not match.</dd>
+
+        <dt><code>strip_query</code><span class="opt">optional</span></dt>
+        <dd>Removes <code>?...</code> from video URLs so the same video isn't added twice.</dd>
+      </dl>
+    </main>
+  </body>
+</html>

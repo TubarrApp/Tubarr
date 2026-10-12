@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -1878,10 +1879,26 @@ func contentVersion(content []byte) string {
 func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Request) {
 	sites := siterules.List()
 
-	type selectorResp struct {
-		Field    string `json:"field"`
-		Selector string `json:"selector"`
+	type fetchResp struct {
+		URL      string `json:"url"`
+		Selector string `json:"selector,omitempty"`
 		Attr     string `json:"attr,omitempty"`
+		JSONPath string `json:"json_path,omitempty"`
+		Regex    string `json:"regex,omitempty"`
+	}
+	type selectorResp struct {
+		Field    string      `json:"field"`
+		Selector string      `json:"selector"`
+		Attr     string      `json:"attr,omitempty"`
+		JSONPath string      `json:"json_path,omitempty"`
+		Regex    string      `json:"regex,omitempty"`
+		Fetch    []fetchResp `json:"fetch,omitempty"`
+	}
+	regexString := func(re *regexp.Regexp) string {
+		if re == nil {
+			return ""
+		}
+		return re.String()
 	}
 	type crawlResp struct {
 		Selector   string `json:"selector"`
@@ -1905,7 +1922,11 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 	for _, site := range sites {
 		selectors := make([]selectorResp, 0, len(site.Metadata))
 		for _, rule := range site.Metadata {
-			selectors = append(selectors, selectorResp{Field: rule.Name, Selector: rule.Selector, Attr: rule.Attr})
+			sel := selectorResp{Field: rule.Name, Selector: rule.Selector, Attr: rule.Attr, JSONPath: rule.JSONPath, Regex: regexString(rule.Regex)}
+			for _, f := range rule.Fetch {
+				sel.Fetch = append(sel.Fetch, fetchResp{URL: f.URL, Selector: f.Selector, Attr: f.Attr, JSONPath: f.JSONPath, Regex: regexString(f.Regex)})
+			}
+			selectors = append(selectors, sel)
 		}
 		var crawl *crawlResp
 		if c := site.Crawl; c != nil {

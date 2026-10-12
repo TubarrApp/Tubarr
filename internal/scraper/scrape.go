@@ -511,6 +511,9 @@ func setupFieldScraping(c *colly.Collector, fieldName string, rules []models.Met
 			// Unescape HTML entities like &#39; &quot; &amp; etc. and trim whitespace.
 			value = html.UnescapeString(value)
 			value = strings.TrimSpace(value)
+			if value != "" && (rule.JSONPath != "" || rule.Regex != nil || len(rule.Fetch) > 0) {
+				value = ruleValue(c, h.Request.URL.String(), value, rule)
+			}
 
 			if value != "" {
 				logger.Pl.S("Grabbed value %q for field %q using selector %q", value, fieldName, rule.Selector)

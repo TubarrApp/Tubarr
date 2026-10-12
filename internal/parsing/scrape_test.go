@@ -64,18 +64,86 @@ func TestParseScrapeSelectorsFileCrawlErrors(t *testing.T) {
 	}
 }
 
-// TestParseExampleScrapeRules tests that the example scrape rules file parses, including its Rumble crawl rule.
+// TestParseScrapeSelectorsFileFetch tests parsing a selector's json_path, regex, and fetch steps.
+func TestParseScrapeSelectorsFileFetch(t *testing.T) {
+	p := writeScrapeConfig(t, "rules.toml", `
+[[sites]]
+domain = "example.com"
+
+  [[sites.selectors]]
+  field = "direct_video_url"
+  selector = 'script[type="application/ld+json"]'
+  json_path = "embedUrl"
+  regex = 'embed/([a-z0-9]+)'
+
+    [[sites.selectors.fetch]]
+    url = "https://example.com/api?v={value}"
+    json_path = "u.hls.url"
+
+    [[sites.selectors.fetch]]
+    url = "{value}"
+    selector = "source"
+    attr = "src"
+    regex = '\.m3u8'
+`)
+	sites, err := ParseScrapeSelectorsFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sites) != 1 || len(sites[0].Selectors) != 1 {
+		t.Fatalf("expected one site with one selector, got %+v", sites)
+	}
+	sel := sites[0].Selectors[0]
+	if sel.JSONPath != "embedUrl" || sel.Regex == nil || sel.Regex.String() != "embed/([a-z0-9]+)" || len(sel.Fetch) != 2 {
+		t.Fatalf("selector parsed incorrectly: %+v", sel)
+	}
+	if f := sel.Fetch[0]; f.URL != "https://example.com/api?v={value}" || f.JSONPath != "u.hls.url" || f.Regex != nil {
+		t.Errorf("fetch step 1 parsed incorrectly: %+v", f)
+	}
+	if f := sel.Fetch[1]; f.URL != "{value}" || f.Selector != "source" || f.Attr != "src" || f.Regex == nil {
+		t.Errorf("fetch step 2 parsed incorrectly: %+v", f)
+	}
+}
+
+// TestParseScrapeSelectorsFileFetchErrors tests that invalid selector regexes and fetch steps produce errors.
+func TestParseScrapeSelectorsFileFetchErrors(t *testing.T) {
+	sel := "sites:\n  - domain: example.com\n    selectors:\n      - field: title\n        selector: h1\n"
+	tests := map[string]string{
+		"bad selector regex": sel + "        regex: '('\n",
+		"fetch missing url":  sel + "        fetch:\n          - json_path: a\n",
+		"bad fetch regex":    sel + "        fetch:\n          - url: '{value}'\n            regex: '['\n",
+	}
+	for name, content := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, "rules.yaml", content)); err == nil {
+				t.Error("expected an error")
+			}
+		})
+	}
+}
+
+// TestParseExampleScrapeRules tests that the example scrape rules file parses, including its Rumble crawl and direct video URL rules.
 func TestParseExampleScrapeRules(t *testing.T) {
 	sites, err := ParseScrapeSelectorsFile("../../web/src/files/example-scrape-rules.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range sites {
-		if s.Domain == "rumble.com" && s.Crawl != nil {
-			return
+		if s.Domain != "rumble.com" {
+			continue
 		}
+		if s.Crawl == nil {
+			t.Error("expected a crawl rule for rumble.com")
+		}
+		for _, sel := range s.Selectors {
+			if sel.Field == "direct_video_url" && len(sel.Fetch) == 1 {
+				return
+			}
+		}
+		t.Error("expected a direct_video_url selector with a fetch step for rumble.com")
+		return
 	}
-	t.Error("expected a crawl rule for rumble.com")
+	t.Error("expected rules for rumble.com")
 }
 
 // TestParseScrapeSelectorsFileImpersonate tests that an unset impersonate value is distinguished from an explicit "" or "none".

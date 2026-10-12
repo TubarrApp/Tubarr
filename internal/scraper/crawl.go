@@ -58,7 +58,7 @@ func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query
 			if rule.Attr != "" {
 				value = e.Attr(rule.Attr)
 			}
-			for _, raw := range crawlRuleValues(value, rule.JSONPath) {
+			for _, raw := range jsonPathValues(value, rule.JSONPath) {
 				link := e.Request.AbsoluteURL(strings.TrimSpace(raw))
 				if link == "" {
 					continue
@@ -82,8 +82,8 @@ func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query
 	return urls, nil
 }
 
-// crawlRuleValues returns the value itself, or the values at jsonPath if one is set.
-func crawlRuleValues(value, jsonPath string) []string {
+// jsonPathValues returns the value itself, or the values at jsonPath if one is set.
+func jsonPathValues(value, jsonPath string) []string {
 	if jsonPath == "" {
 		return []string{value}
 	}
