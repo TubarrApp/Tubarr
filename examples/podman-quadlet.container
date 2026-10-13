@@ -1,0 +1,33 @@
+[Unit]
+Description=Tubarr Container
+# Wait for network connection.
+Wants=network-online.target
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Container]
+# Tubarr's port.
+PodmanArgs=-p 8827:8827
+Image=ghcr.io/tubarrapp/tubarr:latest
+AutoUpdate=registry
+# Add GPU device for hardware acceleration.
+AddDevice=/dev/dri:/dev/dri:rwm
+Volume=/lib/modules:/lib/modules:ro
+# Mount a folder you will use to save videos to.
+Volume=/home/user/videos:/videos:rw,Z
+# Where on your computer Tubarr and Metarr should save its data to.
+Volume=/opt/containers/tubarr/.tubarr:/home/tubarr/.tubarr:Z
+Volume=/opt/containers/tubarr/.metarr:/home/tubarr/.metarr:Z
+# Environment variables for the container.
+Environment=PUID=1000
+Environment=PGID=1000
+Environment=TZ=Europe/London
+Environment=UMASK=022
+
+[Service]
+Type=notify
+Restart=always
+RestartSec=30
+

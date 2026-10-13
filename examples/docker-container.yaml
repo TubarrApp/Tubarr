@@ -1,0 +1,25 @@
+services:
+  tubarr:
+    image: ghcr.io/tubarrapp/tubarr:latest
+    container_name: tubarr
+    restart: always
+    ports:
+      - "8827:8827"
+    devices:
+      # GPU device for hardware acceleration
+      - /dev/dri:/dev/dri
+    volumes:
+      - /lib/modules:/lib/modules:ro
+      # Folder where videos are saved
+      - /home/user/videos:/videos:rw,Z
+      # Where Tubarr and Metarr save their data
+      - /opt/containers/tubarr/.tubarr:/home/tubarr/.tubarr:Z
+      - /opt/containers/tubarr/.metarr:/home/tubarr/.metarr:Z
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/London
+      - UMASK=022
+    labels:
+      # Opt in to automatic image updates via Watchtower (optional)
+      - com.centurylinklabs.watchtower.enable=true
