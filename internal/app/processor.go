@@ -6,22 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"sync"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/metadata"
-	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
+	"tubarr/internal/state"
 	"tubarr/internal/times"
 
 	"github.com/TubarrApp/gocommon/sharedvalidation"
@@ -46,16 +43,11 @@ func InitProcess(
 	)
 
 	// Initialize Metarr semaphore and context.
-	mConc := 1
-	if cu.ChanURLMetarrArgs.Concurrency > 0 {
-		mConc = cu.ChanURLMetarrArgs.Concurrency
-	} else if abstractions.IsSet(keys.MConcurrency) {
-		mConc = sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.MConcurrency))
-	}
-	metarrSem := make(chan struct{}, mConc)
+	metarrSem := make(chan struct{}, metarrConcurrency(cu))
 
-	// Create context for Metarr derived from parent so shutdown propagates.
-	metarrCtx, metarrCancel := context.WithCancel(ctx)
+	// Metarr and download status tracking outlive a user stopping the crawl, but not shutdown.
+	jobParent := state.JobParent(ctx)
+	metarrCtx, metarrCancel := context.WithCancel(jobParent)
 	defer metarrCancel()
 
 	var metarrWg sync.WaitGroup
@@ -69,7 +61,7 @@ func InitProcess(
 	logger.Pl.I("Starting meta/video processing for %d videos", len(videos))
 
 	dlTracker := downloads.NewDownloadTracker(s.DownloadStore(), c.ChanSettings.ExternalDownloader)
-	dlTracker.Start(ctx)
+	dlTracker.Start(jobParent)
 	defer dlTracker.Stop()
 
 	jobs := make(chan *models.Video, len(videos))
@@ -91,13 +83,7 @@ func InitProcess(
 	}
 
 	// Check if Metarr exists and can be run.
-	_, metarrErr := exec.LookPath("metarr")
-	if metarrErr == nil { // If err IS nil.
-		if err := exec.CommandContext(ctx, "metarr", "--help").Run(); err != nil { // Check path can be executed (not just exists).
-			metarrErr = fmt.Errorf("found 'metarr' in $PATH but failed to execute: %w", err)
-		}
-	}
-
+	metarrErr := metarrExecutable(ctx)
 	metarrIsExecutable := metarrErr == nil
 	if metarrErr != nil {
 		logger.Pl.E("Cannot run 'metarr' due to error: %v", metarrErr)
@@ -116,6 +102,7 @@ func InitProcess(
 				}
 
 				err := videoJob(
+					ctx,
 					procCtx,
 					metarrCtx,
 					s.VideoStore(),
@@ -209,6 +196,7 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON strin
 
 // videoJob starts a worker's process for a video.
 func videoJob(
+	crawlCtx context.Context,
 	procCtx context.Context,
 	metarrCtx context.Context,
 	vs contracts.VideoStore,
@@ -226,6 +214,28 @@ func videoJob(
 	if err := times.WaitTime(procCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
 		return err
 	}
+
+	// Take hold of video before touching its files, cancelling any separate Metarr run on it.
+	key := metarrKey{c.ID, v.URL}
+	vMetarrCtx, vMetarrCancel := context.WithCancel(metarrCtx)
+	claim := &metarrClaim{channelName: c.Name, cancel: vMetarrCancel, pipeline: true, done: make(chan struct{})}
+	held, err := preemptMetarr(procCtx, key, claim)
+	if err != nil {
+		vMetarrCancel()
+		return err
+	}
+	if !held {
+		vMetarrCancel()
+		logger.Pl.W("Video %q is already being downloaded elsewhere in channel %q, skipping", v.URL, c.Name)
+		return nil
+	}
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			releaseMetarr(key, claim)
+			vMetarrCancel()
+		}
+	}()
 
 	// Process JSON metadata phase.
 	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
@@ -250,27 +260,46 @@ func videoJob(
 
 	// Check if Metarr can be run.
 	if !metarrIsExecutable {
-		logger.Pl.I("No 'metarr' at $PATH, skipping Metarr process and marking video as finished")
+		logger.Pl.I("No 'metarr' at $PATH, skipping Metarr process and marking video as finished (Metarr can be run later)")
+		v.MetarrStatus = consts.MetarrStatusPending
 		return completeAndStoreVideo(cs, vs, v, c)
 	}
 
 	// Run metarr step.
+	handedOff = true
 	metarrWg.Add(1)
 	go func(video *models.Video, channelURL *models.ChannelURL, channel *models.Channel) {
 		defer metarrWg.Done()
+		defer releaseMetarr(key, claim)
+		defer vMetarrCancel()
+		claim.inMetarr.Store(true)
+
+		// Not started when crawl or Metarr is stopped, mark pending for a later Metarr run.
+		storePending := func() {
+			logger.Pl.W("Metarr not started for video %s, marking as pending", video.URL)
+			video.MetarrStatus = consts.MetarrStatusPending
+			if err := completeAndStoreVideo(cs, vs, video, channel); err != nil {
+				logger.Pl.E("Failed to store video %q after Metarr cancellation: %v", video.URL, err)
+			}
+		}
 
 		// Acquire semaphore slot.
 		select {
 		case metarrSem <- struct{}{}:
 			defer func() { <-metarrSem }()
-		case <-metarrCtx.Done():
-			logger.Pl.W("Metarr cancelled for video %s: %v", video.URL, metarrCtx.Err())
+		case <-vMetarrCtx.Done():
+			storePending()
+			return
+		case <-crawlCtx.Done():
+			storePending()
+			return
+		}
+		if vMetarrCtx.Err() != nil || crawlCtx.Err() != nil {
+			storePending()
 			return
 		}
 
-		if err := metarr.InitMetarr(metarrCtx, video, channelURL, channel, dirParser); err != nil {
-			logger.Pl.E("Metarr processing error for video %q: %v", video.URL, err)
-		}
+		video.MetarrStatus = execMetarr(vMetarrCtx, video, channelURL, channel, dirParser)
 
 		if err := completeAndStoreVideo(cs, vs, video, channel); err != nil {
 			logger.Pl.E("Failed to complete video %q after metarr: %v", video.URL, err)
@@ -283,19 +312,7 @@ func videoJob(
 // completeAndStoreVideo marks a video as complete.
 func completeAndStoreVideo(cs contracts.ChannelStore, vs contracts.VideoStore, v *models.Video, c *models.Channel) error {
 	v.MarkVideoAsComplete()
-
-	// Handle metadata file purging if configured.
-	if abstractions.IsSet(keys.PurgeMetaFile) {
-		if abstractions.GetBool(keys.PurgeMetaFile) {
-			logger.Pl.I("Purging metadata file for video with URL %q as per configuration", v.URL)
-			if err := os.Remove(v.JSONFilePath); err != nil && !os.IsNotExist(err) {
-				logger.Pl.W("Failed to delete metadata file %q: %v", v.JSONFilePath, err)
-			} else {
-				logger.Pl.D(1, "Deleted metadata file %q successfully", v.JSONFilePath)
-				v.JSONFilePath = ""
-			}
-		}
-	}
+	purgeMetaFileIfSet(v)
 
 	// Update video in database.
 	if err := vs.UpdateVideo(v, c.ID); err != nil {

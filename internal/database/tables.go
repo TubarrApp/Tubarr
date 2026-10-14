@@ -60,6 +60,41 @@ func initSettingsTable(tx *sql.Tx) error {
 	return executeSQLFile(tx, settingsSQL, "settings table")
 }
 
+// addColumnIfMissing adds a column to an existing table (for databases created by older versions).
+func addColumnIfMissing(tx *sql.Tx, table, column, definition string) (err error) {
+	rows, err := tx.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return fmt.Errorf("failed to read columns of table %s: %w", table, err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	for rows.Next() {
+		var (
+			cid, notNull, pk int
+			name, colType    string
+			defaultVal       sql.NullString
+		)
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultVal, &pk); err != nil {
+			return fmt.Errorf("failed to scan columns of table %s: %w", table, err)
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to read columns of table %s: %w", table, err)
+	}
+
+	if _, err := tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)); err != nil {
+		return fmt.Errorf("failed to add column %s to table %s: %w", column, table, err)
+	}
+	return nil
+}
+
 // readSQLFile reads the SQL file stored in memory from go:embed.
 func readSQLFile(filename string) (string, error) {
 	data, err := sqlFiles.ReadFile(filename)

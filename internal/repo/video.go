@@ -324,7 +324,8 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 
 	// Update videos table
 	videoQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ? "+
+		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, "+
+			"%s = COALESCE(NULLIF(?, ''), %s) "+
 			"WHERE %s = ? AND %s = ?",
 		consts.DBVideos,
 		consts.QVidThumbnailURL,
@@ -337,6 +338,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		consts.QVidUploadDate,
 		consts.QVidMetadata,
 		consts.QVidUpdatedAt,
+		consts.QVidMetarrStatus, consts.QVidMetarrStatus,
 		consts.QVidURL,
 		consts.QVidChanID,
 	)
@@ -353,6 +355,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		v.UploadDate,
 		metadataJSON,
 		time.Now(),
+		v.MetarrStatus,
 		v.URL,
 		channelID,
 	)
@@ -406,6 +409,85 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 	}
 
 	return videoURL, nil
+}
+
+// GetVideosAwaitingMetarr returns finished videos in a channel which Metarr has not yet successfully processed.
+func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models.Video, err error) {
+	query := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s "+
+			"WHERE %s = ? AND %s = 1 AND %s = 0 AND %s != ?",
+		consts.QVidID,
+		consts.QVidChanID,
+		consts.QVidChanURLID,
+		consts.QVidChanURL,
+		consts.QVidURL,
+		consts.QVidTitle,
+		consts.QVidDescription,
+		consts.QVidThumbnailURL,
+		consts.QVidUploadDate,
+		consts.QVidVideoPath,
+		consts.QVidJSONPath,
+		consts.QVidMetarrStatus,
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidMetarrStatus,
+	)
+
+	rows, err := vs.DB.Query(query, channelID, consts.MetarrStatusDone)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query videos awaiting Metarr: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			logger.Pl.E("Failed to close rows: %v", closeErr)
+		}
+	}()
+
+	for rows.Next() {
+		var (
+			v                                            models.Video
+			channelURLID                                 sql.NullInt64
+			channelURL, title, description, thumbnailURL sql.NullString
+			videoPath, jsonPath, metarrStatus            sql.NullString
+			uploadDate                                   sql.NullTime
+		)
+		if err := rows.Scan(
+			&v.ID,
+			&v.ChannelID,
+			&channelURLID,
+			&channelURL,
+			&v.URL,
+			&title,
+			&description,
+			&thumbnailURL,
+			&uploadDate,
+			&videoPath,
+			&jsonPath,
+			&metarrStatus,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan video: %w", err)
+		}
+
+		v.ChannelURLID = channelURLID.Int64
+		v.ChannelURL = channelURL.String
+		v.Title = title.String
+		v.Description = description.String
+		v.ThumbnailURL = thumbnailURL.String
+		v.UploadDate = uploadDate.Time
+		v.VideoFilePath = videoPath.String
+		v.JSONFilePath = jsonPath.String
+		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
+		v.Finished = true
+
+		videos = append(videos, &v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while retrieving videos: %w", err)
+	}
+
+	return videos, nil
 }
 
 // ******************************** Private ***************************************************************************************

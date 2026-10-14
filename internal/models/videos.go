@@ -32,6 +32,7 @@ type Video struct {
 	UpdatedAt           time.Time             `json:"updated_at" db:"updated_at"`
 	MoveOpOutputDir     string                `json:"-" db:"-"`
 	Ignored             bool                  `json:"ignored" db:"ignored"`
+	MetarrStatus        consts.MetarrStatus   `json:"metarr_status" db:"metarr_status"`
 	FilteredMetaOps     []FilteredMetaOps     `json:"-" db:"-"` // Per-video filtered meta operations
 	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"` // Per-video filtered filename operations
 }

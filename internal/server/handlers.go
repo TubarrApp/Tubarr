@@ -107,12 +107,10 @@ func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.R
 
 	// Ignore run if desired.
 	if input.IgnoreRun != nil && *input.IgnoreRun {
-		if !state.CrawlStateActive(c.Name) {
-			state.LockCrawlState(c.Name)
-
+		if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
 			//nolint:contextcheck
 			go func(ctx context.Context) {
-				defer state.UnlockCrawlState(c.Name)
+				defer unlock()
 				logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
 
 				if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
@@ -120,7 +118,7 @@ func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.R
 				} else {
 					logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 				}
-			}(ss.ctx)
+			}(crawlCtx)
 		} else {
 			logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 		}
@@ -249,12 +247,10 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 
 		// Ignore run if desired.
 		if input.IgnoreRun != nil && *input.IgnoreRun {
-			if !state.CrawlStateActive(c.Name) {
-				state.LockCrawlState(c.Name)
-
+			if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
 				//nolint:contextcheck
 				go func(ctx context.Context) {
-					defer state.UnlockCrawlState(c.Name)
+					defer unlock()
 					logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
 
 					if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
@@ -262,7 +258,7 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 					} else {
 						logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 					}
-				}(ss.ctx)
+				}(crawlCtx)
 			} else {
 				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 			}
@@ -601,13 +597,11 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Ignore run if desired.
 	if r.FormValue("ignore_run") == "true" {
-		if !state.CrawlStateActive(c.Name) {
+		if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
 			logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
-			state.LockCrawlState(c.Name)
-
 			//nolint:contextcheck
 			go func(ctx context.Context) {
-				defer state.UnlockCrawlState(c.Name)
+				defer unlock()
 				logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
 
 				if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
@@ -615,7 +609,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 				} else {
 					logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 				}
-			}(ss.ctx)
+			}(crawlCtx)
 		} else {
 			logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 		}
@@ -1086,9 +1080,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 
 	// Start crawl in background.
-	if !state.CrawlStateActive(c.Name) {
-		state.LockCrawlState(c.Name)
-
+	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
 		// Clean expired blocks first.
 		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
 			logger.Pl.W("Failed to clean expired blocks: %v", err)
@@ -1096,7 +1088,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 
 		//nolint:contextcheck
 		go func(ctx context.Context) {
-			defer state.UnlockCrawlState(c.Name)
+			defer unlock()
 			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
 
 			if performedCrawls, err := app.CrawlChannel(ctx, ss.s, c); err != nil {
@@ -1104,7 +1096,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			} else if performedCrawls {
 				logger.Pl.S("Completed crawl for channel %q", c.Name)
 			}
-		}(ss.ctx)
+		}(crawlCtx)
 
 		w.WriteHeader(http.StatusAccepted)
 		if _, err := w.Write([]byte(`{"message": "Channel crawl started"}`)); err != nil {
@@ -1118,6 +1110,70 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	if _, err := w.Write([]byte(`{"message": "Channel crawl already running for channel"}`)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
 	}
+}
+
+// handleStopCrawl stops a channel's running crawl or download job, letting running Metarr transcodes finish.
+func (ss *serverStore) handleStopCrawl(w http.ResponseWriter, r *http.Request) {
+	c, ok := ss.channelFromURL(w, r)
+	if !ok {
+		return
+	}
+	if !state.StopCrawl(c.Name) {
+		http.Error(w, "no crawl or download running for channel", http.StatusConflict)
+		return
+	}
+
+	logger.Pl.I("Stopping crawl/download for channel %q via web request", c.Name)
+	w.WriteHeader(http.StatusAccepted)
+	if _, err := w.Write([]byte(`Stopping.`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
+}
+
+// handleStopMetarr stops a channel's queued and running Metarr processes.
+func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) {
+	c, ok := ss.channelFromURL(w, r)
+	if !ok {
+		return
+	}
+	n := app.StopMetarr(c.ID)
+	if n == 0 {
+		http.Error(w, "no Metarr processes running for channel", http.StatusConflict)
+		return
+	}
+
+	logger.Pl.I("Stopping %d Metarr process(es) for channel %q via web request", n, c.Name)
+	w.WriteHeader(http.StatusAccepted)
+	if _, err := w.Write([]byte(`Stopping.`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
+}
+
+// handleGetActivity returns the names of channels with running crawls/downloads, crawls being stopped, and Metarr processes.
+func (ss *serverStore) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
+	crawling, stopping := state.CrawlActivity()
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string][]string{
+		"crawling": crawling,
+		"stopping": stopping,
+		"metarr":   app.MetarrActivity(),
+	}); err != nil {
+		logger.Pl.E("Failed to encode activity: %v", err)
+	}
+}
+
+// channelFromURL loads the channel given by the URL's ID, writing an error response if it can't.
+func (ss *serverStore) channelFromURL(w http.ResponseWriter, r *http.Request) (*models.Channel, bool) {
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), false)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return nil, false
+	}
+	if !found || c == nil {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return nil, false
+	}
+	return c, true
 }
 
 // handleIgnoreCrawlChannel initiates a crawl for a specific channel.
@@ -1140,9 +1196,7 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 	}
 
 	// Start crawl in background.
-	if !state.CrawlStateActive(c.Name) {
-		state.LockCrawlState(c.Name)
-
+	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
 		// Clean expired blocks first.
 		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
 			logger.Pl.W("Failed to clean expired blocks: %v", err)
@@ -1150,7 +1204,7 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 
 		//nolint:contextcheck
 		go func(ctx context.Context) {
-			defer state.UnlockCrawlState(c.Name)
+			defer unlock()
 			logger.Pl.I("Starting ignore crawl for channel %q (ID: %d) via web request", c.Name, id)
 
 			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
@@ -1158,7 +1212,7 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 			} else {
 				logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 			}
-		}(ss.ctx)
+		}(crawlCtx)
 
 		w.WriteHeader(http.StatusAccepted)
 		if _, err := w.Write([]byte(`{"message": "Channel ignore crawl started"}`)); err != nil {
@@ -1209,8 +1263,9 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Check crawl state.
-	if state.CrawlStateActive(c.Name) {
+	// Lock crawl state until the background download completes.
+	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name)
+	if !ok {
 		w.WriteHeader(http.StatusLocked)
 		if _, err := w.Write([]byte(`Channel has an active crawl job running. Try again after it is completed.`)); err != nil {
 			logger.Pl.E("Could not write response: %v", err)
@@ -1218,13 +1273,10 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Lock crawl state.
-	state.LockCrawlState(c.Name)
-	defer state.UnlockCrawlState(c.Name)
-
 	// Start download in background.
 	//nolint:contextcheck
 	go func(ctx context.Context) {
+		defer unlock()
 		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.URLs), c.Name, id)
 
 		if err := app.ManualDownloadToChannel(ctx, ss.s, ss.cs, c, requestBody.URLs); err != nil {
@@ -1232,10 +1284,48 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		} else {
 			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)
 		}
-	}(ss.ctx)
+	}(crawlCtx)
 
 	w.WriteHeader(http.StatusAccepted)
 	if _, err := w.Write([]byte(`Download started.`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
+}
+
+// handleRunMetarr runs Metarr on the given videos, or all pending/failed videos if none are given.
+func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+
+	var requestBody struct {
+		VideoIDs []int64 `json:"video_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found || c == nil {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
+	//nolint:contextcheck
+	go func(ctx context.Context) {
+		file.UpdateFromConfigFile(ss.cs, c)
+		if err := app.RunMetarr(ctx, ss.s, c, requestBody.VideoIDs); err != nil {
+			logger.Pl.E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
+		} else {
+			logger.Pl.S("Completed Metarr run for channel %q", c.Name)
+		}
+	}(ss.ctx)
+
+	w.WriteHeader(http.StatusAccepted)
+	if _, err := w.Write([]byte(`Metarr run started.`)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
 	}
 }

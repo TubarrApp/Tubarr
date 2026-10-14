@@ -100,15 +100,11 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 				if elapsed >= interval {
 					// Crawl goroutine
 					go func(ch *models.Channel) {
-						if state.CrawlStateActive(ch.Name) {
+						crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.Name)
+						if !ok {
 							return
 						}
-
-						state.LockCrawlState(ch.Name)
-						defer state.UnlockCrawlState(ch.Name)
-
-						crawlCtx, cancel := context.WithCancel(ctx)
-						defer cancel()
+						defer unlock()
 
 						logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
 						if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {

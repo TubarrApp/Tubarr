@@ -49,6 +49,7 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 	channelCmd.AddCommand(addBatchChannelsCmd(ctx, cs, s))
 	channelCmd.AddCommand(unblockChannelCmd(cs))
 	channelCmd.AddCommand(manualDownloadVideoURLs(ctx, cs, s))
+	channelCmd.AddCommand(runMetarrCmd(ctx, cs, s))
 	channelCmd.AddCommand(crawlChannelCmd(ctx, cs, s))
 	channelCmd.AddCommand(ignoreCrawl(ctx, cs, s))
 	channelCmd.AddCommand(addVideoURLToIgnore(cs))
@@ -266,18 +267,16 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 				return err
 			}
 
-			// Check crawl state.
-			if state.CrawlStateActive(c.Name) {
+			// Lock crawl state.
+			crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name)
+			if !ok {
 				logger.Pl.I("Crawl job is active for channel %q, please try again when it's complete.", c.Name)
 				return nil
 			}
-
-			// Lock crawl state.
-			state.LockCrawlState(c.Name)
-			defer state.UnlockCrawlState(c.Name)
+			defer unlock()
 
 			// Download URLs.
-			if err := app.ManualDownloadToChannel(ctx, s, cs, c, videoURLs); err != nil {
+			if err := app.ManualDownloadToChannel(crawlCtx, s, cs, c, videoURLs); err != nil {
 				return err
 			}
 
@@ -291,6 +290,74 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 	manualURLCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download for a given channel")
 
 	return manualURLCmd
+}
+
+// runMetarrCmd runs Metarr on downloaded videos which Metarr has not yet processed.
+func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+	var (
+		channelID   int
+		channelName string
+		urls        []string
+	)
+
+	runCmd := &cobra.Command{
+		Use:           "run-metarr",
+		Short:         "Run Metarr on downloaded videos it failed on or skipped.",
+		Long:          "Runs Metarr on all pending/failed videos in the channel, or only those given with --urls. The original downloaded files must still exist.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			key, val, err := getChanKeyVal(channelID, channelName)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+
+			c, hasRows, err := cs.GetChannelModel(key, val, true)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			if !hasRows {
+				err := fmt.Errorf("no channel model in database with %s %q", key, val)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+
+			// Resolve URLs to video IDs.
+			var ids []int64
+			if len(urls) > 0 {
+				videos, err := s.VideoStore().GetVideosAwaitingMetarr(c.ID)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					return err
+				}
+				for _, u := range urls {
+					idx := slices.IndexFunc(videos, func(v *models.Video) bool { return v.URL == u })
+					if idx == -1 {
+						logger.Pl.W("Video %q is not awaiting Metarr in channel %q, skipping", u, c.Name)
+						continue
+					}
+					ids = append(ids, videos[idx].ID)
+				}
+				if len(ids) == 0 {
+					return nil
+				}
+			}
+
+			file.UpdateFromConfigFile(cs, c)
+			if err := app.RunMetarr(ctx, s, c, ids); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			return nil
+		},
+	}
+
+	cmd.SetPrimaryChannelFlags(runCmd, &channelName, nil, &channelID)
+	runCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Only run Metarr on these video URLs (default: all pending/failed videos in the channel)")
+
+	return runCmd
 }
 
 // deleteNotifyURLs deletes notification URLs from a channel.
@@ -504,16 +571,15 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			logger.Pl.D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Run ignore crawl.
-			if !state.CrawlStateActive(c.Name) {
-				state.LockCrawlState(c.Name)
-				defer state.UnlockCrawlState(c.Name)
+			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+				defer unlock()
 
 				// Clean expired blocks first.
 				if err := blocking.CleanExpiredBlocks(cs.GetDB()); err != nil {
 					logger.Pl.W("Failed to clean expired blocks: %v", err)
 				}
 
-				if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+				if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
 					return err
 				}
 			} else {
@@ -782,13 +848,12 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 			// Ignore run if desired.
 			if input.IgnoreRun != nil && *input.IgnoreRun {
-				if !state.CrawlStateActive(c.Name) {
-					state.LockCrawlState(c.Name)
-					defer state.UnlockCrawlState(c.Name)
+				if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+					defer unlock()
 
 					logger.Pl.I("Running an 'ignore crawl'...")
 
-					if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+					if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
 						logger.Pl.E("Failed to complete ignore crawl run: %v", err)
 					}
 				} else {
@@ -967,12 +1032,11 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 				// Ignore run if desired.
 				if input.IgnoreRun != nil && *input.IgnoreRun {
-					if !state.CrawlStateActive(c.Name) {
-						state.LockCrawlState(c.Name)
-						defer state.UnlockCrawlState(c.Name)
+					if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+						defer unlock()
 
 						logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
-						if err := app.CrawlChannelIgnore(ctx, s, c); err != nil {
+						if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
 							logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
 						}
 					} else {
@@ -1175,15 +1239,14 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 			}
 
 			// Crawl channel.
-			if !state.CrawlStateActive(c.Name) {
-				state.LockCrawlState(c.Name)
-				defer state.UnlockCrawlState(c.Name)
+			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+				defer unlock()
 
 				// Clean expired blocks first.
 				if err := blocking.CleanExpiredBlocks(cs.GetDB()); err != nil {
 					logger.Pl.W("Failed to clean expired blocks: %v", err)
 				}
-				if performedCrawls, err := app.CrawlChannel(ctx, s, c); err != nil {
+				if performedCrawls, err := app.CrawlChannel(crawlCtx, s, c); err != nil {
 					return err
 				} else if performedCrawls {
 					logger.Pl.S("Completed crawl for channel with %s %q", key, val)

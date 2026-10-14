@@ -122,6 +122,7 @@ const (
 	QVidMetadata     = "metadata"
 	QVidDLStatus     = "download_status"
 	QVidDLPercentage = "download_pct"
+	QVidMetarrStatus = "metarr_status"
 	QVidCreatedAt    = "created_at"
 	QVidUpdatedAt    = "updated_at"
 )
@@ -144,6 +145,7 @@ var ValidVideoKeys = map[string]struct{}{
 	QVidMetadata:     {},
 	QVidDLStatus:     {},
 	QVidDLPercentage: {},
+	QVidMetarrStatus: {},
 	QVidCreatedAt:    {},
 	QVidUpdatedAt:    {},
 }
@@ -216,4 +218,14 @@ const (
 	DLStatusFailed      DownloadStatus = "Failed"
 	DLStatusIgnored     DownloadStatus = "Ignored"
 	DLStatusCancelled   DownloadStatus = "Cancelled"
+)
+
+// MetarrStatus holds constant Metarr processing status strings.
+type MetarrStatus string
+
+// Metarr status strings.
+const (
+	MetarrStatusPending MetarrStatus = "pending"
+	MetarrStatusFailed  MetarrStatus = "failed"
+	MetarrStatusDone    MetarrStatus = "done"
 )

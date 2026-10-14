@@ -161,6 +161,9 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	// Track which ChannelURL model each video uses (by ChannelURLID).
 	channelURLModels := make(map[int64]*models.ChannelURL, len(videoURLs))
 
+	// Video URLs already queued, to skip duplicates.
+	queuedURLs := make(map[string]struct{}, len(videoURLs))
+
 	for _, videoURL := range videoURLs {
 		var (
 			targetChannelURLModel *models.ChannelURL
@@ -179,6 +182,12 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 				return err
 			}
 		}
+
+		if _, dup := queuedURLs[actualVideoURL]; dup {
+			logger.Pl.W("Video %q was entered more than once for channel %q, skipping duplicate", actualVideoURL, c.Name)
+			continue
+		}
+		queuedURLs[actualVideoURL] = struct{}{}
 
 		// Check if this URL's domain is blocked globally for its authentication context.
 		parsed, err := url.Parse(targetChannelURLModel.URL)

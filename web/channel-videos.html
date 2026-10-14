@@ -522,11 +522,32 @@
               <!-- Videos Table -->
               <div x-show="!loading && !error" class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <!-- Channel Info Header -->
-                <div class="border-b border-gray-200 px-6 py-5 dark:border-gray-800">
-                  <h2 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="channelName"></h2>
-                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Total: <span x-text="totalVideos"></span> video<span x-show="totalVideos !== 1">s</span>
-                  </p>
+                <div class="flex items-center justify-between gap-4 border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+                  <div>
+                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="channelName"></h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Total: <span x-text="totalVideos"></span> video<span x-show="totalVideos !== 1">s</span>
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-3">
+                  <button
+                    @click="runMetarrAll()"
+                    :disabled="awaitingMetarr.length === 0 || runningMetarr"
+                    title="Run Metarr on all downloaded videos it hasn't yet processed"
+                    class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Run Metarr on pending (<span x-text="awaitingMetarr.length"></span>)
+                  </button>
+                  <button
+                    x-show="metarrActive"
+                    @click="stopMetarr()"
+                    :disabled="stoppingMetarr"
+                    title="Stop running Metarr transcodes for this channel"
+                    class="px-4 py-2 text-sm font-medium rounded-lg bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span x-text="stoppingMetarr ? 'Stopping Metarr...' : 'Stop Metarr'"></span>
+                  </button>
+                  </div>
                 </div>
 
                 <!-- Bulk Actions Bar -->
@@ -541,6 +562,13 @@
                         class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
                       >
                         Clear Selection
+                      </button>
+                      <button
+                        @click="runMetarrSelected()"
+                        :disabled="runningMetarr || selectedAwaitingMetarr.length === 0"
+                        class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Run Metarr on Selected
                       </button>
                       <button
                         @click="deleteSelected()"
@@ -631,13 +659,27 @@
                                 Ignored
                               </span>
                             </template>
+                            <template x-if="needsMetarr(video)">
+                              <span
+                                class="ml-2 inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                :class="video.metarr_status === 'failed' ? 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500' : 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500'"
+                                x-text="video.metarr_status === 'failed' ? 'Metarr failed' : 'Metarr pending'"
+                              ></span>
+                            </template>
                             <template x-if="!video.finished && !video.ignored">
                               <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
                                 Queued
                               </span>
                             </template>
                           </td>
-                          <td class="px-6 py-4">
+                          <td class="px-6 py-4 whitespace-nowrap">
+                            <button
+                              @click="runMetarr([video.id])"
+                              :disabled="!needsMetarr(video) || runningMetarr"
+                              class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
+                            >
+                              Run Metarr
+                            </button>
                             <a
                               :href="video.url"
                               target="_blank"
@@ -706,6 +748,9 @@
           loading: true,
           error: null,
           deleting: false,
+          runningMetarr: false,
+          metarrActive: false,
+          stoppingMetarr: false,
           currentPage: 1,
           itemsPerPage: 25,
           lastClickedIndex: null,
@@ -742,9 +787,96 @@
 
               this.videos = await videosResponse.json() || [];
               this.loading = false;
+
+              this.loadActivity();
+              if (!this.activityTimer) {
+                this.activityTimer = setInterval(() => this.loadActivity(), 3000);
+              }
             } catch (err) {
               this.error = err.message;
               this.loading = false;
+            }
+          },
+
+          activityTimer: null,
+
+          async loadActivity() {
+            try {
+              const response = await fetch('/api/v1/channels/activity');
+              if (!response.ok) return;
+              const activity = await response.json();
+              const wasActive = this.metarrActive;
+              this.metarrActive = activity.metarr.includes(this.channelName);
+              // Refresh statuses once Metarr finishes.
+              if (wasActive && !this.metarrActive) {
+                this.loadVideos();
+              }
+            } catch (err) {
+              console.error('Error loading channel activity:', err);
+            }
+          },
+
+          async stopMetarr() {
+            if (!confirm(`Stop Metarr for "${this.channelName}"?\n\nRunning transcodes will be stopped. The videos can be finished later with Run Metarr.`)) return;
+            this.stoppingMetarr = true;
+            try {
+              const response = await fetch(`/api/v1/channels/${this.channelId}/stop-metarr`, { method: 'POST' });
+              if (!response.ok && response.status !== 409) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to stop Metarr');
+              }
+              while (this.metarrActive) {
+                await new Promise(r => setTimeout(r, 1000));
+                await this.loadActivity();
+              }
+            } catch (err) {
+              alert(`Failed to stop Metarr: ${err.message}`);
+            } finally {
+              this.stoppingMetarr = false;
+            }
+          },
+
+          needsMetarr(video) {
+            return video.finished && !video.ignored && video.metarr_status !== 'done';
+          },
+
+          get awaitingMetarr() {
+            return this.videos.filter(v => this.needsMetarr(v));
+          },
+
+          get selectedAwaitingMetarr() {
+            return this.awaitingMetarr.filter(v => this.selectedVideos.includes(v.url));
+          },
+
+          async runMetarrAll() {
+            const n = this.awaitingMetarr.length;
+            if (!confirm(`Run Metarr on ${n} video(s)? This may start transcodes.`)) return;
+            await this.runMetarr([]);
+          },
+
+          async runMetarrSelected() {
+            await this.runMetarr(this.selectedAwaitingMetarr.map(v => v.id));
+          },
+
+          async runMetarr(videoIds) {
+            this.runningMetarr = true;
+            try {
+              const response = await fetch(`/api/v1/channels/${this.channelId}/run-metarr`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ video_ids: videoIds })
+              });
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to start Metarr');
+              }
+              await this.loadActivity();
+              setTimeout(() => this.loadVideos(), 3000);
+            } catch (err) {
+              alert(`Error running Metarr: ${err.message}`);
+              console.error('Run Metarr error:', err);
+            } finally {
+              this.runningMetarr = false;
             }
           },
 

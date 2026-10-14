@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
@@ -36,12 +37,15 @@ const tubarrPort = "8827"
 // healthPath is the container healthcheck endpoint.
 const healthPath = "/health"
 
-// skipLogging applies the logger middleware to all requests except those for path.
-func skipLogging(path string, logMiddleware func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+// activityPath is polled by the web UI for running crawls and Metarr processes.
+const activityPath = "/api/v1/channels/activity"
+
+// skipLogging applies the logger middleware to all requests except those for paths.
+func skipLogging(logMiddleware func(http.Handler) http.Handler, paths ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		logged := logMiddleware(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == path {
+			if slices.Contains(paths, r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -57,7 +61,7 @@ func NewRouter(ss serverStore) http.Handler {
 
 	// Middleware
 	r.Use(middleware.RequestID)
-	r.Use(skipLogging(healthPath, middleware.Logger)) // Healthchecks poll often, keep them out of logs.
+	r.Use(skipLogging(middleware.Logger, healthPath, activityPath)) // Polled often, keep out of logs.
 	r.Use(middleware.Recoverer)
 	r.Use(http.NewCrossOriginProtection().Handler) // Blocks other websites' pages from sending changes (CSRF).
 
@@ -73,6 +77,7 @@ func NewRouter(ss serverStore) http.Handler {
 		// Channels API.
 		r.Route("/channels", func(r chi.Router) {
 			r.Get("/all", ss.handleListChannels)
+			r.Get("/activity", ss.handleGetActivity)
 			r.Post("/add", ss.handleCreateChannel)
 			r.Post("/add-from-file", ss.handleAddChannelFromFile)
 			r.Post("/add-from-directory", ss.handleAddChannelsFromDir)
@@ -84,8 +89,11 @@ func NewRouter(ss serverStore) http.Handler {
 			r.Delete("/{id}/delete-videos", ss.handleDeleteChannelVideos)
 			r.Delete("/{id}/cancel-download/{videoID}", ss.handleCancelDownload)
 			r.Post("/{id}/crawl", ss.handleCrawlChannel)
+			r.Post("/{id}/stop-crawl", ss.handleStopCrawl)
+			r.Post("/{id}/stop-metarr", ss.handleStopMetarr)
 			r.Post("/{id}/ignore-crawl", ss.handleIgnoreCrawlChannel)
 			r.Post("/{id}/download-urls", ss.handleDownloadURLs)
+			r.Post("/{id}/run-metarr", ss.handleRunMetarr)
 			r.Post("/{id}/notification-seen", ss.handleNewVideoNotificationSeen)
 			r.Post("/{id}/toggle-pause", ss.handleTogglePauseChannel)
 		})
@@ -185,8 +193,8 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		}
 	}
 
-	// Create shutdown context with timeout.
-	shutdownCtx, cancel := context.WithTimeout(inputCtx, 10*time.Second)
+	// Create shutdown context with timeout (detached, inputCtx is already cancelled on shutdown).
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(inputCtx), 10*time.Second)
 	defer cancel()
 
 	// Attempt graceful shutdown.

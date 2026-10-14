@@ -90,6 +90,7 @@ type VideoStore interface {
 
 	// Get operations.
 	GetVideoURLByID(videoID int64) (videoURL string, err error)
+	GetVideosAwaitingMetarr(channelID int64) (videos []*models.Video, err error)
 
 	// Add operations.
 	AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error)

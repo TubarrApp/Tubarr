@@ -1240,7 +1240,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
 			"ORDER BY %s DESC",
 		consts.QVidID,
@@ -1255,6 +1255,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidDescription,
 		consts.QVidUploadDate,
 		consts.QVidMetadata,
+		consts.QVidMetarrStatus,
 		consts.QVidCreatedAt,
 		consts.QVidUpdatedAt,
 		consts.DBVideos,
@@ -1287,6 +1288,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			metadataStr  sql.NullString
 			channelURLID sql.NullInt64
 			channelURL   sql.NullString
+			metarrStatus sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -1302,11 +1304,13 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			&description,
 			&uploadDate,
 			&metadataStr,
+			&metarrStatus,
 			&v.CreatedAt,
 			&v.UpdatedAt,
 		); err != nil {
 			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 		}
+		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
 
 		// Handle nullable fields.
 		if channelURLID.Valid {
