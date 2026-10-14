@@ -33,6 +33,23 @@ type serverStore struct {
 // tubarrPort.
 const tubarrPort = "8827"
 
+// healthPath is the container healthcheck endpoint.
+const healthPath = "/health"
+
+// skipLogging applies the logger middleware to all requests except those for path.
+func skipLogging(path string, logMiddleware func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		logged := logMiddleware(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == path {
+				next.ServeHTTP(w, r)
+				return
+			}
+			logged.ServeHTTP(w, r)
+		})
+	}
+}
+
 // NewRouter returns a http Handler.
 func NewRouter(ss serverStore) http.Handler {
 	// Initialize router
@@ -40,9 +57,12 @@ func NewRouter(ss serverStore) http.Handler {
 
 	// Middleware
 	r.Use(middleware.RequestID)
-	r.Use(middleware.Logger)
+	r.Use(skipLogging(healthPath, middleware.Logger)) // Healthchecks poll often, keep them out of logs.
 	r.Use(middleware.Recoverer)
 	r.Use(http.NewCrossOriginProtection().Handler) // Blocks other websites' pages from sending changes (CSRF).
+
+	// --- Health ---
+	r.Get(healthPath, ss.handleHealth)
 
 	// --- Metarr Log ---
 	// POST endpoint for Metarr instances to send logs.
@@ -69,6 +89,9 @@ func NewRouter(ss serverStore) http.Handler {
 			r.Post("/{id}/notification-seen", ss.handleNewVideoNotificationSeen)
 			r.Post("/{id}/toggle-pause", ss.handleTogglePauseChannel)
 		})
+
+		// Status API (200 when idle, 503 while jobs run; for container update hooks).
+		r.Get("/status/idle", ss.handleGetIdle)
 
 		// Downloads API.
 		r.Get("/downloads", ss.handleGetDownloads)

@@ -220,7 +220,7 @@ podman exec -it tubarr sh
 
 ## Health Check
 
-The container includes a health check that runs every 30 seconds:
+The container includes a health check that runs every 30 seconds against `http://localhost:8827/health`. It returns 200 when the server and database are working, and 503 otherwise:
 
 ```bash
 # Docker

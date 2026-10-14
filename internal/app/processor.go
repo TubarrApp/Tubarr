@@ -35,6 +35,10 @@ func InitProcess(
 	cu *models.ChannelURL,
 	videos []*models.Video,
 	scrape *scraper.Scraper) (nSucceeded int, nDownloaded int, err error) {
+	// Keep this defer before metarrWg.Wait().
+	AddRunningProcess()
+	defer SubtractRunningProcess()
+
 	// Initialize variables.
 	var (
 		errs []error

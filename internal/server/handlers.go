@@ -1280,6 +1280,35 @@ func (ss *serverStore) handleSetLogLevel(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+// handleHealth reports whether the server and database are working (not whether jobs are running).
+func (ss *serverStore) handleHealth(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+	defer cancel()
+
+	status := "ok"
+	w.Header().Set("Content-Type", "application/json")
+	if err := ss.db.PingContext(ctx); err != nil {
+		logger.Pl.E("Health check failed, database unreachable: %v", err)
+		status = "unhealthy"
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	if err := json.NewEncoder(w).Encode(map[string]string{"status": status}); err != nil {
+		logger.Pl.E("Could not encode health status to JSON: %v", err)
+	}
+}
+
+// handleGetIdle reports running jobs, returning 503 if any are running.
+func (ss *serverStore) handleGetIdle(w http.ResponseWriter, _ *http.Request) {
+	running := app.RunningProcesses()
+	w.Header().Set("Content-Type", "application/json")
+	if running > 0 {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	if err := json.NewEncoder(w).Encode(map[string]int32{"running": running}); err != nil {
+		logger.Pl.E("Could not encode running jobs to JSON: %v", err)
+	}
+}
+
 // handleGetLogLevel retrieves the current logging level.
 func (ss *serverStore) handleGetLogLevel(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
