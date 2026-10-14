@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -36,8 +37,8 @@ func TestFilterSkipsUnavailableDestinations(t *testing.T) {
 	for _, cu := range got {
 		urls = append(urls, cu.URL)
 	}
-	want := []string{"https://ok.example/@a", "https://templated.example/@d"}
-	if len(urls) != len(want) || urls[0] != want[0] || urls[1] != want[1] {
+	want := []string{"https://ok.example/@a", "https://metarr.example/@c", "https://templated.example/@d"} // Metarr creates its output dir.
+	if !slices.Equal(urls, want) {
 		t.Errorf("crawled URLs = %q, want %q", urls, want)
 	}
 }

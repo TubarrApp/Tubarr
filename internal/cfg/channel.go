@@ -1771,7 +1771,7 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 	// Output directory.
 	if f.Changed(keys.MOutputDir) {
 		if c.outputDir != "" {
-			if _, _, err = sharedvalidation.ValidateDirectory(c.outputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
+			if err = validation.CheckDirectory(c.outputDir, sharedtemplates.AllTemplatesMap); err != nil {
 				return nil, err
 			}
 		}

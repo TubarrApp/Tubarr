@@ -388,7 +388,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.TranscodeGPUNode = validGPUNode
 	}
 	if v, ok := data[jsonkeys.MetarrOutputDirectory].(string); ok {
-		if _, _, err := sharedvalidation.ValidateDirectory(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if err := validation.CheckDirectory(v, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
 		metarr.OutputDir = v
@@ -682,7 +682,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("invalid transcode quality string %q: %v", transcodeQualityStr, err), http.StatusBadRequest)
 		return nil
 	}
-	if _, _, err := sharedvalidation.ValidateDirectory(outputDir, false, sharedtemplates.AllTemplatesMap); err != nil {
+	if err := validation.CheckDirectory(outputDir, sharedtemplates.AllTemplatesMap); err != nil {
 		http.Error(w, fmt.Sprintf("cannot get output directories. Input string %q. Error: %v", outputDir, err), http.StatusBadRequest)
 		return nil
 	}

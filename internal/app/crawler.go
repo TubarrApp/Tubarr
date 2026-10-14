@@ -503,16 +503,13 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 
 // checkDestinations returns an error if any of a channel URL's download destinations isn't available.
 func checkDestinations(c *models.Channel, cu *models.ChannelURL) error {
-	s, m := cmp.Or(cu.ChanURLSettings, c.ChanSettings), cmp.Or(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
+	s := cmp.Or(cu.ChanURLSettings, c.ChanSettings)
 	var dirs []string
 	if s != nil {
 		dirs = append(dirs, s.VideoDir, s.JSONDir)
 		for _, op := range s.MetaFilterMoveOps {
 			dirs = append(dirs, op.OutputDir)
 		}
-	}
-	if m != nil {
-		dirs = append(dirs, m.OutputDir)
 	}
 	for _, dir := range dirs {
 		if err := validation.CheckDestination(dir); err != nil {

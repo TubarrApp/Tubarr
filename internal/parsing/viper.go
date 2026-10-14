@@ -850,7 +850,7 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 		metarr.FilteredFilenameOpsFile = *input.FilteredFilenameOpsFile
 	}
 	if input.OutDir != nil {
-		if _, _, err := sharedvalidation.ValidateDirectory(*input.OutDir, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if err := validation.CheckDirectory(*input.OutDir, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, fmt.Errorf("invalid Metarr output directory for per-URL settings: %w", err)
 		}
 		metarr.OutputDir = *input.OutDir

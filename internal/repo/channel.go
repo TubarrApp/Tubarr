@@ -1774,7 +1774,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Default output directory.
 	if v, ok := parsing.GetConfigValue[string](vip, keys.MOutputDir); ok {
-		if _, _, err := sharedvalidation.ValidateDirectory(v, false, sharedtemplates.AllTemplatesMap); err != nil {
+		if err := validation.CheckDirectory(v, sharedtemplates.AllTemplatesMap); err != nil {
 			return err
 		}
 		c.ChanMetarrArgs.OutputDir = v
