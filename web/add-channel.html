@@ -2098,8 +2098,7 @@
                         settings[field] = codecs;
                       }
                     } else if (typeof value === 'string' && value.includes('\n')) {
-                      // Convert newlines to space-separated for text areas
-                      settings[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
+                      settings[field] = value.split('\n').map(v => v.trim()).filter(v => v).join('\n');
                     } else {
                       settings[field] = value;
                     }
@@ -2121,9 +2120,9 @@
                 metarrFields.forEach(field => {
                   const value = urlEntry.custom[field];
                   if (hasValue(value)) {
-                    // Convert newlines to space-separated for text areas
+                    // Keep newlines and trailing spaces, since an operation's value may end in one
                     if (typeof value === 'string' && value.includes('\n')) {
-                      metarr[field] = value.split('\n').map(v => v.trim()).filter(v => v).join(' ');
+                      metarr[field] = value.split('\n').map(v => v.replace(/^\s+|\r$/g, '')).filter(v => v.trim()).join('\n');
                     } else {
                       metarr[field] = value;
                     }

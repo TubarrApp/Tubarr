@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/jsonkeys"
+	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
@@ -430,7 +431,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 
 	// Parse model fields from strings (newline-separated, not space-separated)
 	if filenameOpsStr, ok := data[jsonkeys.MetarrFilenameOps].(string); ok && filenameOpsStr != "" {
-		lines := splitNonEmptyLines(filenameOpsStr)
+		lines := splitOpLines(filenameOpsStr)
 		filenameOps, err := parsing.ParseFilenameOps(lines)
 		if err != nil {
 			return nil, err
@@ -438,7 +439,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.FilenameOps = filenameOps
 	}
 	if filteredFilenameOpsStr, ok := data[jsonkeys.MetarrFilteredFilenameOps].(string); ok && filteredFilenameOpsStr != "" {
-		lines := splitNonEmptyLines(filteredFilenameOpsStr)
+		lines := splitOpLines(filteredFilenameOpsStr)
 		filteredFilenameOps, err := parsing.ParseFilteredFilenameOps(lines)
 		if err != nil {
 			return nil, err
@@ -446,7 +447,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.FilteredFilenameOps = filteredFilenameOps
 	}
 	if metaOpsStr, ok := data[jsonkeys.MetarrMetaOps].(string); ok && metaOpsStr != "" {
-		lines := splitNonEmptyLines(metaOpsStr)
+		lines := splitOpLines(metaOpsStr)
 		metaOps, err := parsing.ParseMetaOps(lines)
 		if err != nil {
 			return nil, err
@@ -454,7 +455,7 @@ func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
 		metarr.MetaOps = metaOps
 	}
 	if filteredMetaOpsStr, ok := data[jsonkeys.MetarrFilteredMetaOps].(string); ok && filteredMetaOpsStr != "" {
-		lines := splitNonEmptyLines(filteredMetaOpsStr)
+		lines := splitOpLines(filteredMetaOpsStr)
 		filteredMetaOps, err := parsing.ParseFilteredMetaOps(lines)
 		if err != nil {
 			return nil, err
@@ -708,22 +709,22 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	}
 
 	// Models (newline-separated, not space-separated).
-	filenameOps, err := parsing.ParseFilenameOps(splitNonEmptyLines(filenameOpsStr))
+	filenameOps, err := parsing.ParseFilenameOps(splitOpLines(filenameOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid filename ops %q: %v", filenameOpsStr, err), http.StatusBadRequest)
 		return nil
 	}
-	filteredFilenameOps, err := parsing.ParseFilteredFilenameOps(splitNonEmptyLines(filteredFilenameOpsStr))
+	filteredFilenameOps, err := parsing.ParseFilteredFilenameOps(splitOpLines(filteredFilenameOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid filtered filename ops %q: %v", filteredFilenameOpsStr, err), http.StatusBadRequest)
 		return nil
 	}
-	metaOps, err := parsing.ParseMetaOps(splitNonEmptyLines(metaOpsStr))
+	metaOps, err := parsing.ParseMetaOps(splitOpLines(metaOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid meta ops %q: %v", metaOpsStr, err), http.StatusBadRequest)
 		return nil
 	}
-	filteredMetaOps, err := parsing.ParseFilteredMetaOps(splitNonEmptyLines(filteredMetaOpsStr))
+	filteredMetaOps, err := parsing.ParseFilteredMetaOps(splitOpLines(filteredMetaOpsStr))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid filtered meta ops %q: %v", filteredMetaOpsStr, err), http.StatusBadRequest)
 		return nil
@@ -753,6 +754,19 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		TranscodeQuality:        transcodeQuality,
 		ExtraFFmpegArgs:         extraFFmpegArgs,
 	}
+}
+
+// splitOpLines splits operation input into non-blank lines, keeping trailing spaces
+// since an operation's value may end in one.
+func splitOpLines(s string) []string {
+	lines := strings.Split(s, "\n")
+	result := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if line = file.TrimOpLine(line); strings.TrimSpace(line) != "" {
+			result = append(result, line)
+		}
+	}
+	return result
 }
 
 // splitNonEmptyLines splits a string by newlines and filters out empty lines.

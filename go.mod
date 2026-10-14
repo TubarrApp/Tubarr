@@ -32,7 +32,7 @@ require (
 )
 
 require (
-	github.com/TubarrApp/gocommon v0.0.0-20261014193135-f9468ea9cff3
+	github.com/TubarrApp/gocommon v0.0.0-20261014194701-b95ec5500083
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
 	github.com/tidwall/gjson v1.20.0

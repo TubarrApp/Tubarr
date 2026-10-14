@@ -54,7 +54,7 @@ func loadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser)
 	}
 
 	logger.Pl.I("Adding filename ops from file %q...", filenameOpsFile)
-	ops, err := file.ReadFileLines(filenameOpsFile)
+	ops, err := file.ReadOpLines(filenameOpsFile)
 	if err != nil {
 		logger.Pl.E("Error loading filename ops from file %q: %v", filenameOpsFile, err)
 		return nil

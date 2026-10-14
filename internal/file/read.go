@@ -44,6 +44,22 @@ func LoadConfigFile(v *viper.Viper, file string) error {
 
 // ReadFileLines loads lines from a file (one per line, ignoring '#' comment lines).
 func ReadFileLines(path string) ([]string, error) {
+	return readLines(path, strings.TrimSpace)
+}
+
+// ReadOpLines is ReadFileLines for operation files, keeping trailing spaces since an
+// operation's value may end in one.
+func ReadOpLines(path string) ([]string, error) {
+	return readLines(path, TrimOpLine)
+}
+
+// TrimOpLine strips leading whitespace and a trailing '\r', keeping trailing spaces.
+func TrimOpLine(s string) string {
+	return strings.TrimLeft(strings.TrimSuffix(s, "\r"), " \t")
+}
+
+// readLines loads non-blank, non-comment lines from a file, tidied by clean.
+func readLines(path string, clean func(string) string) ([]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -58,8 +74,8 @@ func ReadFileLines(path string) ([]string, error) {
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+		line := clean(scanner.Text())
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
 			continue // skip blank lines and comments.
 		}
 		f = append(f, line)

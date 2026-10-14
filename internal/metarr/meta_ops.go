@@ -18,8 +18,8 @@ var nonConflictingMetaOp = map[string]struct{}{
 	sharedconsts.OpPrefix:       {},
 	sharedconsts.OpReplace:      {},
 	sharedconsts.OpRegexReplace: {},
-	sharedconsts.OpTrimBefore:   {},
-	sharedconsts.OpTrimAfter:    {},
+	sharedconsts.OpKeepAfter:    {},
+	sharedconsts.OpKeepBefore:   {},
 }
 
 // loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering
@@ -59,7 +59,7 @@ func loadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []m
 	}
 
 	logger.Pl.I("Adding meta ops from file %q...", metaOpsFile)
-	ops, err := file.ReadFileLines(metaOpsFile)
+	ops, err := file.ReadOpLines(metaOpsFile)
 	if err != nil {
 		logger.Pl.E("Error loading meta ops from file %q: %v", metaOpsFile, err)
 		return nil

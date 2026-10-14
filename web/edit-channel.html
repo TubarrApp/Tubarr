@@ -2243,9 +2243,9 @@
 
                   // Skip empty/null values - not sending them means they fall back to global settings
                   if (hasValue(value)) {
-                    // Keep newlines for operations to preserve values with spaces
+                    // Keep newlines and trailing spaces, since an operation's value may end in one
                     if (typeof value === 'string' && value.includes('\n')) {
-                      metarr[field] = value.split('\n').map(v => v.trim()).filter(v => v).join('\n');
+                      metarr[field] = value.split('\n').map(v => v.replace(/^\s+|\r$/g, '')).filter(v => v.trim()).join('\n');
                     } else {
                       metarr[field] = value;
                     }

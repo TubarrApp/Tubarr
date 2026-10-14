@@ -416,7 +416,7 @@ func loadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryPar
 	}
 
 	logger.Pl.I("Adding filtered meta ops from file %q...", filterFile)
-	filters, err := file.ReadFileLines(filterFile)
+	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
 		logger.Pl.E("Error loading filters from file %q: %v", filterFile, err)
 	}
@@ -461,7 +461,7 @@ func loadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.Director
 	}
 
 	logger.Pl.I("Adding filtered filename ops from file %q...", filterFile)
-	filters, err := file.ReadFileLines(filterFile)
+	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
 		logger.Pl.E("Error loading filtered filename ops from file %q: %v", filterFile, err)
 	}
