@@ -17,10 +17,7 @@ import (
 // Format: "prefix:[COOL CATEGORY] " or "date-tag:prefix:ymd"
 func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 	parsed, warnings, err := sharedparsing.ParseFilenameOps(filenameOps)
-	for _, w := range warnings {
-		logger.Pl.W("%s", w)
-	}
-	if err != nil {
+	if err := rejectInvalid(warnings, err); err != nil {
 		return nil, err
 	}
 	logger.Pl.D(1, "Parsed %d filename operations from %v", len(parsed), filenameOps)
@@ -32,14 +29,27 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 // Format: "director:set:Spielberg" or "title:date-tag:suffix:ymd"
 func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	parsed, warnings, err := sharedparsing.ParseMetaOps(metaOps)
-	for _, w := range warnings {
-		logger.Pl.W("%s", w)
-	}
-	if err != nil {
+	if err := rejectInvalid(warnings, err); err != nil {
 		return nil, err
 	}
 	logger.Pl.D(1, "Parsed %d meta operations from %v", len(parsed), metaOps)
 	return parsed, nil
+}
+
+// rejectInvalid logs parse warnings and fails on any malformed entry, so a typo is
+// reported rather than the operation silently dropped. Duplicates are only logged.
+func rejectInvalid(warnings []sharedparsing.Warning, err error) error {
+	var invalid []string
+	for _, w := range warnings {
+		logger.Pl.W("%s", w)
+		if w.Kind == sharedparsing.WarnInvalid {
+			invalid = append(invalid, w.Msg)
+		}
+	}
+	if len(invalid) > 0 {
+		return errors.New(strings.Join(invalid, "; "))
+	}
+	return err
 }
 
 // ParseFilterOps parses filter operation strings into models.
@@ -164,10 +174,10 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 // Format: "title:contains:cat|director:set:Mr. Cat"
 func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, error) {
 	parsed, warnings, err := sharedparsing.ParseFilteredMetaOps(filteredMetaOps)
-	for _, w := range warnings {
-		logger.Pl.W("%s", w)
+	if err := rejectInvalid(warnings, err); err != nil {
+		return nil, err
 	}
-	return parsed, err
+	return parsed, nil
 }
 
 // ParseFilteredFilenameOps parses filter-based filename operation strings into models.
@@ -175,8 +185,8 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 // Format: "title:contains:cat|prefix:[CATS] "
 func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFilenameOps, error) {
 	parsed, warnings, err := sharedparsing.ParseFilteredFilenameOps(filteredFilenameOps)
-	for _, w := range warnings {
-		logger.Pl.W("%s", w)
+	if err := rejectInvalid(warnings, err); err != nil {
+		return nil, err
 	}
-	return parsed, err
+	return parsed, nil
 }

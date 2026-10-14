@@ -13,10 +13,13 @@ import (
 
 // nonConflictingMetaOp contains keys which do not conflict with other writes.
 var nonConflictingMetaOp = map[string]struct{}{
-	sharedconsts.OpAppend:  {},
-	sharedconsts.OpCopyTo:  {},
-	sharedconsts.OpPrefix:  {},
-	sharedconsts.OpReplace: {},
+	sharedconsts.OpAppend:       {},
+	sharedconsts.OpCopyTo:       {},
+	sharedconsts.OpPrefix:       {},
+	sharedconsts.OpReplace:      {},
+	sharedconsts.OpRegexReplace: {},
+	sharedconsts.OpTrimBefore:   {},
+	sharedconsts.OpTrimAfter:    {},
 }
 
 // loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering

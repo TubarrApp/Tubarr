@@ -51,7 +51,7 @@ func InitVideoTransformers(rootCmd *cobra.Command) error {
 // InitMetaTransformers initializes user flag settings for manipulation of metadata.
 func InitMetaTransformers(rootCmd *cobra.Command) error {
 	// Metadata transformations
-	rootCmd.PersistentFlags().StringSlice(keys.MMetaOps, nil, "Metadata operations (field:operation:value) - e.g. title:set:New Title, description:prefix:Draft-, tags:append:newtag")
+	rootCmd.PersistentFlags().StringArray(keys.MMetaOps, nil, "Metadata operation (field:operation:value) - e.g. 'title:set:New Title'. Repeat the flag for each operation.")
 	if err := viper.BindPFlag(keys.MMetaOps, rootCmd.PersistentFlags().Lookup(keys.MMetaOps)); err != nil {
 		return err
 	}

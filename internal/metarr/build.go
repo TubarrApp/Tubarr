@@ -244,11 +244,11 @@ func processField(f metCmdMapping, argMap map[string]string, argSlicesMap map[st
 		}
 	case strSlice:
 		if len(f.metarrValue.strSlice) > 0 {
-			argSlicesMap[f.cmdKey] = cleanCommaSliceValues(f.metarrValue.strSlice)
+			argSlicesMap[f.cmdKey] = f.metarrValue.strSlice
 		} else if f.viperKey != "" && abstractions.IsSet(f.viperKey) {
 			viperSlice := abstractions.GetStringSlice(f.viperKey)
 			if len(viperSlice) > 0 {
-				argSlicesMap[f.cmdKey] = cleanCommaSliceValues(viperSlice)
+				argSlicesMap[f.cmdKey] = viperSlice
 			}
 		}
 		// Set Meta Overwrite flag if meta-ops arguments exist.
@@ -350,13 +350,4 @@ func cleanAndWrapCommaPaths(path string) string {
 		return b.String()
 	}
 	return path
-}
-
-// cleanCommaSliceValues escapes and fixes slice entries containing commas.
-func cleanCommaSliceValues(slice []string) []string {
-	result := make([]string, 0, len(slice))
-	for _, val := range slice {
-		result = append(result, cleanAndWrapCommaPaths(val))
-	}
-	return result
 }

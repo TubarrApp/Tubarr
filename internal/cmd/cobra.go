@@ -121,27 +121,27 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 		cmd.Flags().StringVar(metaOpsFile, keys.MMetaOpsFile, "", "File containing meta operations (one per line)")
 	}
 	if filteredMetaOpsFile != nil {
-		cmd.Flags().StringVar(filteredMetaOpsFile, keys.MFilteredMetaOpsFile, "", "File containing filtered meta operations (one per line, format: Filter Rules|Meta Ops)")
+		cmd.Flags().StringVar(filteredMetaOpsFile, keys.MFilteredMetaOpsFile, "", "File containing filtered meta operations (one per line, format: Filter|Meta Op)")
 	}
 	if filenameOpsFile != nil {
 		cmd.Flags().StringVar(filenameOpsFile, keys.MFilenameOpsFile, "", "File containing filename operations (one per line)")
 	}
 	if filteredFilenameOpsFile != nil {
-		cmd.Flags().StringVar(filteredFilenameOpsFile, keys.MFilteredFilenameOpsFile, "", "File containing filtered filename operations (one per line, format: Filter Rules|Filename Ops)")
+		cmd.Flags().StringVar(filteredFilenameOpsFile, keys.MFilteredFilenameOpsFile, "", "File containing filtered filename operations (one per line, format: Filter|Filename Op)")
 	}
 
 	// Arrays
 	if filenameOps != nil {
-		cmd.Flags().StringSliceVar(filenameOps, keys.MFilenameOps, nil, "Filename operations for Metarr (e.g. 'prefix:[CATEGORY] ' or 'date-tag:prefix:ymd')")
+		cmd.Flags().StringArrayVar(filenameOps, keys.MFilenameOps, nil, "Filename operation for Metarr (e.g. 'prefix:[CATEGORY] ' or 'date-tag:prefix:ymd'). Repeat the flag for each operation.")
 	}
 	if filteredFilenameOps != nil {
-		cmd.Flags().StringSliceVar(filteredFilenameOps, keys.MFilteredFilenameOps, nil, "Filename operations to perform in Metarr, based on filters matched in metadata")
+		cmd.Flags().StringArrayVar(filteredFilenameOps, keys.MFilteredFilenameOps, nil, "Filename operation to perform in Metarr when a filter matches (filter|operation). Repeat the flag for each operation.")
 	}
 	if metaOps != nil {
-		cmd.Flags().StringSliceVar(metaOps, keys.MMetaOps, nil, "Meta operations to perform in Metarr")
+		cmd.Flags().StringArrayVar(metaOps, keys.MMetaOps, nil, "Meta operation to perform in Metarr. Repeat the flag for each operation.")
 	}
 	if filteredMetaOps != nil {
-		cmd.Flags().StringSliceVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operations to perform in Metarr, based on filters matched in metadata")
+		cmd.Flags().StringArrayVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operation to perform in Metarr when a filter matches (filter|operation). Repeat the flag for each operation.")
 	}
 }
 
