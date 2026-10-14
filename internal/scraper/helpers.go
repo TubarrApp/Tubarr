@@ -8,10 +8,24 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-type ytDlpOutput struct {
-	Entries []struct {
-		URL string `json:"url"`
-	} `json:"entries"`
+// ytDlpEntry is a yt-dlp playlist entry, which may itself be a playlist (e.g. a channel's "Videos" tab).
+type ytDlpEntry struct {
+	URL     string        `json:"url"`
+	Entries []*ytDlpEntry `json:"entries"`
+}
+
+// videoEntries returns the entry's leaf entries, descending into nested playlists.
+func (e *ytDlpEntry) videoEntries() []*ytDlpEntry {
+	if len(e.Entries) == 0 {
+		return []*ytDlpEntry{e}
+	}
+	var out []*ytDlpEntry
+	for _, sub := range e.Entries {
+		if sub != nil {
+			out = append(out, sub.videoEntries()...)
+		}
+	}
+	return out
 }
 
 const rumble = "rumble.com"

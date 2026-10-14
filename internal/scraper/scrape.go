@@ -305,7 +305,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 
 	logger.Pl.D(5, "Retrieved command output from YTDLP for channel %q:\n\n%s", channelURL, string(j))
 
-	var result ytDlpOutput
+	var result ytDlpEntry
 	if err := json.Unmarshal(j, &result); err != nil {
 		return uniqueEpisodeURLs, err
 	}
@@ -314,7 +314,11 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 	chanBaseDomain, _ := getBaseDomain(channelURL)
 
 	// Process entries and add to map.
-	for _, entry := range result.Entries {
+	for _, entry := range result.videoEntries() {
+		// Skip URL-less entries, like empty nested playlists.
+		if entry == &result || entry.URL == "" {
+			continue
+		}
 		// Filter out the channel URL itself if it appears in the entries list.
 		if normalizeURL(entry.URL) == normalizeURL(channelURL) {
 			logger.Pl.D(3, "Skipping entry (entry %q is the exact channel URL: %q)", entry.URL, channelURL)

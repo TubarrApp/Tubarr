@@ -42,7 +42,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 			}
 			panic(p)
 		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
+			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
 				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
@@ -215,7 +215,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 			}
 			panic(p)
 		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
+			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
 				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}
@@ -311,7 +311,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 			}
 			panic(p)
 		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
+			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
 				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
 			}
 		}

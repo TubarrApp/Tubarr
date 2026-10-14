@@ -439,15 +439,17 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 	// Add videos to ignore.
 	if len(videos) > 0 {
+		toIgnore := make([]*models.Video, 0, len(videos))
 		for _, v := range videos {
 			if v.URL == "" {
 				logger.Pl.D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
 				continue
 			}
 			v.MarkVideoAsIgnored()
+			toIgnore = append(toIgnore, v)
 		}
 
-		validVideos, err := s.VideoStore().AddVideos(videos, c.ID)
+		validVideos, err := s.VideoStore().AddVideos(toIgnore, c.ID)
 		if err != nil {
 			logger.Pl.E("Encountered the following errors adding videos for channel %q: %v", c.Name, err)
 
