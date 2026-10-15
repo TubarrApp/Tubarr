@@ -161,7 +161,7 @@ func FuzzSaveCookiesToFile(f *testing.F) {
 		}
 
 		var found bool
-		for _, line := range strings.Split(string(data), "\n") {
+		for line := range strings.SplitSeq(string(data), "\n") {
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
 			}

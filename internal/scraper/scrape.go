@@ -304,8 +304,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 		}
 
 		var stderr string
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			stderr = strings.TrimSpace(string(exitErr.Stderr))
 		}
 		if fs == nil || retried || !models.IsCloudflareBlock(stderr) {

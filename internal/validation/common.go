@@ -44,8 +44,8 @@ func CheckDestination(dir string) error {
 		return nil
 	}
 	base := dir
-	if i := strings.Index(dir, "{{"); i >= 0 {
-		base = filepath.Dir(dir[:i])
+	if before, _, ok := strings.Cut(dir, "{{"); ok {
+		base = filepath.Dir(before)
 	}
 	info, err := os.Stat(base)
 	if err != nil {

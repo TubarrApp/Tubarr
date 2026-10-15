@@ -1,2 +1,4 @@
-all_code.txt
+.gitignore
+.vscode
 .golangci.yaml
+.claude

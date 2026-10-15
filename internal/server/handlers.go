@@ -949,8 +949,8 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 	// Read and parse body for DELETE requests.
 	//
 	// DELETE requests need special handling for form data in the body.
-	bodyBytes := make([]byte, r.ContentLength)
-	if _, err := r.Body.Read(bodyBytes); err != nil && err.Error() != "EOF" {
+	bodyBytes, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 10<<20))
+	if err != nil {
 		logger.Pl.E("Failed to read body: %v", err)
 		http.Error(w, "failed to read request body", http.StatusBadRequest)
 		return

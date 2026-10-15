@@ -461,7 +461,7 @@ func LoadViperIntoStruct(v interface {
 				}
 			case reflect.Slice:
 				sliceType := reflect.SliceOf(elem.Elem())
-				if sliceType == reflect.TypeOf([]string{}) {
+				if sliceType == reflect.TypeFor[[]string]() {
 					v, ok := viperPtr[[]string](v, tag)
 					if ok {
 						val.Field(i).Set(reflect.ValueOf(v))

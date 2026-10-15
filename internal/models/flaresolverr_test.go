@@ -20,13 +20,11 @@ func TestFlareSolverrSolutionRefresh(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 5 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if err := s.Refresh(1); err != nil {
 				t.Error(err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

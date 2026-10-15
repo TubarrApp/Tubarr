@@ -2,6 +2,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -233,19 +235,23 @@ func StaticHandler() http.Handler {
 
 		// Serve / → index.html
 		if cleanPath == "/" {
-			http.ServeFile(w, r, indexPage)
+			servePage(w, r, webRoot, indexPage)
 			return
 		}
 
 		// Serve existing file if present
 		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			if filepath.Ext(fullPath) == ".html" {
+				servePage(w, r, webRoot, fullPath)
+				return
+			}
 			fs.ServeHTTP(w, r)
 			return
 		}
 
 		// Fallback: if the path looks like a SPA route (no file extension)
 		if !strings.Contains(filepath.Base(cleanPath), ".") {
-			http.ServeFile(w, r, indexPage)
+			servePage(w, r, webRoot, indexPage)
 			return
 		}
 
@@ -259,4 +265,38 @@ func StaticHandler() http.Handler {
 		// Final fallback: plain 404 text
 		http.NotFound(w, r)
 	})
+}
+
+var (
+	includeRe    = regexp.MustCompile(`<!--\s*include:([\w-]+)((?:\s+[\w-]+="[^"]*")*)\s*-->`)
+	includeArgRe = regexp.MustCompile(`([\w-]+)="([^"]*)"`)
+)
+
+// servePage serves an HTML page, replacing each <!-- include:name key="value" --> with web/partials/name.html, filling its {{key}} placeholders.
+func servePage(w http.ResponseWriter, r *http.Request, webRoot, page string) {
+	content, err := os.ReadFile(page)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var includeErr error
+	content = includeRe.ReplaceAllFunc(content, func(marker []byte) []byte {
+		m := includeRe.FindSubmatch(marker)
+		partial, err := os.ReadFile(filepath.Join(webRoot, "partials", string(m[1])+".html"))
+		if err != nil {
+			includeErr = err
+			return nil
+		}
+		for _, arg := range includeArgRe.FindAllSubmatch(m[2], -1) {
+			partial = bytes.ReplaceAll(partial, []byte("{{"+string(arg[1])+"}}"), arg[2])
+		}
+		return partial
+	})
+	if includeErr != nil {
+		logger.Pl.E("Failed to build page %q: %v", page, includeErr)
+		http.Error(w, "failed to build page", http.StatusInternalServerError)
+		return
+	}
+	http.ServeContent(w, r, filepath.Base(page), time.Time{}, bytes.NewReader(content))
 }

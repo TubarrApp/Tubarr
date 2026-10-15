@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -255,10 +256,7 @@ func TestUpdateRejectsMissingOrNonHTTPURLs(t *testing.T) {
 	}
 	for _, urls := range []string{"", "--exec=touch-x", "file:///etc/passwd", "example.com/@x"} {
 		before := dbSnapshot(t)
-		form := url.Values{}
-		for k, v := range base {
-			form[k] = v
-		}
+		form := base.Clone()
 		form.Set("urls", urls)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/channels/1/update", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -360,10 +358,8 @@ func FuzzAPI(f *testing.F) {
 
 		// Directory settings are created when validated, so only allow paths inside the test's working directory.
 		for _, vals := range form {
-			for _, v := range vals {
-				if pathOutsideDir(v) {
-					return
-				}
+			if slices.ContainsFunc(vals, pathOutsideDir) {
+				return
 			}
 		}
 
