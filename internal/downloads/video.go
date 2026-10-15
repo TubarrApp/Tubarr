@@ -226,7 +226,11 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	}()
 
 	// Start parser.
-	go d.scanVideoCmdOutput(lineChan, filenameChan, errChan)
+	parserDone := make(chan struct{})
+	go func() {
+		defer close(parserDone)
+		d.scanVideoCmdOutput(lineChan, filenameChan, errChan)
+	}()
 
 	// Wait for completion, error, or cancel.
 	var filename string
@@ -259,7 +263,9 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		d.Video.VideoFilePath = filename
 	}
 
-	// Wait for the command to finish.
+	// Wait for the command to finish (cmd.Wait closes the pipes, so readers must reach EOF first).
+	readers.Wait()
+	<-parserDone
 	if err := cmd.Wait(); err != nil {
 		// Return parse error if present.
 		if parseErr != nil {
@@ -306,6 +312,11 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 			logger.Pl.D(4, "Video %d download terminal output: %q", d.Video.ID, line)
 		}
 
+		// Keep draining after completion so the pipe readers can reach EOF before cmd.Wait.
+		if completed {
+			continue
+		}
+
 		// Collect error messages.
 		lowerLine := strings.ToLower(line)
 		if strings.HasPrefix(lowerLine, "error:") {
@@ -326,7 +337,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		}
 
 		// Detect completed filename.
-		if !completed && strings.HasPrefix(line, "/") {
+		if strings.HasPrefix(line, "/") {
 			if _, ok := sharedconsts.AllVidExtensions[filepath.Ext(line)]; ok { // Download succeeded.
 
 				// Set model to complete.
@@ -336,7 +347,6 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 
 				filenameChan <- line
 				completed = true
-				break
 			}
 		}
 	}
