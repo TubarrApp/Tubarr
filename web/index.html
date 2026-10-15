@@ -1102,20 +1102,32 @@
                                 </div>
                                 <div class="p-4 bg-white dark:bg-white/[0.03]">
                                   <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-2 line-clamp-2 min-h-[2.5rem]" x-text="video.title"></h4>
-                                  <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                    <span x-text="availableDate(video)"></span>
-                                  </p>
-                                  <a
-                                    :href="video.url"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
-                                  >
-                                    Visit original URL
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                                    </svg>
-                                  </a>
+                                  <p class="text-xs text-gray-500 dark:text-gray-400" x-text="availableDate(video)"></p>
+                                  <p
+                                    x-show="video.channel_url"
+                                    class="truncate text-xs text-gray-500 dark:text-gray-400"
+                                    :title="video.channel_url"
+                                    x-text="`From: ${video.channel_url}`"
+                                  ></p>
+                                  <div class="mt-2 flex items-center justify-between gap-2">
+                                    <a
+                                      :href="video.url"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      class="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                                    >
+                                      Visit original URL
+                                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                      </svg>
+                                    </a>
+                                    <button
+                                      @click="downloadAvailable(channel, video)"
+                                      :disabled="downloadingAvailable.includes(video.id)"
+                                      class="px-3 py-1 text-xs font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      x-text="downloadingAvailable.includes(video.id) ? 'Starting...' : 'Download'"
+                                    ></button>
+                                  </div>
                                 </div>
                               </div>
                             </template>
@@ -1227,6 +1239,28 @@
               this.availableVideos = byChannel;
             } catch (err) {
               console.error('Error loading available videos:', err);
+            }
+          },
+
+          downloadingAvailable: [], // IDs of available videos whose download request is in flight.
+
+          // Downloads one available video, then refreshes the list it's removed from.
+          async downloadAvailable(channel, video) {
+            this.downloadingAvailable.push(video.id);
+            try {
+              const response = await fetch(`/api/v1/channels/${channel.id}/available`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'download', video_ids: [video.id] })
+              });
+              if (!response.ok) {
+                throw new Error(await response.text() || response.statusText);
+              }
+              await this.loadAvailableVideos();
+            } catch (err) {
+              alert(`Failed to download "${video.title}": ${err.message}`);
+            } finally {
+              this.downloadingAvailable = this.downloadingAvailable.filter(id => id !== video.id);
             }
           },
 
