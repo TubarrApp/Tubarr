@@ -45,7 +45,7 @@ func NewProgressParser(externalDownloader string, durationSec float64) *Progress
 
 // Parse returns the download percentage if the line reports progress.
 //
-// wget and httpie progress is captured by yt-dlp, so only yt-dlp's final report reaches here for them.
+// httpie progress is captured by yt-dlp, so only yt-dlp's final report reaches here for it.
 func (p *ProgressParser) Parse(line string) (pct float64, ok bool) {
 	// yt-dlp progress (also reports final progress for external downloaders).
 	if pct, ok = YTDLPProgressParser(line); ok {
@@ -62,6 +62,8 @@ func (p *ProgressParser) Parse(line string) (pct float64, ok bool) {
 		pct, ok = CurlProgressParser(line)
 	case command.DownloaderFFmpeg:
 		pct, ok = FFmpegProgressParser(line, p.durationSec)
+	case command.DownloaderWget:
+		pct, ok = WgetProgressParser(line)
 	}
 	if ok {
 		p.pct = pct

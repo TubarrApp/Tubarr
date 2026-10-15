@@ -165,11 +165,13 @@ RUN sed -i 's/^# deb .*universe/deb &/' /etc/apt/sources.list \
  && apt-get update
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Core utilities
+    # External downloaders for yt-dlp (ffmpeg is built above, httpie is installed below)
     aria2 \
     axel \
+    curl \
+    # Core utilities
     ca-certificates \
-    python3 python3-pip \
+    python3 python3-pip python3-venv \
     sqlite3 \
     gosu \
     tzdata \
@@ -231,6 +233,13 @@ RUN ldconfig
 # Then yt-dlp alone is moved to its nightly build ('--pre' would otherwise take beta dependencies too).
 RUN pip3 install --root-user-action=ignore --no-cache-dir --break-system-packages -U "yt-dlp[default,curl-cffi]" \
     && pip3 install --root-user-action=ignore --no-cache-dir --break-system-packages -U --pre --no-deps yt-dlp
+
+######## Install HTTPie (external downloader) in its own venv ########
+# Isolated from the system Python packages that yt-dlp and the auto-updater upgrade, so their urllib3/requests versions can't break it.
+RUN python3 -m venv /opt/httpie \
+    && /opt/httpie/bin/pip install --no-cache-dir httpie \
+    && ln -s /opt/httpie/bin/http /usr/local/bin/http \
+    && http --version
 
 ######## Install Deno globally ########
 RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \

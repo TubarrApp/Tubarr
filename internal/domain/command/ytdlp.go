@@ -63,8 +63,14 @@ const (
 	DownloaderWget   = "wget"
 )
 
-// FFmpegProgress makes ffmpeg write key=value progress lines to stdout.
-const FFmpegProgress = "-progress pipe:1 -nostats"
+// Args making external downloaders report progress where Tubarr can read it.
+const (
+	FFmpegProgress = "-progress pipe:1 -nostats"                            // key=value progress lines on stdout.
+	WgetProgress   = "--show-progress --progress=dot:binary -o /dev/stdout" // yt-dlp passes -nv and captures stderr, so log progress to stdout.
+)
+
+// HttpieConfigDirEnv is the environment variable setting httpie's config directory.
+const HttpieConfigDirEnv = "HTTPIE_CONFIG_DIR"
 
 // Aria2c downloader and arg tags.
 const (

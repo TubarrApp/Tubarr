@@ -11,6 +11,7 @@ const (
 	ariaProgressStr  = `\((\d+(?:\.\d+)?)%\)`
 	axelProgressStr  = `^\[\s*(\d+)%\]`
 	curlBarStr       = `#\s*(\d+(?:\.\d+)?)%$`
+	wgetDotStr       = `^\s*\d+[KMGT]\s*(\d{1,3})%`
 	dlPercentStr     = `\[download\]\s+(\d+\.?\d*)%`
 	yearFragmentsStr = `^(\d{4})?y?(\d{1,2})?m?(\d{1,2})?d?$`
 )
@@ -22,6 +23,7 @@ var (
 	onceAxelProgress  sync.Once
 	onceCurlBar       sync.Once
 	onceDLPercentage  sync.Once
+	onceWgetDot       sync.Once
 	onceYearFragments sync.Once
 
 	AriaItemCount *regexp.Regexp
@@ -29,6 +31,7 @@ var (
 	AxelProgress  *regexp.Regexp
 	CurlBar       *regexp.Regexp
 	DLPercentage  *regexp.Regexp
+	WgetDot       *regexp.Regexp
 	YearFragments *regexp.Regexp
 )
 
@@ -70,6 +73,14 @@ func DownloadPercentCompile() *regexp.Regexp {
 		DLPercentage = regexp.MustCompile(dlPercentStr)
 	})
 	return DLPercentage
+}
+
+// WgetDotCompile compiles regex for wget "dot" progress lines.
+func WgetDotCompile() *regexp.Regexp {
+	onceWgetDot.Do(func() {
+		WgetDot = regexp.MustCompile(wgetDotStr)
+	})
+	return WgetDot
 }
 
 // YearFragmentsCompile compiles regex for parsing user inputted dates.

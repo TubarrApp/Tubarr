@@ -30,14 +30,14 @@ func TestLiveDownloadProgress(t *testing.T) {
 		exe              string // External downloader, "" for native.
 		dlArgs           string
 		ytdlpArgs        string
-		wantIntermediate bool // wget and httpie progress is captured by yt-dlp, so only the final report arrives.
+		wantIntermediate bool // httpie progress is captured by yt-dlp, so only the final report arrives.
 	}{
 		{name: "native", ytdlpArgs: "--limit-rate 1M", wantIntermediate: true},
 		{name: command.DownloaderAria, exe: command.DownloaderAria, dlArgs: "--max-overall-download-limit=1M", wantIntermediate: true},
 		{name: command.DownloaderAxel, exe: command.DownloaderAxel, dlArgs: "-s 1000000", wantIntermediate: true},
 		{name: command.DownloaderCurl, exe: command.DownloaderCurl, dlArgs: "--limit-rate 1M", wantIntermediate: true},
 		{name: command.DownloaderFFmpeg, exe: command.DownloaderFFmpeg, wantIntermediate: true},
-		{name: command.DownloaderWget, exe: command.DownloaderWget},
+		{name: command.DownloaderWget, exe: command.DownloaderWget, dlArgs: "--limit-rate=1m", wantIntermediate: true},
 		{name: command.DownloaderHttpie, exe: "http"},
 	}
 	for _, tt := range tests {
@@ -68,6 +68,11 @@ func checkLiveProgress(t *testing.T, downloader, dlArgs, ytdlpArgs string, wantI
 		Context: ctx,
 	}
 	cmd := d.buildVideoCommand()
+	cleanup, err := d.setDownloaderEnv(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)

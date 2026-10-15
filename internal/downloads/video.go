@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -80,10 +81,18 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)
 		dlName := downloaders.Name(d.ChannelURL.ChanURLSettings.ExternalDownloader)
 
-		// ffmpeg is silenced by yt-dlp's quiet mode, so always request its progress output.
-		if dlName == command.DownloaderFFmpeg {
-			ffmpegArgs := strings.TrimSpace(d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs + " " + command.FFmpegProgress)
-			args = append(args, command.ExternalDLArgs, command.DownloaderFFmpeg+":"+ffmpegArgs)
+		// ffmpeg and wget progress is hidden by yt-dlp, so always request progress output Tubarr can read.
+		var progressArgs string
+		switch dlName {
+		case command.DownloaderFFmpeg:
+			progressArgs = command.FFmpegProgress
+		case command.DownloaderWget:
+			progressArgs = command.WgetProgress
+		}
+
+		if progressArgs != "" {
+			dlArgs := strings.TrimSpace(d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs + " " + progressArgs)
+			args = append(args, command.ExternalDLArgs, dlName+":"+dlArgs)
 
 		} else if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
 
@@ -164,6 +173,13 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	if cmd == nil {
 		return fmt.Errorf("no command built for URL %s", d.Video.URL)
 	}
+
+	// External downloader environment workarounds.
+	cleanup, err := d.setDownloaderEnv(cmd)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 
 	// Set pipes.
 	stdout, err := cmd.StdoutPipe()
@@ -334,6 +350,23 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		errMsg := fmt.Sprintf("yt-dlp failed: %s", strings.Join(errorLines, "; "))
 		errChan <- errors.New(errMsg)
 	}
+}
+
+// setDownloaderEnv applies environment workarounds for the external downloader, returning a cleanup to run after the command exits.
+func (d *VideoDownload) setDownloaderEnv(cmd *exec.Cmd) (cleanup func(), err error) {
+	if downloaders.Name(d.ChannelURL.ChanURLSettings.ExternalDownloader) != command.DownloaderHttpie {
+		return func() {}, nil
+	}
+	dir, err := downloaders.HttpieConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = append(cmd.Environ(), command.HttpieConfigDirEnv+"="+dir)
+	return func() {
+		if err := os.RemoveAll(dir); err != nil {
+			logger.Pl.W("Failed to remove temporary httpie config directory %q: %v", dir, err)
+		}
+	}, nil
 }
 
 // durationSeconds returns the video duration from its metadata, falling back to the crawl listing's duration.
