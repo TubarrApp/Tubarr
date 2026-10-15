@@ -1,7 +1,7 @@
 github.com/PuerkitoBio/goquery v1.11.0 h1:jZ7pwMQXIITcUXNH83LLk+txlaEy6NVOfTuP43xxfqw=
 github.com/PuerkitoBio/goquery v1.11.0/go.mod h1:wQHgxUOU3JGuj3oD/QFfxUdlzW6xPHfqyHre6VMY4DQ=
-github.com/TubarrApp/gocommon v0.0.0-20261014194701-b95ec5500083 h1:n26VsIpJhTbdGf5GmQtCO9e19quX4QGho43pKp1khnk=
-github.com/TubarrApp/gocommon v0.0.0-20261014194701-b95ec5500083/go.mod h1:5m/9WZD2eDGJgR/Y7TO8OZyOuEjhVBVcwBN8ZvKjw1k=
+github.com/TubarrApp/gocommon v0.0.0-20261015233808-d2437871e4cf h1:s+a5opUp92MfMIAsI1CvwhX0jsdgKKGVYYeiN7vBsUg=
+github.com/TubarrApp/gocommon v0.0.0-20261015233808-d2437871e4cf/go.mod h1:HB+P3B7+MJx1/6BZX4UxnPTcXVW7ukT6tN5h4ISOrIs=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a h1:AeXPUzhU0yhID/v5JJEIkjaE85ASe+Vh4Kuv1RSLL+4=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a/go.mod h1:ukJBuruT9b24pdgZwWDvOaCYHeS03B7oQPCUWh25bwM=
 github.com/Velocidex/ordereddict v0.0.0-20220107075049-3dbe58412844/go.mod h1:Y5Tfx5SKGOzkulpqfonrdILSPIuNg+GqKE/DhVJgnpg=
