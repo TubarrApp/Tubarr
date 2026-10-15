@@ -1,9 +1,11 @@
 package repo
 
 import (
+	"cmp"
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -190,6 +192,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	// Check if video already exists
 	if id, exists := vs.videoExists(v, channelID); exists {
 		logger.Pl.D(1, "Video %q already exists in the database with ID %d", v.URL, id)
+		v.ID = id // UpdateVideo sets the download status by ID.
 		if err := vs.UpdateVideo(v, channelID); err != nil {
 			return id, fmt.Errorf("failed to update existing video: %w", err)
 		}
@@ -324,12 +327,13 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 
 	// Update videos table
 	videoQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, "+
+		"UPDATE %s SET %s = COALESCE(NULLIF(?, ''), %s), %s = COALESCE(NULLIF(?, ''), %s), "+
+			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, "+
 			"%s = COALESCE(NULLIF(?, ''), %s) "+
 			"WHERE %s = ? AND %s = ?",
 		consts.DBVideos,
-		consts.QVidThumbnailURL,
-		consts.QVidTitle,
+		consts.QVidThumbnailURL, consts.QVidThumbnailURL, // Keep any found by the crawl until metadata has one.
+		consts.QVidTitle, consts.QVidTitle,
 		consts.QVidDescription,
 		consts.QVidVideoPath,
 		consts.QVidJSONPath,
@@ -488,6 +492,248 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models
 	}
 
 	return videos, nil
+}
+
+// AddAvailableVideos stores newly found videos as Available, skipping any already in the channel.
+//
+// Existing rows are left alone, so a video being downloaded (or failed) isn't reset to Available.
+func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64) (added int, err error) {
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
+				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
+			}
+		}
+	}()
+
+	vidQuery := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(%s, %s) DO NOTHING",
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidChanURLID,
+		consts.QVidChanURL,
+		consts.QVidThumbnailURL,
+		consts.QVidURL,
+		consts.QVidTitle,
+		consts.QVidUploadDate,
+		consts.QVidDuration,
+		consts.QVidCreatedAt,
+		consts.QVidUpdatedAt,
+		consts.QVidChanID, consts.QVidURL,
+	)
+	dlQuery := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s) VALUES (?, ?)",
+		consts.DBDownloads,
+		consts.QDLVidID,
+		consts.QDLStatus,
+	)
+
+	now := time.Now()
+	for _, v := range videos {
+		if v.URL == "" {
+			continue
+		}
+		v.MarkVideoAsAvailable()
+
+		var uploadDate any
+		if !v.UploadDate.IsZero() {
+			uploadDate = v.UploadDate
+		}
+		result, err := tx.Exec(vidQuery, channelID, v.ChannelURLID, v.ChannelURL, v.ThumbnailURL, v.URL, v.Title, uploadDate, v.Duration, now, now)
+		if err != nil {
+			return 0, fmt.Errorf("failed to insert available video %q: %w", v.URL, err)
+		}
+		if n, err := result.RowsAffected(); err != nil || n == 0 {
+			continue // Already in the channel.
+		}
+		if v.ID, err = result.LastInsertId(); err != nil {
+			return 0, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err)
+		}
+		if _, err := tx.Exec(dlQuery, v.ID, consts.DLStatusAvailable); err != nil {
+			return 0, fmt.Errorf("failed to set available status for video %q: %w", v.URL, err)
+		}
+		added++
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return added, nil
+}
+
+// GetAvailableVideos returns all channels' unfinished videos with the given statuses, newest first.
+func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error) {
+	if len(statuses) == 0 {
+		return nil, nil
+	}
+	query := fmt.Sprintf(
+		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, c.%s "+
+			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
+			"WHERE v.%s = 0 AND v.%s = 0 AND d.%s IN (?%s) "+
+			"ORDER BY v.%s DESC, v.%s DESC",
+		consts.QVidID,
+		consts.QVidChanID,
+		consts.QVidChanURLID,
+		consts.QVidChanURL,
+		consts.QVidURL,
+		consts.QVidTitle,
+		consts.QVidThumbnailURL,
+		consts.QVidUploadDate,
+		consts.QVidDuration,
+		consts.QVidCreatedAt,
+		consts.QDLStatus,
+		consts.QChanName,
+		consts.DBVideos,
+		consts.DBDownloads, consts.QDLVidID, consts.QVidID,
+		consts.DBChannels, consts.QChanID, consts.QVidChanID,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QDLStatus, strings.Repeat(", ?", len(statuses)-1),
+		consts.QVidUploadDate,
+		consts.QVidCreatedAt,
+	)
+	args := make([]any, len(statuses))
+	for i, s := range statuses {
+		args[i] = s
+	}
+
+	rows, err := vs.DB.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query available videos: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			logger.Pl.E("Failed to close rows: %v", closeErr)
+		}
+	}()
+
+	for rows.Next() {
+		var (
+			v                               models.AvailableVideo
+			channelURLID                    sql.NullInt64
+			channelURL, title, thumbnailURL sql.NullString
+			uploadDate                      sql.NullTime
+			duration                        sql.NullInt64
+		)
+		if err := rows.Scan(
+			&v.ID,
+			&v.ChannelID,
+			&channelURLID,
+			&channelURL,
+			&v.URL,
+			&title,
+			&thumbnailURL,
+			&uploadDate,
+			&duration,
+			&v.CreatedAt,
+			&v.DownloadStatus.Status,
+			&v.ChannelName,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan available video: %w", err)
+		}
+		v.ChannelURLID = channelURLID.Int64
+		v.ChannelURL = channelURL.String
+		v.Title = cmp.Or(title.String, v.URL)
+		v.ThumbnailURL = thumbnailURL.String
+		v.UploadDate = uploadDate.Time
+		v.Duration = int(duration.Int64)
+		videos = append(videos, &v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while retrieving available videos: %w", err)
+	}
+	return videos, nil
+}
+
+// ClaimVideos moves a channel's given unfinished videos with a status in from to status, returning those moved.
+//
+// Each video is claimed by a conditional update, so concurrent requests can't both claim it.
+// Claiming as Ignored also marks the video ignored, so crawls skip it.
+func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []consts.DownloadStatus, status consts.DownloadStatus) (claimed []*models.Video, err error) {
+	if len(videoIDs) == 0 || len(from) == 0 {
+		return nil, nil
+	}
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
+				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
+			}
+		}
+	}()
+
+	claimQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = 0, %s = ? WHERE %s = ? AND %s IN (?%s) "+
+			"AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = 0)",
+		consts.DBDownloads,
+		consts.QDLStatus,
+		consts.QDLPct,
+		consts.QDLUpdatedAt,
+		consts.QDLVidID,
+		consts.QDLStatus, strings.Repeat(", ?", len(from)-1),
+		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID, consts.QVidFinished, consts.QVidIgnored,
+	)
+	selectQuery := fmt.Sprintf(
+		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
+		consts.QVidURL,
+		consts.QVidChanURLID,
+		consts.QVidChanURL,
+		consts.DBVideos,
+		consts.QVidID,
+	)
+	ignoreQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = 1, %s = ? WHERE %s = ?",
+		consts.DBVideos,
+		consts.QVidIgnored,
+		consts.QVidUpdatedAt,
+		consts.QVidID,
+	)
+
+	now := time.Now()
+	for _, id := range videoIDs {
+		args := []any{status, now, id}
+		for _, s := range from {
+			args = append(args, s)
+		}
+		result, err := tx.Exec(claimQuery, append(args, channelID)...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim video %d: %w", id, err)
+		}
+		if n, err := result.RowsAffected(); err != nil || n == 0 {
+			continue // Not available (already claimed, finished, or in another channel).
+		}
+
+		v := &models.Video{ID: id, ChannelID: channelID}
+		var channelURLID sql.NullInt64
+		var channelURL sql.NullString
+		if err := tx.QueryRow(selectQuery, id).Scan(&v.URL, &channelURLID, &channelURL); err != nil {
+			return nil, fmt.Errorf("failed to read claimed video %d: %w", id, err)
+		}
+		v.ChannelURLID = channelURLID.Int64
+		v.ChannelURL = channelURL.String
+		v.DownloadStatus.Status = status
+
+		if status == consts.DLStatusIgnored {
+			if _, err := tx.Exec(ignoreQuery, now, id); err != nil {
+				return nil, fmt.Errorf("failed to ignore video %d: %w", id, err)
+			}
+			v.Ignored = true
+		}
+		claimed = append(claimed, v)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return claimed, nil
 }
 
 // ******************************** Private ***************************************************************************************

@@ -160,6 +160,41 @@
                 </li>
                 <!-- Menu Item Active Downloads -->
 
+                <!-- Menu Item Available -->
+                <li>
+                  <a
+                    href="available.html"
+                    @click="selected = 'Available'"
+                    class="menu-item group"
+                    :class="(selected === 'Available') || (page === 'available') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Available') || (page === 'available') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4 13.5V18.5C4 19.0523 4.44772 19.5 5 19.5H19C19.5523 19.5 20 19.0523 20 18.5V13.5M4 13.5L6.2 5.8C6.32 5.33 6.75 5 7.24 5H16.76C17.25 5 17.68 5.33 17.8 5.8L20 13.5M4 13.5H8.5L9.5 15.5H14.5L15.5 13.5H20"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Available
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Available -->
+
                 <!-- Menu Item Manual Download -->
                 <li>
                   <a
@@ -707,6 +742,16 @@
                         </label>
                       </div>
 
+                      <!-- Auto Download Override -->
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">New videos:</span>
+                        <select x-model="urlEntry.custom.auto_download" class="h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                          <option value="">Use channel setting</option>
+                          <option value="true">Download automatically</option>
+                          <option value="false">List as available to choose from</option>
+                        </select>
+                      </div>
+
                       <!-- Custom Settings (shown when hasCustomSettings is true) -->
                       <div x-show="urlEntry.hasCustomSettings" x-data="{ urlTab: 'overview' }" class="mt-4 p-4 border-2 border-brand-500 dark:border-brand-600 rounded-lg space-y-3 bg-blue-50 dark:bg-blue-900/20">
                         <div class="flex items-center justify-between">
@@ -1177,6 +1222,20 @@
                         </label>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Paused channels will not be crawled automatically
+                        </p>
+                      </div>
+
+                      <div>
+                        <label class="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            x-model="formData.settings.auto_download"
+                            class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                          />
+                          <span class="text-sm text-gray-700 dark:text-gray-300">Download new videos automatically</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          When off, new videos are listed on the <a href="available.html" class="text-brand-500 hover:text-brand-600">Available</a> page to choose from
                         </p>
                       </div>
                     </div>
@@ -1737,6 +1796,7 @@
               extra_ytdlp_crawl_args: '',
               use_global_cookies: false,
               paused: false,
+              auto_download: true,
               channel_config_file: '',
               from_date: '',
               to_date: '',
@@ -1868,13 +1928,13 @@
                           if (typeof normalized === 'boolean') {
                             urlEntry.custom.paused = normalized;
                           }
-                        } else if (key === 'use_global_cookies') {
+                        } else if (key === 'use_global_cookies' || key === 'auto_download') {
                           // Convert boolean to string for dropdown
                           const normalized = normalizeBool(value);
                           if (normalized === true) {
-                            urlEntry.custom.use_global_cookies = 'true';
+                            urlEntry.custom[key] = 'true';
                           } else if (normalized === false) {
-                            urlEntry.custom.use_global_cookies = 'false';
+                            urlEntry.custom[key] = 'false';
                           }
                           // If undefined/null, leave as undefined (will default to '' in dropdown)
                         } else if (codecFields.includes(key) && Array.isArray(value)) {
@@ -1916,7 +1976,7 @@
               Object.keys(data.settings).forEach(key => {
                 const value = data.settings[key];
                 if (value !== null && value !== undefined && this.formData.settings.hasOwnProperty(key)) {
-                  if (key === 'use_global_cookies' || key === 'paused') {
+                  if (key === 'use_global_cookies' || key === 'paused' || key === 'auto_download') {
                     this.formData.settings[key] = value === 'true' || value === true;
                   } else {
                     this.formData.settings[key] = codecFields.includes(key) && Array.isArray(value) ? value.join('\n') : value;
@@ -1947,6 +2007,7 @@
             return {
               paused: undefined,
               use_global_cookies: undefined,
+              auto_download: '',
               video_directory: '',
               json_directory: '',
               max_concurrency: null,
@@ -2001,6 +2062,8 @@
               const value = custom[key];
               // Skip null, undefined, empty strings
               if (value === null || value === undefined || value === '') continue;
+              // Shown outside the custom settings box.
+              if (key === 'auto_download') continue;
               // Skip numeric defaults (0 is usually not set by user)
               if (typeof value === 'number' && value === 0) continue;
               // Has an actual value
@@ -2086,6 +2149,9 @@
               } else {
                 delete payload.paused; // Remove false value
               }
+
+              // Always send auto_download, as unset means true.
+              payload.auto_download = this.formData.settings.auto_download ? 'true' : 'false';
 
               // Use PUT request to update endpoint
               const response = await fetch(`/api/v1/channels/${this.channelId}/update`, {
@@ -2191,6 +2257,12 @@
                   settings.use_global_cookies = false;
                 }
                 // If empty string, don't set (will be nil in Go)
+              }
+
+              // Process Auto Download override from dropdown (empty inherits from the channel)
+              const autoDownloadValue = normalizeBool(urlEntry.custom && urlEntry.custom.auto_download);
+              if (typeof autoDownloadValue === 'boolean') {
+                settings.auto_download = autoDownloadValue;
               }
 
               // Process custom settings if enabled

@@ -40,6 +40,7 @@ type ChannelFlagValues struct {
 	YTDLPPreferredVideoCodecs []string
 	YTDLPPreferredAudioCodecs []string
 	UseGlobalCookies          bool
+	AutoDownload              bool
 
 	// Filter and operation settings
 	DLFilters           []string

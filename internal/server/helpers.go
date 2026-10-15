@@ -170,6 +170,9 @@ func settingsJSONMap(settings *models.Settings) map[string]any {
 	if settings.Paused {
 		settingsMap[jsonkeys.SettingsPaused] = true
 	}
+	if settings.AutoDownload != nil {
+		settingsMap[jsonkeys.SettingsAutoDownload] = *settings.AutoDownload
+	}
 	if len(settings.YTDLPPreferredVideoCodecs) > 0 {
 		settingsMap[jsonkeys.SettingsYTDLPPreferredVideoCodecs] = settings.YTDLPPreferredVideoCodecs
 	}
@@ -274,6 +277,9 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	}
 	if v, ok := data[jsonkeys.SettingsPaused].(bool); ok {
 		settings.Paused = v
+	}
+	if v, ok := data[jsonkeys.SettingsAutoDownload].(bool); ok {
+		settings.AutoDownload = &v
 	}
 
 	// Parse model fields from strings (newline-separated, not space-separated).
@@ -495,6 +501,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	// Bools
 	useGlobalCookiesStr := r.FormValue(jsonkeys.SettingsUseGlobalCookies)
 	pausedStr := r.FormValue(jsonkeys.SettingsPaused)
+	autoDownloadStr := r.FormValue(jsonkeys.SettingsAutoDownload)
 
 	// Models
 	filtersStr := r.FormValue(jsonkeys.SettingsFilters)
@@ -555,6 +562,11 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	// Bools
 	useGlobalCookies := (useGlobalCookiesStr == "true")
 	paused := (pausedStr == "true")
+	var autoDownload *bool // Unset means true.
+	if autoDownloadStr != "" {
+		b := autoDownloadStr == "true"
+		autoDownload = &b
+	}
 
 	// Model conversions (newline-separated, not space-separated)
 	filters, err := parsing.ParseFilterOps(splitNonEmptyLines(filtersStr), true)
@@ -594,6 +606,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 		Retries:                   retries,
 		UseGlobalCookies:          &useGlobalCookies,
 		Paused:                    paused,
+		AutoDownload:              autoDownload,
 		YtdlpOutputExt:            ytdlpOutExt,
 		ExtraYTDLPVideoArgs:       extraYtdlpVideoArgs,
 		ExtraYTDLPMetaArgs:        extraYtdlpMetaArgs,

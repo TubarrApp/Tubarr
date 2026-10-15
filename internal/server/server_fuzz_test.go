@@ -45,6 +45,7 @@ var fuzzRoutes = []fuzzRoute{
 	{http.MethodPost, "/api/v1/channels/{p}/notification-seen"},
 	{http.MethodPost, "/api/v1/channels/{p}/toggle-pause"},
 	{http.MethodGet, "/api/v1/downloads"},
+	{http.MethodGet, "/api/v1/videos/available"},
 	{http.MethodGet, "/api/v1/logs"},
 	{http.MethodGet, "/api/v1/logs/metarr"},
 	{http.MethodGet, "/api/v1/logs/level"},

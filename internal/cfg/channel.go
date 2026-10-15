@@ -897,6 +897,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	cmd.SetNotifyFlags(addCmd, &flags.Notification)
 
 	addCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
+	addCmd.Flags().BoolVar(&flags.AutoDownload, keys.AutoDownload, true, "Download new videos automatically (false lists them as available to choose from in the web UI)")
 	addCmd.Flags().BoolVar(&flags.IgnoreRun, keys.IgnoreRun, false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
 	addCmd.Flags().StringVar(&addFromFile, "add-channel-from-file", "", "Add a channel using a prewritten file (.json, .toml, .yml/.yaml).\nFile contents example:\n\nchannel-name: 'Cool Channel'\nchannel-urls:\n  - 'https://www.coolchannel.com/'\n")
 
@@ -1090,6 +1091,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 	cmd.SetNotifyFlags(batchCmd, &flags.Notification)
 
 	batchCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
+	batchCmd.Flags().BoolVar(&flags.AutoDownload, keys.AutoDownload, true, "Download new videos automatically (false lists them as available to choose from in the web UI)")
 	batchCmd.Flags().BoolVar(&flags.IgnoreRun, keys.IgnoreRun, false, "Run an 'ignore crawl' for each channel so only new videos are downloaded")
 
 	return batchCmd
@@ -1307,6 +1309,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		ytdlpPreferredVideoCodecs []string
 		ytdlpPreferredAudioCodecs []string
 		useGlobalCookies          bool
+		autoDownload              bool
 
 		// Filter and operation settings.
 		dlFilters           []string
@@ -1457,6 +1460,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				toDate:                    toDate,
 				videoDir:                  vDir,
 				useGlobalCookies:          useGlobalCookies,
+				autoDownload:              autoDownload,
 				ytdlpOutputExt:            ytdlpOutExt,
 				extraYtdlpVideoArgs:       extraYTDLPVideoArgs,
 				extraYtdlpMetaArgs:        extraYTDLPMetaArgs,
@@ -1553,6 +1557,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&ytdlpOutExt, &fromDate, &toDate,
 		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
 		&dlFilters, &ytdlpPreferredVideoCodecs, &ytdlpPreferredAudioCodecs)
+	updateSettingsCmd.Flags().BoolVar(&autoDownload, keys.AutoDownload, true, "Download new videos automatically (false lists them as available to choose from in the web UI)")
 
 	// Metarr.
 	cmd.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
@@ -1961,6 +1966,7 @@ type chanSettings struct {
 	toDate                    string
 	videoDir                  string
 	useGlobalCookies          bool
+	autoDownload              bool
 	ytdlpOutputExt            string
 	extraYtdlpVideoArgs       string
 	extraYtdlpMetaArgs        string
@@ -2138,6 +2144,14 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	if f.Changed(keys.UseGlobalCookies) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.UseGlobalCookies = &c.useGlobalCookies
+			return nil
+		})
+	}
+
+	// Auto download new videos.
+	if f.Changed(keys.AutoDownload) {
+		fns = append(fns, func(s *models.Settings) error {
+			s.AutoDownload = &c.autoDownload
 			return nil
 		})
 	}

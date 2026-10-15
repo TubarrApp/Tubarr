@@ -33,7 +33,7 @@ func TestCrawlSite(channelURL string) (matched bool, source string, urls []strin
 // crawlChannelURLs extracts video URLs from a channel page using a registered (user-defined or built-in) crawl rule.
 //
 // crawled is false if no crawl rule applies to the URL, and yt-dlp should be used instead.
-func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (source string, urls map[string]struct{}, crawled bool, err error) {
+func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (source string, urls map[string]*listedVideo, crawled bool, err error) {
 	query, ok := siterules.MatchCrawl(channelURL)
 	if !ok {
 		return "", nil, false, nil
@@ -44,15 +44,15 @@ func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (s
 }
 
 // crawlWithRule extracts video URLs from a channel page using a user-defined crawl rule.
-func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query models.SiteRules) (map[string]struct{}, error) {
+func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query models.SiteRules) (map[string]*listedVideo, error) {
 	rule := query.Crawl
 	if rule == nil {
 		return nil, fmt.Errorf("site %q has no crawl rule", query.Site)
 	}
-	var urls map[string]struct{}
+	var urls map[string]*listedVideo
 
 	err := s.visitPage(channelURL, cookies, query, func(c *colly.Collector) {
-		urls = make(map[string]struct{}) // Reset per attempt, so a challenged attempt can't leave URLs behind.
+		urls = make(map[string]*listedVideo) // Reset per attempt, so a challenged attempt can't leave URLs behind.
 		c.OnHTML(rule.Selector, func(e *colly.HTMLElement) {
 			value := e.Text
 			if rule.Attr != "" {
@@ -70,7 +70,7 @@ func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query
 					logger.Pl.D(3, "Crawl rule for %q filtered out URL %q", query.Site, link)
 					continue
 				}
-				urls[link] = struct{}{}
+				urls[link] = &listedVideo{}
 			}
 		})
 	})

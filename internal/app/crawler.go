@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
+	"tubarr/internal/state"
 	"tubarr/internal/times"
 	"tubarr/internal/validation"
 
@@ -221,6 +223,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 			ChannelURLID: targetChannelURLModel.ID,
 			ChannelURL:   targetChannelURLModel.URL,
 			URL:          actualVideoURL,
+			SkipFilters:  true,
 		})
 	}
 
@@ -278,6 +281,47 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		return fmt.Errorf("encountered errors during processing: %w", procError)
 	}
 	return nil
+}
+
+// AvailableStatuses are the statuses of videos the user can choose to download or dismiss.
+var AvailableStatuses = []consts.DownloadStatus{consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCancelled}
+
+// DownloadAvailable downloads videos claimed from the Available list, once any running crawl or download of the channel finishes.
+//
+// Claimed videos the download didn't reach are marked cancelled if the channel was stopped, or failed otherwise (e.g. their
+// domain is blocked), so they can be chosen again.
+func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Channel, claimed []*models.Video) (err error) {
+	ids := make([]int64, 0, len(claimed))
+	for _, v := range claimed {
+		ids = append(ids, v.ID)
+	}
+	ctx, unlock, err := state.LockCrawl(parent, c.Name)
+	if err == nil {
+		defer unlock()
+		err = downloadClaimed(ctx, s, c, claimed)
+	}
+
+	unreached := consts.DLStatusFailed
+	if errors.Is(err, state.ErrStoppedWaiting) || (ctx != nil && ctx.Err() != nil) {
+		unreached = consts.DLStatusCancelled
+	}
+	if _, resetErr := s.VideoStore().ClaimVideos(c.ID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, unreached); resetErr != nil {
+		err = errors.Join(err, resetErr)
+	}
+	return err
+}
+
+// downloadClaimed downloads claimed videos through their channel URLs.
+func downloadClaimed(ctx context.Context, s contracts.Store, c *models.Channel, claimed []*models.Video) error {
+	urls := make([]string, 0, len(claimed))
+	for _, v := range claimed {
+		if slices.ContainsFunc(c.URLModels, func(cu *models.ChannelURL) bool { return cu.URL == v.ChannelURL }) {
+			urls = append(urls, v.ChannelURL+"|"+v.URL)
+		} else {
+			urls = append(urls, v.URL) // Channel URL since removed, download as a manual video.
+		}
+	}
+	return ManualDownloadToChannel(ctx, s, s.ChannelStore(), c, urls)
 }
 
 // CrawlChannel crawls a channel for new URLs.
@@ -353,7 +397,8 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	// Main process...
 	var (
 		nSucceeded,
-		nDownloaded int
+		nDownloaded,
+		nAvailable int
 		procError         error
 		channelURLsGotNew []string
 	)
@@ -378,6 +423,18 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 
 		logger.Pl.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 
+		// Leave for the user to choose from if not auto downloading.
+		if !c.AutoDownloads(cu) {
+			added, err := s.VideoStore().AddAvailableVideos(vRequests, c.ID)
+			if err != nil {
+				procError = errors.Join(procError, err)
+				continue
+			}
+			logger.Pl.S("Added %d video(s) as available for URL %q %s(Channel: %s)%s", added, cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
+			nAvailable += added
+			continue
+		}
+
 		// Process video batch.
 		succeeded, downloaded, procErr := InitProcess(ctx, s, c, cu, vRequests, scrape)
 
@@ -399,7 +456,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	}
 
 	// All videos failed.
-	if nSucceeded == 0 {
+	if nSucceeded == 0 && nAvailable == 0 {
 		return true, fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procError)
 	}
 

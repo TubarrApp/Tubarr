@@ -29,16 +29,12 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Apply filters.
-	if !cu.IsManual {
-		passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
-		if err != nil {
-			logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
-		}
-		if !jsonValid || !passedFilters {
-			return false, useFilteredMetaOps, useFilteredFilenameOps, nil
-		}
-	} else {
-		logger.Pl.I("Skipped filter checks for %q in channel %q: Video is a manual download.", v.URL, c.Name)
+	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
+	if err != nil {
+		logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
+	}
+	if !jsonValid || !passedFilters {
+		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
@@ -191,6 +187,12 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 
 	relevantFilteredFilenameOps := getRelevantFilteredFilenameOps(filteredFilenameOps, cu.URL)
 	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
+
+	// Videos the user chose skip download filters.
+	if v.SkipFilters || cu.IsManual {
+		logger.Pl.I("Skipped download filters for %q in channel %q: Video was chosen manually.", v.URL, c.Name)
+		return true, useFilteredMetaOps, useFilteredFilenameOps, nil
+	}
 
 	// Check download filters.
 	allFilters := make([]models.Filters, len(cu.ChanURLSettings.Filters))

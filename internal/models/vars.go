@@ -34,6 +34,7 @@ type ChannelInputPtrs struct {
 	YTDLPPreferredVideoCodecs *[]string `viper:"ytdlp-preferred-video-codecs"`
 	YTDLPPreferredAudioCodecs *[]string `viper:"ytdlp-preferred-audio-codecs"`
 	UseGlobalCookies          *bool     `viper:"use-global-cookies"`
+	AutoDownload              *bool     `viper:"auto-download"`
 
 	// Filter and operation settings.
 	DLFilters *[]string `viper:"filter-ops"`

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 )
 
@@ -91,11 +92,14 @@ type VideoStore interface {
 	// Get operations.
 	GetVideoURLByID(videoID int64) (videoURL string, err error)
 	GetVideosAwaitingMetarr(channelID int64) (videos []*models.Video, err error)
+	GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error)
 
 	// Add operations.
 	AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error)
 	AddVideos(videos []*models.Video, channelID int64) (videoModels []*models.Video, err error)
+	AddAvailableVideos(videos []*models.Video, channelID int64) (added int, err error)
 
 	// Update operations.
 	UpdateVideo(v *models.Video, channelID int64) error
+	ClaimVideos(channelID int64, videoIDs []int64, from []consts.DownloadStatus, status consts.DownloadStatus) (claimed []*models.Video, err error)
 }

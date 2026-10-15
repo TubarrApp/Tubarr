@@ -160,6 +160,9 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.UseGlobalCookies) {
 		in.UseGlobalCookies = &f.UseGlobalCookies
 	}
+	if cmd.Flags().Changed(keys.AutoDownload) {
+		in.AutoDownload = &f.AutoDownload
+	}
 	if cmd.Flags().Changed(keys.FilterOpsInput) {
 		in.DLFilters = &f.DLFilters
 	}

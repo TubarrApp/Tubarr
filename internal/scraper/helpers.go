@@ -3,15 +3,51 @@ package scraper
 import (
 	"net/url"
 	"strings"
+	"time"
 	"tubarr/internal/domain/logger"
 
 	"golang.org/x/net/publicsuffix"
 )
 
+// listedVideo holds what a channel listing shows of a video, which may be nothing beyond its URL.
+type listedVideo struct {
+	Title        string
+	ThumbnailURL string
+	UploadDate   time.Time
+	Duration     int // Seconds.
+}
+
 // ytDlpEntry is a yt-dlp playlist entry, which may itself be a playlist (e.g. a channel's "Videos" tab).
 type ytDlpEntry struct {
-	URL     string        `json:"url"`
+	URL        string  `json:"url"`
+	Title      string  `json:"title"`
+	Duration   float64 `json:"duration"`
+	Timestamp  float64 `json:"timestamp"`
+	UploadDate string  `json:"upload_date"` // YYYYMMDD.
+	Thumbnail  string  `json:"thumbnail"`
+	Thumbnails []struct {
+		URL string `json:"url"`
+	} `json:"thumbnails"`
 	Entries []*ytDlpEntry `json:"entries"`
+}
+
+// listed returns what the flat playlist entry shows of the video.
+func (e *ytDlpEntry) listed() *listedVideo {
+	lv := &listedVideo{
+		Title:        e.Title,
+		ThumbnailURL: e.Thumbnail,
+		Duration:     int(e.Duration),
+	}
+	// yt-dlp orders thumbnails from worst to best.
+	if lv.ThumbnailURL == "" && len(e.Thumbnails) > 0 {
+		lv.ThumbnailURL = e.Thumbnails[len(e.Thumbnails)-1].URL
+	}
+	if t, err := time.Parse("20060102", e.UploadDate); err == nil {
+		lv.UploadDate = t
+	} else if e.Timestamp > 0 {
+		lv.UploadDate = time.Unix(int64(e.Timestamp), 0).UTC()
+	}
+	return lv
 }
 
 // videoEntries returns the entry's leaf entries, descending into nested playlists.

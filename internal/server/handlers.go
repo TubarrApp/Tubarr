@@ -1263,19 +1263,15 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Lock crawl state until the background download completes.
-	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name)
-	if !ok {
-		w.WriteHeader(http.StatusLocked)
-		if _, err := w.Write([]byte(`Channel has an active crawl job running. Try again after it is completed.`)); err != nil {
-			logger.Pl.E("Could not write response: %v", err)
-		}
-		return
-	}
-
-	// Start download in background.
+	// Start download in background, once any running crawl or download of the channel finishes.
+	queued := state.CrawlStateActive(c.Name)
 	//nolint:contextcheck
-	go func(ctx context.Context) {
+	go func() {
+		ctx, unlock, err := state.LockCrawl(ss.ctx, c.Name)
+		if err != nil {
+			logger.Pl.W("Manual download of %d URL(s) for channel %q did not start: %v", len(requestBody.URLs), c.Name, err)
+			return
+		}
 		defer unlock()
 		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.URLs), c.Name, id)
 
@@ -1284,11 +1280,110 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		} else {
 			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)
 		}
-	}(crawlCtx)
+	}()
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	if _, err := w.Write([]byte(`Download started.`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
+	if err := json.NewEncoder(w).Encode(map[string]bool{"queued": queued}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetAvailableVideos returns videos awaiting the user's choice to download them, across all channels.
+//
+// Failed and cancelled videos are only included from channel URLs which don't auto download, as others retry on crawls.
+func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.Request) {
+	videos, err := ss.vs.GetAvailableVideos(app.AvailableStatuses...)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("could not retrieve available videos: %v", err), http.StatusInternalServerError)
+		return
+	}
+	channels, _, err := ss.cs.GetAllChannels(true)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	autoDownloads := make(map[int64]bool)
+	for _, c := range channels {
+		for _, cu := range c.URLModels {
+			autoDownloads[cu.ID] = c.AutoDownloads(cu)
+		}
+	}
+	out := make([]*models.AvailableVideo, 0, len(videos))
+	for _, v := range videos {
+		if v.DownloadStatus.Status != consts.DLStatusAvailable && autoDownloads[v.ChannelURLID] {
+			continue
+		}
+		out = append(out, v)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		logger.Pl.E("Failed to encode available videos: %v", err)
+	}
+}
+
+// handleAvailableAction downloads or dismisses a channel's chosen Available videos.
+//
+// Downloads start once any running crawl or download of the channel finishes, so the channel's Stop button covers them.
+func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Request) {
+	var requestBody struct {
+		Action   string  `json:"action"`
+		VideoIDs []int64 `json:"video_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	if len(requestBody.VideoIDs) == 0 {
+		http.Error(w, "no video IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	var status consts.DownloadStatus
+	switch requestBody.Action {
+	case "download":
+		status = consts.DLStatusQueued
+	case "dismiss":
+		status = consts.DLStatusIgnored
+	default:
+		http.Error(w, fmt.Sprintf("unknown action %q (expected 'download' or 'dismiss')", requestBody.Action), http.StatusBadRequest)
+		return
+	}
+
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found || c == nil {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+
+	claimed, err := ss.vs.ClaimVideos(c.ID, requestBody.VideoIDs, app.AvailableStatuses, status)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to update videos: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if status == consts.DLStatusQueued && len(claimed) > 0 {
+		//nolint:contextcheck
+		go func() {
+			logger.Pl.I("Starting download of %d available video(s) for channel %q via web request", len(claimed), c.Name)
+			if err := app.DownloadAvailable(ss.ctx, ss.s, c, claimed); err != nil {
+				logger.Pl.E("Encountered errors downloading available videos for channel %q: %v", c.Name, err)
+			} else {
+				logger.Pl.S("Completed download of available videos for channel %q", c.Name)
+			}
+		}()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	if err := json.NewEncoder(w).Encode(map[string]int{"count": len(claimed)}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }
 

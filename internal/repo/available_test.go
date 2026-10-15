@@ -1,0 +1,115 @@
+package repo
+
+import (
+	"io"
+	"path/filepath"
+	"slices"
+	"testing"
+	"tubarr/internal/app"
+	"tubarr/internal/database"
+	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/paths"
+	"tubarr/internal/models"
+)
+
+// TestAvailableVideos checks Available videos are stored once, count as seen by crawls, and can only be claimed once.
+func TestAvailableVideos(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.DB.Close() })
+
+	res, err := db.DB.Exec("INSERT INTO channels (name) VALUES ('Test')")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chanID, _ := res.LastInsertId()
+	if res, err = db.DB.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
+		t.Fatal(err)
+	}
+	cuID, _ := res.LastInsertId()
+	c := &models.Channel{ID: chanID, Name: "Test"}
+	vs := GetVideoStore(db.DB)
+	cs, err := GetChannelStore(db.DB)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newVideos := func() []*models.Video {
+		return []*models.Video{
+			{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1", Title: "One", Duration: 60},
+			{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/2"},
+		}
+	}
+	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || added != 2 {
+		t.Fatalf("first add: got %d, %v, want 2 added", added, err)
+	}
+
+	// A second crawl finding the same videos adds nothing.
+	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || added != 0 {
+		t.Fatalf("second add: got %d, %v, want 0 added", added, err)
+	}
+
+	// Available videos count as seen, so crawls don't find them as new.
+	seen, err := cs.GetDownloadedOrIgnoredVideoURLs(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(seen)
+	if want := []string{"https://example.com/v/1", "https://example.com/v/2"}; !slices.Equal(seen, want) {
+		t.Errorf("seen URLs: got %v, want %v", seen, want)
+	}
+
+	available, err := vs.GetAvailableVideos(app.AvailableStatuses...)
+	if err != nil || len(available) != 2 {
+		t.Fatalf("got %d available videos, %v, want 2", len(available), err)
+	}
+	var one *models.AvailableVideo
+	for _, v := range available {
+		if v.URL == "https://example.com/v/1" {
+			one = v
+		}
+	}
+	if one == nil || one.Title != "One" || one.Duration != 60 || one.ChannelName != "Test" || one.DownloadStatus.Status != consts.DLStatusAvailable {
+		t.Fatalf("video 1: got %+v", one)
+	}
+
+	// Claiming twice only succeeds once.
+	ids := []int64{available[0].ID, available[1].ID}
+	claimed, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued)
+	if err != nil || len(claimed) != 2 {
+		t.Fatalf("first claim: got %d, %v, want 2", len(claimed), err)
+	}
+	if again, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(again) != 0 {
+		t.Fatalf("second claim: got %d, %v, want 0", len(again), err)
+	}
+
+	// Claimed videos no longer count as seen, and a crawl re-finding them leaves them alone.
+	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || added != 0 {
+		t.Fatalf("add while downloading: got %d, %v, want 0 added", added, err)
+	}
+	if available, _ := vs.GetAvailableVideos(app.AvailableStatuses...); len(available) != 0 {
+		t.Errorf("expected no available videos while downloading, got %d", len(available))
+	}
+
+	// Videos a download didn't reach go back to failed, and can be dismissed.
+	if reset, err := vs.ClaimVideos(chanID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil || len(reset) != 2 {
+		t.Fatalf("reset: got %d, %v, want 2", len(reset), err)
+	}
+	if dismissed, err := vs.ClaimVideos(chanID, ids[:1], app.AvailableStatuses, consts.DLStatusIgnored); err != nil || len(dismissed) != 1 {
+		t.Fatalf("dismiss: got %d, %v, want 1", len(dismissed), err)
+	}
+	if seen, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 1 {
+		t.Errorf("expected the dismissed video to be seen, got %v", seen)
+	}
+
+	// Videos can't be claimed through another channel.
+	if claimed, err := vs.ClaimVideos(chanID+1, ids[1:], app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(claimed) != 0 {
+		t.Errorf("other channel claim: got %d, %v, want 0", len(claimed), err)
+	}
+}

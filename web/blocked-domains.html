@@ -166,6 +166,41 @@
                 </li>
                 <!-- Menu Item Active Downloads -->
 
+                <!-- Menu Item Available -->
+                <li>
+                  <a
+                    href="available.html"
+                    @click="selected = 'Available'"
+                    class="menu-item group"
+                    :class="(selected === 'Available') || (page === 'available') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Available') || (page === 'available') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4 13.5V18.5C4 19.0523 4.44772 19.5 5 19.5H19C19.5523 19.5 20 19.0523 20 18.5V13.5M4 13.5L6.2 5.8C6.32 5.33 6.75 5 7.24 5H16.76C17.25 5 17.68 5.33 17.8 5.8L20 13.5M4 13.5H8.5L9.5 15.5H14.5L15.5 13.5H20"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Available
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Available -->
+
                 <!-- Menu Item Manual Download -->
                 <li>
                   <a

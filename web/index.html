@@ -284,6 +284,41 @@
                 </li>
                 <!-- Menu Item Active Downloads -->
 
+                <!-- Menu Item Available -->
+                <li>
+                  <a
+                    href="available.html"
+                    @click="selected = 'Available'"
+                    class="menu-item group"
+                    :class="(selected === 'Available') || (page === 'available') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Available') || (page === 'available') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4 13.5V18.5C4 19.0523 4.44772 19.5 5 19.5H19C19.5523 19.5 20 19.0523 20 18.5V13.5M4 13.5L6.2 5.8C6.32 5.33 6.75 5 7.24 5H16.76C17.25 5 17.68 5.33 17.8 5.8L20 13.5M4 13.5H8.5L9.5 15.5H14.5L15.5 13.5H20"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Available
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Available -->
+
                 <!-- Menu Item Manual Download -->
                 <li>
                   <a
@@ -923,13 +958,18 @@
                       <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
                     </div>
 
+                    <!-- Completed Videos Header -->
+                    <div x-show="!channel.videosLoading" class="px-3 pt-3 border-t border-gray-100 dark:border-gray-800 sm:px-6 sm:pt-6">
+                      <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">Latest Completed Videos</h4>
+                    </div>
+
                     <!-- No Videos State -->
-                    <div x-show="!channel.videosLoading && channel.videos.length === 0" class="p-6 border-t border-gray-100 dark:border-gray-800 text-center">
+                    <div x-show="!channel.videosLoading && channel.videos.length === 0" class="p-6 text-center">
                       <p class="text-sm text-gray-500 dark:text-gray-400">No videos downloaded yet</p>
                     </div>
 
                     <!-- Carousel -->
-                    <div x-show="!channel.videosLoading && channel.videos.length > 0" class="p-3 border-t border-gray-100 dark:border-gray-800 sm:p-6">
+                    <div x-show="!channel.videosLoading && channel.videos.length > 0" class="p-3 sm:p-6">
                       <div class="relative rounded-lg border border-gray-200 dark:border-gray-800">
                         <div
                           :id="'carousel-' + channel.id"
@@ -1032,6 +1072,115 @@
                         </svg>
                       </a>
                     </div>
+
+                    <!-- Available Videos (only shown when the channel has some) -->
+                    <div x-show="!channel.videosLoading && availableVideos[channel.id]?.length > 0">
+                      <div class="px-3 pt-3 border-t border-gray-100 dark:border-gray-800 sm:px-6 sm:pt-6">
+                        <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">Latest Available Videos</h4>
+                      </div>
+
+                      <div class="p-3 sm:p-6">
+                        <div class="relative rounded-lg border border-gray-200 dark:border-gray-800">
+                          <div
+                            :id="'carousel-available-' + channel.id"
+                            class="scroll-carousel"
+                          >
+                            <template x-for="video in (availableVideos[channel.id] || []).slice(0, 10)" :key="video.id">
+                              <div class="scroll-carousel-item">
+                                <div class="overflow-hidden">
+                                  <template x-if="video.thumbnail_url">
+                                    <img :src="video.thumbnail_url" :alt="video.title" referrerpolicy="no-referrer" />
+                                  </template>
+                                  <template x-if="!video.thumbnail_url">
+                                    <div class="flex items-center justify-center aspect-video bg-gray-200 dark:bg-gray-800">
+                                      <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                      </svg>
+                                    </div>
+                                  </template>
+                                </div>
+                                <div class="p-4 bg-white dark:bg-white/[0.03]">
+                                  <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-2 line-clamp-2 min-h-[2.5rem]" x-text="video.title"></h4>
+                                  <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                    <span x-text="availableDate(video)"></span>
+                                  </p>
+                                  <a
+                                    :href="video.url"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                                  >
+                                    Visit original URL
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                    </svg>
+                                  </a>
+                                </div>
+                              </div>
+                            </template>
+                          </div>
+
+                          <!-- Navigation Buttons -->
+                          <button
+                            @click="scrollCarousel('available-' + channel.id, 'prev')"
+                            class="carousel-nav-button carousel-nav-prev"
+                            :disabled="!canScrollCarousel('available-' + channel.id, 'prev')"
+                          >
+                            <svg
+                              class="h-auto w-auto stroke-current"
+                              width="24"
+                              height="24"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M15.25 6L9 12.25L15.25 18.5"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            @click="scrollCarousel('available-' + channel.id, 'next')"
+                            class="carousel-nav-button carousel-nav-next"
+                            :disabled="!canScrollCarousel('available-' + channel.id, 'next')"
+                          >
+                            <svg
+                              class="stroke-current"
+                              width="24"
+                              height="24"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M8.75 19L15 12.75L8.75 6.5"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="px-3 pb-3 sm:px-6 sm:pb-6">
+                        <a
+                          :href="'available.html?channel=' + channel.id"
+                          class="flex items-center gap-2 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
+                        >
+                          <span x-text="`Available Videos (${availableVideos[channel.id]?.length})`"></span>
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -1065,6 +1214,28 @@
           globalDownloadLimit: 0,
           savingLimit: false,
           limitSaved: false,
+          availableVideos: {}, // Channel ID -> videos waiting to be chosen, newest first.
+
+          async loadAvailableVideos() {
+            try {
+              const response = await fetch('/api/v1/videos/available');
+              if (!response.ok) return;
+              const byChannel = {};
+              for (const v of await response.json() || []) {
+                (byChannel[v.channel_id] ||= []).push(v);
+              }
+              this.availableVideos = byChannel;
+            } catch (err) {
+              console.error('Error loading available videos:', err);
+            }
+          },
+
+          // Shows the upload date, or when the crawl found the video if the listing had no date.
+          availableDate(video) {
+            const known = (d) => d && !d.startsWith('0001-01-01');
+            if (known(video.upload_date)) return this.formatDate(video.upload_date);
+            return known(video.created_at) ? `Found ${this.formatDate(video.created_at).toLowerCase()}` : '';
+          },
 
           async loadChannels() {
             try {
@@ -1090,6 +1261,7 @@
               }
 
               // Load blocked domains count and global settings
+              this.loadAvailableVideos();
               this.loadBlockedDomainsCount();
               this.loadCrawlConcurrency();
               this.loadGlobalDownloadLimit();
@@ -1198,6 +1370,11 @@
 
           async toggleChannel(channel) {
             channel.expanded = !channel.expanded;
+
+            // Refresh available videos, which crawls may have changed since the page loaded.
+            if (channel.expanded) {
+              this.loadAvailableVideos();
+            }
 
             // If expanding the channel and there's a new video notification, mark it as seen
             if (channel.expanded && channel.new_video_notification) {

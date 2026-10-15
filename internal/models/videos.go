@@ -26,6 +26,7 @@ type Video struct {
 	Title               string                `json:"title" db:"title"`
 	Description         string                `json:"description" db:"description"`
 	UploadDate          time.Time             `json:"upload_date" db:"upload_date"`
+	Duration            int                   `json:"duration" db:"duration"` // Seconds, if the crawl listing gave it.
 	MetadataMap         map[string]any        `json:"-" db:"-"`
 	DownloadStatus      DLStatus              `json:"download_status" db:"download_status"`
 	CreatedAt           time.Time             `json:"created_at" db:"created_at"`
@@ -33,8 +34,15 @@ type Video struct {
 	MoveOpOutputDir     string                `json:"-" db:"-"`
 	Ignored             bool                  `json:"ignored" db:"ignored"`
 	MetarrStatus        consts.MetarrStatus   `json:"metarr_status" db:"metarr_status"`
+	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
 	FilteredMetaOps     []FilteredMetaOps     `json:"-" db:"-"` // Per-video filtered meta operations
 	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"` // Per-video filtered filename operations
+}
+
+// AvailableVideo is a video awaiting the user's choice to download it, with its channel's name.
+type AvailableVideo struct {
+	Video
+	ChannelName string `json:"channel_name"`
 }
 
 // StoreFilenamesFromMetarr stores filenames after Metarr completion.
@@ -85,6 +93,16 @@ func (v *Video) MarkVideoAsIgnored() {
 	v.DownloadStatus.Percent = 0.0
 	v.DownloadStatus.Error = nil
 	v.Ignored = true
+}
+
+// MarkVideoAsAvailable marks the video as awaiting the user's choice to download it.
+func (v *Video) MarkVideoAsAvailable() {
+	if v.Title == "" && v.URL != "" {
+		v.Title = v.URL
+	}
+	v.DownloadStatus.Status = consts.DLStatusAvailable
+	v.DownloadStatus.Percent = 0.0
+	v.DownloadStatus.Error = nil
 }
 
 // MarkVideoAsComplete marks the video with the finished status.

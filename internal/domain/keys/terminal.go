@@ -54,6 +54,7 @@ const (
 	IgnoreRun                 string = "ignore-run"
 	ToDate                    string = "to-date"
 	UseGlobalCookies          string = "use-global-cookies"
+	AutoDownload              string = "auto-download"
 	ExternalDownloader        string = "external-downloader"
 	ExternalDownloaderArgs    string = "external-downloader-args"
 	YTDLPPreferredVideoCodecs string = "ytdlp-preferred-video-codecs"

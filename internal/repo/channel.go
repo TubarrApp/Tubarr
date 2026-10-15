@@ -1350,22 +1350,23 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	return videos, true, nil
 }
 
-// GetDownloadedOrIgnoredVideoURLs loads already downloaded or ignored URLs from the database.
+// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, or Available URLs from the database.
 func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls []string, err error) {
 	if c.ID == 0 {
 		return nil, errors.New("model entered has no ID")
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1)",
+		"SELECT %s FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s = ?))",
 		consts.QVidURL,
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidFinished,
 		consts.QVidIgnored,
+		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
 	)
 
-	rows, err := cs.DB.Query(query, c.ID)
+	rows, err := cs.DB.Query(query, c.ID, consts.DLStatusAvailable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -1422,6 +1423,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		return
 	}
 	fmt.Printf("Paused: %v\n", s.Paused)
+	fmt.Printf("Auto Download: %v\n", c.AutoDownloads(nil))
 
 	fmt.Printf("\n%sChannel Settings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 	displaySettingsStruct(c.ChanSettings)
@@ -1494,6 +1496,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		}
 		fmt.Printf("%sURL %q%s\n", sharedconsts.ColorCyan, u.URL, sharedconsts.ColorReset)
 		fmt.Printf("Paused? %v\n", u.ChanURLSettings.Paused)
+		fmt.Printf("Auto Download? %v\n", c.AutoDownloads(u))
 
 		fmt.Printf("\n%sSettings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 		displaySettingsStruct(u.ChanURLSettings)
@@ -1665,6 +1668,11 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 	// Use global cookies?
 	if v, ok := parsing.GetConfigValue[bool](vip, keys.UseGlobalCookies); ok {
 		c.ChanSettings.UseGlobalCookies = &v
+	}
+
+	// Auto download new videos?
+	if v, ok := parsing.GetConfigValue[bool](vip, keys.AutoDownload); ok {
+		c.ChanSettings.AutoDownload = &v
 	}
 
 	// Video directory.

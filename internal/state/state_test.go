@@ -2,7 +2,9 @@ package state
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 )
 
 func TestCrawlLock(t *testing.T) {
@@ -42,4 +44,34 @@ func TestCrawlLock(t *testing.T) {
 		t.Fatal("stale unlock released newer lock")
 	}
 	unlock2()
+}
+
+// TestLockCrawlWaits tests that LockCrawl gets the lock once the running job ends, and gives up if the channel is stopped.
+func TestLockCrawlWaits(t *testing.T) {
+	_, unlock, _ := TryLockCrawl(context.Background(), "wait")
+	got := make(chan error, 1)
+	go func() {
+		_, unlockWaiter, err := LockCrawl(context.Background(), "wait")
+		if err == nil {
+			unlockWaiter()
+		}
+		got <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	unlock()
+	if err := <-got; err != nil {
+		t.Fatalf("expected the lock once the job ended, got %v", err)
+	}
+
+	_, unlock, _ = TryLockCrawl(context.Background(), "wait")
+	defer unlock()
+	go func() {
+		_, _, err := LockCrawl(context.Background(), "wait")
+		got <- err
+	}()
+	time.Sleep(50 * time.Millisecond)
+	StopCrawl("wait")
+	if err := <-got; !errors.Is(err, ErrStoppedWaiting) {
+		t.Fatalf("expected ErrStoppedWaiting after a stop, got %v", err)
+	}
 }

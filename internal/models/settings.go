@@ -37,7 +37,8 @@ type Settings struct {
 	VideoDir string `json:"video_directory"`
 
 	// Channel toggles.
-	Paused bool `json:"paused"`
+	Paused       bool  `json:"paused"`
+	AutoDownload *bool `json:"auto_download,omitempty"` // Nil inherits (channel URLs) or means true (channels).
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
@@ -611,6 +612,9 @@ func SettingsAllZero(s *Settings) bool {
 
 	// Channel toggles.
 	if s.Paused {
+		return false
+	}
+	if s.AutoDownload != nil {
 		return false
 	}
 

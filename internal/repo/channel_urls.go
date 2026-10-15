@@ -573,6 +573,9 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.UseGlobalCookies, c = mergePtrBoolSettings(urlSettings.UseGlobalCookies, channelSettings.UseGlobalCookies)
 	changed = changed || c
 
+	urlSettings.AutoDownload, c = mergePtrBoolSettings(urlSettings.AutoDownload, channelSettings.AutoDownload)
+	changed = changed || c
+
 	// Note: Paused and BotBlocked fields are per-URL, not cascaded
 	return changed
 }

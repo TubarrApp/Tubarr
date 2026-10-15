@@ -22,6 +22,7 @@ const (
 	SettingsDownloadRetries           = "download_retries"
 	SettingsUseGlobalCookies          = "use_global_cookies"
 	SettingsPaused                    = "paused"
+	SettingsAutoDownload              = "auto_download"
 	SettingsFilters                   = "filters"
 	SettingsMoveOps                   = "move_ops"
 	SettingsYTDLPPreferredVideoCodecs = "ytdlp_preferred_video_codecs"

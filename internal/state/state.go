@@ -3,8 +3,10 @@ package state
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 )
@@ -39,6 +41,42 @@ func TryLockCrawl(parent context.Context, channelName string) (ctx context.Conte
 	}, true
 }
 
+// ErrStoppedWaiting is returned by LockCrawl when the channel is stopped while waiting to lock it.
+var ErrStoppedWaiting = errors.New("stopped while waiting for the channel's running job to finish")
+
+// stopCounts counts each channel's stops, so jobs waiting to lock a channel can tell they were stopped.
+var stopCounts sync.Map // Channel name -> *atomic.Int64.
+
+// stopCount returns the channel's stop counter.
+func stopCount(channelName string) *atomic.Int64 {
+	v, _ := stopCounts.LoadOrStore(channelName, new(atomic.Int64))
+	n, _ := v.(*atomic.Int64)
+	return n
+}
+
+// LockCrawl waits for a channel's running job to finish, then locks its crawl state as TryLockCrawl does.
+//
+// Returns ErrStoppedWaiting if the channel is stopped while waiting, so a stop also cancels waiting jobs.
+func LockCrawl(parent context.Context, channelName string) (ctx context.Context, unlock func(), err error) {
+	stops := stopCount(channelName)
+	start := stops.Load()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		if stops.Load() != start {
+			return nil, nil, ErrStoppedWaiting
+		}
+		if ctx, unlock, ok := TryLockCrawl(parent, channelName); ok {
+			return ctx, unlock, nil
+		}
+		select {
+		case <-parent.Done():
+			return nil, nil, parent.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
 // JobParent returns the context a crawl or download job was started from, which StopCrawl does not cancel.
 //
 // Returns ctx itself if it is not a job context.
@@ -49,7 +87,7 @@ func JobParent(ctx context.Context) context.Context {
 	return ctx
 }
 
-// StopCrawl stops a channel's active crawl or download job, returning false if none is running.
+// StopCrawl stops a channel's active crawl or download job, and any jobs waiting in LockCrawl, returning false if none is running.
 func StopCrawl(channelName string) bool {
 	v, ok := crawlState.Load(channelName)
 	if !ok {
@@ -60,6 +98,7 @@ func StopCrawl(channelName string) bool {
 		logger.Pl.E("Dev Error: Wrong type %T stored in CrawlState for channel %q", v, channelName)
 		return false
 	}
+	stopCount(channelName).Add(1)
 	l.stopped.Store(true)
 	l.cancel()
 	return true

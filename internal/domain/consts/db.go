@@ -119,6 +119,7 @@ const (
 	QVidVideoPath    = "video_path"
 	QVidJSONPath     = "json_path"
 	QVidUploadDate   = "upload_date"
+	QVidDuration     = "duration"
 	QVidMetadata     = "metadata"
 	QVidDLStatus     = "download_status"
 	QVidDLPercentage = "download_pct"
@@ -142,6 +143,7 @@ var ValidVideoKeys = map[string]struct{}{
 	QVidVideoPath:    {},
 	QVidJSONPath:     {},
 	QVidUploadDate:   {},
+	QVidDuration:     {},
 	QVidMetadata:     {},
 	QVidDLStatus:     {},
 	QVidDLPercentage: {},
@@ -212,6 +214,7 @@ type DownloadStatus string
 
 // Download status strings.
 const (
+	DLStatusAvailable   DownloadStatus = "Available" // Found by a crawl, awaiting the user's choice to download it.
 	DLStatusQueued      DownloadStatus = "Queued"
 	DLStatusDownloading DownloadStatus = "Downloading"
 	DLStatusCompleted   DownloadStatus = "Finished"

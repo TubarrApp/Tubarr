@@ -165,6 +165,41 @@
                 </li>
                 <!-- Menu Item Active Downloads -->
 
+                <!-- Menu Item Available -->
+                <li>
+                  <a
+                    href="available.html"
+                    @click="selected = 'Available'"
+                    class="menu-item group"
+                    :class="(selected === 'Available') || (page === 'available') ? 'menu-item-active' : 'menu-item-inactive'"
+                  >
+                    <svg
+                      :class="(selected === 'Available') || (page === 'available') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4 13.5V18.5C4 19.0523 4.44772 19.5 5 19.5H19C19.5523 19.5 20 19.0523 20 18.5V13.5M4 13.5L6.2 5.8C6.32 5.33 6.75 5 7.24 5H16.76C17.25 5 17.68 5.33 17.8 5.8L20 13.5M4 13.5H8.5L9.5 15.5H14.5L15.5 13.5H20"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+
+                    <span
+                      class="menu-item-text"
+                      :class="sidebarToggle ? 'xl:hidden' : ''"
+                    >
+                      Available
+                    </span>
+                  </a>
+                </li>
+                <!-- Menu Item Available -->
+
                 <!-- Menu Item Manual Download -->
                 <li>
                   <a
@@ -617,6 +652,14 @@
                               Bot Blocked
                             </span>
                           </template>
+                          <template x-if="availableCounts[channel.id]">
+                            <a
+                              :href="`available.html?channel=${channel.id}`"
+                              @click.stop
+                              class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-50 text-brand-500 hover:text-brand-600 dark:bg-brand-500/15 dark:text-brand-400"
+                              x-text="`${availableCounts[channel.id]} available`"
+                            ></a>
+                          </template>
                         </p>
                       </div>
                       <svg
@@ -938,12 +981,28 @@
         return {
           channels: [],
           expandedChannels: [],
+          availableCounts: {}, // Channel ID -> videos waiting to be chosen.
           loading: false,
           error: '',
+
+          async loadAvailableCounts() {
+            try {
+              const response = await fetch('/api/v1/videos/available');
+              if (!response.ok) return;
+              const counts = {};
+              for (const v of await response.json() || []) {
+                counts[v.channel_id] = (counts[v.channel_id] || 0) + 1;
+              }
+              this.availableCounts = counts;
+            } catch (err) {
+              console.error('Error loading available videos:', err);
+            }
+          },
 
           async loadChannels() {
             this.loading = true;
             this.error = '';
+            this.loadAvailableCounts();
 
             try {
               const response = await fetch('/api/v1/channels/all');

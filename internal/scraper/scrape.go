@@ -12,6 +12,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -93,19 +94,23 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		if cu.ChanURLSettings != nil {
 			chanCrawlArgs = cu.ChanURLSettings.ExtraYTDLPCrawlArgs
 		}
-		newEpisodeURLs, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, chanCrawlArgs, cu.FlareSolverr)
+		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, chanCrawlArgs, cu.FlareSolverr)
 		if err != nil {
 			return nil, err
 		}
 
 		// Filter and create video requests
-		for _, newURL := range newEpisodeURLs {
+		for newURL, lv := range newEpisodes {
 			if _, exists := existingMap[newURL]; !exists {
 				video := &models.Video{
 					ChannelID:    c.ID,
 					ChannelURLID: cu.ID,
 					ChannelURL:   cu.URL,
 					URL:          newURL,
+					Title:        lv.Title,
+					ThumbnailURL: lv.ThumbnailURL,
+					UploadDate:   lv.UploadDate,
+					Duration:     lv.Duration,
 				}
 				cu.Videos = append(cu.Videos, video)
 				newRequests = append(newRequests, video)
@@ -189,45 +194,55 @@ func (s *Scraper) ScraperURLCookies(ctx context.Context, cs contracts.ChannelSto
 	return s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
 }
 
-// newEpisodeURLs checks for new episode URLs that are not yet in grabbed-urls.txt
+// newEpisodeURLs returns new episode URLs not yet downloaded, ignored, or Available, with what the listing shows of each.
 func (s *Scraper) newEpisodeURLs(
 	ctx context.Context,
 	channelName, channelURL string,
 	existingURLs, fileURLs []string,
 	cookies []*http.Cookie, cookiePath string,
 	crawlArgs string,
-	fs *models.FlareSolverrSolution) ([]string, error) {
+	fs *models.FlareSolverrSolution) (map[string]*listedVideo, error) {
 	// Custom crawl rules and built-in scrapers take priority over yt-dlp.
-	_, uniqueEpisodeURLs, crawled, err := s.crawlChannelURLs(channelURL, cookies)
+	_, episodes, crawled, err := s.crawlChannelURLs(channelURL, cookies)
 	if err != nil {
 		return nil, err
 	}
 	if !crawled {
-		if uniqueEpisodeURLs, err = ytDlpURLFetch(ctx, channelName, channelURL, nil, cookiePath, crawlArgs, fs); err != nil {
+		if episodes, err = ytDlpURLFetch(ctx, channelName, channelURL, nil, cookiePath, crawlArgs, fs); err != nil {
 			return nil, err
 		}
 	}
 
-	// Collect URLs from all sources (scraped + file)
-	episodeURLs := make([]string, 0, len(uniqueEpisodeURLs)+len(fileURLs))
-	for url := range uniqueEpisodeURLs {
-		episodeURLs = append(episodeURLs, url)
+	// Add URLs from other sources, which have no listing details.
+	if episodes == nil {
+		episodes = make(map[string]*listedVideo)
 	}
-	episodeURLs = append(episodeURLs, fileURLs...)
-
+	extraURLs := slices.Clone(fileURLs)
 	if abstractions.IsSet(keys.URLAdd) {
-		urls := abstractions.GetStringSlice(keys.URLAdd)
-		episodeURLs = append(episodeURLs, urls...)
+		extraURLs = append(extraURLs, abstractions.GetStringSlice(keys.URLAdd)...)
+	}
+	for _, u := range extraURLs {
+		if _, ok := episodes[u]; !ok {
+			episodes[u] = &listedVideo{}
+		}
 	}
 
 	// Filter out existing URLs
+	episodeURLs := make([]string, 0, len(episodes))
+	for u := range episodes {
+		episodeURLs = append(episodeURLs, u)
+	}
 	newURLs := ignoreDownloadedURLs(episodeURLs, existingURLs)
 
 	if len(newURLs) == 0 {
 		logger.Pl.I("No new videos at %s", channelURL)
 		return nil, nil
 	}
-	return newURLs, nil
+	newEpisodes := make(map[string]*listedVideo, len(newURLs))
+	for _, u := range newURLs {
+		newEpisodes[u] = episodes[u]
+	}
+	return newEpisodes, nil
 }
 
 // ignoreDownloadedURLs filters out already downloaded URLs.
@@ -251,9 +266,9 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 }
 
 // ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEpisodeURLs map[string]struct{}, cookiePath string, crawlArgs string, fs *models.FlareSolverrSolution) (map[string]struct{}, error) {
+func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEpisodeURLs map[string]*listedVideo, cookiePath string, crawlArgs string, fs *models.FlareSolverrSolution) (map[string]*listedVideo, error) {
 	if uniqueEpisodeURLs == nil {
-		uniqueEpisodeURLs = make(map[string]struct{})
+		uniqueEpisodeURLs = make(map[string]*listedVideo)
 	}
 
 	// Run yt-dlp, refreshing the FlareSolverr solve and retrying once if Cloudflare blocks a FlareSolverr site.
@@ -334,7 +349,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 			}
 		}
 		// Add to map to ensure uniqueness.
-		uniqueEpisodeURLs[entry.URL] = struct{}{}
+		uniqueEpisodeURLs[entry.URL] = entry.listed()
 		logger.Pl.D(3, "Added entry for channel %q: %q", channelURL, entry)
 	}
 
