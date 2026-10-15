@@ -115,9 +115,20 @@ impersonate = "chrome"
     json_path = "u.hls.url"
 
   # As of October 2026, Rumble lists a channel's videos as JSON inside the page's <rum-videos-grid> element.
+  # item_path picks out each video's object, so json_path and the preview fields are read from it.
   [sites.crawl]
   selector = 'rum-videos-grid script[type="application/json"]'
-  json_path = 'items.#(object_type=="video")#.url'
+  item_path = 'items.#(object_type=="video")#'
+  json_path = 'url'
   include = '^https?://([^/]+\.)?rumble\.com/v'
   exclude = '^https?://([^/]+\.)?rumble\.com/videos'
   strip_query = true
+
+  # Preview fields are only shown on the Available page before download. The details saved with a downloaded video
+  # still come from the selectors above, read from the video's own page.
+  preview_fields = [
+    { field = "title", json_path = "title" },
+    { field = "thumbnail", json_path = "thumb" },
+    { field = "duration", json_path = "duration" },
+    { field = "upload_date", json_path = "upload_date" },
+  ]

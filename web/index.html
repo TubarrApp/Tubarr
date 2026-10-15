@@ -105,6 +105,8 @@
         }
       }
 
+      .available-overlay { position: absolute; padding: 0.125rem 0.375rem; border-radius: 0.25rem; background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 0.75rem; line-height: 1rem; }
+
       /* Delete button hover effect */
       .delete-button-hover:hover {
         background-color: rgb(254 242 242); /* red-50 */
@@ -1087,7 +1089,7 @@
                           >
                             <template x-for="video in (availableVideos[channel.id] || []).slice(0, 10)" :key="video.id">
                               <div class="scroll-carousel-item">
-                                <div class="overflow-hidden">
+                                <div class="relative overflow-hidden">
                                   <template x-if="video.thumbnail_url">
                                     <img :src="video.thumbnail_url" :alt="video.title" referrerpolicy="no-referrer" />
                                   </template>
@@ -1099,6 +1101,12 @@
                                       </svg>
                                     </div>
                                   </template>
+                                  <span
+                                    x-show="video.duration > 0"
+                                    class="available-overlay"
+                                    style="bottom: 0.5rem; right: 0.5rem;"
+                                    x-text="formatDuration(video.duration)"
+                                  ></span>
                                 </div>
                                 <div class="p-4 bg-white dark:bg-white/[0.03]">
                                   <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-2 line-clamp-2 min-h-[2.5rem]" x-text="video.title"></h4>
@@ -1269,6 +1277,13 @@
             const known = (d) => d && !d.startsWith('0001-01-01');
             if (known(video.upload_date)) return this.formatDate(video.upload_date);
             return known(video.created_at) ? `Found ${this.formatDate(video.created_at).toLowerCase()}` : '';
+          },
+
+          formatDuration(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = String(seconds % 60).padStart(2, '0');
+            return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
           },
 
           async loadChannels() {

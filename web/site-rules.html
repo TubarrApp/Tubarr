@@ -704,7 +704,7 @@
                 </div>
 
                 <p class="text-xs font-medium text-gray-700 dark:text-gray-300 pt-2">Channel crawling</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Paste a channel URL. This will show you the video URLs found by the crawl rule or built-in crawler for that site, if there is one.</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Paste a channel URL. This will show you the video URLs found by the crawl rule or built-in crawler for that site, if there is one, with any preview fields read for each.</p>
                 <div class="flex items-center gap-3">
                   <input
                     type="text"
@@ -804,11 +804,19 @@
             if (c) {
               const lines = [`selector: ${c.selector}`];
               if (c.attr) lines.push(`attr: ${c.attr}`);
+              if (c.item_path) lines.push(`item_path: ${c.item_path}`);
               if (c.json_path) lines.push(`json_path: ${c.json_path}`);
               if (c.include) lines.push(`include: ${c.include}`);
               if (c.exclude) lines.push(`exclude: ${c.exclude}`);
               if (c.strip_query) lines.push('strip_query: true');
+              if (c.item) lines.push(`item: ${c.item}`);
               sections.push({ title: 'Crawl settings:', lines });
+              if (c.preview_fields?.length) {
+                sections.push({
+                  title: 'Crawl preview fields (Available page only):',
+                  lines: c.preview_fields.map(f => `${f.field}: ${f.selector || ''}${f.attr ? '  [attr=' + f.attr + ']' : ''}${f.json_path ? '  [json_path=' + f.json_path + ']' : ''}${f.regex ? '  [regex=' + f.regex + ']' : ''}`),
+                });
+              }
             }
             return sections;
           },
@@ -975,9 +983,19 @@
                 this.testResult = 'No crawl rule or built-in crawler matches this URL (yt-dlp will be used instead).';
                 return;
               }
-              const urls = data.urls || [];
-              const lines = [`Crawled with: ${data.source}`, `Found ${urls.length} video URL(s)`, ''];
-              lines.push(...urls);
+              const videos = data.videos || (data.urls || []).map(url => ({ url }));
+              const lines = [`Crawled with: ${data.source}`, `Found ${videos.length} video URL(s)`, ''];
+              for (const v of videos) {
+                lines.push(v.url);
+                // Preview fields, shown on the Available page before download.
+                const details = [
+                  v.title && `title: ${v.title}`,
+                  v.upload_date && `upload_date: ${v.upload_date}`,
+                  v.duration && `duration: ${v.duration}s`,
+                  v.thumbnail_url && `thumbnail_url: ${v.thumbnail_url}`,
+                ].filter(Boolean);
+                details.forEach(d => lines.push(`    ${d}`));
+              }
               this.testResult = lines.join('\n');
             } catch (err) {
               this.testResult = 'Failed to test URL.';

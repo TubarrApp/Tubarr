@@ -37,10 +37,13 @@ type FetchStep struct {
 
 // CrawlRule defines how video URLs are extracted from a channel page.
 type CrawlRule struct {
-	Selector   string
-	Attr       string         // Attribute to read ("" reads element text).
-	JSONPath   string         // gjson path applied to the value, if it holds JSON.
-	Include    *regexp.Regexp // URLs must match, if set.
-	Exclude    *regexp.Regexp // URLs must not match, if set.
-	StripQuery bool
+	Selector      string
+	Attr          string         // Attribute to read ("" reads element text).
+	JSONPath      string         // gjson path applied to the value (or to each item, if ItemPath is set), if it holds JSON.
+	Include       *regexp.Regexp // URLs must match, if set.
+	Exclude       *regexp.Regexp // URLs must not match, if set.
+	StripQuery    bool
+	Item          string         // HTML: selector of each video's container, which preview fields are read inside.
+	ItemPath      string         // JSON: gjson path to the array of video objects, which JSONPath and preview fields read from.
+	PreviewFields []MetadataRule // Details shown before download (title, thumbnail, upload_date, duration).
 }

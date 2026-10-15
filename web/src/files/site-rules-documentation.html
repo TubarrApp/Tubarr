@@ -247,7 +247,14 @@ attr = "src"
         <dt><code>json_path</code><span class="opt">optional</span></dt>
         <dd>
           If the value is JSON (e.g. a <code>&lt;script&gt;</code> tag), the path to the video URLs, in
-          <a href="https://github.com/tidwall/gjson/blob/master/SYNTAX.md">gjson syntax</a>.
+          <a href="https://github.com/tidwall/gjson/blob/master/SYNTAX.md">gjson syntax</a>. With
+          <code>item_path</code>, it's the path to the URL within each video's object (e.g. <code>url</code>).
+        </dd>
+
+        <dt><code>item_path</code><span class="opt">optional</span></dt>
+        <dd>
+          For JSON: the path to the list of video objects (e.g. <code>items.#(object_type=="video")#</code>). Use it
+          with <code>preview_fields</code>, so each video's URL and details are read from the same object.
         </dd>
 
         <dt><code>include</code><span class="opt">optional</span></dt>
@@ -258,7 +265,41 @@ attr = "src"
 
         <dt><code>strip_query</code><span class="opt">optional</span></dt>
         <dd>Removes <code>?...</code> from video URLs so the same video isn't added twice.</dd>
+
+        <dt><code>item</code><span class="opt">optional</span></dt>
+        <dd>
+          For HTML: the element holding each video's card on the channel page (e.g. <code>.episode</code>).
+          <code>preview_fields</code> are read inside the card containing each link. Leave it out to read them
+          inside the link element itself.
+        </dd>
+
+        <dt><code>preview_fields</code><span class="opt">optional</span></dt>
+        <dd>
+          <p>
+            Only used to preview videos on the <strong>Available</strong> page before they're downloaded. Details
+            saved with a downloaded video always come from <code>selectors</code>, read from the video's own page.
+          </p>
+          <p>
+            Read from the channel page Tubarr already loads, so they cost no extra requests. Each entry has a
+            <code>field</code> (<code>title</code>, <code>thumbnail</code>, <code>upload_date</code>, or
+            <code>duration</code>), plus <code>selector</code>, <code>attr</code>, <code>json_path</code>, and
+            <code>regex</code> as for metadata selectors. <code>fetch</code> isn't allowed. If a field is listed
+            more than once, the first one found is used. Durations can be <code>1:02:03</code>, seconds, or
+            <code>PT1H2M3S</code>.
+          </p>
+        </dd>
       </dl>
+      <pre><code>[sites.crawl]
+selector = "a[href]"
+attr = "href"
+include = "/episodes/"
+item = ".episode"
+preview_fields = [
+  { field = "title", selector = "h5" },
+  { field = "thumbnail", selector = "img", attr = "data-src" },
+  { field = "duration", selector = ".duration" },
+  { field = "upload_date", selector = "time" },
+]</code></pre>
     </main>
   </body>
 </html>

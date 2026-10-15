@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -13,6 +14,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 
+	"github.com/TubarrApp/gocommon/sharedtags"
 	"github.com/spf13/viper"
 )
 
@@ -29,13 +31,19 @@ type scrapeSiteConfig struct {
 
 // scrapeCrawlConfig mirrors a site's channel page crawl rule in a scrape config file.
 type scrapeCrawlConfig struct {
-	Selector   string `mapstructure:"selector"`
-	Attr       string `mapstructure:"attr"`
-	JSONPath   string `mapstructure:"json_path"`
-	Include    string `mapstructure:"include"`
-	Exclude    string `mapstructure:"exclude"`
-	StripQuery bool   `mapstructure:"strip_query"`
+	Selector      string                 `mapstructure:"selector"`
+	Attr          string                 `mapstructure:"attr"`
+	JSONPath      string                 `mapstructure:"json_path"`
+	Include       string                 `mapstructure:"include"`
+	Exclude       string                 `mapstructure:"exclude"`
+	StripQuery    bool                   `mapstructure:"strip_query"`
+	Item          string                 `mapstructure:"item"`
+	ItemPath      string                 `mapstructure:"item_path"`
+	PreviewFields []scrapeSelectorConfig `mapstructure:"preview_fields"`
 }
+
+// crawlPreviewFields are the fields a crawl rule can read for previewing videos before download.
+var crawlPreviewFields = []string{sharedtags.JTitle, sharedtags.JThumbnailURL, sharedtags.JUploadDate, consts.CrawlFieldDuration}
 
 // scrapeSelectorConfig mirrors a single selector entry for a site in a scrape config file.
 type scrapeSelectorConfig struct {
@@ -273,12 +281,20 @@ func parseCrawlConfig(c *scrapeCrawlConfig) (*models.CrawlRule, error) {
 		Attr:       strings.TrimSpace(c.Attr),
 		JSONPath:   strings.TrimSpace(c.JSONPath),
 		StripQuery: c.StripQuery,
+		Item:       strings.TrimSpace(c.Item),
+		ItemPath:   strings.TrimSpace(c.ItemPath),
 	}
 	if rule.Selector == "" {
 		return nil, fmt.Errorf("crawl rule is missing a selector")
 	}
+	if rule.ItemPath != "" && rule.JSONPath == "" {
+		return nil, fmt.Errorf("crawl rule with item_path needs a json_path for each item's URL")
+	}
 
 	var err error
+	if rule.PreviewFields, err = parseCrawlPreviewFields(c.PreviewFields); err != nil {
+		return nil, err
+	}
 	if include := strings.TrimSpace(c.Include); include != "" {
 		if rule.Include, err = regexp.Compile(include); err != nil {
 			return nil, fmt.Errorf("invalid crawl include pattern %q: %w", include, err)
@@ -290,4 +306,33 @@ func parseCrawlConfig(c *scrapeCrawlConfig) (*models.CrawlRule, error) {
 		}
 	}
 	return rule, nil
+}
+
+// parseCrawlPreviewFields validates a crawl rule's preview fields, which are read from the channel page without fetches.
+func parseCrawlPreviewFields(configs []scrapeSelectorConfig) ([]models.MetadataRule, error) {
+	fields := make([]models.MetadataRule, 0, len(configs))
+	for _, c := range configs {
+		name := strings.TrimSpace(c.Field)
+		if !slices.Contains(crawlPreviewFields, name) {
+			return nil, fmt.Errorf("crawl preview field %q is not one of %s", name, strings.Join(crawlPreviewFields, ", "))
+		}
+		rule := models.MetadataRule{
+			Name:     name,
+			Selector: strings.TrimSpace(c.Selector),
+			Attr:     strings.TrimSpace(c.Attr),
+			JSONPath: strings.TrimSpace(c.JSONPath),
+		}
+		if rule.Selector == "" && rule.JSONPath == "" {
+			return nil, fmt.Errorf("crawl preview field %q needs a selector or json_path", name)
+		}
+		if len(c.Fetch) > 0 {
+			return nil, fmt.Errorf("crawl preview field %q can't use fetch (it would request every video's page on each crawl)", name)
+		}
+		var err error
+		if rule.Regex, err = compileOptionalRegex(c.Regex); err != nil {
+			return nil, fmt.Errorf("crawl preview field %q: %w", name, err)
+		}
+		fields = append(fields, rule)
+	}
+	return fields, nil
 }

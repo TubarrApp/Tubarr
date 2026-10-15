@@ -2115,12 +2115,15 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		return re.String()
 	}
 	type crawlResp struct {
-		Selector   string `json:"selector"`
-		Attr       string `json:"attr,omitempty"`
-		JSONPath   string `json:"json_path,omitempty"`
-		Include    string `json:"include,omitempty"`
-		Exclude    string `json:"exclude,omitempty"`
-		StripQuery bool   `json:"strip_query,omitempty"`
+		Selector      string         `json:"selector"`
+		Attr          string         `json:"attr,omitempty"`
+		JSONPath      string         `json:"json_path,omitempty"`
+		Include       string         `json:"include,omitempty"`
+		Exclude       string         `json:"exclude,omitempty"`
+		StripQuery    bool           `json:"strip_query,omitempty"`
+		Item          string         `json:"item,omitempty"`
+		ItemPath      string         `json:"item_path,omitempty"`
+		PreviewFields []selectorResp `json:"preview_fields,omitempty"`
 	}
 	type siteResp struct {
 		Domain              string         `json:"domain"`
@@ -2144,7 +2147,10 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 		}
 		var crawl *crawlResp
 		if c := site.Crawl; c != nil {
-			crawl = &crawlResp{Selector: c.Selector, Attr: c.Attr, JSONPath: c.JSONPath, StripQuery: c.StripQuery}
+			crawl = &crawlResp{Selector: c.Selector, Attr: c.Attr, JSONPath: c.JSONPath, StripQuery: c.StripQuery, Item: c.Item, ItemPath: c.ItemPath}
+			for _, f := range c.PreviewFields {
+				crawl.PreviewFields = append(crawl.PreviewFields, selectorResp{Field: f.Name, Selector: f.Selector, Attr: f.Attr, JSONPath: f.JSONPath, Regex: regexString(f.Regex)})
+			}
 			if c.Include != nil {
 				crawl.Include = c.Include.String()
 			}
@@ -2203,14 +2209,18 @@ func (ss *serverStore) handleTestCrawlSite(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	matched, source, urls, err := scraper.TestCrawlSite(testURL)
+	matched, source, videos, err := scraper.TestCrawlSite(testURL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to crawl URL: %v", err), http.StatusInternalServerError)
 		return
 	}
 
+	urls := make([]string, 0, len(videos))
+	for _, v := range videos {
+		urls = append(urls, v.URL)
+	}
 	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"matched": matched, "source": source, "urls": urls}
+	resp := map[string]any{"matched": matched, "source": source, "urls": urls, "videos": videos}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		logger.Pl.E("Failed to encode crawl test response: %v", err)
 	}

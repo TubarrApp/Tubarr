@@ -137,20 +137,6 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	// Spawn scraper.
 	scrape := scraper.New()
 
-	// Grab existing releases.
-	// existingVideoURLsMap, _, err := scrape.GetExistingReleases(cs, c)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// Populate AccessDetails for all ChannelURLs upfront.
-	for _, cu := range c.URLModels {
-		cu.Cookies, cu.CookiePath, err = scrape.ScraperURLCookies(ctx, cs, c, cu)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Build a map of channel URL -> ChannelURL model for quick lookup.
 	channelURLMap := make(map[string]*models.ChannelURL, len(c.URLModels))
 	for _, cu := range c.URLModels {
@@ -179,7 +165,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 				return err
 			}
 		} else {
-			targetChannelURLModel, actualVideoURL, err = parseManualVideoURL(ctx, cs, c, scrape, videoURL)
+			targetChannelURLModel, actualVideoURL, err = parseManualVideoURL(cs, c, videoURL)
 			if err != nil {
 				return err
 			}
@@ -250,6 +236,12 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		cu, exists := channelURLModels[channelURLID]
 		if !exists {
 			logger.Pl.E("Could not find ChannelURL model for ID %d", channelURLID)
+			continue
+		}
+
+		// Get access details only for channel URLs with videos to download (e.g. avoids needless FlareSolverr solves).
+		if cu.Cookies, cu.CookiePath, err = scrape.ScraperURLCookies(ctx, cs, c, cu); err != nil {
+			procError = errors.Join(procError, err)
 			continue
 		}
 
@@ -668,19 +660,13 @@ func parsePipedVideoURL(videoURL string, channelURLMap map[string]*models.Channe
 }
 
 // parseManualVideoURL handles video URLs without a channel URL prefix.
-func parseManualVideoURL(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, scrape *scraper.Scraper, videoURL string) (*models.ChannelURL, string, error) {
+func parseManualVideoURL(cs contracts.ChannelStore, c *models.Channel, videoURL string) (*models.ChannelURL, string, error) {
 	if c == nil {
 		return nil, "", fmt.Errorf("channel cannot be nil")
 	}
 
 	// Use special manual downloads entry.
 	targetChannelURLModel, err := ensureManualDownloadsChannelURL(cs, c)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// Get access details for manual downloads.
-	targetChannelURLModel.Cookies, targetChannelURLModel.CookiePath, err = scrape.ScraperURLCookies(ctx, cs, c, targetChannelURLModel)
 	if err != nil {
 		return nil, "", err
 	}

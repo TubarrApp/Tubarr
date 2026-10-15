@@ -23,6 +23,7 @@ import (
 const (
 	// flareSolverrResponseHeadroom is how much longer than its solve time limit FlareSolverr is given to respond.
 	flareSolverrResponseHeadroom = 30 * time.Second
+	flareSolverrEndpointSuffix   = "/v1"
 )
 
 // flareSolverrSolution holds the cookies and user agent FlareSolverr's browser got past Cloudflare with.
@@ -64,7 +65,8 @@ type flareSolverrResponse struct {
 
 // ValidateFlareSolverrURL checks a FlareSolverr base URL is a usable http(s) URL.
 func ValidateFlareSolverrURL(baseURL string) error {
-	_, err := flareSolverrEndpoint(baseURL)
+	u, err := flareSolverrEndpoint(baseURL)
+	logger.Pl.D(5, "FlareSolverr URL %q validated as %q", baseURL, u)
 	return err
 }
 
@@ -72,11 +74,11 @@ func ValidateFlareSolverrURL(baseURL string) error {
 func flareSolverrEndpoint(baseURL string) (string, error) {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	u, err := url.Parse(baseURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+	if err != nil || (!strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https")) || u.Host == "" {
 		return "", fmt.Errorf("invalid FlareSolverr URL %q (expected e.g. http://localhost:8191)", baseURL)
 	}
-	if !strings.HasSuffix(baseURL, "/v1") {
-		baseURL += "/v1"
+	if !strings.HasSuffix(baseURL, flareSolverrEndpointSuffix) {
+		baseURL += flareSolverrEndpointSuffix
 	}
 	return baseURL, nil
 }
@@ -178,7 +180,7 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 
 	baseURL := abstractions.GetString(keys.FlareSolverrURL)
 	if baseURL == "" {
-		return nil, cm.flareSolverrFailed(host, fmt.Errorf("no FlareSolverr URL is set in settings"))
+		return nil, cm.flareSolverrFailed(host, http.StatusNotFound, fmt.Errorf("no FlareSolverr URL is set in settings"))
 	}
 
 	logger.Pl.I("Solving %q through FlareSolverr at %q...", homeURL, baseURL)
@@ -186,12 +188,12 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 	if rules, ok := siterules.MatchAny(pageURL); ok && rules.FlareSolverrTimeout > 0 {
 		timeout = rules.FlareSolverrTimeout
 	}
-	sol, _, err := solveFlareSolverr(ctx, baseURL, homeURL, timeout)
+	sol, statusCode, err := solveFlareSolverr(ctx, baseURL, homeURL, timeout)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, err // Cancelled, not a FlareSolverr failure.
 		}
-		return nil, cm.flareSolverrFailed(host, err)
+		return nil, cm.flareSolverrFailed(host, statusCode, err)
 	}
 	if !cm.fsHeadersTried {
 		cm.fsHeadersTried = true
@@ -214,8 +216,8 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 // flareSolverrFailed logs and remembers a FlareSolverr failure for host for the rest of the crawl session.
 //
 // Must be called with cm.fsMu held.
-func (cm *CookieManager) flareSolverrFailed(host string, err error) error {
-	err = fmt.Errorf("FlareSolverr unavailable for %q: %w", host, err)
+func (cm *CookieManager) flareSolverrFailed(host string, statusCode int, err error) error {
+	err = fmt.Errorf("FlareSolverr unavailable for %q (status %d): %w", host, statusCode, err)
 	cm.fsFailures[host] = err
 	logger.Pl.W("%v. Falling back to normal requests for %q for the rest of this crawl.", err, host)
 	return err

@@ -39,19 +39,39 @@ func InitGlobalDownloadLimit(limit int) {
 	}
 }
 
-// AcquireGlobalDownloadSlot blocks until a download slot is available.
+// AcquireGlobalDownloadSlot blocks until a download slot is available, or ctx is done.
 // Returns the semaphore channel that was used (for proper release later).
 // Returns immediately if no global limit is configured (limit=0).
-func AcquireGlobalDownloadSlot() chan struct{} {
+func AcquireGlobalDownloadSlot(ctx context.Context, videoURL string) (chan struct{}, error) {
 	globalDownloadSemMu.RLock()
 	sem := globalDownloadSem
 	globalDownloadSemMu.RUnlock()
 
 	if sem == nil {
-		return nil
+		return nil, nil
 	}
-	sem <- struct{}{}
-	return sem
+	if err := acquireSlot(ctx, sem, "global", videoURL); err != nil {
+		return nil, err
+	}
+	return sem, nil
+}
+
+// acquireSlot takes a slot on sem, logging if it has to wait for one.
+func acquireSlot(ctx context.Context, sem chan struct{}, limitDesc, videoURL string) error {
+	select {
+	case sem <- struct{}{}:
+		return nil
+	default:
+	}
+
+	logger.Pl.I("Waiting for a free %s download slot for %q (all %d in use)...", limitDesc, videoURL, cap(sem))
+	select {
+	case sem <- struct{}{}:
+		logger.Pl.D(1, "Got a %s download slot for %q", limitDesc, videoURL)
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // domainDownloadSems limits concurrent downloads per hostname.
@@ -87,22 +107,24 @@ func SetDomainDownloadLimit(hostname string, limit int) {
 	}
 }
 
-// AcquireDomainDownloadSlot blocks until a slot is available for the video URL's domain.
+// AcquireDomainDownloadSlot blocks until a slot is available for the video URL's domain, or ctx is done.
 // Returns the semaphore used, for passing to ReleaseDomainDownloadSlot.
 // Returns nil if no limit is configured for that domain.
-func AcquireDomainDownloadSlot(rawURL string) chan struct{} {
+func AcquireDomainDownloadSlot(ctx context.Context, rawURL string) (chan struct{}, error) {
 	hostname := extractHostname(rawURL)
 	if hostname == "" {
-		return nil
+		return nil, nil
 	}
 	domainDownloadSemsMu.RLock()
 	sem := domainDownloadSems[hostname]
 	domainDownloadSemsMu.RUnlock()
 	if sem == nil {
-		return nil
+		return nil, nil
 	}
-	sem <- struct{}{}
-	return sem
+	if err := acquireSlot(ctx, sem, hostname, rawURL); err != nil {
+		return nil, err
+	}
+	return sem, nil
 }
 
 // ReleaseDomainDownloadSlot releases a domain slot previously acquired.

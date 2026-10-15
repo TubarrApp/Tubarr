@@ -2,6 +2,7 @@ package siterules
 
 import (
 	"regexp"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/sharedtags"
@@ -63,8 +64,20 @@ var bitchute = models.SiteRules{
 
 // censored holds the built-in rules for censored.tv.
 var censored = models.SiteRules{
-	Site:  "censored.tv",
-	Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href", Include: regexp.MustCompile(`/episodes/`)},
+	Site: "censored.tv",
+	Crawl: &models.CrawlRule{
+		Selector: "a[href]",
+		Attr:     "href",
+		Include:  regexp.MustCompile(`/episodes/`),
+		Item:     ".episode",
+		PreviewFields: []models.MetadataRule{
+			{Name: sharedtags.JTitle, Selector: "h5"},
+			{Name: sharedtags.JThumbnailURL, Selector: "img[data-src]", Attr: "data-src"},
+			{Name: sharedtags.JThumbnailURL, Selector: "img[src]", Attr: "src"},
+			{Name: consts.CrawlFieldDuration, Selector: ".duration"},
+			{Name: sharedtags.JUploadDate, Selector: "time"},
+		},
+	},
 	Metadata: []models.MetadataRule{
 		{Name: sharedtags.JTitle, Selector: "#episode-container .episode-title"},
 		{Name: sharedtags.JDescription, Selector: "#about .raised-content"},
@@ -92,10 +105,17 @@ var rumble = models.SiteRules{
 	Impersonate: "chrome", // Rumble blocks non-Chrome TLS fingerprints.
 	Crawl: &models.CrawlRule{
 		Selector:   `rum-videos-grid script[type="application/json"]`,
-		JSONPath:   `items.#(object_type=="video")#.url`,
+		ItemPath:   `items.#(object_type=="video")#`,
+		JSONPath:   "url",
 		Include:    regexp.MustCompile(`^https?://([^/]+\.)?rumble\.com/v`),
 		Exclude:    regexp.MustCompile(`^https?://([^/]+\.)?rumble\.com/videos`),
 		StripQuery: true,
+		PreviewFields: []models.MetadataRule{
+			{Name: sharedtags.JTitle, JSONPath: "title"},
+			{Name: sharedtags.JThumbnailURL, JSONPath: "thumb"},
+			{Name: consts.CrawlFieldDuration, JSONPath: "duration"},
+			{Name: sharedtags.JUploadDate, JSONPath: "upload_date"},
+		},
 	},
 	Metadata: []models.MetadataRule{
 		{Name: sharedtags.JTitle, Selector: "title"},

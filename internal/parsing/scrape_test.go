@@ -48,12 +48,46 @@ sites:
 	}
 }
 
+// TestParseScrapeSelectorsFileCrawlPreview tests parsing a crawl rule's item, item_path, and preview fields.
+func TestParseScrapeSelectorsFileCrawlPreview(t *testing.T) {
+	p := writeScrapeConfig(t, "rules.toml", `
+[[sites]]
+domain = "example.com"
+
+  [sites.crawl]
+  selector = 'script[type="application/json"]'
+  item_path = 'items.#(object_type=="video")#'
+  json_path = 'url'
+  item = '.card'
+  preview_fields = [
+    { field = 'title', json_path = 'title' },
+    { field = 'duration', json_path = 'length', regex = '(\d+)' },
+  ]
+`)
+	sites, err := ParseScrapeSelectorsFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := sites[0].Crawl
+	if c.ItemPath != `items.#(object_type=="video")#` || c.JSONPath != "url" || c.Item != ".card" || len(c.PreviewFields) != 2 {
+		t.Fatalf("crawl rule parsed incorrectly: %+v", c)
+	}
+	if f := c.PreviewFields[1]; f.Name != consts.CrawlFieldDuration || f.JSONPath != "length" || f.Regex == nil {
+		t.Errorf("duration preview field parsed incorrectly: %+v", f)
+	}
+}
+
 // TestParseScrapeSelectorsFileCrawlErrors tests that invalid crawl rules in a scrape config file produce errors.
 func TestParseScrapeSelectorsFileCrawlErrors(t *testing.T) {
 	tests := map[string]string{
 		"sets nothing":           "sites:\n  - domain: example.com\n",
 		"missing crawl selector": "sites:\n  - domain: example.com\n    crawl:\n      include: '/v'\n",
 		"bad include regex":      "sites:\n  - domain: example.com\n    crawl:\n      selector: a\n      include: '('\n",
+		"item_path no json_path": "sites:\n  - domain: example.com\n    crawl:\n      selector: script\n      item_path: items\n",
+		"unknown preview field":  "sites:\n  - domain: example.com\n    crawl:\n      selector: a\n      preview_fields:\n        - {field: description, selector: p}\n",
+		"preview no selector":    "sites:\n  - domain: example.com\n    crawl:\n      selector: a\n      preview_fields:\n        - {field: title}\n",
+		"preview fetch":          "sites:\n  - domain: example.com\n    crawl:\n      selector: a\n      preview_fields:\n        - {field: title, selector: h5, fetch: [{url: '/x'}]}\n",
+		"preview bad regex":      "sites:\n  - domain: example.com\n    crawl:\n      selector: a\n      preview_fields:\n        - {field: title, selector: h5, regex: '('}\n",
 	}
 	for name, content := range tests {
 		t.Run(name, func(t *testing.T) {
