@@ -144,7 +144,8 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
     -o tubarr ./cmd/tubarr
 
 ############ Build Metarr ############
-RUN git clone https://github.com/TubarrApp/Metarr.git /build/metarr-src && \
+ARG METARR_REF=master
+RUN git clone --depth 1 --branch "$METARR_REF" https://github.com/TubarrApp/Metarr.git /build/metarr-src && \
     cd /build/metarr-src && \
     go mod download && \
     CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \

@@ -37,6 +37,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=beta,enable=${{ github.ref == 'refs/heads/beta' }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -45,3 +46,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Beta builds (the beta branch, or a tag like v1.5.0-beta.1) bundle Metarr's beta branch.
+          build-args: |
+            METARR_REF=${{ (github.ref == 'refs/heads/beta' || contains(github.ref_name, '-beta')) && 'beta' || 'master' }}
