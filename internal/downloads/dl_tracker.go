@@ -12,23 +12,21 @@ import (
 
 // DownloadTracker is the model holding data related to download tracking.
 type DownloadTracker struct {
-	db         *sql.DB
-	updates    chan models.StatusUpdate
-	batchSize  int
-	done       chan struct{}
-	dlStore    contracts.DownloadStore
-	downloader string
+	db        *sql.DB
+	updates   chan models.StatusUpdate
+	batchSize int
+	done      chan struct{}
+	dlStore   contracts.DownloadStore
 }
 
 // NewDownloadTracker returns the model used for tracking downloads.
-func NewDownloadTracker(store contracts.DownloadStore, externalDler string) *DownloadTracker {
+func NewDownloadTracker(store contracts.DownloadStore) *DownloadTracker {
 	return &DownloadTracker{
-		db:         store.GetDB(),
-		updates:    make(chan models.StatusUpdate, 100),
-		batchSize:  50,
-		done:       make(chan struct{}),
-		dlStore:    store,
-		downloader: externalDler,
+		db:        store.GetDB(),
+		updates:   make(chan models.StatusUpdate, 100),
+		batchSize: 50,
+		done:      make(chan struct{}),
+		dlStore:   store,
 	}
 }
 

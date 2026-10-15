@@ -18,10 +18,21 @@ const (
 	Output               = "-o"
 	P                    = "-P"
 	Print                = "--print"
+	Progress             = "--progress" // Needed as --print implies --quiet.
+	ProgressNewline      = "--newline"
+	ProgressTemplate     = "--progress-template"
 	RestrictFilenames    = "--restrict-filenames"
 	Retries              = "--retries"
 	YTDLP                = "yt-dlp"
 	YtDLPOutputExtension = "--merge-output-format"
+)
+
+// Progress line format (fields: downloaded bytes, total bytes, estimated total bytes, fragment index, fragment count).
+const (
+	ProgressMarker      = "[tubarr-progress]"
+	ProgressTemplateFmt = "download:" + ProgressMarker +
+		" %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s" +
+		" %(progress.fragment_index)s %(progress.fragment_count)s"
 )
 
 // Scrape-related yt-dlp commands.
@@ -42,6 +53,18 @@ var (
 )
 
 // Downloaders
+
+// External downloaders supported by yt-dlp.
+const (
+	DownloaderAxel   = "axel"
+	DownloaderCurl   = "curl"
+	DownloaderFFmpeg = "ffmpeg"
+	DownloaderHttpie = "httpie"
+	DownloaderWget   = "wget"
+)
+
+// FFmpegProgress makes ffmpeg write key=value progress lines to stdout.
+const FFmpegProgress = "-progress pipe:1 -nostats"
 
 // Aria2c downloader and arg tags.
 const (

@@ -60,7 +60,7 @@ func InitProcess(
 	// Begin main process.
 	logger.Pl.I("Starting meta/video processing for %d videos", len(videos))
 
-	dlTracker := downloads.NewDownloadTracker(s.DownloadStore(), c.ChanSettings.ExternalDownloader)
+	dlTracker := downloads.NewDownloadTracker(s.DownloadStore())
 	dlTracker.Start(jobParent)
 	defer dlTracker.Stop()
 

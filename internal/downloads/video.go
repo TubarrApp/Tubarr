@@ -2,13 +2,16 @@ package downloads
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
@@ -46,6 +49,9 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Print filename to console upon completion.
 	args = append(args, command.Print, command.AfterMove)
 
+	// Machine-readable progress lines.
+	args = append(args, command.Progress, command.ProgressNewline, command.ProgressTemplate, command.ProgressTemplateFmt)
+
 	// Cookie path.
 	if d.ChannelURL.CookiePath == "" {
 		if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
@@ -72,9 +78,16 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// External downloaders and arguments.
 	if d.ChannelURL.ChanURLSettings.ExternalDownloader != "" {
 		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)
-		if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
+		dlName := downloaders.Name(d.ChannelURL.ChanURLSettings.ExternalDownloader)
 
-			switch d.ChannelURL.ChanURLSettings.ExternalDownloader {
+		// ffmpeg is silenced by yt-dlp's quiet mode, so always request its progress output.
+		if dlName == command.DownloaderFFmpeg {
+			ffmpegArgs := strings.TrimSpace(d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs + " " + command.FFmpegProgress)
+			args = append(args, command.ExternalDLArgs, command.DownloaderFFmpeg+":"+ffmpegArgs)
+
+		} else if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
+
+			switch dlName {
 			case command.DownloaderAria:
 
 				ariaCmd := command.DownloaderAria + ":" +
@@ -172,21 +185,28 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 
-	// Merge stdout and stderr into lineChan.
-	go func() {
-		defer close(lineChan)
-		scanner := bufio.NewScanner(io.MultiReader(stdout, stderr))
-		for scanner.Scan() {
-			select {
-			case lineChan <- scanner.Text():
-			case <-d.Context.Done():
-				logger.Pl.W("Download canceled: %v", d.Context.Err())
-				return
+	// Merge stdout and stderr into lineChan, reading both concurrently so neither pipe can fill and stall yt-dlp.
+	var readers sync.WaitGroup
+	for _, pipe := range []io.Reader{stdout, stderr} {
+		readers.Go(func() {
+			scanner := bufio.NewScanner(pipe)
+			scanner.Split(scanLinesOrCR)
+			for scanner.Scan() {
+				select {
+				case lineChan <- scanner.Text():
+				case <-d.Context.Done():
+					logger.Pl.W("Download canceled: %v", d.Context.Err())
+					return
+				}
 			}
-		}
-		if err := scanner.Err(); err != nil {
-			logger.Pl.E("Scanner error reading yt-dlp output: %v", err)
-		}
+			if err := scanner.Err(); err != nil {
+				logger.Pl.E("Scanner error reading yt-dlp output: %v", err)
+			}
+		})
+	}
+	go func() {
+		readers.Wait()
+		close(lineChan)
 	}()
 
 	// Start parser.
@@ -261,9 +281,9 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 	defer state.DeleteActiveVideoDownloadStatus(d.Video.ID)
 
 	var (
-		totalItemsFound, totalDownloadedItems int
-		completed                             bool
-		errorLines                            []string
+		progress   = downloaders.NewProgressParser(d.ChannelURL.ChanURLSettings.ExternalDownloader, d.durationSeconds())
+		completed  bool
+		errorLines []string
 	)
 	for line := range lineChan {
 		if line != "" {
@@ -283,19 +303,10 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 			}
 		}
 
-		// Aria2 progress parsing.
-		if d.DLTracker.downloader == command.DownloaderAria {
-			gotLine, itemsFound, downloadedItems, pct, status :=
-				downloaders.Aria2OutputParser(line, totalItemsFound, totalDownloadedItems, d.Video.DownloadStatus.Percent, d.Video.DownloadStatus.Status)
-
-			totalItemsFound = itemsFound
-			totalDownloadedItems = downloadedItems
-
-			if gotLine {
-				d.Video.DownloadStatus.Status = status
-				d.Video.DownloadStatus.Percent = pct
-				d.DLTracker.sendUpdate(d.Video)
-			}
+		// yt-dlp and external downloader progress parsing.
+		if pct, ok := progress.Parse(line); ok {
+			d.updateProgress(consts.DLStatusDownloading, pct)
+			continue
 		}
 
 		// Detect completed filename.
@@ -323,4 +334,42 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 		errMsg := fmt.Sprintf("yt-dlp failed: %s", strings.Join(errorLines, "; "))
 		errChan <- errors.New(errMsg)
 	}
+}
+
+// durationSeconds returns the video duration from its metadata, falling back to the crawl listing's duration.
+func (d *VideoDownload) durationSeconds() float64 {
+	switch v := d.Video.MetadataMap["duration"].(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	}
+	return float64(d.Video.Duration)
+}
+
+// updateProgress sends a status update when the status or whole percentage changes.
+func (d *VideoDownload) updateProgress(status consts.DownloadStatus, pct float64) {
+	prev := d.Video.DownloadStatus
+	d.Video.DownloadStatus.Status = status
+	d.Video.DownloadStatus.Percent = pct
+	if status != prev.Status || math.Floor(pct) != math.Floor(prev.Percent) {
+		d.DLTracker.sendUpdate(d.Video)
+	}
+}
+
+// scanLinesOrCR is a bufio.SplitFunc splitting on "\n", "\r\n", or a lone "\r" (progress bar redraws).
+func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	if i := bytes.IndexAny(data, "\r\n"); i >= 0 {
+		if data[i] == '\r' && i+1 < len(data) && data[i+1] == '\n' {
+			return i + 2, data[:i], nil
+		}
+		return i + 1, data[:i], nil
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
 }

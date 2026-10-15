@@ -24,8 +24,8 @@ func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, cur
 
 	// Progress percentages
 	switch totalItemCount {
-	// "1 item(s)", expect % progress output
-	case 1:
+	// "1 item(s)" (or no batch notice, e.g. console log level above notice), expect % progress output
+	case 0, 1:
 		if matches := regex.AriaProgressCompile().FindStringSubmatch(line); len(matches) == 2 {
 
 			if parsedPct, err := strconv.ParseFloat(matches[1], 64); err == nil { // If err IS nil
