@@ -39,91 +39,99 @@ import (
 	"github.com/spf13/viper"
 )
 
+// addChannelFromConfig adds a channel from a config file, with its logins and notifications, in one transaction.
+//
+// Errors in the file wrap contracts.ErrInvalidChannel.
+func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ignoreRun bool, err error) {
+	var input models.ChannelInputPtrs
+	v := viper.New()
+	if err := file.LoadConfigFile(v, path); err != nil {
+		return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+	}
+	if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
+		return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+	}
+	if input.URLSettings, err = parsing.ParseURLSettingsFromViper(v); err != nil {
+		return nil, false, fmt.Errorf("%w: failed to parse url-settings: %w", contracts.ErrInvalidChannel, err)
+	}
+
+	c, authMap, err := parsing.BuildChannelFromInput(input)
+	if err != nil {
+		return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+	}
+	var notifications []*models.Notification
+	if input.Notification != nil && len(*input.Notification) != 0 {
+		if notifications, err = parsing.ParseNotifications(*input.Notification); err != nil {
+			return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+		}
+	}
+
+	if err := ss.cs.WithTx(func(cs contracts.ChannelStore) error {
+		id, err := cs.AddChannel(c)
+		if err != nil {
+			return err
+		}
+		c.ID = id
+		if len(authMap) > 0 {
+			if err := cs.AddAuth(id, authMap); err != nil {
+				return err
+			}
+		}
+		if len(notifications) > 0 {
+			return cs.AddNotifyURLs(id, notifications)
+		}
+		return nil
+	}); err != nil {
+		return nil, false, err
+	}
+	return c, input.IgnoreRun != nil && *input.IgnoreRun, nil
+}
+
+// startIgnoreCrawl runs an ignore crawl for a new channel in the background, unless one is already running.
+//
+// The crawl outlives the request, so it runs under the server's context.
+//
+//nolint:contextcheck
+func (ss *serverStore) startIgnoreCrawl(c *models.Channel) {
+	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name)
+	if !ok {
+		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
+		return
+	}
+	logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
+	go func(ctx context.Context) {
+		defer unlock()
+		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
+			logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+		} else {
+			logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
+		}
+	}(crawlCtx)
+}
+
+// channelErrStatus returns the HTTP status for a channel store error.
+func channelErrStatus(err error) int {
+	if errors.Is(err, contracts.ErrInvalidChannel) {
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
+}
+
 // handleAddChannelFromFile adds a new channel from a specified config file path using Viper.
 func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.Request) {
-	var input models.ChannelInputPtrs
-
-	// Grab config filepath from form.
 	addFromFile := r.FormValue("add_from_config_file")
 	if addFromFile == "" {
 		http.Error(w, "no config file entered, could not add new channel", http.StatusBadRequest)
 		return
 	}
 
-	// Use local viper instance for consistency with directory handler.
-	v := viper.New()
-	if err := file.LoadConfigFile(v, addFromFile); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Load viper variables into the struct from local instance.
-	if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Parse per-URL settings if present.
-	urlSettings, err := parsing.ParseURLSettingsFromViper(v)
+	c, ignoreRun, err := ss.addChannelFromConfig(addFromFile)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse url-settings: %v", err), http.StatusBadRequest)
+		http.Error(w, err.Error(), channelErrStatus(err))
 		return
 	}
-	input.URLSettings = urlSettings
-
-	// Fill channel from config file input.
-	c, authMap, err := parsing.BuildChannelFromInput(input)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Add channel to database.
-	channelID, err := ss.cs.AddChannel(c)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	c.ID = channelID
-
-	if len(authMap) > 0 {
-		if err := ss.cs.AddAuth(channelID, authMap); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Add notifications if present.
-	if input.Notification != nil && len(*input.Notification) != 0 {
-		v, err := parsing.ParseNotifications(*input.Notification)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if err := ss.cs.AddNotifyURLs(channelID, v); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Ignore run if desired.
-	if input.IgnoreRun != nil && *input.IgnoreRun {
-		if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
-			//nolint:contextcheck
-			go func(ctx context.Context) {
-				defer unlock()
-				logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
-
-				if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-					logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
-				} else {
-					logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
-				}
-			}(crawlCtx)
-		} else {
-			logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
-		}
+	if ignoreRun {
+		ss.startIgnoreCrawl(c)
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -156,117 +164,24 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Track results
-	successes := make([]string, 0, len(batchConfigFiles))
-	failures := make([]struct {
+	type failure struct {
 		file   string
 		reason string
-	}, 0, len(batchConfigFiles))
+	}
+	successes := make([]string, 0, len(batchConfigFiles))
+	failures := make([]failure, 0, len(batchConfigFiles))
 
 	logger.Pl.I("Adding channels from config files %v", batchConfigFiles)
 
 	for _, batchConfigFile := range batchConfigFiles {
-		var input models.ChannelInputPtrs
-		v := viper.New()
-
-		// Load in config file
-		if err := file.LoadConfigFile(v, batchConfigFile); err != nil {
-			failures = append(failures, struct {
-				file   string
-				reason string
-			}{batchConfigFile, err.Error()})
-			continue
-		}
-
-		// Load viper variables into the struct from local instance
-		if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
-			failures = append(failures, struct {
-				file   string
-				reason string
-			}{batchConfigFile, err.Error()})
-			continue
-		}
-
-		// Parse per-URL settings if present
-		urlSettings, err := parsing.ParseURLSettingsFromViper(v)
+		c, ignoreRun, err := ss.addChannelFromConfig(batchConfigFile)
 		if err != nil {
-			failures = append(failures, struct {
-				file   string
-				reason string
-			}{batchConfigFile, fmt.Sprintf("failed to parse url-settings: %v", err)})
+			failures = append(failures, failure{batchConfigFile, err.Error()})
 			continue
 		}
-		input.URLSettings = urlSettings
-
-		c, authMap, err := parsing.BuildChannelFromInput(input)
-		if err != nil {
-			failures = append(failures, struct {
-				file   string
-				reason string
-			}{batchConfigFile, err.Error()})
-			continue
+		if ignoreRun {
+			ss.startIgnoreCrawl(c)
 		}
-
-		channelID, err := ss.cs.AddChannel(c)
-		if err != nil {
-			failures = append(failures, struct {
-				file   string
-				reason string
-			}{batchConfigFile, err.Error()})
-			continue
-		}
-
-		c.ID = channelID
-
-		if len(authMap) > 0 {
-			if err := ss.cs.AddAuth(channelID, authMap); err != nil {
-				failures = append(failures, struct {
-					file   string
-					reason string
-				}{batchConfigFile, err.Error()})
-				continue
-			}
-		}
-
-		if input.Notification != nil && len(*input.Notification) != 0 {
-			v, err := parsing.ParseNotifications(*input.Notification)
-			if err != nil {
-				failures = append(failures, struct {
-					file   string
-					reason string
-				}{batchConfigFile, err.Error()})
-				continue
-			}
-
-			if err := ss.cs.AddNotifyURLs(channelID, v); err != nil {
-				failures = append(failures, struct {
-					file   string
-					reason string
-				}{batchConfigFile, err.Error()})
-				continue
-			}
-		}
-
-		// Ignore run if desired.
-		if input.IgnoreRun != nil && *input.IgnoreRun {
-			if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
-				//nolint:contextcheck
-				go func(ctx context.Context) {
-					defer unlock()
-					logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
-
-					if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-						logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
-					} else {
-						logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
-					}
-				}(crawlCtx)
-			} else {
-				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
-			}
-		}
-
-		// Track success
 		successes = append(successes, c.Name)
 	}
 
@@ -507,32 +422,12 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Add to database.
 	if c.ID, err = ss.cs.AddChannel(c); err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, contracts.ErrInvalidChannel) {
-			status = http.StatusBadRequest
-		}
-		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), status)
+		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), channelErrStatus(err))
 		return
 	}
 
-	// Ignore run if desired.
 	if r.FormValue("ignore_run") == "true" {
-		if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
-			logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
-			//nolint:contextcheck
-			go func(ctx context.Context) {
-				defer unlock()
-				logger.Pl.I("Starting ignore crawl for channel %q via web request", c.Name)
-
-				if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-					logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
-				} else {
-					logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
-				}
-			}(crawlCtx)
-		} else {
-			logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
-		}
+		ss.startIgnoreCrawl(c)
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -617,122 +512,91 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// -- Write. --
-	if name != "" && name != existingChannel.Name {
-		if err := ss.cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
-			http.Error(w, fmt.Sprintf("failed to update channel name: %v", err), http.StatusInternalServerError)
-			return
-		}
-		existingChannel.Name = name
-	}
-	if _, err := ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
-		*s = *newSettings
-		return nil
-	}); err != nil {
-		http.Error(w, fmt.Sprintf("failed to update channel settings: %v", err), http.StatusInternalServerError)
-		return
-	}
-	if _, err := ss.cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
-		*m = *newMetarr
-		return nil
-	}); err != nil {
-		http.Error(w, fmt.Sprintf("failed to update channel metarr args: %v", err), http.StatusInternalServerError)
-		return
+	notificationURLs := strings.Fields(r.FormValue("notifications"))
+	notifications := make([]*models.Notification, 0, len(notificationURLs))
+	for _, notifyURL := range notificationURLs {
+		notifications = append(notifications, &models.Notification{ChannelID: channelID, NotifyURL: notifyURL})
 	}
 
-	// Build map of existing URLs.
-	existingURLMap := make(map[string]*models.ChannelURL)
-	for _, urlModel := range existingChannel.URLModels {
-		existingURLMap[urlModel.URL] = urlModel
-	}
-
-	// Build map of new URLs.
-	newURLMap := make(map[string]bool)
-	for _, u := range urls {
-		if u != "" {
-			newURLMap[u] = true
-		}
-	}
-
-	// Delete URLs that are no longer in the list.
-	for existingURL, urlModel := range existingURLMap {
-		if !newURLMap[existingURL] {
-			// URL was removed, delete it.
-			if err := ss.cs.DeleteChannelURL(urlModel.ID); err != nil {
-				logger.Pl.E("Failed to delete channel URL %q: %v", existingURL, err)
+	// -- Write, in one transaction so a failed update changes nothing. --
+	if err := ss.cs.WithTx(func(cs contracts.ChannelStore) error {
+		if name != "" && name != existingChannel.Name {
+			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
+				return fmt.Errorf("failed to update channel name: %w", err)
 			}
 		}
-	}
-
-	// Add or update URLs.
-	for _, u := range urls {
-		// Get auth details for this URL if they exist.
-		var parsedUsername, parsedPassword, parsedLoginURL string
-		if _, exists := authMap[u]; exists {
-			parsedUsername = authMap[u].Username
-			parsedPassword = authMap[u].Password
-			parsedLoginURL = authMap[u].LoginURL
+		if _, err := cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+			*s = *newSettings
+			return nil
+		}); err != nil {
+			return fmt.Errorf("failed to update channel settings: %w", err)
+		}
+		if _, err := cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
+			*m = *newMetarr
+			return nil
+		}); err != nil {
+			return fmt.Errorf("failed to update channel metarr args: %w", err)
 		}
 
-		// Check if URL already exists.
-		if existingURLModel, exists := existingURLMap[u]; exists {
-			// Update existing URL. A blank password keeps the saved one, as passwords aren't sent to the edit page.
-			if parsedPassword != "" || parsedUsername == "" {
-				existingURLModel.Password = parsedPassword
+		// Delete URLs no longer listed. The manual downloads URL is never listed in the edit form, so it's kept.
+		existingURLMap := make(map[string]*models.ChannelURL, len(existingChannel.URLModels))
+		for _, urlModel := range existingChannel.URLModels {
+			existingURLMap[urlModel.URL] = urlModel
+		}
+		for existingURL, urlModel := range existingURLMap {
+			if !urlModel.IsManual && !slices.Contains(urls, existingURL) {
+				if err := cs.DeleteChannelURL(urlModel.ID); err != nil {
+					return fmt.Errorf("failed to delete URL %q: %w", existingURL, err)
+				}
 			}
-			existingURLModel.Username = parsedUsername
-			existingURLModel.LoginURL = parsedLoginURL
-			existingURLModel.UpdatedAt = now
+		}
 
-			// Apply per-URL custom settings if they exist, otherwise clear them.
-			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
+		// Add or update listed URLs.
+		for _, u := range urls {
+			var parsedUsername, parsedPassword, parsedLoginURL string
+			if a, exists := authMap[u]; exists {
+				parsedUsername, parsedPassword, parsedLoginURL = a.Username, a.Password, a.LoginURL
+			}
+			urlSettings := urlSettingsMap[u]
+
+			if existingURLModel, exists := existingURLMap[u]; exists {
+				// A blank password keeps the saved one, as passwords aren't sent to the edit page.
+				if parsedPassword != "" || parsedUsername == "" {
+					existingURLModel.Password = parsedPassword
+				}
+				existingURLModel.Username = parsedUsername
+				existingURLModel.LoginURL = parsedLoginURL
+				existingURLModel.UpdatedAt = now
 				existingURLModel.ChanURLSettings = urlSettings.Settings
 				existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
-			} else {
-				// No custom settings for this URL - clear any existing ones.
-				existingURLModel.ChanURLSettings = nil
-				existingURLModel.ChanURLMetarrArgs = nil
+
+				if err := cs.UpdateChannelURLSettings(existingURLModel); err != nil {
+					return fmt.Errorf("failed to update URL %q: %w", u, err)
+				}
+				continue
 			}
 
-			if err := ss.cs.UpdateChannelURLSettings(existingURLModel); err != nil {
-				http.Error(w, fmt.Sprintf("failed to update URL %q: %v", u, err), http.StatusInternalServerError)
-				return
-			}
-		} else {
-			// Add new URL.
 			chanURL := &models.ChannelURL{
-				URL:       u,
-				Username:  parsedUsername,
-				Password:  parsedPassword,
-				LoginURL:  parsedLoginURL,
-				LastScan:  now,
-				CreatedAt: now,
-				UpdatedAt: now,
+				URL:               u,
+				Username:          parsedUsername,
+				Password:          parsedPassword,
+				LoginURL:          parsedLoginURL,
+				ChanURLSettings:   urlSettings.Settings,
+				ChanURLMetarrArgs: urlSettings.Metarr,
+				LastScan:          now,
+				CreatedAt:         now,
+				UpdatedAt:         now,
 			}
-
-			// Apply per-URL custom settings if they exist.
-			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
-				chanURL.ChanURLSettings = urlSettings.Settings
-				chanURL.ChanURLMetarrArgs = urlSettings.Metarr
-			}
-
-			// Add the new URL to the channel.
-			if _, err := ss.cs.AddChannelURL(channelID, chanURL, false); err != nil {
-				http.Error(w, fmt.Sprintf("failed to add URL %q: %v", u, err), http.StatusInternalServerError)
-				return
+			if _, err := cs.AddChannelURL(channelID, chanURL, false); err != nil {
+				return fmt.Errorf("failed to add URL %q: %w", u, err)
 			}
 		}
-	}
 
-	// Handle notification URLs update.
-	// First, get existing notifications to delete them.
-	existingNotifications, err := ss.cs.GetNotifyURLs(channelID)
-	if err != nil {
-		logger.Pl.E("Failed to fetch existing notifications for channel %d: %v", channelID, err)
-	}
-
-	// Delete all existing notifications if there are any.
-	if len(existingNotifications) > 0 {
+		// Replace notifications.
+		existingNotifications, err := cs.GetNotifyURLs(channelID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch existing notifications: %w", err)
+		}
 		existingURLs := make([]string, 0, len(existingNotifications))
 		existingNames := make([]string, 0, len(existingNotifications))
 		for _, n := range existingNotifications {
@@ -744,39 +608,20 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			}
 		}
 		if len(existingURLs) > 0 || len(existingNames) > 0 {
-			if err := ss.cs.DeleteNotifyURLs(channelID, existingURLs, existingNames); err != nil {
-				logger.Pl.E("Failed to delete existing notifications for channel %d: %v", channelID, err)
-				http.Error(w, fmt.Sprintf("failed to delete existing notifications: %v", err), http.StatusInternalServerError)
-				return
+			if err := cs.DeleteNotifyURLs(channelID, existingURLs, existingNames); err != nil {
+				return fmt.Errorf("failed to delete existing notifications: %w", err)
 			}
 		}
-	}
-
-	// Add new notifications if provided.
-	notificationsStr := r.FormValue("notifications")
-	if notificationsStr != "" {
-		// Parse notification URLs from space-separated string.
-		notificationURLs := strings.Fields(notificationsStr)
-
-		// Convert to Notification models.
-		notifications := make([]*models.Notification, 0, len(notificationURLs))
-		for _, notifyURL := range notificationURLs {
-			if notifyURL != "" {
-				notifications = append(notifications, &models.Notification{
-					ChannelID: channelID,
-					NotifyURL: notifyURL,
-				})
-			}
-		}
-
-		// Add new notifications if any.
 		if len(notifications) > 0 {
-			if err := ss.cs.AddNotifyURLs(channelID, notifications); err != nil {
-				logger.Pl.E("Failed to add notification URLs for channel %d: %v", channelID, err)
-				http.Error(w, fmt.Sprintf("failed to add notification URLs: %v", err), http.StatusInternalServerError)
-				return
+			if err := cs.AddNotifyURLs(channelID, notifications); err != nil {
+				return fmt.Errorf("failed to add notification URLs: %w", err)
 			}
 		}
+		return nil
+	}); err != nil {
+		logger.Pl.E("Failed to update channel %d: %v", channelID, err)
+		http.Error(w, err.Error(), channelErrStatus(err))
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
