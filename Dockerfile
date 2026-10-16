@@ -148,6 +148,12 @@ ARG METARR_REF=master
 RUN git clone --depth 1 --branch "$METARR_REF" https://github.com/TubarrApp/Metarr.git /build/metarr-src && \
     cd /build/metarr-src && \
     go mod download && \
+    # Tubarr and Metarr share the operation grammar in gocommon, so they must pin the same version.
+    tubarr_gocommon="$(cd /build && go list -m -f '{{.Version}}' github.com/TubarrApp/gocommon)" && \
+    metarr_gocommon="$(go list -m -f '{{.Version}}' github.com/TubarrApp/gocommon)" && \
+    if [ "$tubarr_gocommon" != "$metarr_gocommon" ]; then \
+        echo "gocommon versions differ: Tubarr $tubarr_gocommon, Metarr $metarr_gocommon (METARR_REF=$METARR_REF)" >&2; exit 1; \
+    fi && \
     CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-w -s" \
         -o /build/metarr ./cmd/metarr
 
@@ -175,6 +181,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-venv \
     sqlite3 \
     gosu \
+    tini \
     tzdata \
     wget \
     xz-utils \
@@ -292,6 +299,8 @@ ENV PUID=1000 PGID=1000
 ENV HOME=/home/tubarr
 ENV TZ=UTC
 ENV PATH="/usr/local/bin:${PATH}"
+# Tells Tubarr it is in a container, so the web interface listens on all addresses by default.
+ENV TUBARR_DOCKER=1
 
 EXPOSE 8827
 VOLUME ["/home/tubarr/.tubarr", "/downloads", "/metadata"]
@@ -299,4 +308,5 @@ VOLUME ["/home/tubarr/.tubarr", "/downloads", "/metadata"]
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8827/health || exit 1
 
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# tini runs as PID 1, reaping processes orphaned by yt-dlp, ffmpeg and the external downloaders.
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]

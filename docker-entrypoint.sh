@@ -25,15 +25,15 @@ usermod -aG video "$USER" 2>/dev/null || true
 # Fix /tmp permissions
 chmod 1777 /tmp
 
-# Make home directory, chown necessary directories
+# Make home directory, chown necessary directories (the Tubarr binary stays root-owned, so Tubarr can't replace it)
 mkdir -p /home/tubarr /downloads /metadata
-chown -R "$PUID":"$PGID" /app/tubarr /downloads /metadata 2>/dev/null || true
+chown -R "$PUID":"$PGID" /downloads /metadata 2>/dev/null || true
 
 # File creation mask, inherited by the updater, Tubarr, and its child processes (yt-dlp, Metarr, ffmpeg)
 umask "${UMASK:-022}"
 
-# Run updater in background
-/usr/local/bin/auto-updater &
+# Run updater in background, as root with root's own home, so pip and Python don't read config the tubarr user can write
+HOME=/root PYTHONNOUSERSITE=1 /usr/local/bin/auto-updater &
 
 # Start web interface
 exec gosu "$USER" /app/tubarr --web
