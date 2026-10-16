@@ -88,43 +88,58 @@
               </div>
             </div>
 
-            <!-- Domain Download Limits Card -->
+            <!-- Domain Limits Card -->
             <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
               <div class="border-b border-gray-200 p-5 sm:px-6 dark:border-gray-700 flex items-center justify-between">
                 <div>
-                  <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Domain Download Limits</h3>
-                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Limit concurrent downloads per hostname (e.g. youtube.com)</p>
+                  <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Domain Limits</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Limit concurrent downloads and crawls per hostname (e.g. youtube.com). 0 or blank = unlimited. Adding an existing hostname replaces its limits.</p>
                 </div>
               </div>
 
               <div class="p-5 sm:p-6 space-y-4">
                 <!-- Add Domain Form -->
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                   <input
                     type="text"
                     x-model="newHostname"
                     placeholder="youtube.com"
                     class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    style="min-width: 12rem;"
                     @keydown.enter="addDomainLimit()"
                   />
-                  <input
-                    type="number"
-                    x-model.number="newLimit"
-                    min="1"
-                    placeholder="Limit"
-                    class="w-24 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                    @keydown.enter="addDomainLimit()"
-                  />
-                  <button
-                    @click="addDomainLimit()"
-                    :disabled="!newHostname || newLimit < 1"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                  >
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Add
-                  </button>
+                  <div class="flex flex-wrap items-center gap-3">
+                    <input
+                      type="number"
+                      x-model.number="newDownloadLimit"
+                      min="0"
+                      placeholder="Download"
+                      title="Concurrent downloads"
+                      class="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      style="width: 7rem;"
+                      @keydown.enter="addDomainLimit()"
+                    />
+                    <input
+                      type="number"
+                      x-model.number="newCrawlLimit"
+                      min="0"
+                      placeholder="Crawl"
+                      title="Concurrent crawls"
+                      class="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      style="width: 7rem;"
+                      @keydown.enter="addDomainLimit()"
+                    />
+                    <button
+                      @click="addDomainLimit()"
+                      :disabled="!newHostname || !(newDownloadLimit > 0 || newCrawlLimit > 0)"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                    >
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add
+                    </button>
+                  </div>
                 </div>
                 <p x-show="addError" x-text="addError" class="text-xs" style="color: #ef4444;"></p>
 
@@ -145,6 +160,7 @@
                       <tr>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Hostname</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Concurrent Downloads</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Concurrent Crawls</th>
                         <th class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
                       </tr>
                     </thead>
@@ -152,7 +168,8 @@
                       <template x-for="[hostname, limit] in Object.entries(domainLimits)" :key="hostname">
                         <tr>
                           <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white" x-text="hostname"></td>
-                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" x-text="limit"></td>
+                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" x-text="limit.download || 'Unlimited'"></td>
+                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400" x-text="limit.crawl || 'Unlimited'"></td>
                           <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                             <button
                               @click="removeDomainLimit(hostname)"
@@ -180,36 +197,39 @@
                 Ensure <code>curl_cffi</code> is installed on the machine and available to yt-dlp.
               </p>
 
-              <div class="flex items-center gap-3 py-3">
+              <div class="flex flex-wrap items-center gap-3 py-3">
                 <input
                   type="text"
                   x-model="flareSolverrURL"
                   placeholder="http://localhost:8191"
                   class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  style="min-width: 12rem;"
                   @keydown.enter="saveFlareSolverrURL()"
                 />
-                <button
-                  @click="saveFlareSolverrURL()"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                >
-                  Save
-                </button>
-                <button
-                  @click="flareSolverrURL = ''; saveFlareSolverrURL()"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                  Clear
-                </button>
-                <button
-                  @click="testFlareSolverr()"
-                  :disabled="!flareSolverrURL || testingFlareSolverr"
-                  title="Solve https://example.com through FlareSolverr to check it works"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                  <span x-show="!testingFlareSolverr">Test</span>
-                  <span x-show="testingFlareSolverr">Testing...</span>
-                </button>
-                <span x-show="flareSolverrSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                <div class="flex flex-wrap items-center gap-3">
+                  <button
+                    @click="saveFlareSolverrURL()"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    @click="flareSolverrURL = ''; saveFlareSolverrURL()"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    @click="testFlareSolverr()"
+                    :disabled="!flareSolverrURL || testingFlareSolverr"
+                    title="Solve https://example.com through FlareSolverr to check it works"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                  >
+                    <span x-show="!testingFlareSolverr">Test</span>
+                    <span x-show="testingFlareSolverr">Testing...</span>
+                  </button>
+                  <span x-show="flareSolverrSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                </div>
               </div>
               <p x-show="flareSolverrMessage" x-text="flareSolverrMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
               <p x-show="flareSolverrError" x-text="flareSolverrError" class="text-xs mt-1" style="color: #ef4444;"></p>
@@ -247,7 +267,8 @@
           domainLimits: {},
           loadingLimits: true,
           newHostname: '',
-          newLimit: 1,
+          newDownloadLimit: '',
+          newCrawlLimit: '',
           addError: '',
 
           // FlareSolverr
@@ -327,7 +348,7 @@
           async loadDomainLimits() {
             this.loadingLimits = true;
             try {
-              const response = await fetch('/api/v1/settings/domain-download-limits');
+              const response = await fetch('/api/v1/settings/domain-limits');
               if (!response.ok) throw new Error('Failed to fetch domain limits');
               this.domainLimits = await response.json();
             } catch (err) {
@@ -340,22 +361,25 @@
           async addDomainLimit() {
             this.addError = '';
             const hostname = this.newHostname.trim().toLowerCase();
-            if (!hostname || this.newLimit < 1) return;
+            const download = Number(this.newDownloadLimit) || 0;
+            const crawl = Number(this.newCrawlLimit) || 0;
+            if (!hostname || (download < 1 && crawl < 1)) return;
 
             try {
-              const response = await fetch('/api/v1/settings/domain-download-limits', {
+              const response = await fetch('/api/v1/settings/domain-limits', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ hostname, limit: this.newLimit })
+                body: new URLSearchParams({ hostname, download, crawl })
               });
               if (!response.ok) {
                 const text = await response.text();
                 this.addError = text || 'Failed to add domain limit';
                 return;
               }
-              this.domainLimits[hostname] = this.newLimit;
+              this.domainLimits = { ...this.domainLimits, [hostname]: { download, crawl } };
               this.newHostname = '';
-              this.newLimit = 1;
+              this.newDownloadLimit = '';
+              this.newCrawlLimit = '';
             } catch (err) {
               this.addError = 'Failed to add domain limit';
               console.error(err);
@@ -364,7 +388,7 @@
 
           async removeDomainLimit(hostname) {
             try {
-              const response = await fetch(`/api/v1/settings/domain-download-limits/${encodeURIComponent(hostname)}`, {
+              const response = await fetch(`/api/v1/settings/domain-limits/${encodeURIComponent(hostname)}`, {
                 method: 'DELETE'
               });
               if (!response.ok) {

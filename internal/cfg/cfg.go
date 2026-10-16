@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
+	"tubarr/internal/limits"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 	"tubarr/internal/validation"
@@ -51,11 +52,16 @@ var rootCmd = &cobra.Command{
 				}
 			}
 
-			// Initialize domain download limits from DB.
-			if limits, err := settingsStore.GetDomainLimits(); err != nil {
-				logger.Pl.W("Failed to load domain download limits from DB: %v", err)
-			} else {
-				downloads.InitDomainDownloadLimits(limits)
+			// Initialize domain download and crawl limits from DB.
+			for k, limiter := range map[string]*limits.DomainLimiter{
+				keys.DomainDownloadLimits: limits.DomainDownloads,
+				keys.DomainCrawlLimits:    limits.DomainCrawls,
+			} {
+				if m, err := settingsStore.GetDomainLimitMap(k); err != nil {
+					logger.Pl.W("Failed to load setting %q from DB: %v", k, err)
+				} else {
+					limiter.Init(m)
+				}
 			}
 
 			// Scrape config file path and FlareSolverr URL.

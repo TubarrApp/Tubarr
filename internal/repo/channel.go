@@ -113,6 +113,60 @@ func (cs *ChannelStore) UpdateNewVideoURLs(key, val string, newVideoURLs []strin
 	return nil
 }
 
+// SetNotificationDot sets the channel's new video notification state in the database.
+func (cs *ChannelStore) SetNotificationDot(channelID int64, state bool) error {
+	return cs.UpdateChannelValue(consts.QChanID, strconv.FormatInt(channelID, 10), consts.QChanNewVideoNotification, state)
+}
+
+// AddNewVideoURLs adds unseen video URLs (deduplicated) and sets the notification dot.
+func (cs *ChannelStore) AddNewVideoURLs(channelID int64, urls []string) error {
+	if len(urls) == 0 {
+		return nil
+	}
+	vars.UpdateNewVideoURLMutex.Lock()
+	defer vars.UpdateNewVideoURLMutex.Unlock()
+
+	cIDStr := strconv.FormatInt(channelID, 10)
+	newVideoURLs, err := cs.GetNewVideoURLs(consts.QChanID, cIDStr)
+	if err != nil {
+		return fmt.Errorf("could not fetch new video URLs: %w", err)
+	}
+	for _, u := range urls {
+		if !slices.Contains(newVideoURLs, u) {
+			newVideoURLs = append(newVideoURLs, u)
+		}
+	}
+	if err := cs.UpdateNewVideoURLs(consts.QChanID, cIDStr, newVideoURLs); err != nil {
+		return fmt.Errorf("could not store new video URLs: %w", err)
+	}
+	return cs.SetNotificationDot(channelID, true)
+}
+
+// RemoveNewVideoURLs removes video URLs and clears the notification dot if none remain.
+func (cs *ChannelStore) RemoveNewVideoURLs(channelID int64, urls []string) error {
+	if len(urls) == 0 {
+		return nil
+	}
+	vars.UpdateNewVideoURLMutex.Lock()
+	defer vars.UpdateNewVideoURLMutex.Unlock()
+
+	cIDStr := strconv.FormatInt(channelID, 10)
+	newVideoURLs, err := cs.GetNewVideoURLs(consts.QChanID, cIDStr)
+	if err != nil {
+		return fmt.Errorf("could not fetch new video URLs: %w", err)
+	}
+	updated := slices.DeleteFunc(newVideoURLs, func(u string) bool {
+		return slices.Contains(urls, u)
+	})
+	if err := cs.UpdateNewVideoURLs(consts.QChanID, cIDStr, updated); err != nil {
+		return fmt.Errorf("could not store new video URLs: %w", err)
+	}
+	if len(updated) == 0 {
+		return cs.SetNotificationDot(channelID, false)
+	}
+	return nil
+}
+
 // GetChannelName returns the channel name from an input key and value.
 func (cs *ChannelStore) GetChannelName(key, val string) (string, error) {
 	if _, ok := consts.ValidChannelKeys[key]; !ok {
@@ -296,44 +350,9 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 		logger.Pl.E("Failed to retrieve affected rows: %v", err)
 	}
 
-	// Lock for array update.
-	vars.UpdateNewVideoURLMutex.Lock()
-	defer vars.UpdateNewVideoURLMutex.Unlock()
-
-	// Get channel ID as a string.
-	cIDStr := strconv.FormatInt(channelID, 10)
-
-	// Get new video URLs from database.
-	newVideoURLs, err := cs.GetNewVideoURLs(consts.QChanID, cIDStr)
-	if err != nil {
-		logger.Pl.E("Could not fetch 'new video URLs' from database: %v", err)
-	} else {
-		// On no error, update the slice.
-		updated := make([]string, 0, len(newVideoURLs))
-
-		// Make deleted URLs lookup map.
-		deletedURLs := make(map[string]bool, len(urls))
-		for _, u := range urls {
-			deletedURLs[u] = true
-		}
-
-		// Check if any 'new video urls' were deleted.
-		for _, nvu := range newVideoURLs {
-			if !deletedURLs[nvu] {
-				updated = append(updated, nvu)
-			}
-		}
-
-		// Store updated URLs back to DB.
-		if err := cs.UpdateNewVideoURLs(consts.QChanID, cIDStr, updated); err != nil {
-			logger.Pl.E("Could not store 'new video url' array in database: %v", err)
-		} else {
-			if len(updated) == 0 {
-				if err := cs.UpdateChannelValue(consts.QChanID, cIDStr, consts.QChanNewVideoNotification, false); err != nil {
-					logger.Pl.E("Failed to clear notification dot: %v", err)
-				}
-			}
-		}
+	// Remove deleted videos from the unseen list.
+	if err := cs.RemoveNewVideoURLs(channelID, urls); err != nil {
+		logger.Pl.E("Failed to update new video URLs for channel ID %d: %v", channelID, err)
 	}
 
 	logger.Pl.S("Channel ID %d: Deleted videos for URLs %v", channelID, urls)

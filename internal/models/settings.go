@@ -2,6 +2,12 @@ package models
 
 import "github.com/TubarrApp/gocommon/sharedmodels"
 
+// DomainLimit holds a domain's concurrent download and crawl limits (0 = unlimited).
+type DomainLimit struct {
+	Download int `json:"download"`
+	Crawl    int `json:"crawl"`
+}
+
 // Settings are the primary settings for a channel, affecting videos belonging to it.
 type Settings struct {
 	// Configurations.

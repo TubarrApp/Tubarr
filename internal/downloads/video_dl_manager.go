@@ -9,6 +9,7 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
 	"tubarr/internal/times"
 )
@@ -50,11 +51,11 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	defer ongoingDownloads.Delete(d.Video.URL)
 
 	// Acquire per-domain slot first (blocks if domain limit reached, no-op if no limit).
-	domainSem, err := AcquireDomainDownloadSlot(d.Context, d.Video.URL)
+	domainSem, err := limits.DomainDownloads.Acquire(d.Context, d.Video.URL)
 	if err != nil {
 		return false, d.cancelVideoDownload()
 	}
-	defer ReleaseDomainDownloadSlot(domainSem)
+	defer limits.Release(domainSem)
 
 	// Acquire global download slot (blocks if limit reached, no-op if limit=0).
 	// Store the semaphore to ensure we release on the same one we acquired.
@@ -62,7 +63,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	if err != nil {
 		return false, d.cancelVideoDownload()
 	}
-	defer ReleaseGlobalDownloadSlot(dlSem)
+	defer limits.Release(dlSem)
 
 	// Ensure cleanup on exit.
 	defer d.cleanup()

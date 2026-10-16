@@ -20,13 +20,14 @@ type Store interface {
 	TubarrSettingsStore() TubarrSettingsStore
 }
 
-// TubarrSettingsStore allows access to global settings and domain download limit methods.
+// TubarrSettingsStore allows access to global settings and domain limit methods.
 type TubarrSettingsStore interface {
 	GetDB() *sql.DB
 	GetSetting(key string) (value string, found bool, err error)
 	SetSetting(key, value string) error
-	GetDomainLimits() (map[string]int, error)
-	SetDomainLimit(hostname string, concurrency int) error
+	GetDomainLimits() (map[string]models.DomainLimit, error)
+	GetDomainLimitMap(key string) (map[string]int, error)
+	SetDomainLimit(hostname string, limit models.DomainLimit) error
 	DeleteDomainLimit(hostname string) error
 }
 
@@ -49,6 +50,9 @@ type ChannelStore interface {
 	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error)
 	UpdateLastScan(channelID int64) error
 	UpdateNewVideoURLs(key, val string, newVideoURLs []string) error
+	SetNotificationDot(channelID int64, state bool) error
+	AddNewVideoURLs(channelID int64, urls []string) error
+	RemoveNewVideoURLs(channelID int64, urls []string) error
 
 	// Delete operations.
 	DeleteChannel(key, val string) error
@@ -97,7 +101,7 @@ type VideoStore interface {
 	// Add operations.
 	AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error)
 	AddVideos(videos []*models.Video, channelID int64) (videoModels []*models.Video, err error)
-	AddAvailableVideos(videos []*models.Video, channelID int64) (added int, err error)
+	AddAvailableVideos(videos []*models.Video, channelID int64) (addedURLs []string, err error)
 
 	// Update operations.
 	UpdateVideo(v *models.Video, channelID int64) error

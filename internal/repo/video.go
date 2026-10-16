@@ -497,10 +497,10 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models
 // AddAvailableVideos stores newly found videos as Available, skipping any already in the channel.
 //
 // Existing rows are left alone, so a video being downloaded (or failed) isn't reset to Available.
-func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64) (added int, err error) {
+func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64) (addedURLs []string, err error) {
 	tx, err := vs.DB.Begin()
 	if err != nil {
-		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -546,24 +546,24 @@ func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64
 		}
 		result, err := tx.Exec(vidQuery, channelID, v.ChannelURLID, v.ChannelURL, v.ThumbnailURL, v.URL, v.Title, uploadDate, v.Duration, now, now)
 		if err != nil {
-			return 0, fmt.Errorf("failed to insert available video %q: %w", v.URL, err)
+			return nil, fmt.Errorf("failed to insert available video %q: %w", v.URL, err)
 		}
 		if n, err := result.RowsAffected(); err != nil || n == 0 {
 			continue // Already in the channel.
 		}
 		if v.ID, err = result.LastInsertId(); err != nil {
-			return 0, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err)
+			return nil, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err)
 		}
 		if _, err := tx.Exec(dlQuery, v.ID, consts.DLStatusAvailable); err != nil {
-			return 0, fmt.Errorf("failed to set available status for video %q: %w", v.URL, err)
+			return nil, fmt.Errorf("failed to set available status for video %q: %w", v.URL, err)
 		}
-		added++
+		addedURLs = append(addedURLs, v.URL)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-	return added, nil
+	return addedURLs, nil
 }
 
 // GetAvailableVideos returns all channels' unfinished videos with the given statuses, newest first.

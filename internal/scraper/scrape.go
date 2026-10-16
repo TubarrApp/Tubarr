@@ -22,6 +22,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
@@ -83,9 +84,16 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 		logger.Pl.D(1, "Processing channel URL %q", cu.URL)
 
+		// Hold a domain crawl slot (no-op if the domain has no crawl limit).
+		crawlSem, err := limits.DomainCrawls.Acquire(ctx, cu.URL)
+		if err != nil {
+			return nil, err
+		}
+
 		// Get access details once per ChannelURL - delegated to CookieManager
 		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
 		if err != nil {
+			limits.Release(crawlSem)
 			return nil, err
 		}
 
@@ -95,6 +103,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			chanCrawlArgs = cu.ChanURLSettings.ExtraYTDLPCrawlArgs
 		}
 		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, chanCrawlArgs, cu.FlareSolverr)
+		limits.Release(crawlSem)
 		if err != nil {
 			return nil, err
 		}

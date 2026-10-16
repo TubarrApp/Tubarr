@@ -417,13 +417,16 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 
 		// Leave for the user to choose from if not auto downloading.
 		if !c.AutoDownloads(cu) {
-			added, err := s.VideoStore().AddAvailableVideos(vRequests, c.ID)
+			addedURLs, err := s.VideoStore().AddAvailableVideos(vRequests, c.ID)
 			if err != nil {
 				procError = errors.Join(procError, err)
 				continue
 			}
-			logger.Pl.S("Added %d video(s) as available for URL %q %s(Channel: %s)%s", added, cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
-			nAvailable += added
+			if err := cs.AddNewVideoURLs(c.ID, addedURLs); err != nil {
+				logger.Pl.E("Failed to set notification dot for channel %q: %v", c.Name, err)
+			}
+			logger.Pl.S("Added %d video(s) as available for URL %q %s(Channel: %s)%s", len(addedURLs), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
+			nAvailable += len(addedURLs)
 			continue
 		}
 

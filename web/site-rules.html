@@ -67,37 +67,40 @@
                 Other fields are added into the metadata JSON as-is, without special handling.
               </p>
 
-              <div class="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
+              <div class="flex flex-wrap items-center gap-3 py-3 border-b border-gray-100 dark:border-gray-800">
                 <input
                   type="text"
                   x-model="scrapeConfigPath"
                   placeholder="/path/to/scrape-sites.yaml"
                   class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  style="min-width: 12rem;"
                   @keydown.enter="saveScrapeConfigPath()"
                 />
-                <button
-                  @click="saveScrapeConfigPath()"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                >
-                  Save
-                </button>
-                <button
-                  @click="scrapeConfigPath = ''; saveScrapeConfigPath()"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                  Clear
-                </button>
-                <button
-                  @click="reloadScrapeConfig()"
-                  :disabled="reloadingConfig"
-                  title="Re-read the scrape config file from disk, in case it was edited since Tubarr started"
-                  class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                >
-                  <span x-show="!reloadingConfig">Refresh</span>
-                  <span x-show="reloadingConfig">Refreshing...</span>
-                </button>
-                <span x-show="savingScrapeConfig" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
-                <span x-show="scrapeConfigSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                <div class="flex flex-wrap items-center gap-3">
+                  <button
+                    @click="saveScrapeConfigPath()"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    @click="scrapeConfigPath = ''; saveScrapeConfigPath()"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    @click="reloadScrapeConfig()"
+                    :disabled="reloadingConfig"
+                    title="Re-read the scrape config file from disk, in case it was edited since Tubarr started"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                  >
+                    <span x-show="!reloadingConfig">Refresh</span>
+                    <span x-show="reloadingConfig">Refreshing...</span>
+                  </button>
+                  <span x-show="savingScrapeConfig" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
+                  <span x-show="scrapeConfigSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                </div>
               </div>
               <p x-show="scrapeConfigError" x-text="scrapeConfigError" class="text-xs mt-2" style="color: #ef4444;"></p>
             </div>
@@ -202,12 +205,13 @@
 
                 <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Metadata scraping</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Paste a video URL containing the metadata you want to scrape. This will show you the results of the scraping selectors for that URL, if any are found.</p>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                   <input
                     type="text"
                     x-model="testUrl"
                     placeholder="https://example.com/video/123"
                     class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    style="min-width: 12rem;"
                     @keydown.enter="testScrapeUrl()"
                   />
                   <button
@@ -222,12 +226,13 @@
 
                 <p class="text-xs font-medium text-gray-700 dark:text-gray-300 pt-2">Channel crawling</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Paste a channel URL. This will show you the video URLs found by the crawl rule or built-in crawler for that site, if there is one, with any preview fields read for each.</p>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                   <input
                     type="text"
                     x-model="testCrawlUrl"
                     placeholder="https://example.com/c/channel"
                     class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    style="min-width: 12rem;"
                     @keydown.enter="testCrawlChannelUrl()"
                   />
                   <button

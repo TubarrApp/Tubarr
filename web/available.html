@@ -76,7 +76,7 @@
                   <select
                     x-model="channelFilter"
                     @change="urlFilter = ''; filterChanged()"
-                    class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    class="max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="" x-text="`All channels (${videos.length})`"></option>
                     <template x-for="ch in channelOptions" :key="ch.id">
@@ -88,7 +88,7 @@
                     x-show="channelFilter !== '' && urlOptions.length > 1"
                     x-model="urlFilter"
                     @change="filterChanged()"
-                    class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    class="max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="" x-text="`All URLs (${channelVideos.length})`"></option>
                     <template x-for="u in urlOptions" :key="u.id">

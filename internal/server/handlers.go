@@ -26,6 +26,7 @@ import (
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
@@ -1368,6 +1369,16 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if status == consts.DLStatusIgnored && len(claimed) > 0 {
+		dismissedURLs := make([]string, 0, len(claimed))
+		for _, v := range claimed {
+			dismissedURLs = append(dismissedURLs, v.URL)
+		}
+		if err := ss.cs.RemoveNewVideoURLs(c.ID, dismissedURLs); err != nil {
+			logger.Pl.E("Failed to update new video URLs for channel %q: %v", c.Name, err)
+		}
+	}
+
 	if status == consts.DLStatusQueued && len(claimed) > 0 {
 		//nolint:contextcheck
 		go func() {
@@ -1680,7 +1691,7 @@ func (ss *serverStore) handleUnblockDomain(w http.ResponseWriter, r *http.Reques
 // handleNewVideoNotificationSeen marks a new video notification as seen.
 func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	_, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -1691,7 +1702,7 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 	}
 
 	// Set notification to false.
-	if err := ss.cs.UpdateChannelValue(consts.QChanID, id, consts.QChanNewVideoNotification, false); err != nil {
+	if err := ss.cs.SetNotificationDot(c.ID, false); err != nil {
 		http.Error(w, fmt.Sprintf("failed to mark new video notification as seen for channel ID %q: %v", id, err), http.StatusInternalServerError)
 		return
 	}
@@ -1834,8 +1845,8 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 	}
 }
 
-// handleGetDomainDownloadLimits returns all per-domain download concurrency limits.
-func (ss *serverStore) handleGetDomainDownloadLimits(w http.ResponseWriter, _ *http.Request) {
+// handleGetDomainLimits returns all per-domain download and crawl concurrency limits.
+func (ss *serverStore) handleGetDomainLimits(w http.ResponseWriter, _ *http.Request) {
 	limits, err := ss.tss.GetDomainLimits()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to get domain limits: %v", err), http.StatusInternalServerError)
@@ -1847,41 +1858,41 @@ func (ss *serverStore) handleGetDomainDownloadLimits(w http.ResponseWriter, _ *h
 	}
 }
 
-// handleSetDomainDownloadLimit sets the download concurrency limit for a specific domain.
-func (ss *serverStore) handleSetDomainDownloadLimit(w http.ResponseWriter, r *http.Request) {
-	hostname := r.FormValue("hostname")
+// handleSetDomainLimit sets the download and crawl concurrency limits for a specific domain (0 or blank = unlimited).
+func (ss *serverStore) handleSetDomainLimit(w http.ResponseWriter, r *http.Request) {
+	hostname := strings.ToLower(strings.TrimSpace(r.FormValue("hostname")))
 	if hostname == "" {
 		http.Error(w, "hostname parameter is required", http.StatusBadRequest)
 		return
 	}
-	limitStr := r.FormValue("limit")
-	if limitStr == "" {
-		http.Error(w, "limit parameter is required", http.StatusBadRequest)
-		return
-	}
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid limit value %q: %v", limitStr, err), http.StatusBadRequest)
-		return
-	}
-	if limit < 0 {
-		http.Error(w, "limit must be 0 or greater", http.StatusBadRequest)
-		return
+	var limit models.DomainLimit
+	for param, dst := range map[string]*int{"download": &limit.Download, "crawl": &limit.Crawl} {
+		val := r.FormValue(param)
+		if val == "" {
+			continue
+		}
+		n, err := strconv.Atoi(val)
+		if err != nil || n < 0 {
+			http.Error(w, fmt.Sprintf("invalid %s limit %q: must be 0 or greater", param, val), http.StatusBadRequest)
+			return
+		}
+		*dst = n
 	}
 	if err := ss.tss.SetDomainLimit(hostname, limit); err != nil {
 		http.Error(w, fmt.Sprintf("failed to set domain limit: %v", err), http.StatusInternalServerError)
 		return
 	}
-	downloads.SetDomainDownloadLimit(hostname, limit)
+	limits.DomainDownloads.Set(hostname, limit.Download)
+	limits.DomainCrawls.Set(hostname, limit.Crawl)
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit updated", "hostname": hostname, "limit": limit}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit updated", "hostname": hostname, "download": limit.Download, "crawl": limit.Crawl}); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }
 
-// handleDeleteDomainDownloadLimit removes the download concurrency limit for a specific domain.
-func (ss *serverStore) handleDeleteDomainDownloadLimit(w http.ResponseWriter, r *http.Request) {
+// handleDeleteDomainLimit removes the download and crawl concurrency limits for a specific domain.
+func (ss *serverStore) handleDeleteDomainLimit(w http.ResponseWriter, r *http.Request) {
 	hostname := chi.URLParam(r, "hostname")
 	if hostname == "" {
 		http.Error(w, "hostname is required", http.StatusBadRequest)
@@ -1891,7 +1902,8 @@ func (ss *serverStore) handleDeleteDomainDownloadLimit(w http.ResponseWriter, r 
 		http.Error(w, fmt.Sprintf("failed to delete domain limit: %v", err), http.StatusInternalServerError)
 		return
 	}
-	downloads.SetDomainDownloadLimit(hostname, 0)
+	limits.DomainDownloads.Set(hostname, 0)
+	limits.DomainCrawls.Set(hostname, 0)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit removed", "hostname": hostname}); err != nil {

@@ -6,12 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/domain/vars"
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/metadata"
@@ -319,29 +317,8 @@ func completeAndStoreVideo(cs contracts.ChannelStore, vs contracts.VideoStore, v
 		return fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 
-	// Update channel's last video added timestamp.
-	cIDStr := strconv.FormatInt(c.ID, 10)
-
-	// Lock for array update.
-	vars.UpdateNewVideoURLMutex.Lock()
-	defer vars.UpdateNewVideoURLMutex.Unlock()
-
-	// Get and store new video URLs.
-	newVideoURLs, err := cs.GetNewVideoURLs(consts.QChanID, cIDStr)
-	if err != nil {
-		logger.Pl.E("Could not fetch new video URLs: %v", err)
-	} else {
-		newVideoURLs = append(newVideoURLs, v.URL)
-
-		// Update new video URLs into the database.
-		if err := cs.UpdateNewVideoURLs(consts.QChanID, cIDStr, newVideoURLs); err != nil {
-			logger.Pl.E("Could not store new video URLs: %v", err)
-		}
-	}
-
-	// Set new video notification to true.
-	c.NewVideoNotification = true
-	if err := cs.UpdateChannelValue(consts.QChanID, fmt.Sprintf("%d", c.ID), consts.QChanNewVideoNotification, c.NewVideoNotification); err != nil {
+	// Add to unseen list and set notification dot.
+	if err := cs.AddNewVideoURLs(c.ID, []string{v.URL}); err != nil {
 		logger.Pl.E("Failed to update channel %q notification status: %v", c.Name, err)
 	}
 

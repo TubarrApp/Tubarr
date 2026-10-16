@@ -3,16 +3,14 @@ package downloads
 import (
 	"context"
 	"errors"
-	"net/url"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
-
-	"golang.org/x/net/publicsuffix"
 )
 
 var ongoingDownloads sync.Map       // map[int64]*VideoDownload.
@@ -50,111 +48,10 @@ func AcquireGlobalDownloadSlot(ctx context.Context, videoURL string) (chan struc
 	if sem == nil {
 		return nil, nil
 	}
-	if err := acquireSlot(ctx, sem, "global", videoURL); err != nil {
+	if err := limits.AcquireSlot(ctx, sem, "global download", videoURL); err != nil {
 		return nil, err
 	}
 	return sem, nil
-}
-
-// acquireSlot takes a slot on sem, logging if it has to wait for one.
-func acquireSlot(ctx context.Context, sem chan struct{}, limitDesc, videoURL string) error {
-	select {
-	case sem <- struct{}{}:
-		return nil
-	default:
-	}
-
-	logger.Pl.I("Waiting for a free %s download slot for %q (all %d in use)...", limitDesc, videoURL, cap(sem))
-	select {
-	case sem <- struct{}{}:
-		logger.Pl.D(1, "Got a %s download slot for %q", limitDesc, videoURL)
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// domainDownloadSems limits concurrent downloads per hostname.
-// A missing key means no limit for that domain.
-var domainDownloadSems = make(map[string]chan struct{})
-var domainDownloadSemsMu sync.RWMutex
-
-// InitDomainDownloadLimits initializes all per-domain semaphores from a map.
-// Called on startup after loading settings from the database.
-func InitDomainDownloadLimits(limits map[string]int) {
-	domainDownloadSemsMu.Lock()
-	defer domainDownloadSemsMu.Unlock()
-	domainDownloadSems = make(map[string]chan struct{})
-	for hostname, limit := range limits {
-		if limit > 0 {
-			domainDownloadSems[hostname] = make(chan struct{}, limit)
-		}
-	}
-	logger.Pl.I("Initialized %d domain download limit(s)", len(domainDownloadSems))
-}
-
-// SetDomainDownloadLimit updates the concurrency limit for a single domain at runtime.
-// A limit of 0 removes the limit. In-flight downloads on the old semaphore release cleanly.
-func SetDomainDownloadLimit(hostname string, limit int) {
-	domainDownloadSemsMu.Lock()
-	defer domainDownloadSemsMu.Unlock()
-	if limit > 0 {
-		domainDownloadSems[hostname] = make(chan struct{}, limit)
-		logger.Pl.I("Domain download limit for %q set to %d", hostname, limit)
-	} else {
-		delete(domainDownloadSems, hostname)
-		logger.Pl.I("Domain download limit for %q removed (unlimited)", hostname)
-	}
-}
-
-// AcquireDomainDownloadSlot blocks until a slot is available for the video URL's domain, or ctx is done.
-// Returns the semaphore used, for passing to ReleaseDomainDownloadSlot.
-// Returns nil if no limit is configured for that domain.
-func AcquireDomainDownloadSlot(ctx context.Context, rawURL string) (chan struct{}, error) {
-	hostname := extractHostname(rawURL)
-	if hostname == "" {
-		return nil, nil
-	}
-	domainDownloadSemsMu.RLock()
-	sem := domainDownloadSems[hostname]
-	domainDownloadSemsMu.RUnlock()
-	if sem == nil {
-		return nil, nil
-	}
-	if err := acquireSlot(ctx, sem, hostname, rawURL); err != nil {
-		return nil, err
-	}
-	return sem, nil
-}
-
-// ReleaseDomainDownloadSlot releases a domain slot previously acquired.
-func ReleaseDomainDownloadSlot(sem chan struct{}) {
-	if sem == nil {
-		return
-	}
-	<-sem
-}
-
-// extractHostname parses a URL and returns its eTLD+1 hostname (e.g. "youtube.com").
-func extractHostname(rawURL string) string {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	hostname := parsed.Hostname()
-	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
-		return strings.ToLower(domain)
-	}
-	return strings.ToLower(hostname)
-}
-
-// ReleaseGlobalDownloadSlot releases a download slot on the given semaphore.
-// Pass the same semaphore returned by AcquireGlobalDownloadSlot.
-func ReleaseGlobalDownloadSlot(sem chan struct{}) {
-	if sem == nil {
-		return
-	}
-	<-sem
 }
 
 // isProcessNotExist checks if an error indicates a process doesn't exist.

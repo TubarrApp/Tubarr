@@ -46,13 +46,13 @@ func TestAvailableVideos(t *testing.T) {
 			{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/2"},
 		}
 	}
-	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || added != 2 {
-		t.Fatalf("first add: got %d, %v, want 2 added", added, err)
+	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || len(added) != 2 {
+		t.Fatalf("first add: got %d, %v, want 2 added", len(added), err)
 	}
 
 	// A second crawl finding the same videos adds nothing.
-	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || added != 0 {
-		t.Fatalf("second add: got %d, %v, want 0 added", added, err)
+	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || len(added) != 0 {
+		t.Fatalf("second add: got %d, %v, want 0 added", len(added), err)
 	}
 
 	// Available videos count as seen, so crawls don't find them as new.
@@ -90,8 +90,8 @@ func TestAvailableVideos(t *testing.T) {
 	}
 
 	// Claimed videos no longer count as seen, and a crawl re-finding them leaves them alone.
-	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || added != 0 {
-		t.Fatalf("add while downloading: got %d, %v, want 0 added", added, err)
+	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || len(added) != 0 {
+		t.Fatalf("add while downloading: got %d, %v, want 0 added", len(added), err)
 	}
 	if available, _ := vs.GetAvailableVideos(app.AvailableStatuses...); len(available) != 0 {
 		t.Errorf("expected no available videos while downloading, got %d", len(available))

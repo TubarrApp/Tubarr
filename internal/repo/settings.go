@@ -7,6 +7,7 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/models"
 )
 
 // TubarrSettingsStore holds a pointer to the sql.DB.
@@ -52,9 +53,31 @@ func (ss *TubarrSettingsStore) SetSetting(key, value string) error {
 	return nil
 }
 
-// GetDomainLimits returns the domain download limits map from the settings table.
-func (ss *TubarrSettingsStore) GetDomainLimits() (map[string]int, error) {
-	val, found, err := ss.GetSetting(keys.DomainDownloadLimits)
+// GetDomainLimits returns the per-domain download and crawl limits.
+func (ss *TubarrSettingsStore) GetDomainLimits() (map[string]models.DomainLimit, error) {
+	downloads, err := ss.GetDomainLimitMap(keys.DomainDownloadLimits)
+	if err != nil {
+		return nil, err
+	}
+	crawls, err := ss.GetDomainLimitMap(keys.DomainCrawlLimits)
+	if err != nil {
+		return nil, err
+	}
+	limits := make(map[string]models.DomainLimit, len(downloads))
+	for hostname, n := range downloads {
+		limits[hostname] = models.DomainLimit{Download: n}
+	}
+	for hostname, n := range crawls {
+		l := limits[hostname]
+		l.Crawl = n
+		limits[hostname] = l
+	}
+	return limits, nil
+}
+
+// GetDomainLimitMap returns the hostname to limit map stored under a domain limits setting key.
+func (ss *TubarrSettingsStore) GetDomainLimitMap(key string) (map[string]int, error) {
+	val, found, err := ss.GetSetting(key)
 	if err != nil {
 		return nil, err
 	}
@@ -63,32 +86,39 @@ func (ss *TubarrSettingsStore) GetDomainLimits() (map[string]int, error) {
 		return limits, nil
 	}
 	if err := json.Unmarshal([]byte(val), &limits); err != nil {
-		return nil, fmt.Errorf("failed to parse domain limits JSON: %w", err)
+		return nil, fmt.Errorf("failed to parse %s JSON: %w", key, err)
 	}
 	return limits, nil
 }
 
-// SetDomainLimit sets the download concurrency limit for a specific hostname.
-// A concurrency of 0 removes the limit for that hostname.
-func (ss *TubarrSettingsStore) SetDomainLimit(hostname string, concurrency int) error {
-	limits, err := ss.GetDomainLimits()
+// SetDomainLimit sets the download and crawl limits for a hostname. A limit of 0 removes it.
+func (ss *TubarrSettingsStore) SetDomainLimit(hostname string, limit models.DomainLimit) error {
+	if err := ss.setDomainLimitValue(keys.DomainDownloadLimits, hostname, limit.Download); err != nil {
+		return err
+	}
+	return ss.setDomainLimitValue(keys.DomainCrawlLimits, hostname, limit.Crawl)
+}
+
+// DeleteDomainLimit removes the download and crawl limits for a hostname.
+func (ss *TubarrSettingsStore) DeleteDomainLimit(hostname string) error {
+	return ss.SetDomainLimit(hostname, models.DomainLimit{})
+}
+
+// setDomainLimitValue sets one hostname's limit under a domain limits setting key.
+func (ss *TubarrSettingsStore) setDomainLimitValue(key, hostname string, limit int) error {
+	limits, err := ss.GetDomainLimitMap(key)
 	if err != nil {
 		return err
 	}
-	if concurrency <= 0 {
+	if limit <= 0 {
 		delete(limits, hostname)
 	} else {
-		limits[hostname] = concurrency
+		limits[hostname] = limit
 	}
 	data, err := json.Marshal(limits)
 	if err != nil {
-		return fmt.Errorf("failed to marshal domain limits: %w", err)
+		return fmt.Errorf("failed to marshal %s: %w", key, err)
 	}
-	logger.Pl.I("Domain download limits updated: %s", string(data))
-	return ss.SetSetting(keys.DomainDownloadLimits, string(data))
-}
-
-// DeleteDomainLimit removes the download concurrency limit for a specific hostname.
-func (ss *TubarrSettingsStore) DeleteDomainLimit(hostname string) error {
-	return ss.SetDomainLimit(hostname, 0)
+	logger.Pl.I("Setting %s updated: %s", key, string(data))
+	return ss.SetSetting(key, string(data))
 }

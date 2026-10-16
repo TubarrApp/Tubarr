@@ -206,9 +206,9 @@
                       </div>
 
                       <!-- Auto Download Override -->
-                      <div class="flex items-center gap-2">
+                      <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">New videos:</span>
-                        <select x-model="urlEntry.custom.auto_download" class="h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                        <select x-model="urlEntry.custom.auto_download" class="max-w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                           <option value="">Use channel setting</option>
                           <option value="true">Download automatically</option>
                           <option value="false">List as available to choose from</option>
@@ -500,7 +500,7 @@
                 <!-- Tabs for Settings -->
                 <div x-data="{ activeTab: 'basic' }" class="space-y-4">
                   <div class="border-b border-gray-200 dark:border-gray-700">
-                    <nav class="flex space-x-4">
+                    <nav class="flex flex-wrap">
                       <button
                         type="button"
                         @click="activeTab = 'basic'"
@@ -1203,7 +1203,7 @@
                           <li><code class="bg-white dark:bg-gray-800 px-2 py-0.5 rounded">Notify URL|Friendly Name</code> - Applies to all channel URLs</li>
                           <li><code class="bg-white dark:bg-gray-800 px-2 py-0.5 rounded">Channel URL|Notify URL|Friendly Name</code> - Applies only to specific channel URL</li>
                         </ul>
-                        <p class="mt-2">Example: <code class="bg-white dark:bg-gray-800 px-2 py-0.5 rounded">http://plex:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex Library Refresh</code></p>
+                        <p class="mt-2 break-words">Example: <code class="bg-white dark:bg-gray-800 px-2 py-0.5 rounded">http://plex:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex Library Refresh</code></p>
                       </div>
 
                       <div>
