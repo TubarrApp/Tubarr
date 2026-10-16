@@ -282,10 +282,11 @@
 
             // Level with appropriate color matching logging constants
             if (log.level) {
-              const levelUpper = log.level.toUpperCase();
+              const level = String(log.level);
+              const levelUpper = level.toUpperCase();
               let color = '#9ca3af'; // gray-400
 
-              switch (log.level.toLowerCase()) {
+              switch (level.toLowerCase()) {
                 case 'error':
                   color = '#ef4444'; // red-500 - ColorRed = \033[91m (bright red)
                   break;
@@ -303,7 +304,7 @@
                   break;
               }
 
-              parts.push(`<span style="color: ${color}; font-weight: bold;">[${levelUpper}]</span>`);
+              parts.push(`<span style="color: ${color}; font-weight: bold;">[${this.escapeHtml(levelUpper)}]</span>`);
             }
 
             // Function in dim cyan
@@ -313,7 +314,7 @@
 
             // File and line in dim cyan
             if (log.file && log.line) {
-              parts.push(`<span style="color: #0891b2;">[${this.escapeHtml(log.file)}:${log.line}]</span>`);
+              parts.push(`<span style="color: #0891b2;">[${this.escapeHtml(log.file)}:${this.escapeHtml(String(log.line))}]</span>`);
             }
 
             // Message in light gray

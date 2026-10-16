@@ -143,7 +143,7 @@
                           <td class="px-4 py-3 video-col">
                             <div class="scrollable-text">
                               <p class="text-sm font-medium text-brand-600 dark:text-brand-400" x-text="job.title || job.url"></p>
-                              <a :href="job.url" target="_blank" rel="noopener noreferrer" @click.stop class="text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400" x-text="job.url"></a>
+                              <a :href="safeURL(job.url)" target="_blank" rel="noopener noreferrer" @click.stop class="text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400" x-text="job.url"></a>
                             </div>
                           </td>
                           <td class="px-4 py-3 channel-col">

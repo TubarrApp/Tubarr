@@ -107,3 +107,9 @@ func removeQueryParams(inputURL string) string {
 	u.RawQuery = "" // Clear query parameters
 	return u.String()
 }
+
+// isHTTPURL reports whether s is an absolute http or https URL with a host.
+func isHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
+}

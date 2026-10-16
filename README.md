@@ -132,6 +132,16 @@ A channel's **Stop Queue** button stops it starting anything new, letting in-pro
 
 The web pages are served from the `web/` folder next to the `tubarr` binary. `GET /health` is available for container healthchecks.
 
+### Logging in
+
+The interface listens on `127.0.0.1:8827` by default (all addresses in Docker). Use `--listen 0.0.0.0:8827` (or `TUBARR_LISTEN`) to reach it from other machines.
+
+- **First visit:** create a username and password. Tubarr asks for them on every new browser after that.
+- **Skip login for trusted addresses:** under **Settings > Web Interface Access**, list IPs or ranges (e.g. `192.168.1.0/24`) that need no login. This machine (localhost) is on the list by default.
+- **Scripts:** send the API key from the same page in an `X-Api-Key` header.
+- **Forgotten password:** open Tubarr from the machine it runs on (localhost skips the login) and change it in Settings, or set `TUBARR_WEB_PASSWORD` (and optionally `TUBARR_WEB_USERNAME`) and restart.
+- **Reverse proxy with its own login:** `--web-auth none` (or `TUBARR_WEB_AUTH=none`) turns Tubarr's login off. Add the proxy under **Trusted Proxies** so client addresses are read correctly.
+
 ---
 
 ## Docker / Podman

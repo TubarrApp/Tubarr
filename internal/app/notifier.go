@@ -10,7 +10,7 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/net"
+	"tubarr/internal/network"
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
@@ -117,7 +117,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 
 		regClient, lanClient := newNotifyHTTPClients((30 * time.Second), (10 * time.Second))
 		client := regClient
-		if net.IsPrivateNetwork(parsed.Host) {
+		if network.IsPrivateNetwork(parsed.Host) {
 			client = lanClient
 		}
 

@@ -1553,15 +1553,15 @@
             const authEntries = [];
             this.formData.urls.forEach(urlEntry => {
               if (urlEntry.hasAuth && urlEntry.username && urlEntry.loginURL) {
-                authEntries.push(JSON.stringify({
+                authEntries.push({
                   channel_url: urlEntry.url,
                   username: urlEntry.username,
                   password: urlEntry.password || '',
                   login_url: urlEntry.loginURL
-                }));
+                });
               }
             });
-            return authEntries.join(' ');
+            return authEntries.length > 0 ? JSON.stringify(authEntries) : '';
           },
 
           buildPerURLSettingsJSON() {

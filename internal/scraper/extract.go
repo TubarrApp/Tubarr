@@ -8,6 +8,7 @@ import (
 	"strings"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
@@ -26,6 +27,11 @@ func ruleValue(c *colly.Collector, pageURL, value string, rule models.MetadataRu
 	for i, step := range rule.Fetch {
 		stepURL, err := fetchStepURL(prevURL, step.URL, value)
 		if err != nil {
+			logger.Pl.W("Field %q fetch step %d: %v", rule.Name, i+1, err)
+			return ""
+		}
+
+		if err := checkFetchTarget(pageURL, stepURL); err != nil {
 			logger.Pl.W("Field %q fetch step %d: %v", rule.Name, i+1, err)
 			return ""
 		}
@@ -92,6 +98,25 @@ func fetchStepURL(prevURL, template, value string) (string, error) {
 		return "", fmt.Errorf("URL %q is not an http(s) URL", u)
 	}
 	return u.String(), nil
+}
+
+// checkFetchTarget refuses a fetch step to a private address when the scraped page is on a public host.
+//
+// Fetch URLs are built from page content, so a public page must not be able to point Tubarr at the local network.
+// Pages hosted on the local network may still fetch from it.
+func checkFetchTarget(pageURL, targetURL string) error {
+	page, err := url.Parse(pageURL)
+	if err != nil {
+		return fmt.Errorf("invalid page URL %q: %w", pageURL, err)
+	}
+	target, err := url.Parse(targetURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL %q: %w", targetURL, err)
+	}
+	if !network.IsPrivateNetwork(page.Hostname()) && network.IsPrivateNetwork(target.Hostname()) {
+		return fmt.Errorf("refusing request to local network address %q from public page %q", target.Host, page.Host)
+	}
+	return nil
 }
 
 // fetchBody requests a URL with a clone of the page's collector (sharing its transport, user agent, and cookies).

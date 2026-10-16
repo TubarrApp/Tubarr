@@ -92,6 +92,9 @@ func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 	if err := file.LoadConfigFile(v, f); err != nil {
 		return nil, fmt.Errorf("failed to load scrape config file %q: %w", name, err)
 	}
+	if !v.IsSet("sites") {
+		return nil, fmt.Errorf("%q is not a scrape config file: it has no 'sites' key (use 'sites: []' for none)", name)
+	}
 
 	var raw struct {
 		Sites []scrapeSiteConfig `mapstructure:"sites"`

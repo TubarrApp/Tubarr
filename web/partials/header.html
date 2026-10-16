@@ -1,3 +1,26 @@
+<script>
+  // safeURL returns u if it is an http(s) URL, for binding to href or src, else null (Alpine then drops the attribute).
+  window.safeURL = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
+
+  // Send the page to the login screen when an API call finds the session has ended.
+  (() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (response.status === 401 && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login.html?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+      }
+      return response;
+    };
+  })();
+
+  // logOut ends the session and returns to the login screen.
+  window.logOut = async () => {
+    await fetch('/api/v1/auth/logout', { method: 'POST' });
+    window.location.href = '/login.html';
+  };
+</script>
+
 <!-- Small Device Overlay Start -->
 <div
   :class="sidebarToggle ? 'block xl:hidden' : 'hidden'"
@@ -72,6 +95,14 @@
     <h1 class="flex-1 truncate text-xl font-semibold text-gray-800 dark:text-white/90">
       {{title}}
     </h1>
+
+    <button
+      type="button"
+      @click="logOut()"
+      class="shrink-0 text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400"
+    >
+      Log out
+    </button>
 
     <!-- Small Device Logo -->
     <a href="index.html" class="shrink-0 xl:hidden">

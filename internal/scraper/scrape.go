@@ -110,6 +110,13 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 		// Filter and create video requests
 		for newURL, lv := range newEpisodes {
+			if !isHTTPURL(newURL) {
+				logger.Pl.W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
+				continue
+			}
+			if !isHTTPURL(lv.ThumbnailURL) {
+				lv.ThumbnailURL = ""
+			}
 			if _, exists := existingMap[newURL]; !exists {
 				video := &models.Video{
 					ChannelID:    c.ID,

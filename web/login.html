@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Log In | Tubarr</title>
+    <link rel="icon" href="/src/images/favicon.ico">
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body class="dark bg-gray-900">
+    <div class="flex h-screen items-center justify-center p-4" x-data="loginPage()" x-init="init()" x-cloak>
+      <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]">
+        <h1 class="mb-2 text-xl font-semibold text-gray-800 dark:text-white/90" x-text="setup ? 'Create your Tubarr login' : 'Log in to Tubarr'"></h1>
+        <p class="mb-6 text-sm text-gray-500 dark:text-gray-400" x-show="setup">
+          No login exists yet. Choose a username and a password of at least 8 characters.
+        </p>
+
+        <form @submit.prevent="submit()">
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username</label>
+            <input
+              type="text"
+              x-model="username"
+              required
+              autocomplete="username"
+              class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            />
+          </div>
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+            <input
+              type="password"
+              x-model="password"
+              required
+              :autocomplete="setup ? 'new-password' : 'current-password'"
+              class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            />
+          </div>
+          <div class="mb-6" x-show="setup">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confirm password</label>
+            <input
+              type="password"
+              x-model="confirm"
+              :required="setup"
+              autocomplete="new-password"
+              class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            />
+          </div>
+
+          <div x-show="error" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+            <p class="text-sm text-red-800 dark:text-red-300" x-text="error"></p>
+          </div>
+
+          <button
+            type="submit"
+            :disabled="submitting"
+            class="px-6 py-3 bg-brand-500 text-white rounded-lg font-medium hover:bg-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            x-text="setup ? 'Create login' : 'Log in'"
+          ></button>
+        </form>
+      </div>
+    </div>
+
+    <script defer src="bundle.js"></script>
+    <script>
+      function loginPage() {
+        return {
+          setup: false,
+          username: '',
+          password: '',
+          confirm: '',
+          error: '',
+          submitting: false,
+
+          async init() {
+            try {
+              const response = await fetch('/api/v1/auth/status');
+              const status = await response.json();
+              if (status.authenticated) {
+                this.goNext();
+                return;
+              }
+              this.setup = status.setup_required;
+            } catch (err) {
+              this.error = 'Could not reach Tubarr: ' + err.message;
+            }
+          },
+
+          // goNext returns to the page that asked for a login, accepting only paths on this site.
+          goNext() {
+            const next = new URLSearchParams(window.location.search).get('next') || '/';
+            const local = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\');
+            window.location.href = local ? next : '/';
+          },
+
+          async submit() {
+            this.error = '';
+            if (this.setup && this.password !== this.confirm) {
+              this.error = 'Passwords do not match';
+              return;
+            }
+            this.submitting = true;
+            try {
+              const response = await fetch(this.setup ? '/api/v1/auth/setup' : '/api/v1/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: this.username, password: this.password })
+              });
+              if (!response.ok) {
+                throw new Error((await response.text()).trim() || response.statusText);
+              }
+              this.goNext();
+            } catch (err) {
+              this.error = err.message;
+            } finally {
+              this.submitting = false;
+            }
+          }
+        };
+      }
+    </script>
+  </body>
+</html>

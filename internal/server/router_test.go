@@ -32,6 +32,9 @@ func TestServePageIncludes(t *testing.T) {
 				t.Errorf("%s: rendered page still contains %q", filepath.Base(page), leftover)
 			}
 		}
+		if filepath.Base(page) == "login.html" { // Shown before logging in, so it has no sidebar or header.
+			continue
+		}
 		if !strings.Contains(body, "<aside") || !strings.Contains(body, "<header") {
 			t.Errorf("%s: rendered page is missing the sidebar or header", filepath.Base(page))
 		}

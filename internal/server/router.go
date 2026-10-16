@@ -3,10 +3,11 @@ package server
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,10 +16,14 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/vars"
+	"tubarr/internal/serverauth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/spf13/viper"
 )
 
 // serverStore holds the database, stores, and contexts for the server.
@@ -31,16 +36,48 @@ type serverStore struct {
 	db     *sql.DB
 	ctx    context.Context
 	cancel context.CancelFunc
+	access *serverauth.Manager // Nil in tests that don't exercise logins.
 }
 
 // tubarrPort.
 const tubarrPort = "8827"
+
+// dockerEnv is set by the Docker image, so the interface listens on all addresses there by default.
+const dockerEnv = "TUBARR_DOCKER"
+
+// listenAddress returns the address to listen on: the --listen flag or TUBARR_LISTEN, else localhost outside Docker.
+func listenAddress() string {
+	if addr := cmp.Or(viper.GetString(keys.WebListen), os.Getenv("TUBARR_LISTEN")); addr != "" {
+		return addr
+	}
+	if os.Getenv(dockerEnv) != "" {
+		return ":" + tubarrPort
+	}
+	return "127.0.0.1:" + tubarrPort
+}
+
+// loginRequired reports whether the --web-auth flag or TUBARR_WEB_AUTH leaves logins on (anything but "none").
+func loginRequired() bool {
+	mode := cmp.Or(viper.GetString(keys.WebAuth), os.Getenv("TUBARR_WEB_AUTH"))
+	return !strings.EqualFold(strings.TrimSpace(mode), "none")
+}
 
 // healthPath is the container healthcheck endpoint.
 const healthPath = "/health"
 
 // activityPath is polled by the web UI for running crawls and Metarr processes.
 const activityPath = "/api/v1/channels/activity"
+
+// maxRequestBody is the largest request body accepted (scrape config file saves are the largest).
+const maxRequestBody = 10 << 20
+
+// limitRequestBody caps request bodies at maxRequestBody.
+func limitRequestBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+		next.ServeHTTP(w, r)
+	})
+}
 
 // skipLogging applies the logger middleware to all requests except those for paths.
 func skipLogging(logMiddleware func(http.Handler) http.Handler, paths ...string) func(http.Handler) http.Handler {
@@ -57,7 +94,7 @@ func skipLogging(logMiddleware func(http.Handler) http.Handler, paths ...string)
 }
 
 // NewRouter returns a http Handler.
-func NewRouter(ss serverStore) http.Handler {
+func NewRouter(ss serverStore) (http.Handler, error) {
 	// Initialize router
 	r := chi.NewRouter()
 
@@ -66,16 +103,25 @@ func NewRouter(ss serverStore) http.Handler {
 	r.Use(skipLogging(middleware.Logger, healthPath, activityPath)) // Polled often, keep out of logs.
 	r.Use(middleware.Recoverer)
 	r.Use(http.NewCrossOriginProtection().Handler) // Blocks other websites' pages from sending changes (CSRF).
+	r.Use(limitRequestBody)
+	if ss.access != nil {
+		r.Use(ss.access.Middleware)
+	}
 
 	// --- Health ---
 	r.Get(healthPath, ss.handleHealth)
 
 	// --- Metarr Log ---
 	// POST endpoint for Metarr instances to send logs.
-	r.Post("/metarr-logs", ss.handlePostMetarrLogs)
+	r.Post(serverauth.MetarrLogsPath, ss.handlePostMetarrLogs)
 
 	// --- API Routes ---
 	r.Route("/api/v1", func(r chi.Router) {
+		// Login and access settings API.
+		if ss.access != nil {
+			ss.access.Mount(r)
+		}
+
 		// Channels API.
 		r.Route("/channels", func(r chi.Router) {
 			r.Get("/all", ss.handleListChannels)
@@ -143,14 +189,23 @@ func NewRouter(ss serverStore) http.Handler {
 
 	// --- Static Frontend ---
 	// Serve compiled web UI for all unmatched routes (after API routes).
-	staticHandler := StaticHandler()
+	staticHandler, err := StaticHandler()
+	if err != nil {
+		return nil, err
+	}
 	r.Handle("/*", staticHandler)
 
-	return r
+	return r, nil
 }
 
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
 func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, database *sql.DB) error {
+	access, err := serverauth.New(database, store.TubarrSettingsStore(), loginRequired())
+	if err != nil {
+		return fmt.Errorf("failed to set up web interface access: %w", err)
+	}
+	vars.MetarrLogToken = access.LogToken()
+
 	ss := serverStore{
 		s:      store,
 		cs:     store.ChannelStore(),
@@ -160,23 +215,30 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		db:     database,
 		ctx:    inputCtx,
 		cancel: inputCtxCancel,
+		access: access,
 	}
 
-	r := NewRouter(ss)
-	addr := ":" + tubarrPort
+	r, err := NewRouter(ss)
+	if err != nil {
+		return err
+	}
+	addr := listenAddress()
 
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           r,
-		ReadHeaderTimeout: 10 * time.Second, // Stops slow clients holding connections open; bodies and responses are unaffected.
+		ReadHeaderTimeout: 10 * time.Second, // Stops slow clients holding connections open.
+		ReadTimeout:       time.Minute,      // Whole request, body included.
+		IdleTimeout:       2 * time.Minute,  // Keep-alive connections between requests.
+		// No WriteTimeout: test crawls and FlareSolverr tests answer synchronously and can take minutes.
 	}
 
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		logger.Pl.I("Tubarr web server listening on http://localhost%s\n", srv.Addr)
+		logger.Pl.I("Tubarr web server listening on %s\n", srv.Addr)
 
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- fmt.Errorf("server failed: %w", err)
 			return
 		}
@@ -208,23 +270,21 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
 
-	logger.Pl.S("Server at http://localhost%s shut down successfully\n", addr)
+	logger.Pl.S("Server at %s shut down successfully\n", addr)
 	return nil
 }
 
-// StaticHandler handles serving of web pages.
-func StaticHandler() http.Handler {
+// StaticHandler handles serving of web pages from the web folder next to the executable.
+func StaticHandler() (http.Handler, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		log.Printf("failed to get executable path, cannot locate web pages: %v", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to get executable path, cannot locate web pages: %w", err)
 	}
 	baseDir := filepath.Dir(exe)
 	webRoot := filepath.Join(baseDir, "web")
 
 	if _, err := os.Stat(webRoot); err != nil {
-		log.Printf("webpage root %q cannot be loaded: %v", webRoot, err)
-		os.Exit(1)
+		return nil, fmt.Errorf("webpage root %q cannot be loaded: %w", webRoot, err)
 	}
 
 	fs := http.FileServer(http.Dir(webRoot))
@@ -266,7 +326,7 @@ func StaticHandler() http.Handler {
 
 		// Final fallback: plain 404 text
 		http.NotFound(w, r)
-	})
+	}), nil
 }
 
 var (

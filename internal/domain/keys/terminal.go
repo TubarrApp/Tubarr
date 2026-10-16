@@ -131,6 +131,19 @@ const (
 // Web interface or terminal.
 const (
 	RunWebInterface = "web"
+	WebListen       = "listen"   // Address the web interface listens on.
+	WebAuth         = "web-auth" // "required" (default) or "none".
+)
+
+// Web interface login settings (stored in the settings table).
+const (
+	WebUsername       = "web-username"
+	WebPasswordHash   = "web-password-hash"
+	WebAPIKey         = "web-api-key"
+	WebSkipLocalhost  = "web-skip-login-localhost" // "true" or "false".
+	WebSkipLogin      = "web-skip-login"           // JSON list of IPs and CIDR ranges.
+	WebAllowedHosts   = "web-allowed-hosts"        // JSON list of extra hostnames the interface is reached by.
+	WebTrustedProxies = "web-trusted-proxies"      // JSON list of proxy IPs and CIDR ranges trusted for X-Forwarded-For.
 )
 
 // Miscellaneous.

@@ -1,5 +1,5 @@
-// Package net provides networking utilities for Tubarr.
-package net
+// Package network provides networking utilities for Tubarr.
+package network
 
 import (
 	"net"

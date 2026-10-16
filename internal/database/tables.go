@@ -18,6 +18,7 @@ const (
 	programSQL        = "sql/program.sql"
 	settingsSQL       = "sql/settings.sql"
 	videoSQL          = "sql/videos.sql"
+	webSessionsSQL    = "sql/web_sessions.sql"
 )
 
 // initProgramTable initializes the primary program database table.
@@ -58,6 +59,11 @@ func initBlockedDomainsTable(tx *sql.Tx) error {
 // initSettingsTable initializes the global settings table.
 func initSettingsTable(tx *sql.Tx) error {
 	return executeSQLFile(tx, settingsSQL, "settings table")
+}
+
+// initWebSessionsTable initializes the web interface login sessions table.
+func initWebSessionsTable(tx *sql.Tx) error {
+	return executeSQLFile(tx, webSessionsSQL, "web sessions table")
 }
 
 // addColumnIfMissing adds a column to an existing table (for databases created by older versions).

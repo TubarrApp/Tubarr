@@ -119,7 +119,7 @@
                         <!-- Video Info -->
                         <td class="px-4 py-3 video-col">
                           <div class="flex items-center gap-3">
-                            <img x-show="download.thumbnail_url" :src="download.thumbnail_url" :alt="download.title" class="h-12 w-20 object-cover rounded" />
+                            <img x-show="download.thumbnail_url" :src="safeURL(download.thumbnail_url)" :alt="download.title" class="h-12 w-20 object-cover rounded" />
                             <div class="flex-1 min-w-0 video-text">
                               <div class="scrollable-text">
                                 <div class="scrollable-text-content">

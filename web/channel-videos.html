@@ -167,7 +167,7 @@
                           <td class="px-6 py-4">
                             <template x-if="video.thumbnail_url">
                               <img
-                                :src="video.thumbnail_url"
+                                :src="safeURL(video.thumbnail_url)"
                                 :alt="video.title"
                                 class="w-32 aspect-video object-cover rounded"
                               />
@@ -221,7 +221,7 @@
                               Run Metarr
                             </button>
                             <a
-                              :href="video.url"
+                              :href="safeURL(video.url)"
                               target="_blank"
                               rel="noopener noreferrer"
                               class="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"

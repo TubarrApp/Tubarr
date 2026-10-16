@@ -160,6 +160,14 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	if err := viper.BindPFlag(keys.RunWebInterface, rootCmd.PersistentFlags().Lookup(keys.RunWebInterface)); err != nil {
 		return err
 	}
+	rootCmd.PersistentFlags().String(keys.WebListen, "", "Address for the web interface to listen on (default 127.0.0.1:8827, or :8827 in Docker; env TUBARR_LISTEN)")
+	if err := viper.BindPFlag(keys.WebListen, rootCmd.PersistentFlags().Lookup(keys.WebListen)); err != nil {
+		return err
+	}
+	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login: 'required' (default) or 'none', e.g. behind a reverse proxy with its own login (env TUBARR_WEB_AUTH)")
+	if err := viper.BindPFlag(keys.WebAuth, rootCmd.PersistentFlags().Lookup(keys.WebAuth)); err != nil {
+		return err
+	}
 	if viper.IsSet(keys.RunWebInterface) {
 		return nil
 	}

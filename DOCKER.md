@@ -273,6 +273,8 @@ docker run -d \
 2. No unnecessary packages are installed
 3. All volumes should use restrictive permissions on the host
 4. Consider using Docker secrets for sensitive configuration
+5. The web interface asks for a login, created on the first visit. To reset a forgotten password, set `TUBARR_WEB_PASSWORD` (and optionally `TUBARR_WEB_USERNAME`) in the compose file and restart.
+6. Requests from the host reach the container from the Docker gateway (e.g. `172.17.0.1`), not localhost. Listing the whole Docker range under **Skip Login For** skips the login for everything reaching the published port.
 
 ## Backup and Restore
 

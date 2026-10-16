@@ -19,6 +19,17 @@ func writeScrapeConfig(t *testing.T, name, content string) string {
 	return p
 }
 
+// TestParseScrapeSelectorsFileNeedsSites tests that a file without a sites key is rejected, and an empty list accepted.
+func TestParseScrapeSelectorsFileNeedsSites(t *testing.T) {
+	if _, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, "other.yaml", "name: something else\n")); err == nil {
+		t.Error("file without a sites key was accepted")
+	}
+	sites, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, "empty.yaml", "sites: []\n"))
+	if err != nil || len(sites) != 0 {
+		t.Errorf("sites: [] = %d sites, %v; want 0, nil", len(sites), err)
+	}
+}
+
 // TestParseScrapeSelectorsFile tests parsing a scrape config file with multiple sites and selectors.
 func TestParseScrapeSelectorsFileCrawl(t *testing.T) {
 	p := writeScrapeConfig(t, "rules.yaml", `

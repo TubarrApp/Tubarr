@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -16,16 +17,6 @@ import (
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
-
-// fillChannelFromConfigFile parses a Channel and its access details from a config file input.
-func fillChannelFromConfigFile(w http.ResponseWriter, input models.ChannelInputPtrs) (*models.Channel, map[string]*models.ChannelAccessDetails) {
-	c, m, err := parsing.BuildChannelFromInput(input)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return nil, make(map[string]*models.ChannelAccessDetails)
-	}
-	return c, m
-}
 
 // metarrArgsJSONMap returns a map of MetarrArgs JSON keys and their values.
 func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
@@ -182,146 +173,226 @@ func settingsJSONMap(settings *models.Settings) map[string]any {
 	return settingsMap
 }
 
-// parseSettingsFromMap parses Settings from a map[string]any (from JSON).
+// splitAuthDetails splits the auth_details form value into one JSON object per entry.
 //
-// This is used when parsing per-URL settings from the frontend.
-func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
+// The web UI sends a JSON array; space-separated objects are still accepted, though they break on values with spaces.
+func splitAuthDetails(s string) ([]string, error) {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "[") {
+		return strings.Fields(s), nil
+	}
+	var entries []json.RawMessage
+	if err := json.Unmarshal([]byte(s), &entries); err != nil {
+		return nil, fmt.Errorf("invalid auth_details JSON: %w", err)
+	}
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, string(e))
+	}
+	return out, nil
+}
+
+// urlSettingsInput is the per-URL settings JSON sent by the web UI, keyed by channel URL.
+type urlSettingsInput struct {
+	Settings *settingsInput   `json:"settings"`
+	Metarr   *metarrArgsInput `json:"metarr"`
+}
+
+// settingsInput holds the per-URL Settings the web UI sent. Nil fields were not sent.
+type settingsInput struct {
+	CookiesFromBrowser        *string  `json:"cookies_from_browser"`
+	ExternalDownloader        *string  `json:"external_downloader"`
+	ExternalDownloaderArgs    *string  `json:"external_downloader_args"`
+	ExtraYTDLPVideoArgs       *string  `json:"extra_ytdlp_video_args"`
+	ExtraYTDLPMetaArgs        *string  `json:"extra_ytdlp_meta_args"`
+	ExtraYTDLPCrawlArgs       *string  `json:"extra_ytdlp_crawl_args"`
+	FilterFile                *string  `json:"filter_file"`
+	MoveOpsFile               *string  `json:"move_ops_file"`
+	JSONDir                   *string  `json:"json_directory"`
+	VideoDir                  *string  `json:"video_directory"`
+	MaxFilesize               *string  `json:"max_filesize"`
+	YtdlpOutputExt            *string  `json:"ytdlp_output_ext"`
+	FromDate                  *string  `json:"from_date"`
+	ToDate                    *string  `json:"to_date"`
+	MaxConcurrency            *int     `json:"max_concurrency"`
+	CrawlFreq                 *int     `json:"crawl_freq"`
+	DownloadRetries           *int     `json:"download_retries"`
+	UseGlobalCookies          *bool    `json:"use_global_cookies"`
+	Paused                    *bool    `json:"paused"`
+	AutoDownload              *bool    `json:"auto_download"`
+	Filters                   *string  `json:"filters"`
+	MoveOps                   *string  `json:"move_ops"`
+	YTDLPPreferredVideoCodecs []string `json:"ytdlp_preferred_video_codecs"`
+	YTDLPPreferredAudioCodecs []string `json:"ytdlp_preferred_audio_codecs"`
+}
+
+// metarrArgsInput holds the per-URL MetarrArgs the web UI sent. Nil fields were not sent.
+type metarrArgsInput struct {
+	OutputExt               *string  `json:"metarr_output_ext"`
+	FilenameOpsFile         *string  `json:"metarr_filename_ops_file"`
+	FilteredFilenameOpsFile *string  `json:"metarr_filtered_filename_ops_file"`
+	MetaOpsFile             *string  `json:"metarr_meta_ops_file"`
+	FilteredMetaOpsFile     *string  `json:"metarr_filtered_meta_ops_file"`
+	ExtraFFmpegArgs         *string  `json:"metarr_extra_ffmpeg_args"`
+	RenameStyle             *string  `json:"metarr_rename_style"`
+	MinFreeMem              *string  `json:"metarr_min_free_mem"`
+	GPU                     *string  `json:"metarr_gpu"`
+	GPUNode                 *string  `json:"metarr_transcode_gpu_node"`
+	OutputDir               *string  `json:"metarr_output_directory"`
+	TranscodeVideoFilter    *string  `json:"metarr_transcode_video_filter"`
+	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
+	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
+	TranscodeQuality        *string  `json:"metarr_transcode_quality"`
+	Concurrency             *int     `json:"metarr_concurrency"`
+	MaxCPU                  *float64 `json:"metarr_max_cpu_usage"`
+	FilenameOps             *string  `json:"metarr_filename_ops"`
+	FilteredFilenameOps     *string  `json:"metarr_filtered_filename_ops"`
+	MetaOps                 *string  `json:"metarr_meta_ops"`
+	FilteredMetaOps         *string  `json:"metarr_filtered_meta_ops"`
+}
+
+// parseURLSettings parses the per-URL settings JSON from the frontend.
+func parseURLSettings(raw string) (map[string]urlSettings, error) {
+	parsed := make(map[string]urlSettings)
+	if raw == "" {
+		return parsed, nil
+	}
+	var input map[string]urlSettingsInput
+	if err := json.Unmarshal([]byte(raw), &input); err != nil {
+		return nil, fmt.Errorf("invalid url_settings JSON: %w", err)
+	}
+	for channelURL, in := range input {
+		var (
+			out urlSettings
+			err error
+		)
+		if in.Settings != nil {
+			if out.Settings, err = parseSettingsInput(in.Settings); err != nil {
+				return nil, fmt.Errorf("invalid Settings for URL %q: %w", channelURL, err)
+			}
+		}
+		if in.Metarr != nil {
+			if out.Metarr, err = parseMetarrArgsInput(in.Metarr); err != nil {
+				return nil, fmt.Errorf("invalid Metarr Args for URL %q: %w", channelURL, err)
+			}
+		}
+		parsed[channelURL] = out
+	}
+	return parsed, nil
+}
+
+// urlSettings are a channel URL's parsed custom settings.
+type urlSettings struct {
+	Settings *models.Settings
+	Metarr   *models.MetarrArgs
+}
+
+// parseSettingsInput validates per-URL Settings from the frontend.
+func parseSettingsInput(in *settingsInput) (*models.Settings, error) {
 	settings := &models.Settings{}
 
-	// Extract string fields
-	if v, ok := data[jsonkeys.SettingsCookiesFromBrowser].(string); ok {
-		settings.CookiesFromBrowser = v
-	}
-	if v, ok := data[jsonkeys.SettingsExternalDownloader].(string); ok {
-		settings.ExternalDownloader = v
-	}
-	if v, ok := data[jsonkeys.SettingsExternalDownloaderArgs].(string); ok {
-		settings.ExternalDownloaderArgs = v
-	}
-	if v, ok := data[jsonkeys.SettingsExtraYtdlpVideoArgs].(string); ok {
-		settings.ExtraYTDLPVideoArgs = v
-	}
-	if v, ok := data[jsonkeys.SettingsExtraYtdlpMetaArgs].(string); ok {
-		settings.ExtraYTDLPMetaArgs = v
-	}
-	if v, ok := data[jsonkeys.SettingsExtraYtdlpCrawlArgs].(string); ok {
-		settings.ExtraYTDLPCrawlArgs = v
-	}
-	if v, ok := data[jsonkeys.SettingsFilterFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
+	// Strings not needing validation.
+	setString(&settings.CookiesFromBrowser, in.CookiesFromBrowser)
+	setString(&settings.ExternalDownloader, in.ExternalDownloader)
+	setString(&settings.ExternalDownloaderArgs, in.ExternalDownloaderArgs)
+	setString(&settings.ExtraYTDLPVideoArgs, in.ExtraYTDLPVideoArgs)
+	setString(&settings.ExtraYTDLPMetaArgs, in.ExtraYTDLPMetaArgs)
+	setString(&settings.ExtraYTDLPCrawlArgs, in.ExtraYTDLPCrawlArgs)
+
+	if v := in.FilterFile; v != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
-		settings.FilterFile = v
+		settings.FilterFile = *v
 	}
-	if v, ok := data[jsonkeys.SettingsMoveOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
+	if v := in.MoveOpsFile; v != nil {
+		if _, _, err := sharedvalidation.ValidateFile(*v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
-		settings.MetaFilterMoveOpFile = v
+		settings.MetaFilterMoveOpFile = *v
 	}
-	if v, ok := data[jsonkeys.SettingsJSONDirectory].(string); ok {
-		if err := validation.CheckDirectory(v, sharedtemplates.TubarrTemplateTags); err != nil {
+	if v := in.JSONDir; v != nil {
+		if err := validation.CheckDirectory(*v, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
-		settings.JSONDir = v
+		settings.JSONDir = *v
 	}
-	if v, ok := data[jsonkeys.SettingsVideoDirectory].(string); ok {
-		if err := validation.CheckDirectory(v, sharedtemplates.TubarrTemplateTags); err != nil {
+	if v := in.VideoDir; v != nil {
+		if err := validation.CheckDirectory(*v, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
-		settings.VideoDir = v
+		settings.VideoDir = *v
 	}
-	if v, ok := data[jsonkeys.SettingsMaxFilesize].(string); ok {
-		validFilesize, err := validation.ValidateMaxFilesize(v)
+	if v := in.MaxFilesize; v != nil {
+		validFilesize, err := validation.ValidateMaxFilesize(*v)
 		if err != nil {
 			return nil, err
 		}
 		settings.MaxFilesize = validFilesize
 	}
-	if v, ok := data[jsonkeys.SettingsYtdlpOutputExt].(string); ok {
-		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
+	if v := in.YtdlpOutputExt; v != nil {
+		if err := validation.ValidateYtdlpOutputExtension(*v); err != nil {
 			return nil, err
 		}
-		settings.YtdlpOutputExt = v
+		settings.YtdlpOutputExt = *v
 	}
-	if v, ok := data[jsonkeys.SettingsFromDate].(string); ok {
-		validDate, err := validation.ValidateToFromDate(v)
+	if v := in.FromDate; v != nil {
+		validDate, err := validation.ValidateToFromDate(*v)
 		if err != nil {
 			return nil, err
 		}
 		settings.FromDate = validDate
 	}
-	if v, ok := data[jsonkeys.SettingsToDate].(string); ok {
-		validDate, err := validation.ValidateToFromDate(v)
+	if v := in.ToDate; v != nil {
+		validDate, err := validation.ValidateToFromDate(*v)
 		if err != nil {
 			return nil, err
 		}
 		settings.ToDate = validDate
 	}
 
-	// Extract integer fields.
-	if v, ok := data[jsonkeys.SettingsMaxConcurrency].(int); ok {
-		valid := sharedvalidation.ValidateConcurrencyLimit(v)
-		settings.Concurrency = valid
+	if v := in.MaxConcurrency; v != nil {
+		settings.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*v)
 	}
-	if v, ok := data[jsonkeys.SettingsCrawlFreq].(int); ok {
-		settings.CrawlFreq = max(v, 0)
+	if v := in.CrawlFreq; v != nil {
+		settings.CrawlFreq = max(*v, 0)
 	}
-	if v, ok := data[jsonkeys.SettingsDownloadRetries].(int); ok {
-		settings.Retries = max(v, 0)
+	if v := in.DownloadRetries; v != nil {
+		settings.Retries = max(*v, 0)
 	}
 
-	// Extract boolean fields.
-	if v, ok := data[jsonkeys.SettingsUseGlobalCookies].(bool); ok {
-		settings.UseGlobalCookies = &v
-	}
-	if v, ok := data[jsonkeys.SettingsPaused].(bool); ok {
-		settings.Paused = v
-	}
-	if v, ok := data[jsonkeys.SettingsAutoDownload].(bool); ok {
-		settings.AutoDownload = &v
+	settings.UseGlobalCookies = in.UseGlobalCookies
+	settings.AutoDownload = in.AutoDownload
+	if in.Paused != nil {
+		settings.Paused = *in.Paused
 	}
 
-	// Parse model fields from strings (newline-separated, not space-separated).
-	if filtersStr, ok := data[jsonkeys.SettingsFilters].(string); ok && filtersStr != "" {
-		lines := splitNonEmptyLines(filtersStr)
-		filters, err := parsing.ParseFilterOps(lines, true)
+	// Models (newline-separated, not space-separated).
+	if v := in.Filters; v != nil && *v != "" {
+		filters, err := parsing.ParseFilterOps(splitNonEmptyLines(*v), true)
 		if err != nil {
 			return nil, err
 		}
 		settings.Filters = filters
 	}
-	if moveOpsStr, ok := data[jsonkeys.SettingsMoveOps].(string); ok && moveOpsStr != "" {
-		lines := splitNonEmptyLines(moveOpsStr)
-		moveOps, err := parsing.ParseMetaFilterMoveOps(lines)
+	if v := in.MoveOps; v != nil && *v != "" {
+		moveOps, err := parsing.ParseMetaFilterMoveOps(splitNonEmptyLines(*v))
 		if err != nil {
 			return nil, err
 		}
 		settings.MetaFilterMoveOps = moveOps
 	}
 
-	// Parse codec preferences.
-	if videoCodecs, ok := data[jsonkeys.SettingsYTDLPPreferredVideoCodecs].([]any); ok {
-		codecs := make([]string, 0, len(videoCodecs))
-		for _, v := range videoCodecs {
-			if codec, ok := v.(string); ok {
-				codecs = append(codecs, codec)
-			}
-		}
-		validCodecs, err := validation.ValidatePreferredVideoCodecs(codecs)
+	// Codec preferences.
+	if in.YTDLPPreferredVideoCodecs != nil {
+		validCodecs, err := validation.ValidatePreferredVideoCodecs(in.YTDLPPreferredVideoCodecs)
 		if err != nil {
 			return nil, err
 		}
 		settings.YTDLPPreferredVideoCodecs = validCodecs
 	}
-	if audioCodecs, ok := data[jsonkeys.SettingsYTDLPPreferredAudioCodecs].([]any); ok {
-		codecs := make([]string, 0, len(audioCodecs))
-		for _, v := range audioCodecs {
-			if codec, ok := v.(string); ok {
-				codecs = append(codecs, codec)
-			}
-		}
-		validCodecs, err := validation.ValidatePreferredAudioCodecs(codecs)
+	if in.YTDLPPreferredAudioCodecs != nil {
+		validCodecs, err := validation.ValidatePreferredAudioCodecs(in.YTDLPPreferredAudioCodecs)
 		if err != nil {
 			return nil, err
 		}
@@ -331,142 +402,120 @@ func parseSettingsFromMap(data map[string]any) (*models.Settings, error) {
 	return settings, nil
 }
 
-// parseMetarrArgsFromMap parses MetarrArgs from a map[string]any (from JSON).
-//
-// This is used when parsing per-URL metarr settings from the frontend.
-func parseMetarrArgsFromMap(data map[string]any) (*models.MetarrArgs, error) {
+// setString sets *dst to *v if v was sent.
+func setString(dst *string, v *string) {
+	if v != nil {
+		*dst = *v
+	}
+}
+
+// parseMetarrArgsInput validates per-URL MetarrArgs from the frontend.
+func parseMetarrArgsInput(in *metarrArgsInput) (*models.MetarrArgs, error) {
 	metarr := &models.MetarrArgs{}
 
-	// Extract string fields
-	if v, ok := data[jsonkeys.MetarrOutputExt].(string); ok {
-		metarr.OutputExt = v
-	}
-	if v, ok := data[jsonkeys.MetarrFilenameOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
+	// Strings not needing validation.
+	setString(&metarr.OutputExt, in.OutputExt)
+	setString(&metarr.ExtraFFmpegArgs, in.ExtraFFmpegArgs)
+	setString(&metarr.TranscodeVideoFilter, in.TranscodeVideoFilter)
+
+	for _, f := range []struct {
+		dst *string
+		v   *string
+	}{
+		{&metarr.FilenameOpsFile, in.FilenameOpsFile},
+		{&metarr.FilteredFilenameOpsFile, in.FilteredFilenameOpsFile},
+		{&metarr.MetaOpsFile, in.MetaOpsFile},
+		{&metarr.FilteredMetaOpsFile, in.FilteredMetaOpsFile},
+	} {
+		if f.v == nil {
+			continue
+		}
+		if _, _, err := sharedvalidation.ValidateFile(*f.v, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
-		metarr.FilenameOpsFile = v
+		*f.dst = *f.v
 	}
-	if v, ok := data[jsonkeys.MetarrFilteredFilenameOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
+	if v := in.RenameStyle; v != nil {
+		if err := validation.ValidateRenameFlag(*v); err != nil {
 			return nil, err
 		}
-		metarr.FilteredFilenameOpsFile = v
+		metarr.RenameStyle = *v
 	}
-	if v, ok := data[jsonkeys.MetarrMetaOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
+	if v := in.MinFreeMem; v != nil {
+		if _, err := sharedvalidation.ValidateMinFreeMem(*v); err != nil {
 			return nil, err
 		}
-		metarr.MetaOpsFile = v
+		metarr.MinFreeMem = *v
 	}
-	if v, ok := data[jsonkeys.MetarrFilteredMetaOpsFile].(string); ok {
-		if _, _, err := sharedvalidation.ValidateFile(v, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, err
-		}
-		metarr.FilteredMetaOpsFile = v
-	}
-	if v, ok := data[jsonkeys.MetarrExtraFFmpegArgs].(string); ok {
-		metarr.ExtraFFmpegArgs = v
-	}
-	if v, ok := data[jsonkeys.MetarrRenameStyle].(string); ok {
-		if err := validation.ValidateRenameFlag(v); err != nil {
-			return nil, err
-		}
-		metarr.RenameStyle = v
-	}
-	if v, ok := data[jsonkeys.MetarrMinFreeMem].(string); ok {
-		if _, err := sharedvalidation.ValidateMinFreeMem(v); err != nil {
-			return nil, err
-		}
-		metarr.MinFreeMem = v
-	}
-	if v, ok := data[jsonkeys.MetarrGPU].(string); ok {
-		validGPU, err := validation.ValidateGPUAcceleration(v)
+	if v := in.GPU; v != nil {
+		validGPU, err := validation.ValidateGPUAcceleration(*v)
 		if err != nil {
 			return nil, err
 		}
 		metarr.TranscodeGPU = validGPU
 	}
-	if v, ok := data[jsonkeys.MetarrGPUNode].(string); ok {
-		validGPUNode, err := sharedvalidation.ValidateAccelTypeDeviceNode(metarr.TranscodeGPU, v)
+	if v := in.GPUNode; v != nil {
+		validGPUNode, err := sharedvalidation.ValidateAccelTypeDeviceNode(metarr.TranscodeGPU, *v)
 		if err != nil {
 			return nil, err
 		}
 		metarr.TranscodeGPUNode = validGPUNode
 	}
-	if v, ok := data[jsonkeys.MetarrOutputDirectory].(string); ok {
-		if err := validation.CheckDirectory(v, sharedtemplates.AllTemplatesMap); err != nil {
+	if v := in.OutputDir; v != nil {
+		if err := validation.CheckDirectory(*v, sharedtemplates.AllTemplatesMap); err != nil {
 			return nil, err
 		}
-		metarr.OutputDir = v
+		metarr.OutputDir = *v
 	}
-	if v, ok := data[jsonkeys.MetarrTranscodeVideoFilter].(string); ok {
-		metarr.TranscodeVideoFilter = v
-	}
-	if v, ok := data[jsonkeys.MetarrVideoCodecs].([]string); ok {
-		validPairs, err := validation.ValidateVideoTranscodeCodecSlice(v, metarr.TranscodeGPU)
+	if v := in.VideoCodecs; v != nil {
+		validPairs, err := validation.ValidateVideoTranscodeCodecSlice(splitNonEmptyLines(*v), metarr.TranscodeGPU)
 		if err != nil {
 			return nil, err
 		}
 		metarr.TranscodeVideoCodecs = validPairs
 	}
-	if v, ok := data[jsonkeys.MetarrAudioCodecs].([]string); ok {
-		validPairs, err := validation.ValidateAudioTranscodeCodecSlice(v)
+	if v := in.AudioCodecs; v != nil {
+		validPairs, err := validation.ValidateAudioTranscodeCodecSlice(splitNonEmptyLines(*v))
 		if err != nil {
 			return nil, err
 		}
 		metarr.TranscodeAudioCodecs = validPairs
 	}
-	if v, ok := data[jsonkeys.MetarrTranscodeQuality].(string); ok {
-		validQuality, err := sharedvalidation.ValidateTranscodeQuality(v)
+	if v := in.TranscodeQuality; v != nil {
+		validQuality, err := sharedvalidation.ValidateTranscodeQuality(*v)
 		if err != nil {
 			return nil, err
 		}
 		metarr.TranscodeQuality = validQuality
 	}
-
-	// Extract integer fields
-	if v, ok := data[jsonkeys.MetarrConcurrency].(int); ok {
-		metarr.Concurrency = sharedvalidation.ValidateConcurrencyLimit(v)
+	if v := in.Concurrency; v != nil {
+		metarr.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*v)
+	}
+	if v := in.MaxCPU; v != nil {
+		metarr.MaxCPU = *v
 	}
 
-	// Extract float fields
-	if v, ok := data[jsonkeys.MetarrMaxCPU].(float64); ok {
-		metarr.MaxCPU = v
-	}
-
-	// Parse model fields from strings (newline-separated, not space-separated)
-	if filenameOpsStr, ok := data[jsonkeys.MetarrFilenameOps].(string); ok && filenameOpsStr != "" {
-		lines := splitOpLines(filenameOpsStr)
-		filenameOps, err := parsing.ParseFilenameOps(lines)
-		if err != nil {
+	// Models (newline-separated, not space-separated).
+	var err error
+	if v := in.FilenameOps; v != nil && *v != "" {
+		if metarr.FilenameOps, err = parsing.ParseFilenameOps(splitOpLines(*v)); err != nil {
 			return nil, err
 		}
-		metarr.FilenameOps = filenameOps
 	}
-	if filteredFilenameOpsStr, ok := data[jsonkeys.MetarrFilteredFilenameOps].(string); ok && filteredFilenameOpsStr != "" {
-		lines := splitOpLines(filteredFilenameOpsStr)
-		filteredFilenameOps, err := parsing.ParseFilteredFilenameOps(lines)
-		if err != nil {
+	if v := in.FilteredFilenameOps; v != nil && *v != "" {
+		if metarr.FilteredFilenameOps, err = parsing.ParseFilteredFilenameOps(splitOpLines(*v)); err != nil {
 			return nil, err
 		}
-		metarr.FilteredFilenameOps = filteredFilenameOps
 	}
-	if metaOpsStr, ok := data[jsonkeys.MetarrMetaOps].(string); ok && metaOpsStr != "" {
-		lines := splitOpLines(metaOpsStr)
-		metaOps, err := parsing.ParseMetaOps(lines)
-		if err != nil {
+	if v := in.MetaOps; v != nil && *v != "" {
+		if metarr.MetaOps, err = parsing.ParseMetaOps(splitOpLines(*v)); err != nil {
 			return nil, err
 		}
-		metarr.MetaOps = metaOps
 	}
-	if filteredMetaOpsStr, ok := data[jsonkeys.MetarrFilteredMetaOps].(string); ok && filteredMetaOpsStr != "" {
-		lines := splitOpLines(filteredMetaOpsStr)
-		filteredMetaOps, err := parsing.ParseFilteredMetaOps(lines)
-		if err != nil {
+	if v := in.FilteredMetaOps; v != nil && *v != "" {
+		if metarr.FilteredMetaOps, err = parsing.ParseFilteredMetaOps(splitOpLines(*v)); err != nil {
 			return nil, err
 		}
-		metarr.FilteredMetaOps = filteredMetaOps
 	}
 
 	return metarr, nil

@@ -139,7 +139,7 @@ func setupFuzzServer(t *testing.T) {
 			fuzzServer.initErr = err
 			return
 		}
-		// StaticHandler exits unless a web folder sits next to the executable, which here is the test binary.
+		// StaticHandler fails unless a web folder sits next to the executable, which here is the test binary.
 		exe, err := os.Executable()
 		if err != nil {
 			fuzzServer.initErr = err
@@ -162,7 +162,10 @@ func setupFuzzServer(t *testing.T) {
 			s: store, cs: store.ChannelStore(), ds: store.DownloadStore(), vs: store.VideoStore(),
 			tss: store.TubarrSettingsStore(), db: db.DB, ctx: ctx, cancel: cancel,
 		}
-		fuzzServer.handler = NewRouter(ss)
+		if fuzzServer.handler, err = NewRouter(ss); err != nil {
+			fuzzServer.initErr = err
+			return
+		}
 		fuzzServer.db = db.DB
 
 		form := url.Values{

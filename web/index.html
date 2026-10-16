@@ -456,7 +456,7 @@
                             <div class="scroll-carousel-item">
                               <div class="overflow-hidden">
                                 <template x-if="video.thumbnail_url">
-                                  <img :src="video.thumbnail_url" :alt="video.title" />
+                                  <img :src="safeURL(video.thumbnail_url)" :alt="video.title" />
                                 </template>
                                 <template x-if="!video.thumbnail_url">
                                   <div class="flex items-center justify-center aspect-video bg-gray-200 dark:bg-gray-800">
@@ -473,7 +473,7 @@
                                   <span x-text="formatDate(video.upload_date)"></span>
                                 </p>
                                 <a
-                                  :href="video.url"
+                                  :href="safeURL(video.url)"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   class="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
@@ -565,7 +565,7 @@
                               <div class="scroll-carousel-item">
                                 <div class="relative overflow-hidden">
                                   <template x-if="video.thumbnail_url">
-                                    <img :src="video.thumbnail_url" :alt="video.title" referrerpolicy="no-referrer" />
+                                    <img :src="safeURL(video.thumbnail_url)" :alt="video.title" referrerpolicy="no-referrer" />
                                   </template>
                                   <template x-if="!video.thumbnail_url">
                                     <div class="flex items-center justify-center aspect-video bg-gray-200 dark:bg-gray-800">
@@ -593,7 +593,7 @@
                                   ></p>
                                   <div class="mt-2 flex items-center justify-between gap-2">
                                     <a
-                                      :href="video.url"
+                                      :href="safeURL(video.url)"
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       class="inline-flex items-center gap-1 text-xs text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
@@ -1110,7 +1110,7 @@
                 method: 'POST'
               });
 
-              if (!response.ok) {
+              if (!response.ok && response.status !== 409) { // 409: a crawl is already running, the message says so.
                 throw new Error('Failed to start crawl');
               }
 
@@ -1134,7 +1134,7 @@
                 method: 'POST'
               });
 
-              if (!response.ok) {
+              if (!response.ok && response.status !== 409) { // 409: a crawl is already running, the message says so.
                 throw new Error('Failed to ignore uploads to date');
               }
 

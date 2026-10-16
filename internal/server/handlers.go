@@ -72,8 +72,9 @@ func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.R
 	input.URLSettings = urlSettings
 
 	// Fill channel from config file input.
-	c, authMap := fillChannelFromConfigFile(w, input)
-	if c == nil {
+	c, authMap, err := parsing.BuildChannelFromInput(input)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -197,12 +198,12 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 		}
 		input.URLSettings = urlSettings
 
-		c, authMap := fillChannelFromConfigFile(w, input)
-		if c == nil {
+		c, authMap, err := parsing.BuildChannelFromInput(input)
+		if err != nil {
 			failures = append(failures, struct {
 				file   string
 				reason string
-			}{batchConfigFile, "channel returned nil"})
+			}{batchConfigFile, err.Error()})
 			continue
 		}
 
@@ -406,17 +407,18 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Build auth_details array (excluding manual-downloads).
-	authDetails := make([]map[string]string, 0)
+	// Passwords are never sent back, only whether one is saved.
+	authDetails := make([]map[string]any, 0)
 	for _, urlModel := range c.URLModels {
 		if urlModel.URL == consts.ManualDownloadsCol {
 			continue
 		}
 		if urlModel.Username != "" || urlModel.LoginURL != "" {
-			authDetails = append(authDetails, map[string]string{
-				"channel_url": urlModel.URL,
-				"username":    urlModel.Username,
-				"password":    urlModel.Password,
-				"login_url":   urlModel.LoginURL,
+			authDetails = append(authDetails, map[string]any{
+				"channel_url":  urlModel.URL,
+				"username":     urlModel.Username,
+				"has_password": urlModel.Password != "",
+				"login_url":    urlModel.LoginURL,
 			})
 		}
 	}
@@ -478,13 +480,17 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 	// Get form values.
 	name := r.FormValue("name")
 	urls := strings.Fields(r.FormValue("urls"))
-	authDetails := strings.Fields(r.FormValue("auth_details"))
 	username := r.FormValue("username")
 	loginURL := r.FormValue("login_url")
 	password := r.FormValue("password")
 	now := time.Now()
 
 	// Parse authentication details.
+	authDetails, err := splitAuthDetails(r.FormValue("auth_details"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
@@ -492,39 +498,10 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Parse per-URL settings JSON if provided.
-	urlSettingsRaw := make(map[string]map[string]map[string]any)
-	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
-		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsRaw); err != nil {
-			http.Error(w, fmt.Sprintf("invalid url_settings JSON: %v", err), http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Parse the URL settings into proper structures.
-	urlSettingsMap := make(map[string]struct {
-		Settings *models.Settings
-		Metarr   *models.MetarrArgs
-	})
-	for channelURL, settingsData := range urlSettingsRaw {
-		parsed := struct {
-			Settings *models.Settings
-			Metarr   *models.MetarrArgs
-		}{}
-
-		if settingsMap, hasSettings := settingsData["settings"]; hasSettings {
-			if parsed.Settings, err = parseSettingsFromMap(settingsMap); err != nil {
-				http.Error(w, fmt.Sprintf("Invalid Settings for URL %q: %v", channelURL, err), http.StatusBadRequest)
-				return
-			}
-		}
-		if metarrMap, hasMetarr := settingsData["metarr"]; hasMetarr {
-			if parsed.Metarr, err = parseMetarrArgsFromMap(metarrMap); err != nil {
-				http.Error(w, fmt.Sprintf("Invalid Metarr Args for URL %q: %v", channelURL, err), http.StatusBadRequest)
-				return
-			}
-		}
-
-		urlSettingsMap[channelURL] = parsed
+	urlSettingsMap, err := parseURLSettings(r.FormValue("url_settings"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// Validate and create ChannelURL models.
@@ -674,13 +651,17 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	authDetails := strings.Fields(r.FormValue("auth_details"))
 	username := r.FormValue("username")
 	loginURL := r.FormValue("login_url")
 	password := r.FormValue("password")
 	now := time.Now()
 
 	// Parse authentication details.
+	authDetails, err := splitAuthDetails(r.FormValue("auth_details"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
@@ -688,39 +669,10 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Parse per-URL settings JSON if provided.
-	urlSettingsRaw := make(map[string]map[string]map[string]any)
-	if urlSettingsJSON := r.FormValue("url_settings"); urlSettingsJSON != "" {
-		if err := json.Unmarshal([]byte(urlSettingsJSON), &urlSettingsRaw); err != nil {
-			http.Error(w, fmt.Sprintf("invalid url_settings JSON: %v", err), http.StatusBadRequest)
-			return
-		}
-	}
-
-	// Parse the URL settings into proper structures.
-	urlSettingsMap := make(map[string]struct {
-		Settings *models.Settings
-		Metarr   *models.MetarrArgs
-	})
-	for channelURL, settingsData := range urlSettingsRaw {
-		parsed := struct {
-			Settings *models.Settings
-			Metarr   *models.MetarrArgs
-		}{}
-
-		if settingsMap, hasSettings := settingsData["settings"]; hasSettings {
-			if parsed.Settings, err = parseSettingsFromMap(settingsMap); err != nil {
-				http.Error(w, fmt.Sprintf("Invalid Settings for URL %q: %v", channelURL, err), http.StatusBadRequest)
-				return
-			}
-		}
-		if metarrMap, hasMetarr := settingsData["metarr"]; hasMetarr {
-			if parsed.Metarr, err = parseMetarrArgsFromMap(metarrMap); err != nil {
-				http.Error(w, fmt.Sprintf("Invalid Metarr Args for URL %q: %v", channelURL, err), http.StatusBadRequest)
-				return
-			}
-		}
-
-		urlSettingsMap[channelURL] = parsed
+	urlSettingsMap, err := parseURLSettings(r.FormValue("url_settings"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// -- Write. --
@@ -782,9 +734,11 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 
 		// Check if URL already exists.
 		if existingURLModel, exists := existingURLMap[u]; exists {
-			// Update existing URL.
+			// Update existing URL. A blank password keeps the saved one, as passwords aren't sent to the edit page.
+			if parsedPassword != "" || parsedUsername == "" {
+				existingURLModel.Password = parsedPassword
+			}
 			existingURLModel.Username = parsedUsername
-			existingURLModel.Password = parsedPassword
 			existingURLModel.LoginURL = parsedLoginURL
 			existingURLModel.UpdatedAt = now
 
@@ -950,7 +904,7 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 	// Read and parse body for DELETE requests.
 	//
 	// DELETE requests need special handling for form data in the body.
-	bodyBytes, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 10<<20))
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Pl.E("Failed to read body: %v", err)
 		http.Error(w, "failed to read request body", http.StatusBadRequest)
@@ -1107,7 +1061,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 	logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 
-	w.WriteHeader(http.StatusAlreadyReported)
+	w.WriteHeader(http.StatusConflict)
 	if _, err := w.Write([]byte(`{"message": "Channel crawl already running for channel"}`)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
 	}
@@ -1258,7 +1212,7 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 	}
 	logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 
-	w.WriteHeader(http.StatusAlreadyReported)
+	w.WriteHeader(http.StatusConflict)
 	if _, err := w.Write([]byte(`{"message": "Channel ignore crawl already running for channel"}`)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
 	}

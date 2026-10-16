@@ -44,6 +44,75 @@
         <main class="p-4 md:p-6 2xl:p-10">
           <div class="mx-auto max-w-7xl space-y-6">
 
+            <!-- Web Interface Access Card -->
+            <div x-data="accessSettings()" x-init="init()" class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Web Interface Access</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4" x-show="!loginRequired">
+                Login is turned off (--web-auth none). Anyone who can reach Tubarr can control it, so only use this behind a reverse proxy with its own login.
+              </p>
+
+              <!-- Login -->
+              <div class="py-3 border-b border-gray-100 dark:border-gray-800">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Login</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Signed in as <span x-text="username || '(not set up)'"></span>. Changing the login signs out every other browser.</p>
+                <div class="flex flex-wrap items-center gap-3">
+                  <input type="text" x-model="newUsername" placeholder="Username" autocomplete="username"
+                    class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
+                  <input type="password" x-model="currentPassword" placeholder="Current password" autocomplete="current-password"
+                    class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
+                  <input type="password" x-model="newPassword" placeholder="New password" autocomplete="new-password"
+                    class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
+                  <button @click="changeLogin()" class="h-9 px-4 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors">Change login</button>
+                  <span x-show="loginMessage" x-text="loginMessage" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                </div>
+              </div>
+
+              <!-- API Key -->
+              <div class="py-3 border-b border-gray-100 dark:border-gray-800">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">API Key</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Scripts can send this in an <code>X-Api-Key</code> header instead of logging in.</p>
+                <div class="flex flex-wrap items-center gap-3">
+                  <code class="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm text-gray-800 dark:text-white/90" x-text="showKey ? apiKey : '••••••••••••••••'"></code>
+                  <button @click="showKey = !showKey" class="text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400" x-text="showKey ? 'Hide' : 'Show'"></button>
+                  <button @click="regenerateKey()" class="text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400">Regenerate</button>
+                </div>
+              </div>
+
+              <!-- Trusted addresses -->
+              <div class="py-3">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Skip Login For</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Requests from these addresses need no login. One IP or CIDR range per line (e.g. 192.168.1.0/24).
+                  In Docker, requests from the host arrive from the Docker gateway (e.g. 172.17.0.1), so adding 172.16.0.0/12 would skip login for everything reaching the port.
+                </p>
+                <label class="flex items-center gap-2 mb-3 text-sm text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" x-model="access.skip_localhost" />
+                  This machine (localhost)
+                </label>
+                <textarea x-model="skipLoginText" rows="3" placeholder="192.168.1.0/24"
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
+
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Allowed Hostnames</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Names this server is reached by without a login, besides localhost, IP addresses and its own hostname (e.g. tubarr.home). Others are refused, so other websites can't reach Tubarr through your browser.
+                </p>
+                <textarea x-model="allowedHostsText" rows="2" placeholder="tubarr.home"
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
+
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Trusted Proxies</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Reverse proxies whose X-Forwarded-For header gives the real client address. Leave empty without a reverse proxy.
+                </p>
+                <textarea x-model="trustedProxiesText" rows="2" placeholder="10.0.0.2"
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
+
+                <div class="flex items-center gap-3 mt-4">
+                  <button @click="saveAccess()" class="h-9 px-4 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors">Save access settings</button>
+                  <span x-show="accessMessage" x-text="accessMessage" class="text-sm text-gray-500 dark:text-gray-400"></span>
+                </div>
+              </div>
+            </div>
+
             <!-- Global Concurrency Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Concurrency</h3>
@@ -245,6 +314,83 @@
 
     <script defer src="bundle.js"></script>
     <script>
+      function accessSettings() {
+        const lines = (text) => text.split('\n').map(l => l.trim()).filter(l => l);
+        return {
+          loginRequired: true,
+          username: '',
+          newUsername: '',
+          currentPassword: '',
+          newPassword: '',
+          loginMessage: '',
+          apiKey: '',
+          showKey: false,
+          access: { skip_localhost: true },
+          skipLoginText: '',
+          allowedHostsText: '',
+          trustedProxiesText: '',
+          accessMessage: '',
+
+          async init() {
+            const response = await fetch('/api/v1/settings/auth');
+            if (!response.ok) {
+              this.accessMessage = 'Failed to load access settings: ' + (await response.text());
+              return;
+            }
+            const data = await response.json();
+            this.loginRequired = data.login_required;
+            this.username = data.username;
+            this.newUsername = data.username;
+            this.apiKey = data.api_key;
+            this.access = data.access;
+            this.skipLoginText = (data.access.skip_login || []).join('\n');
+            this.allowedHostsText = (data.access.allowed_hosts || []).join('\n');
+            this.trustedProxiesText = (data.access.trusted_proxies || []).join('\n');
+          },
+
+          async changeLogin() {
+            this.loginMessage = '';
+            const response = await fetch('/api/v1/settings/auth/password', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ current_password: this.currentPassword, username: this.newUsername, new_password: this.newPassword })
+            });
+            if (!response.ok) {
+              this.loginMessage = (await response.text()).trim();
+              return;
+            }
+            this.username = this.newUsername;
+            this.currentPassword = '';
+            this.newPassword = '';
+            this.loginMessage = 'Login changed';
+          },
+
+          async regenerateKey() {
+            if (!confirm('Regenerate the API key? Scripts using the old key will stop working.')) return;
+            const response = await fetch('/api/v1/settings/auth/api-key', { method: 'POST' });
+            if (response.ok) {
+              this.apiKey = (await response.json()).api_key;
+              this.showKey = true;
+            }
+          },
+
+          async saveAccess() {
+            this.accessMessage = '';
+            const response = await fetch('/api/v1/settings/auth', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                skip_localhost: this.access.skip_localhost,
+                skip_login: lines(this.skipLoginText),
+                allowed_hosts: lines(this.allowedHostsText),
+                trusted_proxies: lines(this.trustedProxiesText)
+              })
+            });
+            this.accessMessage = response.ok ? 'Saved' : (await response.text()).trim();
+          }
+        };
+      }
+
       function settingsData() {
         return {
           page: 'settings',

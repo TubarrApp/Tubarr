@@ -6,8 +6,10 @@ import (
 	"os/exec"
 	"syscall"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/serverauth"
 )
 
 // InitMetarr begins processing with Metarr.
@@ -22,6 +24,9 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 	cmd.Cancel = func() error {
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
+	if vars.MetarrLogToken != "" {
+		cmd.Env = append(cmd.Environ(), serverauth.LogTokenEnv+"="+vars.MetarrLogToken)
+	}
 
 	if err := runMetarr(cmd, v); err != nil {
 		return err
@@ -34,7 +39,6 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	logger.Pl.I("Running Metarr command:\n\n%s\n", cmd.String())
 
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 
 	// Run command and grab stdout.
 	metarrStdout, err := cmd.Output()
