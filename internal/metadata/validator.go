@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strings"
 	"time"
 	"tubarr/internal/domain/logger"
@@ -169,21 +170,13 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 // handleFilters uses user input filters to check if the video should be downloaded.
 func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
 	// Check filtered meta ops.
-	filteredMetaOps := make([]models.FilteredMetaOps, len(cu.ChanURLMetarrArgs.FilteredMetaOps))
-	copy(filteredMetaOps, cu.ChanURLMetarrArgs.FilteredMetaOps)
-
-	filteredMetaOpsFileFilters := loadFilteredMetaOpsFromFile(cu, dirParser)
-	filteredMetaOps = append(filteredMetaOps, filteredMetaOpsFileFilters...)
+	filteredMetaOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, loadFilteredMetaOpsFromFile(cu, dirParser))
 
 	relevantFilteredMetaOps := getRelevantFilteredMetaOps(filteredMetaOps, cu.URL)
 	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, relevantFilteredMetaOps, c.Name)
 
 	// Check filtered filename ops.
-	filteredFilenameOps := make([]models.FilteredFilenameOps, len(cu.ChanURLMetarrArgs.FilteredFilenameOps))
-	copy(filteredFilenameOps, cu.ChanURLMetarrArgs.FilteredFilenameOps)
-
-	filteredFilenameOpsFileFilters := loadFilteredFilenameOpsFromFile(cu, dirParser)
-	filteredFilenameOps = append(filteredFilenameOps, filteredFilenameOpsFileFilters...)
+	filteredFilenameOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, loadFilteredFilenameOpsFromFile(cu, dirParser))
 
 	relevantFilteredFilenameOps := getRelevantFilteredFilenameOps(filteredFilenameOps, cu.URL)
 	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
@@ -195,12 +188,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	}
 
 	// Check download filters.
-	allFilters := make([]models.Filters, len(cu.ChanURLSettings.Filters))
-	copy(allFilters, cu.ChanURLSettings.Filters)
-
-	fileFilters := loadFilterOpsFromFile(cu, dirParser)
-	allFilters = append(allFilters, fileFilters...)
-
+	allFilters := slices.Concat(cu.ChanURLSettings.Filters, loadFilterOpsFromFile(cu, dirParser))
 	relevantFilters := getRelevantFilters(allFilters, cu.URL)
 
 	if !checkFilters(v, "Download filters", relevantFilters) {
@@ -283,13 +271,8 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 
 // HandleMoveOps checks if Metarr should use an output directory based on existent metadata.
 func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
-	// Work with a copy of database move ops.
-	allMoveOps := make([]models.MetaFilterMoveOps, len(cu.ChanURLSettings.MetaFilterMoveOps))
-	copy(allMoveOps, cu.ChanURLSettings.MetaFilterMoveOps)
-
-	// Add file-based move ops.
-	fileMoveOps := loadMoveOpsFromFile(cu, dirParser)
-	allMoveOps = append(allMoveOps, fileMoveOps...)
+	// Copy of the database move ops, plus file-based move ops.
+	allMoveOps := slices.Concat(cu.ChanURLSettings.MetaFilterMoveOps, loadMoveOpsFromFile(cu, dirParser))
 
 	// Filter to relevant ones for this URL.
 	relevantMoveOps := getRelevantMoveOps(allMoveOps, cu.URL)

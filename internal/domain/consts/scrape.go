@@ -5,6 +5,7 @@ import "time"
 // Impersonate defines the type of browser to impersonate during scraping.
 type Impersonate string
 
+// Browsers which can be impersonated (none disables impersonation).
 const (
 	ImpersonateNone    Impersonate = ""
 	ImpersonateChrome  Impersonate = "chrome"

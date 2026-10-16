@@ -33,7 +33,7 @@ func TestFilterSkipsUnavailableDestinations(t *testing.T) {
 	}
 
 	got, _ := filterAllowedValidURLs(c)
-	var urls []string
+	urls := make([]string, 0, len(got))
 	for _, cu := range got {
 		urls = append(urls, cu.URL)
 	}

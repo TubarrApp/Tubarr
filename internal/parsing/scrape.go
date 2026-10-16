@@ -210,7 +210,7 @@ func SaveScrapeSelectorsFile(path, content string) ([]models.SiteScraper, error)
 		return nil, fmt.Errorf("failed to create temporary file for %q: %w", path, err)
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath) // No-op once renamed into place.
+	defer func() { _ = os.Remove(tmpPath) }() // No-op once renamed into place.
 
 	if _, err := tmp.WriteString(content); err != nil {
 		_ = tmp.Close()

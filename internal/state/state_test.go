@@ -60,7 +60,10 @@ func TestCrawlLock(t *testing.T) {
 
 // TestUnlockLeavesStopOpen tests that unlocking cancels the job's contexts without signalling a stop.
 func TestUnlockLeavesStopOpen(t *testing.T) {
-	ctx, unlock, _ := TryLockCrawl(context.Background(), "unlock")
+	ctx, unlock, ok := TryLockCrawl(context.Background(), "unlock")
+	if !ok {
+		t.Fatal("TryLockCrawl failed on an unlocked channel")
+	}
 	unlock()
 	if ctx.Err() == nil || QueueCtx(ctx).Err() == nil {
 		t.Fatal("unlock did not cancel job contexts")

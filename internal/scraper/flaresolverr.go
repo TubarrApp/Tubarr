@@ -137,7 +137,11 @@ func flareSolverrGet(ctx context.Context, baseURL, pageURL string, timeout time.
 	if err != nil {
 		return nil, fmt.Errorf("FlareSolverr request to %q failed: %w", endpoint, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Pl.W("Failed to close FlareSolverr response body: %v", err)
+		}
+	}()
 
 	var fsResp flareSolverrResponse
 	if err := json.NewDecoder(resp.Body).Decode(&fsResp); err != nil {

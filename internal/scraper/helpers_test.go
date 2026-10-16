@@ -19,8 +19,9 @@ func TestVideoEntriesNestedTabs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var got []string
-	for _, e := range result.videoEntries() {
+	entries := result.videoEntries()
+	got := make([]string, 0, len(entries))
+	for _, e := range entries {
 		got = append(got, e.URL)
 	}
 	want := []string{

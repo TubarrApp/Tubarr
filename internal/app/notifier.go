@@ -85,7 +85,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 		resp, err := client.Post(notifyURL, "application/json", nil)
 		if err != nil {
 			// Drop net/http's copy of the full URL, which can hold tokens.
-			if ue, ok := err.(*url.Error); ok {
+			if ue, ok := errors.AsType[*url.Error](err); ok {
 				err = ue.Err
 			}
 			return fmt.Errorf("failed to send notification for channel %q (ID: %d): %w", c.Name, c.ID, err)
