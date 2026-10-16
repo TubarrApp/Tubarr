@@ -30,23 +30,6 @@ func (ds *DownloadStore) GetDB() *sql.DB {
 
 // SetDownloadStatus updates the download status of a single video.
 func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
-	tx, err := ds.DB.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for video with URL %q: %v", v.URL, rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Error rolling back download status for video with URL %q (original error: %v): %v", v.URL, err, rbErr)
-			}
-		}
-	}()
-
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
 		consts.DBDownloads,
@@ -56,7 +39,7 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 		consts.QVidID,
 	)
 
-	if _, err := tx.Exec(
+	if _, err := ds.DB.Exec(
 		query,
 		v.DownloadStatus.Status,
 		v.DownloadStatus.Percent,
@@ -65,34 +48,11 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 	); err != nil {
 		return fmt.Errorf("failed to update status for video %d: %w", v.ID, err)
 	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
 	return nil
 }
 
 // UpdateDownloadStatus retrieves the download status of a video and updates it in the database.
 func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models.StatusUpdate) error {
-	tx, err := ds.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for updates: %+v: %v", update, rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Failed to rollback transaction for updates: %+v (original error: %v): %v", update, err, rbErr)
-			}
-		}
-	}()
-
-	// Execute individual updates within the transaction
 	normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
 
 	query := fmt.Sprintf(
@@ -103,7 +63,7 @@ func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models
 		consts.QDLVidID,
 	)
 
-	if _, err := tx.ExecContext(
+	if _, err := ds.DB.ExecContext(
 		ctx,
 		query,
 		update.Status,
@@ -112,32 +72,6 @@ func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models
 	); err != nil {
 		return fmt.Errorf("failed to update download status for video %q: %w", update.VideoURL, err)
 	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit status updates: %w", err)
-	}
-
-	return nil
-}
-
-// GetDownloadStatus retrieves the download status of a video.
-func (ds *DownloadStore) GetDownloadStatus(v *models.Video) error {
-
-	query := fmt.Sprintf(
-		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
-		consts.QDLVidID,
-		consts.QDLStatus,
-		consts.QDLPct,
-		consts.DBDownloads,
-		consts.QDLVidID,
-	)
-
-	normalizeDownloadStatus(&v.DownloadStatus.Percent, &v.DownloadStatus.Status, v.ID)
-
-	if err := ds.DB.QueryRow(query, v.ID).Scan(&v); err != nil {
-		return fmt.Errorf("failed to query download statuses: %w", err)
-	}
-
 	return nil
 }
 

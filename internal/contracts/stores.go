@@ -34,6 +34,7 @@ type TubarrSettingsStore interface {
 // ChannelStore allows access to channel repo methods.
 type ChannelStore interface {
 	GetDB() *sql.DB
+	WithTx(fn func(cs ChannelStore) error) error
 
 	// Add operations.
 	AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error

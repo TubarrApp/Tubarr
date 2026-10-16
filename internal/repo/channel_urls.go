@@ -69,7 +69,7 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 		consts.QChanURLUpdatedAt,
 	)
 
-	result, err := cs.DB.Exec(query,
+	result, err := cs.q.Exec(query,
 		channelID,
 		cu.URL,
 		cu.Username,
@@ -133,7 +133,7 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 		consts.QChanURLID,
 	)
 
-	if _, err := cs.DB.Exec(
+	if _, err := cs.q.Exec(
 		query,
 		cu.Username,
 		cu.EncryptedPassword,
@@ -170,7 +170,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		consts.QChanURLChannelID,
 	)
 
-	rows, err := cs.DB.Query(query, c.ID)
+	rows, err := cs.q.Query(query, c.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query channel URLs: %w", err)
 	}
@@ -318,7 +318,7 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, merge
 		settingsJSON, metarrJSON     []byte
 	)
 
-	if err := cs.DB.QueryRow(query, channelID, urlStr).Scan(
+	if err := cs.q.QueryRow(query, channelID, urlStr).Scan(
 		&cu.ID,
 		&cu.URL,
 		&username,
@@ -429,7 +429,7 @@ func (cs *ChannelStore) DeleteChannelURL(channelURLID int64) error {
 		consts.QChanURLID,
 	)
 
-	if _, err := cs.DB.Exec(query, channelURLID); err != nil {
+	if _, err := cs.q.Exec(query, channelURLID); err != nil {
 		return fmt.Errorf("failed to delete channel URL ID %d: %w", channelURLID, err)
 	}
 
@@ -462,7 +462,7 @@ func (cs *ChannelStore) DeleteChannelURLAuth(cu *models.ChannelURL) error {
 		consts.QChanURLID,
 	)
 
-	if _, err := cs.DB.Exec(query, "", "", "", cu.ID); err != nil {
+	if _, err := cs.q.Exec(query, "", "", "", cu.ID); err != nil {
 		return fmt.Errorf("failed to delete auth details for channel URL ID %d: %w", cu.ID, err)
 	}
 
@@ -486,7 +486,7 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 		key,
 	)
 
-	if err := cs.DB.QueryRow(query, val).Scan(&count); err != nil {
+	if err := cs.q.QueryRow(query, val).Scan(&count); err != nil {
 		logger.Pl.E("failed to check if channel URL exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}

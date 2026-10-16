@@ -31,9 +31,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ChannelStore holds a pointer to the sql.DB.
+// ChannelStore holds the database, and the transaction its queries run in if it's bound to one.
 type ChannelStore struct {
-	DB          *sql.DB
+	db          *sql.DB
+	q           querier
+	tx          *sql.Tx
 	PasswordMgr *auth.PasswordManager
 }
 
@@ -45,14 +47,32 @@ func GetChannelStore(db *sql.DB) (*ChannelStore, error) {
 	}
 
 	return &ChannelStore{
-		DB:          db,
+		db:          db,
+		q:           db,
 		PasswordMgr: pm,
 	}, nil
 }
 
 // GetDB returns the database.
 func (cs *ChannelStore) GetDB() *sql.DB {
-	return cs.DB
+	return cs.db
+}
+
+// WithTx runs fn with a store whose operations all run in one transaction, committed if fn returns nil.
+//
+// If cs is already bound to a transaction, fn runs in that one.
+func (cs *ChannelStore) WithTx(fn func(cs contracts.ChannelStore) error) error {
+	return cs.inTx(func(tcs *ChannelStore) error { return fn(tcs) })
+}
+
+// inTx runs fn with a store bound to a transaction, reusing cs's own if it has one.
+func (cs *ChannelStore) inTx(fn func(tcs *ChannelStore) error) error {
+	if cs.tx != nil {
+		return fn(cs)
+	}
+	return inTx(cs.db, func(tx *sql.Tx) error {
+		return fn(&ChannelStore{db: cs.db, q: tx, tx: tx, PasswordMgr: cs.PasswordMgr})
+	})
 }
 
 // GetNewVideoURLs returns the slice of new video URLs from the database (used for notification dot).
@@ -69,7 +89,7 @@ func (cs *ChannelStore) GetNewVideoURLs(key, val string) ([]string, error) {
 	)
 
 	var raw []byte
-	err := cs.DB.QueryRow(query, val).Scan(&raw)
+	err := cs.q.QueryRow(query, val).Scan(&raw)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return []string{}, fmt.Errorf("channel with %s %q does not exist", key, val)
@@ -107,7 +127,7 @@ func (cs *ChannelStore) UpdateNewVideoURLs(key, val string, newVideoURLs []strin
 		key,
 	)
 
-	if _, err := cs.DB.Exec(query, vidURLJSON, val); err != nil {
+	if _, err := cs.q.Exec(query, vidURLJSON, val); err != nil {
 		return err
 	}
 	return nil
@@ -181,7 +201,7 @@ func (cs *ChannelStore) GetChannelName(key, val string) (string, error) {
 		key,
 	)
 
-	err := cs.DB.QueryRow(query, val).Scan(&name)
+	err := cs.q.QueryRow(query, val).Scan(&name)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", fmt.Errorf("channel with %s %q does not exist", key, val)
@@ -206,7 +226,7 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 		key,
 	)
 
-	err := cs.DB.QueryRow(query, val).Scan(&id)
+	err := cs.q.QueryRow(query, val).Scan(&id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, fmt.Errorf("channel with %s %q does not exist", key, val)
@@ -231,7 +251,7 @@ func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password
 		consts.QChanURLURL,
 	)
 
-	if err = cs.DB.QueryRow(query, channelID, url).Scan(&u, &p, &l); err != nil {
+	if err = cs.q.QueryRow(query, channelID, url).Scan(&u, &p, &l); err != nil {
 		logger.Pl.I("No auth details found in database for channel ID: %d, URL: %s", channelID, url)
 		return "", "", "", err
 	}
@@ -273,7 +293,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 
 	args = append([]any{channelID}, args...) // prepend channelID.
 
-	rows, err := cs.DB.Query(query, args...)
+	rows, err := cs.q.Query(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve videos: %w", err)
 	}
@@ -337,7 +357,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string) error
 	)
 	deleteArgs = append([]any{channelID}, deleteArgs...)
 
-	deleteResult, err := cs.DB.Exec(deleteQuery, deleteArgs...)
+	deleteResult, err := cs.q.Exec(deleteQuery, deleteArgs...)
 	if err != nil {
 		return err
 	}
@@ -406,25 +426,25 @@ func (cs ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 
 	// Propagate into database.
 	chanID := strconv.FormatInt(c.ID, 10)
-	_, err = cs.UpdateChannelSettingsJSON(consts.QChanID, chanID, func(s *models.Settings) error {
-		if c.ChanSettings == nil {
-			return fmt.Errorf("c.ChanSettings is nil")
+	if err := cs.inTx(func(tcs *ChannelStore) error {
+		if _, err := tcs.UpdateChannelSettingsJSON(consts.QChanID, chanID, func(s *models.Settings) error {
+			if c.ChanSettings == nil {
+				return fmt.Errorf("c.ChanSettings is nil")
+			}
+			*s = *c.ChanSettings
+			return nil
+		}); err != nil {
+			return err
 		}
-		*s = *c.ChanSettings
-		return nil
-	})
-	if err != nil {
+		_, err := tcs.UpdateChannelMetarrArgsJSON(consts.QChanID, chanID, func(m *models.MetarrArgs) error {
+			if c.ChanMetarrArgs == nil {
+				return fmt.Errorf("c.ChanMetarrArgs is nil")
+			}
+			*m = *c.ChanMetarrArgs
+			return nil
+		})
 		return err
-	}
-
-	_, err = cs.UpdateChannelMetarrArgsJSON(consts.QChanID, chanID, func(m *models.MetarrArgs) error {
-		if c.ChanMetarrArgs == nil {
-			return fmt.Errorf("c.ChanMetarrArgs is nil")
-		}
-		*m = *c.ChanMetarrArgs
-		return nil
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -452,7 +472,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 		consts.QVidFinished,
 	)
 
-	if _, err := cs.DB.Exec(query, channelID, ignoreURL, true); err != nil {
+	if _, err := cs.q.Exec(query, channelID, ignoreURL, true); err != nil {
 		return err
 	}
 
@@ -473,7 +493,7 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 	)
 
 	// Execute query to get rows.
-	rows, err := cs.DB.Query(query, id)
+	rows, err := cs.q.Query(query, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query notification URLs: %w", err)
 	}
@@ -546,7 +566,7 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 	args = append(args, urlArgs...)
 	args = append(args, nameArgs...)
 
-	if _, err := cs.DB.Exec(query, args...); err != nil {
+	if _, err := cs.q.Exec(query, args...); err != nil {
 		return err
 	}
 
@@ -561,37 +581,18 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 
 // AddNotifyURLs sets notification pairs in the database.
 func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.Notification) error {
-	tx, err := cs.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
+	return cs.inTx(func(tcs *ChannelStore) error {
+		for _, n := range notifications {
+			if err := tcs.addNotifyURL(channelID, n.ChannelURL, n.NotifyURL, n.Name); err != nil {
+				return err
 			}
 		}
-	}()
-
-	for _, n := range notifications {
-		chanURL := n.ChannelURL
-		notifyURL := n.NotifyURL
-		name := n.Name
-
-		if err := cs.addNotifyURL(tx, channelID, chanURL, notifyURL, name); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }
 
-// AddAuth adds authentication details to a channel.
-func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) (err error) {
+// AddAuth adds authentication details to a channel's URLs.
+func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error {
 	if !cs.channelExistsID(chanID) {
 		return fmt.Errorf("channel with ID %d does not exist", chanID)
 	}
@@ -601,33 +602,38 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 		return nil
 	}
 
-	for chanURL, a := range authDetails {
-		if !cs.channelURLExists(consts.QChanURLURL, chanURL) {
-			return fmt.Errorf("channel with URL %q does not exist", chanURL)
-		}
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ?",
+		consts.DBChannelURLs,
+		consts.QChanURLUsername,
+		consts.QChanURLPassword,
+		consts.QChanURLLoginURL,
+		consts.QChanURLChannelID,
+		consts.QChanURLURL,
+	)
+	return cs.inTx(func(tcs *ChannelStore) error {
+		for chanURL, a := range authDetails {
+			if a.EncryptedPassword == "" && a.Password != "" {
+				encrypted, err := tcs.PasswordMgr.Encrypt(a.Password)
+				if err != nil {
+					return err
+				}
+				a.EncryptedPassword = encrypted
+			}
 
-		if a.EncryptedPassword == "" && a.Password != "" {
-			a.EncryptedPassword, err = cs.PasswordMgr.Encrypt(a.Password)
+			res, err := tcs.q.Exec(query, a.Username, a.EncryptedPassword, a.LoginURL, chanID, chanURL)
 			if err != nil {
 				return err
 			}
+			if n, err := res.RowsAffected(); err != nil {
+				return err
+			} else if n == 0 {
+				return fmt.Errorf("%w: channel with ID %d has no URL %q", contracts.ErrInvalidChannel, chanID, chanURL)
+			}
+			logger.Pl.S("Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
 		}
-
-		query := fmt.Sprintf(
-			"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
-			consts.DBChannelURLs,
-			consts.QChanURLUsername,
-			consts.QChanURLPassword,
-			consts.QChanURLLoginURL,
-			consts.QChanURLChannelID,
-		)
-
-		if _, err := cs.DB.Exec(query, a.Username, a.EncryptedPassword, a.LoginURL, chanID); err != nil {
-			return err
-		}
-		logger.Pl.S("Added authentication details for URL %q in channel with ID %d", chanURL, chanID)
-	}
-	return nil
+		return nil
+	})
 }
 
 // createDownloadDirs creates plain (untemplated) video and JSON directories when settings are saved. They're never created
@@ -703,27 +709,23 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("failed to marshal empty new video URL slice: %w", err)
 	}
 
-	// Begin transaction.
-	tx, err := cs.DB.Begin()
-	if err != nil {
-		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	var id int64
+	if err := cs.inTx(func(tcs *ChannelStore) (err error) {
+		id, err = tcs.insertChannel(c, settingsJSON, metarrJSON, newVideoURLs)
+		return err
+	}); err != nil {
+		return 0, err
 	}
 
-	// Ensure rollback on error.
-	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for channel %q: %v", c.Name, rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Rollback failed for channel %q (original error: %v): %v", c.Name, err, rbErr)
-			}
-		}
-	}()
+	cURLs := c.GetURLs()
+	logger.Pl.S("Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
+		id, c.Name, cURLs, c.ChanSettings.CrawlFreq, c.ChanSettings.Filters, c.ChanSettings, c.ChanMetarrArgs)
 
-	// Insert into the channels table.
+	return id, nil
+}
+
+// insertChannel inserts the channel and its URLs, returning the new channel ID.
+func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSON, newVideoURLs []byte) (int64, error) {
 	now := time.Now()
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -738,7 +740,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		consts.QChanUpdatedAt,
 	)
 
-	result, err := tx.Exec(
+	result, err := cs.q.Exec(
 		query,
 		c.Name,
 		c.ChannelConfigFile,
@@ -766,14 +768,15 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 		// Validate URL format (skip empty URLs and the special "manual-downloads" URL).
 		if cu.URL != "" && cu.URL != "manual-downloads" {
-			if _, urlErr := url.ParseRequestURI(cu.URL); urlErr != nil {
-				err = fmt.Errorf("invalid URL %q: %w", cu.URL, urlErr)
-				return 0, err
+			if _, err := url.ParseRequestURI(cu.URL); err != nil {
+				return 0, fmt.Errorf("invalid URL %q: %w", cu.URL, err)
 			}
 		}
 
 		if cu.EncryptedPassword == "" && cu.Password != "" {
-			cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
+			if cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password); err != nil {
+				return 0, fmt.Errorf("failed to encrypt password for URL %q: %w", cu.URL, err)
+			}
 		}
 
 		// Check if custom args exist.
@@ -808,7 +811,7 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 			consts.QChanURLUpdatedAt,
 		)
 
-		urlInsertResult, err := tx.Exec(
+		urlInsertResult, err := cs.q.Exec(
 			urlInsertQuery,
 			id,
 			cu.URL,
@@ -834,16 +837,6 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 
 		logger.Pl.D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
 	}
-
-	// Commit transaction.
-	if err = tx.Commit(); err != nil {
-		return 0, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	cURLs := c.GetURLs()
-	logger.Pl.S("Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
-		id, c.Name, cURLs, c.ChanSettings.CrawlFreq, c.ChanSettings.Filters, c.ChanSettings, c.ChanMetarrArgs)
-
 	return id, nil
 }
 
@@ -859,7 +852,7 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 		key,
 	)
 
-	result, err := cs.DB.Exec(query, val)
+	result, err := cs.q.Exec(query, val)
 	if err != nil {
 		return fmt.Errorf("failed to delete channel: %w", err)
 	}
@@ -902,7 +895,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	)
 
 	var c models.Channel
-	err = cs.DB.QueryRow(query, val).Scan(
+	err = cs.q.QueryRow(query, val).Scan(
 		&c.ID,
 		&c.Name,
 		&c.ChannelConfigFile,
@@ -968,7 +961,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		consts.QChanName,
 	)
 
-	rows, err := cs.DB.Query(query)
+	rows, err := cs.q.Query(query)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, false, nil
 	} else if err != nil {
@@ -1047,7 +1040,16 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 }
 
 // UpdateChannelMetarrArgsJSON updates args for Metarr output.
-func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error) {
+func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (rows int64, err error) {
+	err = cs.inTx(func(tcs *ChannelStore) (err error) {
+		rows, err = tcs.updateChannelMetarrArgsJSON(key, val, updateFn)
+		return err
+	})
+	return rows, err
+}
+
+// updateChannelMetarrArgsJSON reads, updates and writes back the channel's MetarrArgs.
+func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error) {
 	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
@@ -1060,7 +1062,7 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 		key,
 	)
 
-	err := cs.DB.QueryRow(query, val).Scan(&metarrArgs)
+	err := cs.q.QueryRow(query, val).Scan(&metarrArgs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
@@ -1100,7 +1102,7 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 		key,
 	)
 
-	rtn, err := cs.DB.Exec(updateQuery, updatedArgs, val)
+	rtn, err := cs.q.Exec(updateQuery, updatedArgs, val)
 	if err != nil {
 		return 0, fmt.Errorf("failed to update channel settings in database: %w", err)
 	}
@@ -1109,7 +1111,16 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 }
 
 // UpdateChannelSettingsJSON updates specific settings in the channel's settings JSON.
-func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error) {
+func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (rows int64, err error) {
+	err = cs.inTx(func(tcs *ChannelStore) (err error) {
+		rows, err = tcs.updateChannelSettingsJSON(key, val, updateFn)
+		return err
+	})
+	return rows, err
+}
+
+// updateChannelSettingsJSON reads, updates and writes back the channel's settings.
+func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error) {
 	if _, ok := consts.ValidChannelKeys[key]; !ok {
 		return 0, fmt.Errorf("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelKeys)
 	}
@@ -1122,7 +1133,7 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 		key,
 	)
 
-	err := cs.DB.QueryRow(query, val).Scan(&settingsJSON)
+	err := cs.q.QueryRow(query, val).Scan(&settingsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
@@ -1170,7 +1181,7 @@ func (cs *ChannelStore) UpdateChannelSettingsJSON(key, val string, updateFn func
 		key,
 	)
 
-	rtn, err := cs.DB.Exec(updateQuery, updatedSettings, val)
+	rtn, err := cs.q.Exec(updateQuery, updatedSettings, val)
 	if err != nil {
 		return 0, fmt.Errorf("failed to update channel settings in database: %w", err)
 	}
@@ -1204,7 +1215,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 	}
 
 	// Execute query.
-	res, err := cs.DB.Exec(query, newVal, val)
+	res, err := cs.q.Exec(query, newVal, val)
 	if err != nil {
 		return err
 	}
@@ -1234,7 +1245,7 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 		consts.QChanID,
 	)
 
-	result, err := cs.DB.Exec(query, now, now, channelID)
+	result, err := cs.q.Exec(query, now, now, channelID)
 	if err != nil {
 		return fmt.Errorf("failed to update last scan time: %w", err)
 	}
@@ -1284,7 +1295,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidUpdatedAt,
 	)
 
-	rows, err := cs.DB.Query(query, c.ID)
+	rows, err := cs.q.Query(query, c.ID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, false, nil
 	} else if err != nil {
@@ -1385,7 +1396,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
 	)
 
-	rows, err := cs.DB.Query(query, c.ID, consts.DLStatusAvailable)
+	rows, err := cs.q.Query(query, c.ID, consts.DLStatusAvailable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -1879,7 +1890,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 }
 
 // addNotifyURL sets a notification table entry for a channel with a given ID.
-func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, notifyName string) error {
+func (cs *ChannelStore) addNotifyURL(id int64, chanURL, notifyURL, notifyName string) error {
 	if notifyURL == "" {
 		return errors.New("please enter a notification URL")
 	}
@@ -1902,7 +1913,7 @@ func (cs *ChannelStore) addNotifyURL(tx *sql.Tx, id int64, chanURL, notifyURL, n
 		querySuffix, // appended like Squirrel's .Suffix()
 	)
 
-	_, err := tx.Exec(
+	_, err := cs.q.Exec(
 		query,
 		id,
 		notifyName,
@@ -1937,7 +1948,7 @@ func (cs *ChannelStore) channelExists(key, val string) bool {
 		key,
 	)
 
-	if err := cs.DB.QueryRow(query, val).Scan(&count); err != nil {
+	if err := cs.q.QueryRow(query, val).Scan(&count); err != nil {
 		logger.Pl.E("failed to check if channel exists with key=%s val=%s: %v", key, val, err)
 		return false
 	}
@@ -1953,7 +1964,7 @@ func (cs ChannelStore) channelExistsID(id int64) bool {
 		consts.QChanID,
 	)
 
-	if err := cs.DB.QueryRow(query, id).Scan(&exists); errors.Is(err, sql.ErrNoRows) {
+	if err := cs.q.QueryRow(query, id).Scan(&exists); errors.Is(err, sql.ErrNoRows) {
 		return false
 	} else if err != nil {
 		logger.Pl.E("Failed to check if channel with ID %d exists", id)

@@ -3,6 +3,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
@@ -15,7 +16,8 @@ const (
 	dbDriver = "sqlite3"
 
 	// dbParams are applied to every pooled connection (foreign_keys, busy_timeout and synchronous are per-connection).
-	dbParams = "?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL"
+	// Transactions begin IMMEDIATE, taking the write lock up front so busy_timeout applies instead of failing on upgrade.
+	dbParams = "?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_txlock=immediate"
 )
 
 // Database holds the global database instance for Tubarr.
@@ -80,15 +82,8 @@ func (d *Database) initTables() error {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for table creation: %v", rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("transaction rollback failed after original error %v: %v", err, rbErr)
-			}
+		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+			logger.Pl.E("Failed to roll back table creation: %v", err)
 		}
 	}()
 

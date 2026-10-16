@@ -37,18 +37,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
-				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
-			}
-		}
-	}()
+	defer rollback(tx)
 
 	validVideos := make([]*models.Video, 0, len(videos))
 	errs := make([]error, 0, len(videos))
@@ -205,24 +194,11 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		return 0, fmt.Errorf("failed to marshal JSON for video %q: %w", v.URL, err)
 	}
 
-	// Begin transaction
 	tx, err := vs.DB.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
-				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
-			}
-		}
-	}()
+	defer rollback(tx)
 
 	now := time.Now()
 
@@ -301,29 +277,16 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 
 // UpdateVideo updates the status of the video in the database.
 func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
-	tx, err := vs.DB.Begin()
-
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-
-	defer func() {
-		if p := recover(); p != nil {
-			if rbErr := tx.Rollback(); rbErr != nil {
-				logger.Pl.E("Panic rollback failed for channel %d: %v", channelID, rbErr)
-			}
-			panic(p)
-		} else if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
-				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
-			}
-		}
-	}()
-
 	metadataJSON, err := marshalVideoMetadataJSON(v)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON for video with URL %q: %w", v.URL, err)
 	}
+
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer rollback(tx)
 
 	// Update videos table
 	videoQuery := fmt.Sprintf(
@@ -502,13 +465,7 @@ func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer func() {
-		if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
-				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
-			}
-		}
-	}()
+	defer rollback(tx)
 
 	vidQuery := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
@@ -662,13 +619,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer func() {
-		if err != nil {
-			if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
-				logger.Pl.E("Rollback failed for channel %d (original error: %v): %v", channelID, err, rbErr)
-			}
-		}
-	}()
+	defer rollback(tx)
 
 	claimQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = 0, %s = ? WHERE %s = ? AND %s IN (?%s) "+
