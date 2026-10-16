@@ -197,17 +197,10 @@ func (cm *CookieManager) GetCachedCookies(hostname string) []*http.Cookie {
 
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
 func (cm *CookieManager) loadCookiesForDomain(domain string) (cookies []*http.Cookie) {
-	var (
-		domainsToTry = []string{domain, "." + domain}
-		kookyCookies []*kooky.Cookie
-	)
-
 	// Find cookies from browsers.
-	for _, d := range domainsToTry {
-		kookyCookies = append(kookyCookies, kooky.ReadCookies(kooky.Valid, kooky.Domain(d))...)
-
+	for _, d := range []string{domain, "." + domain} {
 		cookiesFound := 0
-		for _, c := range kookyCookies {
+		for _, c := range kooky.ReadCookies(kooky.Valid, kooky.Domain(d)) {
 			name := strings.ToLower(c.Name)
 			if strings.HasPrefix(name, "st-") || strings.HasPrefix(name, "cst-") || strings.HasPrefix(name, "temp-") {
 				continue
