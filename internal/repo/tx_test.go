@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"tubarr/internal/contracts"
 	"tubarr/internal/database"
@@ -95,6 +96,35 @@ func TestAddChannelWithDetailsRollsBack(t *testing.T) {
 	}
 	if cs.channelExists(consts.QChanName, "chan") {
 		t.Error("channel was added although its logins failed")
+	}
+}
+
+// TestDeleteChannelCascades tests that deleting a channel removes its URLs and notifications, on any pooled connection.
+func TestDeleteChannelCascades(t *testing.T) {
+	cs := newTestChannelStore(t)
+	c := testChannel(t, "chan", "https://example.com/@a")
+	if err := cs.AddChannelWithDetails(c, nil, []*models.Notification{{NotifyURL: "https://notify.example.com"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Hold the connection the database was set up on, so the delete runs on another one.
+	conn, err := cs.db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	if err := cs.DeleteChannel(consts.QChanID, strconv.FormatInt(c.ID, 10)); err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range []string{consts.DBChannelURLs, consts.DBNotifications} {
+		var n int
+		if err := conn.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM "+table+" WHERE channel_id = ?", c.ID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Errorf("%s: %d row(s) left behind by the deleted channel", table, n)
+		}
 	}
 }
 
