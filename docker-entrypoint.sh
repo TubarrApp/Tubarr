@@ -29,6 +29,9 @@ chmod 1777 /tmp
 mkdir -p /home/tubarr /downloads /metadata
 chown -R "$PUID":"$PGID" /app/tubarr /downloads /metadata 2>/dev/null || true
 
+# File creation mask, inherited by the updater, Tubarr, and its child processes (yt-dlp, Metarr, ffmpeg)
+umask "${UMASK:-022}"
+
 # Run updater in background
 /usr/local/bin/auto-updater &
 

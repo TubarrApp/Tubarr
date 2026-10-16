@@ -19,18 +19,30 @@ func TestCrawlLock(t *testing.T) {
 		t.Fatal("lock not reported active")
 	}
 
-	if !StopCrawl("chan") || ctx.Err() == nil {
-		t.Fatal("stop did not cancel context")
+	if !StopQueue("chan") || QueueCtx(ctx).Err() == nil {
+		t.Fatal("stop queue did not cancel queue context")
 	}
-	if JobParent(ctx).Err() != nil {
-		t.Fatal("stop cancelled job parent")
+	if ctx.Err() != nil {
+		t.Fatal("stop queue cancelled active context")
+	}
+	select {
+	case <-StopRequested(ctx):
+	default:
+		t.Fatal("stop queue did not signal stop requested")
 	}
 	if active, stopping := CrawlActivity(); len(active) != 0 || len(stopping) != 1 {
 		t.Fatal("stopped job should be reported as stopping until it unlocks")
 	}
 
+	if !AbortAll("chan") || ctx.Err() == nil {
+		t.Fatal("abort did not cancel active context")
+	}
+	if JobParent(ctx).Err() != nil {
+		t.Fatal("abort cancelled job parent")
+	}
+
 	unlock()
-	if CrawlStateActive("chan") || StopCrawl("chan") {
+	if CrawlStateActive("chan") || AbortAll("chan") {
 		t.Fatal("lock not released")
 	}
 
@@ -44,6 +56,20 @@ func TestCrawlLock(t *testing.T) {
 		t.Fatal("stale unlock released newer lock")
 	}
 	unlock2()
+}
+
+// TestUnlockLeavesStopOpen tests that unlocking cancels the job's contexts without signalling a stop.
+func TestUnlockLeavesStopOpen(t *testing.T) {
+	ctx, unlock, _ := TryLockCrawl(context.Background(), "unlock")
+	unlock()
+	if ctx.Err() == nil || QueueCtx(ctx).Err() == nil {
+		t.Fatal("unlock did not cancel job contexts")
+	}
+	select {
+	case <-StopRequested(ctx):
+		t.Fatal("unlock signalled stop requested")
+	default:
+	}
 }
 
 // TestLockCrawlWaits tests that LockCrawl gets the lock once the running job ends, and gives up if the channel is stopped.
@@ -70,7 +96,7 @@ func TestLockCrawlWaits(t *testing.T) {
 		got <- err
 	}()
 	time.Sleep(50 * time.Millisecond)
-	StopCrawl("wait")
+	StopQueue("wait")
 	if err := <-got; !errors.Is(err, ErrStoppedWaiting) {
 		t.Fatalf("expected ErrStoppedWaiting after a stop, got %v", err)
 	}

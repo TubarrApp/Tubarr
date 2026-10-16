@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -30,7 +31,6 @@ func InitProcess(
 	cu *models.ChannelURL,
 	videos []*models.Video,
 	scrape *scraper.Scraper) (nSucceeded int, nDownloaded int, err error) {
-	// Keep this defer before metarrWg.Wait().
 	AddRunningProcess()
 	defer SubtractRunningProcess()
 
@@ -40,16 +40,24 @@ func InitProcess(
 		conc = sharedvalidation.ValidateConcurrencyLimit(c.ChanSettings.Concurrency)
 	)
 
-	// Initialize Metarr semaphore and context.
-	metarrSem := make(chan struct{}, metarrConcurrency(cu))
-
-	// Metarr and download status tracking outlive a user stopping the crawl, but not shutdown.
+	// Metarr and download status tracking outlive the job, but not shutdown.
 	jobParent := state.JobParent(ctx)
 	metarrCtx, metarrCancel := context.WithCancel(jobParent)
-	defer metarrCancel()
 
+	// Running Metarr processes finish in the background, so the channel isn't held until they do.
 	var metarrWg sync.WaitGroup
-	defer metarrWg.Wait()
+	AddRunningProcess()
+	defer func() {
+		go func() {
+			metarrWg.Wait()
+			metarrCancel()
+			SubtractRunningProcess()
+		}()
+	}()
+
+	// Queued videos don't start once the job is stopped, in-progress ones only stop on abort.
+	queueCtx := state.QueueCtx(ctx)
+	stopRequested := state.StopRequested(ctx)
 
 	// Bot detection context for video workers only.
 	procCtx, procCancel := context.WithCancel(ctx)
@@ -93,16 +101,17 @@ func InitProcess(
 		wg.Go(func() {
 			for v := range jobs {
 				select {
-				case <-procCtx.Done():
-					results <- fmt.Errorf("skipped %q: %w", v.URL, procCtx.Err())
+				case <-queueCtx.Done():
+					results <- fmt.Errorf("skipped %q: %w", v.URL, queueCtx.Err())
 					continue
 				default:
 				}
 
 				err := videoJob(
-					ctx,
+					queueCtx,
 					procCtx,
 					metarrCtx,
+					stopRequested,
 					s.VideoStore(),
 					s.ChannelStore(),
 					dlTracker,
@@ -110,7 +119,7 @@ func InitProcess(
 					v,
 					cu,
 					c,
-					metarrSem,
+					metarrSem(cu),
 					&metarrWg,
 					metarrIsExecutable)
 
@@ -194,9 +203,10 @@ func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON strin
 
 // videoJob starts a worker's process for a video.
 func videoJob(
-	crawlCtx context.Context,
+	queueCtx context.Context,
 	procCtx context.Context,
 	metarrCtx context.Context,
+	stopRequested <-chan struct{},
 	vs contracts.VideoStore,
 	cs contracts.ChannelStore,
 	dlTracker *downloads.DownloadTracker,
@@ -209,7 +219,7 @@ func videoJob(
 	metarrIsExecutable bool,
 ) (err error) {
 	// Bot detection avoidance wait time.
-	if err := times.WaitTime(procCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
+	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
 		return err
 	}
 
@@ -217,7 +227,7 @@ func videoJob(
 	key := metarrKey{c.ID, v.URL}
 	vMetarrCtx, vMetarrCancel := context.WithCancel(metarrCtx)
 	claim := &metarrClaim{channelName: c.Name, cancel: vMetarrCancel, pipeline: true, done: make(chan struct{})}
-	held, err := preemptMetarr(procCtx, key, claim)
+	held, err := preemptMetarr(queueCtx, key, claim)
 	if err != nil {
 		vMetarrCancel()
 		return err
@@ -270,9 +280,9 @@ func videoJob(
 		defer metarrWg.Done()
 		defer releaseMetarr(key, claim)
 		defer vMetarrCancel()
-		claim.inMetarr.Store(true)
+		claim.enqueue(video, channelURL)
 
-		// Not started when crawl or Metarr is stopped, mark pending for a later Metarr run.
+		// Not started when the job or Metarr is stopped, mark pending for a later Metarr run.
 		storePending := func() {
 			logger.Pl.W("Metarr not started for video %s, marking as pending", video.URL)
 			video.MetarrStatus = consts.MetarrStatusPending
@@ -288,14 +298,15 @@ func videoJob(
 		case <-vMetarrCtx.Done():
 			storePending()
 			return
-		case <-crawlCtx.Done():
+		case <-stopRequested:
 			storePending()
 			return
 		}
-		if vMetarrCtx.Err() != nil || crawlCtx.Err() != nil {
+		if vMetarrCtx.Err() != nil || isClosed(stopRequested) {
 			storePending()
 			return
 		}
+		claim.startedAt.Store(time.Now().UnixMilli())
 
 		video.MetarrStatus = execMetarr(vMetarrCtx, video, channelURL, channel, dirParser)
 
@@ -305,6 +316,16 @@ func videoJob(
 	}(v, cu, c)
 
 	return nil
+}
+
+// isClosed reports whether ch is closed, false for a nil channel.
+func isClosed(ch <-chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
 }
 
 // completeAndStoreVideo marks a video as complete.

@@ -134,6 +134,41 @@
           </li>
           <!-- Menu Item Active Downloads -->
 
+          <!-- Menu Item Active Transcodes -->
+          <li>
+            <a
+              href="active-transcodes.html"
+              @click="selected = 'Active Transcodes'"
+              class="menu-item group"
+              :class="(selected === 'Active Transcodes') || (page === 'activeTranscodes') ? 'menu-item-active' : 'menu-item-inactive'"
+            >
+              <svg
+                :class="(selected === 'Active Transcodes') || (page === 'activeTranscodes') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 10L19.553 7.724C20.218 7.391 21 7.875 21 8.618V15.382C21 16.125 20.218 16.609 19.553 16.276L15 14M5 18H13C14.105 18 15 17.105 15 16V8C15 6.895 14.105 6 13 6H5C3.895 6 3 6.895 3 8V16C3 17.105 3.895 18 5 18Z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                  fill="none"
+                />
+              </svg>
+
+              <span
+                class="menu-item-text"
+                :class="sidebarToggle ? 'xl:hidden' : ''"
+              >
+                Active Transcodes
+              </span>
+            </a>
+          </li>
+          <!-- Menu Item Active Transcodes -->
+
           <!-- Menu Item Available -->
           <li>
             <a

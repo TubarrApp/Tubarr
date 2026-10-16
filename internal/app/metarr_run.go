@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"sync"
 	"sync/atomic"
+	"time"
 	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
@@ -35,8 +37,52 @@ type metarrClaim struct {
 	channelName string
 	cancel      context.CancelFunc // Cancels the video's Metarr run.
 	pipeline    bool               // Held by the download pipeline, which other downloads cannot preempt.
-	inMetarr    atomic.Bool        // Queued for or running in Metarr.
+	inMetarr    atomic.Bool        // Queued for or running in Metarr, set once the fields below are.
 	done        chan struct{}
+
+	videoID      int64
+	channelURLID int64
+	channelURL   string
+	title        string
+	queuedAt     time.Time
+	startedAt    atomic.Int64 // Unix milliseconds the Metarr process started, 0 while queued.
+}
+
+// enqueue records the video a claim holds and marks it as queued for Metarr.
+func (claim *metarrClaim) enqueue(v *models.Video, cu *models.ChannelURL) {
+	claim.videoID, claim.channelURLID, claim.channelURL, claim.title = v.ID, cu.ID, cu.URL, v.Title
+	claim.queuedAt = time.Now()
+	claim.inMetarr.Store(true)
+}
+
+// MetarrJob is a video queued for or running in Metarr.
+type MetarrJob struct {
+	VideoID      int64      `json:"video_id"`
+	ChannelID    int64      `json:"channel_id"`
+	ChannelName  string     `json:"channel_name"`
+	ChannelURLID int64      `json:"channel_url_id"`
+	ChannelURL   string     `json:"channel_url"`
+	URL          string     `json:"url"`
+	Title        string     `json:"title"`
+	QueuedAt     time.Time  `json:"queued_at"`
+	StartedAt    *time.Time `json:"started_at,omitempty"`
+}
+
+// metarrSems holds the Metarr semaphores shared by all runs, keyed by metarrSemKey.
+var metarrSems sync.Map
+
+// metarrSemKey identifies a channel URL's Metarr semaphore, a new one being used if its concurrency limit changes.
+type metarrSemKey struct {
+	channelURLID int64
+	limit        int
+}
+
+// metarrSem returns the Metarr semaphore shared by all runs for a channel URL.
+func metarrSem(cu *models.ChannelURL) chan struct{} {
+	n := metarrConcurrency(cu)
+	v, _ := metarrSems.LoadOrStore(metarrSemKey{cu.ID, n}, make(chan struct{}, n))
+	sem, _ := v.(chan struct{})
+	return sem
 }
 
 // RunMetarr runs Metarr on finished videos in a channel which Metarr has not yet processed.
@@ -72,11 +118,7 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 		wg   sync.WaitGroup
 		mu   sync.Mutex
 		errs []error
-		sems = make(map[int64]chan struct{}, len(c.URLModels))
 	)
-	for _, cu := range c.URLModels {
-		sems[cu.ID] = make(chan struct{}, metarrConcurrency(cu))
-	}
 
 	for _, v := range videos {
 		cu := findChannelURL(c, v.ChannelURLID)
@@ -88,23 +130,25 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 		key := metarrKey{c.ID, v.URL}
 		vCtx, vCancel := context.WithCancel(ctx)
 		claim := &metarrClaim{channelName: c.Name, cancel: vCancel, done: make(chan struct{})}
-		claim.inMetarr.Store(true)
+		claim.enqueue(v, cu)
 		if _, loaded := metarrClaims.LoadOrStore(key, claim); loaded {
 			vCancel()
 			logger.Pl.W("Video %q is already being processed, skipping", v.URL)
 			continue
 		}
 
+		sem := metarrSem(cu)
 		wg.Go(func() {
 			defer releaseMetarr(key, claim)
 			defer vCancel()
 
 			select {
-			case sems[cu.ID] <- struct{}{}:
-				defer func() { <-sems[cu.ID] }()
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
 			case <-vCtx.Done():
 				return
 			}
+			claim.startedAt.Store(time.Now().UnixMilli())
 
 			if err := runVideoMetarr(vCtx, s.VideoStore(), v, cu, c); err != nil {
 				logger.Pl.E("Metarr run failed for video %q: %v", v.URL, err)
@@ -206,17 +250,53 @@ func metarrConcurrency(cu *models.ChannelURL) int {
 	return 1
 }
 
-// StopMetarr cancels all queued and running Metarr processes for a channel, returning how many were stopped.
-func StopMetarr(channelID int64) (n int) {
+// StopMetarr cancels a channel's queued and running Metarr processes, returning how many were stopped.
+//
+// If videoIDs is empty, all of the channel's Metarr processes are stopped.
+func StopMetarr(channelID int64, videoIDs []int64) (n int) {
 	metarrClaims.Range(func(k, v any) bool {
 		key, _ := k.(metarrKey)
-		if claim, ok := v.(*metarrClaim); ok && key.channelID == channelID && claim.inMetarr.Load() {
+		claim, ok := v.(*metarrClaim)
+		if !ok || key.channelID != channelID || !claim.inMetarr.Load() {
+			return true
+		}
+		if len(videoIDs) == 0 || slices.Contains(videoIDs, claim.videoID) {
 			claim.cancel()
 			n++
 		}
 		return true
 	})
 	return n
+}
+
+// MetarrJobs returns the videos queued for or running in Metarr, oldest first.
+func MetarrJobs() []MetarrJob {
+	jobs := []MetarrJob{}
+	metarrClaims.Range(func(k, v any) bool {
+		key, _ := k.(metarrKey)
+		claim, ok := v.(*metarrClaim)
+		if !ok || !claim.inMetarr.Load() {
+			return true
+		}
+		job := MetarrJob{
+			VideoID:      claim.videoID,
+			ChannelID:    key.channelID,
+			ChannelName:  claim.channelName,
+			ChannelURLID: claim.channelURLID,
+			ChannelURL:   claim.channelURL,
+			URL:          key.url,
+			Title:        claim.title,
+			QueuedAt:     claim.queuedAt,
+		}
+		if ms := claim.startedAt.Load(); ms != 0 {
+			started := time.UnixMilli(ms)
+			job.StartedAt = &started
+		}
+		jobs = append(jobs, job)
+		return true
+	})
+	slices.SortFunc(jobs, func(a, b MetarrJob) int { return a.QueuedAt.Compare(b.QueuedAt) })
+	return jobs
 }
 
 // MetarrActivity returns the names of channels with queued or running Metarr processes.

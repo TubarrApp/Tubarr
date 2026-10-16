@@ -1113,33 +1113,60 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// handleStopCrawl stops a channel's running crawl or download job, letting running Metarr transcodes finish.
-func (ss *serverStore) handleStopCrawl(w http.ResponseWriter, r *http.Request) {
+// handleStopQueue stops a channel's job from starting queued work, letting in-progress downloads and Metarr processes finish.
+func (ss *serverStore) handleStopQueue(w http.ResponseWriter, r *http.Request) {
 	c, ok := ss.channelFromURL(w, r)
 	if !ok {
 		return
 	}
-	if !state.StopCrawl(c.Name) {
+	if !state.StopQueue(c.Name) {
 		http.Error(w, "no crawl or download running for channel", http.StatusConflict)
 		return
 	}
 
-	logger.Pl.I("Stopping crawl/download for channel %q via web request", c.Name)
+	logger.Pl.I("Stopping queued work for channel %q via web request", c.Name)
 	w.WriteHeader(http.StatusAccepted)
 	if _, err := w.Write([]byte(`Stopping.`)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
 	}
 }
 
-// handleStopMetarr stops a channel's queued and running Metarr processes.
+// handleAbortAll stops all of a channel's work, killing in-progress downloads and Metarr processes.
+func (ss *serverStore) handleAbortAll(w http.ResponseWriter, r *http.Request) {
+	c, ok := ss.channelFromURL(w, r)
+	if !ok {
+		return
+	}
+	aborted := state.AbortAll(c.Name)
+	n := app.StopMetarr(c.ID, nil)
+	if !aborted && n == 0 {
+		http.Error(w, "nothing running for channel", http.StatusConflict)
+		return
+	}
+
+	logger.Pl.I("Aborting all work for channel %q via web request (%d Metarr process(es))", c.Name, n)
+	w.WriteHeader(http.StatusAccepted)
+	if _, err := w.Write([]byte(`Stopping.`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
+	}
+}
+
+// handleStopMetarr stops a channel's queued and running Metarr processes, or only those for the video IDs in the body.
 func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) {
 	c, ok := ss.channelFromURL(w, r)
 	if !ok {
 		return
 	}
-	n := app.StopMetarr(c.ID)
+	var body struct {
+		VideoIDs []int64 `json:"video_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	n := app.StopMetarr(c.ID, body.VideoIDs)
 	if n == 0 {
-		http.Error(w, "no Metarr processes running for channel", http.StatusConflict)
+		http.Error(w, "no matching Metarr processes running for channel", http.StatusConflict)
 		return
 	}
 
@@ -1160,6 +1187,14 @@ func (ss *serverStore) handleGetActivity(w http.ResponseWriter, _ *http.Request)
 		"metarr":   app.MetarrActivity(),
 	}); err != nil {
 		logger.Pl.E("Failed to encode activity: %v", err)
+	}
+}
+
+// handleGetTranscodes returns the videos queued for or running in Metarr.
+func (ss *serverStore) handleGetTranscodes(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(app.MetarrJobs()); err != nil {
+		logger.Pl.E("Failed to encode transcodes: %v", err)
 	}
 }
 
@@ -1327,7 +1362,7 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.R
 
 // handleAvailableAction downloads or dismisses a channel's chosen Available videos.
 //
-// Downloads start once any running crawl or download of the channel finishes, so the channel's Stop button covers them.
+// Downloads start once any running crawl or download of the channel finishes, so the channel's Stop Queue and Abort All buttons cover them.
 func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
 		Action   string  `json:"action"`

@@ -91,7 +91,8 @@ func NewRouter(ss serverStore) http.Handler {
 			r.Delete("/{id}/delete-videos", ss.handleDeleteChannelVideos)
 			r.Delete("/{id}/cancel-download/{videoID}", ss.handleCancelDownload)
 			r.Post("/{id}/crawl", ss.handleCrawlChannel)
-			r.Post("/{id}/stop-crawl", ss.handleStopCrawl)
+			r.Post("/{id}/stop-queue", ss.handleStopQueue)
+			r.Post("/{id}/abort", ss.handleAbortAll)
 			r.Post("/{id}/stop-metarr", ss.handleStopMetarr)
 			r.Post("/{id}/ignore-crawl", ss.handleIgnoreCrawlChannel)
 			r.Post("/{id}/download-urls", ss.handleDownloadURLs)
@@ -106,6 +107,7 @@ func NewRouter(ss serverStore) http.Handler {
 
 		// Downloads API.
 		r.Get("/downloads", ss.handleGetDownloads)
+		r.Get("/transcodes", ss.handleGetTranscodes)
 		r.Get("/videos/available", ss.handleGetAvailableVideos)
 
 		// Logs API.

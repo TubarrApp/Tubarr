@@ -125,9 +125,10 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	if c == nil || c.ChanSettings == nil {
 		return fmt.Errorf("invalid nil parameters (channel: %v, channel settings: %v)", c == nil, c.ChanSettings == nil)
 	}
+	queueCtx := state.QueueCtx(ctx)
 
 	// Add random sleep before processing (added bot detection).
-	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
+	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
 		return err
 	}
 
@@ -231,6 +232,10 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		if len(videos) == 0 {
 			continue
 		}
+		if queueCtx.Err() != nil {
+			procError = errors.Join(procError, queueCtx.Err())
+			break
+		}
 
 		// Get the ChannelURL model stored earlier.
 		cu, exists := channelURLModels[channelURLID]
@@ -240,7 +245,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		}
 
 		// Get access details only for channel URLs with videos to download (e.g. avoids needless FlareSolverr solves).
-		if cu.Cookies, cu.CookiePath, err = scrape.ScraperURLCookies(ctx, cs, c, cu); err != nil {
+		if cu.Cookies, cu.CookiePath, err = scrape.ScraperURLCookies(queueCtx, cs, c, cu); err != nil {
 			procError = errors.Join(procError, err)
 			continue
 		}
@@ -294,7 +299,7 @@ func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Chan
 	}
 
 	unreached := consts.DLStatusFailed
-	if errors.Is(err, state.ErrStoppedWaiting) || (ctx != nil && ctx.Err() != nil) {
+	if errors.Is(err, state.ErrStoppedWaiting) || (ctx != nil && state.QueueCtx(ctx).Err() != nil) {
 		unreached = consts.DLStatusCancelled
 	}
 	if _, resetErr := s.VideoStore().ClaimVideos(c.ID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, unreached); resetErr != nil {
@@ -354,9 +359,10 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 
 	// Get channel store.
 	cs := s.ChannelStore()
+	queueCtx := state.QueueCtx(ctx)
 
 	// Add random sleep before processing (added bot detection).
-	if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
+	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
 		return false, err
 	}
 
@@ -370,7 +376,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 
 	// Get new releases for channel.
 	scrape := scraper.New()
-	videos, err := scrape.GetNewReleases(ctx, cs, c, false)
+	videos, err := scrape.GetNewReleases(queueCtx, cs, c, false)
 	if err != nil {
 		if updateErr := cs.UpdateLastScan(c.ID); updateErr != nil {
 			logger.Pl.E("Failed to update channel %q last scan time after failure to crawl channel: %v", c.Name, updateErr)
@@ -411,6 +417,10 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 		}
 		if len(vRequests) == 0 {
 			continue
+		}
+		if queueCtx.Err() != nil {
+			procError = errors.Join(procError, queueCtx.Err())
+			break
 		}
 
 		logger.Pl.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
@@ -484,7 +494,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 	// Get new releases.
 	scrape := scraper.New()
-	videos, err := scrape.GetNewReleases(ctx, cs, c, true)
+	videos, err := scrape.GetNewReleases(state.QueueCtx(ctx), cs, c, true)
 	if err != nil {
 		return err
 	}

@@ -193,7 +193,7 @@
 
               const result = await response.json().catch(() => ({}));
               this.success = result.queued
-                ? `Queued ${urls.length} URL(s): the download starts when the channel's current crawl or download finishes. The channel's Stop button cancels it.`
+                ? `Queued ${urls.length} URL(s): the download starts when the channel's current crawl or download finishes. The channel's Stop Queue or Abort All button cancels it.`
                 : `Successfully started downloading ${urls.length} URL(s) to the selected channel. Check Active Downloads for progress.`;
               this.urlsText = '';
 
