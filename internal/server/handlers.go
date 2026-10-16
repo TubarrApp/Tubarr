@@ -311,51 +311,31 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, _ *http.Request
 		return
 	}
 
-	// Build response with properly formatted data (consistent with handleGetChannel)
-	response := make([]map[string]any, 0, len(channels))
+	response := make([]channelResponse, 0, len(channels))
 	for _, c := range channels {
-		channelMap := make(map[string]any)
-		channelMap["id"] = c.ID
-		channelMap["name"] = c.Name
-		channelMap["urls"] = c.GetURLs()
-		channelMap["last_scan"] = c.LastScan
-		channelMap["created_at"] = c.CreatedAt
-		channelMap["updated_at"] = c.UpdatedAt
-		channelMap["channel_config_file"] = c.ChannelConfigFile
-		channelMap["new_video_notification"] = c.NewVideoNotification
-
-		// Convert settings to map with string representations
-		if c.ChanSettings != nil {
-			channelMap["settings"] = settingsJSONMap(c.ChanSettings)
+		cr := channelResponse{
+			ID:                   c.ID,
+			Name:                 c.Name,
+			URLs:                 c.GetURLs(),
+			LastScan:             c.LastScan,
+			CreatedAt:            c.CreatedAt,
+			UpdatedAt:            c.UpdatedAt,
+			ChannelConfigFile:    c.ChannelConfigFile,
+			NewVideoNotification: c.NewVideoNotification,
+			Settings:             newSettingsResponse(c.ChanSettings),
+			Metarr:               newMetarrArgsResponse(c.ChanMetarrArgs),
 		}
-
-		// Convert metarr args to map with string representations
-		if c.ChanMetarrArgs != nil {
-			channelMap["metarr"] = metarrArgsJSONMap(c.ChanMetarrArgs)
+		for _, urlModel := range c.URLModels {
+			cr.URLModels = append(cr.URLModels, channelURLResponse{
+				ID:       urlModel.ID,
+				URL:      urlModel.URL,
+				Username: urlModel.Username,
+				LoginURL: urlModel.LoginURL,
+				Settings: newSettingsResponse(urlModel.ChanURLSettings),
+				Metarr:   newMetarrArgsResponse(urlModel.ChanURLMetarrArgs),
+			})
 		}
-
-		// Include URL models with their settings converted
-		if len(c.URLModels) > 0 {
-			urlModels := make([]map[string]any, 0, len(c.URLModels))
-			for _, urlModel := range c.URLModels {
-				urlMap := make(map[string]any)
-				urlMap["id"] = urlModel.ID
-				urlMap["url"] = urlModel.URL
-				urlMap["username"] = urlModel.Username
-				urlMap["login_url"] = urlModel.LoginURL
-
-				if urlModel.ChanURLSettings != nil {
-					urlMap["settings"] = settingsJSONMap(urlModel.ChanURLSettings)
-				}
-				if urlModel.ChanURLMetarrArgs != nil {
-					urlMap["metarr"] = metarrArgsJSONMap(urlModel.ChanURLMetarrArgs)
-				}
-				urlModels = append(urlModels, urlMap)
-			}
-			channelMap["url_models"] = urlModels
-		}
-
-		response = append(response, channelMap)
+		response = append(response, cr)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -378,89 +358,51 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Build response with properly formatted data for the edit form.
-	response := make(map[string]any)
-	response[consts.QChanID] = c.ID
-	response[consts.QChanName] = c.Name
-
-	// Filter out manual-downloads URL from the list.
-	urls := c.GetURLs()
-	urls = slices.DeleteFunc(urls, func(url string) bool {
-		return url == consts.ManualDownloadsCol
-	})
-	response["urls"] = urls
-
-	response[consts.QChanLastScan] = c.LastScan
-	response[consts.QChanCreatedAt] = c.CreatedAt
-	response[consts.QChanUpdatedAt] = c.UpdatedAt
-
-	// Convert global settings to map with string representations.
-	if c.ChanSettings != nil {
-		settingsMap := settingsJSONMap(c.ChanSettings)
-		response[consts.QChanSettings] = settingsMap
+	response := channelDetailResponse{
+		ID:   c.ID,
+		Name: c.Name,
+		URLs: slices.DeleteFunc(c.GetURLs(), func(url string) bool {
+			return url == consts.ManualDownloadsCol
+		}),
+		LastScan:    c.LastScan,
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+		Settings:    newSettingsResponse(c.ChanSettings),
+		Metarr:      newMetarrArgsResponse(c.ChanMetarrArgs),
+		AuthDetails: []authDetailResponse{},
+		URLSettings: map[string]urlSettingsResponse{},
 	}
 
-	// Convert global metarr args to map with string representations.
-	if c.ChanMetarrArgs != nil {
-		metarrMap := metarrArgsJSONMap(c.ChanMetarrArgs)
-		response[consts.QChanMetarr] = metarrMap
-	}
-
-	// Build auth_details array (excluding manual-downloads).
-	// Passwords are never sent back, only whether one is saved.
-	authDetails := make([]map[string]any, 0)
+	// Logins and custom settings per URL, leaving out manual downloads. Passwords are never sent back, only whether one is saved.
 	for _, urlModel := range c.URLModels {
 		if urlModel.URL == consts.ManualDownloadsCol {
 			continue
 		}
 		if urlModel.Username != "" || urlModel.LoginURL != "" {
-			authDetails = append(authDetails, map[string]any{
-				"channel_url":  urlModel.URL,
-				"username":     urlModel.Username,
-				"has_password": urlModel.Password != "",
-				"login_url":    urlModel.LoginURL,
+			response.AuthDetails = append(response.AuthDetails, authDetailResponse{
+				ChannelURL:  urlModel.URL,
+				Username:    urlModel.Username,
+				HasPassword: urlModel.Password != "",
+				LoginURL:    urlModel.LoginURL,
 			})
 		}
-	}
-	response["auth_details"] = authDetails
-
-	// Build url_settings map (excluding manual-downloads).
-	urlSettings := make(map[string]map[string]any)
-	for _, urlModel := range c.URLModels {
-		if urlModel.URL == consts.ManualDownloadsCol {
-			continue
-		}
 		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil {
-			urlSettings[urlModel.URL] = make(map[string]any)
-
-			// Add settings with display strings.
-			if urlModel.ChanURLSettings != nil {
-				settingsMap := settingsJSONMap(urlModel.ChanURLSettings)
-				urlSettings[urlModel.URL][consts.QChanURLSettings] = settingsMap
-			}
-
-			// Add metarr with display strings.
-			if urlModel.ChanURLMetarrArgs != nil {
-				metarrMap := metarrArgsJSONMap(urlModel.ChanURLMetarrArgs)
-				urlSettings[urlModel.URL][consts.QChanURLMetarr] = metarrMap
+			response.URLSettings[urlModel.URL] = urlSettingsResponse{
+				Settings: newSettingsResponse(urlModel.ChanURLSettings),
+				Metarr:   newMetarrArgsResponse(urlModel.ChanURLMetarrArgs),
 			}
 		}
 	}
-	response["url_settings"] = urlSettings
 
-	// Fetch and include notification URLs.
+	// Notification URLs.
 	notifications, err := ss.cs.GetNotifyURLs(c.ID)
 	if err != nil {
 		logger.Pl.E("Failed to fetch notification URLs for channel %d: %v", c.ID, err)
-	} else if len(notifications) > 0 {
-		// Extract just the NotifyURL values for the frontend.
-		notifyURLs := make([]string, 0, len(notifications))
-		for _, n := range notifications {
-			if n.NotifyURL != "" {
-				notifyURLs = append(notifyURLs, n.NotifyURL)
-			}
+	}
+	for _, n := range notifications {
+		if n.NotifyURL != "" {
+			response.Notifications = append(response.Notifications, n.NotifyURL)
 		}
-		response["notifications"] = notifyURLs
 	}
 
 	w.Header().Set("Content-Type", "application/json")

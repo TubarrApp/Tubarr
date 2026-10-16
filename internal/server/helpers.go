@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -18,159 +19,185 @@ import (
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
-// metarrArgsJSONMap returns a map of MetarrArgs JSON keys and their values.
-func metarrArgsJSONMap(mArgs *models.MetarrArgs) map[string]any {
-	metarrMap := make(map[string]any)
-	if mArgs.OutputDir != "" {
-		metarrMap[jsonkeys.MetarrOutputDirectory] = mArgs.OutputDir
-	}
-	if mArgs.OutputExt != "" {
-		metarrMap[jsonkeys.MetarrOutputExt] = mArgs.OutputExt
-	}
-	if mArgs.RenameStyle != "" {
-		metarrMap[jsonkeys.MetarrRenameStyle] = mArgs.RenameStyle
-	}
-	if mArgs.Concurrency > 0 {
-		metarrMap[jsonkeys.MetarrConcurrency] = mArgs.Concurrency
-	}
-	if mArgs.MaxCPU >= 0 {
-		metarrMap[jsonkeys.MetarrMaxCPU] = mArgs.MaxCPU
-	}
-	if mArgs.MinFreeMem != "" {
-		metarrMap[jsonkeys.MetarrMinFreeMem] = mArgs.MinFreeMem
-	}
-	if mArgs.TranscodeGPU != "" {
-		metarrMap[jsonkeys.MetarrGPU] = mArgs.TranscodeGPU
-	}
-	if mArgs.TranscodeGPUNode != "" {
-		metarrMap[jsonkeys.MetarrGPUNode] = mArgs.TranscodeGPUNode
-	}
-	if len(mArgs.TranscodeVideoCodecs) != 0 {
-		metarrMap[jsonkeys.MetarrVideoCodecs] = mArgs.TranscodeVideoCodecs
-	}
-	if len(mArgs.TranscodeAudioCodecs) != 0 {
-		metarrMap[jsonkeys.MetarrAudioCodecs] = mArgs.TranscodeAudioCodecs
-	}
-	if mArgs.TranscodeQuality != "" {
-		metarrMap[jsonkeys.MetarrTranscodeQuality] = mArgs.TranscodeQuality
-	}
-	if mArgs.TranscodeVideoFilter != "" {
-		metarrMap[jsonkeys.MetarrTranscodeVideoFilter] = mArgs.TranscodeVideoFilter
-	}
-	if mArgs.ExtraFFmpegArgs != "" {
-		metarrMap[jsonkeys.MetarrExtraFFmpegArgs] = mArgs.ExtraFFmpegArgs
-	}
-	if mArgs.FilenameOpsFile != "" {
-		metarrMap[jsonkeys.MetarrFilenameOpsFile] = mArgs.FilenameOpsFile
-	}
-	if mArgs.FilteredFilenameOpsFile != "" {
-		metarrMap[jsonkeys.MetarrFilteredFilenameOpsFile] = mArgs.FilteredFilenameOpsFile
-	}
-	if mArgs.MetaOpsFile != "" {
-		metarrMap[jsonkeys.MetarrMetaOpsFile] = mArgs.MetaOpsFile
-	}
-	if mArgs.FilteredMetaOpsFile != "" {
-		metarrMap[jsonkeys.MetarrFilteredMetaOpsFile] = mArgs.FilteredMetaOpsFile
-	}
-	if len(mArgs.MetaOps) > 0 {
-		metarrMap[jsonkeys.MetarrMetaOps] = strings.Join(sharedparsing.FormatMetaOps(mArgs.MetaOps, "", true), "\n")
-	}
-	if len(mArgs.FilenameOps) > 0 {
-		metarrMap[jsonkeys.MetarrFilenameOps] = strings.Join(sharedparsing.FormatFilenameOps(mArgs.FilenameOps, "", true), "\n")
-	}
-	if len(mArgs.FilteredMetaOps) > 0 {
-		filteredMetaStrings := make([]string, 0)
-		for i := range mArgs.FilteredMetaOps {
-			filteredMetaStrings = append(filteredMetaStrings, models.FilteredMetaOpsToSlice(mArgs.FilteredMetaOps[i])...)
-		}
-		metarrMap[jsonkeys.MetarrFilteredMetaOps] = strings.Join(filteredMetaStrings, "\n")
-	}
-	if len(mArgs.FilteredFilenameOps) > 0 {
-		filteredFilenameStrings := make([]string, 0)
-		for i := range mArgs.FilteredFilenameOps {
-			filteredFilenameStrings = append(filteredFilenameStrings, models.FilteredFilenameOpsToSlice(mArgs.FilteredFilenameOps[i])...)
-		}
-		metarrMap[jsonkeys.MetarrFilteredFilenameOps] = strings.Join(filteredFilenameStrings, "\n")
-	}
-	return metarrMap
+// channelResponse is a channel as listed in the web UI.
+type channelResponse struct {
+	ID                   int64                `json:"id"`
+	Name                 string               `json:"name"`
+	URLs                 []string             `json:"urls"`
+	LastScan             time.Time            `json:"last_scan"`
+	CreatedAt            time.Time            `json:"created_at"`
+	UpdatedAt            time.Time            `json:"updated_at"`
+	ChannelConfigFile    string               `json:"channel_config_file"`
+	NewVideoNotification bool                 `json:"new_video_notification"`
+	Settings             *settingsResponse    `json:"settings,omitempty"`
+	Metarr               *metarrArgsResponse  `json:"metarr,omitempty"`
+	URLModels            []channelURLResponse `json:"url_models,omitempty"`
 }
 
-// settingsJSONMap returns a map of Settings JSON keys and their values.
-func settingsJSONMap(settings *models.Settings) map[string]any {
-	settingsMap := make(map[string]any)
-	if settings.VideoDir != "" {
-		settingsMap[jsonkeys.SettingsVideoDirectory] = settings.VideoDir
+// channelURLResponse is a channel URL as listed in the web UI.
+type channelURLResponse struct {
+	ID       int64               `json:"id"`
+	URL      string              `json:"url"`
+	Username string              `json:"username"`
+	LoginURL string              `json:"login_url"`
+	Settings *settingsResponse   `json:"settings,omitempty"`
+	Metarr   *metarrArgsResponse `json:"metarr,omitempty"`
+}
+
+// channelDetailResponse is a channel as loaded into the edit form.
+type channelDetailResponse struct {
+	ID            int64                          `json:"id"`
+	Name          string                         `json:"name"`
+	URLs          []string                       `json:"urls"`
+	LastScan      time.Time                      `json:"last_scan"`
+	CreatedAt     time.Time                      `json:"created_at"`
+	UpdatedAt     time.Time                      `json:"updated_at"`
+	Settings      *settingsResponse              `json:"settings,omitempty"`
+	Metarr        *metarrArgsResponse            `json:"metarr,omitempty"`
+	AuthDetails   []authDetailResponse           `json:"auth_details"`
+	URLSettings   map[string]urlSettingsResponse `json:"url_settings"`
+	Notifications []string                       `json:"notifications,omitempty"`
+}
+
+// authDetailResponse is a channel URL's login, without its password.
+type authDetailResponse struct {
+	ChannelURL  string `json:"channel_url"`
+	Username    string `json:"username"`
+	HasPassword bool   `json:"has_password"`
+	LoginURL    string `json:"login_url"`
+}
+
+// urlSettingsResponse is a channel URL's custom settings.
+type urlSettingsResponse struct {
+	Settings *settingsResponse   `json:"settings,omitempty"`
+	Metarr   *metarrArgsResponse `json:"metarr,omitempty"`
+}
+
+// metarrArgsResponse is MetarrArgs as sent to the web UI, with operations as newline-separated text. Unset fields are left out.
+type metarrArgsResponse struct {
+	OutputDir               string   `json:"metarr_output_directory,omitempty"`
+	OutputExt               string   `json:"metarr_output_ext,omitempty"`
+	RenameStyle             string   `json:"metarr_rename_style,omitempty"`
+	Concurrency             int      `json:"metarr_concurrency,omitempty"`
+	MaxCPU                  *float64 `json:"metarr_max_cpu_usage,omitempty"`
+	MinFreeMem              string   `json:"metarr_min_free_mem,omitempty"`
+	GPU                     string   `json:"metarr_gpu,omitempty"`
+	GPUNode                 string   `json:"metarr_transcode_gpu_node,omitempty"`
+	VideoCodecs             []string `json:"metarr_transcode_video_transcode_codecs,omitempty"`
+	AudioCodecs             []string `json:"metarr_transcode_audio_codecs,omitempty"`
+	TranscodeQuality        string   `json:"metarr_transcode_quality,omitempty"`
+	TranscodeVideoFilter    string   `json:"metarr_transcode_video_filter,omitempty"`
+	ExtraFFmpegArgs         string   `json:"metarr_extra_ffmpeg_args,omitempty"`
+	FilenameOpsFile         string   `json:"metarr_filename_ops_file,omitempty"`
+	FilteredFilenameOpsFile string   `json:"metarr_filtered_filename_ops_file,omitempty"`
+	MetaOpsFile             string   `json:"metarr_meta_ops_file,omitempty"`
+	FilteredMetaOpsFile     string   `json:"metarr_filtered_meta_ops_file,omitempty"`
+	MetaOps                 string   `json:"metarr_meta_ops,omitempty"`
+	FilenameOps             string   `json:"metarr_filename_ops,omitempty"`
+	FilteredMetaOps         string   `json:"metarr_filtered_meta_ops,omitempty"`
+	FilteredFilenameOps     string   `json:"metarr_filtered_filename_ops,omitempty"`
+}
+
+// newMetarrArgsResponse converts MetarrArgs for the web UI.
+func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
+	if m == nil {
+		return nil
 	}
-	if settings.JSONDir != "" {
-		settingsMap[jsonkeys.SettingsJSONDirectory] = settings.JSONDir
+	r := &metarrArgsResponse{
+		OutputDir:               m.OutputDir,
+		OutputExt:               m.OutputExt,
+		RenameStyle:             m.RenameStyle,
+		Concurrency:             max(m.Concurrency, 0),
+		MinFreeMem:              m.MinFreeMem,
+		GPU:                     m.TranscodeGPU,
+		GPUNode:                 m.TranscodeGPUNode,
+		VideoCodecs:             m.TranscodeVideoCodecs,
+		AudioCodecs:             m.TranscodeAudioCodecs,
+		TranscodeQuality:        m.TranscodeQuality,
+		TranscodeVideoFilter:    m.TranscodeVideoFilter,
+		ExtraFFmpegArgs:         m.ExtraFFmpegArgs,
+		FilenameOpsFile:         m.FilenameOpsFile,
+		FilteredFilenameOpsFile: m.FilteredFilenameOpsFile,
+		MetaOpsFile:             m.MetaOpsFile,
+		FilteredMetaOpsFile:     m.FilteredMetaOpsFile,
+		MetaOps:                 strings.Join(sharedparsing.FormatMetaOps(m.MetaOps, "", true), "\n"),
+		FilenameOps:             strings.Join(sharedparsing.FormatFilenameOps(m.FilenameOps, "", true), "\n"),
 	}
-	if settings.Concurrency > 0 {
-		settingsMap[jsonkeys.SettingsMaxConcurrency] = settings.Concurrency
+	if m.MaxCPU >= 0 {
+		r.MaxCPU = &m.MaxCPU
 	}
-	if settings.CrawlFreq > 0 {
-		settingsMap[jsonkeys.SettingsCrawlFreq] = settings.CrawlFreq
+	filteredMeta := make([]string, 0, len(m.FilteredMetaOps))
+	for i := range m.FilteredMetaOps {
+		filteredMeta = append(filteredMeta, models.FilteredMetaOpsToSlice(m.FilteredMetaOps[i])...)
 	}
-	if settings.Retries > 0 {
-		settingsMap[jsonkeys.SettingsDownloadRetries] = settings.Retries
+	r.FilteredMetaOps = strings.Join(filteredMeta, "\n")
+	filteredFilename := make([]string, 0, len(m.FilteredFilenameOps))
+	for i := range m.FilteredFilenameOps {
+		filteredFilename = append(filteredFilename, models.FilteredFilenameOpsToSlice(m.FilteredFilenameOps[i])...)
 	}
-	if settings.MaxFilesize != "" {
-		settingsMap[jsonkeys.SettingsMaxFilesize] = settings.MaxFilesize
+	r.FilteredFilenameOps = strings.Join(filteredFilename, "\n")
+	return r
+}
+
+// settingsResponse is Settings as sent to the web UI, with filters and move ops as newline-separated text. Unset fields are left out.
+type settingsResponse struct {
+	VideoDir               string   `json:"video_directory,omitempty"`
+	JSONDir                string   `json:"json_directory,omitempty"`
+	MaxConcurrency         int      `json:"max_concurrency,omitempty"`
+	CrawlFreq              int      `json:"crawl_freq,omitempty"`
+	DownloadRetries        int      `json:"download_retries,omitempty"`
+	MaxFilesize            string   `json:"max_filesize,omitempty"`
+	FromDate               string   `json:"from_date,omitempty"`
+	ToDate                 string   `json:"to_date,omitempty"`
+	FilterFile             string   `json:"filter_file,omitempty"`
+	Filters                string   `json:"filters,omitempty"`
+	YtdlpOutputExt         string   `json:"ytdlp_output_ext,omitempty"`
+	CookiesFromBrowser     string   `json:"cookies_from_browser,omitempty"`
+	ExternalDownloader     string   `json:"external_downloader,omitempty"`
+	ExternalDownloaderArgs string   `json:"external_downloader_args,omitempty"`
+	ExtraYTDLPVideoArgs    string   `json:"extra_ytdlp_video_args,omitempty"`
+	ExtraYTDLPMetaArgs     string   `json:"extra_ytdlp_meta_args,omitempty"`
+	ExtraYTDLPCrawlArgs    string   `json:"extra_ytdlp_crawl_args,omitempty"`
+	MoveOpsFile            string   `json:"move_ops_file,omitempty"`
+	MoveOps                string   `json:"move_ops,omitempty"`
+	UseGlobalCookies       *bool    `json:"use_global_cookies,omitempty"`
+	Paused                 bool     `json:"paused,omitempty"`
+	AutoDownload           *bool    `json:"auto_download,omitempty"`
+	PreferredVideoCodecs   []string `json:"ytdlp_preferred_video_codecs,omitempty"`
+	PreferredAudioCodecs   []string `json:"ytdlp_preferred_audio_codecs,omitempty"`
+}
+
+// newSettingsResponse converts Settings for the web UI.
+func newSettingsResponse(s *models.Settings) *settingsResponse {
+	if s == nil {
+		return nil
 	}
-	if settings.FromDate != "" {
-		settingsMap[jsonkeys.SettingsFromDate] = settings.FromDate
+	return &settingsResponse{
+		VideoDir:               s.VideoDir,
+		JSONDir:                s.JSONDir,
+		MaxConcurrency:         max(s.Concurrency, 0),
+		CrawlFreq:              max(s.CrawlFreq, 0),
+		DownloadRetries:        max(s.Retries, 0),
+		MaxFilesize:            s.MaxFilesize,
+		FromDate:               s.FromDate,
+		ToDate:                 s.ToDate,
+		FilterFile:             s.FilterFile,
+		Filters:                strings.Join(models.FiltersArrayToSlice(s.Filters, true), "\n"),
+		YtdlpOutputExt:         s.YtdlpOutputExt,
+		CookiesFromBrowser:     s.CookiesFromBrowser,
+		ExternalDownloader:     s.ExternalDownloader,
+		ExternalDownloaderArgs: s.ExternalDownloaderArgs,
+		ExtraYTDLPVideoArgs:    s.ExtraYTDLPVideoArgs,
+		ExtraYTDLPMetaArgs:     s.ExtraYTDLPMetaArgs,
+		ExtraYTDLPCrawlArgs:    s.ExtraYTDLPCrawlArgs,
+		MoveOpsFile:            s.MetaFilterMoveOpFile,
+		MoveOps:                strings.Join(models.MetaFilterMoveOpsArrayToSlice(s.MetaFilterMoveOps), "\n"),
+		UseGlobalCookies:       s.UseGlobalCookies,
+		Paused:                 s.Paused,
+		AutoDownload:           s.AutoDownload,
+		PreferredVideoCodecs:   s.YTDLPPreferredVideoCodecs,
+		PreferredAudioCodecs:   s.YTDLPPreferredAudioCodecs,
 	}
-	if settings.ToDate != "" {
-		settingsMap[jsonkeys.SettingsToDate] = settings.ToDate
-	}
-	if settings.FilterFile != "" {
-		settingsMap[jsonkeys.SettingsFilterFile] = settings.FilterFile
-	}
-	if len(settings.Filters) > 0 {
-		settingsMap[jsonkeys.SettingsFilters] = strings.Join(models.FiltersArrayToSlice(settings.Filters, true), "\n")
-	}
-	if settings.YtdlpOutputExt != "" {
-		settingsMap[jsonkeys.SettingsYtdlpOutputExt] = settings.YtdlpOutputExt
-	}
-	if settings.CookiesFromBrowser != "" {
-		settingsMap[jsonkeys.SettingsCookiesFromBrowser] = settings.CookiesFromBrowser
-	}
-	if settings.ExternalDownloader != "" {
-		settingsMap[jsonkeys.SettingsExternalDownloader] = settings.ExternalDownloader
-	}
-	if settings.ExternalDownloaderArgs != "" {
-		settingsMap[jsonkeys.SettingsExternalDownloaderArgs] = settings.ExternalDownloaderArgs
-	}
-	if settings.ExtraYTDLPVideoArgs != "" {
-		settingsMap[jsonkeys.SettingsExtraYtdlpVideoArgs] = settings.ExtraYTDLPVideoArgs
-	}
-	if settings.ExtraYTDLPMetaArgs != "" {
-		settingsMap[jsonkeys.SettingsExtraYtdlpMetaArgs] = settings.ExtraYTDLPMetaArgs
-	}
-	if settings.ExtraYTDLPCrawlArgs != "" {
-		settingsMap[jsonkeys.SettingsExtraYtdlpCrawlArgs] = settings.ExtraYTDLPCrawlArgs
-	}
-	if settings.MetaFilterMoveOpFile != "" {
-		settingsMap[jsonkeys.SettingsMoveOpsFile] = settings.MetaFilterMoveOpFile
-	}
-	if len(settings.MetaFilterMoveOps) > 0 {
-		settingsMap[jsonkeys.SettingsMoveOps] = strings.Join(models.MetaFilterMoveOpsArrayToSlice(settings.MetaFilterMoveOps), "\n")
-	}
-	if settings.UseGlobalCookies != nil {
-		settingsMap[jsonkeys.SettingsUseGlobalCookies] = *settings.UseGlobalCookies
-	}
-	if settings.Paused {
-		settingsMap[jsonkeys.SettingsPaused] = true
-	}
-	if settings.AutoDownload != nil {
-		settingsMap[jsonkeys.SettingsAutoDownload] = *settings.AutoDownload
-	}
-	if len(settings.YTDLPPreferredVideoCodecs) > 0 {
-		settingsMap[jsonkeys.SettingsYTDLPPreferredVideoCodecs] = settings.YTDLPPreferredVideoCodecs
-	}
-	if len(settings.YTDLPPreferredAudioCodecs) > 0 {
-		settingsMap[jsonkeys.SettingsYTDLPPreferredAudioCodecs] = settings.YTDLPPreferredAudioCodecs
-	}
-	return settingsMap
 }
 
 // splitAuthDetails splits the auth_details form value into one JSON object per entry.
