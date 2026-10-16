@@ -2,9 +2,11 @@
 package blocking
 
 import (
+	"cmp"
 	"database/sql"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -17,8 +19,12 @@ import (
 
 // GetBlockContext determines the block context for a channel URL based on authentication settings.
 func GetBlockContext(cu *models.ChannelURL) vars.BlockContext {
+	if cu == nil {
+		return vars.BlockContextUnauth
+	}
+
 	// Priority #1: Username/password authentication.
-	if cu != nil && cu.LoginURL != "" && cu.Username != "" {
+	if cu.LoginURL != "" && cu.Username != "" {
 		return vars.BlockContextAuth
 	}
 
@@ -32,7 +38,7 @@ func GetBlockContext(cu *models.ChannelURL) vars.BlockContext {
 }
 
 // BlockDomain blocks a domain for a specific context globally (memory + database).
-func BlockDomain(db *sql.DB, domain string, context vars.BlockContext) error {
+func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) error {
 	now := time.Now()
 
 	// Normalize domain to eTLD+1.
@@ -48,7 +54,7 @@ func BlockDomain(db *sql.DB, domain string, context vars.BlockContext) error {
 	if vars.BlockedDomains[normalizedDomain] == nil {
 		vars.BlockedDomains[normalizedDomain] = make(map[vars.BlockContext]time.Time)
 	}
-	vars.BlockedDomains[normalizedDomain][context] = now
+	vars.BlockedDomains[normalizedDomain][blockContext] = now
 
 	// Persist to database.
 	query := fmt.Sprintf(`INSERT OR REPLACE INTO %s (%s, %s, %s) VALUES (?, ?, ?)`,
@@ -58,18 +64,18 @@ func BlockDomain(db *sql.DB, domain string, context vars.BlockContext) error {
 		consts.QBlockedAt,
 	)
 
-	if _, err := db.Exec(query, normalizedDomain, string(context), now); err != nil {
-		return fmt.Errorf("failed to persist blocked domain %q (context: %s) to database: %w", normalizedDomain, context, err)
+	if _, err := db.Exec(query, normalizedDomain, string(blockContext), now); err != nil {
+		return fmt.Errorf("failed to persist blocked domain %q (context: %s) to database: %w", normalizedDomain, blockContext, err)
 	}
 
-	logger.Pl.W("Blocked domain %q for context %q due to bot detection", normalizedDomain, context)
+	logger.Pl.W("Blocked domain %q for context %q due to bot detection", normalizedDomain, blockContext)
 	return nil
 }
 
 // IsBlocked checks if a domain is blocked for a specific context.
 //
 // Returns true if blocked and timeout has not expired.
-func IsBlocked(domain string, context vars.BlockContext) (isBlocked bool, blockedAt time.Time, remainingTime time.Duration) {
+func IsBlocked(domain string, blockContext vars.BlockContext) (isBlocked bool, blockedAt time.Time, remainingTime time.Duration) {
 	normalizedDomain := normalizeDomain(domain)
 
 	vars.BlockedDomainsMutex.RLock()
@@ -79,7 +85,7 @@ func IsBlocked(domain string, context vars.BlockContext) (isBlocked bool, blocke
 		return false, time.Time{}, 0
 	}
 
-	blockedTime, exists := vars.BlockedDomains[normalizedDomain][context]
+	blockedTime, exists := vars.BlockedDomains[normalizedDomain][blockContext]
 	if !exists {
 		return false, time.Time{}, 0
 	}
@@ -99,13 +105,13 @@ func IsBlocked(domain string, context vars.BlockContext) (isBlocked bool, blocke
 }
 
 // UnblockDomain unblocks a domain for a specific context (or all contexts if context is empty).
-func UnblockDomain(db *sql.DB, domain string, context vars.BlockContext) error {
+func UnblockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) error {
 	normalizedDomain := normalizeDomain(domain)
 
 	vars.BlockedDomainsMutex.Lock()
 	defer vars.BlockedDomainsMutex.Unlock()
 
-	if context == "" {
+	if blockContext == "" {
 		// Unblock all contexts for this domain.
 		delete(vars.BlockedDomains, normalizedDomain)
 
@@ -122,7 +128,7 @@ func UnblockDomain(db *sql.DB, domain string, context vars.BlockContext) error {
 	} else {
 		// Unblock specific context.
 		if vars.BlockedDomains[normalizedDomain] != nil {
-			delete(vars.BlockedDomains[normalizedDomain], context)
+			delete(vars.BlockedDomains[normalizedDomain], blockContext)
 			if len(vars.BlockedDomains[normalizedDomain]) == 0 {
 				delete(vars.BlockedDomains, normalizedDomain)
 			}
@@ -134,11 +140,11 @@ func UnblockDomain(db *sql.DB, domain string, context vars.BlockContext) error {
 			consts.QBlockedContext,
 		)
 
-		if _, err := db.Exec(query, normalizedDomain, string(context)); err != nil {
-			return fmt.Errorf("failed to unblock domain %q (context: %s) from database: %w", normalizedDomain, context, err)
+		if _, err := db.Exec(query, normalizedDomain, string(blockContext)); err != nil {
+			return fmt.Errorf("failed to unblock domain %q (context: %s) from database: %w", normalizedDomain, blockContext, err)
 		}
 
-		logger.Pl.S("Unblocked domain %q for context %q", normalizedDomain, context)
+		logger.Pl.S("Unblocked domain %q for context %q", normalizedDomain, blockContext)
 	}
 
 	return nil
@@ -180,11 +186,11 @@ func LoadBlockedDomains(db *sql.DB) error {
 			continue
 		}
 
-		context := vars.BlockContext(contextStr)
+		blockContext := vars.BlockContext(contextStr)
 		if vars.BlockedDomains[domain] == nil {
 			vars.BlockedDomains[domain] = make(map[vars.BlockContext]time.Time)
 		}
-		vars.BlockedDomains[domain][context] = blockedAt
+		vars.BlockedDomains[domain][blockContext] = blockedAt
 		count++
 	}
 
@@ -207,22 +213,22 @@ func CleanExpiredBlocks(db *sql.DB) error {
 	defer vars.BlockedDomainsMutex.Unlock()
 
 	domainsToRemove := make([]struct {
-		domain  string
-		context vars.BlockContext
+		domain       string
+		blockContext vars.BlockContext
 	}, 0)
 
 	// Find expired blocks.
 	for domain, contexts := range vars.BlockedDomains {
-		for context, blockedTime := range contexts {
+		for blockContext, blockedTime := range contexts {
 			timeoutMinutes := GetTimeoutForDomain(domain)
 			timeout := time.Duration(timeoutMinutes) * time.Minute
 			unlockTime := blockedTime.Add(timeout)
 
 			if time.Now().After(unlockTime) {
 				domainsToRemove = append(domainsToRemove, struct {
-					domain  string
-					context vars.BlockContext
-				}{domain, context})
+					domain       string
+					blockContext vars.BlockContext
+				}{domain, blockContext})
 			}
 		}
 	}
@@ -231,7 +237,7 @@ func CleanExpiredBlocks(db *sql.DB) error {
 	for _, item := range domainsToRemove {
 		// Remove from memory.
 		if vars.BlockedDomains[item.domain] != nil {
-			delete(vars.BlockedDomains[item.domain], item.context)
+			delete(vars.BlockedDomains[item.domain], item.blockContext)
 			if len(vars.BlockedDomains[item.domain]) == 0 {
 				delete(vars.BlockedDomains, item.domain)
 			}
@@ -244,31 +250,29 @@ func CleanExpiredBlocks(db *sql.DB) error {
 			consts.QBlockedContext,
 		)
 
-		if _, err := db.Exec(query, item.domain, string(item.context)); err != nil {
-			logger.Pl.E("Failed to remove expired block for domain %q (context: %s): %v", item.domain, item.context, err)
+		if _, err := db.Exec(query, item.domain, string(item.blockContext)); err != nil {
+			logger.Pl.E("Failed to remove expired block for domain %q (context: %s): %v", item.domain, item.blockContext, err)
 		} else {
-			logger.Pl.S("Removed expired block for domain %q (context: %s)", item.domain, item.context)
-		}
-
-		// Remove from in-memory AvoidURLs map if context matches.
-		if val, exists := vars.AvoidURLs.Load(item.domain); exists {
-			if storedContext, ok := val.(vars.BlockContext); ok && storedContext == item.context {
-				vars.AvoidURLs.Delete(item.domain)
-				logger.Pl.D(2, "Removed expired in-memory block for domain %q (context: %s)", item.domain, item.context)
-			}
+			logger.Pl.S("Removed expired block for domain %q (context: %s)", item.domain, item.blockContext)
 		}
 	}
 
 	return nil
 }
 
+// botTimeoutKeys are BotTimeoutMap's keys, longest first, so a more specific key wins.
+var botTimeoutKeys = slices.SortedFunc(maps.Keys(consts.BotTimeoutMap), func(a, b string) int {
+	return cmp.Or(len(b)-len(a), strings.Compare(a, b))
+})
+
 // GetTimeoutForDomain returns the timeout in minutes for a given domain.
 //
-// Uses BotTimeoutMap if domain matches, otherwise returns default of 12 hours (720 minutes).
+// Uses BotTimeoutMap if the domain ends with a key, otherwise returns default of 12 hours (720 minutes).
 func GetTimeoutForDomain(domain string) float64 {
-	for key, timeout := range consts.BotTimeoutMap {
-		if strings.Contains(domain, key) {
-			return timeout
+	domain = strings.ToLower(domain)
+	for _, key := range botTimeoutKeys {
+		if strings.HasSuffix(domain, key) {
+			return consts.BotTimeoutMap[key]
 		}
 	}
 	return 720.0 // Default: 12 hours.

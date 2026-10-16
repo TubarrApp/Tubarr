@@ -31,7 +31,7 @@ func (l *DomainLimiter) Init(limits map[string]int) {
 	l.sems = make(map[string]chan struct{})
 	for hostname, limit := range limits {
 		if limit > 0 {
-			l.sems[strings.ToLower(hostname)] = make(chan struct{}, limit)
+			l.sems[NormalizeDomain(hostname)] = make(chan struct{}, limit)
 		}
 	}
 	logger.Pl.I("Initialized %d domain %s limit(s)", len(l.sems), l.kind)
@@ -39,7 +39,7 @@ func (l *DomainLimiter) Init(limits map[string]int) {
 
 // Set updates the limit for one domain at runtime (0 removes it). Holders of the old semaphore release cleanly.
 func (l *DomainLimiter) Set(hostname string, limit int) {
-	hostname = strings.ToLower(hostname)
+	hostname = NormalizeDomain(hostname)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if limit > 0 {
@@ -100,7 +100,21 @@ func Hostname(rawURL string) string {
 	if err != nil {
 		return ""
 	}
-	hostname := parsed.Hostname()
+	return registeredDomain(parsed.Hostname())
+}
+
+// NormalizeDomain returns the eTLD+1 of a hostname or URL as entered by a user (e.g. "www.youtube.com" → "youtube.com").
+func NormalizeDomain(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.Contains(s, "://") {
+		return Hostname(s)
+	}
+	host, _, _ := strings.Cut(s, "/")
+	return registeredDomain(host)
+}
+
+// registeredDomain returns the eTLD+1 of a hostname, or the lowercased hostname if it has none.
+func registeredDomain(hostname string) string {
 	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
 		return strings.ToLower(domain)
 	}

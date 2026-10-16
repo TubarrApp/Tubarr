@@ -1580,11 +1580,12 @@ func (ss *serverStore) handleGetTubarrLogs(w http.ResponseWriter, r *http.Reques
 func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	// Print logs from memory with read lock.
+	// Copy the lines under the lock, so a slow client doesn't hold up incoming logs (lines are never modified once stored).
 	vars.MetarrLogsMutex.RLock()
-	defer vars.MetarrLogsMutex.RUnlock()
+	logs := slices.Clone(vars.MetarrLogs)
+	vars.MetarrLogsMutex.RUnlock()
 
-	for _, line := range vars.MetarrLogs {
+	for _, line := range logs {
 		// Check if client disconnected.
 		if r.Context().Err() != nil {
 			return
@@ -1664,11 +1665,11 @@ func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, _ *http.Re
 		timeRemaining := make(map[vars.BlockContext]string)
 
 		// Only include non-expired contexts.
-		for context, blockedAt := range contexts {
-			isBlocked, _, remaining := blocking.IsBlocked(domain, context)
+		for blockCtx, blockedAt := range contexts {
+			isBlocked, _, remaining := blocking.IsBlocked(domain, blockCtx)
 			if isBlocked {
-				activeContexts[context] = blockedAt
-				timeRemaining[context] = remaining.Round(time.Second).String()
+				activeContexts[blockCtx] = blockedAt
+				timeRemaining[blockCtx] = remaining.Round(time.Second).String()
 			}
 		}
 
@@ -1732,7 +1733,7 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
+	if !found || c == nil {
 		http.Error(w, "channel not found", http.StatusNotFound)
 		return
 	}
@@ -1896,7 +1897,7 @@ func (ss *serverStore) handleGetDomainLimits(w http.ResponseWriter, _ *http.Requ
 
 // handleSetDomainLimit sets the download and crawl concurrency limits for a specific domain (0 or blank = unlimited).
 func (ss *serverStore) handleSetDomainLimit(w http.ResponseWriter, r *http.Request) {
-	hostname := strings.ToLower(strings.TrimSpace(r.FormValue("hostname")))
+	hostname := limits.NormalizeDomain(r.FormValue("hostname"))
 	if hostname == "" {
 		http.Error(w, "hostname parameter is required", http.StatusBadRequest)
 		return

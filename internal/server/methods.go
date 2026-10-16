@@ -106,6 +106,13 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						}
 						defer unlock()
 
+						release, err := app.AcquireCrawlSlot(state.QueueCtx(crawlCtx), ch.Name)
+						if err != nil {
+							logger.Pl.D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
+							return
+						}
+						defer release()
+
 						logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
 						if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {
 							logger.Pl.E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
@@ -266,14 +273,15 @@ var errNoActiveDownload = errors.New("no active download found")
 // cancelDownload marks a download as cancelled in the database.
 func (ss *serverStore) cancelDownload(videoID int64) error {
 	query := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = CURRENT_TIMESTAMP WHERE %s = ?",
+		"UPDATE %s SET %s = ?, %s = CURRENT_TIMESTAMP WHERE %s = ? AND %s IN (?, ?)",
 		consts.DBDownloads,
 		consts.QDLStatus,
 		consts.QDLUpdatedAt,
 		consts.QDLVidID,
+		consts.QDLStatus,
 	)
 
-	result, err := ss.db.Exec(query, consts.DLStatusCancelled, videoID)
+	result, err := ss.db.Exec(query, consts.DLStatusCancelled, videoID, consts.DLStatusQueued, consts.DLStatusDownloading)
 	if err != nil {
 		return fmt.Errorf("failed to cancel download: %w", err)
 	}

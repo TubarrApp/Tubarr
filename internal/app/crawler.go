@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
 	"tubarr/internal/scraper"
 	"tubarr/internal/state"
@@ -28,15 +29,35 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
+// crawlSems holds the scheduled crawl semaphores, keyed by limit so a changed setting takes effect for new crawls.
+var crawlSems sync.Map
+
+// AcquireCrawlSlot waits for a scheduled crawl slot under the crawl concurrency setting (0 = unlimited), or ctx to end.
+//
+// Returns a function releasing the slot.
+func AcquireCrawlSlot(ctx context.Context, channelName string) (release func(), err error) {
+	n := abstractions.GetInt(keys.CrawlConcurrency)
+	if n <= 0 {
+		return func() {}, nil
+	}
+	v, _ := crawlSems.LoadOrStore(n, make(chan struct{}, n))
+	sem, _ := v.(chan struct{})
+	if err := limits.AcquireSlot(ctx, sem, "crawl", channelName); err != nil {
+		return nil, err
+	}
+	return func() { <-sem }, nil
+}
+
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(ctx context.Context, s contracts.Store) error {
 	// Grab all channels from database.
 	cs := s.ChannelStore()
 	channels, hasRows, err := cs.GetAllChannels(true)
+	if err != nil {
+		return err
+	}
 	if !hasRows {
 		logger.Pl.I("No channels in database")
-	} else if err != nil {
-		return err
 	}
 
 	// Clean expired blocks first.
@@ -185,11 +206,11 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 			continue
 		}
 		hostname := parsed.Hostname()
-		context := blocking.GetBlockContext(targetChannelURLModel)
-		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, context)
+		blockCtx := blocking.GetBlockContext(targetChannelURLModel)
+		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, blockCtx)
 		if isBlocked {
 			logger.Pl.W("Skipping video %q for channel %q. Domain is blocked for context %q (Blocked at: %v, Time remaining: %v)",
-				actualVideoURL, c.Name, context, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
+				actualVideoURL, c.Name, blockCtx, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
 			continue
 		}
 		if err := checkDestinations(c, targetChannelURLModel); err != nil {
@@ -546,10 +567,10 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 		}
 
 		// Check if this URL is blocked globally for its authentication context.
-		context := blocking.GetBlockContext(cu)
-		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, context)
+		blockCtx := blocking.GetBlockContext(cu)
+		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, blockCtx)
 		if isBlocked {
-			logger.Pl.D(2, "Skipping URL %q for channel %q. Domain %q is blocked for context %q (Blocked at: %v, Time remaining: %v)", cu.URL, c.Name, hostname, context, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
+			logger.Pl.D(2, "Skipping URL %q for channel %q. Domain %q is blocked for context %q (Blocked at: %v, Time remaining: %v)", cu.URL, c.Name, hostname, blockCtx, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
 			continue
 		}
 
@@ -630,9 +651,12 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 // blockChannelBotDetected blocks a domain globally due to bot detection on the given URL.
 func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, videoURL string) error {
 	// Fall back to the channel URL if the video URL can't be parsed.
+	var hostname string
 	parsedURL, err := url.Parse(videoURL)
-	hostname := parsedURL.Hostname()
-	if err != nil || hostname == "" {
+	if err == nil {
+		hostname = parsedURL.Hostname()
+	}
+	if hostname == "" {
 		// Fall back to channel URL if video URL is invalid.
 		logger.Pl.E("Could not parse video URL %q, falling back to channel URL", videoURL)
 		parsedURL, err = url.Parse(cu.URL)
@@ -643,12 +667,12 @@ func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, v
 	}
 
 	// Determine the block context based on authentication.
-	context := blocking.GetBlockContext(cu)
+	blockCtx := blocking.GetBlockContext(cu)
 
 	// Block the domain globally for this context.
 	db := cs.GetDB()
-	if err := blocking.BlockDomain(db, hostname, context); err != nil {
-		return fmt.Errorf("failed to block domain %q (context: %s): %w", hostname, context, err)
+	if err := blocking.BlockDomain(db, hostname, blockCtx); err != nil {
+		return fmt.Errorf("failed to block domain %q (context: %s): %w", hostname, blockCtx, err)
 	}
 
 	return nil

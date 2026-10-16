@@ -13,6 +13,9 @@ import (
 
 const (
 	dbDriver = "sqlite3"
+
+	// dbParams are applied to every pooled connection (foreign_keys, busy_timeout and synchronous are per-connection).
+	dbParams = "?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL"
 )
 
 // Database holds the global database instance for Tubarr.
@@ -25,34 +28,49 @@ type Database struct {
 // Can initiate or return database, and perform main program operations.
 func InitDB() (d *Database, err error) {
 	d = new(Database)
-	d.DB, err = sql.Open(dbDriver, paths.DBFilePath)
+	d.DB, err = sql.Open(dbDriver, paths.DBFilePath+dbParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database at path %q: %w", paths.DBFilePath, err)
 	}
-
-	// Enable foreign keys
-	if _, err := d.DB.Exec(`PRAGMA foreign_keys = ON;`); err != nil {
-		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+	if err := d.DB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to open database at path %q: %w", paths.DBFilePath, err)
 	}
 
-	// Enable Write-Ahead Logging for concurrent access
-	if _, err := d.DB.Exec(`PRAGMA journal_mode = WAL;`); err != nil {
-		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
-	}
-
-	// Allow SQLite to wait for locks (in milliseconds)
-	if _, err := d.DB.Exec(`PRAGMA busy_timeout = 5000;`); err != nil {
-		return nil, fmt.Errorf("failed to set busy_timeout: %w", err)
-	}
-
-	// Slightly reduce fsync frequency for faster writes
-	if _, err := d.DB.Exec(`PRAGMA synchronous = NORMAL;`); err != nil {
-		return nil, fmt.Errorf("failed to set synchronous mode: %w", err)
-	}
 	if err := d.initTables(); err != nil {
 		return nil, fmt.Errorf("failed to initialize tables: %w", err)
 	}
+	d.reportForeignKeyViolations()
 	return d, nil
+}
+
+// reportForeignKeyViolations logs rows left pointing at deleted parents (e.g. from before foreign keys were enforced).
+func (d *Database) reportForeignKeyViolations() {
+	rows, err := d.DB.Query(`PRAGMA foreign_key_check;`)
+	if err != nil {
+		logger.Pl.W("Failed to check database foreign keys: %v", err)
+		return
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Pl.W("Failed to close database foreign key check: %v", err)
+		}
+	}()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var (
+			table, parent string
+			rowID, fkID   sql.NullInt64
+		)
+		if err := rows.Scan(&table, &rowID, &parent, &fkID); err != nil {
+			logger.Pl.W("Failed to read database foreign key check: %v", err)
+			return
+		}
+		counts[table+" → "+parent]++
+	}
+	for tables, n := range counts {
+		logger.Pl.W("Database has %d row(s) in %s pointing at missing parent rows", n, tables)
+	}
 }
 
 // initTables initializes the SQL tables.

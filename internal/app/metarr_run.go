@@ -123,7 +123,9 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 	for _, v := range videos {
 		cu := findChannelURL(c, v.ChannelURLID)
 		if cu == nil {
+			mu.Lock()
 			errs = append(errs, fmt.Errorf("video %q: channel URL no longer exists", v.URL))
+			mu.Unlock()
 			continue
 		}
 

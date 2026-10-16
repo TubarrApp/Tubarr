@@ -22,7 +22,6 @@ var BotTimeoutMap = map[string]float64{
 	"u.be":       2880,
 	"itch.tv":    1440,
 	"itter.com":  720,
-	"x.com":      720,
 	"dit.com":    360,
 	"imeo.com":   480,
 	"motion.com": 360,
