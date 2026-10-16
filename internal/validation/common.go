@@ -24,8 +24,11 @@ import (
 )
 
 // CheckDirectory validates a directory path like sharedvalidation.ValidateDirectory, but without creating it or
-// requiring it to exist (whether it's available is checked before downloading, by CheckDestination).
+// requiring it to exist (whether it's available is checked before downloading, by CheckDestination). A blank dir is unset.
 func CheckDirectory(dir string, templateMap map[string]struct{}) error {
+	if dir == "" {
+		return nil
+	}
 	hasTemplating, _, err := sharedvalidation.ValidateDirectory(dir, false, templateMap)
 	if err != nil && !hasTemplating {
 		if _, statErr := os.Stat(filepath.Clean(dir)); errors.Is(statErr, os.ErrNotExist) {
@@ -134,7 +137,7 @@ func ValidateYtdlpOutputExtension(e string) error {
 
 // ValidateLoggingLevel checks and validates the debug level.
 func ValidateLoggingLevel() {
-	logging.Level = min(max(abstractions.GetInt(keys.DebugLevel), 0), 5)
+	logging.SetLevel(min(max(abstractions.GetInt(keys.DebugLevel), 0), 5))
 }
 
 // ValidateMaxFilesize checks that max filesize value is valid for yt-dlp.

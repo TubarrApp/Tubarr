@@ -1504,7 +1504,8 @@ func (ss *serverStore) handleSetLogLevel(w http.ResponseWriter, r *http.Request)
 		http.Error(w, fmt.Sprintf("could not set logging level using input %q: %v", levelStr, err), http.StatusBadRequest)
 		return
 	}
-	logging.Level = level
+	level = min(max(level, -1), 5)
+	logging.SetLevel(level)
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(fmt.Appendf(nil, "Logging level set to %d", level)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
@@ -1543,7 +1544,7 @@ func (ss *serverStore) handleGetIdle(w http.ResponseWriter, _ *http.Request) {
 // handleGetLogLevel retrieves the current logging level.
 func (ss *serverStore) handleGetLogLevel(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]int{"level": logging.Level}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]int{"level": logging.Level()}); err != nil {
 		logger.Pl.E("Could not encode log level to JSON: %v", err)
 	}
 }

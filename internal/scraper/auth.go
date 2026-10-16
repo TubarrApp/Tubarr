@@ -93,7 +93,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 		if cookie.Domain == "" {
 			cookie.Domain = postResp.Request.URL.Hostname()
 		}
-		if logging.Level > 1 {
+		if logging.Level() > 1 {
 			logger.Pl.I("Cookie received: %s; Expires=%s", cookie.Name, cookie.Expires) // Value omitted, it's a session secret.
 		}
 	}

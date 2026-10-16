@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/TubarrApp/gocommon v0.0.0-20261016084105-12c71523e1eb
+	github.com/TubarrApp/gocommon v0.0.0-20261016193406-fe7a6531fe3a
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
@@ -16,8 +16,9 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/tidwall/gjson v1.20.0
+	golang.org/x/crypto v0.58.0
 	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6
-	golang.org/x/net v0.57.0
+	golang.org/x/net v0.60.0
 )
 
 require (
@@ -65,9 +66,8 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/zalando/go-keyring v0.2.6 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

@@ -1199,7 +1199,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 	)
 
 	// Print SQL query.
-	if logging.Level > 1 {
+	if logging.Level() > 1 {
 		logger.Pl.P("Executing SQL: %s with args: %v\n", query, []any{newVal, val})
 	}
 
@@ -1456,7 +1456,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	displayMetarrArgsStruct(c.ChanMetarrArgs)
 
 	// For dev debugging.
-	if logging.Level > 0 {
+	if logging.Level() > 0 {
 		fmt.Printf("\n%sNew Video Notifications:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 		fmt.Printf("Notification Displayed? %v\n", c.NewVideoNotification)
 		newVideoURLs, err := cs.GetNewVideoURLs(consts.QChanName, c.Name)

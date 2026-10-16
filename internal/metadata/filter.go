@@ -128,7 +128,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		result = append(result, fmo)
 	}
 
-	if logging.Level >= 2 {
+	if logging.Level() >= 2 {
 		logger.Pl.P("Filtered meta op results for channel %q:", channelName)
 		for _, fmo := range result {
 			for _, mo := range fmo.MetaOps {
@@ -175,7 +175,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		result = append(result, ffo)
 	}
 
-	if logging.Level >= 2 {
+	if logging.Level() >= 2 {
 		logger.Pl.P("Filtered filename op results for channel %q:", channelName)
 		for _, ffo := range result {
 			for _, fo := range ffo.FilenameOps {
