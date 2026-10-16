@@ -90,7 +90,12 @@
               <!-- No Downloads Message -->
               <div x-show="downloads.length === 0" class="p-8 text-center">
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M12 3.25C12.4142 3.25 12.75 3.58579 12.75 4V12.1893L15.4697 9.46967C15.7626 9.17678 16.2374 9.17678 16.5303 9.46967C16.8232 9.76256 16.8232 10.2374 16.5303 10.5303L12.5303 14.5303C12.2374 14.8232 11.7626 14.8232 11.4697 14.5303L7.46967 10.5303C7.17678 10.2374 7.17678 9.76256 7.46967 9.46967C7.76256 9.17678 8.23744 9.17678 8.53033 9.46967L11.25 12.1893V4C11.25 3.58579 11.5858 3.25 12 3.25ZM3.25 15C3.66421 15 4 15.3358 4 15.75V18.5C4 18.9142 4.33579 19.25 4.75 19.25H19.25C19.6642 19.25 20 18.9142 20 18.5V15.75C20 15.3358 20.3358 15 20.75 15C21.1642 15 21.5 15.3358 21.5 15.75V18.5C21.5 19.7426 20.4926 20.75 19.25 20.75H4.75C3.50736 20.75 2.5 19.7426 2.5 18.5V15.75C2.5 15.3358 2.83579 15 3.25 15Z"
+                  fill="currentColor"
+                />
                 </svg>
                 <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No active downloads</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">If you have requested downloads, they will appear here once they start.</p>
