@@ -60,7 +60,7 @@ func scrapeTestRules(t *testing.T, pageURL string, rules []models.MetadataRule) 
 	s := New()
 	v := &models.Video{URL: pageURL}
 	query := models.SiteRules{Site: "test", Metadata: rules}
-	if err := s.visitPage(pageURL, nil, query, func(c *colly.Collector) {
+	if err := s.visitPage(t.Context(), pageURL, nil, query, func(c *colly.Collector) {
 		s.ScrapeWithRules(pageURL, c, v, query)
 	}); err != nil {
 		t.Fatal(err)

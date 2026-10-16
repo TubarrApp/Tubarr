@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"html"
 	"net/http"
@@ -32,8 +33,8 @@ type CrawledVideo struct {
 // TestCrawlSite runs the crawler Tubarr would use for a channel URL and returns the videos found, sorted by URL.
 //
 // Used by the web UI to preview crawl rules. matched is false if the URL would be crawled with yt-dlp.
-func TestCrawlSite(channelURL string) (matched bool, source string, videos []CrawledVideo, err error) {
-	source, found, matched, err := New().crawlChannelURLs(channelURL, nil)
+func TestCrawlSite(ctx context.Context, channelURL string) (matched bool, source string, videos []CrawledVideo, err error) {
+	source, found, matched, err := New().crawlChannelURLs(ctx, channelURL, nil)
 	if !matched || err != nil {
 		return matched, source, nil, err
 	}
@@ -53,25 +54,25 @@ func TestCrawlSite(channelURL string) (matched bool, source string, videos []Cra
 // crawlChannelURLs extracts video URLs from a channel page using a registered (user-defined or built-in) crawl rule.
 //
 // crawled is false if no crawl rule applies to the URL, and yt-dlp should be used instead.
-func (s *Scraper) crawlChannelURLs(channelURL string, cookies []*http.Cookie) (source string, urls map[string]*listedVideo, crawled bool, err error) {
+func (s *Scraper) crawlChannelURLs(ctx context.Context, channelURL string, cookies []*http.Cookie) (source string, urls map[string]*listedVideo, crawled bool, err error) {
 	query, ok := siterules.MatchCrawl(channelURL)
 	if !ok {
 		return "", nil, false, nil
 	}
 	logger.Pl.I("Using crawl rule for %q", query.Site)
-	urls, err = s.crawlWithRule(channelURL, cookies, query)
+	urls, err = s.crawlWithRule(ctx, channelURL, cookies, query)
 	return "crawl rule for " + query.Site, urls, true, err
 }
 
 // crawlWithRule extracts video URLs, and any preview fields, from a channel page using a site's crawl rule.
-func (s *Scraper) crawlWithRule(channelURL string, cookies []*http.Cookie, query models.SiteRules) (map[string]*listedVideo, error) {
+func (s *Scraper) crawlWithRule(ctx context.Context, channelURL string, cookies []*http.Cookie, query models.SiteRules) (map[string]*listedVideo, error) {
 	rule := query.Crawl
 	if rule == nil {
 		return nil, fmt.Errorf("site %q has no crawl rule", query.Site)
 	}
 	var urls map[string]*listedVideo
 
-	err := s.visitPage(channelURL, cookies, query, func(c *colly.Collector) {
+	err := s.visitPage(ctx, channelURL, cookies, query, func(c *colly.Collector) {
 		urls = make(map[string]*listedVideo) // Reset per attempt, so a challenged attempt can't leave URLs behind.
 		c.OnHTML(rule.Selector, func(e *colly.HTMLElement) {
 			value := e.Text

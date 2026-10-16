@@ -125,7 +125,7 @@ func TestCrawlWithRuleFlareSolverr(t *testing.T) {
 	useFlareSolverr(t, fakeFlareSolverr(t, &solves))
 	site := fakeCloudflareSite(t, 1)
 
-	got, err := New().crawlWithRule(site.URL+"/channel", nil, flareSolverrQuery())
+	got, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestCrawlWithRuleFlareSolverrResolve(t *testing.T) {
 
 	// The site only accepts the second solve's cookie, so the first attempt is challenged.
 	site := fakeCloudflareSite(t, 2)
-	got, err := New().crawlWithRule(site.URL+"/channel", nil, flareSolverrQuery())
+	got, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestCrawlWithRuleFlareSolverrResolve(t *testing.T) {
 	// A site that keeps challenging fails after one retry, rather than solving forever.
 	solves.Store(0)
 	site = fakeCloudflareSite(t, 100)
-	if _, err := New().crawlWithRule(site.URL+"/channel", nil, flareSolverrQuery()); err == nil || !strings.Contains(err.Error(), "again after a fresh FlareSolverr solve") {
+	if _, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery()); err == nil || !strings.Contains(err.Error(), "again after a fresh FlareSolverr solve") {
 		t.Errorf("expected a still-challenged error, got %v", err)
 	}
 	if solves.Load() != 2 {
@@ -199,14 +199,14 @@ func TestCrawlWithRuleFlareSolverrFallback(t *testing.T) {
 
 	// No FlareSolverr URL: crawls the site with normal requests.
 	viper.Set(keys.FlareSolverrURL, "")
-	got, err := New().crawlWithRule(plain.URL+"/channel", nil, flareSolverrQuery())
+	got, err := New().crawlWithRule(t.Context(), plain.URL+"/channel", nil, flareSolverrQuery())
 	if err != nil || len(got) != 1 {
 		t.Fatalf("expected a fallback crawl to find 1 URL, got %v, %v", got, err)
 	}
 
 	// If Cloudflare then challenges, the error says why FlareSolverr wasn't used.
 	site := fakeCloudflareSite(t, 1)
-	_, err = New().crawlWithRule(site.URL+"/channel", nil, flareSolverrQuery())
+	_, err = New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
 	if err == nil || !strings.Contains(err.Error(), "FlareSolverr could not be used") || !strings.Contains(err.Error(), "no FlareSolverr URL") {
 		t.Errorf("expected an error explaining FlareSolverr wasn't used, got %v", err)
 	}
@@ -216,7 +216,7 @@ func TestCrawlWithRuleFlareSolverrFallback(t *testing.T) {
 	useFlareSolverr(t, fakeFailingFlareSolverr(t, 0, &calls))
 	s := New()
 	for range 3 {
-		if _, err := s.crawlWithRule(plain.URL+"/channel", nil, flareSolverrQuery()); err != nil {
+		if _, err := s.crawlWithRule(t.Context(), plain.URL+"/channel", nil, flareSolverrQuery()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -232,7 +232,7 @@ func TestCrawlWithRuleFlareSolverrResolveFails(t *testing.T) {
 
 	// The site only accepts a second solve, which fails.
 	site := fakeCloudflareSite(t, 2)
-	_, err := New().crawlWithRule(site.URL+"/channel", nil, flareSolverrQuery())
+	_, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
 	if err == nil || !strings.Contains(err.Error(), "fresh FlareSolverr solve failed") || !strings.Contains(err.Error(), "Error solving the challenge") {
 		t.Errorf("expected a failed fresh solve error, got %v", err)
 	}
@@ -369,7 +369,7 @@ func TestFlareSolverrCopiesBrowserHeaders(t *testing.T) {
 
 	s := New()
 	for range 2 {
-		if _, err := s.crawlWithRule(site.URL+"/channel", nil, flareSolverrQuery()); err != nil {
+		if _, err := s.crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -397,7 +397,7 @@ func TestFlareSolverrNewerSolveForDownloads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fs := models.NewFlareSolverrSolution(first.ytDLPSolve(), cm.flareSolverrResolver(cu, nil), cm.flareSolverrNewer(cu, nil))
+	fs := models.NewFlareSolverrSolution(first.ytDLPSolve(), cm.flareSolverrResolver(t.Context(), cu, nil), cm.flareSolverrNewer(cu, nil))
 	if got := fs.Current(); got.Gen != first.gen {
 		t.Errorf("expected the first solve with nothing newer, got gen %d", got.Gen)
 	}
@@ -429,7 +429,7 @@ func TestCrawlWithRuleFlareSolverrResolveWithChannelCookies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.crawlWithRule(site.URL+"/channel", first.cookies, flareSolverrQuery()); err != nil {
+	if _, err := s.crawlWithRule(t.Context(), site.URL+"/channel", first.cookies, flareSolverrQuery()); err != nil {
 		t.Errorf("expected the retry to use the refreshed solve's cookies, got %v", err)
 	}
 	if solves.Load() != 2 {

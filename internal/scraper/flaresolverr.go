@@ -225,10 +225,12 @@ func (cm *CookieManager) flareSolverrFailed(host string, statusCode int, err err
 
 // flareSolverrResolver returns a function that solves cu's URL through FlareSolverr again (unless already solved since
 // staleGen), and rewrites cu's cookie file with the new cookies on top of baseCookies.
-func (cm *CookieManager) flareSolverrResolver(cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
+//
+// The solves are made under ctx, the context of the crawl or download job the cookies are for.
+func (cm *CookieManager) flareSolverrResolver(ctx context.Context, cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
 	pageURL, cookiePath := cu.URL, cu.CookiePath
 	return func(staleGen int) (models.FlareSolverrSolve, error) {
-		sol, err := cm.flareSolverrSolution(context.Background(), pageURL, staleGen)
+		sol, err := cm.flareSolverrSolution(ctx, pageURL, staleGen)
 		if err != nil {
 			return models.FlareSolverrSolve{}, err
 		}
@@ -286,9 +288,9 @@ func logCloudflareChallenge(urlStr string, r *colly.Response) {
 }
 
 // TestFlareSolverr solves a simple page through the FlareSolverr instance at baseURL, to check it works.
-func TestFlareSolverr(baseURL string) (status int, userAgent string, cookies int, elapsed time.Duration, err error) {
+func TestFlareSolverr(ctx context.Context, baseURL string) (status int, userAgent string, cookies int, elapsed time.Duration, err error) {
 	start := time.Now()
-	sol, status, err := solveFlareSolverr(context.Background(), baseURL, "https://example.com", consts.FlareSolverrDefaultTimeout)
+	sol, status, err := solveFlareSolverr(ctx, baseURL, "https://example.com", consts.FlareSolverrDefaultTimeout)
 	if err != nil {
 		return 0, "", 0, time.Since(start), err
 	}

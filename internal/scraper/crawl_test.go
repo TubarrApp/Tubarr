@@ -75,7 +75,7 @@ func TestCrawlWithRule(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query := models.SiteRules{Site: "test", Crawl: &tt.rule}
-			got, err := New().crawlWithRule(srv.URL+"/channel", nil, query)
+			got, err := New().crawlWithRule(t.Context(), srv.URL+"/channel", nil, query)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -99,14 +99,14 @@ func TestCrawlWithRuleRequestError(t *testing.T) {
 	defer srv.Close()
 
 	query := models.SiteRules{Site: "test", Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-	if _, err := New().crawlWithRule(srv.URL, nil, query); err == nil {
+	if _, err := New().crawlWithRule(t.Context(), srv.URL, nil, query); err == nil {
 		t.Error("expected an error for a 403 channel page")
 	}
 }
 
 // TestCrawlWithRuleNilRule tests that crawlWithRule returns an error rather than panicking when a site has no crawl rule.
 func TestCrawlWithRuleNilRule(t *testing.T) {
-	if _, err := New().crawlWithRule("https://example.com", nil, models.SiteRules{Site: "example.com"}); err == nil {
+	if _, err := New().crawlWithRule(t.Context(), "https://example.com", nil, models.SiteRules{Site: "example.com"}); err == nil {
 		t.Error("expected an error for a site with no crawl rule")
 	}
 }
@@ -125,7 +125,7 @@ func TestCrawlWithRuleUserAgent(t *testing.T) {
 
 	for _, impersonate := range []string{"", "chrome"} {
 		query := models.SiteRules{Site: "test", Impersonate: impersonate, UserAgent: userAgent, Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-		got, err := New().crawlWithRule(srv.URL, nil, query)
+		got, err := New().crawlWithRule(t.Context(), srv.URL, nil, query)
 		if err != nil || len(got) != 1 {
 			t.Errorf("impersonate %q: expected the site's user agent to be sent, got %v, %v", impersonate, got, err)
 		}
@@ -169,7 +169,7 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 			{Name: sharedtags.JUploadDate, Selector: "time"},
 		},
 	}
-	got, err := New().crawlWithRule(srv.URL, nil, models.SiteRules{Site: "test", Crawl: &html})
+	got, err := New().crawlWithRule(t.Context(), srv.URL, nil, models.SiteRules{Site: "test", Crawl: &html})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 			{Name: sharedtags.JUploadDate, JSONPath: "upload_date"},
 		},
 	}
-	got, err = New().crawlWithRule(srv.URL, nil, models.SiteRules{Site: "test", Crawl: &json})
+	got, err = New().crawlWithRule(t.Context(), srv.URL, nil, models.SiteRules{Site: "test", Crawl: &json})
 	if err != nil {
 		t.Fatal(err)
 	}

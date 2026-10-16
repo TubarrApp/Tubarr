@@ -1985,7 +1985,7 @@ func (ss *serverStore) handleTestFlareSolverr(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	status, userAgent, cookies, elapsed, err := scraper.TestFlareSolverr(fsURL)
+	status, userAgent, cookies, elapsed, err := scraper.TestFlareSolverr(r.Context(), fsURL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("FlareSolverr test failed: %v", err), http.StatusBadGateway)
 		return
@@ -2191,7 +2191,7 @@ func (ss *serverStore) handleTestScrapeSite(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	matched, site, metadata, err := scraper.TestScrapeSite(testURL)
+	matched, site, metadata, err := scraper.TestScrapeSite(r.Context(), testURL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to scrape URL: %v", err), http.StatusInternalServerError)
 		return
@@ -2212,7 +2212,7 @@ func (ss *serverStore) handleTestCrawlSite(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	matched, source, videos, err := scraper.TestCrawlSite(testURL)
+	matched, source, videos, err := scraper.TestCrawlSite(r.Context(), testURL)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to crawl URL: %v", err), http.StatusInternalServerError)
 		return

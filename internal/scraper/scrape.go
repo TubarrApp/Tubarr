@@ -152,7 +152,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 }
 
 // ScrapeCustomSite scrapes custom sites for metadata.
-func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) error {
+func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string, v *models.Video) error {
 	// Find a registered rule set (built-in or user-supplied) based on URL domain.
 	query, ok := siterules.MatchMetadata(v.URL)
 	if !ok {
@@ -162,7 +162,7 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 
 	// Visit the webpage.
 	var metadata map[string]any
-	if err := s.visitPage(urlStr, nil, query, func(c *colly.Collector) {
+	if err := s.visitPage(ctx, urlStr, nil, query, func(c *colly.Collector) {
 		metadata = s.ScrapeWithRules(urlStr, c, v, query)
 	}); err != nil {
 		return fmt.Errorf("failed to visit URL: %w", err)
@@ -188,7 +188,7 @@ func (s *Scraper) ScrapeCustomSite(urlStr, outputDir string, v *models.Video) er
 // the discovered metadata.
 //
 // Used by the web UI to preview whether a custom scraper matches a given URL and retrieves the correct data.
-func TestScrapeSite(urlStr string) (matched bool, site string, metadata map[string]any, err error) {
+func TestScrapeSite(ctx context.Context, urlStr string) (matched bool, site string, metadata map[string]any, err error) {
 	query, ok := siterules.MatchMetadata(urlStr)
 	if !ok {
 		return false, "", nil, nil
@@ -196,7 +196,7 @@ func TestScrapeSite(urlStr string) (matched bool, site string, metadata map[stri
 
 	s := New()
 	v := &models.Video{URL: urlStr}
-	if err := s.visitPage(urlStr, nil, query, func(c *colly.Collector) {
+	if err := s.visitPage(ctx, urlStr, nil, query, func(c *colly.Collector) {
 		metadata = s.ScrapeWithRules(urlStr, c, v, query)
 	}); err != nil {
 		return true, query.Site, nil, fmt.Errorf("failed to visit URL: %w", err)
@@ -219,7 +219,7 @@ func (s *Scraper) newEpisodeURLs(
 	crawlArgs string,
 	fs *models.FlareSolverrSolution) (map[string]*listedVideo, error) {
 	// Custom crawl rules and built-in scrapers take priority over yt-dlp.
-	_, episodes, crawled, err := s.crawlChannelURLs(channelURL, cookies)
+	_, episodes, crawled, err := s.crawlChannelURLs(ctx, channelURL, cookies)
 	if err != nil {
 		return nil, err
 	}
@@ -376,16 +376,19 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 // For FlareSolverr sites, requests use the solved cookies and user agent, and a Cloudflare challenge
 // triggers one fresh FlareSolverr solve and retry. If FlareSolverr is unavailable, falls back to the
 // site's normal requests.
-func (s *Scraper) visitPage(urlStr string, cookies []*http.Cookie, query models.SiteRules, setup func(c *colly.Collector)) error {
+func (s *Scraper) visitPage(ctx context.Context, urlStr string, cookies []*http.Cookie, query models.SiteRules, setup func(c *colly.Collector)) error {
 	var (
 		sol   *flareSolverrSolution
 		fsErr error
 	)
 	if query.FlareSolverr {
-		sol, fsErr = s.cookieManager.flareSolverrSolution(context.Background(), urlStr, 0)
+		sol, fsErr = s.cookieManager.flareSolverrSolution(ctx, urlStr, 0)
 	}
 
 	for retried := false; ; retried = true {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		challenged, err := s.visitPageOnce(urlStr, cookies, query, sol, setup)
 		switch {
 		case !challenged:
@@ -399,7 +402,7 @@ func (s *Scraper) visitPage(urlStr string, cookies []*http.Cookie, query models.
 		}
 
 		logger.Pl.W("Cloudflare challenged the request for %q, refreshing its FlareSolverr solve...", urlStr)
-		if sol, err = s.cookieManager.flareSolverrSolution(context.Background(), urlStr, sol.gen); err != nil {
+		if sol, err = s.cookieManager.flareSolverrSolution(ctx, urlStr, sol.gen); err != nil {
 			return fmt.Errorf("cloudflare challenged the request for %q, and a fresh FlareSolverr solve failed: %w", urlStr, err)
 		}
 	}

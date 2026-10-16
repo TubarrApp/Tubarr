@@ -37,7 +37,7 @@ func TestChromeHeadersSent(t *testing.T) {
 	crawl := func(impersonate string) {
 		t.Helper()
 		query := models.SiteRules{Site: "test", Impersonate: impersonate, UserAgent: userAgent, Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-		if _, err := New().crawlWithRule(srv.URL, []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
+		if _, err := New().crawlWithRule(t.Context(), srv.URL, []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -82,7 +82,7 @@ func TestFirefoxHeadersSent(t *testing.T) {
 	defer srv.Close()
 
 	query := models.SiteRules{Site: "test", Impersonate: "firefox", UserAgent: userAgent, Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-	if _, err := New().crawlWithRule(srv.URL, []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
+	if _, err := New().crawlWithRule(t.Context(), srv.URL, []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
 		t.Fatal(err)
 	}
 

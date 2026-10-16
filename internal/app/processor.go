@@ -145,7 +145,7 @@ func InitProcess(
 		video.VideoDir = cu.ChanURLSettings.VideoDir
 
 		// Use custom scraper if needed.
-		if video.JSONFilePath, err = executeCustomScraper(scrape, video); err != nil {
+		if video.JSONFilePath, err = executeCustomScraper(queueCtx, scrape, video); err != nil {
 			logger.Pl.E("Custom scraper failed for %q: %v", video.URL, err)
 			errs = append(errs, err)
 			continue
@@ -188,13 +188,13 @@ func InitProcess(
 }
 
 // executeCustomScraper checks if a custom scraper should be used for this release.
-func executeCustomScraper(s *scraper.Scraper, v *models.Video) (customJSON string, err error) {
+func executeCustomScraper(ctx context.Context, s *scraper.Scraper, v *models.Video) (customJSON string, err error) {
 	if v == nil || s == nil {
 		return "", fmt.Errorf("invalid nil parameter (video: %v, scraper: %v)", v == nil, s == nil)
 	}
 
 	// Detect custom site.
-	if err := s.ScrapeCustomSite(v.URL, v.JSONDir, v); err != nil {
+	if err := s.ScrapeCustomSite(ctx, v.URL, v.JSONDir, v); err != nil {
 		return "", err
 	}
 
