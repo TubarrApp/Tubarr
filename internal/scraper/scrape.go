@@ -389,7 +389,7 @@ func (s *Scraper) visitPage(ctx context.Context, urlStr string, cookies []*http.
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		challenged, err := s.visitPageOnce(urlStr, cookies, query, sol, setup)
+		challenged, err := s.visitPageOnce(ctx, urlStr, cookies, query, sol, setup)
 		switch {
 		case !challenged:
 			return err
@@ -409,8 +409,8 @@ func (s *Scraper) visitPage(ctx context.Context, urlStr string, cookies []*http.
 }
 
 // visitPageOnce makes a single visitPage attempt, reporting whether Cloudflare challenged it.
-func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query models.SiteRules, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
-	c, err := initializeCollector(urlStr, s.cookieManager, query, sol, cookies)
+func (s *Scraper) visitPageOnce(ctx context.Context, urlStr string, cookies []*http.Cookie, query models.SiteRules, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
+	c, err := initializeCollector(ctx, urlStr, s.cookieManager, query, sol, cookies)
 	if err != nil {
 		return false, err
 	}
@@ -443,8 +443,8 @@ func (s *Scraper) visitPageOnce(urlStr string, cookies []*http.Cookie, query mod
 //
 // Cookies are set in order, later ones replacing earlier ones with the same name: this crawl session's, then the caller's
 // (e.g. the channel URL's), then for FlareSolverr sites (sol set), the solution's, so a refreshed solve isn't undone by
-// older Cloudflare cookies. FlareSolverr sites impersonate Chrome with the solution's user agent.
-func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
+// older Cloudflare cookies. FlareSolverr sites impersonate Chrome with the solution's user agent. Requests are cancelled with ctx.
+func initializeCollector(ctx context.Context, urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
@@ -472,6 +472,7 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 		colly.Async(true),
 	)
 	collector.SetRequestTimeout(60 * time.Second)
+	transport := http.DefaultTransport
 	switch impersonate := consts.Impersonate(query.Impersonate); {
 	case sol != nil:
 		rt, userAgent, err := newTLSRoundTripper(consts.ImpersonateChrome, sol.userAgent)
@@ -479,7 +480,7 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 			return nil, err
 		}
 		rt.headers = sol.headers
-		collector.WithTransport(rt)
+		transport = rt
 		collector.UserAgent = userAgent
 		jar.SetCookies(parsedURL, sol.cookies) // Set last, to replace any stale Cloudflare cookies.
 	case impersonate != consts.ImpersonateNone:
@@ -487,16 +488,28 @@ func initializeCollector(urlStr string, cm *CookieManager, query models.SiteRule
 		if err != nil {
 			return nil, err
 		}
-		collector.WithTransport(rt)
+		transport = rt
 		collector.UserAgent = userAgent
-	default: // Colly's default transport, which verifies certificates.
+	default: // The standard transport, which verifies certificates.
 		if query.UserAgent != "" {
 			collector.UserAgent = query.UserAgent
 		}
 	}
+	collector.WithTransport(ctxRoundTripper{ctx: ctx, next: transport})
 	collector.SetCookieJar(jar)
 
 	return collector, nil
+}
+
+// ctxRoundTripper sends requests through next under ctx, as colly v1 has no request context.
+type ctxRoundTripper struct {
+	ctx  context.Context
+	next http.RoundTripper
+}
+
+// RoundTrip sends req through next under the round tripper's context.
+func (t ctxRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.next.RoundTrip(req.WithContext(t.ctx))
 }
 
 // sanitizeFilename removes illegal characters.

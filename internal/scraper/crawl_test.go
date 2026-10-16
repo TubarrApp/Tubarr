@@ -1,6 +1,7 @@
 package scraper
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -91,7 +92,7 @@ func TestCrawlWithRule(t *testing.T) {
 	}
 }
 
-// TestCrawlWithRuleNoMatch tests that crawlWithRule returns an empty result when no URLs match the crawl rule.
+// TestCrawlWithRuleRequestError tests that crawlWithRule returns an error when the channel page request fails.
 func TestCrawlWithRuleRequestError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -101,6 +102,25 @@ func TestCrawlWithRuleRequestError(t *testing.T) {
 	query := models.SiteRules{Site: "test", Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
 	if _, err := New().crawlWithRule(t.Context(), srv.URL, nil, query); err == nil {
 		t.Error("expected an error for a 403 channel page")
+	}
+}
+
+// TestCrawlWithRuleCancelled tests that cancelling the context ends a channel page request still waiting on the server.
+func TestCrawlWithRuleCancelled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	query := models.SiteRules{Site: "test", Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
+	if _, err := New().crawlWithRule(ctx, srv.URL, nil, query); err == nil {
+		t.Error("expected an error for a cancelled request")
+	}
+	if elapsed := time.Since(start); elapsed > 10*time.Second {
+		t.Errorf("request ran for %v after its context was cancelled", elapsed)
 	}
 }
 
