@@ -40,7 +40,7 @@ func main() {
 		paths.DBFilePath, paths.TubarrLogFilePath)
 
 	// Setup Tubarr logging.
-	logConfig := logging.LoggingConfig{
+	logConfig := logging.Config{
 		LogFilePath: paths.TubarrLogFilePath,
 		MaxSizeMB:   1,
 		MaxBackups:  3,
