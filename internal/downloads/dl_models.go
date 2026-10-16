@@ -5,16 +5,25 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"strings"
 	"sync"
+	"syscall"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/limits"
 	"tubarr/internal/models"
 )
 
-var ongoingDownloads sync.Map       // map[int64]*VideoDownload.
+var ongoingDownloads sync.Map       // map[ongoingKey]struct{}.
 var activeDownloadContexts sync.Map // map[int64]context.CancelFunc.
+
+// ongoingKey identifies a running download of one type of file for a URL.
+type ongoingKey struct {
+	kind DownloadType
+	url  string
+}
+
+// ErrDuplicateDownload is returned when the same file is already being downloaded for a URL.
+var ErrDuplicateDownload = errors.New("already being downloaded")
 
 // globalDownloadSem limits concurrent video downloads across all channels.
 // nil means no global limit (unlimited concurrent downloads).
@@ -56,7 +65,7 @@ func AcquireGlobalDownloadSlot(ctx context.Context, videoURL string) (chan struc
 
 // isProcessNotExist checks if an error indicates a process doesn't exist.
 func isProcessNotExist(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "no such process")
+	return errors.Is(err, syscall.ESRCH)
 }
 
 // DownloadType represents the type of download operation.

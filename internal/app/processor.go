@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
@@ -96,7 +97,10 @@ func InitProcess(
 	}
 
 	// Start workers.
-	var wg sync.WaitGroup
+	var (
+		wg         sync.WaitGroup
+		downloaded atomic.Int32
+	)
 	for range conc {
 		wg.Go(func() {
 			for v := range jobs {
@@ -121,7 +125,8 @@ func InitProcess(
 					c,
 					metarrSem(cu),
 					&metarrWg,
-					metarrIsExecutable)
+					metarrIsExecutable,
+					&downloaded)
 
 				results <- err
 			}
@@ -171,12 +176,7 @@ func InitProcess(
 		}
 	}
 
-	// Count videos that were actually downloaded (not skipped).
-	for _, video := range videos {
-		if video.Finished && !video.Ignored {
-			nDownloaded++
-		}
-	}
+	nDownloaded = int(downloaded.Load())
 
 	// Return errors, and succeeded/downloaded counts.
 	if len(errs) > 0 {
@@ -217,6 +217,7 @@ func videoJob(
 	metarrSem chan struct{},
 	metarrWg *sync.WaitGroup,
 	metarrIsExecutable bool,
+	downloaded *atomic.Int32,
 ) (err error) {
 	// Bot detection avoidance wait time.
 	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
@@ -247,6 +248,10 @@ func videoJob(
 
 	// Process JSON metadata phase.
 	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
+	if errors.Is(err, downloads.ErrDuplicateDownload) {
+		logger.Pl.I("Skipping video %q: %v", v.URL, err)
+		return nil
+	}
 	if err != nil {
 		handleBotBlock(cs, cu, v.URL, botBlockChannel)
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
@@ -261,10 +266,15 @@ func videoJob(
 
 	// Process video download phase.
 	botBlockChannel, err = processVideo(procCtx, v, cu, c, dlTracker)
+	if errors.Is(err, downloads.ErrDuplicateDownload) {
+		logger.Pl.I("Skipping video %q: %v", v.URL, err)
+		return nil
+	}
 	if err != nil {
 		handleBotBlock(cs, cu, v.URL, botBlockChannel)
 		return fmt.Errorf("video processing error for video URL %q: %w", v.URL, err)
 	}
+	downloaded.Add(1)
 
 	// Check if Metarr can be run.
 	if !metarrIsExecutable {

@@ -44,11 +44,11 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 		return false, errors.New("video model is nil")
 	}
 
-	if _, exists := ongoingDownloads.LoadOrStore(d.Video.URL, struct{}{}); exists {
-		logger.Pl.I("Skipping duplicate download for: %s", d.Video.URL)
-		return false, nil
+	key := ongoingKey{TypeVideo, d.Video.URL}
+	if _, exists := ongoingDownloads.LoadOrStore(key, struct{}{}); exists {
+		return false, fmt.Errorf("video %q: %w", d.Video.URL, ErrDuplicateDownload)
 	}
-	defer ongoingDownloads.Delete(d.Video.URL)
+	defer ongoingDownloads.Delete(key)
 
 	// Acquire per-domain slot first (blocks if domain limit reached, no-op if no limit).
 	domainSem, err := limits.DomainDownloads.Acquire(d.Context, d.Video.URL)
@@ -89,7 +89,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 		default:
 			if err := d.videoDLAttempt(); err != nil {
 				// Check bot detection FIRST - abort immediately if detected.
-				if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, err); botErr != nil {
+				if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
 					return true, botErr // Only 'TRUE' path for bot detected.
 				}
 

@@ -11,7 +11,6 @@ import (
 	"tubarr/internal/blocking"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 )
 
@@ -56,7 +55,11 @@ func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) erro
 			return fmt.Errorf("unexpected error while checking file: %w", err)
 		}
 
-		time.Sleep(consts.Interval100ms)
+		select {
+		case <-d.Context.Done():
+			return d.Context.Err()
+		case <-time.After(consts.Interval100ms):
+		}
 	}
 	return fmt.Errorf("file not ready or empty after %v: %s", timeout, filepath)
 }
@@ -76,58 +79,53 @@ func (d *JSONDownload) cancelJSONDownload() error {
 	return fmt.Errorf("user canceled JSON download for %s: %w", d.Video.URL, d.Context.Err())
 }
 
-// checkBotDetection checks and handles detection of bot activity.
-func checkBotDetection(uri string, cu *models.ChannelURL, inputErr error) error {
-	if strings.Contains(strings.ToLower(inputErr.Error()), "confirm you’re not a bot") || // Curly apostrophe (used by some tube sites)
-		strings.Contains(strings.ToLower(inputErr.Error()), "confirm you're not a bot") || // Straight apostrophe
-		strings.Contains(strings.ToLower(inputErr.Error()), "not a robot") {
+// checkBotDetection checks for detection of bot activity, blocking the video's domain if found.
+func checkBotDetection(uri string, cu *models.ChannelURL, db *sql.DB, inputErr error) error {
+	lowerErr := strings.ToLower(inputErr.Error())
+	if !strings.Contains(lowerErr, "confirm you’re not a bot") && // Curly apostrophe (used by some tube sites)
+		!strings.Contains(lowerErr, "confirm you're not a bot") && // Straight apostrophe
+		!strings.Contains(lowerErr, "not a robot") {
+		return nil
+	}
 
-		siteHost, err := url.Parse(uri) // Avoid using the 'ChannelURL' URL, which can be the manual download value
-		if err != nil {
-			logger.Pl.E("Failed to parse URL %q after bot detection", uri)
+	// Avoid using the 'ChannelURL' URL, which can be the manual download value.
+	if host := hostname(uri); host != "" && db != nil {
+		if err := blocking.BlockDomain(db, host, blocking.GetBlockContext(cu)); err != nil {
+			logger.Pl.E("Failed to block %q after bot detection: %v", host, err)
 		}
+	} else {
+		logger.Pl.E("Failed to parse URL %q after bot detection", uri)
+	}
+	return fmt.Errorf("url %q %s. Aborting without retries. Error message: %w", uri, consts.BotActivitySentinel, inputErr)
+}
 
-		// Store hostname as key, context as value for context-aware blocking.
-		context := blocking.GetBlockContext(cu)
-		vars.AvoidURLs.Store(siteHost.Hostname(), context)
-		return fmt.Errorf("url %q %s. Aborting without retries. Error message: %w", uri, consts.BotActivitySentinel, inputErr)
+// checkIfAvoidURL checks if the hostname of the URL is blocked for the channel URL's context.
+func checkIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
+	if cu == nil || db == nil {
+		return nil
+	}
+
+	siteHost := hostname(uri)
+	if siteHost == "" {
+		logger.Pl.E("Could not parse URL %q, will check against full URL instead", uri)
+		siteHost = uri
+	}
+
+	blockCtx := blocking.GetBlockContext(cu)
+	if isBlocked, blockedAt, remainingTime := blocking.IsBlocked(siteHost, blockCtx); isBlocked {
+		return fmt.Errorf("skipping download for %q due to site %q blocked for context %q (blocked at %v, %v remaining)",
+			uri, siteHost, blockCtx, blockedAt, remainingTime)
 	}
 	return nil
 }
 
-// checkIfAvoidURL checks if the hostname of the URL should be skipped.
-func checkIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
-	var siteHost string
-
-	parsedURL, err := url.Parse(uri)
+// hostname returns a URL's hostname, or "" if it can't be parsed.
+func hostname(uri string) string {
+	parsed, err := url.Parse(uri)
 	if err != nil {
-		logger.Pl.E("Could not parse URL %q, will check against full URL instead", uri)
-		siteHost = uri
-	} else {
-		siteHost = parsedURL.Hostname()
+		return ""
 	}
-
-	// Check in-memory vars.AvoidURLs map (for same-session blocks).
-	if val, exists := vars.AvoidURLs.Load(siteHost); exists {
-		if storedBlockContext, ok := val.(vars.BlockContext); ok {
-			if blocking.GetBlockContext(cu) == storedBlockContext {
-				return fmt.Errorf("skipping download for %q due to site %q detecting bot activity (context: %q)", uri, siteHost, storedBlockContext)
-			}
-		} else {
-			return fmt.Errorf("dev error: invalid block context type (%T) for hostname %q in AvoidURLs map", storedBlockContext, siteHost)
-		}
-	}
-
-	// Check persistent blocking system (for database-persisted blocks).
-	if cu != nil && db != nil {
-		context := blocking.GetBlockContext(cu)
-		if isBlocked, blockedAt, remainingTime := blocking.IsBlocked(siteHost, context); isBlocked {
-			return fmt.Errorf("skipping download for %q due to site %q blocked for context %q (blocked at %v, %v remaining)",
-				uri, siteHost, context, blockedAt, remainingTime)
-		}
-	}
-
-	return nil
+	return parsed.Hostname()
 }
 
 // buildVideoCodecList builds the codec preference string for yt-dlp.

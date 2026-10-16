@@ -101,6 +101,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	// Build command with context.
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
+	useProcessGroup(cmd)
 	return cmd
 }
 
@@ -117,6 +118,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 
 	logger.Pl.I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	err := cmd.Run()
+	killProcessGroup(cmd)
 	if err != nil {
 		return fmt.Errorf("yt-dlp error for %s: %w\nStderr: %s", d.Video.URL, err, stderr.String())
 	}

@@ -165,7 +165,14 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Combine command...
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
+	useProcessGroup(cmd)
 	return cmd
+}
+
+// videoParseResult is the outcome read from a video download's output.
+type videoParseResult struct {
+	filename string
+	err      error
 }
 
 // executeVideoDownload executes the video download command and waits for completion.
@@ -191,15 +198,19 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("stderr pipe error: %w", err)
 	}
 
-	// Set channels.
+	// Hold the video so it can't be downloaded twice at once (locks from other downloads until deletion from map).
+	if !state.ClaimActiveVideoDownload(d.Video.ID, d.Video.DownloadStatus) {
+		return fmt.Errorf("video with ID %d is already downloading (URL: %q)", d.Video.ID, d.Video.URL)
+	}
+	defer state.DeleteActiveVideoDownloadStatus(d.Video.ID)
+
 	lineChan := make(chan string, 100)
-	filenameChan := make(chan string, 1)
-	errChan := make(chan error, 1)
 
 	logger.Pl.I("Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
+	defer killProcessGroup(cmd)
 
 	// Merge stdout and stderr into lineChan, reading both concurrently so neither pipe can fill and stall yt-dlp.
 	var readers sync.WaitGroup
@@ -225,86 +236,45 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		close(lineChan)
 	}()
 
-	// Start parser.
-	parserDone := make(chan struct{})
+	// Parse output until both pipes close (the process exited or was killed on cancel).
+	resultChan := make(chan videoParseResult, 1)
 	go func() {
-		defer close(parserDone)
-		d.scanVideoCmdOutput(lineChan, filenameChan, errChan)
+		resultChan <- d.scanVideoCmdOutput(lineChan)
 	}()
+	result := <-resultChan
 
-	// Wait for completion, error, or cancel.
-	var filename string
-	var parseErr error
-
-	select {
-	case <-d.Context.Done():
-		logger.Pl.W("Download cancelled: %v", d.Context.Err())
-
-		// End the command.
-		if err := cmd.Cancel(); err != nil {
-			if cmd.Process != nil {
-				if err := cmd.Process.Kill(); err != nil {
-					logger.Pl.E("Failed to kill video download process %v: %v", cmd.Process, err)
-				}
-			}
-		}
-		return d.Context.Err()
-
-	case parseErr = <-errChan:
-		// Error detected by parser.
-		if parseErr != nil {
-			return parseErr
-		}
-
-	case filename = <-filenameChan:
-		if filename == "" {
-			return errors.New("no output filename captured")
-		}
-		d.Video.VideoFilePath = filename
-	}
-
-	// Wait for the command to finish (cmd.Wait closes the pipes, so readers must reach EOF first).
+	// cmd.Wait closes the pipes, so readers must reach EOF first.
 	readers.Wait()
-	<-parserDone
-	if err := cmd.Wait(); err != nil {
-		// Return parse error if present.
-		if parseErr != nil {
-			return parseErr
-		}
-		return fmt.Errorf("yt-dlp failed: %w", err)
-	}
+	waitErr := cmd.Wait()
 
-	// Verify filename.
-	if filename != "" {
-		// Ensure file is fully written.
-		if err := d.waitForFile(d.Video.VideoFilePath, 10*time.Second); err != nil {
-			return err
-		}
-		if err := verifyVideoDownload(d.Video.VideoFilePath); err != nil {
-			return err
-		}
+	if err := d.Context.Err(); err != nil {
+		logger.Pl.W("Download cancelled: %v", err)
+		return err
 	}
-	return nil
+	if result.err != nil {
+		return result.err
+	}
+	if waitErr != nil {
+		return fmt.Errorf("yt-dlp failed: %w", waitErr)
+	}
+	if result.filename == "" {
+		return errors.New("no output filename captured")
+	}
+	d.Video.VideoFilePath = result.filename
+
+	// Ensure file is fully written.
+	if err := d.waitForFile(d.Video.VideoFilePath, 10*time.Second); err != nil {
+		return err
+	}
+	return verifyVideoDownload(d.Video.VideoFilePath)
 }
 
-// scanVideoCmdOutput scans the yt-dlp video download output for relevant information.
-func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan chan<- string, errChan chan<- error) {
-	defer close(filenameChan)
-	defer close(errChan)
-
-	// Check if video is already downloading.
-	if state.ActiveVideoDownloadStatusExists(d.Video.ID) {
-		errChan <- fmt.Errorf("video with ID %d is already downloading (URL: %q)", d.Video.ID, d.Video.URL)
-		return
-	}
-
-	// Save state to map (locks from other downloads until deletion from map).
-	state.SetActiveVideoDownloadStatus(d.Video.ID, d.Video.DownloadStatus)
-	defer state.DeleteActiveVideoDownloadStatus(d.Video.ID)
-
+// scanVideoCmdOutput scans the yt-dlp video download output for the completed filename or errors.
+func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseResult {
 	var (
 		progress   = downloaders.NewProgressParser(d.ChannelURL.ChanURLSettings.ExternalDownloader, d.durationSeconds())
 		completed  bool
+		filename   string
 		errorLines []string
 	)
 	for line := range lineChan {
@@ -345,21 +315,23 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string, filenameChan 
 				d.Video.DownloadStatus.Percent = 100.0
 				d.DLTracker.sendUpdate(d.Video)
 
-				filenameChan <- line
+				filename = line
 				completed = true
 			}
 		}
 	}
 
-	// Send errors if download failed.
-	if !completed && len(errorLines) > 0 {
+	if completed {
+		return videoParseResult{filename: filename}
+	}
+	if len(errorLines) > 0 {
 		// Limit to last 5 error lines to avoid overwhelming the error message.
 		if len(errorLines) > 5 {
 			errorLines = errorLines[len(errorLines)-5:]
 		}
-		errMsg := fmt.Sprintf("yt-dlp failed: %s", strings.Join(errorLines, "; "))
-		errChan <- errors.New(errMsg)
+		return videoParseResult{err: fmt.Errorf("yt-dlp failed: %s", strings.Join(errorLines, "; "))}
 	}
+	return videoParseResult{}
 }
 
 // setDownloaderEnv applies environment workarounds for the external downloader, returning a cleanup to run after the command exits.

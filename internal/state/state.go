@@ -235,51 +235,19 @@ func SetActiveVideoDownloadStatus(videoID int64, status models.DLStatus) {
 	activeVideoDownloadStatus.Store(videoID, status)
 }
 
+// ClaimActiveVideoDownload marks a video as downloading, returning false if it already is.
+func ClaimActiveVideoDownload(videoID int64, status models.DLStatus) bool {
+	_, loaded := activeVideoDownloadStatus.LoadOrStore(videoID, status)
+	return !loaded
+}
+
 // DeleteActiveVideoDownloadStatus deletes the entry in the map for this video.
 func DeleteActiveVideoDownloadStatus(videoID int64) {
 	activeVideoDownloadStatus.Delete(videoID)
 }
-
-// // ResetActiveVideoDownloadStatus resets download status model for the video.
-// func ResetActiveVideoDownloadStatus(v *models.Video) {
-// 	activeVideoDownloadStatus.Store(v.ID, models.DLStatus{
-// 		Status:  v.DownloadStatus.Status,
-// 		Percent: v.DownloadStatus.Percent,
-// 		Error:   v.DownloadStatus.Error,
-// 	})
-// }
 
 // ActiveVideoDownloadStatusExists checks if the current video is already being downloaded.
 func ActiveVideoDownloadStatusExists(videoID int64) bool {
 	_, ok := activeVideoDownloadStatus.Load(videoID)
 	return ok
 }
-
-// // GetActiveVideoDownloadStatus returns the current download status.
-// func GetActiveVideoDownloadStatus(v *models.Video) (stateFromMap models.DLStatus) {
-// 	s, ok := activeVideoDownloadStatus.Load(v.ID)
-// 	if !ok {
-// 		ResetVideoDownloadStatus(v)
-// 		s, ok = activeVideoDownloadStatus.Load(v.ID)
-// 		if !ok {
-// 			logger.Pl.E("Could not get download status from map")
-// 			return models.DLStatus{
-// 				Status:  consts.DLStatusFailed,
-// 				Percent: 0.0,
-// 				Error:   fmt.Errorf("could not get download status for video %q from map", v.URL),
-// 			}
-// 		}
-// 	}
-
-// 	currentState, ok := s.(models.DLStatus)
-// 	if !ok {
-// 		logger.Pl.E("Dev Error: Wrong type %T stored in StatusUpdate for video %q", s, v.URL)
-// 		return models.DLStatus{
-// 			Status:  consts.DLStatusFailed,
-// 			Percent: 0.0,
-// 			Error:   fmt.Errorf("could not get download status for video %q from map", v.URL),
-// 		}
-// 	}
-
-// 	return currentState
-// }
