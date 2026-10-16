@@ -171,8 +171,9 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 // videoParseResult is the outcome read from a video download's output.
 type videoParseResult struct {
-	filename string
-	err      error
+	filename     string
+	destinations []string
+	err          error
 }
 
 // executeVideoDownload executes the video download command and waits for completion.
@@ -242,6 +243,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 		resultChan <- d.scanVideoCmdOutput(lineChan)
 	}()
 	result := <-resultChan
+	d.destinations = append(d.destinations, result.destinations...)
 
 	// cmd.Wait closes the pipes, so readers must reach EOF first.
 	readers.Wait()
@@ -272,10 +274,11 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 // scanVideoCmdOutput scans the yt-dlp video download output for the completed filename or errors.
 func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseResult {
 	var (
-		progress   = downloaders.NewProgressParser(d.ChannelURL.ChanURLSettings.ExternalDownloader, d.durationSeconds())
-		completed  bool
-		filename   string
-		errorLines []string
+		progress     = downloaders.NewProgressParser(d.ChannelURL.ChanURLSettings.ExternalDownloader, d.durationSeconds())
+		completed    bool
+		filename     string
+		destinations []string
+		errorLines   []string
 	)
 	for line := range lineChan {
 		if line != "" {
@@ -284,6 +287,12 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 
 		// Keep draining after completion so the pipe readers can reach EOF before cmd.Wait.
 		if completed {
+			continue
+		}
+
+		// Files being downloaded to, whose partials are removed if the user cancels.
+		if dest, ok := strings.CutPrefix(line, command.DownloadDestinationPrefix); ok {
+			destinations = append(destinations, strings.TrimSpace(dest))
 			continue
 		}
 
@@ -321,17 +330,18 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 		}
 	}
 
-	if completed {
-		return videoParseResult{filename: filename}
-	}
-	if len(errorLines) > 0 {
+	result := videoParseResult{destinations: destinations}
+	switch {
+	case completed:
+		result.filename = filename
+	case len(errorLines) > 0:
 		// Limit to last 5 error lines to avoid overwhelming the error message.
 		if len(errorLines) > 5 {
 			errorLines = errorLines[len(errorLines)-5:]
 		}
-		return videoParseResult{err: fmt.Errorf("yt-dlp failed: %s", strings.Join(errorLines, "; "))}
+		result.err = fmt.Errorf("yt-dlp failed: %s", strings.Join(errorLines, "; "))
 	}
-	return videoParseResult{}
+	return result
 }
 
 // setDownloaderEnv applies environment workarounds for the external downloader, returning a cleanup to run after the command exits.

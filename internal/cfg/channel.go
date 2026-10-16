@@ -814,36 +814,20 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			return nil
 		},
 		RunE: func(_ *cobra.Command, _ []string) error {
-			// Build channel from input.
 			c, authMap, err := parsing.BuildChannelFromInput(input)
 			if err != nil {
 				return err
 			}
+			var notifications []*models.Notification
+			if input.Notification != nil {
+				if notifications, err = parsing.ParseNotifications(*input.Notification); err != nil {
+					return err
+				}
+			}
 
-			// Add channel to database.
 			logger.Pl.I("Adding channel %q to Tubarr...", c.Name)
-			channelID, err := cs.AddChannel(c)
-			if err != nil {
+			if err := cs.AddChannelWithDetails(c, authMap, notifications); err != nil {
 				return err
-			}
-			c.ID = channelID
-
-			if len(authMap) > 0 {
-				if err := cs.AddAuth(channelID, authMap); err != nil {
-					return err
-				}
-			}
-
-			// Add notification URLs if any.
-			if input.Notification != nil && len(*input.Notification) != 0 {
-				validPairs, err := parsing.ParseNotifications(*input.Notification)
-				if err != nil {
-					return err
-				}
-
-				if err := cs.AddNotifyURLs(channelID, validPairs); err != nil {
-					return err
-				}
 			}
 
 			// Ignore run if desired.
@@ -933,11 +917,14 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 			logger.Pl.I("Found %d config file(s) in directory %q", len(batchConfigFiles), configDirectory)
 
-			var successes []string
-			var failures []struct {
+			type failure struct {
 				file string
 				err  error
 			}
+			var (
+				successes []string
+				failures  []failure
+			)
 
 			// Process each config file.
 			for i, batchConfigFile := range batchConfigFiles {
@@ -953,93 +940,48 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 					f.Changed = false
 				})
 
-				// Load config file into Viper.
 				v := viper.New()
 				if err := file.LoadConfigFile(v, batchConfigFile); err != nil {
-					return err
+					failures = append(failures, failure{batchConfigFile, err})
+					continue
 				}
-
-				// Apply Viper settings to Cobra flags.
 				if err := resetCobraFlagsAndLoadViper(cmd, v); err != nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, fmt.Errorf("failed to apply config: %w", err)})
+					failures = append(failures, failure{batchConfigFile, fmt.Errorf("failed to apply config: %w", err)})
 					continue
 				}
-
-				// Load Viper into input struct.
 				mergeFlagsIntoInput(cmd, &flags, &input)
-
-				// Parse URL settings from Viper.
-				urlSettings, err := parsing.ParseURLSettingsFromViper(v)
-				if err == nil {
-					input.URLSettings = urlSettings
+				if input.URLSettings, err = parsing.ParseURLSettingsFromViper(v); err != nil {
+					failures = append(failures, failure{batchConfigFile, fmt.Errorf("failed to parse url-settings: %w", err)})
+					continue
 				}
 
-				// Build channel from input.
 				c, authMap, err := parsing.BuildChannelFromInput(input)
-				if err != nil || c == nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, err})
-					continue
-				}
-
-				// Add channel to database.
-				logger.Pl.I("Adding channel %q to Tubarr...", c.Name)
-				channelID, err := cs.AddChannel(c)
 				if err != nil {
-					failures = append(failures, struct {
-						file string
-						err  error
-					}{batchConfigFile, fmt.Errorf("failed to add channel to database: %w", err)})
+					failures = append(failures, failure{batchConfigFile, err})
 					continue
 				}
-
-				c.ID = channelID
-
-				// Add auth if existent.
-				if len(authMap) > 0 {
-					if err := cs.AddAuth(channelID, authMap); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("failed to add auth: %w", err)})
+				var notifications []*models.Notification
+				if input.Notification != nil {
+					if notifications, err = parsing.ParseNotifications(*input.Notification); err != nil {
+						failures = append(failures, failure{batchConfigFile, fmt.Errorf("invalid notification URLs: %w", err)})
 						continue
 					}
 				}
 
-				// Add notification URLs if existent.
-				if input.Notification != nil && len(*input.Notification) != 0 {
-					validPairs, err := parsing.ParseNotifications(*input.Notification)
-					if err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("invalid notification URLs: %w", err)})
-						continue
-					}
-
-					if err := cs.AddNotifyURLs(channelID, validPairs); err != nil {
-						failures = append(failures, struct {
-							file string
-							err  error
-						}{batchConfigFile, fmt.Errorf("failed to add notification URLs: %w", err)})
-						continue
-					}
+				logger.Pl.I("Adding channel %q to Tubarr...", c.Name)
+				if err := cs.AddChannelWithDetails(c, authMap, notifications); err != nil {
+					failures = append(failures, failure{batchConfigFile, fmt.Errorf("failed to add channel to database: %w", err)})
+					continue
 				}
 
 				// Ignore run if desired.
 				if input.IgnoreRun != nil && *input.IgnoreRun {
 					if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
-						defer unlock()
-
 						logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
 						if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
 							logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
 						}
+						unlock()
 					} else {
 						logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 					}

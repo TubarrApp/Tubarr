@@ -1,11 +1,15 @@
 package downloads
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"tubarr/internal/blocking"
@@ -67,10 +71,43 @@ func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) erro
 // cancelVideoDownload cancels the download, typically due to user input.
 func (d *VideoDownload) cancelVideoDownload() error {
 	d.cleanup()
+	if errors.Is(context.Cause(d.Context), ErrCancelledByUser) {
+		removePartialFiles(d.Video.VideoDir, d.destinations)
+	}
 	d.Video.DownloadStatus.Status = consts.DLStatusCancelled
 	d.Video.DownloadStatus.Error = d.Context.Err()
 	d.DLTracker.sendUpdate(d.Video)
 	return fmt.Errorf("user canceled video download for %s: %w", d.Video.URL, d.Context.Err())
+}
+
+// removePartialFiles removes the .part and .ytdl files yt-dlp left for each destination it reported, if inside dir.
+//
+// Only these exact paths are removed, so other downloads and files in the directory are never touched.
+func removePartialFiles(dir string, destinations []string) {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		logger.Pl.W("Not removing partial downloads, failed to resolve directory %q: %v", dir, err)
+		return
+	}
+	for _, dest := range destinations {
+		absDest, err := filepath.Abs(dest)
+		if err != nil {
+			logger.Pl.W("Not removing partial download for %q: %v", dest, err)
+			continue
+		}
+		rel, err := filepath.Rel(absDir, absDest)
+		if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			logger.Pl.W("Not removing partial download for %q, it's outside the video directory %q", dest, dir)
+			continue
+		}
+		for _, p := range []string{absDest + ".part", absDest + ".ytdl"} {
+			if err := os.Remove(p); err == nil {
+				logger.Pl.I("Removed partial download %q", p)
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				logger.Pl.W("Failed to remove partial download %q: %v", p, err)
+			}
+		}
+	}
 }
 
 // cancelJSONDownload cancels the download and cleans up resources.

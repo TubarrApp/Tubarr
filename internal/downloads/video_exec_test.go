@@ -35,6 +35,82 @@ func (b *lockedBuffer) String() string {
 	return b.buf.String()
 }
 
+// TestCancelRemovesPartials tests that a user cancel removes only the partials of reported destinations in the video directory,
+// and that a shutdown keeps them for resuming.
+func TestCancelRemovesPartials(t *testing.T) {
+	origLogger := logger.Pl
+	logger.Pl = &logging.ProgramLogger{Console: &lockedBuffer{}}
+	t.Cleanup(func() { logger.Pl = origLogger })
+
+	for _, tc := range []struct {
+		name        string
+		cause       error
+		wantRemoved bool
+	}{
+		{"user cancel", ErrCancelledByUser, true},
+		{"shutdown", nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, outside := t.TempDir(), t.TempDir()
+			dest := filepath.Join(dir, "video.f137.mp4")
+			outsideDest := filepath.Join(outside, "elsewhere.mp4")
+			kept := []string{filepath.Join(dir, "other.mp4.part"), outsideDest + ".part"}
+			for _, p := range kept {
+				if err := os.WriteFile(p, nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			ctx, cancel := context.WithCancelCause(t.Context())
+			defer cancel(nil)
+			d := &VideoDownload{
+				Video:      &models.Video{ID: 800001, URL: "https://a.example/v", VideoDir: dir},
+				Channel:    &models.Channel{},
+				ChannelURL: &models.ChannelURL{ChanURLSettings: &models.Settings{}},
+				DLTracker:  &DownloadTracker{updates: make(chan models.StatusUpdate, 100), done: make(chan struct{})},
+				Context:    ctx,
+			}
+
+			script := fmt.Sprintf(`echo "[download] Destination: %s"; echo "[download] Destination: %s"; : > %q; : > %q; exec sleep 30`,
+				dest, outsideDest, dest+".part", dest+".ytdl")
+			cmd := exec.CommandContext(ctx, "sh", "-c", script)
+			useProcessGroup(cmd)
+			done := make(chan error, 1)
+			go func() { done <- d.executeVideoDownload(cmd) }()
+
+			for start := time.Now(); ; time.Sleep(10 * time.Millisecond) {
+				if _, err := os.Stat(dest + ".ytdl"); err == nil {
+					break
+				}
+				if time.Since(start) > 10*time.Second {
+					t.Fatal("fake yt-dlp never wrote its partials")
+				}
+			}
+			if tc.cause != nil {
+				cancel(tc.cause)
+			} else {
+				cancel(context.Canceled)
+			}
+			if err := <-done; err == nil {
+				t.Fatal("expected an error from a cancelled download")
+			}
+			_ = d.cancelVideoDownload()
+
+			for _, p := range []string{dest + ".part", dest + ".ytdl"} {
+				_, err := os.Stat(p)
+				if removed := os.IsNotExist(err); removed != tc.wantRemoved {
+					t.Errorf("%s: removed = %v, want %v", filepath.Base(p), removed, tc.wantRemoved)
+				}
+			}
+			for _, p := range kept {
+				if _, err := os.Stat(p); err != nil {
+					t.Errorf("%q was removed although it wasn't this download's partial in the video directory", p)
+				}
+			}
+		})
+	}
+}
+
 // TestExecuteVideoDownloadTrailingOutput checks output after the final filename is fully read before cmd.Wait closes the pipes.
 func TestExecuteVideoDownloadTrailingOutput(t *testing.T) {
 	logs := &lockedBuffer{}

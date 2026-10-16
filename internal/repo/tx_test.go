@@ -85,6 +85,19 @@ func TestWithTxRollsBack(t *testing.T) {
 	}
 }
 
+// TestAddChannelWithDetailsRollsBack tests that a channel isn't added when its logins can't be.
+func TestAddChannelWithDetailsRollsBack(t *testing.T) {
+	cs := newTestChannelStore(t)
+	c := testChannel(t, "chan", "https://example.com/@a")
+	err := cs.AddChannelWithDetails(c, map[string]*models.ChannelAccessDetails{"https://example.com/@other": {Username: "bob"}}, nil)
+	if !errors.Is(err, contracts.ErrInvalidChannel) {
+		t.Fatalf("expected ErrInvalidChannel for a login on a URL not in the channel, got %v", err)
+	}
+	if cs.channelExists(consts.QChanName, "chan") {
+		t.Error("channel was added although its logins failed")
+	}
+}
+
 // TestAddNotifyURLsFailureReleasesTx tests that a failed AddNotifyURLs rolls back, leaving the database writable.
 func TestAddNotifyURLsFailureReleasesTx(t *testing.T) {
 	cs := newTestChannelStore(t)

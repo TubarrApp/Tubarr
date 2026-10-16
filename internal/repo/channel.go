@@ -653,6 +653,26 @@ func createDownloadDirs(s *models.Settings) error {
 	return nil
 }
 
+// AddChannelWithDetails adds a channel with its logins and notifications in one transaction, setting c.ID.
+func (cs *ChannelStore) AddChannelWithDetails(c *models.Channel, authDetails map[string]*models.ChannelAccessDetails, notifications []*models.Notification) error {
+	return cs.inTx(func(tcs *ChannelStore) error {
+		id, err := tcs.AddChannel(c)
+		if err != nil {
+			return err
+		}
+		c.ID = id
+		if len(authDetails) > 0 {
+			if err := tcs.AddAuth(id, authDetails); err != nil {
+				return err
+			}
+		}
+		if len(notifications) > 0 {
+			return tcs.AddNotifyURLs(id, notifications)
+		}
+		return nil
+	})
+}
+
 // AddChannel adds a new channel to the database.
 func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	if c.ChanSettings.VideoDir == "" {

@@ -435,8 +435,8 @@ func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelUR
 	logger.Pl.I("Processing video download for URL: %s", v.URL)
 
 	// Create cancellable context for this specific download.
-	downloadCtx, cancel := context.WithCancel(procCtx)
-	defer cancel()
+	downloadCtx, cancel := context.WithCancelCause(procCtx)
+	defer cancel(nil)
 
 	// Register the cancel function so it can be called from API.
 	downloads.RegisterDownloadContext(v.ID, v.URL, cancel)

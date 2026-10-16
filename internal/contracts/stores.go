@@ -39,6 +39,7 @@ type ChannelStore interface {
 	// Add operations.
 	AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error
 	AddChannel(c *models.Channel) (int64, error)
+	AddChannelWithDetails(c *models.Channel, authDetails map[string]*models.ChannelAccessDetails, notifications []*models.Notification) error
 	AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error)
 	AddNotifyURLs(channelID int64, notifications []*models.Notification) error
 	AddURLToIgnore(channelID int64, ignoreURL string) error

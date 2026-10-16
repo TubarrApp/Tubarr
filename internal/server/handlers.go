@@ -39,7 +39,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// addChannelFromConfig adds a channel from a config file, with its logins and notifications, in one transaction.
+// addChannelFromConfig adds a channel from a config file, with its logins and notifications.
 //
 // Errors in the file wrap contracts.ErrInvalidChannel.
 func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ignoreRun bool, err error) {
@@ -66,22 +66,7 @@ func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ign
 		}
 	}
 
-	if err := ss.cs.WithTx(func(cs contracts.ChannelStore) error {
-		id, err := cs.AddChannel(c)
-		if err != nil {
-			return err
-		}
-		c.ID = id
-		if len(authMap) > 0 {
-			if err := cs.AddAuth(id, authMap); err != nil {
-				return err
-			}
-		}
-		if len(notifications) > 0 {
-			return cs.AddNotifyURLs(id, notifications)
-		}
-		return nil
-	}); err != nil {
+	if err := ss.cs.AddChannelWithDetails(c, authMap, notifications); err != nil {
 		return nil, false, err
 	}
 	return c, input.IgnoreRun != nil && *input.IgnoreRun, nil
@@ -109,12 +94,19 @@ func (ss *serverStore) startIgnoreCrawl(c *models.Channel) {
 	}(crawlCtx)
 }
 
+// errChannelNotFound is returned when the channel being changed doesn't exist.
+var errChannelNotFound = errors.New("channel not found")
+
 // channelErrStatus returns the HTTP status for a channel store error.
 func channelErrStatus(err error) int {
-	if errors.Is(err, contracts.ErrInvalidChannel) {
+	switch {
+	case errors.Is(err, errChannelNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, contracts.ErrInvalidChannel):
 		return http.StatusBadRequest
+	default:
+		return http.StatusInternalServerError
 	}
-	return http.StatusInternalServerError
 }
 
 // handleAddChannelFromFile adds a new channel from a specified config file path using Viper.
@@ -452,17 +444,6 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Get existing channel.
-	existingChannel, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || existingChannel == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
-		return
-	}
-
 	// -- Parse and validate everything before writing, so a rejected update changes nothing. --
 	name := r.FormValue("name")
 
@@ -518,8 +499,16 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		notifications = append(notifications, &models.Notification{ChannelID: channelID, NotifyURL: notifyURL})
 	}
 
-	// -- Write, in one transaction so a failed update changes nothing. --
+	// -- Read and write in one transaction, so the update applies to the current channel and a failure changes nothing. --
 	if err := ss.cs.WithTx(func(cs contracts.ChannelStore) error {
+		existingChannel, found, err := cs.GetChannelModel(consts.QChanID, idStr, false)
+		if err != nil {
+			return fmt.Errorf("failed to load channel: %w", err)
+		}
+		if !found || existingChannel == nil {
+			return errChannelNotFound
+		}
+
 		if name != "" && name != existingChannel.Name {
 			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
 				return fmt.Errorf("failed to update channel name: %w", err)

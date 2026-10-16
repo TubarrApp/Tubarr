@@ -14,7 +14,10 @@ import (
 )
 
 var ongoingDownloads sync.Map       // map[ongoingKey]struct{}.
-var activeDownloadContexts sync.Map // map[int64]context.CancelFunc.
+var activeDownloadContexts sync.Map // map[int64]context.CancelCauseFunc.
+
+// ErrCancelledByUser is the cause of a download context cancelled from the web UI or API, as opposed to by shutdown.
+var ErrCancelledByUser = errors.New("download cancelled by user")
 
 // ongoingKey identifies a running download of one type of file for a URL.
 type ongoingKey struct {
@@ -100,9 +103,10 @@ type VideoDownload struct {
 	Context    context.Context
 
 	// Private
-	cmd   *exec.Cmd
-	mu    sync.Mutex
-	fsGen int // FlareSolverr solution generation the last command used.
+	cmd          *exec.Cmd
+	mu           sync.Mutex
+	fsGen        int      // FlareSolverr solution generation the last command used.
+	destinations []string // Files yt-dlp reported downloading to, across attempts.
 }
 
 // cleanup safely terminates any running command.
@@ -168,7 +172,7 @@ func (d *JSONDownload) cleanup() {
 }
 
 // RegisterDownloadContext registers a cancellation function for a video download.
-func RegisterDownloadContext(videoID int64, videoURL string, cancel context.CancelFunc) {
+func RegisterDownloadContext(videoID int64, videoURL string, cancel context.CancelCauseFunc) {
 	activeDownloadContexts.Store(videoID, cancel)
 	logger.Pl.D(2, "Registered cancellation context for video ID %d with URL %q", videoID, videoURL)
 }
@@ -182,9 +186,9 @@ func UnregisterDownloadContext(videoID int64, videoURL string) {
 // CancelDownloadByVideoID cancels an active download by video ID.
 func CancelDownloadByVideoID(videoID int64, videoURL string) bool {
 	if cancel, ok := activeDownloadContexts.Load(videoID); ok {
-		if cancelFunc, ok := cancel.(context.CancelFunc); ok {
+		if cancelFunc, ok := cancel.(context.CancelCauseFunc); ok {
 			logger.Pl.I("Cancelling download for video ID %d with URL %q", videoID, videoURL)
-			cancelFunc()
+			cancelFunc(ErrCancelledByUser)
 			return true
 		}
 	}

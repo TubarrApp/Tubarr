@@ -1,6 +1,9 @@
 // Package command holds constants used for building argument strings for commands.
 package command
 
+// DownloadDestinationPrefix starts the yt-dlp output line naming each file it downloads to.
+const DownloadDestinationPrefix = "[download] Destination: "
+
 // General yt-dlp commands.
 const (
 	AfterMove            = "after_move:%(filepath)s"
