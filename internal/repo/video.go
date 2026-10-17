@@ -59,7 +59,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 	now := time.Now()
 
 	for _, v := range validVideos {
-		videoID, exists := vs.videoExists(v, channelID)
+		videoID, exists := vs.VideoExists(v, channelID)
 		if exists {
 			// Update finished and ignored status
 			updateQuery := fmt.Sprintf(
@@ -180,7 +180,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	}
 
 	// Check if video already exists
-	if id, exists := vs.videoExists(v, channelID); exists {
+	if id, exists := vs.VideoExists(v, channelID); exists {
 		logger.Pl.D(1, "Video %q already exists in the database with ID %d", v.URL, id)
 		v.ID = id // UpdateVideo sets the download status by ID.
 		if err := vs.UpdateVideo(v, channelID); err != nil {
@@ -690,10 +690,8 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	return claimed, nil
 }
 
-// ******************************** Private ***************************************************************************************
-
-// videoExists returns true if the video exists in the database.
-func (vs *VideoStore) videoExists(v *models.Video, channelID int64) (int64, bool) {
+// VideoExists returns the video's ID and true if the channel already has a video with its URL.
+func (vs *VideoStore) VideoExists(v *models.Video, channelID int64) (int64, bool) {
 	var id int64
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ? AND %s = ?",
@@ -711,6 +709,8 @@ func (vs *VideoStore) videoExists(v *models.Video, channelID int64) (int64, bool
 		return 0, false
 	}
 
-	logger.Pl.D(1, "Video with URL %q already exists in the database with ID %d", v.URL, v.ID)
+	logger.Pl.D(1, "Video with URL %q already exists in the database with ID %d", v.URL, id)
 	return id, true
 }
+
+// ******************************** Private ***************************************************************************************

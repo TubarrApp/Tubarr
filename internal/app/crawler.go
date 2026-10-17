@@ -226,13 +226,18 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		// Store the model for later use.
 		channelURLModels[targetChannelURLModel.ID] = targetChannelURLModel
 
-		customVideoRequests = append(customVideoRequests, &models.Video{
+		v := &models.Video{
 			ChannelID:    c.ID,
 			ChannelURLID: targetChannelURLModel.ID,
 			ChannelURL:   targetChannelURLModel.URL,
 			URL:          actualVideoURL,
 			SkipFilters:  true,
-		})
+		}
+		// Known videos (e.g. chosen from Available) keep their ID, so they show on the Downloads page from the start.
+		if id, exists := s.VideoStore().VideoExists(v, c.ID); exists {
+			v.ID = id
+		}
+		customVideoRequests = append(customVideoRequests, v)
 	}
 
 	// Fill output directories and batch channels together.

@@ -23,7 +23,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
-	"tubarr/internal/serverauth"
+	"tubarr/internal/server/serverauth"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
