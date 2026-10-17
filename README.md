@@ -168,10 +168,9 @@ Tick **Use HTTPS** under **Settings > HTTPS** and restart Tubarr to serve the in
 The repo includes:
 
 - `Dockerfile`
-- `examples/docker-compose.yaml` – recommended, uses the published `ghcr.io/tubarrapp/tubarr` image
+- `examples/docker-compose.yaml` – uses the published `ghcr.io/tubarrapp/tubarr` image
 - `examples/podman-quadlet.container` – Podman Quadlet equivalent
-- `docker-compose.yml` – builds the image from your local checkout
-- `DOCKER.md` (detailed guide)
+- `DOCKER.md` (detailed guide, including building the image from a local checkout)
 
 Volumes:
 | Host path             | Container | Purpose                |

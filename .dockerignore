@@ -41,8 +41,8 @@ docs/
 
 # Docker files (no need to copy these into the image)
 Dockerfile
-docker-compose.yml
 .dockerignore
+examples/
 
 # Generated files
 all_code.txt

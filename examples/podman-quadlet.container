@@ -1,33 +1,57 @@
+# Tubarr as a Podman Quadlet.
+#
+# Put this in /etc/containers/systemd/tubarr.container (or ~/.config/containers/systemd/ for rootless),
+# change the paths and settings below, then:
+#   systemctl daemon-reload
+#   systemctl start tubarr
+# Rootless: add --user to both, and change WantedBy to default.target.
+
 [Unit]
-Description=Tubarr Container
-# Wait for network connection.
+Description=Tubarr
 Wants=network-online.target
 After=network-online.target
 
-[Install]
-WantedBy=multi-user.target
-
 [Container]
-# Tubarr's port.
-PodmanArgs=-p 8827:8827
 Image=ghcr.io/tubarrapp/tubarr:latest
+ContainerName=tubarr
+# Picked up by podman-auto-update.timer, if you have it enabled.
 AutoUpdate=registry
-# Add GPU device for hardware acceleration.
-AddDevice=/dev/dri:/dev/dri:rwm
-Volume=/lib/modules:/lib/modules:ro
-# Mount a folder you will use to save videos to.
-Volume=/home/user/videos:/videos:rw,Z
-# Where on your computer Tubarr and Metarr should save its data to.
+
+# Change the first number to use a different port on the host.
+PublishPort=8827:8827
+
+# GPU for hardware transcoding. Leave these commented out if there's no /dev/dri,
+# otherwise the container won't start.
+#AddDevice=/dev/dri:/dev/dri:rwm
+
+# Tubarr and Metarr data (database, settings, logs). Create these first, owned by PUID/PGID.
 Volume=/opt/containers/tubarr/.tubarr:/home/tubarr/.tubarr:Z
 Volume=/opt/containers/tubarr/.metarr:/home/tubarr/.metarr:Z
-# Environment variables for the container.
+
+# Mount path(s) you can have Tubarr save videos to.
+# Channels use the container path (in this example you would set them to save under /videos/).
+Volume=/home/user/videos:/videos:rw,z
+
+# User and group to run as. Should own the folders above.
 Environment=PUID=1000
 Environment=PGID=1000
-Environment=TZ=Europe/London
+Environment=TZ=America/New_York
 Environment=UMASK=022
 
+# Optional (unit files only allow comments on their own line):
+#Environment=TUBARR_WEB_HTTPS=true
+# Your own certificate. Ensure the certificate path is mounted.
+#Environment=TUBARR_WEB_TLS_CERT=/certs/fullchain.pem
+#Environment=TUBARR_WEB_TLS_KEY=/certs/privkey.pem
+# Turn Tubarr's login off, only behind a proxy with its own login.
+#Environment=TUBARR_WEB_AUTH=none
+# Set the login at startup (can also be used to reset a forgotten password).
+#Environment=TUBARR_WEB_USERNAME=admin
+#Environment=TUBARR_WEB_PASSWORD=change-me
+
 [Service]
-Type=notify
 Restart=always
 RestartSec=30
 
+[Install]
+WantedBy=multi-user.target

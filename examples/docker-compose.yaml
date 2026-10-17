@@ -1,30 +1,41 @@
+# Tubarr with Docker Compose. Copy this file, change the host paths (left of each ':') and settings, then run:
+#   docker compose up -d
+# The image's own health check covers both HTTP and HTTPS, so none is needed here.
 services:
   tubarr:
     image: ghcr.io/tubarrapp/tubarr:latest
     container_name: tubarr
     restart: unless-stopped
     ports:
-      - "8827:8827"
-    devices:
-      # GPU device for hardware acceleration
-      - /dev/dri:/dev/dri
+      - "8827:8827" # To use another host port, change the left side (e.g. "9000:8827").
+
+    # Optional GPU for hardware transcoding. Leave commented out if the host has no /dev/dri,
+    # or the container won't start.
+    # devices:
+    #   - /dev/dri:/dev/dri
+
     volumes:
-      # Folder where videos are saved (container UID/GID must have write access)
-      - /home/user/videos:/videos:rw,z
-      # Where Tubarr and Metarr save their data (must be owned by PUID/PGID specified below)
+      # Where Tubarr and Metarr keep their database, settings and logs. Create these folders first, owned by
+      # PUID/PGID below.
       - /opt/containers/tubarr/.tubarr:/home/tubarr/.tubarr:Z
       - /opt/containers/tubarr/.metarr:/home/tubarr/.metarr:Z
+      # Mount path(s) you can have Tubarr save videos to.
+      # Channels use the container path (in this example you would set them to save under /videos/).
+      - /home/user/videos:/videos:rw,z # ':Z' and ':z' are SELinux labels.
+
     environment:
-      - PUID=1000
+      - PUID=1000 # User and group Tubarr runs as, matching the owner of the folders above.
       - PGID=1000
       - TZ=America/New_York
       - UMASK=022
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8827/health"]
-      interval: 30s
-      timeout: 3s
-      start_period: 5s
-      retries: 3
+      # Optional web interface settings:
+      # - TUBARR_WEB_HTTPS=true
+      # - TUBARR_WEB_TLS_CERT=/certs/fullchain.pem  # Ensure certificate path is mounted.
+      # - TUBARR_WEB_TLS_KEY=/certs/privkey.pem
+      # - TUBARR_WEB_AUTH=none                      # Turn Tubarr's login off, only behind a proxy with its own login.
+      # - TUBARR_WEB_USERNAME=admin                 # Set the login at startup (can also be used to reset a forgotten password).
+      # - TUBARR_WEB_PASSWORD=change-me
+
     labels:
-      # Opt in to automatic image updates via Watchtower (optional)
+      # Optional: lets Watchtower update the image automatically if it is installed.
       - com.centurylinklabs.watchtower.enable=true

@@ -10,20 +10,16 @@ This guide explains how to run Tubarr in Docker or Podman containers.
 
 ## Quick Start with Docker Compose
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/TubarrApp/Tubarr.git
-   cd Tubarr
-   ```
+1. **Copy [`examples/docker-compose.yaml`](examples/docker-compose.yaml)** into a folder of your own, as `docker-compose.yaml`. It uses the published `ghcr.io/tubarrapp/tubarr` image, so there's nothing to build.
 
-2. **Edit docker-compose.yml (optional):**
-   - Change the timezone in the `TZ` environment variable
-   - Adjust volume mount paths if needed
-   - Modify resource limits if desired
+2. **Edit it:**
+   - Set the host paths (left of each `:`) for Tubarr's data and your video library, and create those folders, owned by `PUID`/`PGID`
+   - Set `TZ`, and `PUID`/`PGID` to the user that owns those folders
+   - Uncomment the GPU device or the optional web settings if you want them
 
 3. **Start Tubarr:**
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 4. **Access the web interface:**
@@ -31,17 +27,21 @@ This guide explains how to run Tubarr in Docker or Podman containers.
 
 5. **View logs:**
    ```bash
-   docker-compose logs -f tubarr
+   docker compose logs -f tubarr
    ```
 
 6. **Stop Tubarr:**
    ```bash
-   docker-compose down
+   docker compose down
    ```
+
+For Podman, [`examples/podman-quadlet.container`](examples/podman-quadlet.container) is the Quadlet equivalent.
 
 ## Manual Docker Build and Run
 
 ### Building the Image
+
+To build from a local checkout instead of using the published image (then use `image: tubarr:latest` in your compose file):
 
 ```bash
 # Build with Docker
@@ -79,13 +79,13 @@ podman run -d \
 
 ## Volume Mounts
 
-The container requires one main volume for configuration and database:
-
 | Volume Path | Purpose | Required |
 |------------|---------|----------|
 | `/home/tubarr/.tubarr` | Database, settings, and configuration files | Yes |
+| `/home/tubarr/.metarr` | Metarr's logs and data | Recommended |
+| e.g. `/videos` | Your video library | Yes, for downloads |
 
-**Note:** Video and metadata directories are configured per-channel using the `--video-directory` and `--json-directory` flags when adding channels. You'll need to mount your desired host directories to matching paths inside the container. See the "Adding a Channel" section for examples.
+**Note:** Channels' video and metadata directories are paths *inside the container*, so mount your library (e.g. at `/videos`) and set channels to save under it (e.g. `/videos/{{channel_name}}`). Avoid mounting a large library at `/downloads` or `/metadata`: the container changes ownership of everything under those two paths to `PUID`/`PGID` on every start.
 
 ## Environment Variables
 
@@ -146,9 +146,8 @@ To run Tubarr as a systemd service with Podman:
 
 ### With Docker Compose:
 ```bash
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+docker compose pull
+docker compose up -d
 ```
 
 ### With Docker:
@@ -207,10 +206,7 @@ podman ps | grep tubarr
 
 ### yt-dlp or Metarr not found
 
-The Dockerfile includes these dependencies. If they're missing, rebuild:
-```bash
-docker-compose build --no-cache
-```
+The image includes these dependencies. If they're missing, pull the image again (`docker compose pull`), or rebuild a local image with `docker build --no-cache -t tubarr:latest .`.
 
 ## Accessing the Container Shell
 
@@ -284,43 +280,45 @@ docker run -d \
 
 ## Backup and Restore
 
+Paths below are the example compose file's; use your own host data folder.
+
 ### Backup:
 ```bash
 # Stop the container
-docker-compose down
+docker compose down
 
-# Backup config directory (includes database)
-tar -czf tubarr-backup-$(date +%Y%m%d).tar.gz .tubarr/
+# Backup the data folder (includes the database)
+tar -czf tubarr-backup-$(date +%Y%m%d).tar.gz -C /opt/containers/tubarr .tubarr
 
 # Restart
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Restore:
 ```bash
 # Stop the container
-docker-compose down
+docker compose down
 
 # Restore from backup
-tar -xzf tubarr-backup-YYYYMMDD.tar.gz
+tar -xzf tubarr-backup-YYYYMMDD.tar.gz -C /opt/containers/tubarr
 
 # Restart
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Network Configuration
 
-The docker-compose.yml creates a dedicated bridge network. To connect other containers:
+Compose puts Tubarr on its project's default network. To reach it from containers in another compose project (e.g. a reverse proxy), give both a shared network:
 
 ```yaml
 services:
-  your-service:
+  tubarr:
     networks:
-      - tubarr-network
+      - proxy
 
 networks:
-  tubarr-network:
-    external: true
+  proxy:
+    external: true # Created once with: docker network create proxy
 ```
 
 ## Support
