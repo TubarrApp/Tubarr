@@ -75,7 +75,7 @@ func InitProcess(
 	results := make(chan error, len(videos))
 
 	// Parse directories.
-	dirParser := parsing.NewDirectoryParser(c, parsing.TubarrTags)
+	dirParser := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
 	if c.ChanSettings.VideoDir, err = dirParser.ParseDirectory(c.ChanSettings.VideoDir, "channel video directory"); err != nil {
 		return 0, 0, err
 	}

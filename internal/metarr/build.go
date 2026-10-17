@@ -60,7 +60,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		purgeMetaFile = abstractions.GetBool(keys.PurgeMetaFile)
 	}
 
-	mOutDirParser := parsing.NewDirectoryParser(c, parsing.AllTags)
+	mOutDirParser := parsing.NewDirectoryParser(c, cu, parsing.AllTags)
 	// Define fields to process.
 	fields := []metCmdMapping{
 		// Metarr args:

@@ -21,9 +21,10 @@ const (
 	templateLen   = len(openTemplate) + len(closeTemplate) + 4
 )
 
-// DirectoryParser holds a channel model, used for filling some template tags.
+// DirectoryParser holds the channel and channel URL, used for filling channel template tags.
 type DirectoryParser struct {
 	C       *models.Channel
+	CU      *models.ChannelURL
 	Tagging TubarrOrMetarrTags
 }
 
@@ -37,9 +38,10 @@ const (
 )
 
 // NewDirectoryParser returns a directory parser model.
-func NewDirectoryParser(c *models.Channel, tagType TubarrOrMetarrTags) (parseDir *DirectoryParser) {
+func NewDirectoryParser(c *models.Channel, cu *models.ChannelURL, tagType TubarrOrMetarrTags) (parseDir *DirectoryParser) {
 	return &DirectoryParser{
 		C:       c,
+		CU:      cu,
 		Tagging: tagType,
 	}
 }
@@ -101,12 +103,14 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 
 		// Get tag part, check tag is not invalid.
 		tag := remaining[startIdx+len(openTemplate) : endIdx]
-		if _, ok := sharedtemplates.MetarrTemplateTags[tag]; ok && dp.Tagging == TubarrTags {
-			return "", fmt.Errorf("cannot use Metarr tags for %q. Please avoid %v", dir, sharedtemplates.MetarrTemplateTags)
+		if name, _ := sharedtemplates.ParseTag(tag); dp.Tagging == TubarrTags {
+			if _, ok := sharedtemplates.MetarrTemplateTags[name]; ok {
+				return "", fmt.Errorf("cannot use Metarr tags for %q. Please avoid %v", dir, sharedtemplates.DescribeTags(sharedtemplates.MetarrTemplateTags))
+			}
 		}
 
 		// Replacement string
-		replacement, err := dp.replaceTemplateTags(strings.TrimSpace(tag))
+		replacement, err := dp.replaceTemplateTags(tag)
 		if err != nil {
 			return "", err
 		}
@@ -125,28 +129,47 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 // replaceTemplateTags makes template replacements in the directory string.
 func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 	c := dp.C
-	tag = strings.ToLower(tag)
+	name, directive := sharedtemplates.ParseTag(tag)
+	if directive != "" && !sharedtemplates.ValidTag(tag, sharedtemplates.AllTemplatesMap) {
+		return "", fmt.Errorf("tag %q detected as invalid, supported tags: %v", tag, sharedtemplates.DescribeTags(sharedtemplates.AllTemplatesMap))
+	}
 
-	switch tag {
+	var value string
+	switch name {
 	case sharedtemplates.ChannelID:
-		if c != nil && c.ID != 0 {
-			return strconv.Itoa(int(c.ID)), nil
+		if c == nil || c.ID == 0 {
+			return "", errors.New("templating: channel ID is 0")
 		}
-		return "", errors.New("templating: channel ID is 0")
+		value = strconv.FormatInt(c.ID, 10)
 
 	case sharedtemplates.ChannelName:
-		if c != nil && c.Name != "" {
-			return c.Name, nil
+		if c == nil || c.Name == "" {
+			return "", errors.New("templating: channel name empty")
 		}
-		return "", errors.New("templating: channel name empty")
+		value = c.Name
+
+	case sharedtemplates.ChannelURL:
+		if dp.CU == nil || dp.CU.URL == "" {
+			return "", errors.New("templating: channel URL empty")
+		}
+		value = sharedtemplates.StripURLScheme(dp.CU.URL)
 
 	default:
-		if _, ok := sharedtemplates.MetarrTemplateTags[tag]; ok {
+		if _, ok := sharedtemplates.MetarrTemplateTags[name]; ok {
 			if _, err := exec.LookPath("metarr"); err != nil {
 				return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %w", tag, err)
 			}
-			return "{{" + tag + "}}", nil
+			if directive != "" {
+				name += ":" + directive // Left for Metarr to fill.
+			}
+			return "{{" + name + "}}", nil
 		}
 		return "", fmt.Errorf("tag %q detected as invalid", tag)
 	}
+
+	// One directory level, e.g. "AC/DC" can't nest and ".." can't climb out.
+	if value = sharedtemplates.SanitizePathComponent(value, sharedtemplates.MaxNameBytes); value == "" {
+		return "", fmt.Errorf("templating: %q is empty once made safe for a path", tag)
+	}
+	return value, nil
 }

@@ -86,6 +86,16 @@ Templates are resolved per channel or per video:
 - **Any directory:** `{{channel_name}}`, `{{channel_id}}`, `{{channel_url}}`.
 - **`--metarr-output-directory` only:** also `{{video_title}}`, `{{video_url}}`, `{{year}}`, `{{month}}`, `{{day}}`, `{{author}}`, `{{director}}`, `{{domain}}`. These are filled from each video's metadata by Metarr, so they're rejected in other directories.
 
+Date tags take an optional format after a colon:
+
+| Tag | Example | Formats |
+|---|---|---|
+| `{{year}}` | `2026` | `{{year:yyyy}}` → `2026` (default), `{{year:yy}}` → `26` |
+| `{{month}}` | `01` | `{{month:number}}` → `01` (default), `{{month:abbreviated}}` → `Jan`, `{{month:word}}` → `January` |
+| `{{day}}` | `07` | none |
+
+For example, `--metarr-output-directory '/media/{{channel_name}}/{{year}}/{{month:abbreviated}}'` sorts videos into folders like `/media/Cats/2026/Jan`.
+
 Use `tubarr channel add-batch --add-from-directory ./configs` to import multiple channels from config files.
 
 Pass `--auto-download=false` to list new videos under **Available** in the web UI instead of downloading them, and `--ignore-run` to skip a channel's existing backlog.

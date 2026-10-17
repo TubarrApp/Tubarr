@@ -242,7 +242,7 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 		}
 	}
 
-	dirParser := parsing.NewDirectoryParser(c, parsing.TubarrTags)
+	dirParser := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
 
 	// Video already passed filters on download, only the filtered ops are needed.
 	_, v.FilteredMetaOps, v.FilteredFilenameOps, _ = metadata.ValidateAndFilter(v, cu, c, dirParser)
