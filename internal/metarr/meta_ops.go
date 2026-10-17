@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"fmt"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -24,8 +25,11 @@ var nonConflictingMetaOp = map[string]struct{}{
 
 // loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering
 func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
-	// Load file ops (highest priority)
-	fileMetaOps := loadMetaOpsFromFile(cu, dirParser)
+	// Load file ops (highest priority). An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
+	fileMetaOps, err := LoadMetaOpsFromFile(cu, dirParser)
+	if err != nil {
+		logger.Pl.E("Meta ops file for %q can't be used: %v", cu.URL, err)
+	}
 
 	// File ops override DB ops with same key
 	nonConflictingDBOps := filterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
@@ -43,43 +47,39 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	return getDedupedMetaOpStrings(channelMatchedOps)
 }
 
-// loadMetaOpsFromFile loads in meta operations from the given file.
+// LoadMetaOpsFromFile loads in meta operations from the given file.
 //
-// File ops take precedence and will replace any matching DB ops.
-func loadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaOps {
+// File ops take precedence and will replace any matching DB ops. Returns an error if the file is set but can't be read
+// or parsed.
+func LoadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.MetaOps, error) {
 	if cu.ChanURLMetarrArgs.MetaOpsFile == "" {
-		return nil
+		return nil, nil
 	}
 
-	metaOpsFile := cu.ChanURLMetarrArgs.MetaOpsFile
-	var err error
-	if metaOpsFile, err = dp.ParseDirectory(metaOpsFile, "meta ops"); err != nil {
-		logger.Pl.E("Failed to parse directory %q: %v", metaOpsFile, err)
-		return nil
+	metaOpsFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.MetaOpsFile, "meta ops")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse meta ops file path %q: %w", cu.ChanURLMetarrArgs.MetaOpsFile, err)
 	}
 
 	logger.Pl.I("Adding meta ops from file %q...", metaOpsFile)
 	ops, err := file.ReadOpLines(metaOpsFile)
 	if err != nil {
-		logger.Pl.E("Error loading meta ops from file %q: %v", metaOpsFile, err)
-		return nil
+		return nil, fmt.Errorf("failed to read meta ops file: %w", err)
 	}
 
 	// Parse meta operations from strings
 	parsedOps, err := parsing.ParseMetaOps(ops)
 	if err != nil {
-		logger.Pl.E("Error parsing meta ops from file %q: %v", metaOpsFile, err)
-		return nil
+		return nil, fmt.Errorf("failed to parse meta ops in %q: %w", metaOpsFile, err)
 	}
 
 	// Validate the parsed operations
 	if err := validation.ValidateMetaOps(parsedOps); err != nil {
-		logger.Pl.E("Error validating meta ops from file %q: %v", metaOpsFile, err)
-		return nil
+		return nil, fmt.Errorf("invalid meta ops in %q: %w", metaOpsFile, err)
 	}
 
 	logger.Pl.I("Loaded %d meta ops from file", len(parsedOps))
-	return parsedOps
+	return parsedOps, nil
 }
 
 // filterConflictingMetaOps removes DB ops that conflict with file ops on the same field

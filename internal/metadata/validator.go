@@ -32,13 +32,14 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 
 	// Apply filters.
 	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
-	if errors.Is(err, errFilterFile) {
-		// An error rather than a failed check, so the video is skipped but not marked ignored, and is tried again once the file is fixed.
-		return false, useFilteredMetaOps, useFilteredFilenameOps, fmt.Errorf("skipping %q: %w", v.URL, err)
-	}
 	if err != nil {
+		if errors.Is(err, errFilterFile) {
+			// An error rather than a failed check, so the video is skipped but not marked ignored, and is tried again once the file is fixed.
+			return false, useFilteredMetaOps, useFilteredFilenameOps, fmt.Errorf("skipping %q: %w", v.URL, err)
+		}
 		logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
 	}
+
 	if !jsonValid || !passedFilters {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
@@ -174,14 +175,22 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 
 // handleFilters uses user input filters to check if the video should be downloaded.
 func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	// Check filtered meta ops.
-	filteredMetaOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, loadFilteredMetaOpsFromFile(cu, dirParser))
+	// Check filtered meta ops (an unusable file holds back Metarr for the whole batch, see app.metarrSkip).
+	fileFilteredMetaOps, fileErr := LoadFilteredMetaOpsFromFile(cu, dirParser)
+	if fileErr != nil {
+		logger.Pl.E("Filtered meta ops file for %q can't be used: %v", cu.URL, fileErr)
+	}
+	filteredMetaOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, fileFilteredMetaOps)
 
 	relevantFilteredMetaOps := getRelevantFilteredMetaOps(filteredMetaOps, cu.URL)
 	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, relevantFilteredMetaOps, c.Name)
 
 	// Check filtered filename ops.
-	filteredFilenameOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, loadFilteredFilenameOpsFromFile(cu, dirParser))
+	fileFilteredFilenameOps, fileErr := LoadFilteredFilenameOpsFromFile(cu, dirParser)
+	if fileErr != nil {
+		logger.Pl.E("Filtered filename ops file for %q can't be used: %v", cu.URL, fileErr)
+	}
+	filteredFilenameOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, fileFilteredFilenameOps)
 
 	relevantFilteredFilenameOps := getRelevantFilteredFilenameOps(filteredFilenameOps, cu.URL)
 	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
@@ -193,7 +202,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	}
 
 	// Check download filters.
-	fileFilters, err := loadFilterOpsFromFile(cu, dirParser)
+	fileFilters, err := LoadFilterOpsFromFile(cu, dirParser)
 	if err != nil {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, err
 	}

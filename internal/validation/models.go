@@ -88,101 +88,100 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 	m.Concurrency = max(m.Concurrency, 0) // 0 inherits the channel's limit, or the global one.
 
-	if m.FilenameOps != nil {
-		if err := ValidateFilenameOps(m.FilenameOps); err != nil {
-			return fmt.Errorf("invalid filename ops in Metarr settings: %w", err)
-		}
-	}
-
-	if checkPaths && m.FilteredMetaOpsFile != "" {
-		if _, _, err := sharedvalidation.ValidateFile(m.FilteredMetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return fmt.Errorf("invalid filtered meta ops file %q in Metarr settings: %w", m.FilteredMetaOpsFile, err)
-		}
-	}
-
-	if m.FilteredFilenameOps != nil {
-		if err := ValidateFilteredFilenameOps(m.FilteredFilenameOps); err != nil {
-			return fmt.Errorf("invalid filtered filename ops in Metarr settings: %w", err)
-		}
-	}
-
-	if checkPaths && m.FilteredFilenameOpsFile != "" {
-		if _, _, err := sharedvalidation.ValidateFile(m.FilteredFilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return fmt.Errorf("invalid filtered filename ops file %q in Metarr settings: %w", m.FilteredFilenameOpsFile, err)
-		}
-	}
-
+	// Meta ops
+	// Filtered:
 	if m.FilteredMetaOps != nil {
 		if err := ValidateFilteredMetaOps(m.FilteredMetaOps); err != nil {
 			return fmt.Errorf("invalid filtered meta ops in Metarr settings: %w", err)
 		}
 	}
-
 	if checkPaths && m.FilteredMetaOpsFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(m.FilteredMetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return fmt.Errorf("invalid filtered meta op(s) file %q in Metarr settings: %w", m.FilteredMetaOpsFile, err)
+			return fmt.Errorf("invalid filtered meta ops file %q in Metarr settings: %w", m.FilteredMetaOpsFile, err)
 		}
 	}
-
-	if m.TranscodeGPU != "" {
-		if _, err := ValidateGPUAcceleration(m.TranscodeGPU); err != nil {
-			return fmt.Errorf("invalid GPU config in Metarr Settings: %w", err)
-		}
-	}
-
-	if m.TranscodeGPUNode != "" {
-		if _, err := sharedvalidation.ValidateAccelTypeDeviceNode(m.TranscodeGPU, m.TranscodeGPUNode); err != nil {
-			return fmt.Errorf("invalid GPU node config in Metarr Settings: %w", err)
-		}
-	}
-
-	m.MaxCPU = sharedvalidation.ValidateMaxCPU(m.MaxCPU, true)
-
+	// Unfiltered:
 	if m.MetaOps != nil {
 		if err := ValidateMetaOps(m.MetaOps); err != nil {
 			return fmt.Errorf("invalid meta op(s) in Metarr settings: %w", err)
 		}
 	}
-
 	if checkPaths && m.MetaOpsFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(m.MetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid meta ops file %q in Metarr settings: %w", m.MetaOpsFile, err)
 		}
 	}
 
+	// Filename ops
+	// Filtered:
+	if m.FilteredFilenameOps != nil {
+		if err := ValidateFilteredFilenameOps(m.FilteredFilenameOps); err != nil {
+			return fmt.Errorf("invalid filtered filename ops in Metarr settings: %w", err)
+		}
+	}
+	if checkPaths && m.FilteredFilenameOpsFile != "" {
+		if _, _, err := sharedvalidation.ValidateFile(m.FilteredFilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid filtered filename ops file %q in Metarr settings: %w", m.FilteredFilenameOpsFile, err)
+		}
+	}
+	// Unfiltered:
+	if m.FilenameOps != nil {
+		if err := ValidateFilenameOps(m.FilenameOps); err != nil {
+			return fmt.Errorf("invalid filename ops in Metarr settings: %w", err)
+		}
+	}
+	if checkPaths && m.FilenameOpsFile != "" {
+		if _, _, err := sharedvalidation.ValidateFile(m.FilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid filename ops file %q in Metarr settings: %w", m.FilenameOpsFile, err)
+		}
+	}
+
+	// GPU arguments
+	if m.TranscodeGPU != "" {
+		if _, err := ValidateGPUAcceleration(m.TranscodeGPU); err != nil {
+			return fmt.Errorf("invalid GPU config in Metarr Settings: %w", err)
+		}
+	}
+	if m.TranscodeGPUNode != "" {
+		if _, err := sharedvalidation.ValidateAccelTypeDeviceNode(m.TranscodeGPU, m.TranscodeGPUNode); err != nil {
+			return fmt.Errorf("invalid GPU node config in Metarr Settings: %w", err)
+		}
+	}
+
+	// System resources
+	m.MaxCPU = sharedvalidation.ValidateMaxCPU(m.MaxCPU, true)
 	if m.MinFreeMem != "" {
 		if _, err := sharedvalidation.ValidateMinFreeMem(m.MinFreeMem); err != nil {
 			return fmt.Errorf("invalid minimum free memory in Metarr settings: %w", err)
 		}
 	}
 
+	// File output
 	if m.OutputExt != "" {
 		if _, err := sharedvalidation.ValidateFFmpegOutputExt(m.OutputExt); err != nil {
 			return fmt.Errorf("invalid output filetype in Metarr settings: %w", err)
 		}
 	}
-
 	if m.RenameStyle != "" {
 		if err := ValidateRenameFlag(m.RenameStyle); err != nil {
 			return fmt.Errorf("invalid rename flag in Metarr settings: %w", err)
 		}
 	}
+	if checkPaths && m.OutputDir != "" {
+		if err := CheckDirectory(m.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
+			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
+		}
+	}
 
+	// Codecs
 	if m.TranscodeAudioCodecs != nil {
 		if _, err := ValidateAudioTranscodeCodecSlice(m.TranscodeAudioCodecs); err != nil {
 			return fmt.Errorf("invalid audio codec(s) in Metarr settings: %w", err)
 		}
 	}
-
 	if m.TranscodeVideoCodecs != nil {
 		if _, err := ValidateVideoTranscodeCodecSlice(m.TranscodeVideoCodecs, ""); err != nil {
 			return fmt.Errorf("invalid video codec(s) in Metarr settings: %w", err)
-		}
-	}
-
-	if checkPaths && m.OutputDir != "" {
-		if err := CheckDirectory(m.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
-			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
 		}
 	}
 

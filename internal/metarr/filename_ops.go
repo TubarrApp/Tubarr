@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"fmt"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -19,8 +20,11 @@ var conflictingFilenameOp = map[string]struct{}{
 
 // loadAndMergeFilenameOps loads and merges filename ops: file ops override DB ops, then apply filtering
 func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
-	// Load file ops (highest priority)
-	fileFilenameOps := loadFilenameOpsFromFile(cu, dirParser)
+	// Load file ops (highest priority). An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
+	fileFilenameOps, err := LoadFilenameOpsFromFile(cu, dirParser)
+	if err != nil {
+		logger.Pl.E("Filename ops file for %q can't be used: %v", cu.URL, err)
+	}
 
 	// Ops from file override DB ops with same key
 	nonConflictingDBOps := filterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps)
@@ -38,43 +42,39 @@ func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.C
 	return getDedupedFilenameOpStrings(channelMatchedOps)
 }
 
-// loadFilenameOpsFromFile loads in file operations from the given file.
+// LoadFilenameOpsFromFile loads in file operations from the given file.
 //
-// File ops take precedence and will replace any matching DB ops.
-func loadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilenameOps {
+// File ops take precedence and will replace any matching DB ops. Returns an error if the file is set but can't be read
+// or parsed.
+func LoadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.FilenameOps, error) {
 	if cu.ChanURLMetarrArgs.FilenameOpsFile == "" {
-		return nil
+		return nil, nil
 	}
 
-	filenameOpsFile := cu.ChanURLMetarrArgs.FilenameOpsFile
-	var err error
-	if filenameOpsFile, err = dp.ParseDirectory(filenameOpsFile, "filename ops"); err != nil {
-		logger.Pl.E("Failed to parse directory %q: %v", filenameOpsFile, err)
-		return nil
+	filenameOpsFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.FilenameOpsFile, "filename ops")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse filename ops file path %q: %w", cu.ChanURLMetarrArgs.FilenameOpsFile, err)
 	}
 
 	logger.Pl.I("Adding filename ops from file %q...", filenameOpsFile)
 	ops, err := file.ReadOpLines(filenameOpsFile)
 	if err != nil {
-		logger.Pl.E("Error loading filename ops from file %q: %v", filenameOpsFile, err)
-		return nil
+		return nil, fmt.Errorf("failed to read filename ops file: %w", err)
 	}
 
 	// Parse filename operations from strings
 	parsedOps, err := parsing.ParseFilenameOps(ops)
 	if err != nil {
-		logger.Pl.E("Error parsing filename ops from file %q: %v", filenameOpsFile, err)
-		return nil
+		return nil, fmt.Errorf("failed to parse filename ops in %q: %w", filenameOpsFile, err)
 	}
 
 	// Validate the parsed operations
 	if err := validation.ValidateFilenameOps(parsedOps); err != nil {
-		logger.Pl.E("Error validating filename ops from file %q: %v", filenameOpsFile, err)
-		return nil
+		return nil, fmt.Errorf("invalid filename ops in %q: %w", filenameOpsFile, err)
 	}
 
 	logger.Pl.I("Loaded %d filename ops from file", len(parsedOps))
-	return parsedOps
+	return parsedOps, nil
 }
 
 // filterConflictingFilenameOps removes DB ops that are fully identical to file ops

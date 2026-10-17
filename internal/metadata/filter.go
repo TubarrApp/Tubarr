@@ -16,6 +16,9 @@ import (
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
+// errFilterFile marks a filter file that is set but can't be used.
+var errFilterFile = errors.New("filter file can't be used")
+
 // checkFilters determines whether a video matches the given filters.
 func checkFilters(v *models.Video, filterType string, filters []models.Filters) bool {
 	mustTotal, mustPassed := 0, 0
@@ -356,13 +359,10 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 	return true, nil
 }
 
-// errFilterFile marks a filter file that is set but can't be used.
-var errFilterFile = errors.New("filter file can't be used")
-
-// loadFilterOpsFromFile loads filter operations from a file (one per line).
+// LoadFilterOpsFromFile loads filter operations from a file (one per line).
 //
 // Returns an error if the file is set but can't be read or parsed, so videos aren't downloaded unfiltered.
-func loadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.Filters, error) {
+func LoadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.Filters, error) {
 	if cu.ChanURLSettings.FilterFile == "" {
 		return nil, nil
 	}
@@ -400,94 +400,86 @@ func loadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) (
 	return parsedFilters, nil
 }
 
-// loadFilteredMetaOpsFromFile loads filter operations from a file (one per line).
-func loadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredMetaOps {
-	var err error
-
+// LoadFilteredMetaOpsFromFile loads filtered meta operations from a file (one per line).
+//
+// Returns an error if the file is set but can't be read or parsed.
+func LoadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.FilteredMetaOps, error) {
 	if cu.ChanURLMetarrArgs.FilteredMetaOpsFile == "" {
-		return nil
+		return nil, nil
 	}
 
-	filterFile := cu.ChanURLMetarrArgs.FilteredMetaOpsFile
-
-	if filterFile, err = dp.ParseDirectory(filterFile, "metarr-filtered-meta-ops"); err != nil {
-		logger.Pl.E("Failed to parse directory %q: %v", filterFile, err)
-		return nil
+	filterFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.FilteredMetaOpsFile, "metarr-filtered-meta-ops")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse filtered meta ops file path %q: %w", cu.ChanURLMetarrArgs.FilteredMetaOpsFile, err)
 	}
 
 	logger.Pl.I("Adding filtered meta ops from file %q...", filterFile)
 	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
-		logger.Pl.E("Error loading filters from file %q: %v", filterFile, err)
+		return nil, fmt.Errorf("failed to read filtered meta ops file: %w", err)
 	}
 
 	if len(filters) == 0 {
 		logger.Pl.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
-		return nil
+		return nil, nil
 	}
 
 	// Parse filtered meta ops from strings
 	parsedFilters, err := parsing.ParseFilteredMetaOps(filters)
 	if err != nil {
-		logger.Pl.E("Error parsing filtered meta ops from file %v: %v", filterFile, err)
-		return nil
+		return nil, fmt.Errorf("failed to parse filtered meta ops in %q: %w", filterFile, err)
 	}
 
 	// Validate the parsed ops
 	if err := validation.ValidateFilteredMetaOps(parsedFilters); err != nil {
-		logger.Pl.E("Error validating filtered meta ops from file %v: %v", filterFile, err)
-		return nil
+		return nil, fmt.Errorf("invalid filtered meta ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
 		logger.Pl.D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
 	}
 
-	return parsedFilters
+	return parsedFilters, nil
 }
 
-// loadFilteredFilenameOpsFromFile loads filtered filename operations from a file (one per line).
-func loadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.FilteredFilenameOps {
-	var err error
-
+// LoadFilteredFilenameOpsFromFile loads filtered filename operations from a file (one per line).
+//
+// Returns an error if the file is set but can't be read or parsed.
+func LoadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.FilteredFilenameOps, error) {
 	if cu.ChanURLMetarrArgs.FilteredFilenameOpsFile == "" {
-		return nil
+		return nil, nil
 	}
 
-	filterFile := cu.ChanURLMetarrArgs.FilteredFilenameOpsFile
-
-	if filterFile, err = dp.ParseDirectory(filterFile, "metarr-filtered-filename-ops"); err != nil {
-		logger.Pl.E("Failed to parse directory %q: %v", filterFile, err)
-		return nil
+	filterFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.FilteredFilenameOpsFile, "metarr-filtered-filename-ops")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse filtered filename ops file path %q: %w", cu.ChanURLMetarrArgs.FilteredFilenameOpsFile, err)
 	}
 
 	logger.Pl.I("Adding filtered filename ops from file %q...", filterFile)
 	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
-		logger.Pl.E("Error loading filtered filename ops from file %q: %v", filterFile, err)
+		return nil, fmt.Errorf("failed to read filtered filename ops file: %w", err)
 	}
 
 	if len(filters) == 0 {
 		logger.Pl.I("No valid filtered filename ops found in file. Format is one per line 'title:contains:dogs:must' (Only apply filename ops to videos with 'dogs' in the title)")
-		return nil
+		return nil, nil
 	}
 
 	// Parse filtered filename ops from strings
 	parsedFilters, err := parsing.ParseFilteredFilenameOps(filters)
 	if err != nil {
-		logger.Pl.E("Error parsing filtered filename ops from file %v: %v", filterFile, err)
-		return nil
+		return nil, fmt.Errorf("failed to parse filtered filename ops in %q: %w", filterFile, err)
 	}
 
 	// Validate the parsed ops
 	if err := validation.ValidateFilteredFilenameOps(parsedFilters); err != nil {
-		logger.Pl.E("Error validating filtered filename ops from file %v: %v", filterFile, err)
-		return nil
+		return nil, fmt.Errorf("invalid filtered filename ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
 		logger.Pl.D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
 	}
 
-	return parsedFilters
+	return parsedFilters, nil
 }
 
 // loadMoveOpsFromFile loads move operations from a file (one per line).

@@ -89,11 +89,18 @@ func InitProcess(
 		return 0, 0, err
 	}
 
-	// Check if Metarr exists and can be run.
-	metarrErr := metarrExecutable(ctx)
-	metarrIsExecutable := metarrErr == nil
-	if metarrErr != nil {
-		logger.Pl.E("Cannot run 'metarr' due to error: %v", metarrErr)
+	// An unusable filter file prevents unintentional unwanted downloads.
+	var skipDownloads models.SkipDownloads
+	if _, filterErr := metadata.LoadFilterOpsFromFile(cu, dirParser); filterErr != nil {
+		logger.Pl.E("Not downloading crawled videos for %q until its filter file is fixed: %v", cu.URL, filterErr)
+		errs = append(errs, fmt.Errorf("channel URL %q: %w", cu.URL, filterErr))
+		skipDownloads = models.SkipDownloads{Skip: true, Reason: models.SkipDLMissingFilterFile}
+	}
+
+	// Metarr is held back if it can't run or an ops file can't be used, leaving videos pending for Run Metarr.
+	skipMetarr, skipErr := metarrSkip(metarrExecutable(ctx), cu, dirParser)
+	if skipErr != nil {
+		logger.Pl.E("Not running Metarr for %q (videos stay pending for Run Metarr): %s: %v", cu.URL, skipMetarr.Reason, skipErr)
 	}
 
 	// Start workers.
@@ -124,7 +131,6 @@ func InitProcess(
 					cu,
 					c,
 					&metarrWg,
-					metarrIsExecutable,
 					&downloaded)
 
 				results <- err
@@ -138,6 +144,16 @@ func InitProcess(
 			logger.Pl.E("Video in queue for channel %q is nil", c.Name)
 			continue
 		}
+
+		// Chosen videos skip download filters, so only crawled ones wait for a usable filter file.
+		if !video.SkipFilters && !cu.IsManual {
+			video.SkipDownloads = skipDownloads
+		}
+		if video.SkipDownloads.Skip {
+			logger.Pl.W("Skipping download of %q: %s", video.URL, video.SkipDownloads.Reason)
+			continue
+		}
+		video.SkipMetarr = skipMetarr
 
 		// Get video paths.
 		video.JSONDir = cu.ChanURLSettings.JSONDir
@@ -214,7 +230,6 @@ func videoJob(
 	cu *models.ChannelURL,
 	c *models.Channel,
 	metarrWg *sync.WaitGroup,
-	metarrIsExecutable bool,
 	downloaded *atomic.Int32,
 ) (err error) {
 	// Take hold of video before touching its files, cancelling any separate Metarr run on it.
@@ -306,9 +321,9 @@ func videoJob(
 	}
 	downloaded.Add(1)
 
-	// Check if Metarr can be run.
-	if !metarrIsExecutable {
-		logger.Pl.I("No 'metarr' at $PATH, skipping Metarr process and marking video as finished (Metarr can be run later)")
+	// Metarr held back for the batch: finished with Metarr pending, so Run Metarr can process it once fixed.
+	if v.SkipMetarr.Skip {
+		logger.Pl.W("Skipping Metarr for %q, marking it finished with Metarr pending: %s", v.URL, v.SkipMetarr.Reason)
 		v.MetarrStatus = consts.MetarrStatusPending
 		return completeAndStoreVideo(cs, vs, v, c)
 	}

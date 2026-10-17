@@ -1076,8 +1076,12 @@ func settingsPathsChanged(old, updated *models.Settings) bool {
 
 // metarrArgsPathsChanged reports whether an update changed any path ValidateMetarrArgsModel checks.
 func metarrArgsPathsChanged(old, updated *models.MetarrArgs) bool {
-	return old.OutputDir != updated.OutputDir || old.MetaOpsFile != updated.MetaOpsFile ||
-		old.FilteredMetaOpsFile != updated.FilteredMetaOpsFile || old.FilteredFilenameOpsFile != updated.FilteredFilenameOpsFile
+	return old.OutputDir != updated.OutputDir || // Output directory
+		old.MetaOpsFile != updated.MetaOpsFile || // Meta ops file
+		old.FilteredMetaOpsFile != updated.FilteredMetaOpsFile || // Filtered meta ops file
+		old.FilenameOpsFile != updated.FilenameOpsFile || // Filename ops file
+		old.FilteredFilenameOpsFile != updated.FilteredFilenameOpsFile // Filtered filename ops file
+
 }
 
 // updateChannelMetarrArgsJSON reads, updates and writes back the channel's MetarrArgs.

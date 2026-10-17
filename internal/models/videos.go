@@ -34,10 +34,38 @@ type Video struct {
 	MoveOpOutputDir     string                `json:"-" db:"-"`
 	Ignored             bool                  `json:"ignored" db:"ignored"`
 	MetarrStatus        consts.MetarrStatus   `json:"metarr_status" db:"metarr_status"`
-	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
 	FilteredMetaOps     []FilteredMetaOps     `json:"-" db:"-"` // Per-video filtered meta operations
 	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"` // Per-video filtered filename operations
+	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
+	SkipMetarr          SkipMetarr            `json:"-" db:"-"`
+	SkipDownloads       SkipDownloads         `json:"-" db:"-"`
 }
+
+// SkipMetarr skips Metarr processing with a given reason.
+type SkipMetarr struct {
+	Skip   bool
+	Reason SkipMetarrReasons
+}
+type SkipMetarrReasons string
+
+const (
+	SkipMetarrNoPath                         SkipMetarrReasons = "metarr isn't on $PATH or won't run"
+	SkipMetarrMissingFilenameOpsFile         SkipMetarrReasons = "filename ops path is set, but the file can't be read or parsed"
+	SkipMetarrMissingMetaOpsFile             SkipMetarrReasons = "meta ops path is set, but the file can't be read or parsed"
+	SkipMetarrMissingFilteredMetaOpsFile     SkipMetarrReasons = "filtered meta ops path is set, but the file can't be read or parsed"
+	SkipMetarrMissingFilteredFilenameOpsFile SkipMetarrReasons = "filtered filename ops path is set, but the file can't be read or parsed"
+)
+
+// SkipDownloads skips any JSON or video downloads with a given reason.
+type SkipDownloads struct {
+	Skip   bool
+	Reason SkipDownloadReasons
+}
+type SkipDownloadReasons string
+
+const (
+	SkipDLMissingFilterFile SkipDownloadReasons = "filter file path is set, but file appears to be unreachable"
+)
 
 // AvailableVideo is a video awaiting the user's choice to download it, with its channel's name.
 type AvailableVideo struct {

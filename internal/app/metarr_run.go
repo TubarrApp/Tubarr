@@ -183,9 +183,10 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 	logger.Pl.I("Running Metarr on %d video(s) in channel %q", len(videos), c.Name)
 
 	var (
-		wg   sync.WaitGroup
-		mu   sync.Mutex
-		errs []error
+		wg    sync.WaitGroup
+		mu    sync.Mutex
+		errs  []error
+		skips = map[int64]error{} // Channel URL ID -> why its videos can't run, checked once per URL.
 	)
 
 	for _, v := range videos {
@@ -193,6 +194,23 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 		if cu == nil {
 			mu.Lock()
 			errs = append(errs, fmt.Errorf("video %q: channel URL no longer exists", v.URL))
+			mu.Unlock()
+			continue
+		}
+
+		// An unusable ops file leaves the URL's videos pending rather than run without its ops.
+		skipErr, checked := skips[cu.ID]
+		if !checked {
+			var skip models.SkipMetarr
+			if skip, skipErr = metarrSkip(nil, cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); skipErr != nil {
+				skipErr = fmt.Errorf("%s: %w", skip.Reason, skipErr)
+				logger.Pl.E("Not running Metarr for %q, its videos stay pending: %v", cu.URL, skipErr)
+			}
+			skips[cu.ID] = skipErr
+		}
+		if skipErr != nil {
+			mu.Lock()
+			errs = append(errs, fmt.Errorf("video %q: %w", v.URL, skipErr))
 			mu.Unlock()
 			continue
 		}
@@ -294,6 +312,27 @@ func purgeMetaFileIfSet(v *models.Video) {
 	}
 	logger.Pl.D(1, "Deleted metadata file %q successfully", v.JSONFilePath)
 	v.JSONFilePath = ""
+}
+
+// metarrSkip returns why Metarr can't run for a channel URL's videos, with the error behind it: metarrErr from
+// metarrExecutable, or an ops file that can't be used, which Metarr would otherwise run without.
+func metarrSkip(metarrErr error, cu *models.ChannelURL, dp *parsing.DirectoryParser) (models.SkipMetarr, error) {
+	if metarrErr != nil {
+		return models.SkipMetarr{Skip: true, Reason: models.SkipMetarrNoPath}, metarrErr
+	}
+	if _, err := metarr.LoadMetaOpsFromFile(cu, dp); err != nil {
+		return models.SkipMetarr{Skip: true, Reason: models.SkipMetarrMissingMetaOpsFile}, err
+	}
+	if _, err := metarr.LoadFilenameOpsFromFile(cu, dp); err != nil {
+		return models.SkipMetarr{Skip: true, Reason: models.SkipMetarrMissingFilenameOpsFile}, err
+	}
+	if _, err := metadata.LoadFilteredMetaOpsFromFile(cu, dp); err != nil {
+		return models.SkipMetarr{Skip: true, Reason: models.SkipMetarrMissingFilteredMetaOpsFile}, err
+	}
+	if _, err := metadata.LoadFilteredFilenameOpsFromFile(cu, dp); err != nil {
+		return models.SkipMetarr{Skip: true, Reason: models.SkipMetarrMissingFilteredFilenameOpsFile}, err
+	}
+	return models.SkipMetarr{}, nil
 }
 
 // metarrExecutable returns an error if Metarr is not in $PATH or cannot be executed.
