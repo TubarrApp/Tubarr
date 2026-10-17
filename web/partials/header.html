@@ -96,8 +96,12 @@
       {{title}}
     </h1>
 
+    <!-- Only shown with a session to end, not when login is off or this address skips it. -->
     <button
       type="button"
+      x-data="{ hasSession: false }"
+      x-init="fetch('/api/v1/auth/status').then(r => r.ok ? r.json() : {}).then(s => { hasSession = !!s.session; }).catch(() => {})"
+      x-show="hasSession"
       @click="logOut()"
       class="shrink-0 text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400"
     >

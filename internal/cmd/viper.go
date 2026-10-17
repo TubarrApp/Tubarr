@@ -108,6 +108,12 @@ func InitProgramFlags(rootCmd *cobra.Command) error {
 		return err
 	}
 
+	// Global Post-processing Concurrency
+	rootCmd.PersistentFlags().Int(keys.PostProcessConcurrency, 0, "Maximum concurrent Metarr post-processing runs across all channels (0 = unlimited)")
+	if err := viper.BindPFlag(keys.PostProcessConcurrency, rootCmd.PersistentFlags().Lookup(keys.PostProcessConcurrency)); err != nil {
+		return err
+	}
+
 	// Custom scrape site config file (global, applies to all channels)
 	rootCmd.PersistentFlags().String(keys.ScrapeConfigFile, "", "Path to a config file (yaml/toml/json) defining custom scraping selectors for additional sites")
 	if err := viper.BindPFlag(keys.ScrapeConfigFile, rootCmd.PersistentFlags().Lookup(keys.ScrapeConfigFile)); err != nil {

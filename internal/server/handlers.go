@@ -741,7 +741,8 @@ func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, _ *http.Request
 			videoMap[consts.QVidTitle] = video.Title
 			videoMap[consts.QVidChanID] = video.ChannelID
 			videoMap[consts.QVidChanURLID] = video.ChannelURLID
-			videoMap["channel_name"] = c.Name
+			videoMap[consts.QVidChanURL] = video.ChannelURL
+			videoMap[consts.QVidChanName] = c.Name
 			videoMap[consts.QVidURL] = video.URL
 			videoMap[consts.QVidThumbnailURL] = video.ThumbnailURL
 			videoMap[consts.QVidDLStatus] = video.DownloadStatus
@@ -765,7 +766,6 @@ func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Update database status first.
 	if err := ss.cancelDownload(videoID); err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, errNoActiveDownload) {
@@ -775,19 +775,45 @@ func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Cancel the actual running download process.
-	var videoURL string
-	if videoURL, err = ss.vs.GetVideoURLByID(videoID); err != nil {
-		logger.Pl.E("Could not get video URL for ID %d: %v", videoID, err)
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write([]byte(`{"message": "Download canceled successfully"}`)); err != nil {
+		logger.Pl.E("Failed to write response message: %v", err)
 	}
-	cancelled := ss.ds.CancelDownload(videoID, videoURL)
-	if !cancelled {
-		logger.Pl.W("Download for video ID %d was marked as cancelled in DB but no active download process was found", videoID)
+}
+
+// handleCancelDownloads cancels several downloads by video ID.
+func (ss *serverStore) handleCancelDownloads(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		VideoIDs []int64 `json:"video_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	if len(body.VideoIDs) == 0 {
+		http.Error(w, "no video IDs given", http.StatusBadRequest)
+		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(`{"message": "Download cancelled successfully"}`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
+	canceled := 0
+	for _, id := range body.VideoIDs {
+		if err := ss.cancelDownload(id); err != nil {
+			if !errors.Is(err, errNoActiveDownload) {
+				logger.Pl.E("Failed to cancel download for video ID %d: %v", id, err)
+			}
+			continue
+		}
+		canceled++
+	}
+	if canceled == 0 {
+		http.Error(w, "no matching downloads found", http.StatusNotFound)
+		return
+	}
+
+	logger.Pl.I("Canceled %d download(s) via web request", canceled)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]int{"canceled": canceled}); err != nil {
+		logger.Pl.E("Failed to encode cancel response: %v", err)
 	}
 }
 
@@ -1057,7 +1083,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 
 // handleGetAvailableVideos returns videos awaiting the user's choice to download them, across all channels.
 //
-// Failed and cancelled videos are only included from channel URLs which don't auto download, as others retry on crawls.
+// Failed and canceled videos are only included from channel URLs which don't auto download, as others retry on crawls.
 func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.Request) {
 	videos, err := ss.vs.GetAvailableVideos(app.AvailableStatuses...)
 	if err != nil {
@@ -1608,6 +1634,35 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Global download concurrency updated", "limit": limit}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetPostProcessConcurrency returns the global post-processing (Metarr) concurrency limit.
+func (ss *serverStore) handleGetPostProcessConcurrency(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]int{"limit": viper.GetInt(keys.PostProcessConcurrency)}); err != nil {
+		logger.Pl.E("Failed to encode post-processing concurrency: %v", err)
+	}
+}
+
+// handleSetPostProcessConcurrency updates the global post-processing (Metarr) concurrency limit.
+func (ss *serverStore) handleSetPostProcessConcurrency(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.FormValue("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 0 {
+		http.Error(w, fmt.Sprintf("invalid limit value %q, must be 0 or greater", limitStr), http.StatusBadRequest)
+		return
+	}
+
+	if err := ss.tss.SetSetting(keys.PostProcessConcurrency, limitStr); err != nil {
+		logger.Pl.W("Failed to persist post-processing concurrency to DB: %v", err)
+	}
+	viper.Set(keys.PostProcessConcurrency, limit)
+	app.InitGlobalMetarrLimit(limit)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Post-processing concurrency updated", "limit": limit}); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }

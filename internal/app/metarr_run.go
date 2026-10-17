@@ -15,12 +15,11 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/limits"
 	"tubarr/internal/metadata"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-
-	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // metarrClaims holds videos currently owned by a Metarr run or the download pipeline, keyed by metarrKey.
@@ -68,21 +67,90 @@ type MetarrJob struct {
 	StartedAt    *time.Time `json:"started_at,omitempty"`
 }
 
-// metarrSems holds the Metarr semaphores shared by all runs, keyed by metarrSemKey.
+// globalMetarrSem limits Metarr runs across all channels (0 = unlimited).
+var globalMetarrSem = limits.NewSemaphore(0)
+
+// metarrSems holds the channel and channel URL Metarr semaphores, keyed by metarrSemKey.
 var metarrSems sync.Map
 
-// metarrSemKey identifies a channel URL's Metarr semaphore, a new one being used if its concurrency limit changes.
+// metarrSemKey identifies a channel's Metarr semaphore, or a channel URL's if it sets its own limit.
 type metarrSemKey struct {
-	channelURLID int64
-	limit        int
+	channelURL bool
+	id         int64
 }
 
-// metarrSem returns the Metarr semaphore shared by all runs for a channel URL.
-func metarrSem(cu *models.ChannelURL) chan struct{} {
-	n := metarrConcurrency(cu)
-	v, _ := metarrSems.LoadOrStore(metarrSemKey{cu.ID, n}, make(chan struct{}, n))
-	sem, _ := v.(chan struct{})
+// InitGlobalMetarrLimit sets the Metarr concurrency limit across all channels (0 = unlimited).
+func InitGlobalMetarrLimit(limit int) {
+	globalMetarrSem.SetLimit(limit)
+	if limit > 0 {
+		logger.Pl.I("Global post-processing concurrency limit set to %d", limit)
+	} else {
+		logger.Pl.I("Global post-processing concurrency limit disabled (unlimited)")
+	}
+}
+
+// metarrSem returns the semaphore limiting a channel URL's Metarr runs, or nil if only the global limit applies.
+//
+// URLs inheriting the channel's limit share the channel's semaphore, a URL with its own limit has its own.
+func metarrSem(c *models.Channel, cu *models.ChannelURL) *limits.Semaphore {
+	var chanLimit, urlLimit int
+	if c.ChanMetarrArgs != nil {
+		chanLimit = c.ChanMetarrArgs.Concurrency
+	}
+	if cu.ChanURLMetarrArgs != nil {
+		urlLimit = cu.ChanURLMetarrArgs.Concurrency // Merged, so equal to the channel's when inherited.
+	}
+
+	key, limit := metarrSemKey{false, c.ID}, chanLimit
+	if urlLimit > 0 && urlLimit != chanLimit {
+		key, limit = metarrSemKey{true, cu.ID}, urlLimit
+	}
+	if limit <= 0 {
+		return nil
+	}
+
+	v, ok := metarrSems.Load(key)
+	if !ok {
+		v, _ = metarrSems.LoadOrStore(key, limits.NewSemaphore(limit))
+	}
+	sem, _ := v.(*limits.Semaphore)
+	sem.SetLimit(limit)
 	return sem
+}
+
+// acquireMetarrSlots waits for a channel (or channel URL) and a global Metarr slot, returning a func releasing both.
+//
+// The global slot is taken last, so a video waiting on its channel doesn't hold one. Returns false if ctx is done or
+// stop is closed first.
+func acquireMetarrSlots(ctx context.Context, stop <-chan struct{}, c *models.Channel, cu *models.ChannelURL) (release func(), ok bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-stop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	sem := metarrSem(c, cu)
+	if sem != nil {
+		if err := sem.Acquire(ctx); err != nil {
+			return nil, false
+		}
+	}
+	if err := globalMetarrSem.Acquire(ctx); err != nil {
+		if sem != nil {
+			sem.Release()
+		}
+		return nil, false
+	}
+	return func() {
+		globalMetarrSem.Release()
+		if sem != nil {
+			sem.Release()
+		}
+	}, true
 }
 
 // RunMetarr runs Metarr on finished videos in a channel which Metarr has not yet processed.
@@ -139,17 +207,15 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 			continue
 		}
 
-		sem := metarrSem(cu)
 		wg.Go(func() {
 			defer releaseMetarr(key, claim)
 			defer vCancel()
 
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-vCtx.Done():
+			release, ok := acquireMetarrSlots(vCtx, nil, c, cu)
+			if !ok {
 				return
 			}
+			defer release()
 			claim.startedAt.Store(time.Now().UnixMilli())
 
 			if err := runVideoMetarr(vCtx, s.VideoStore(), v, cu, c); err != nil {
@@ -184,9 +250,9 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 
 	v.MetarrStatus = execMetarr(ctx, v, cu, c, dirParser)
 
-	// Cancelled (stopped, new download of this video, or shutdown), leave the database entry as it was.
+	// Canceled (stopped, new download of this video, or shutdown), leave the database entry as it was.
 	if ctx.Err() != nil {
-		logger.Pl.I("Metarr run for video %q was cancelled, not storing result", v.URL)
+		logger.Pl.I("Metarr run for video %q was canceled, not storing result", v.URL)
 		return nil //nolint:nilerr // Cancellation is not a failure.
 	}
 
@@ -206,7 +272,7 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 func execMetarr(ctx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) consts.MetarrStatus {
 	if err := metarr.InitMetarr(ctx, v, cu, c, dirParser); err != nil {
 		if ctx.Err() != nil {
-			logger.Pl.W("Metarr cancelled for video %q: %v", v.URL, err)
+			logger.Pl.W("Metarr canceled for video %q: %v", v.URL, err)
 			return consts.MetarrStatusPending
 		}
 		logger.Pl.E("Metarr processing error for video %q: %v", v.URL, err)
@@ -239,17 +305,6 @@ func metarrExecutable(ctx context.Context) error {
 		return fmt.Errorf("found 'metarr' in $PATH but failed to execute: %w", err)
 	}
 	return nil
-}
-
-// metarrConcurrency returns the Metarr concurrency limit for a channel URL.
-func metarrConcurrency(cu *models.ChannelURL) int {
-	if cu.ChanURLMetarrArgs.Concurrency > 0 {
-		return cu.ChanURLMetarrArgs.Concurrency
-	}
-	if abstractions.IsSet(keys.MConcurrency) {
-		return sharedvalidation.ValidateConcurrencyLimit(abstractions.GetInt(keys.MConcurrency))
-	}
-	return 1
 }
 
 // StopMetarr cancels a channel's queued and running Metarr processes, returning how many were stopped.

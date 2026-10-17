@@ -16,8 +16,8 @@ import (
 var ongoingDownloads sync.Map       // map[ongoingKey]struct{}.
 var activeDownloadContexts sync.Map // map[int64]context.CancelCauseFunc.
 
-// ErrCancelledByUser is the cause of a download context cancelled from the web UI or API, as opposed to by shutdown.
-var ErrCancelledByUser = errors.New("download cancelled by user")
+// ErrCanceledByUser is the cause of a download context canceled from the web UI or API, as opposed to by shutdown.
+var ErrCanceledByUser = errors.New("download canceled by user")
 
 // ongoingKey identifies a running download of one type of file for a URL.
 type ongoingKey struct {
@@ -188,7 +188,7 @@ func CancelDownloadByVideoID(videoID int64, videoURL string) bool {
 	if cancel, ok := activeDownloadContexts.Load(videoID); ok {
 		if cancelFunc, ok := cancel.(context.CancelCauseFunc); ok {
 			logger.Pl.I("Cancelling download for video ID %d with URL %q", videoID, videoURL)
-			cancelFunc(ErrCancelledByUser)
+			cancelFunc(ErrCanceledByUser)
 			return true
 		}
 	}

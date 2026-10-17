@@ -23,7 +23,7 @@ func TestCrawlLock(t *testing.T) {
 		t.Fatal("stop queue did not cancel queue context")
 	}
 	if ctx.Err() != nil {
-		t.Fatal("stop queue cancelled active context")
+		t.Fatal("stop queue canceled active context")
 	}
 	select {
 	case <-StopRequested(ctx):
@@ -38,7 +38,7 @@ func TestCrawlLock(t *testing.T) {
 		t.Fatal("abort did not cancel active context")
 	}
 	if JobParent(ctx).Err() != nil {
-		t.Fatal("abort cancelled job parent")
+		t.Fatal("abort canceled job parent")
 	}
 
 	unlock()

@@ -33,7 +33,7 @@ type (
 
 // TryLockCrawl locks a channel's crawl state if it isn't already locked.
 //
-// Returns the job's active context, cancelled by AbortAll, and an unlock function which must be called when the job ends.
+// Returns the job's active context, canceled by AbortAll, and an unlock function which must be called when the job ends.
 func TryLockCrawl(parent context.Context, channelName string) (ctx context.Context, unlock func(), ok bool) {
 	activeCtx, cancelActive := context.WithCancel(parent)
 	activeCtx = context.WithValue(activeCtx, jobParentKey{}, parent)
@@ -98,7 +98,7 @@ func JobParent(ctx context.Context) context.Context {
 	return ctx
 }
 
-// QueueCtx returns a job's queue context, cancelled by StopQueue and AbortAll, for work which must not start once stopped.
+// QueueCtx returns a job's queue context, canceled by StopQueue and AbortAll, for work which must not start once stopped.
 //
 // Returns ctx itself if it is not a job context.
 func QueueCtx(ctx context.Context) context.Context {

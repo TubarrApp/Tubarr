@@ -123,7 +123,6 @@ func InitProcess(
 					v,
 					cu,
 					c,
-					metarrSem(cu),
 					&metarrWg,
 					metarrIsExecutable,
 					&downloaded)
@@ -214,16 +213,10 @@ func videoJob(
 	v *models.Video,
 	cu *models.ChannelURL,
 	c *models.Channel,
-	metarrSem chan struct{},
 	metarrWg *sync.WaitGroup,
 	metarrIsExecutable bool,
 	downloaded *atomic.Int32,
 ) (err error) {
-	// Bot detection avoidance wait time.
-	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL); err != nil {
-		return err
-	}
-
 	// Take hold of video before touching its files, cancelling any separate Metarr run on it.
 	key := metarrKey{c.ID, v.URL}
 	vMetarrCtx, vMetarrCancel := context.WithCancel(metarrCtx)
@@ -246,8 +239,42 @@ func videoJob(
 		}
 	}()
 
+	// Per-video context, canceled from the Downloads page once the video is tracked there.
+	vidCtx, vidCancel := context.WithCancelCause(procCtx)
+	defer vidCancel(nil)
+	tracked := false
+	track := func(stage string) {
+		if v.ID == 0 {
+			return
+		}
+		if !tracked {
+			downloads.RegisterDownloadContext(v.ID, v.URL, vidCancel)
+			tracked = true
+		}
+		dlTracker.SetStatus(v, consts.DLStatusQueued, 0, stage, nil)
+	}
+	defer func() {
+		if !tracked {
+			return
+		}
+		downloads.UnregisterDownloadContext(v.ID, v.URL)
+		finishTracking(vidCtx, dlTracker, v, err)
+	}()
+	track("Waiting to start")
+
+	// Bot detection avoidance wait time.
+	waitCtx, waitCancel := context.WithCancelCause(queueCtx)
+	stopWait := context.AfterFunc(vidCtx, func() { waitCancel(context.Cause(vidCtx)) })
+	err = times.WaitTime(waitCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL)
+	stopWait()
+	waitCancel(nil)
+	if err != nil {
+		return err
+	}
+
 	// Process JSON metadata phase.
-	proceed, botBlockChannel, err := processJSON(procCtx, vs, dlTracker, dirParser, c, cu, v)
+	track("Fetching metadata")
+	proceed, botBlockChannel, err := processJSON(vidCtx, vs, dlTracker, dirParser, c, cu, v)
 	if errors.Is(err, downloads.ErrDuplicateDownload) {
 		logger.Pl.I("Skipping video %q: %v", v.URL, err)
 		return nil
@@ -261,11 +288,14 @@ func videoJob(
 		return nil
 	}
 
+	// New videos have an ID once their metadata is stored.
+	track("Waiting for download slot")
+
 	// Check move operations.
 	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, dirParser)
 
 	// Process video download phase.
-	botBlockChannel, err = processVideo(procCtx, v, cu, c, dlTracker)
+	botBlockChannel, err = processVideo(vidCtx, v, cu, c, dlTracker)
 	if errors.Is(err, downloads.ErrDuplicateDownload) {
 		logger.Pl.I("Skipping video %q: %v", v.URL, err)
 		return nil
@@ -301,17 +331,13 @@ func videoJob(
 			}
 		}
 
-		// Acquire semaphore slot.
-		select {
-		case metarrSem <- struct{}{}:
-			defer func() { <-metarrSem }()
-		case <-vMetarrCtx.Done():
-			storePending()
-			return
-		case <-stopRequested:
+		// Acquire channel and global Metarr slots.
+		release, ok := acquireMetarrSlots(vMetarrCtx, stopRequested, channel, channelURL)
+		if !ok {
 			storePending()
 			return
 		}
+		defer release()
 		if vMetarrCtx.Err() != nil || isClosed(stopRequested) {
 			storePending()
 			return
@@ -326,6 +352,21 @@ func videoJob(
 	}(v, cu, c)
 
 	return nil
+}
+
+// finishTracking sends a video's final status, dropping it from the Downloads page.
+//
+// A video leaving the pipeline unfinished (still Queued or Downloading) is marked Failed, or Canceled if the user
+// canceled it, so it returns to the Available list.
+func finishTracking(vidCtx context.Context, dlTracker *downloads.DownloadTracker, v *models.Video, err error) {
+	status := v.DownloadStatus.Status
+	if status == consts.DLStatusQueued || status == consts.DLStatusDownloading {
+		status = consts.DLStatusFailed
+		if errors.Is(context.Cause(vidCtx), downloads.ErrCanceledByUser) {
+			status = consts.DLStatusCanceled
+		}
+	}
+	dlTracker.SetStatus(v, status, v.DownloadStatus.Percent, "", err)
 }
 
 // isClosed reports whether ch is closed, false for a nil channel.
@@ -427,22 +468,14 @@ func processJSON(
 }
 
 // processVideo processes video downloads.
-func processVideo(procCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) (botBlockChannel bool, err error) {
+func processVideo(vidCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) (botBlockChannel bool, err error) {
 	if v == nil || cu == nil || c == nil {
 		return false, fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
 	}
 
 	logger.Pl.I("Processing video download for URL: %s", v.URL)
 
-	// Create cancellable context for this specific download.
-	downloadCtx, cancel := context.WithCancelCause(procCtx)
-	defer cancel(nil)
-
-	// Register the cancel function so it can be called from API.
-	downloads.RegisterDownloadContext(v.ID, v.URL, cancel)
-	defer downloads.UnregisterDownloadContext(v.ID, v.URL)
-
-	dl, err := downloads.NewVideoDownload(downloadCtx, v, cu, c, dlTracker.GetStore(), dlTracker, &downloads.Options{
+	dl, err := downloads.NewVideoDownload(vidCtx, v, cu, c, dlTracker.GetStore(), dlTracker, &downloads.Options{
 		MaxRetries:       3,
 		RetryMaxInterval: 20,
 	})

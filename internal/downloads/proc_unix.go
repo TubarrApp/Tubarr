@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// cancelWaitDelay is how long a cancelled command's process group has to exit before its pipes are closed.
+// cancelWaitDelay is how long a canceled command's process group has to exit before its pipes are closed.
 const cancelWaitDelay = 15 * time.Second
 
 // useProcessGroup starts cmd in its own process group, so cancelling it stops its children (e.g. ffmpeg, aria2c) too.

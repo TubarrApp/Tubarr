@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"tubarr/internal/app"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
@@ -39,7 +40,7 @@ var rootCmd = &cobra.Command{
 
 		// Load persisted settings from DB, applying them only if the CLI flag was not explicitly set.
 		if settingsStore != nil {
-			intKeys := []string{keys.CrawlConcurrency, keys.GlobalDownloadConcurrency}
+			intKeys := []string{keys.CrawlConcurrency, keys.GlobalDownloadConcurrency, keys.PostProcessConcurrency}
 			for _, k := range intKeys {
 				if !cmd.Flags().Changed(k) {
 					if val, found, err := settingsStore.GetSetting(k); err != nil {
@@ -80,6 +81,7 @@ var rootCmd = &cobra.Command{
 
 		// Initialize global download concurrency limit (0 = unlimited).
 		downloads.InitGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
+		app.InitGlobalMetarrLimit(viper.GetInt(keys.PostProcessConcurrency))
 
 		// Setup benchmarking if flag is set.
 		if viper.GetBool(keys.Benchmarking) {

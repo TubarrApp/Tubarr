@@ -1840,7 +1840,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 
 	// Metarr concurrency.
 	if v, ok := parsing.GetConfigValue[int](vip, keys.MConcurrency); ok {
-		c.ChanMetarrArgs.Concurrency = sharedvalidation.ValidateConcurrencyLimit(v)
+		c.ChanMetarrArgs.Concurrency = max(v, 0)
 	}
 
 	// Metarr max CPU.

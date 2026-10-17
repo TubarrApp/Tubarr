@@ -126,6 +126,7 @@ const (
 	QVidMetarrStatus = "metarr_status"
 	QVidCreatedAt    = "created_at"
 	QVidUpdatedAt    = "updated_at"
+	QVidChanName     = "channel_name"
 )
 
 // ValidVideoKeys holds valid keys for the video database.
@@ -150,6 +151,7 @@ var ValidVideoKeys = map[string]struct{}{
 	QVidMetarrStatus: {},
 	QVidCreatedAt:    {},
 	QVidUpdatedAt:    {},
+	QVidChanName:     {},
 }
 
 // Downloads database entry keys.
@@ -220,7 +222,7 @@ const (
 	DLStatusCompleted   DownloadStatus = "Finished"
 	DLStatusFailed      DownloadStatus = "Failed"
 	DLStatusIgnored     DownloadStatus = "Ignored"
-	DLStatusCancelled   DownloadStatus = "Cancelled"
+	DLStatusCanceled    DownloadStatus = "Canceled"
 )
 
 // MetarrStatus holds constant Metarr processing status strings.

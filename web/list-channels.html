@@ -200,6 +200,7 @@
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Max Concurrency:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.max_concurrency || 1"></span>
+                              <span x-show="capNote(channel.settings?.max_concurrency, globalDownloadLimit)" class="ml-2 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(channel.settings?.max_concurrency, globalDownloadLimit)"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Download Retries:</span>
@@ -293,7 +294,7 @@
 
                         <!-- Metarr Settings Section -->
                         <div x-show="channel.metarr">
-                          <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Metarr Settings</h4>
+                          <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Post-processing</h4>
                           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Output Directory:</span>
@@ -309,7 +310,8 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Concurrency:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_concurrency || 3"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_concurrency || 'Global'"></span>
+                              <span x-show="capNote(channel.metarr?.metarr_concurrency, globalPostProcessLimit)" class="ml-2 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(channel.metarr?.metarr_concurrency, globalPostProcessLimit)"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Max CPU Usage:</span>
@@ -442,6 +444,26 @@
           availableCounts: {}, // Channel ID -> videos waiting to be chosen.
           loading: false,
           error: '',
+          globalDownloadLimit: 0,
+          globalPostProcessLimit: 0,
+
+          // A note when a limit is above the global one (0 = unlimited), which caps it.
+          capNote(value, global) {
+            return global > 0 && value > global ? `(capped at ${global} by global limit)` : '';
+          },
+
+          async loadGlobalLimits() {
+            try {
+              const [postProcess, download] = await Promise.all([
+                fetch('/api/v1/settings/post-process-concurrency'),
+                fetch('/api/v1/settings/global-download-concurrency')
+              ]);
+              if (postProcess.ok) this.globalPostProcessLimit = (await postProcess.json()).limit ?? 0;
+              if (download.ok) this.globalDownloadLimit = (await download.json()).limit ?? 0;
+            } catch (err) {
+              console.error('Error loading global concurrency limits:', err);
+            }
+          },
 
           async loadAvailableCounts() {
             try {
@@ -461,6 +483,7 @@
             this.loading = true;
             this.error = '';
             this.loadAvailableCounts();
+            this.loadGlobalLimits();
 
             try {
               const response = await fetch('/api/v1/channels/all');

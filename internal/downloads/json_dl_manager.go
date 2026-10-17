@@ -63,7 +63,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 
 		select {
 		case <-d.Context.Done():
-			logger.Pl.W("Download cancelled: %v", d.Context.Err())
+			logger.Pl.W("Download canceled: %v", d.Context.Err())
 			return false, d.cancelJSONDownload()
 		default:
 			if err := d.jsonDLAttempt(); err != nil {
@@ -91,7 +91,7 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 
 					select {
 					case <-d.Context.Done():
-						logger.Pl.W("Download cancelled: %v", d.Context.Err())
+						logger.Pl.W("Download canceled: %v", d.Context.Err())
 						return false, d.cancelJSONDownload()
 					case <-time.After(randWait):
 						continue

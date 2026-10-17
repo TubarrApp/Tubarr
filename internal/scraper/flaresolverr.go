@@ -195,7 +195,7 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 	sol, statusCode, err := solveFlareSolverr(ctx, baseURL, homeURL, timeout)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, err // Cancelled, not a FlareSolverr failure.
+			return nil, err // Canceled, not a FlareSolverr failure.
 		}
 		return nil, cm.flareSolverrFailed(host, statusCode, err)
 	}

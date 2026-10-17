@@ -116,7 +116,7 @@
             <!-- Global Concurrency Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Concurrency</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">0 = unlimited for all settings</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">0 = unlimited for all settings<br><br>A channel or channel URL left at 0 is limited only by this.</p>
 
               <!-- Crawl Concurrency -->
               <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
@@ -138,7 +138,7 @@
               </div>
 
               <!-- Download Concurrency -->
-              <div class="flex items-center justify-between py-3">
+              <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
                 <div class="flex-1">
                   <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Download Concurrency</p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">Total video downloads across all channels</p>
@@ -153,6 +153,25 @@
                   />
                   <span x-show="savingLimit" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
                   <span x-show="limitSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                </div>
+              </div>
+
+              <!-- Post-processing Concurrency -->
+              <div class="flex items-center justify-between py-3">
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Post-processing Concurrency</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Total post-processing runs across all channels</p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <input
+                    type="number"
+                    x-model.number="postProcessConcurrency"
+                    min="0"
+                    class="w-20 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    @change="updatePostProcessConcurrency()"
+                  />
+                  <span x-show="savingPostProcess" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
+                  <span x-show="postProcessSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
                 </div>
               </div>
             </div>
@@ -409,6 +428,11 @@
           savingLimit: false,
           limitSaved: false,
 
+          // Global post-processing concurrency
+          postProcessConcurrency: 0,
+          savingPostProcess: false,
+          postProcessSaved: false,
+
           // Domain limits
           domainLimits: {},
           loadingLimits: true,
@@ -427,6 +451,7 @@
           init() {
             this.loadCrawlConcurrency();
             this.loadGlobalDownloadLimit();
+            this.loadPostProcessConcurrency();
             this.loadDomainLimits();
             this.loadFlareSolverrURL();
           },
@@ -488,6 +513,36 @@
               console.error('Error saving global download limit:', err);
             } finally {
               this.savingLimit = false;
+            }
+          },
+
+          async loadPostProcessConcurrency() {
+            try {
+              const response = await fetch('/api/v1/settings/post-process-concurrency');
+              if (!response.ok) return;
+              const data = await response.json();
+              this.postProcessConcurrency = data.limit ?? 0;
+            } catch (err) {
+              console.error('Error loading post-processing concurrency:', err);
+            }
+          },
+
+          async updatePostProcessConcurrency() {
+            this.savingPostProcess = true;
+            this.postProcessSaved = false;
+            try {
+              const response = await fetch('/api/v1/settings/post-process-concurrency', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ limit: this.postProcessConcurrency })
+              });
+              if (!response.ok) throw new Error('Failed to update');
+              this.postProcessSaved = true;
+              setTimeout(() => { this.postProcessSaved = false; }, 2000);
+            } catch (err) {
+              console.error('Error saving post-processing concurrency:', err);
+            } finally {
+              this.savingPostProcess = false;
             }
           },
 

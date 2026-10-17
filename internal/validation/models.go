@@ -85,7 +85,7 @@ func ValidateSettingsModel(s *models.Settings) error {
 //
 // Ensures all metarr settings are valid before storage/after retrieval.
 func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
-	m.Concurrency = sharedvalidation.ValidateConcurrencyLimit(m.Concurrency)
+	m.Concurrency = max(m.Concurrency, 0) // 0 inherits the channel's limit, or the global one.
 
 	if m.FilenameOps != nil {
 		if err := ValidateFilenameOps(m.FilenameOps); err != nil {

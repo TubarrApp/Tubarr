@@ -47,7 +47,7 @@ func TestCancelRemovesPartials(t *testing.T) {
 		cause       error
 		wantRemoved bool
 	}{
-		{"user cancel", ErrCancelledByUser, true},
+		{"user cancel", ErrCanceledByUser, true},
 		{"shutdown", nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -92,7 +92,7 @@ func TestCancelRemovesPartials(t *testing.T) {
 				cancel(context.Canceled)
 			}
 			if err := <-done; err == nil {
-				t.Fatal("expected an error from a cancelled download")
+				t.Fatal("expected an error from a canceled download")
 			}
 			_ = d.cancelVideoDownload()
 

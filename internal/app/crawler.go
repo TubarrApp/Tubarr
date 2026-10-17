@@ -302,11 +302,11 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 }
 
 // AvailableStatuses are the statuses of videos the user can choose to download or dismiss.
-var AvailableStatuses = []consts.DownloadStatus{consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCancelled}
+var AvailableStatuses = []consts.DownloadStatus{consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCanceled}
 
 // DownloadAvailable downloads videos claimed from the Available list, once any running crawl or download of the channel finishes.
 //
-// Claimed videos the download didn't reach are marked cancelled if the channel was stopped, or failed otherwise (e.g. their
+// Claimed videos the download didn't reach are marked canceled if the channel was stopped, or failed otherwise (e.g. their
 // domain is blocked), so they can be chosen again.
 func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Channel, claimed []*models.Video) (err error) {
 	ids := make([]int64, 0, len(claimed))
@@ -321,7 +321,7 @@ func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Chan
 
 	unreached := consts.DLStatusFailed
 	if errors.Is(err, state.ErrStoppedWaiting) || (ctx != nil && state.QueueCtx(ctx).Err() != nil) {
-		unreached = consts.DLStatusCancelled
+		unreached = consts.DLStatusCanceled
 	}
 	if _, resetErr := s.VideoStore().ClaimVideos(c.ID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, unreached); resetErr != nil {
 		err = errors.Join(err, resetErr)
@@ -397,12 +397,12 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 
 	// Get new releases for channel.
 	scrape := scraper.New()
-	videos, err := scrape.GetNewReleases(queueCtx, cs, c, false)
-	if err != nil {
+	videos, crawlErr := scrape.GetNewReleases(queueCtx, cs, c, false)
+	if crawlErr != nil && len(videos) == 0 {
 		if updateErr := cs.UpdateLastScan(c.ID); updateErr != nil {
 			logger.Pl.E("Failed to update channel %q last scan time after failure to crawl channel: %v", c.Name, updateErr)
 		}
-		return false, err
+		return false, crawlErr
 	}
 
 	if len(videos) == 0 {
@@ -413,12 +413,12 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 		return true, nil
 	}
 
-	// Main process...
+	// Main process (a partial crawl's errors are reported alongside processing errors).
 	var (
 		nSucceeded,
 		nDownloaded,
 		nAvailable int
-		procError         error
+		procError         = crawlErr
 		channelURLsGotNew []string
 	)
 
@@ -515,9 +515,9 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 	// Get new releases.
 	scrape := scraper.New()
-	videos, err := scrape.GetNewReleases(state.QueueCtx(ctx), cs, c, true)
-	if err != nil {
-		return err
+	videos, crawlErr := scrape.GetNewReleases(state.QueueCtx(ctx), cs, c, true)
+	if crawlErr != nil && len(videos) == 0 {
+		return crawlErr
 	}
 
 	// Add videos to ignore.
@@ -543,7 +543,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 		logger.Pl.S("Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
 	}
-	return nil
+	return crawlErr
 }
 
 // filterAllowedValidURLs returns only valid and unblocked URLs.

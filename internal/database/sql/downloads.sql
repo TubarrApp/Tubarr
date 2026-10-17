@@ -7,3 +7,5 @@ CREATE TABLE IF NOT EXISTS downloads (
     FOREIGN KEY(video_id) REFERENCES videos(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
+-- Status renamed from 'Cancelled'.
+UPDATE downloads SET status = 'Canceled' WHERE status = 'Cancelled';

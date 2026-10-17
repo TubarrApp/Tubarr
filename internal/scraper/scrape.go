@@ -63,7 +63,7 @@ func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Chann
 	return existingMap, existingURLs, nil
 }
 
-// GetNewReleases checks a channel's URLs for new video URLs that haven't been recorded as downloaded.
+// GetNewReleases checks a channel's URLs for new video URLs, returning those found alongside any per-URL errors.
 func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, ignoreCrawl bool) ([]*models.Video, error) {
 	if len(c.URLModels) == 0 {
 		logger.Pl.D(1, "Channel %q has no URLs configured, skipping automatic crawl", c.Name)
@@ -75,7 +75,10 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		return nil, err
 	}
 
-	var newRequests []*models.Video
+	var (
+		newRequests []*models.Video
+		urlErrs     error
+	)
 
 	// Process each ChannelURL
 	for _, cu := range c.URLModels {
@@ -94,7 +97,12 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
 		if err != nil {
 			limits.Release(crawlSem)
-			return nil, err
+			if ctx.Err() != nil {
+				return nil, err
+			}
+			logger.Pl.E("Skipping channel URL %q, failed to get cookies: %v", cu.URL, err)
+			urlErrs = errors.Join(urlErrs, fmt.Errorf("channel URL %q: %w", cu.URL, err))
+			continue
 		}
 
 		// Fetch new episode URLs
@@ -105,7 +113,12 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, chanCrawlArgs, cu.FlareSolverr)
 		limits.Release(crawlSem)
 		if err != nil {
-			return nil, err
+			if ctx.Err() != nil {
+				return nil, err
+			}
+			logger.Pl.E("Skipping channel URL %q, crawl failed: %v", cu.URL, err)
+			urlErrs = errors.Join(urlErrs, fmt.Errorf("channel URL %q: %w", cu.URL, err))
+			continue
 		}
 
 		// Filter and create video requests
@@ -148,7 +161,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 	}
 
-	return newRequests, nil
+	return newRequests, urlErrs
 }
 
 // ScrapeCustomSite scrapes custom sites for metadata.
@@ -443,7 +456,7 @@ func (s *Scraper) visitPageOnce(ctx context.Context, urlStr string, cookies []*h
 //
 // Cookies are set in order, later ones replacing earlier ones with the same name: this crawl session's, then the caller's
 // (e.g. the channel URL's), then for FlareSolverr sites (sol set), the solution's, so a refreshed solve isn't undone by
-// older Cloudflare cookies. FlareSolverr sites impersonate Chrome with the solution's user agent. Requests are cancelled with ctx.
+// older Cloudflare cookies. FlareSolverr sites impersonate Chrome with the solution's user agent. Requests are canceled with ctx.
 func initializeCollector(ctx context.Context, urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {

@@ -250,7 +250,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	waitErr := cmd.Wait()
 
 	if err := d.Context.Err(); err != nil {
-		logger.Pl.W("Download cancelled: %v", err)
+		logger.Pl.W("Download canceled: %v", err)
 		return err
 	}
 	if result.err != nil {
@@ -319,10 +319,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 		if strings.HasPrefix(line, "/") {
 			if _, ok := sharedconsts.AllVidExtensions[filepath.Ext(line)]; ok { // Download succeeded.
 
-				// Set model to complete.
-				d.Video.DownloadStatus.Status = consts.DLStatusCompleted
-				d.Video.DownloadStatus.Percent = 100.0
-				d.DLTracker.sendUpdate(d.Video)
+				d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
 
 				filename = line
 				completed = true
@@ -378,7 +375,7 @@ func (d *VideoDownload) updateProgress(status consts.DownloadStatus, pct float64
 	d.Video.DownloadStatus.Status = status
 	d.Video.DownloadStatus.Percent = pct
 	if status != prev.Status || math.Floor(pct) != math.Floor(prev.Percent) {
-		d.DLTracker.sendUpdate(d.Video)
+		d.DLTracker.SendUpdate(d.Video)
 	}
 }
 

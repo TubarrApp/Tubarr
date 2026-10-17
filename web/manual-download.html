@@ -194,13 +194,13 @@
               const result = await response.json().catch(() => ({}));
               this.success = result.queued
                 ? `Queued ${urls.length} URL(s): the download starts when the channel's current crawl or download finishes. The channel's Stop Queue or Abort All button cancels it.`
-                : `Successfully started downloading ${urls.length} URL(s) to the selected channel. Check Active Downloads for progress.`;
+                : `Successfully started downloading ${urls.length} URL(s) to the selected channel. Check Downloads for progress.`;
               this.urlsText = '';
 
               // Redirect to active downloads after a delay, unless the download is waiting to start.
               if (!result.queued) {
                 setTimeout(() => {
-                  window.location.href = 'active-downloads.html';
+                  window.location.href = 'downloads.html';
                 }, 2000);
               }
             } catch (err) {

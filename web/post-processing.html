@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <style>
+      [x-cloak] { display: none !important; }
+      .transcodes-table { width: 100%; }
+      .transcodes-table .check-col { width: 2.5rem; }
+      .transcodes-table .video-col { width: 40%; }
+      .transcodes-table .channel-col { width: 20%; }
+      .transcodes-table .status-col { width: 10%; }
+      .transcodes-table .elapsed-col { width: 12%; font-variant-numeric: tabular-nums; }
+      .scrollable-text { display: block; max-width: 100%; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
+      .scrollable-text::-webkit-scrollbar { height: 4px; }
+    </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Post-processing | Tubarr</title>
+    <link rel="icon" href="/src/images/favicon.ico">
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body
+    x-data="{ page: 'postProcessing', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+    class="dark bg-gray-900"
+  >
+    <!-- ===== Preloader Start ===== -->
+    <div
+      x-show="loaded"
+      x-init="loaded = false"
+      class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black"
+    >
+      <div class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
+    </div>
+    <!-- ===== Preloader End ===== -->
+
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden" x-cloak>
+      <!-- include:sidebar selected="Post-processing" -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto">
+        <!-- include:header title="Post-processing" -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main x-data="transcodesData()" x-init="init()">
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+            <div class="mb-6">
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Videos queued for or running in Metarr. Canceled videos stay downloaded and can be finished later with Run Metarr.
+              </p>
+            </div>
+
+            <!-- Error Message -->
+            <div x-show="error" class="mb-6 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-400">
+              <p x-text="error"></p>
+            </div>
+
+            <!-- Loading State -->
+            <div x-show="loading" class="flex justify-center items-center py-12">
+              <div class="h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
+            </div>
+
+            <div x-show="!loading && !error" class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
+              <!-- No Transcodes Message -->
+              <div x-show="jobs.length === 0" class="p-8 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Nothing post-processing</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Nothing is queued for or running in Metarr.</p>
+              </div>
+
+              <div x-show="jobs.length > 0">
+                <!-- Filters -->
+                <div class="flex flex-wrap items-center gap-4 border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+                  <select
+                    x-model="channelFilter"
+                    @change="urlFilter = ''; filterChanged()"
+                    class="max-w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="" x-text="`All channels (${jobs.length})`"></option>
+                    <template x-for="ch in channelOptions" :key="ch.id">
+                      <option :value="ch.id" :selected="channelFilter === ch.id" x-text="`${ch.name} (${ch.count})`"></option>
+                    </template>
+                  </select>
+
+                  <select
+                    x-show="channelFilter !== '' && urlOptions.length > 1"
+                    x-model="urlFilter"
+                    @change="filterChanged()"
+                    class="max-w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="" x-text="`All URLs (${channelJobs.length})`"></option>
+                    <template x-for="u in urlOptions" :key="u.id">
+                      <option :value="u.id" :selected="urlFilter === u.id" x-text="`${shortURL(u.url)} (${u.count})`"></option>
+                    </template>
+                  </select>
+                </div>
+
+                <!-- Selection Bar -->
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-gray-800">
+                  <div class="flex flex-wrap items-center gap-4 text-sm">
+                    <span class="font-medium text-gray-900 dark:text-white">
+                      <span x-text="selectedCount"></span> of <span x-text="filteredJobs.length"></span> selected
+                    </span>
+                    <button @click="selectAllFiltered()" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Select all</button>
+                    <button @click="selectQueued()" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Select queued</button>
+                    <button x-show="selectedCount > 0" @click="selected = {}" class="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100">Clear</button>
+                  </div>
+                  <button
+                    @click="cancel(Object.values(selected))"
+                    :disabled="selectedCount === 0 || working"
+                    class="px-4 py-2 text-sm font-medium text-white rounded-lg bg-error-500 hover:bg-error-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel<span x-show="selectedCount > 0" x-text="` (${selectedCount})`"></span>
+                  </button>
+                </div>
+
+                <!-- Transcodes Table -->
+                <div class="overflow-x-auto">
+                  <table class="transcodes-table">
+                    <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
+                      <tr>
+                        <th class="px-4 py-2.5 check-col"></th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 video-col">Video</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 channel-col">Channel</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 status-col">Status</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 elapsed-col">Time</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                      <template x-for="(job, i) in filteredJobs" :key="job.video_id">
+                        <tr @click="toggle(job, i, $event)" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td class="px-4 py-3 check-col">
+                            <input
+                              type="checkbox"
+                              :checked="!!selected[job.video_id]"
+                              @click.stop="toggle(job, i, $event)"
+                              class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                            />
+                          </td>
+                          <td class="px-4 py-3 video-col">
+                            <div class="scrollable-text">
+                              <p class="text-sm font-medium text-brand-600 dark:text-brand-400" x-text="job.title || job.url"></p>
+                              <a :href="safeURL(job.url)" target="_blank" rel="noopener noreferrer" @click.stop class="text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400" x-text="job.url"></a>
+                            </div>
+                          </td>
+                          <td class="px-4 py-3 channel-col">
+                            <p class="text-sm text-gray-900 dark:text-white" x-text="job.channel_name"></p>
+                            <p class="truncate text-xs text-gray-500 dark:text-gray-400" :title="job.channel_url" x-text="shortURL(job.channel_url)"></p>
+                          </td>
+                          <td class="px-4 py-3 status-col">
+                            <span x-show="job.started_at" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">Running</span>
+                            <span x-show="!job.started_at" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Queued</span>
+                          </td>
+                          <td class="px-4 py-3 elapsed-col">
+                            <span
+                              class="text-sm text-gray-600 dark:text-gray-400"
+                              :title="job.started_at ? `Started ${new Date(job.started_at).toLocaleString()}` : `Queued ${new Date(job.queued_at).toLocaleString()}`"
+                              x-text="job.started_at ? elapsed(job.started_at) : `waiting ${elapsed(job.queued_at)}`"
+                            ></span>
+                          </td>
+                          <td class="px-4 py-3">
+                            <button
+                              @click.stop="cancel([job])"
+                              :disabled="working"
+                              class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
+                            >
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                              </svg>
+                              <span>Cancel</span>
+                            </button>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+
+    <script defer src="bundle.js"></script>
+    <script>
+      function transcodesData() {
+        return {
+          jobs: [],
+          selected: {}, // Video ID -> job.
+          channelFilter: '',
+          urlFilter: '',
+          loading: true,
+          error: null,
+          working: false,
+          now: Date.now(),
+          lastClickedIndex: null,
+          pollInterval: null,
+          clockInterval: null,
+
+          init() {
+            const params = new URLSearchParams(window.location.search);
+            this.channelFilter = params.get('channel') || '';
+            this.urlFilter = params.get('url') || '';
+            this.loadJobs();
+            this.pollInterval = setInterval(() => this.loadJobs(), 2000);
+            this.clockInterval = setInterval(() => { this.now = Date.now(); }, 1000);
+          },
+
+          async loadJobs() {
+            try {
+              const response = await fetch('/api/v1/transcodes');
+              if (!response.ok) {
+                throw new Error(await response.text() || 'Failed to fetch transcodes');
+              }
+              this.jobs = await response.json() || [];
+              this.error = null;
+              // Drop selections which have finished.
+              const live = new Set(this.jobs.map(j => j.video_id));
+              for (const id of Object.keys(this.selected)) {
+                if (!live.has(Number(id))) delete this.selected[id];
+              }
+            } catch (err) {
+              this.error = err.message;
+              clearInterval(this.pollInterval);
+            } finally {
+              this.loading = false;
+            }
+          },
+
+          // Channels with transcodes, and their counts.
+          get channelOptions() {
+            const byID = new Map();
+            for (const j of this.jobs) {
+              const ch = byID.get(j.channel_id) || { id: String(j.channel_id), name: j.channel_name, count: 0 };
+              ch.count++;
+              byID.set(j.channel_id, ch);
+            }
+            return [...byID.values()].sort((a, b) => a.name.localeCompare(b.name));
+          },
+
+          get channelJobs() {
+            if (this.channelFilter === '') return this.jobs;
+            return this.jobs.filter(j => String(j.channel_id) === this.channelFilter);
+          },
+
+          // The selected channel's URLs with transcodes, and their counts.
+          get urlOptions() {
+            const byID = new Map();
+            for (const j of this.channelJobs) {
+              const u = byID.get(j.channel_url_id) || { id: String(j.channel_url_id), url: j.channel_url, count: 0 };
+              u.count++;
+              byID.set(j.channel_url_id, u);
+            }
+            return [...byID.values()];
+          },
+
+          // Running first, then queued, each oldest first as the server sends them.
+          get filteredJobs() {
+            let list = this.channelJobs;
+            if (this.urlFilter !== '') {
+              list = list.filter(j => String(j.channel_url_id) === this.urlFilter);
+            }
+            return [...list.filter(j => j.started_at), ...list.filter(j => !j.started_at)];
+          },
+
+          get selectedCount() {
+            return Object.keys(this.selected).length;
+          },
+
+          filterChanged() {
+            this.lastClickedIndex = null;
+            const params = new URLSearchParams();
+            if (this.channelFilter) params.set('channel', this.channelFilter);
+            if (this.urlFilter) params.set('url', this.urlFilter);
+            const query = params.toString();
+            history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
+          },
+
+          toggle(job, index, event) {
+            const select = !this.selected[job.video_id];
+            if (event.shiftKey && this.lastClickedIndex !== null) {
+              const start = Math.min(this.lastClickedIndex, index);
+              const end = Math.max(this.lastClickedIndex, index);
+              for (const j of this.filteredJobs.slice(start, end + 1)) {
+                this.setSelected(j, select);
+              }
+            } else {
+              this.setSelected(job, select);
+            }
+            this.lastClickedIndex = index;
+          },
+
+          setSelected(job, select) {
+            if (select) {
+              this.selected[job.video_id] = job;
+            } else {
+              delete this.selected[job.video_id];
+            }
+          },
+
+          selectAllFiltered() {
+            this.filteredJobs.forEach(j => this.setSelected(j, true));
+          },
+
+          selectQueued() {
+            this.filteredJobs.filter(j => !j.started_at).forEach(j => this.setSelected(j, true));
+          },
+
+          // Cancels the given transcodes, sent per channel.
+          async cancel(chosen) {
+            if (chosen.length === 0) return;
+            const running = chosen.filter(j => j.started_at).length;
+            const detail = running > 0 ? `\n\n${running} running Metarr process(es) will be stopped and their progress lost.` : '';
+            if (!confirm(`Cancel post-processing for ${chosen.length} video(s)?${detail}\n\nThe videos can be finished later with Run Metarr.`)) return;
+
+            const byChannel = new Map();
+            for (const j of chosen) {
+              byChannel.set(j.channel_id, [...(byChannel.get(j.channel_id) || []), j.video_id]);
+            }
+
+            this.working = true;
+            const errors = [];
+            for (const [channelID, ids] of byChannel) {
+              try {
+                const response = await fetch(`/api/v1/channels/${channelID}/stop-metarr`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ video_ids: ids })
+                });
+                // 409: already finished.
+                if (!response.ok && response.status !== 409) {
+                  throw new Error(await response.text() || response.statusText);
+                }
+              } catch (err) {
+                errors.push(err.message);
+              }
+            }
+            this.working = false;
+            for (const j of chosen) delete this.selected[j.video_id];
+            this.lastClickedIndex = null;
+
+            await this.loadJobs();
+            if (errors.length > 0) {
+              alert(`Some videos could not be canceled:\n\n${errors.join('\n')}`);
+            }
+          },
+
+          // Formats the time since a timestamp, e.g. "1:02:03" or "4:05".
+          elapsed(since) {
+            const secs = Math.max(0, Math.floor((this.now - new Date(since).getTime()) / 1000));
+            const h = Math.floor(secs / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            const s = String(secs % 60).padStart(2, '0');
+            return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+          },
+
+          shortURL(url) {
+            if (!url) return '';
+            try {
+              const u = new URL(url);
+              return (u.hostname.replace(/^www\./, '') + u.pathname).replace(/\/$/, '');
+            } catch {
+              return url;
+            }
+          },
+
+          destroy() {
+            clearInterval(this.pollInterval);
+            clearInterval(this.clockInterval);
+          }
+        };
+      }
+    </script>
+  </body>
+</html>

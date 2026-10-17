@@ -22,7 +22,7 @@ import (
 
 // startCrawlWatchdog constantly checks channels and runs crawls when they're due.
 //
-// This function blocks until the stop channel is signaled or context is cancelled.
+// This function blocks until the stop channel is signaled or context is canceled.
 func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Signal) {
 	const timeBetweenCheck = (10 * time.Second)
 
@@ -37,7 +37,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 			logger.Pl.I("Crawl watchdog received stop signal, shutting down...")
 			return
 		case <-ctx.Done():
-			logger.Pl.I("Crawl watchdog context cancelled, shutting down...")
+			logger.Pl.I("Crawl watchdog context canceled, shutting down...")
 			return
 		case <-ticker.C:
 			// Clean expired blocks first.
@@ -254,6 +254,7 @@ func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Vide
 				DownloadStatus: models.DLStatus{
 					Status:  statusUpdate.Status,
 					Percent: statusUpdate.Percent,
+					Stage:   statusUpdate.Stage,
 					Error:   statusUpdate.Error,
 				},
 			}
@@ -270,8 +271,16 @@ func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Vide
 // errNoActiveDownload is returned when there is no download to cancel.
 var errNoActiveDownload = errors.New("no active download found")
 
-// cancelDownload marks a download as cancelled in the database.
+// cancelDownload stops a video's running download and marks it canceled in the database.
+//
+// The running process is canceled first, as a video waiting to retry isn't Queued or Downloading in the database.
 func (ss *serverStore) cancelDownload(videoID int64) error {
+	videoURL, err := ss.vs.GetVideoURLByID(videoID)
+	if err != nil {
+		logger.Pl.E("Could not get video URL for ID %d: %v", videoID, err)
+	}
+	canceled := ss.ds.CancelDownload(videoID, videoURL)
+
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = CURRENT_TIMESTAMP WHERE %s = ? AND %s IN (?, ?)",
 		consts.DBDownloads,
@@ -281,7 +290,7 @@ func (ss *serverStore) cancelDownload(videoID int64) error {
 		consts.QDLStatus,
 	)
 
-	result, err := ss.db.Exec(query, consts.DLStatusCancelled, videoID, consts.DLStatusQueued, consts.DLStatusDownloading)
+	result, err := ss.db.Exec(query, consts.DLStatusCanceled, videoID, consts.DLStatusQueued, consts.DLStatusDownloading)
 	if err != nil {
 		return fmt.Errorf("failed to cancel download: %w", err)
 	}
@@ -291,7 +300,7 @@ func (ss *serverStore) cancelDownload(videoID int64) error {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
-	if rowsAffected == 0 {
+	if rowsAffected == 0 && !canceled {
 		return fmt.Errorf("%w for video ID %d", errNoActiveDownload, videoID)
 	}
 

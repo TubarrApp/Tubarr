@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// useProcessGroup gives a cancelled cmd time to exit before its pipes are closed.
+// useProcessGroup gives a canceled cmd time to exit before its pipes are closed.
 func useProcessGroup(cmd *exec.Cmd) {
 	cmd.WaitDelay = 15 * time.Second
 }

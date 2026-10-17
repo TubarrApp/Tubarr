@@ -53,8 +53,14 @@ func (t *DownloadTracker) Stop() {
 	}
 }
 
-// sendUpdate constructs the update and sends it into the processing channel.
-func (t *DownloadTracker) sendUpdate(v *models.Video) {
+// SetStatus sets the video's download status fields and sends the update.
+func (t *DownloadTracker) SetStatus(v *models.Video, status consts.DownloadStatus, pct float64, stage string, err error) {
+	v.DownloadStatus = models.DLStatus{Status: status, Percent: pct, Stage: stage, Error: err}
+	t.SendUpdate(v)
+}
+
+// SendUpdate constructs the update and sends it into the processing channel.
+func (t *DownloadTracker) SendUpdate(v *models.Video) {
 	if v == nil || v.URL == "" {
 		logger.Pl.E("Invalid video struct before status update: %+v", v)
 		return
@@ -69,6 +75,7 @@ func (t *DownloadTracker) sendUpdate(v *models.Video) {
 		VideoURL:     v.URL,
 		Status:       v.DownloadStatus.Status,
 		Percent:      v.DownloadStatus.Percent,
+		Stage:        v.DownloadStatus.Stage,
 		Error:        v.DownloadStatus.Error,
 	}
 	select {
@@ -97,7 +104,7 @@ func (t *DownloadTracker) processUpdates(ctx context.Context) {
 
 // drain stores updates still queued, then the latest status of each of this tracker's videos still cached.
 //
-// Uses a fresh context, as the original may already be cancelled when Stop is called.
+// Uses a fresh context, as the original may already be canceled when Stop is called.
 func (t *DownloadTracker) drain() {
 	drainCtx := context.Background()
 	for {
@@ -135,6 +142,7 @@ func (t *DownloadTracker) flushUpdates(ctx context.Context, update models.Status
 	// Check if state is different.
 	if update.Status == lastUpdate.Status &&
 		update.Percent == lastUpdate.Percent &&
+		update.Stage == lastUpdate.Stage &&
 		errors.Is(update.Error, lastUpdate.Error) {
 		return
 	}

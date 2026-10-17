@@ -71,12 +71,10 @@ func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) erro
 // cancelVideoDownload cancels the download, typically due to user input.
 func (d *VideoDownload) cancelVideoDownload() error {
 	d.cleanup()
-	if errors.Is(context.Cause(d.Context), ErrCancelledByUser) {
+	if errors.Is(context.Cause(d.Context), ErrCanceledByUser) {
 		removePartialFiles(d.Video.VideoDir, d.destinations)
 	}
-	d.Video.DownloadStatus.Status = consts.DLStatusCancelled
-	d.Video.DownloadStatus.Error = d.Context.Err()
-	d.DLTracker.sendUpdate(d.Video)
+	d.DLTracker.SetStatus(d.Video, consts.DLStatusCanceled, d.Video.DownloadStatus.Percent, "", d.Context.Err())
 	return fmt.Errorf("user canceled video download for %s: %w", d.Video.URL, d.Context.Err())
 }
 

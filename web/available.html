@@ -73,10 +73,18 @@
               <div x-show="!loading && !error && videos.length > 0" class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <!-- Filters -->
                 <div class="flex flex-wrap items-center gap-4 border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+                  <input
+                    type="search"
+                    x-model="titleFilter"
+                    @input="filterChanged()"
+                    placeholder="Filter by title"
+                    class="w-56 max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+
                   <select
                     x-model="channelFilter"
                     @change="urlFilter = ''; filterChanged()"
-                    class="max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    class="max-w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="" x-text="`All channels (${videos.length})`"></option>
                     <template x-for="ch in channelOptions" :key="ch.id">
@@ -88,7 +96,7 @@
                     x-show="channelFilter !== '' && urlOptions.length > 1"
                     x-model="urlFilter"
                     @change="filterChanged()"
-                    class="max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    class="max-w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="" x-text="`All URLs (${channelVideos.length})`"></option>
                     <template x-for="u in urlOptions" :key="u.id">
@@ -99,7 +107,7 @@
                   <select
                     x-model="sortOrder"
                     @change="currentPage = 1"
-                    class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    class="rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
                     <option value="newest">Newest first</option>
                     <option value="oldest">Oldest first</option>
@@ -249,6 +257,7 @@
           selected: {}, // Video ID -> video.
           channelFilter: '',
           urlFilter: '',
+          titleFilter: '',
           sortOrder: 'newest',
           loading: true,
           error: null,
@@ -261,6 +270,7 @@
             const params = new URLSearchParams(window.location.search);
             this.channelFilter = params.get('channel') || '';
             this.urlFilter = params.get('url') || '';
+            this.titleFilter = params.get('q') || '';
             this.loadVideos();
             new ResizeObserver(() => this.fitPageToRows()).observe(this.$refs.grid);
           },
@@ -321,6 +331,10 @@
             if (this.urlFilter !== '') {
               list = list.filter(v => String(v.channel_url_id) === this.urlFilter);
             }
+            const title = this.titleFilter.trim().toLowerCase();
+            if (title) {
+              list = list.filter(v => (v.title || '').toLowerCase().includes(title));
+            }
             // The server sends newest first.
             return this.sortOrder === 'oldest' ? [...list].reverse() : list;
           },
@@ -335,6 +349,7 @@
             const params = new URLSearchParams();
             if (this.channelFilter) params.set('channel', this.channelFilter);
             if (this.urlFilter) params.set('url', this.urlFilter);
+            if (this.titleFilter.trim()) params.set('q', this.titleFilter.trim());
             const query = params.toString();
             history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
           },

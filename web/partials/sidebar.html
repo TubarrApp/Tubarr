@@ -36,7 +36,8 @@
     class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear"
   >
     <!-- Sidebar Menu -->
-    <nav x-data="{selected: $persist('{{selected}}')}">
+    <!-- Highlights come from the page itself, not a remembered click, so they can't go stale. -->
+    <nav x-data="{ channelsOpen: ['addChannel', 'addChannelFromFile', 'editChannel', 'listChannels', 'channelVideos'].includes(page) }">
       <!-- Menu Group -->
       <div>
         <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
@@ -70,12 +71,11 @@
           <li>
             <a
               href="index.html"
-              @click="selected = 'Home'"
               class="menu-item group"
-              :class="(selected === 'Home') || (page === 'home') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'home') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Home') || (page === 'home') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="(page === 'home') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -100,16 +100,15 @@
           </li>
           <!-- Menu Item Home -->
 
-          <!-- Menu Item Active Downloads -->
+          <!-- Menu Item Downloads -->
           <li>
             <a
-              href="active-downloads.html"
-              @click="selected = 'Active Downloads'"
+              href="downloads.html"
               class="menu-item group"
-              :class="(selected === 'Active Downloads') || (page === 'activeDownloads') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'downloads') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Active Downloads') || (page === 'activeDownloads') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="(page === 'downloads') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -128,22 +127,21 @@
                 class="menu-item-text"
                 :class="sidebarToggle ? 'xl:hidden' : ''"
               >
-                Active Downloads
+                Downloads
               </span>
             </a>
           </li>
-          <!-- Menu Item Active Downloads -->
+          <!-- Menu Item Downloads -->
 
-          <!-- Menu Item Active Transcodes -->
+          <!-- Menu Item Post-processing -->
           <li>
             <a
-              href="active-transcodes.html"
-              @click="selected = 'Active Transcodes'"
+              href="post-processing.html"
               class="menu-item group"
-              :class="(selected === 'Active Transcodes') || (page === 'activeTranscodes') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'postProcessing') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Active Transcodes') || (page === 'activeTranscodes') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="(page === 'postProcessing') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -163,22 +161,21 @@
                 class="menu-item-text"
                 :class="sidebarToggle ? 'xl:hidden' : ''"
               >
-                Active Transcodes
+                Post-processing
               </span>
             </a>
           </li>
-          <!-- Menu Item Active Transcodes -->
+          <!-- Menu Item Post-processing -->
 
           <!-- Menu Item Available -->
           <li>
             <a
               href="available.html"
-              @click="selected = 'Available'"
               class="menu-item group"
-              :class="(selected === 'Available') || (page === 'available') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'available') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Available') || (page === 'available') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="(page === 'available') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -208,12 +205,11 @@
           <li>
             <a
               href="manual-download.html"
-              @click="selected = 'Manual Download'"
               class="menu-item group"
-              :class="(selected === 'Manual Download') || (page === 'manualDownload') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'manualDownload') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Manual Download') || (page === 'manualDownload') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="(page === 'manualDownload') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -250,12 +246,12 @@
           <li>
             <a
               href="#"
-              @click.prevent="selected = (selected === 'Channels' ? '':'Channels')"
+              @click.prevent="channelsOpen = !channelsOpen"
               class="menu-item group"
-              :class="(selected === 'Channels') || ['addChannel', 'addChannelFromFile', 'editChannel', 'listChannels', 'channelVideos'].includes(page) ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="['addChannel', 'addChannelFromFile', 'editChannel', 'listChannels', 'channelVideos'].includes(page) ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Channels') || ['addChannel', 'addChannelFromFile', 'editChannel', 'listChannels', 'channelVideos'].includes(page) ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="['addChannel', 'addChannelFromFile', 'editChannel', 'listChannels', 'channelVideos'].includes(page) ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -279,7 +275,7 @@
 
               <svg
                 class="menu-item-arrow"
-                :class="[(selected === 'Channels') ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'xl:hidden' : '' ]"
+                :class="[channelsOpen ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'xl:hidden' : '' ]"
                 width="20"
                 height="20"
                 viewBox="0 0 20 20"
@@ -299,7 +295,7 @@
             <!-- Dropdown Menu Start -->
             <div
               class="translate transform overflow-hidden"
-              :class="(selected === 'Channels') ? 'block' :'hidden'"
+              :class="channelsOpen ? 'block' :'hidden'"
             >
               <ul
                 :class="sidebarToggle ? 'xl:hidden' : 'flex'"
@@ -342,12 +338,11 @@
           <li>
             <a
               href="blocked-domains.html"
-              @click="selected = 'Blocked Domains'"
               class="menu-item group"
-              :class="(selected === 'Blocked Domains') || (page === 'blockedDomains') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'blockedDomains') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Blocked Domains') || (page === 'blockedDomains') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="(page === 'blockedDomains') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -372,12 +367,11 @@
           <li>
             <a
               href="logs.html"
-              @click="selected = 'Logs'"
               class="menu-item group"
-              :class="(selected === 'Logs') || (page === 'logs') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'logs') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Logs') || (page === 'logs') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
+                :class="(page === 'logs') ? 'menu-item-icon-active'  :'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -406,12 +400,11 @@
           <li>
             <a
               href="site-rules.html"
-              @click="selected = 'Site Rules'"
               class="menu-item group"
-              :class="(selected === 'Site Rules') || (page === 'site-rules') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'site-rules') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Site Rules') || (page === 'site-rules') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
+                :class="(page === 'site-rules') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -438,12 +431,11 @@
           <li>
             <a
               href="settings.html"
-              @click="selected = 'Settings'"
               class="menu-item group"
-              :class="(selected === 'Settings') || (page === 'settings') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="(page === 'settings') ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(selected === 'Settings') || (page === 'settings') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
+                :class="(page === 'settings') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"

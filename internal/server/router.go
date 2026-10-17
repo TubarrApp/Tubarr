@@ -153,6 +153,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 
 		// Downloads API.
 		r.Get("/downloads", ss.handleGetDownloads)
+		r.Post("/downloads/cancel", ss.handleCancelDownloads)
 		r.Get("/transcodes", ss.handleGetTranscodes)
 		r.Get("/videos/available", ss.handleGetAvailableVideos)
 
@@ -171,6 +172,8 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 		r.Put("/settings/crawl-concurrency", ss.handleSetCrawlConcurrency)
 		r.Get("/settings/global-download-concurrency", ss.handleGetGlobalDownloadConcurrency)
 		r.Put("/settings/global-download-concurrency", ss.handleSetGlobalDownloadConcurrency)
+		r.Get("/settings/post-process-concurrency", ss.handleGetPostProcessConcurrency)
+		r.Put("/settings/post-process-concurrency", ss.handleSetPostProcessConcurrency)
 		r.Get("/settings/domain-limits", ss.handleGetDomainLimits)
 		r.Put("/settings/domain-limits", ss.handleSetDomainLimit)
 		r.Delete("/settings/domain-limits/{hostname}", ss.handleDeleteDomainLimit)
@@ -252,7 +255,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 	// Wait for interrupt signal.
 	select {
 	case <-inputCtx.Done():
-		logger.Pl.S("Shutting down server (context cancelled)...")
+		logger.Pl.S("Shutting down server (context canceled)...")
 
 	case err := <-serverErr:
 		// server crashed
@@ -261,7 +264,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		}
 	}
 
-	// Create shutdown context with timeout (detached, inputCtx is already cancelled on shutdown).
+	// Create shutdown context with timeout (detached, inputCtx is already canceled on shutdown).
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(inputCtx), 10*time.Second)
 	defer cancel()
 

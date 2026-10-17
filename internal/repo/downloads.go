@@ -84,22 +84,13 @@ func (ds *DownloadStore) CancelDownload(videoID int64, videoURL string) bool {
 
 // normalizeDownloadStatus normalizes percentage and statuses if required.
 func normalizeDownloadStatus(pctPtr *float64, statusPtr *consts.DownloadStatus, videoID int64) {
-	var (
-		pct    float64
-		status consts.DownloadStatus
-	)
 	if pctPtr == nil || statusPtr == nil {
 		logger.Pl.E("Status or percentage passed into function as 'nil' for video with ID %d", videoID)
 		return
 	}
 
-	if *pctPtr >= 100.0 {
-		status = consts.DLStatusCompleted
-		pct = 100.0
-	} else if *pctPtr < 0.0 {
-		pct = 0.0
+	*pctPtr = min(max(*pctPtr, 0.0), 100.0)
+	if *statusPtr == consts.DLStatusCompleted {
+		*pctPtr = 100.0
 	}
-
-	*pctPtr = pct
-	*statusPtr = status
 }

@@ -6,6 +6,7 @@ import "tubarr/internal/domain/consts"
 type DLStatus struct {
 	Status  consts.DownloadStatus `json:"status"`
 	Percent float64               `json:"percentage"`
+	Stage   string                `json:"stage,omitempty"` // What a queued video is waiting on, not stored.
 	Error   error                 `json:"error"`
 }
 
@@ -19,5 +20,6 @@ type StatusUpdate struct {
 	VideoURL     string
 	Status       consts.DownloadStatus
 	Percent      float64
+	Stage        string
 	Error        error
 }

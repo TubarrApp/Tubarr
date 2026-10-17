@@ -516,7 +516,7 @@ func parseMetarrArgsInput(in *metarrArgsInput) (*models.MetarrArgs, error) {
 		metarr.TranscodeQuality = validQuality
 	}
 	if v := in.Concurrency; v != nil {
-		metarr.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*v)
+		metarr.Concurrency = max(*v, 0)
 	}
 	if v := in.MaxCPU; v != nil {
 		metarr.MaxCPU = *v
@@ -785,7 +785,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 			http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
 			return nil
 		}
-		maxConcurrency = sharedvalidation.ValidateConcurrencyLimit(maxConcurrency)
+		maxConcurrency = max(maxConcurrency, 0)
 	}
 
 	maxCPU := 0.00

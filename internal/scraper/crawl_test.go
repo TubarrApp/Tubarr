@@ -105,8 +105,8 @@ func TestCrawlWithRuleRequestError(t *testing.T) {
 	}
 }
 
-// TestCrawlWithRuleCancelled tests that cancelling the context ends a channel page request still waiting on the server.
-func TestCrawlWithRuleCancelled(t *testing.T) {
+// TestCrawlWithRuleCanceled tests that cancelling the context ends a channel page request still waiting on the server.
+func TestCrawlWithRuleCanceled(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		<-r.Context().Done()
 	}))
@@ -117,10 +117,10 @@ func TestCrawlWithRuleCancelled(t *testing.T) {
 	start := time.Now()
 	query := models.SiteRules{Site: "test", Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
 	if _, err := New().crawlWithRule(ctx, srv.URL, nil, query); err == nil {
-		t.Error("expected an error for a cancelled request")
+		t.Error("expected an error for a canceled request")
 	}
 	if elapsed := time.Since(start); elapsed > 10*time.Second {
-		t.Errorf("request ran for %v after its context was cancelled", elapsed)
+		t.Errorf("request ran for %v after its context was canceled", elapsed)
 	}
 }
 

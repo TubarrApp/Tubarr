@@ -49,6 +49,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 		return false, fmt.Errorf("video %q: %w", d.Video.URL, ErrDuplicateDownload)
 	}
 	defer ongoingDownloads.Delete(key)
+	d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0, "Waiting for download slot", nil)
 
 	// Acquire per-domain slot first (blocks if domain limit reached, no-op if no limit).
 	domainSem, err := limits.DomainDownloads.Acquire(d.Context, d.Video.URL)
@@ -84,7 +85,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 
 		select {
 		case <-d.Context.Done():
-			logger.Pl.W("Download cancelled: %v", d.Context.Err())
+			logger.Pl.W("Download canceled: %v", d.Context.Err())
 			return false, d.cancelVideoDownload()
 		default:
 			if err := d.videoDLAttempt(); err != nil {
@@ -105,9 +106,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 				// Other errors - continue retry logic.
 				lastErr = err
 				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
-				d.Video.DownloadStatus.Status = consts.DLStatusFailed
-				d.Video.DownloadStatus.Error = err
-				d.DLTracker.sendUpdate(d.Video)
+				d.DLTracker.SetStatus(d.Video, consts.DLStatusFailed, d.Video.DownloadStatus.Percent, "", err)
 
 				if attempt < d.Options.MaxRetries {
 					if !fsRefreshed {
@@ -116,22 +115,20 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 
 					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
 					logger.Pl.I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
+					d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0,
+						fmt.Sprintf("Retrying in %.0fs (attempt %d/%d)", randWait.Seconds(), attempt+1, d.Options.MaxRetries), nil)
 
 					select {
 					case <-d.Context.Done():
-						logger.Pl.W("Download cancelled: %v", d.Context.Err())
+						logger.Pl.W("Download canceled: %v", d.Context.Err())
 						return false, d.cancelVideoDownload()
 					case <-time.After(randWait):
 						continue
 					}
 				}
 			} else {
-				d.Video.DownloadStatus.Status = consts.DLStatusCompleted
-				d.Video.DownloadStatus.Percent = 100.0
-				d.Video.DownloadStatus.Error = nil
 				d.Video.UpdatedAt = time.Now()
-
-				d.DLTracker.sendUpdate(d.Video)
+				d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
 				logger.Pl.S("Successfully completed video download for URL: %s", d.Video.URL)
 
 				return false, nil
@@ -147,10 +144,8 @@ func (d *VideoDownload) videoDLAttempt() error {
 	d.cmd = d.buildVideoCommand()
 	d.mu.Unlock()
 
-	// Set video "Queued" status.
-	d.Video.DownloadStatus.Status = consts.DLStatusQueued
-	d.Video.DownloadStatus.Percent = 0.0
-	d.DLTracker.sendUpdate(d.Video)
+	// Start each attempt from 0%, the first progress line may be a finished stream or resumed part.
+	d.DLTracker.SetStatus(d.Video, consts.DLStatusDownloading, 0, "", nil)
 
 	// Execute the video download.
 	return d.executeVideoDownload(d.cmd)

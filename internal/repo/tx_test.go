@@ -128,6 +128,50 @@ func TestDeleteChannelCascades(t *testing.T) {
 	}
 }
 
+// TestDeleteVideoLinksCascade tests that deleting a URL unlinks its videos without deleting them, and deleting a video
+// removes its download row, on any pooled connection.
+func TestDeleteVideoLinksCascade(t *testing.T) {
+	cs := newTestChannelStore(t)
+	c := testChannel(t, "chan", "https://example.com/@a")
+	if err := cs.AddChannelWithDetails(c, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	v := &models.Video{URL: "https://example.com/v/1", ChannelURL: "https://example.com/@a"}
+	videoID, err := GetVideoStore(cs.db).AddVideo(v, c.ID, c.URLModels[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Hold the connection the database was set up on, so the deletes run on another one.
+	conn, err := cs.db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	count := func(query string) int {
+		t.Helper()
+		var n int
+		if err := conn.QueryRowContext(t.Context(), query, videoID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	if err := cs.DeleteChannelURL(c.URLModels[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if n := count("SELECT COUNT(*) FROM " + consts.DBVideos + " WHERE id = ? AND channel_url_id IS NULL"); n != 1 {
+		t.Errorf("deleting the URL left its video linked to it, or deleted the video (%d unlinked rows, want 1)", n)
+	}
+
+	if err := cs.DeleteVideosByURLs(c.ID, []string{v.URL}); err != nil {
+		t.Fatal(err)
+	}
+	if n := count("SELECT COUNT(*) FROM " + consts.DBDownloads + " WHERE video_id = ?"); n != 0 {
+		t.Errorf("deleting the video left %d download row(s) behind", n)
+	}
+}
+
 // TestAddNotifyURLsFailureReleasesTx tests that a failed AddNotifyURLs rolls back, leaving the database writable.
 func TestAddNotifyURLsFailureReleasesTx(t *testing.T) {
 	cs := newTestChannelStore(t)

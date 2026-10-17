@@ -30,18 +30,21 @@ type credentials struct {
 	Password string `json:"password"`
 }
 
-// handleStatus reports whether a login must be set up, and whether this request is already let in.
+// handleStatus reports whether a login must be set up, whether this request is already let in, and whether it has a
+// session to log out of.
 func (m *Manager) handleStatus(w http.ResponseWriter, r *http.Request) {
 	hasLogin, err := m.hasLogin()
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	authenticated := !m.required || m.skipsLogin(m.clientIP(r)) || m.validSession(w, r)
+	session := m.required && m.validSession(w, r)
+	authenticated := !m.required || m.skipsLogin(m.clientIP(r)) || session
 	writeJSON(w, map[string]bool{
 		"login_required": m.required,
 		"setup_required": m.required && !hasLogin,
 		"authenticated":  authenticated && (hasLogin || !m.required),
+		"session":        session,
 	})
 }
 

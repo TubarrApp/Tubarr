@@ -94,9 +94,9 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL 
 		return nil
 	case <-ctx.Done():
 		if videoURL == "" {
-			return fmt.Errorf("context cancelled during stagger wait for channel %q", channelName)
+			return fmt.Errorf("context canceled during stagger wait for channel %q", channelName)
 		}
-		return fmt.Errorf("context cancelled during stagger wait for video %q in channel %q", videoURL, channelName)
+		return fmt.Errorf("context canceled during stagger wait for video %q in channel %q", videoURL, channelName)
 	}
 }
 

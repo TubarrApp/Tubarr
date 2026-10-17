@@ -226,7 +226,7 @@
                             <button type="button" @click="urlTab = 'overview'" :class="urlTab === 'overview' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs font-medium rounded-t">Overview</button>
                             <button type="button" @click="urlTab = 'basic'" :class="urlTab === 'basic' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Basic</button>
                             <button type="button" @click="urlTab = 'advanced'" :class="urlTab === 'advanced' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Advanced</button>
-                            <button type="button" @click="urlTab = 'metarr'" :class="urlTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Metarr</button>
+                            <button type="button" @click="urlTab = 'metarr'" :class="urlTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Post-processing</button>
                           </nav>
                         </div>
 
@@ -236,7 +236,7 @@
                           <ul class="list-disc list-inside space-y-1 ml-2">
                             <li><strong>Basic:</strong> Directories, concurrency, retries, filesize, filters</li>
                             <li><strong>Advanced:</strong> YT-DLP settings, external downloaders, move operations</li>
-                            <li><strong>Metarr:</strong> Output directory, transcoding, meta/filename operations</li>
+                            <li><strong>Post-processing:</strong> Metarr output directory, transcoding, meta/filename operations</li>
                           </ul>
                           <p class="mt-2 text-brand-600 dark:text-brand-400">💡 Any field left empty will use the global channel setting.</p>
                         </div>
@@ -399,7 +399,8 @@
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Concurrency</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" min="0" :placeholder="urlPostProcessHint()" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600" />
+                              <p x-show="capNote(urlEntry.custom.metarr_concurrency, globalPostProcessLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(urlEntry.custom.metarr_concurrency, globalPostProcessLimit)"></p>
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
@@ -521,7 +522,7 @@
                         :class="activeTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
                         class="py-2 px-4 border-b-2 font-medium text-sm"
                       >
-                        Metarr Settings
+                        Post-processing
                       </button>
                       <button
                         type="button"
@@ -574,6 +575,7 @@
                           placeholder="3"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
+                        <p x-show="capNote(formData.settings.max_concurrency, globalDownloadLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(formData.settings.max_concurrency, globalDownloadLimit)"></p>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">WARNING: Higher concurrency can cause bot detection on some tube sites.</p>
                       </div>
 
@@ -953,10 +955,11 @@
                         <input
                           type="number"
                           x-model.number="formData.metarr.metarr_concurrency"
-                          min="1"
-                          placeholder="5"
+                          min="0"
+                          :placeholder="globalPostProcessHint()"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
+                        <p x-show="capNote(formData.metarr.metarr_concurrency, globalPostProcessLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(formData.metarr.metarr_concurrency, globalPostProcessLimit)"></p>
                       </div>
 
                       <div>
@@ -1363,7 +1366,7 @@
               metarr_output_directory: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
-              metarr_concurrency: 3,
+              metarr_concurrency: '',
               metarr_max_cpu_usage: '',
               metarr_min_free_mem: '',
               metarr_gpu: '',
@@ -1386,6 +1389,38 @@
           error: '',
           success: '',
           submitting: false,
+          globalPostProcessLimit: 0,
+          globalDownloadLimit: 0,
+
+          init() {
+            this.loadGlobalLimits();
+          },
+
+          // A note when a limit is above the global one (0 = unlimited), which caps it.
+          capNote(value, global) {
+            return global > 0 && value > global ? `Capped at ${global} by the global limit (Settings)` : '';
+          },
+
+          // Placeholders showing what an empty post-processing concurrency falls back to.
+          globalPostProcessHint() {
+            return this.globalPostProcessLimit > 0 ? `Use global (${this.globalPostProcessLimit})` : 'Use global (unlimited)';
+          },
+          urlPostProcessHint() {
+            const n = this.formData.metarr.metarr_concurrency;
+            return n > 0 ? `Use channel (${n})` : this.globalPostProcessHint();
+          },
+          async loadGlobalLimits() {
+            try {
+              const [postProcess, download] = await Promise.all([
+                fetch('/api/v1/settings/post-process-concurrency'),
+                fetch('/api/v1/settings/global-download-concurrency')
+              ]);
+              if (postProcess.ok) this.globalPostProcessLimit = (await postProcess.json()).limit ?? 0;
+              if (download.ok) this.globalDownloadLimit = (await download.json()).limit ?? 0;
+            } catch (err) {
+              console.error('Error loading global concurrency limits:', err);
+            }
+          },
 
           addURL() {
             this.formData.urls.push({
