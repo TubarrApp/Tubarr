@@ -78,6 +78,14 @@
               <div x-show="downloads.length > 0">
                 <!-- Filters -->
                 <div class="flex flex-wrap items-center gap-4 border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+                  <input
+                    type="search"
+                    x-model="titleFilter"
+                    @input="filterChanged()"
+                    placeholder="Filter by title"
+                    class="w-56 max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+
                   <select
                     x-model="channelFilter"
                     @change="urlFilter = ''; filterChanged()"
@@ -206,6 +214,7 @@
           selected: {}, // Video ID -> download.
           channelFilter: '',
           urlFilter: '',
+          titleFilter: '',
           loading: true,
           error: null,
           working: false,
@@ -216,6 +225,7 @@
             const params = new URLSearchParams(window.location.search);
             this.channelFilter = params.get('channel') || '';
             this.urlFilter = params.get('url') || '';
+            this.titleFilter = params.get('q') || '';
             this.loadDownloads();
             this.pollInterval = setInterval(() => this.loadDownloads(), 2000);
           },
@@ -278,6 +288,10 @@
             if (this.urlFilter !== '') {
               list = list.filter(d => String(d.channel_url_id) === this.urlFilter);
             }
+            const title = this.titleFilter.trim().toLowerCase();
+            if (title) { // URL too, as a download may not have a title yet.
+              list = list.filter(d => (d.title || d.url || '').toLowerCase().includes(title));
+            }
             return [...list].sort((a, b) => (this.isDownloading(b) - this.isDownloading(a)) || (a.id - b.id));
           },
 
@@ -290,6 +304,7 @@
             const params = new URLSearchParams();
             if (this.channelFilter) params.set('channel', this.channelFilter);
             if (this.urlFilter) params.set('url', this.urlFilter);
+            if (this.titleFilter.trim()) params.set('q', this.titleFilter.trim());
             const query = params.toString();
             history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
           },

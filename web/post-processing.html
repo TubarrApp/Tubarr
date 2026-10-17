@@ -73,6 +73,14 @@
               <div x-show="jobs.length > 0">
                 <!-- Filters -->
                 <div class="flex flex-wrap items-center gap-4 border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+                  <input
+                    type="search"
+                    x-model="titleFilter"
+                    @input="filterChanged()"
+                    placeholder="Filter by title"
+                    class="w-56 max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+
                   <select
                     x-model="channelFilter"
                     @change="urlFilter = ''; filterChanged()"
@@ -196,6 +204,7 @@
           selected: {}, // Video ID -> job.
           channelFilter: '',
           urlFilter: '',
+          titleFilter: '',
           loading: true,
           error: null,
           working: false,
@@ -208,6 +217,7 @@
             const params = new URLSearchParams(window.location.search);
             this.channelFilter = params.get('channel') || '';
             this.urlFilter = params.get('url') || '';
+            this.titleFilter = params.get('q') || '';
             this.loadJobs();
             this.pollInterval = setInterval(() => this.loadJobs(), 2000);
             this.clockInterval = setInterval(() => { this.now = Date.now(); }, 1000);
@@ -267,6 +277,10 @@
             if (this.urlFilter !== '') {
               list = list.filter(j => String(j.channel_url_id) === this.urlFilter);
             }
+            const title = this.titleFilter.trim().toLowerCase();
+            if (title) { // URL too, matching what's shown when there's no title.
+              list = list.filter(j => (j.title || j.url || '').toLowerCase().includes(title));
+            }
             return [...list.filter(j => j.started_at), ...list.filter(j => !j.started_at)];
           },
 
@@ -279,6 +293,7 @@
             const params = new URLSearchParams();
             if (this.channelFilter) params.set('channel', this.channelFilter);
             if (this.urlFilter) params.set('url', this.urlFilter);
+            if (this.titleFilter.trim()) params.set('q', this.titleFilter.trim());
             const query = params.toString();
             history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
           },

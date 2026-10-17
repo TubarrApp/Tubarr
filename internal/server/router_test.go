@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"tubarr/internal/domain/logger"
 )
 
 // TestServePageIncludes tests that every web page has its shared partials filled in.
@@ -79,6 +81,7 @@ func TestMetarrLogURL(t *testing.T) {
 
 // TestServePageMissingPartial tests that a page including an unknown partial fails rather than serving a broken page.
 func TestServePageMissingPartial(t *testing.T) {
+	logger.Pl.Console = io.Discard // servePage logs the error.
 	webRoot := t.TempDir()
 	page := filepath.Join(webRoot, "page.html")
 	if err := os.WriteFile(page, []byte(`<!-- include:nope title="x" -->`), 0o644); err != nil {

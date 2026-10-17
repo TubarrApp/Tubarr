@@ -107,7 +107,23 @@
                     </button>
 
                     <div class="flex items-center gap-2">
-                      <label for="logLevel" class="text-sm font-medium text-gray-700 dark:text-gray-300">Level:</label>
+                      <label for="logType" class="text-sm font-medium text-gray-700 dark:text-gray-300">Show:</label>
+                      <select
+                        id="logType"
+                        x-model="typeFilter"
+                        class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                      >
+                        <option value="">All</option>
+                        <option value="error">Errors</option>
+                        <option value="warn">Warnings</option>
+                        <option value="success">Success</option>
+                        <option value="info">Info</option>
+                        <option value="debug">Debug</option>
+                      </select>
+                    </div>
+
+                    <div class="flex items-center gap-2" title="How much debug detail Tubarr writes to the log">
+                      <label for="logLevel" class="text-sm font-medium text-gray-700 dark:text-gray-300">Debug level:</label>
                       <select
                         id="logLevel"
                         x-model="logLevel"
@@ -126,7 +142,7 @@
                   </div>
 
                   <div class="text-sm text-gray-500 dark:text-gray-400">
-                    <span x-text="logs.length + ' entries'"></span>
+                    <span x-text="typeFilter ? `${shownLogs.length} of ${logs.length} entries` : `${logs.length} entries`"></span>
                   </div>
                 </div>
 
@@ -137,14 +153,15 @@
                   class="bg-gray-950 rounded-lg p-4 font-mono text-xs overflow-y-auto"
                   style="height: calc(100vh - 400px); min-height: 400px;"
                 >
-                  <template x-if="logs.length === 0">
+                  <template x-if="shownLogs.length === 0">
                     <div class="text-gray-500 text-center py-8">
-                      <p x-show="!loading">No logs available</p>
-                      <p x-show="loading">Loading logs...</p>
+                      <p x-show="!loading && logs.length === 0">No logs available</p>
+                      <p x-show="!loading && logs.length > 0">No entries of this type</p>
+                      <p x-show="loading && logs.length === 0">Loading logs...</p>
                     </div>
                   </template>
 
-                  <template x-for="(log, index) in logs" :key="index">
+                  <template x-for="(log, index) in shownLogs" :key="index">
                     <div class="mb-1 hover:bg-gray-900 px-2 py-1 rounded">
                       <span x-html="formatLogEntry(log)"></span>
                     </div>
@@ -179,9 +196,17 @@
           refreshInterval: null,
           isAtBottom: true,
           logLevel: -1,
+          typeFilter: '', // Log entry level to show, '' for all.
           activeTab: 'tubarr',
 
+          // Lines without a level (e.g. run separators) only show under All.
+          get shownLogs() {
+            if (!this.typeFilter) return this.logs;
+            return this.logs.filter(log => String(log.level || '').toLowerCase() === this.typeFilter);
+          },
+
           init() {
+            this.$watch('typeFilter', () => this.$nextTick(() => this.scrollToBottom()));
             this.fetchLogLevel();
             this.fetchLogs();
             this.startAutoRefresh();
