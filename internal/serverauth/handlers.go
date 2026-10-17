@@ -39,7 +39,7 @@ func (m *Manager) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session := m.required && m.validSession(w, r)
-	authenticated := !m.required || m.skipsLogin(m.clientIP(r)) || session
+	authenticated := !m.required || m.skipsLoginFor(r) || session
 	writeJSON(w, map[string]bool{
 		"login_required": m.required,
 		"setup_required": m.required && !hasLogin,

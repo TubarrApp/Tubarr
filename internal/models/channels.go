@@ -22,10 +22,22 @@ type Channel struct {
 	NewVideoNotification bool      `db:"new_video_notification"`
 }
 
-// GetCrawlFreq returns the program's crawl frequency (-1 is unset).
+// DefaultCrawlFreq is the crawl frequency in minutes for a channel without one.
+const DefaultCrawlFreq = 30
+
+// GetCrawlFreq returns the program's crawl frequency (-1 is unset). 0 means every terminal run.
 func (c *Channel) GetCrawlFreq() int {
 	if c.ChanSettings.CrawlFreq < 0 {
-		return 30 // default
+		return DefaultCrawlFreq
+	}
+	return c.ChanSettings.CrawlFreq
+}
+
+// ScheduledCrawlFreq returns the web scheduler's crawl frequency in minutes, using the default for 0 or less (e.g. a
+// channel added from the terminal without --crawl-freq), which would otherwise be crawled constantly.
+func (c *Channel) ScheduledCrawlFreq() int {
+	if c.ChanSettings.CrawlFreq <= 0 {
+		return DefaultCrawlFreq
 	}
 	return c.ChanSettings.CrawlFreq
 }

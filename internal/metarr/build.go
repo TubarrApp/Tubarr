@@ -282,8 +282,6 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *par
 			logger.Pl.E("Failed to parse directory %q for video with URL %q: %v", d, v.URL, err)
 			break
 		}
-
-		abstractions.Set(keys.MoveOnComplete, parsed)
 		return parsed
 
 	// #2 Priority: Move operation filter output directory.

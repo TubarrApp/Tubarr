@@ -141,6 +141,43 @@ func TestSkipLogin(t *testing.T) {
 	}
 }
 
+// TestProxyOnThisMachine tests a reverse proxy on this machine doesn't let its visitors skip the login as localhost.
+func TestProxyOnThisMachine(t *testing.T) {
+	m, h := newTestServer(t, true)
+	viaProxy := func(client string) func(*http.Request) {
+		return func(r *http.Request) {
+			r.RemoteAddr = "127.0.0.1:41000"
+			r.Host = "127.0.0.1:8827" // nginx's default Host for proxy_pass http://127.0.0.1:8827.
+			r.Header.Set("X-Forwarded-For", client)
+		}
+	}
+	local := func(r *http.Request) { r.RemoteAddr = "127.0.0.1:41000"; r.Host = "127.0.0.1:8827" }
+
+	if w := request(h, http.MethodGet, "/api/v1/ping", "", local); w.Code != http.StatusOK {
+		t.Fatalf("browser on this machine = %d, want 200", w.Code)
+	}
+	if w := request(h, http.MethodGet, "/api/v1/ping", "", viaProxy("203.0.113.7")); w.Code != http.StatusUnauthorized {
+		t.Fatalf("internet visitor via untrusted local proxy = %d, want 401", w.Code)
+	}
+	if w := request(h, http.MethodGet, "/api/v1/ping", "", func(r *http.Request) {
+		local(r)
+		r.Header.Set("X-Real-IP", "203.0.113.7")
+	}); w.Code != http.StatusUnauthorized {
+		t.Fatalf("X-Real-IP via untrusted local proxy = %d, want 401", w.Code)
+	}
+
+	// Trusted, the proxy's forwarded address decides instead.
+	if err := m.setAccessConfig(true, nil, nil, []string{"127.0.0.1"}); err != nil {
+		t.Fatal(err)
+	}
+	if w := request(h, http.MethodGet, "/api/v1/ping", "", viaProxy("203.0.113.7")); w.Code != http.StatusUnauthorized {
+		t.Fatalf("internet visitor via trusted proxy = %d, want 401", w.Code)
+	}
+	if w := request(h, http.MethodGet, "/api/v1/ping", "", viaProxy("127.0.0.1")); w.Code != http.StatusOK {
+		t.Fatalf("this machine via trusted proxy = %d, want 200", w.Code)
+	}
+}
+
 // TestLoginNotRequired tests --web-auth none lets requests through, still checking the host.
 func TestLoginNotRequired(t *testing.T) {
 	_, h := newTestServer(t, false)

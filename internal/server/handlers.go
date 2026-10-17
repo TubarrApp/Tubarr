@@ -78,7 +78,7 @@ func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ign
 //
 //nolint:contextcheck
 func (ss *serverStore) startIgnoreCrawl(c *models.Channel) {
-	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name)
+	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID)
 	if !ok {
 		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
 		return
@@ -622,17 +622,21 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 // handleDeleteChannel deletes a channel from Tubarr.
 func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	_, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !found {
+	if !found || c == nil {
 		http.Error(w, "channel not found", http.StatusNotFound)
 		return
 	}
 
-	// Delete associated downloads from state manager.
+	// Stop the channel's crawl, downloads and Metarr runs, which would otherwise carry on for a deleted channel.
+	if aborted, n := state.AbortAll(c.ID), app.StopMetarr(c.ID, nil); aborted || n > 0 {
+		logger.Pl.I("Stopped running work for channel %q before deleting it (%d Metarr process(es))", c.Name, n)
+	}
+
 	if err := ss.cs.DeleteChannel(consts.QChanID, id); err != nil {
 		logger.Pl.E("Failed to delete channel %q: %v", id, err)
 		http.Error(w, fmt.Sprintf("failed to delete channel %q: %v", id, err), http.StatusInternalServerError)
@@ -837,7 +841,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 
 	// Start crawl in background.
-	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
+	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID); ok {
 		// Clean expired blocks first.
 		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
 			logger.Pl.W("Failed to clean expired blocks: %v", err)
@@ -875,7 +879,7 @@ func (ss *serverStore) handleStopQueue(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !state.StopQueue(c.Name) {
+	if !state.StopQueue(c.ID) {
 		http.Error(w, "no crawl or download running for channel", http.StatusConflict)
 		return
 	}
@@ -893,7 +897,7 @@ func (ss *serverStore) handleAbortAll(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	aborted := state.AbortAll(c.Name)
+	aborted := state.AbortAll(c.ID)
 	n := app.StopMetarr(c.ID, nil)
 	if !aborted && n == 0 {
 		http.Error(w, "nothing running for channel", http.StatusConflict)
@@ -933,11 +937,11 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// handleGetActivity returns the names of channels with running crawls/downloads, crawls being stopped, and Metarr processes.
+// handleGetActivity returns the IDs of channels with running crawls/downloads, crawls being stopped, and Metarr processes.
 func (ss *serverStore) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
 	crawling, stopping := state.CrawlActivity()
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string][]string{
+	if err := json.NewEncoder(w).Encode(map[string][]int64{
 		"crawling": crawling,
 		"stopping": stopping,
 		"metarr":   app.MetarrActivity(),
@@ -988,7 +992,7 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 	}
 
 	// Start crawl in background.
-	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.Name); ok {
+	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID); ok {
 		// Clean expired blocks first.
 		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
 			logger.Pl.W("Failed to clean expired blocks: %v", err)
@@ -1056,10 +1060,10 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	}
 
 	// Start download in background, once any running crawl or download of the channel finishes.
-	queued := state.CrawlStateActive(c.Name)
+	queued := state.CrawlStateActive(c.ID)
 	//nolint:contextcheck
 	go func() {
-		ctx, unlock, err := state.LockCrawl(ss.ctx, c.Name)
+		ctx, unlock, err := state.LockCrawl(ss.ctx, c.ID)
 		if err != nil {
 			logger.Pl.W("Manual download of %d URL(s) for channel %q did not start: %v", len(requestBody.URLs), c.Name, err)
 			return

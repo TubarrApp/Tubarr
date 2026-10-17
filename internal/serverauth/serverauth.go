@@ -106,7 +106,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 				return
 			}
 		case isPublicPath(r.URL.Path):
-		case !m.required || m.skipsLogin(m.clientIP(r)):
+		case !m.required || m.skipsLoginFor(r):
 			// No login, so the host must be checked: another site's page could otherwise reach Tubarr by DNS rebinding.
 			if !m.hostAllowed(r.Host) {
 				http.Error(w, fmt.Sprintf("host %q is not allowed: add it under Settings > Web Interface Access, or use the server's IP address", r.Host), http.StatusForbidden)
@@ -169,6 +169,41 @@ func (m *Manager) hostAllowed(hostport string) bool {
 	defer m.mu.RUnlock()
 	_, ok := m.cfg.allowedHosts[host]
 	return ok
+}
+
+// forwardedHeaders are headers reverse proxies add when relaying a request.
+var forwardedHeaders = []string{"Forwarded", "X-Forwarded-For", "X-Real-IP", "X-Forwarded-Host", "X-Forwarded-Proto", "Via"}
+
+// skipsLoginFor reports whether r needs no login.
+//
+// A request relayed by a proxy that isn't trusted never skips it by address, as its real client is unknown: a proxy on
+// this machine would otherwise make every visitor look like localhost.
+func (m *Manager) skipsLoginFor(r *http.Request) bool {
+	if m.relayedByUntrustedProxy(r) {
+		return false
+	}
+	return m.skipsLogin(m.clientIP(r))
+}
+
+// relayedByUntrustedProxy reports whether r carries proxy headers on a connection from outside the trusted proxies.
+func (m *Manager) relayedByUntrustedProxy(r *http.Request) bool {
+	relayed := false
+	for _, h := range forwardedHeaders {
+		if r.Header.Get(h) != "" {
+			relayed = true
+			break
+		}
+	}
+	if !relayed {
+		return false
+	}
+	addrPort, err := netip.ParseAddrPort(r.RemoteAddr)
+	if err != nil {
+		return true
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return !containsAddr(m.cfg.trustedProxies, addrPort.Addr().Unmap())
 }
 
 // skipsLogin reports whether requests from ip need no login.

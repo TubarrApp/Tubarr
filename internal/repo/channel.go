@@ -694,10 +694,10 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	// Validate complete models at DB write boundary.
-	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
+	if err := validation.ValidateSettingsModel(c.ChanSettings, true); err != nil {
 		return 0, fmt.Errorf("%w: invalid settings: %w", contracts.ErrInvalidChannel, err)
 	}
-	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs); err != nil {
+	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs, true); err != nil {
 		return 0, fmt.Errorf("%w: invalid metarr config: %w", contracts.ErrInvalidChannel, err)
 	}
 
@@ -947,11 +947,11 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 		}
 	}
 
-	// Validate models at DB read boundary.
-	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
+	// Validate models at DB read boundary (paths aren't checked, so one unavailable path can't stop loading).
+	if err := validation.ValidateSettingsModel(c.ChanSettings, false); err != nil {
 		return nil, true, fmt.Errorf("invalid settings from database: %w", err)
 	}
-	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs); err != nil {
+	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs, false); err != nil {
 		return nil, true, fmt.Errorf("invalid metarr config from database: %w", err)
 	}
 
@@ -1023,10 +1023,10 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		}
 
 		// Validate models at DB read boundary.
-		if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
+		if err := validation.ValidateSettingsModel(c.ChanSettings, false); err != nil {
 			return nil, true, fmt.Errorf("invalid settings from database for channel %q: %w", c.Name, err)
 		}
-		if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs); err != nil {
+		if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs, false); err != nil {
 			return nil, true, fmt.Errorf("invalid metarr config from database for channel %q: %w", c.Name, err)
 		}
 
@@ -1044,12 +1044,12 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 		// Check custom URL settings.
 		for _, cURL := range c.URLModels {
 			if !models.SettingsAllZero(cURL.ChanURLSettings) && !models.ChildSettingsMatchParent(c.ChanSettings, cURL.ChanURLSettings) {
-				if err := validation.ValidateSettingsModel(cURL.ChanURLSettings); err != nil {
+				if err := validation.ValidateSettingsModel(cURL.ChanURLSettings, false); err != nil {
 					return nil, true, err
 				}
 			}
 			if !models.MetarrArgsAllZero(cURL.ChanURLMetarrArgs) && !models.ChildMetarrArgsMatchParent(c.ChanMetarrArgs, cURL.ChanURLMetarrArgs) {
-				if err := validation.ValidateMetarrArgsModel(cURL.ChanURLMetarrArgs); err != nil {
+				if err := validation.ValidateMetarrArgsModel(cURL.ChanURLMetarrArgs, false); err != nil {
 					return nil, true, err
 				}
 			}
@@ -1066,6 +1066,18 @@ func (cs *ChannelStore) UpdateChannelMetarrArgsJSON(key, val string, updateFn fu
 		return err
 	})
 	return rows, err
+}
+
+// settingsPathsChanged reports whether an update changed any path ValidateSettingsModel checks.
+func settingsPathsChanged(old, updated *models.Settings) bool {
+	return old.VideoDir != updated.VideoDir || old.JSONDir != updated.JSONDir ||
+		old.FilterFile != updated.FilterFile || old.MetaFilterMoveOpFile != updated.MetaFilterMoveOpFile
+}
+
+// metarrArgsPathsChanged reports whether an update changed any path ValidateMetarrArgsModel checks.
+func metarrArgsPathsChanged(old, updated *models.MetarrArgs) bool {
+	return old.OutputDir != updated.OutputDir || old.MetaOpsFile != updated.MetaOpsFile ||
+		old.FilteredMetaOpsFile != updated.FilteredMetaOpsFile || old.FilteredFilenameOpsFile != updated.FilteredFilenameOpsFile
 }
 
 // updateChannelMetarrArgsJSON reads, updates and writes back the channel's MetarrArgs.
@@ -1096,12 +1108,13 @@ func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn fu
 	}
 
 	// Apply the update.
+	old := args
 	if err := updateFn(&args); err != nil {
 		return 0, fmt.Errorf("failed to update settings: %w", err)
 	}
 
-	// Validate updated MetarrArgs at DB write boundary.
-	if err := validation.ValidateMetarrArgsModel(&args); err != nil {
+	// Validate updated MetarrArgs at DB write boundary, checking paths only if the update changed one.
+	if err := validation.ValidateMetarrArgsModel(&args, metarrArgsPathsChanged(&old, &args)); err != nil {
 		return 0, fmt.Errorf("updated metarr config is invalid: %w", err)
 	}
 
@@ -1167,18 +1180,19 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 	}
 
 	// Apply the update.
-	oldVideoDir, oldJSONDir := settings.VideoDir, settings.JSONDir
+	old := settings
 	if err := updateFn(&settings); err != nil {
 		return 0, fmt.Errorf("failed to update settings: %w", err)
 	}
 
-	// Validate updated Settings at DB write boundary.
-	if err := validation.ValidateSettingsModel(&settings); err != nil {
+	// Validate updated Settings at DB write boundary, checking paths only if the update changed one, so e.g. pausing a
+	// channel works while its filter file or drive is unavailable.
+	if err := validation.ValidateSettingsModel(&settings, settingsPathsChanged(&old, &settings)); err != nil {
 		return 0, fmt.Errorf("updated settings are invalid: %w", err)
 	}
 
 	// Create changed destination directories (only changed ones, so e.g. pausing never recreates a missing destination).
-	if settings.VideoDir != oldVideoDir || settings.JSONDir != oldJSONDir {
+	if settings.VideoDir != old.VideoDir || settings.JSONDir != old.JSONDir {
 		if err := createDownloadDirs(&settings); err != nil {
 			return 0, err
 		}
@@ -1757,7 +1771,7 @@ func (cs *ChannelStore) applyConfigChannelSettings(vip *viper.Viper, c *models.C
 	}
 
 	// Validate complete Settings model at config boundary.
-	if err := validation.ValidateSettingsModel(c.ChanSettings); err != nil {
+	if err := validation.ValidateSettingsModel(c.ChanSettings, true); err != nil {
 		return fmt.Errorf("invalid settings in config file %q: %w", c.ChannelConfigFile, err)
 	}
 
@@ -1902,7 +1916,7 @@ func (cs *ChannelStore) applyConfigChannelMetarrSettings(vip *viper.Viper, c *mo
 	}
 
 	// Validate complete MetarrArgs model at config boundary.
-	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs); err != nil {
+	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs, true); err != nil {
 		return fmt.Errorf("invalid metarr config in config file %q: %w", c.ChannelConfigFile, err)
 	}
 

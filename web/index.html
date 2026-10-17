@@ -1055,16 +1055,17 @@
             }
           },
 
+          // Activity lists channel IDs, which unlike names can't change while a job runs.
           isCrawling(channel) {
-            return this.activity.crawling.includes(channel.name) || this.isStopping(channel);
+            return this.activity.crawling.includes(channel.id) || this.isStopping(channel);
           },
 
           isStopping(channel) {
-            return this.activity.stopping.includes(channel.name);
+            return this.activity.stopping.includes(channel.id);
           },
 
           isMetarrActive(channel) {
-            return this.activity.metarr.includes(channel.name);
+            return this.activity.metarr.includes(channel.id);
           },
 
           async stopQueue(channel) {

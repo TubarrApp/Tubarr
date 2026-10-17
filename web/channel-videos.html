@@ -346,7 +346,7 @@
               if (!response.ok) return;
               const activity = await response.json();
               const wasActive = this.metarrActive;
-              this.metarrActive = activity.metarr.includes(this.channelName);
+              this.metarrActive = activity.metarr.includes(Number(this.channelId)); // IDs, as the page's ID comes from its URL.
               // Refresh statuses once Metarr finishes.
               if (wasActive && !this.metarrActive) {
                 this.loadVideos();

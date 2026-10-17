@@ -356,20 +356,21 @@ func MetarrJobs() []MetarrJob {
 	return jobs
 }
 
-// MetarrActivity returns the names of channels with queued or running Metarr processes.
-func MetarrActivity() []string {
-	seen := map[string]struct{}{}
-	names := []string{}
-	metarrClaims.Range(func(_, v any) bool {
+// MetarrActivity returns the IDs of channels with queued or running Metarr processes.
+func MetarrActivity() []int64 {
+	seen := map[int64]struct{}{}
+	ids := []int64{}
+	metarrClaims.Range(func(k, v any) bool {
+		key, _ := k.(metarrKey)
 		if claim, ok := v.(*metarrClaim); ok && claim.inMetarr.Load() {
-			if _, dup := seen[claim.channelName]; !dup {
-				seen[claim.channelName] = struct{}{}
-				names = append(names, claim.channelName)
+			if _, dup := seen[key.channelID]; !dup {
+				seen[key.channelID] = struct{}{}
+				ids = append(ids, key.channelID)
 			}
 		}
 		return true
 	})
-	return names
+	return ids
 }
 
 // preemptMetarr takes a hold on a video for the download pipeline, cancelling and awaiting any separate Metarr run on it.

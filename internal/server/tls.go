@@ -209,14 +209,14 @@ func newestModTime(files ...string) (time.Time, error) {
 	return newest, nil
 }
 
-// loadOrCreateSelfSigned reuses the saved self-signed certificate, regenerating it near expiry or when the hostname changes.
+// loadOrCreateSelfSigned reuses the saved self-signed certificate, regenerating it only near expiry or if unreadable.
+//
+// A hostname change doesn't regenerate it: containers get a new hostname when recreated, and a new certificate would
+// bring back the browser warning for no benefit. Deleting the file makes a new one.
 func loadOrCreateSelfSigned(path string) (*tls.Certificate, error) {
-	host, _ := os.Hostname()
 	if data, err := os.ReadFile(path); err == nil {
 		cert, err := tls.X509KeyPair(data, data)
-		if err == nil && cert.Leaf != nil &&
-			time.Until(cert.Leaf.NotAfter) > selfSignedRenewAt &&
-			(host == "" || cert.Leaf.VerifyHostname(host) == nil) {
+		if err == nil && cert.Leaf != nil && time.Until(cert.Leaf.NotAfter) > selfSignedRenewAt {
 			return &cert, nil
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -224,6 +224,7 @@ func loadOrCreateSelfSigned(path string) (*tls.Certificate, error) {
 	}
 
 	logger.Pl.I("Generating self-signed TLS certificate at %s", path)
+	host, _ := os.Hostname()
 	data, err := generateSelfSigned(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate self-signed certificate: %w", err)

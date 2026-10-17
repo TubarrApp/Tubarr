@@ -10,14 +10,15 @@ import (
 
 // ValidateSettingsModel validates correct Settings values.
 //
-// Ensures all settings are valid before storage/after retrieval.
-func ValidateSettingsModel(s *models.Settings) error {
+// Ensures all settings are valid before storage/after retrieval. checkPaths checks files and directories, done when
+// saving: loading skips it, so one unavailable path (e.g. a deleted filter file) can't stop every channel loading.
+func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	var err error
 
 	s.Concurrency = sharedvalidation.ValidateConcurrencyLimit(s.Concurrency)
 	s.CrawlFreq = max(s.CrawlFreq, 0)
 
-	if s.FilterFile != "" {
+	if checkPaths && s.FilterFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(s.FilterFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid filter file %q in settings: %w", s.FilterFile, err)
 		}
@@ -35,7 +36,7 @@ func ValidateSettingsModel(s *models.Settings) error {
 		}
 	}
 
-	if s.JSONDir != "" {
+	if checkPaths && s.JSONDir != "" {
 		if err = CheckDirectory(s.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid JSON directory %q in settings: %w", s.JSONDir, err)
 		}
@@ -47,7 +48,7 @@ func ValidateSettingsModel(s *models.Settings) error {
 		}
 	}
 
-	if s.MetaFilterMoveOpFile != "" {
+	if checkPaths && s.MetaFilterMoveOpFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(s.MetaFilterMoveOpFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid move op file %q in settings: %w", s.MetaFilterMoveOpFile, err)
 		}
@@ -66,7 +67,7 @@ func ValidateSettingsModel(s *models.Settings) error {
 		}
 	}
 
-	if s.VideoDir != "" {
+	if checkPaths && s.VideoDir != "" {
 		if err = CheckDirectory(s.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid video directory %q in settings: %w", s.VideoDir, err)
 		}
@@ -83,8 +84,8 @@ func ValidateSettingsModel(s *models.Settings) error {
 
 // ValidateMetarrArgsModel validates correct Metarr Args values.
 //
-// Ensures all metarr settings are valid before storage/after retrieval.
-func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
+// Ensures all metarr settings are valid before storage/after retrieval. checkPaths is as for ValidateSettingsModel.
+func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 	m.Concurrency = max(m.Concurrency, 0) // 0 inherits the channel's limit, or the global one.
 
 	if m.FilenameOps != nil {
@@ -93,7 +94,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	if m.FilteredMetaOpsFile != "" {
+	if checkPaths && m.FilteredMetaOpsFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(m.FilteredMetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid filtered meta ops file %q in Metarr settings: %w", m.FilteredMetaOpsFile, err)
 		}
@@ -105,7 +106,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	if m.FilteredFilenameOpsFile != "" {
+	if checkPaths && m.FilteredFilenameOpsFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(m.FilteredFilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid filtered filename ops file %q in Metarr settings: %w", m.FilteredFilenameOpsFile, err)
 		}
@@ -117,7 +118,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	if m.FilteredMetaOpsFile != "" {
+	if checkPaths && m.FilteredMetaOpsFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(m.FilteredMetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid filtered meta op(s) file %q in Metarr settings: %w", m.FilteredMetaOpsFile, err)
 		}
@@ -143,7 +144,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	if m.MetaOpsFile != "" {
+	if checkPaths && m.MetaOpsFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(m.MetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
 			return fmt.Errorf("invalid meta ops file %q in Metarr settings: %w", m.MetaOpsFile, err)
 		}
@@ -179,7 +180,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs) error {
 		}
 	}
 
-	if m.OutputDir != "" {
+	if checkPaths && m.OutputDir != "" {
 		if err := CheckDirectory(m.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
 			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
 		}

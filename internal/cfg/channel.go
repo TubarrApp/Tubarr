@@ -268,7 +268,7 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 			}
 
 			// Lock crawl state.
-			crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name)
+			crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID)
 			if !ok {
 				logger.Pl.I("Crawl job is active for channel %q, please try again when it's complete.", c.Name)
 				return nil
@@ -571,7 +571,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			logger.Pl.D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Run ignore crawl.
-			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
 				defer unlock()
 
 				// Clean expired blocks first.
@@ -832,7 +832,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 			// Ignore run if desired.
 			if input.IgnoreRun != nil && *input.IgnoreRun {
-				if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+				if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
 					defer unlock()
 
 					logger.Pl.I("Running an 'ignore crawl'...")
@@ -976,7 +976,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 
 				// Ignore run if desired.
 				if input.IgnoreRun != nil && *input.IgnoreRun {
-					if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+					if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
 						logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
 						if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
 							logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
@@ -1183,7 +1183,7 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 			}
 
 			// Crawl channel.
-			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.Name); ok {
+			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
 				defer unlock()
 
 				// Clean expired blocks first.

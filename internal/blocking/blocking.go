@@ -295,10 +295,11 @@ func GetAllBlockedDomains() map[string]map[vars.BlockContext]time.Time {
 
 // normalizeDomain extracts the eTLD+1 (effective top-level domain + 1 label).
 //
-// e.g., m.google.com -> google.com, www.bbc.co.uk -> bbc.co.uk.
+// e.g., m.google.com -> google.com, www.bbc.co.uk -> bbc.co.uk. Lowercases first, as the public suffix list is lowercase.
 func normalizeDomain(rawDomain string) string {
+	rawDomain = strings.ToLower(rawDomain)
 	if domain, err := publicsuffix.EffectiveTLDPlusOne(rawDomain); err == nil {
-		return strings.ToLower(domain)
+		return domain
 	}
-	return strings.ToLower(rawDomain)
+	return rawDomain
 }

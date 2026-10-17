@@ -150,13 +150,14 @@ The interface listens on `127.0.0.1:8827` by default (all addresses in Docker). 
 - **Skip login for trusted addresses:** under **Settings > Web Interface Access**, list IPs or ranges (e.g. `192.168.1.0/24`) that need no login. This machine (localhost) is on the list by default.
 - **Scripts:** send the API key from the same page in an `X-Api-Key` header.
 - **Forgotten password:** open Tubarr from the machine it runs on (localhost skips the login) and change it in Settings, or set `TUBARR_WEB_PASSWORD` (and optionally `TUBARR_WEB_USERNAME`) and restart.
+- **Reverse proxy:** add the proxy's address under **Trusted Proxies** (e.g. `127.0.0.1` for one on the same machine), and have it send `X-Forwarded-For`, so Tubarr sees each visitor's real address. Requests relayed by a proxy that isn't trusted always need the login. A proxy that sends no forwarding headers at all (e.g. nginx with only `proxy_pass`) can't be told apart from a browser on this machine, so add `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` or untick **This machine (localhost)**.
 - **Reverse proxy with its own login:** `--web-auth none` (or `TUBARR_WEB_AUTH=none`) turns Tubarr's login off. Add the proxy under **Trusted Proxies** so client addresses are read correctly.
 
 ### HTTPS
 
 Tick **Use HTTPS** under **Settings > HTTPS** and restart Tubarr to serve the interface at `https://localhost:8827`. `--web-https` (or `TUBARR_WEB_HTTPS=true`/`false`) overrides the setting.
 
-- **Default:** a self-signed certificate, saved as `tls-self-signed.pem` in the Tubarr folder and reused, so the browser warning only needs accepting once.
+- **Default:** a self-signed certificate, saved as `tls-self-signed.pem` in the Tubarr folder and reused (including across container updates), so the browser warning only needs accepting once. It's renewed automatically a month before it expires; delete the file and restart to make a new one sooner.
 - **Your own certificate:** set the path under **Settings > HTTPS**, or with `--web-tls-cert` / `TUBARR_WEB_TLS_CERT` (and `--web-tls-key` / `TUBARR_WEB_TLS_KEY` if the key is in a separate file). A PEM file holding both the certificate and key works on its own. Renewed files are picked up without a restart.
 - **Reverse proxy:** leave HTTPS off and let the proxy (Caddy, Traefik, nginx) handle certificates, or point the proxy at `https://` and skip verification of the self-signed certificate.
 

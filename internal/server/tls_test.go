@@ -36,6 +36,30 @@ func TestSelfSignedReused(t *testing.T) {
 	}
 }
 
+// TestSelfSignedKeptAfterHostnameChange checks a certificate made under another hostname (e.g. a recreated container) is kept.
+func TestSelfSignedKeptAfterHostnameChange(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	path := filepath.Join(t.TempDir(), selfSignedFile)
+	old, err := generateSelfSigned("old-container-hostname.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, old, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cert, err := loadOrCreateSelfSigned(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(path); err != nil || !bytes.Equal(data, old) {
+		t.Error("self-signed certificate was regenerated after a hostname change")
+	}
+	if cert.Leaf.VerifyHostname("old-container-hostname.invalid") != nil {
+		t.Error("loaded certificate isn't the saved one")
+	}
+}
+
 // TestCustomCertificateFallbackAndReload checks a combined PEM is served, missing files fall back, and changes reload.
 func TestCustomCertificateFallbackAndReload(t *testing.T) {
 	logger.Pl.Console = io.Discard

@@ -84,6 +84,7 @@
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
                   Requests from these addresses need no login. One IP or CIDR range per line (e.g. 192.168.1.0/24).
                   In Docker, requests from the host arrive from the Docker gateway (e.g. 172.17.0.1), so adding 172.16.0.0/12 would skip login for everything reaching the port.
+                  Behind a reverse proxy, add it under Trusted Proxies below: requests it relays otherwise always need the login, unless it sends no forwarding headers, which look like this machine.
                 </p>
                 <label class="flex items-center gap-2 mb-3 text-sm text-gray-700 dark:text-gray-300">
                   <input type="checkbox" x-model="access.skip_localhost" />

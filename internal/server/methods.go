@@ -67,7 +67,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 
 				// Calculate elapsed time since last scan
 				elapsed := now.Sub(c.LastScan)
-				interval := time.Duration(c.ChanSettings.CrawlFreq) * time.Minute
+				interval := time.Duration(c.ScheduledCrawlFreq()) * time.Minute
 
 				// Add jitter
 				if !abstractions.IsSet(keys.SkipAllWaits) {
@@ -100,7 +100,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 				if elapsed >= interval {
 					// Crawl goroutine
 					go func(ch *models.Channel) {
-						crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.Name)
+						crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.ID)
 						if !ok {
 							return
 						}

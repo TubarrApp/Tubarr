@@ -21,3 +21,17 @@ func TestGetTimeoutForDomain(t *testing.T) {
 		}
 	}
 }
+
+// TestNormalizeDomain tests hosts reduce to their registered domain whatever their case.
+func TestNormalizeDomain(t *testing.T) {
+	for in, want := range map[string]string{
+		"www.youtube.com":   "youtube.com",
+		"WWW.YouTube.COM":   "youtube.com",
+		"www.bbc.co.uk":     "bbc.co.uk",
+		"WWW.EXAMPLE.CO.UK": "example.co.uk",
+	} {
+		if got := normalizeDomain(in); got != want {
+			t.Errorf("normalizeDomain(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

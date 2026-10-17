@@ -313,7 +313,7 @@ func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Chan
 	for _, v := range claimed {
 		ids = append(ids, v.ID)
 	}
-	ctx, unlock, err := state.LockCrawl(parent, c.Name)
+	ctx, unlock, err := state.LockCrawl(parent, c.ID)
 	if err == nil {
 		defer unlock()
 		err = downloadClaimed(ctx, s, c, claimed)

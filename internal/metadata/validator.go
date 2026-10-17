@@ -3,6 +3,7 @@ package metadata
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -31,6 +32,10 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 
 	// Apply filters.
 	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
+	if errors.Is(err, errFilterFile) {
+		// An error rather than a failed check, so the video is skipped but not marked ignored, and is tried again once the file is fixed.
+		return false, useFilteredMetaOps, useFilteredFilenameOps, fmt.Errorf("skipping %q: %w", v.URL, err)
+	}
 	if err != nil {
 		logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
 	}
@@ -188,7 +193,11 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	}
 
 	// Check download filters.
-	allFilters := slices.Concat(cu.ChanURLSettings.Filters, loadFilterOpsFromFile(cu, dirParser))
+	fileFilters, err := loadFilterOpsFromFile(cu, dirParser)
+	if err != nil {
+		return false, useFilteredMetaOps, useFilteredFilenameOps, err
+	}
+	allFilters := slices.Concat(cu.ChanURLSettings.Filters, fileFilters)
 	relevantFilters := getRelevantFilters(allFilters, cu.URL)
 
 	if !checkFilters(v, "Download filters", relevantFilters) {

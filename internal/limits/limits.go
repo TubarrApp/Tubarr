@@ -114,9 +114,12 @@ func NormalizeDomain(s string) string {
 }
 
 // registeredDomain returns the eTLD+1 of a hostname, or the lowercased hostname if it has none.
+//
+// Lowercases first, as the public suffix list is lowercase ("EXAMPLE.CO.UK" would otherwise give "co.uk").
 func registeredDomain(hostname string) string {
+	hostname = strings.ToLower(hostname)
 	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
-		return strings.ToLower(domain)
+		return domain
 	}
-	return strings.ToLower(hostname)
+	return hostname
 }
