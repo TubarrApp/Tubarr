@@ -113,3 +113,54 @@ func TestAvailableVideos(t *testing.T) {
 		t.Errorf("other channel claim: got %d, %v, want 0", len(claimed), err)
 	}
 }
+
+// TestAvailableVideosListingOrder checks undated videos are listed in the order their channel lists them, with later
+// crawls' videos above earlier ones.
+func TestAvailableVideosListingOrder(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.DB.Close() })
+
+	res, err := db.DB.Exec("INSERT INTO channels (name) VALUES ('Test')")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chanID, _ := res.LastInsertId()
+	if res, err = db.DB.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
+		t.Fatal(err)
+	}
+	cuID, _ := res.LastInsertId()
+	vs := GetVideoStore(db.DB)
+
+	// Each crawl's videos in listing order, newest first.
+	batch := func(urls ...string) []*models.Video {
+		videos := make([]*models.Video, 0, len(urls))
+		for _, u := range urls {
+			videos = append(videos, &models.Video{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: u})
+		}
+		return videos
+	}
+	if _, err := vs.AddAvailableVideos(batch("old/3", "old/2", "old/1", "old/0"), chanID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vs.AddAvailableVideos(batch("new/1", "new/0"), chanID); err != nil {
+		t.Fatal(err)
+	}
+
+	available, err := vs.GetAvailableVideos(app.AvailableStatuses...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(available))
+	for _, v := range available {
+		got = append(got, v.URL)
+	}
+	if want := []string{"new/1", "new/0", "old/3", "old/2", "old/1", "old/0"}; !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

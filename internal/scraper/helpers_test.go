@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -32,6 +33,26 @@ func TestVideoEntriesNestedTabs(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// TestListedInOrder checks crawled videos come back in the order the channel lists them, with a repeated URL kept at
+// its first position and its details merged.
+func TestListedInOrder(t *testing.T) {
+	var want []string
+	urls := make(map[string]*listedVideo)
+	for i := range 30 {
+		u := fmt.Sprintf("https://example.com/v/%d", i)
+		want = append(want, u)
+		mergeListed(urls, u, &listedVideo{})
+	}
+	mergeListed(urls, want[3], &listedVideo{Title: "Repeat"})
+
+	if got := listedInOrder(urls); !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	if lv := urls[want[3]]; lv.Order != 3 || lv.Title != "Repeat" {
+		t.Errorf("repeated URL: got order %d, title %q, want 3, %q", lv.Order, lv.Title, "Repeat")
 	}
 }
 

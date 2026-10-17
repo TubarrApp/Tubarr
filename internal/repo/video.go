@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
@@ -459,7 +460,8 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models
 
 // AddAvailableVideos stores newly found videos as Available, skipping any already in the channel.
 //
-// Existing rows are left alone, so a video being downloaded (or failed) isn't reset to Available.
+// Videos are given in the channel's listing order and inserted last first, so GetAvailableVideos' ID tie-breaker keeps
+// that order. Existing rows are left alone, so a video being downloaded (or failed) isn't reset to Available.
 func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64) (addedURLs []string, err error) {
 	tx, err := vs.DB.Begin()
 	if err != nil {
@@ -491,7 +493,7 @@ func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64
 	)
 
 	now := time.Now()
-	for _, v := range videos {
+	for _, v := range slices.Backward(videos) {
 		if v.URL == "" {
 			continue
 		}
@@ -532,7 +534,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, c.%s "+
 			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
 			"WHERE v.%s = 0 AND v.%s = 0 AND d.%s IN (?%s) "+
-			"ORDER BY v.%s DESC, v.%s DESC",
+			"ORDER BY v.%s DESC, v.%s DESC, v.%s DESC",
 		consts.QVidID,
 		consts.QVidChanID,
 		consts.QVidChanURLID,
@@ -553,6 +555,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		consts.QDLStatus, strings.Repeat(", ?", len(statuses)-1),
 		consts.QVidUploadDate,
 		consts.QVidCreatedAt,
+		consts.QVidID,
 	)
 	args := make([]any, len(statuses))
 	for i, s := range statuses {

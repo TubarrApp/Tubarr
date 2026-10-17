@@ -1,7 +1,9 @@
 package scraper
 
 import (
+	"cmp"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"tubarr/internal/domain/logger"
@@ -15,6 +17,17 @@ type listedVideo struct {
 	ThumbnailURL string
 	UploadDate   time.Time
 	Duration     int // Seconds.
+	Order        int // Position in the channel's listing, as the site lists it.
+}
+
+// listedInOrder returns the URLs of listed videos in the order the channel lists them.
+func listedInOrder(videos map[string]*listedVideo) []string {
+	urls := make([]string, 0, len(videos))
+	for u := range videos {
+		urls = append(urls, u)
+	}
+	slices.SortFunc(urls, func(a, b string) int { return cmp.Compare(videos[a].Order, videos[b].Order) })
+	return urls
 }
 
 // ytDlpEntry is a yt-dlp playlist entry, which may itself be a playlist (e.g. a channel's "Videos" tab).

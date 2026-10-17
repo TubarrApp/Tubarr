@@ -121,8 +121,9 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			continue
 		}
 
-		// Filter and create video requests
-		for newURL, lv := range newEpisodes {
+		// Filter and create video requests, in the order the channel lists them.
+		for _, newURL := range listedInOrder(newEpisodes) {
+			lv := newEpisodes[newURL]
 			if !isHTTPURL(newURL) {
 				logger.Pl.W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
 				continue
@@ -252,7 +253,7 @@ func (s *Scraper) newEpisodeURLs(
 	}
 	for _, u := range extraURLs {
 		if _, ok := episodes[u]; !ok {
-			episodes[u] = &listedVideo{}
+			episodes[u] = &listedVideo{Order: len(episodes)}
 		}
 	}
 
@@ -377,7 +378,7 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 			}
 		}
 		// Add to map to ensure uniqueness.
-		uniqueEpisodeURLs[entry.URL] = entry.listed()
+		mergeListed(uniqueEpisodeURLs, entry.URL, entry.listed())
 		logger.Pl.D(3, "Added entry for channel %q: %q", channelURL, entry)
 	}
 

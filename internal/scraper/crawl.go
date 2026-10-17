@@ -187,11 +187,12 @@ func setListedField(lv *listedVideo, name, value string, absURL func(string) str
 	}
 }
 
-// mergeListed adds a video to urls, filling details missing from an earlier match of the same URL.
+// mergeListed adds a video to urls in listing order, filling details missing from an earlier match of the same URL.
 func mergeListed(urls map[string]*listedVideo, link string, lv *listedVideo) {
 	existing, ok := urls[link]
 	if !ok {
 		copied := *lv
+		copied.Order = len(urls)
 		urls[link] = &copied
 		return
 	}
