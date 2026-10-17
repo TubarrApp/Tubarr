@@ -299,14 +299,15 @@ ENV PUID=1000 PGID=1000
 ENV HOME=/home/tubarr
 ENV TZ=UTC
 ENV PATH="/usr/local/bin:${PATH}"
-# Tells Tubarr it is in a container, so the web interface listens on all addresses by default.
-ENV TUBARR_DOCKER=1
+# Listen on all addresses in the container, so the published port reaches it. Override with TUBARR_WEB_ADDRESS.
+ENV TUBARR_WEB_ADDRESS=:8827
 
 EXPOSE 8827
 VOLUME ["/home/tubarr/.tubarr", "/downloads", "/metadata"]
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8827/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8827/health || \
+      wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost:8827/health || exit 1
 
 # tini runs as PID 1, reaping processes orphaned by yt-dlp, ffmpeg and the external downloaders.
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]

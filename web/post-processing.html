@@ -215,9 +215,9 @@
 
           async loadJobs() {
             try {
-              const response = await fetch('/api/v1/transcodes');
+              const response = await fetch('/api/v1/post-processing');
               if (!response.ok) {
-                throw new Error(await response.text() || 'Failed to fetch transcodes');
+                throw new Error(await response.text() || 'Failed to fetch post-processes');
               }
               this.jobs = await response.json() || [];
               this.error = null;

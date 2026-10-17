@@ -132,8 +132,11 @@ const (
 // Web interface or terminal.
 const (
 	RunWebInterface = "web"
-	WebListen       = "listen"   // Address the web interface listens on.
-	WebAuth         = "web-auth" // "required" (default) or "none".
+	WebAddress      = "web-address"  // Address the web interface listens on.
+	WebAuth         = "web-auth"     // "required" (default) or "none".
+	WebHTTPS        = "web-https"    // Serve over HTTPS, also a saved setting ("true" or "false", applied on restart).
+	WebTLSCert      = "web-tls-cert" // PEM certificate path (or certificate and key combined), also a saved setting.
+	WebTLSKey       = "web-tls-key"  // PEM key path, empty when combined with the certificate, also a saved setting.
 )
 
 // Web interface login settings (stored in the settings table).

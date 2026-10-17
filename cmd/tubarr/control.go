@@ -32,17 +32,20 @@ func startHeartbeat(ctx context.Context, progControl *repo.ProgControl) {
 // cleanup safely quits the program.
 func cleanup(progControl *repo.ProgControl, startTime time.Time) {
 	defer func() {
-		r := recover() // grab panic condition
+		r := recover() // Grab panic condition if present
 		if r != nil {
 			logger.Pl.E("Panic occurred: %v", r)
 		}
 
+		// Close benchmarking.
 		benchmark.CloseBenchFiles(logger.Pl, vars.BenchmarkFiles, "", nil)
 
+		// Graceful shutdown of Tubarr.
 		if err := progControl.QuitTubarr(startTime); err != nil {
-			logger.Pl.E("!!! Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (2 minutes) !!!")
+			logger.Pl.E("Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (%s)", consts.StaleProcessThreshold.String())
 		}
 
+		// Re-panic if necessary
 		if r != nil {
 			panic(r)
 		}

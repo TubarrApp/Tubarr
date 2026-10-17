@@ -129,12 +129,12 @@ func setupFuzzServer(t *testing.T) {
 		fuzzServer.logBuf = &bytes.Buffer{}
 		middleware.DefaultLogger = middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: log.New(syncWriter{}, "", 0), NoColor: true})
 
-		db, err := database.InitDB()
+		dbase, err := database.InitDB()
 		if err != nil {
 			fuzzServer.initErr = err
 			return
 		}
-		store, err := repo.InitStores(db.DB)
+		store, err := repo.InitStores(dbase)
 		if err != nil {
 			fuzzServer.initErr = err
 			return
@@ -160,13 +160,13 @@ func setupFuzzServer(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		ss := serverStore{
 			s: store, cs: store.ChannelStore(), ds: store.DownloadStore(), vs: store.VideoStore(),
-			tss: store.TubarrSettingsStore(), db: db.DB, ctx: ctx, cancel: cancel,
+			tss: store.TubarrSettingsStore(), db: dbase, ctx: ctx, cancel: cancel,
 		}
 		if fuzzServer.handler, err = NewRouter(ss); err != nil {
 			fuzzServer.initErr = err
 			return
 		}
-		fuzzServer.db = db.DB
+		fuzzServer.db = dbase
 
 		form := url.Values{
 			"name":                           {"Fuzz Channel"},

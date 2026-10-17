@@ -5,10 +5,13 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,6 +19,7 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
@@ -37,28 +41,51 @@ type serverStore struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	access *serverauth.Manager // Nil in tests that don't exercise logins.
+	certs  *tlsCerts           // Nil unless serving HTTPS.
 }
 
 // tubarrPort.
-const tubarrPort = "8827"
+const (
+	defaultTubarrPort      = "8827"
+	defaultTubarrUIAddress = "127.0.0.1"
+)
 
-// dockerEnv is set by the Docker image, so the interface listens on all addresses there by default.
-const dockerEnv = "TUBARR_DOCKER"
-
-// listenAddress returns the address to listen on: the --listen flag or TUBARR_LISTEN, else localhost outside Docker.
+// listenAddress returns the address to listen on: --web-address or TUBARR_WEB_ADDRESS (set by the Docker image), else localhost.
 func listenAddress() string {
-	if addr := cmp.Or(viper.GetString(keys.WebListen), os.Getenv("TUBARR_LISTEN")); addr != "" {
+	addr := cmp.Or(
+		strings.TrimSpace(viper.GetString(keys.WebAddress)),
+		strings.TrimSpace(os.Getenv(consts.EnvWebAddress)),
+		defaultTubarrUIAddress)
+
+	return withDefaultPort(addr)
+}
+
+// withDefaultPort adds tubarrPort to an address given without one (e.g. "0.0.0.0", "localhost", "::1").
+func withDefaultPort(addr string) string {
+	if host, port, err := net.SplitHostPort(addr); err == nil {
+		if port == "" { // "localhost:" would otherwise get a random port.
+			return net.JoinHostPort(host, defaultTubarrPort)
+		}
 		return addr
 	}
-	if os.Getenv(dockerEnv) != "" {
-		return ":" + tubarrPort
+	return net.JoinHostPort(strings.Trim(addr, "[]"), defaultTubarrPort)
+}
+
+// metarrLogURL returns the URL Metarr posts its logs to, using loopback when listening on all addresses.
+func metarrLogURL(scheme, addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
 	}
-	return "127.0.0.1:" + tubarrPort
+	if ip, err := netip.ParseAddr(host); host == "" || (err == nil && ip.IsUnspecified()) {
+		host = "127.0.0.1"
+	}
+	return scheme + "://" + net.JoinHostPort(host, port) + serverauth.MetarrLogsPath
 }
 
 // loginRequired reports whether the --web-auth flag or TUBARR_WEB_AUTH leaves logins on (anything but "none").
 func loginRequired() bool {
-	mode := cmp.Or(viper.GetString(keys.WebAuth), os.Getenv("TUBARR_WEB_AUTH"))
+	mode := cmp.Or(viper.GetString(keys.WebAuth), os.Getenv(consts.EnvWebAuth))
 	return !strings.EqualFold(strings.TrimSpace(mode), "none")
 }
 
@@ -81,13 +108,17 @@ func limitRequestBody(next http.Handler) http.Handler {
 
 // skipLogging applies the logger middleware to all requests except those for paths.
 func skipLogging(logMiddleware func(http.Handler) http.Handler, paths ...string) func(http.Handler) http.Handler {
+	// Following middleware wraps the next handler in the chain.
 	return func(next http.Handler) http.Handler {
 		logged := logMiddleware(next)
+
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if slices.Contains(paths, r.URL.Path) {
-				next.ServeHTTP(w, r)
+				next.ServeHTTP(w, r) // 'next' is the next handler. Serve from this instead of the logger for provided paths...
 				return
 			}
+
+			// ...Everything else goes through the 'logged' middleware first.
 			logged.ServeHTTP(w, r)
 		})
 	}
@@ -154,7 +185,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 		// Downloads API.
 		r.Get("/downloads", ss.handleGetDownloads)
 		r.Post("/downloads/cancel", ss.handleCancelDownloads)
-		r.Get("/transcodes", ss.handleGetTranscodes)
+		r.Get("/post-processing", ss.handleGetPostProcessing)
 		r.Get("/videos/available", ss.handleGetAvailableVideos)
 
 		// Logs API.
@@ -180,6 +211,9 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 		r.Get("/settings/flaresolverr-url", ss.handleGetFlareSolverrURL)
 		r.Put("/settings/flaresolverr-url", ss.handleSetFlareSolverrURL)
 		r.Post("/settings/flaresolverr-url/test", ss.handleTestFlareSolverr)
+		r.Get("/settings/tls", ss.handleGetTLS)
+		r.Put("/settings/tls", ss.handleSetTLS)
+		r.Put("/settings/tls/enabled", ss.handleSetHTTPSEnabled)
 		r.Get("/settings/scrape-config-file", ss.handleGetScrapeConfigFile)
 		r.Put("/settings/scrape-config-file", ss.handleSetScrapeConfigFile)
 		r.Post("/settings/scrape-config-file/reload", ss.handleReloadScrapeConfigFile)
@@ -202,8 +236,8 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 }
 
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
-func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, database *sql.DB) error {
-	access, err := serverauth.New(database, store.TubarrSettingsStore(), loginRequired())
+func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, d *sql.DB) error {
+	access, err := serverauth.New(d, store.TubarrSettingsStore(), loginRequired())
 	if err != nil {
 		return fmt.Errorf("failed to set up web interface access: %w", err)
 	}
@@ -215,10 +249,20 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		ds:     store.DownloadStore(),
 		vs:     store.VideoStore(),
 		tss:    store.TubarrSettingsStore(),
-		db:     database,
+		db:     d,
 		ctx:    inputCtx,
 		cancel: inputCtxCancel,
 		access: access,
+	}
+
+	// Self-signed certificate unless a custom one is set.
+	scheme := "http"
+	if on, _ := httpsSetting(ss.tss); on {
+		scheme = "https"
+		certPath, keyPath, _ := tlsPaths(ss.tss)
+		if ss.certs, err = newTLSCerts(certPath, keyPath); err != nil {
+			return fmt.Errorf("failed to set up HTTPS: %w", err)
+		}
 	}
 
 	r, err := NewRouter(ss)
@@ -226,6 +270,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		return err
 	}
 	addr := listenAddress()
+	vars.MetarrLogURL = metarrLogURL(scheme, addr)
 
 	srv := &http.Server{
 		Addr:              addr,
@@ -235,13 +280,22 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		IdleTimeout:       2 * time.Minute,  // Keep-alive connections between requests.
 		// No WriteTimeout: test crawls and FlareSolverr tests answer synchronously and can take minutes.
 	}
+	if ss.certs != nil {
+		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: ss.certs.getCertificate}
+	}
 
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
-		logger.Pl.I("Tubarr web server listening on %s\n", srv.Addr)
+		logger.Pl.I("Tubarr web server listening on %s://%s\n", scheme, srv.Addr)
 
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		var err error
+		if srv.TLSConfig != nil {
+			err = srv.ListenAndServeTLS("", "") // Certificates come from TLSConfig.GetCertificate.
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- fmt.Errorf("server failed: %w", err)
 			return
 		}
@@ -255,7 +309,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 	// Wait for interrupt signal.
 	select {
 	case <-inputCtx.Done():
-		logger.Pl.S("Shutting down server (context canceled)...")
+		logger.Pl.I("Shutting down server (context canceled)...")
 
 	case err := <-serverErr:
 		// server crashed

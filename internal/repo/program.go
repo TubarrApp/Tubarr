@@ -76,11 +76,9 @@ func (pc *ProgControl) StartTubarr() (pid int, err error) {
 
 // QuitTubarr sets the program exit fields, ready for next run.
 func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
-	id, running, err := pc.checkProgRunning()
-	if err != nil {
+	if id, running, err := pc.checkProgRunning(); err != nil {
 		return err
-	}
-	if !running {
+	} else if !running {
 		return fmt.Errorf("tubarr is not marked as running. Process %d still active?", id)
 	}
 
@@ -90,6 +88,7 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 		logger.Pl.E("Failed to get device hostname: %v", err)
 	}
 
+	// Update program elements in database.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ? WHERE %s = 1",
 		consts.DBProgram,
@@ -100,8 +99,8 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 		consts.QProgID,
 	)
 
-	if _, err := pc.DB.Exec(
-		query,
+	if _, err := pc.DB.Exec(query,
+		// Fills query '?' placeholders:
 		false,
 		0,
 		now,
@@ -110,6 +109,7 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 		return err
 	}
 
+	// Log exit messages and return.
 	logger.Pl.I("Tubarr finished: %v\n\nTime elapsed: %.2f seconds\n",
 		now.Local().Format("2006-01-02 15:04:05.00 MST"),
 		now.Sub(startTime).Seconds())
@@ -128,8 +128,7 @@ func (pc *ProgControl) UpdateHeartbeat() error {
 		consts.QProgID,
 	)
 
-	_, err := pc.DB.Exec(query, time.Now())
-	if err != nil {
+	if _, err := pc.DB.Exec(query, time.Now()); err != nil {
 		return err
 	}
 
@@ -185,7 +184,7 @@ func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 		return false, err
 	}
 
-	if time.Since(lastHeartbeat) > 2*time.Minute {
+	if time.Since(lastHeartbeat) > consts.StaleProcessThreshold {
 
 		logger.Pl.I("Detected stale process, resetting state...")
 

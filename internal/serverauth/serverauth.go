@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 
@@ -36,13 +37,6 @@ const (
 
 	// MetarrLogsPath is the endpoint Metarr posts logs to, authorized by the log token alone.
 	MetarrLogsPath = "/metarr-logs"
-
-	// Env vars setting the login at startup, for when the password is forgotten (e.g. in Docker).
-	envUsername = "TUBARR_WEB_USERNAME"
-	envPassword = "TUBARR_WEB_PASSWORD"
-
-	// LogTokenEnv passes the log token to Metarr.
-	LogTokenEnv = "TUBARR_LOG_TOKEN"
 )
 
 // errNoLogin is returned when no login has been set up yet.
@@ -322,11 +316,11 @@ func (m *Manager) setStringList(key string, list []string) error {
 
 // applyEnvLogin sets the login from the environment if a password is given there.
 func (m *Manager) applyEnvLogin() error {
-	password := os.Getenv(envPassword)
+	password := os.Getenv(consts.EnvWebPassword)
 	if password == "" {
 		return nil
 	}
-	username := os.Getenv(envUsername)
+	username := os.Getenv(consts.EnvWebUsername)
 	if username == "" {
 		if current, _, err := m.settings.GetSetting(keys.WebUsername); err == nil && current != "" {
 			username = current
@@ -335,9 +329,9 @@ func (m *Manager) applyEnvLogin() error {
 		}
 	}
 	if err := m.setLogin(username, password); err != nil {
-		return fmt.Errorf("failed to set web login from %s: %w", envPassword, err)
+		return fmt.Errorf("failed to set web login from %s: %w", consts.EnvWebPassword, err)
 	}
-	logger.Pl.I("Web interface login for %q set from %s", username, envPassword)
+	logger.Pl.I("Web interface login for %q set from %s", username, consts.EnvWebPassword)
 	return nil
 }
 

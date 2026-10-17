@@ -2,34 +2,32 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"tubarr/internal/database"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/repo"
 )
 
 // initializeApplication sets up the application for the current run.
 func initializeApplication() (store *repo.Store, db *sql.DB, progControl *repo.ProgControl, err error) {
 	// Database & stores.
-	database, err := database.InitDB()
-	if err != nil {
+	if db, err = database.InitDB(); err != nil {
 		return nil, nil, nil, err
 	}
-	store, err = repo.InitStores(database.DB)
-	if err != nil {
+	if store, err = repo.InitStores(db); err != nil {
 		return nil, nil, nil, err
 	}
 
 	// Start controller.
-	progControl = repo.NewProgController(database.DB)
+	progControl = repo.NewProgController(db)
+
+	// Start Tubarr process.
 	if progControl.ProcessID, err = progControl.StartTubarr(); err != nil {
 		if strings.HasPrefix(err.Error(), "failure:") {
-			logger.Pl.E("DB %v\n", err)
-			return nil, nil, nil, err
+			err = fmt.Errorf("DB %w", err) // "DB failure: reason"
 		}
-		logger.Pl.P("Tubarr exiting with error: %v\n", err)
 		return nil, nil, nil, err
 	}
 
-	return store, database.DB, progControl, err
+	return store, db, progControl, err
 }

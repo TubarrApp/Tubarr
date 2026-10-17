@@ -94,6 +94,12 @@ The container requires one main volume for configuration and database:
 | `TZ` | `UTC` | Timezone for logs and scheduling |
 | `PUID` | `1000` | User ID for running Tubarr (matches host user to avoid permission issues) |
 | `PGID` | `1000` | Group ID for running Tubarr (matches host group to avoid permission issues) |
+| `TUBARR_WEB_ADDRESS` | `:8827` | Address the web interface listens on inside the container |
+| `TUBARR_WEB_AUTH` | `required` | `none` turns the web login off, e.g. behind a reverse proxy with its own login |
+| `TUBARR_WEB_HTTPS` | | `true` or `false`, overriding the **Use HTTPS** setting. Uses a self-signed certificate unless one is set below or in Settings |
+| `TUBARR_WEB_TLS_CERT` | | Path inside the container to a PEM certificate (or certificate and key combined), e.g. a read-only mount of `/certs/fullchain.pem` |
+| `TUBARR_WEB_TLS_KEY` | | Path to the PEM private key, if not combined with the certificate |
+| `TUBARR_WEB_USERNAME` / `TUBARR_WEB_PASSWORD` | | Sets the web login at startup, e.g. to reset a forgotten password |
 
 ## Port Mapping
 
@@ -220,7 +226,7 @@ podman exec -it tubarr sh
 
 ## Health Check
 
-The container includes a health check that runs every 30 seconds against `http://localhost:8827/health`. It returns 200 when the server and database are working, and 503 otherwise:
+The container includes a health check that runs every 30 seconds against `http://localhost:8827/health` (or `https://` when HTTPS is on). It returns 200 when the server and database are working, and 503 otherwise:
 
 ```bash
 # Docker

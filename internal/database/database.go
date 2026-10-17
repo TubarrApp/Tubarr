@@ -25,24 +25,34 @@ type Database struct {
 	DB *sql.DB
 }
 
-// InitDB returns a new DB control instance.
+// InitDB returns a new SQL DB instance.
 //
 // Can initiate or return database, and perform main program operations.
-func InitDB() (d *Database, err error) {
-	d = new(Database)
-	d.DB, err = sql.Open(dbDriver, paths.DBFilePath+dbParams)
-	if err != nil {
+func InitDB() (db *sql.DB, err error) {
+	dbPath := paths.DBFilePath + dbParams
+	if db, err = sql.Open(dbDriver, dbPath); err != nil {
 		return nil, fmt.Errorf("failed to open database at path %q: %w", paths.DBFilePath, err)
+	} else if db == nil {
+		return nil, fmt.Errorf("unexpected nil sql.DB pointer returned by sql.Open. Driver: %q Database Path: %q", dbDriver, dbPath)
 	}
-	if err := d.DB.Ping(); err != nil {
+	d := &Database{DB: db}
+
+	// Ping database.
+	if err = db.Ping(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to open database at path %q: %w", paths.DBFilePath, err)
 	}
 
-	if err := d.initTables(); err != nil {
+	// Initialize database tables.
+	if err = d.initTables(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to initialize tables: %w", err)
 	}
+
+	// Check for orphaned rows.
 	d.reportForeignKeyViolations()
-	return d, nil
+
+	return db, nil
 }
 
 // reportForeignKeyViolations logs rows left pointing at deleted parents (e.g. from before foreign keys were enforced).

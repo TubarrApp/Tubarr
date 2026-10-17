@@ -56,9 +56,9 @@ func main() {
 	logger.Pl = pl
 
 	// Initialize application (DB, stores, etc).
-	store, database, progControl, err := initializeApplication()
+	store, db, progControl, err := initializeApplication()
 	if err != nil {
-		logger.Pl.E("error initializing Tubarr: %v", err)
+		logger.Pl.E("Error initializing Tubarr: %v", err)
 		return
 	}
 
@@ -66,7 +66,7 @@ func main() {
 	vars.MetarrLogs = file.LoadMetarrLogs()
 
 	// Load blocked domains from database.
-	if err := blocking.LoadBlockedDomains(database); err != nil {
+	if err := blocking.LoadBlockedDomains(db); err != nil {
 		logger.Pl.W("Failed to load blocked domains: %v", err)
 	}
 
@@ -86,7 +86,7 @@ func main() {
 		close(heartbeatDone)
 	}()
 
-	// ---- INIT COMMANDS ----
+	// ---- INIT COMMANDS (e.g. --web, --debug) ----
 	if err := cfg.InitCommands(ctx, store); err != nil {
 		logger.Pl.E("Error: %v", err)
 		cancel()
@@ -102,7 +102,7 @@ func main() {
 		}
 
 		if abstractions.IsSet(keys.RunWebInterface) {
-			return server.StartServer(ctx, cancel, store, database)
+			return server.StartServer(ctx, cancel, store, db)
 		}
 
 		if abstractions.GetBool(keys.TerminalRunDefaultBehavior) {

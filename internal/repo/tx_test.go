@@ -24,8 +24,8 @@ func newTestChannelStore(t *testing.T) *ChannelStore {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.DB.Close() })
-	cs, err := GetChannelStore(db.DB)
+	t.Cleanup(func() { _ = db.Close() })
+	cs, err := GetChannelStore(db)
 	if err != nil {
 		t.Fatal(err)
 	}

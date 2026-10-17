@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/app"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
@@ -157,23 +158,38 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory".
 
-	// Web version vs. terminal version toggle.
+	// Web interface flags (always registered, flags aren't parsed until Execute).
 	rootCmd.PersistentFlags().Bool(keys.RunWebInterface, false, "Run Tubarr as a web interface")
 	if err := viper.BindPFlag(keys.RunWebInterface, rootCmd.PersistentFlags().Lookup(keys.RunWebInterface)); err != nil {
 		return err
 	}
-	rootCmd.PersistentFlags().String(keys.WebListen, "", "Address for the web interface to listen on (default 127.0.0.1:8827, or :8827 in Docker; env TUBARR_LISTEN)")
-	if err := viper.BindPFlag(keys.WebListen, rootCmd.PersistentFlags().Lookup(keys.WebListen)); err != nil {
+	rootCmd.PersistentFlags().String(keys.WebAddress, "", "Address for the web interface to listen on (default 127.0.0.1:8827, or :8827 in Docker; env "+consts.EnvWebAddress+")")
+	if err := viper.BindPFlag(keys.WebAddress, rootCmd.PersistentFlags().Lookup(keys.WebAddress)); err != nil {
 		return err
 	}
-	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login: 'required' (default) or 'none', e.g. behind a reverse proxy with its own login (env TUBARR_WEB_AUTH)")
+	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login: 'required' (default) or 'none', e.g. behind a reverse proxy with its own login (env "+consts.EnvWebAuth+")")
 	if err := viper.BindPFlag(keys.WebAuth, rootCmd.PersistentFlags().Lookup(keys.WebAuth)); err != nil {
 		return err
 	}
+	rootCmd.PersistentFlags().Bool(keys.WebHTTPS, false, "Serve the web interface over HTTPS, overriding the Settings page (env "+consts.EnvWebHTTPS+")")
+	if err := viper.BindPFlag(keys.WebHTTPS, rootCmd.PersistentFlags().Lookup(keys.WebHTTPS)); err != nil {
+		return err
+	}
+	rootCmd.PersistentFlags().String(keys.WebTLSCert, "", "HTTPS certificate path, PEM with or without the key, overriding the Settings page (env "+consts.EnvWebTLSCert+")")
+	if err := viper.BindPFlag(keys.WebTLSCert, rootCmd.PersistentFlags().Lookup(keys.WebTLSCert)); err != nil {
+		return err
+	}
+	rootCmd.PersistentFlags().String(keys.WebTLSKey, "", "HTTPS private key path, if not in the --"+keys.WebTLSCert+" file (env "+consts.EnvWebTLSKey+")")
+	if err := viper.BindPFlag(keys.WebTLSKey, rootCmd.PersistentFlags().Lookup(keys.WebTLSKey)); err != nil {
+		return err
+	}
+
+	// Only true here when set by env, skip CLI flags and commands.
 	if viper.IsSet(keys.RunWebInterface) {
 		return nil
 	}
 
+	// CLI flags.
 	if err := cmd.InitProgramFlags(rootCmd); err != nil {
 		return err
 	}
@@ -187,6 +203,7 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 		return err
 	}
 
+	// Add Channel and Video function commands.
 	rootCmd.AddCommand(InitChannelCmds(ctx, s))
 	rootCmd.AddCommand(InitVideoCmds(s))
 

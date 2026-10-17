@@ -134,13 +134,21 @@ The web pages are served from the `web/` folder next to the `tubarr` binary. `GE
 
 ### Logging in
 
-The interface listens on `127.0.0.1:8827` by default (all addresses in Docker). Use `--listen 0.0.0.0:8827` (or `TUBARR_LISTEN`) to reach it from other machines.
+The interface listens on `127.0.0.1:8827` by default (all addresses in Docker). Use `--web-address 0.0.0.0:8827` (or `TUBARR_WEB_ADDRESS`) to reach it from other machines. The port defaults to 8827 if left out.
 
 - **First visit:** create a username and password. Tubarr asks for them on every new browser after that.
 - **Skip login for trusted addresses:** under **Settings > Web Interface Access**, list IPs or ranges (e.g. `192.168.1.0/24`) that need no login. This machine (localhost) is on the list by default.
 - **Scripts:** send the API key from the same page in an `X-Api-Key` header.
 - **Forgotten password:** open Tubarr from the machine it runs on (localhost skips the login) and change it in Settings, or set `TUBARR_WEB_PASSWORD` (and optionally `TUBARR_WEB_USERNAME`) and restart.
 - **Reverse proxy with its own login:** `--web-auth none` (or `TUBARR_WEB_AUTH=none`) turns Tubarr's login off. Add the proxy under **Trusted Proxies** so client addresses are read correctly.
+
+### HTTPS
+
+Tick **Use HTTPS** under **Settings > HTTPS** and restart Tubarr to serve the interface at `https://localhost:8827`. `--web-https` (or `TUBARR_WEB_HTTPS=true`/`false`) overrides the setting.
+
+- **Default:** a self-signed certificate, saved as `tls-self-signed.pem` in the Tubarr folder and reused, so the browser warning only needs accepting once.
+- **Your own certificate:** set the path under **Settings > HTTPS**, or with `--web-tls-cert` / `TUBARR_WEB_TLS_CERT` (and `--web-tls-key` / `TUBARR_WEB_TLS_KEY` if the key is in a separate file). A PEM file holding both the certificate and key works on its own. Renewed files are picked up without a restart.
+- **Reverse proxy:** leave HTTPS off and let the proxy (Caddy, Traefik, nginx) handle certificates, or point the proxy at `https://` and skip verification of the self-signed certificate.
 
 ---
 

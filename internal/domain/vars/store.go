@@ -21,6 +21,7 @@ var (
 	MetarrLogs      [][]byte
 	MetarrLogsMutex sync.RWMutex
 	MetarrLogToken  string // Passed to Metarr, which sends it with its logs. Empty outside web mode.
+	MetarrLogURL    string // Passed to Metarr, where it sends its logs. Empty outside web mode.
 )
 
 // BlockContext represents the authentication context for domain blocking.

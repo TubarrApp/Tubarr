@@ -13,24 +13,25 @@ import (
 // Store holds the database variable and sub-stores like ChannelStore etc.
 type Store struct {
 	db                  *sql.DB
-	videoStore          *VideoStore
 	channelStore        *ChannelStore
+	videoStore          *VideoStore
 	downloadStore       *DownloadStore
 	tubarrSettingsStore *TubarrSettingsStore
 }
 
 // InitStores injects databases into the store methods.
-func InitStores(db *sql.DB) (*Store, error) {
-	chanStore, err := GetChannelStore(db)
+func InitStores(d *sql.DB) (*Store, error) {
+	chanStore, err := GetChannelStore(d)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Store{
-		db:                  db,
-		videoStore:          GetVideoStore(db),
+		db:                  d,
 		channelStore:        chanStore,
-		downloadStore:       GetDownloadStore(db),
-		tubarrSettingsStore: GetTubarrSettingsStore(db),
+		videoStore:          GetVideoStore(d),
+		downloadStore:       GetDownloadStore(d),
+		tubarrSettingsStore: GetTubarrSettingsStore(d),
 	}, nil
 }
 

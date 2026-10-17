@@ -946,11 +946,11 @@ func (ss *serverStore) handleGetActivity(w http.ResponseWriter, _ *http.Request)
 	}
 }
 
-// handleGetTranscodes returns the videos queued for or running in Metarr.
-func (ss *serverStore) handleGetTranscodes(w http.ResponseWriter, _ *http.Request) {
+// handleGetPostProcessing returns the videos queued for or running in Metarr.
+func (ss *serverStore) handleGetPostProcessing(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(app.MetarrJobs()); err != nil {
-		logger.Pl.E("Failed to encode transcodes: %v", err)
+		logger.Pl.E("Failed to encode post-processes: %v", err)
 	}
 }
 
@@ -1800,6 +1800,91 @@ func (ss *serverStore) handleSetFlareSolverrURL(w http.ResponseWriter, r *http.R
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]string{"message": "FlareSolverr URL updated", "url": fsURL}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetTLS returns the HTTPS state and custom certificate paths.
+func (ss *serverStore) handleGetTLS(w http.ResponseWriter, _ *http.Request) {
+	certPath, keyPath, certLocked := tlsPaths(ss.tss)
+	enabled, locked := httpsSetting(ss.tss)
+
+	w.Header().Set("Content-Type", "application/json")
+	resp := map[string]any{
+		"https":       ss.certs != nil, // Serving HTTPS now.
+		"enabled":     enabled,         // Serving HTTPS after a restart.
+		"locked":      locked,
+		"cert":        certPath,
+		"key":         keyPath,
+		"cert_locked": certLocked,
+		"active":      ss.certs.active(),
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Pl.E("Failed to encode TLS settings: %v", err)
+	}
+}
+
+// handleSetTLS updates (or, given an empty certificate path, clears) the custom HTTPS certificate.
+func (ss *serverStore) handleSetTLS(w http.ResponseWriter, r *http.Request) {
+	if _, _, locked := tlsPaths(nil); locked {
+		http.Error(w, "certificate is set by --"+keys.WebTLSCert+" or "+consts.EnvWebTLSCert+", change it there", http.StatusConflict)
+		return
+	}
+	certPath := strings.TrimSpace(r.FormValue("cert"))
+	keyPath := strings.TrimSpace(r.FormValue("key"))
+	if certPath == "" && keyPath != "" {
+		http.Error(w, "a key needs a certificate path", http.StatusBadRequest)
+		return
+	}
+
+	// Load before saving, so a bad path can't replace a working certificate.
+	if certPath != "" {
+		if err := checkKeyPair(certPath, keyPath); err != nil {
+			http.Error(w, fmt.Sprintf("failed to load certificate: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+
+	for k, val := range map[string]string{keys.WebTLSCert: certPath, keys.WebTLSKey: keyPath} {
+		if err := ss.tss.SetSetting(k, val); err != nil {
+			http.Error(w, fmt.Sprintf("failed to save setting %q: %v", k, err), http.StatusInternalServerError)
+			return
+		}
+	}
+	ss.certs.setPaths(certPath, keyPath)
+
+	msg := "Certificate updated"
+	if ss.certs == nil {
+		msg = "Certificate saved, used once HTTPS is on"
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": msg, "active": ss.certs.active()}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleSetHTTPSEnabled saves whether to serve HTTPS, applied when Tubarr restarts.
+func (ss *serverStore) handleSetHTTPSEnabled(w http.ResponseWriter, r *http.Request) {
+	if _, locked := httpsSetting(nil); locked {
+		http.Error(w, "HTTPS is set by --"+keys.WebHTTPS+" or "+consts.EnvWebHTTPS+", change it there", http.StatusConflict)
+		return
+	}
+	enabled, err := strconv.ParseBool(r.FormValue("enabled"))
+	if err != nil {
+		http.Error(w, "enabled must be true or false", http.StatusBadRequest)
+		return
+	}
+	if err := ss.tss.SetSetting(keys.WebHTTPS, strconv.FormatBool(enabled)); err != nil {
+		http.Error(w, fmt.Sprintf("failed to save setting %q: %v", keys.WebHTTPS, err), http.StatusInternalServerError)
+		return
+	}
+
+	msg := "Saved"
+	if enabled != (ss.certs != nil) {
+		msg = "Saved, restart Tubarr to apply"
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"message": msg, "enabled": enabled}); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }

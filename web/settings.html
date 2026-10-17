@@ -323,6 +323,74 @@
               <p x-show="flareSolverrError" x-text="flareSolverrError" class="text-xs mt-1" style="color: #ef4444;"></p>
             </div>
 
+            <!-- HTTPS Certificate Card -->
+            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">HTTPS</h3>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Serves the web interface over HTTPS instead of HTTP, applied when Tubarr restarts. Uses a self-signed certificate unless a certificate is set below,
+                so browsers show a warning the first time.
+                <br>
+                <br>
+                <span x-show="!tlsHTTPS">HTTPS is currently off.</span>
+                <span x-show="tlsHTTPS && tlsActive === 'self-signed'">Serving the self-signed certificate.</span>
+                <span x-show="tlsHTTPS && tlsActive === 'custom'">Serving the certificate below.</span>
+                <span x-show="tlsEnabled !== tlsHTTPS" class="font-medium">Restart Tubarr to apply the change.</span>
+              </p>
+
+              <label class="flex items-center gap-2 mb-1 text-sm text-gray-700 dark:text-gray-300" :class="tlsLocked && 'opacity-50 cursor-not-allowed'">
+                <input type="checkbox" x-model="tlsEnabled" :disabled="tlsLocked" :class="tlsLocked && 'cursor-not-allowed'" @change="saveHTTPSEnabled()" />
+                Use HTTPS
+                <span x-show="httpsSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+              </label>
+              <p x-show="tlsLocked" class="text-xs mb-1 text-gray-500 dark:text-gray-400">Set by <code>--web-https</code> or <code>TUBARR_WEB_HTTPS</code>, change it there.</p>
+              <p x-show="httpsError" x-text="httpsError" class="text-xs mb-1" style="color: #ef4444;"></p>
+
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Certificate</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                Path to a PEM certificate on the Tubarr machine, either with the key in the same file or with a separate key file. Changes apply to new connections without a restart.
+              </p>
+
+              <p x-show="tlsCertLocked" class="text-xs mb-3 text-gray-500 dark:text-gray-400">Set by <code>--web-tls-cert</code> or <code>TUBARR_WEB_TLS_CERT</code>, change it there.</p>
+              <div class="flex flex-col gap-3 py-3">
+                <input
+                  type="text"
+                  x-model="tlsCert"
+                  :disabled="tlsCertLocked"
+                  :class="tlsCertLocked && 'opacity-50 cursor-not-allowed'"
+                  placeholder="/path/to/certificate.pem"
+                  class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  @keydown.enter="saveTLS()"
+                />
+                <input
+                  type="text"
+                  x-model="tlsKey"
+                  :disabled="tlsCertLocked"
+                  :class="tlsCertLocked && 'opacity-50 cursor-not-allowed'"
+                  placeholder="/path/to/private-key.pem (leave empty if combined with the certificate)"
+                  class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  @keydown.enter="saveTLS()"
+                />
+                <div x-show="!tlsCertLocked" class="flex flex-wrap items-center gap-3">
+                  <button
+                    @click="saveTLS()"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    @click="tlsCert = ''; tlsKey = ''; saveTLS()"
+                    title="Clear the saved paths and use the self-signed certificate"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                  >
+                    Clear
+                  </button>
+                  <span x-show="tlsSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                </div>
+              </div>
+              <p x-show="tlsMessage" x-text="tlsMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
+              <p x-show="tlsError" x-text="tlsError" class="text-xs mt-1" style="color: #ef4444;"></p>
+            </div>
+
           </div>
         </main>
         <!-- ===== Main Content End ===== -->
@@ -448,12 +516,27 @@
           flareSolverrError: '',
           testingFlareSolverr: false,
 
+          // HTTPS certificate
+          tlsHTTPS: false,
+          tlsEnabled: false,
+          tlsLocked: false,
+          httpsSaved: false,
+          httpsError: '',
+          tlsActive: '',
+          tlsCertLocked: false,
+          tlsCert: '',
+          tlsKey: '',
+          tlsSaved: false,
+          tlsMessage: '',
+          tlsError: '',
+
           init() {
             this.loadCrawlConcurrency();
             this.loadGlobalDownloadLimit();
             this.loadPostProcessConcurrency();
             this.loadDomainLimits();
             this.loadFlareSolverrURL();
+            this.loadTLS();
           },
 
           async loadCrawlConcurrency() {
@@ -634,6 +717,71 @@
             } catch (err) {
               this.flareSolverrError = 'Failed to update FlareSolverr URL';
               console.error('Error saving FlareSolverr URL:', err);
+            }
+          },
+
+          async loadTLS() {
+            try {
+              const response = await fetch('/api/v1/settings/tls');
+              if (!response.ok) return;
+              const data = await response.json();
+              this.tlsHTTPS = data.https;
+              this.tlsEnabled = data.enabled;
+              this.tlsLocked = data.locked;
+              this.tlsActive = data.active;
+              this.tlsCertLocked = data.cert_locked;
+              this.tlsCert = data.cert ?? '';
+              this.tlsKey = data.key ?? '';
+            } catch (err) {
+              console.error('Error loading HTTPS certificate settings:', err);
+            }
+          },
+
+          async saveHTTPSEnabled() {
+            this.httpsSaved = false;
+            this.httpsError = '';
+            try {
+              const response = await fetch('/api/v1/settings/tls/enabled', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ enabled: this.tlsEnabled })
+              });
+              if (!response.ok) {
+                this.httpsError = await response.text() || 'Failed to update HTTPS';
+                this.tlsEnabled = !this.tlsEnabled;
+                return;
+              }
+              this.httpsSaved = true;
+              setTimeout(() => { this.httpsSaved = false; }, 2000);
+            } catch (err) {
+              this.httpsError = 'Failed to update HTTPS';
+              this.tlsEnabled = !this.tlsEnabled;
+              console.error('Error saving HTTPS setting:', err);
+            }
+          },
+
+          async saveTLS() {
+            this.tlsSaved = false;
+            this.tlsMessage = '';
+            this.tlsError = '';
+            try {
+              const response = await fetch('/api/v1/settings/tls', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ cert: this.tlsCert, key: this.tlsKey })
+              });
+              if (!response.ok) {
+                this.tlsError = await response.text() || 'Failed to update certificate';
+                return;
+              }
+              const data = await response.json();
+              this.tlsActive = data.active;
+              this.tlsMessage = data.message;
+              this.tlsSaved = true;
+              setTimeout(() => { this.tlsSaved = false; }, 2000);
+            } catch (err) {
+              this.tlsError = 'Failed to update certificate';
+              console.error('Error saving HTTPS certificate:', err);
             }
           },
 

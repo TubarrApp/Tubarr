@@ -26,9 +26,9 @@ func newTestServer(t *testing.T, required bool) (*Manager, http.Handler) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.DB.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
-	m, err := New(db.DB, repo.GetTubarrSettingsStore(db.DB), required)
+	m, err := New(db, repo.GetTubarrSettingsStore(db), required)
 	if err != nil {
 		t.Fatal(err)
 	}

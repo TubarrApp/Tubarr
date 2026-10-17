@@ -41,6 +41,42 @@ func TestServePageIncludes(t *testing.T) {
 	}
 }
 
+// TestWithDefaultPort tests that listen addresses given without a port get the default one.
+func TestWithDefaultPort(t *testing.T) {
+	for in, want := range map[string]string{
+		"0.0.0.0":        "0.0.0.0:8827",
+		"localhost":      "localhost:8827",
+		"localhost:":     "localhost:8827",
+		"::":             "[::]:8827",
+		"::1":            "[::1]:8827",
+		"[::1]":          "[::1]:8827",
+		"[::1]:9000":     "[::1]:9000",
+		":9000":          ":9000",
+		"127.0.0.1:9000": "127.0.0.1:9000",
+	} {
+		if got := withDefaultPort(in); got != want {
+			t.Errorf("withDefaultPort(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestMetarrLogURL tests that Metarr is pointed at a reachable address for each listen address.
+func TestMetarrLogURL(t *testing.T) {
+	for _, tc := range []struct{ scheme, addr, want string }{
+		{"http", "127.0.0.1:8827", "http://127.0.0.1:8827/metarr-logs"},
+		{"http", ":8827", "http://127.0.0.1:8827/metarr-logs"},
+		{"https", "0.0.0.0:9000", "https://127.0.0.1:9000/metarr-logs"},
+		{"https", "[::]:9000", "https://127.0.0.1:9000/metarr-logs"},
+		{"http", "192.168.1.5:8827", "http://192.168.1.5:8827/metarr-logs"},
+		{"http", "[::1]:8827", "http://[::1]:8827/metarr-logs"},
+		{"http", "localhost:8827", "http://localhost:8827/metarr-logs"},
+	} {
+		if got := metarrLogURL(tc.scheme, tc.addr); got != tc.want {
+			t.Errorf("metarrLogURL(%q, %q) = %q, want %q", tc.scheme, tc.addr, got, tc.want)
+		}
+	}
+}
+
 // TestServePageMissingPartial tests that a page including an unknown partial fails rather than serving a broken page.
 func TestServePageMissingPartial(t *testing.T) {
 	webRoot := t.TempDir()

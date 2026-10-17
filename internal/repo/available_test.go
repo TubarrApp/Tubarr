@@ -22,20 +22,20 @@ func TestAvailableVideos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.DB.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
-	res, err := db.DB.Exec("INSERT INTO channels (name) VALUES ('Test')")
+	res, err := db.Exec("INSERT INTO channels (name) VALUES ('Test')")
 	if err != nil {
 		t.Fatal(err)
 	}
 	chanID, _ := res.LastInsertId()
-	if res, err = db.DB.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
+	if res, err = db.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
 		t.Fatal(err)
 	}
 	cuID, _ := res.LastInsertId()
 	c := &models.Channel{ID: chanID, Name: "Test"}
-	vs := GetVideoStore(db.DB)
-	cs, err := GetChannelStore(db.DB)
+	vs := GetVideoStore(db)
+	cs, err := GetChannelStore(db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,18 +124,18 @@ func TestAvailableVideosListingOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.DB.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
-	res, err := db.DB.Exec("INSERT INTO channels (name) VALUES ('Test')")
+	res, err := db.Exec("INSERT INTO channels (name) VALUES ('Test')")
 	if err != nil {
 		t.Fatal(err)
 	}
 	chanID, _ := res.LastInsertId()
-	if res, err = db.DB.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
+	if res, err = db.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
 		t.Fatal(err)
 	}
 	cuID, _ := res.LastInsertId()
-	vs := GetVideoStore(db.DB)
+	vs := GetVideoStore(db)
 
 	// Each crawl's videos in listing order, newest first.
 	batch := func(urls ...string) []*models.Video {
