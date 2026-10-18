@@ -74,6 +74,8 @@ const (
 	URLFile                   string = "url-file"
 	URLAdd                    string = "add-url"
 	URLs                      string = "urls"
+	ChannelURL                string = "channel-url"
+	SendToAvailable           string = "send-to-available"
 	VideoIDs                  string = "video-ids"
 	AllVideos                 string = "all-videos"
 	DeleteFiles               string = "delete-files"

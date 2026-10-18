@@ -116,7 +116,7 @@ Videos download as `Title [video ID]`, so videos with the same title, or a title
 
 - Default behavior (`tubarr`) crawls every channel that isn't paused and is due for a crawl, then exits. Each channel URL is due on its own crawl frequency if it has one, or the channel's `--crawl-freq`, and a crawl only checks the URLs that are due.
 - Use `tubarr channel crawl --channel-name 'Cool Channel'` to manually trigger one channel.
-- `tubarr channel download-video-urls --channel-name 'Cool Channel' --urls "channelURL|videoURL"` downloads ad-hoc videos without enabling the full crawler. A plain video URL (no `channelURL|`) downloads it to the channel's manual downloads.
+- `tubarr channel download-video-urls --channel-name 'Cool Channel' --urls videoURL` downloads ad-hoc videos without enabling the full crawler, to the channel's manual downloads. Add `--channel-url` with one of the channel's URLs to download them through it (e.g. for its authentication), or `--send-to-available` to add them to **Available** instead of downloading them.
 - `tubarr channel run-metarr --channel-name 'Cool Channel'` runs Metarr on downloaded videos it failed on or skipped.
 - `tubarr channel list-available` lists videos waiting in **Available** with their IDs (add `--channel-name` for one channel). `tubarr channel download-available --channel-name 'Cool Channel'` lists the channel's videos numbered and asks which to download (e.g. `1,3,5-8` or `all`), or pass `--video-ids`, `--urls` or `--all` to skip the prompt. `dismiss-available` works the same way to dismiss them.
 - `tubarr channel delete-videos --channel-name 'Cool Channel' --urls videoURL` removes videos from the channel's list, so later crawls treat them as new. Their files are kept unless you add `--delete-files`.

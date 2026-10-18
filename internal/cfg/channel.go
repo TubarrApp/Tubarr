@@ -26,6 +26,7 @@ import (
 	"tubarr/internal/state"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/cobra"
@@ -199,14 +200,17 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 		channelName string
 
 		// URLs and files.
-		cFile string
-		urls  []string
+		cFile           string
+		urls            []string
+		channelURL      string
+		sendToAvailable bool
 	)
 
 	manualURLCmd := &cobra.Command{
-		Use:           "download-video-urls",
-		Short:         "Download inputted URLs (plaintext or file).",
-		Long:          "If using a file, the file should contain one URL per line.",
+		Use:   "download-video-urls",
+		Short: "Download inputted URLs (plaintext or file).",
+		Long: fmt.Sprintf("If using a file, the file should contain one URL per line. Use --%s to download through one of the channel's URLs "+
+			"(e.g. for its authentication), else they go to the channel's manual downloads.", keys.ChannelURL),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -240,16 +244,6 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 			// Combine with video URLs if any.
 			videoURLs := append(urls, urlLines...)
 
-			// Check URLs have valid syntax.
-			for _, u := range videoURLs {
-				splitLen := len(strings.Split(u, "|"))
-				if splitLen > 2 {
-					err := fmt.Errorf("url syntax entered incorrectly. Should be either just the URL or 'channel URL|video URL'")
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					return err
-				}
-			}
-
 			// Get and check key/val pair.
 			key, val, err := getChanKeyVal(channelID, channelName)
 			if err != nil {
@@ -269,6 +263,44 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 				return err
 			}
 
+			// Resolve the channel URL the videos go through, if given.
+			var channelURLID int64
+			if channelURL != "" {
+				var valid []string
+				for _, cu := range c.URLModels {
+					if cu.IsManual {
+						continue
+					}
+					if sharedparsing.NormalizeChannelURL(cu.URL) == sharedparsing.NormalizeChannelURL(channelURL) {
+						channelURLID = cu.ID
+						break
+					}
+					valid = append(valid, cu.URL)
+				}
+				if channelURLID == 0 {
+					err := fmt.Errorf("--%s %q isn't one of channel %q's URLs: %v", keys.ChannelURL, channelURL, c.Name, valid)
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					return err
+				}
+			}
+			videos := make([]models.ManualVideo, 0, len(videoURLs))
+			for _, u := range videoURLs {
+				videos = append(videos, models.ManualVideo{URL: u, ChannelURLID: channelURLID})
+			}
+
+			// Add to the Available list instead of downloading.
+			if sendToAvailable {
+				added, existing, err := app.AddManualAvailable(s, c, videos)
+				if err != nil {
+					return err
+				}
+				logger.Pl.S("Added %d video(s) to channel %q's Available list", len(added), c.Name)
+				if len(existing) > 0 {
+					logger.Pl.W("Skipped %d video(s) already in channel %q:\n%s", len(existing), c.Name, strings.Join(existing, "\n"))
+				}
+				return nil
+			}
+
 			// Lock crawl state.
 			crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID)
 			if !ok {
@@ -278,7 +310,7 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 			defer unlock()
 
 			// Download URLs.
-			if err := app.ManualDownloadToChannel(crawlCtx, s, cs, c, videoURLs); err != nil {
+			if err := app.ManualDownloadToChannel(crawlCtx, s, cs, c, videos); err != nil {
 				return err
 			}
 
@@ -290,6 +322,8 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 	cmd.SetPrimaryChannelFlags(manualURLCmd, &channelName, nil, &channelID)
 	manualURLCmd.Flags().StringVarP(&cFile, keys.URLFile, "f", "", "Enter a file containing one URL per line to download them to your given channel")
 	manualURLCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to download for a given channel")
+	manualURLCmd.Flags().StringVar(&channelURL, keys.ChannelURL, "", "One of the channel's URLs to download the videos through, e.g. for its authentication")
+	manualURLCmd.Flags().BoolVar(&sendToAvailable, keys.SendToAvailable, false, "Add the videos to the channel's Available list instead of downloading them")
 
 	return manualURLCmd
 }
@@ -462,7 +496,7 @@ func downloadAvailableCmd(ctx context.Context, cs contracts.ChannelStore, s cont
 			}
 
 			logger.Pl.I("Starting download of %d available video(s) for channel %q", len(claimed), c.Name)
-			if err := app.DownloadAvailable(ctx, s, c, claimed); err != nil {
+			if err := app.DownloadAvailable(ctx, s, c, claimed, nil); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}

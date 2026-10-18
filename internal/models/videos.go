@@ -100,6 +100,20 @@ type AvailableVideo struct {
 	RetriesOnCrawl bool   `json:"retries_on_crawl,omitempty"` // A failed or canceled video the channel URL's next crawl downloads again.
 }
 
+// ManualVideo is a video URL sent in for a channel, through the channel URL with the given ID (0 for its manual downloads).
+type ManualVideo struct {
+	URL          string      `json:"url"`
+	ChannelURLID int64       `json:"channel_url_id"`
+	Auth         *ManualAuth `json:"auth,omitempty"` // Replaces the channel URL's login for this download only.
+}
+
+// ManualAuth is login details sent with manual videos, used for their download and never stored.
+type ManualAuth struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	LoginURL string `json:"login_url"`
+}
+
 // StoreFilenamesFromMetarr stores filenames after Metarr completion.
 func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 	lines := strings.Split(cmdOut, "\n")

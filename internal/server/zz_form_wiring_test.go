@@ -855,7 +855,7 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/channels/{}/override-ops/{}?video={}", keys: []string{"video"}, replay: func(t *testing.T) {
 			readsJSON(fmt.Sprintf("/api/v1/channels/1/override-ops/%d", fuzzChannelURLID(t)))(t)
 		}},
-		{path: "/api/v1/channels/{}/available", keys: []string{"action", "video_ids", "overrides"}, replay: func(t *testing.T) {
+		{path: "/api/v1/channels/{}/available", keys: []string{"action", "video_ids", "overrides", "auth"}, replay: func(t *testing.T) {
 			vs := repo.GetVideoStore(fuzzServer.db)
 			const videoURL = "https://example.com/v/wiring-available"
 			if _, err := vs.AddAvailableVideos([]*models.Video{{ChannelURLID: fuzzChannelURLID(t), ChannelURL: "https://example.com/@fuzz", URL: videoURL, Title: "Wiring"}}, 1); err != nil {
@@ -908,12 +908,39 @@ func pageRequests() []pageRequest {
 				t.Errorf("deleting a video with delete_files kept its file (stat error: %v)", err)
 			}
 		}},
-		{path: "/api/v1/channels/{}/download-urls", keys: []string{"urls"}, replay: func(t *testing.T) {
-			w := sendJSON(t, post, "/api/v1/channels/1/download-urls", map[string][]string{"urls": {"not a url"}})
+		{path: "/api/v1/channels/{}/download-urls", keys: []string{"videos", "url", "channel_url_id", "auth"}, replay: func(t *testing.T) {
+			w := sendJSON(t, post, "/api/v1/channels/1/download-urls", map[string]any{"videos": []models.ManualVideo{{URL: "not a url"}}})
 			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "not a url") {
 				t.Errorf("downloading an invalid URL = %d %s, want 400 naming it", w.Code, w.Body.String())
 			}
-			checkUnknownKeyRefused(t, post, "/api/v1/channels/1/download-urls", `{"urls":["not a url"]}`)
+			badAuth := []models.ManualVideo{{URL: "https://example.com/v/auth", Auth: &models.ManualAuth{Username: "user", LoginURL: "not a url"}}}
+			if w := sendJSON(t, post, "/api/v1/channels/1/download-urls", map[string]any{"videos": badAuth}); w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "authentication") {
+				t.Errorf("downloading with an invalid login URL = %d %s, want 400", w.Code, w.Body.String())
+			}
+			goodAuth := []models.ManualVideo{{URL: "https://example.com/v/auth", Auth: &models.ManualAuth{Username: "user", LoginURL: "https://example.com/login"}}}
+			if w := sendJSON(t, post, "/api/v1/channels/1/available-urls", map[string]any{"videos": goodAuth}); w.Code != http.StatusBadRequest {
+				t.Errorf("sending a video with authentication to Available = %d %s, want 400 as it isn't stored", w.Code, w.Body.String())
+			}
+			checkUnknownKeyRefused(t, post, "/api/v1/channels/1/download-urls", `{"videos":[{"url":"not a url"}]}`)
+		}},
+		{path: "/api/v1/channels/{}/available-urls", keys: []string{"videos", "url", "channel_url_id"}, replay: func(t *testing.T) {
+			const videoURL = "https://example.com/v/wiring-sent"
+			body := fmt.Sprintf(`{"videos":[{"url":%q,"channel_url_id":%d}]}`, videoURL, fuzzChannelURLID(t))
+			var got struct {
+				Videos   []models.Video `json:"videos"`
+				Existing []string       `json:"existing"`
+			}
+			for i, want := range []int{1, 0} { // Sending it again finds it already in the channel.
+				w := sendRequest(t, post, "/api/v1/channels/1/available-urls", "application/json", body)
+				if err := json.Unmarshal(w.Body.Bytes(), &got); w.Code != http.StatusOK || err != nil || len(got.Videos) != want || len(got.Existing) != 1-want {
+					t.Fatalf("sending to Available (try %d) = %d %s, want %d added", i+1, w.Code, w.Body.String(), want)
+				}
+			}
+			var status string
+			if err := fuzzServer.db.QueryRow("SELECT d.status FROM downloads d JOIN videos v ON v.id = d.video_id WHERE v.url = ?", videoURL).Scan(&status); err != nil || status != string(consts.DLStatusAvailable) {
+				t.Errorf("sent video's status = %q (%v), want %q", status, err, consts.DLStatusAvailable)
+			}
+			checkUnknownKeyRefused(t, post, "/api/v1/channels/1/available-urls", body)
 		}},
 		{path: "/api/v1/channels/{}/ignore-crawl", replay: routed(post, "/api/v1/channels/999999/ignore-crawl", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/latest-downloads", replay: readsJSON("/api/v1/channels/1/latest-downloads")},

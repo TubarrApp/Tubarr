@@ -16,25 +16,31 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// TestCheckManualURLs tests manual download lines must be full http(s) URLs, with piped ones naming one of the
-// channel's URLs, matched ignoring case and a trailing slash.
-func TestCheckManualURLs(t *testing.T) {
-	c := &models.Channel{URLModels: []*models.ChannelURL{{URL: "https://example.com/@Cats/"}}}
-	for line, ok := range map[string]bool{
-		"https://example.com/v/1":                           true,
-		"https://example.com/@cats|https://example.com/v/2": true,
-		"not a url":       false,
-		"example.com/v/3": false,
-		"https://example.com/@dogs|https://example.com/v/4": false,
-		"https://example.com/@cats|not a url":               false,
-		"https://example.com/@cats|a|b":                     false,
+// TestCheckManualVideos tests manual videos must be full http(s) URLs, with no channel URL or one of the channel's.
+func TestCheckManualVideos(t *testing.T) {
+	c := &models.Channel{Name: "Cats", URLModels: []*models.ChannelURL{{ID: 4, URL: "https://example.com/@cats"}}}
+	for _, tc := range []struct {
+		mv models.ManualVideo
+		ok bool
+	}{
+		{models.ManualVideo{URL: "https://example.com/v/1"}, true},
+		{models.ManualVideo{URL: "https://example.com/v/2", ChannelURLID: 4}, true},
+		{models.ManualVideo{URL: "not a url"}, false},
+		{models.ManualVideo{URL: "example.com/v/3"}, false},
+		{models.ManualVideo{URL: "https://example.com/v/4", ChannelURLID: 5}, false},
+		{models.ManualVideo{URL: "https://example.com/v/5", Auth: &models.ManualAuth{Username: "u", LoginURL: "https://example.com/login"}}, true},
+		{models.ManualVideo{URL: "https://example.com/v/6", Auth: &models.ManualAuth{LoginURL: "https://example.com/login"}}, false},
+		{models.ManualVideo{URL: "https://example.com/v/7", Auth: &models.ManualAuth{Username: "u", LoginURL: "example.com/login"}}, false},
 	} {
-		if bad := CheckManualURLs(c, []string{line}); (len(bad) == 0) != ok {
-			t.Errorf("CheckManualURLs(%q) = %v, want accepted: %t", line, bad, ok)
+		if bad := CheckManualVideos(c, []models.ManualVideo{tc.mv}); (len(bad) == 0) != tc.ok {
+			t.Errorf("CheckManualVideos(%+v) = %v, want accepted: %t", tc.mv, bad, tc.ok)
 		}
 	}
-	if cu, videoURL, err := parsePipedVideoURL("https://EXAMPLE.com/@cats|https://example.com/v/5", c); err != nil || cu != c.URLModels[0] || videoURL != "https://example.com/v/5" {
-		t.Errorf("parsePipedVideoURL = %v, %q, %v; want the channel's URL", cu, videoURL, err)
+	if cu, err := manualChannelURL(nil, c, 4); err != nil || cu != c.URLModels[0] {
+		t.Errorf("manualChannelURL(4) = %v, %v; want the channel's URL", cu, err)
+	}
+	if _, err := manualChannelURL(nil, c, 5); err == nil {
+		t.Error("manualChannelURL(5) found a URL the channel doesn't have")
 	}
 }
 

@@ -49,7 +49,7 @@ func NewCookieManager() *CookieManager {
 // GetChannelURLCookies returns channel access details for a given video.
 func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
 	// Fetch auth details if this is a manual entry or not from DB. -- NEVER HAS AUTH? MAY BE UNNECESSARY CODE. --
-	if cu.IsManual || cu.ID == 0 {
+	if (cu.IsManual || cu.ID == 0) && !cu.NeedsAuth() { // Login details sent with manual videos win.
 		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
 		if err != nil {
 			logger.Pl.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
@@ -117,9 +117,9 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 		if err == nil {
 			hostname := parsed.Hostname()
 			cm.mu.Lock()
-			// Merge with any existing cookies for this domain in the session
+			// Merge with any existing cookies for this domain in the session, these winning (e.g. a login sent with manual videos).
 			if existing, ok := cm.cookies[hostname]; ok {
-				cookies = mergeCookies(existing, cookies)
+				cookies = mergeCookies(cookies, existing)
 			}
 			cm.cookies[hostname] = cookies
 			logger.Pl.D(2, "Stored %d cookies for hostname %q in this crawl session", len(cookies), hostname)

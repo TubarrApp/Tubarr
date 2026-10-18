@@ -34,14 +34,14 @@
         <!-- include:header title="Manual Download" -->
 
         <!-- ===== Main Content Start ===== -->
-        <main x-data="manualDownloadData()" x-init="init()">
+        <main x-data="manualDownloadData()" x-init="init()" @download-as-done.window="downloadAsDone()" @download-as-cancel.window="downloadAsCancelled($event.detail)">
           <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
             <div class="mb-6">
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                Download video URLs directly to a channel. Enter URLs one per line.
-                <br>
-                <br>
-                NOTE: Use piped <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">channel-url|video-url</code> entries where authentication is needed. The channel-url component should correspond to a monitored URL for the selected channel which has authentication details attached.
+                Add video URLs for a channel, then download them, or send them to the Available page to choose them later or use Download As.
+              </p>
+              <p class="mt-4 text-sm text-warning-600 dark:text-warning-500">
+                NOTE: Videos will inherit authentication details from their associated 'Channel URL' if you do not manually provide your own.
               </p>
             </div>
 
@@ -49,7 +49,7 @@
             <div
               class="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8 dark:border-gray-800 dark:bg-white/[0.03]"
             >
-              <form @submit.prevent="submitDownload()">
+              <form @submit.prevent="addEntries()">
                 <!-- Channel Selection -->
                 <div class="mb-6">
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -57,12 +57,30 @@
                   </label>
                   <select
                     x-model="selectedChannelId"
+                    @change="selectedURLId = ''"
                     required
                     class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                   >
                     <option value="" disabled>Select a channel...</option>
                     <template x-for="channel in channels" :key="channel.id">
                       <option :value="channel.id" x-text="channel.name"></option>
+                    </template>
+                  </select>
+                </div>
+
+                <!-- Channel URL Selection -->
+                <div class="mb-6">
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Channel URL
+                  </label>
+                  <select
+                    x-model="selectedURLId"
+                    :disabled="!selectedChannelId"
+                    class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  >
+                    <option value="">None (manual downloads)</option>
+                    <template x-for="u in channelURLs" :key="u.id">
+                      <option :value="u.id" x-text="u.url"></option>
                     </template>
                   </select>
                 </div>
@@ -76,44 +94,155 @@
                     x-model="urlsText"
                     required
                     rows="10"
-                    placeholder="https://example.com/video1&#10;https://example.com/video2&#10;channel-url|video-url"
+                    placeholder="https://example.com/video1&#10;https://example.com/video2"
                     class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
                   ></textarea>
-                  <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Supports pipe syntax: <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">channel-url|video-url</code>
-                  </p>
                 </div>
 
                 <!-- Error Message -->
                 <div x-show="error" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
-                  <p class="text-sm text-red-800 dark:text-red-300" x-text="error"></p>
+                  <p class="text-sm text-red-800 dark:text-red-300 whitespace-pre-line" x-text="error"></p>
                 </div>
 
                 <!-- Success Message -->
                 <div x-show="success" class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
-                  <p class="text-sm text-green-800 dark:text-green-300" x-text="success"></p>
+                  <p class="text-sm text-green-800 dark:text-green-300 whitespace-pre-line" x-text="success"></p>
                 </div>
 
-                <!-- Submit Button -->
+                <!-- Add Button -->
                 <div class="flex justify-end">
                   <button
                     type="submit"
-                    :disabled="submitting"
-                    class="px-6 py-3 bg-brand-500 text-white rounded-lg font-medium hover:bg-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    class="px-6 py-3 bg-brand-500 text-white rounded-lg font-medium hover:bg-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/50 transition-colors"
                   >
-                    <span x-show="!submitting">Download URLs</span>
-                    <span x-show="submitting" class="flex items-center">
-                      <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Downloading...
-                    </span>
+                    Add
                   </button>
                 </div>
               </form>
             </div>
             <!-- Form Content End -->
+
+            <!-- Video List Start -->
+            <div x-show="entries.length > 0" class="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+              <!-- Selection Bar -->
+              <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-gray-800">
+                <div class="flex flex-wrap items-center gap-4 text-sm">
+                  <span class="font-medium text-gray-900 dark:text-white">
+                    <span x-text="checkedEntries.length"></span> of <span x-text="entries.length"></span> selected
+                  </span>
+                  <button @click="entries.forEach(e => e.checked = true)" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Select All</button>
+                  <button @click="entries.forEach(e => e.checked = false)" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Select None</button>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    @click="openAuthDialog()"
+                    :disabled="checkedEntries.length === 0 || working"
+                    title="Log in with these details to download the selected videos. They're used for this download only and aren't saved."
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    Authentication Details
+                  </button>
+                  <button
+                    @click="sendChecked('available')"
+                    :disabled="checkedEntries.length === 0 || checkedEntries.some(e => e.auth) || working"
+                    :title="checkedEntries.some(e => e.auth) ? 'Authentication details aren\'t saved, so selected videos with them can only be downloaded directly.' : 'Add the selected videos to the Available page, to download them later or with Download As.'"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    Send to Available
+                  </button>
+                  <button
+                    @click="sendChecked('download')"
+                    :disabled="checkedEntries.length === 0 || working"
+                    class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Download<span x-show="checkedEntries.length > 0" x-text="` (${checkedEntries.length})`"></span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Rows -->
+              <ul class="divide-y divide-gray-200 dark:divide-gray-800">
+                <template x-for="entry in entries" :key="entry.key">
+                  <li class="flex items-start gap-4 px-6 py-4">
+                    <input
+                      type="checkbox"
+                      x-model="entry.checked"
+                      class="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <p class="break-all font-mono text-sm text-gray-900 dark:text-white" x-text="entry.url"></p>
+                      <p class="mt-1 break-all text-xs text-gray-500 dark:text-gray-400">
+                        <span x-text="entry.channelName"></span> · <span x-text="entry.channelURL || 'Manual downloads'"></span>
+                        <span x-show="entry.auth" class="text-warning-600 dark:text-warning-500" x-text="entry.auth && `· 🔒 ${entry.auth.username} @ ${shortHost(entry.auth.login_url)}`"></span>
+                      </p>
+                      <p x-show="entry.error" class="mt-1 text-xs text-error-600 dark:text-error-500" x-text="entry.error"></p>
+                    </div>
+                    <button
+                      type="button"
+                      @click="downloadAs(entry)"
+                      :disabled="working"
+                      title="Download this video with its own filename and Metarr ops."
+                      class="shrink-0 text-xs text-brand-500 hover:underline disabled:opacity-50 dark:text-brand-400"
+                    >
+                      Download As…
+                    </button>
+                    <button
+                      type="button"
+                      @click="removeEntries([entry])"
+                      title="Remove from the list"
+                      class="shrink-0 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                </template>
+              </ul>
+            </div>
+            <!-- Video List End -->
+          </div>
+
+          <!-- Authentication Dialog -->
+          <div
+            x-show="authDialog.open"
+            x-cloak
+            @keydown.escape.window="authDialog.open = false"
+            @click.self="authDialog.open = false"
+            class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4"
+          >
+            <form @submit.prevent="applyAuth()" class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+              <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Add Authentication Details</h3>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                For the <span x-text="checkedEntries.length"></span> selected video(s). Used to log in for their download only, and not saved.
+              </p>
+              <div class="mt-4 space-y-4">
+                <template x-for="field in authFields" :key="field.key">
+                  <div>
+                    <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300" x-text="field.label"></label>
+                    <input
+                      :type="field.type"
+                      x-model="authDialog[field.key]"
+                      :placeholder="field.placeholder"
+                      :autocomplete="field.type === 'password' ? 'new-password' : 'off'"
+                      class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    />
+                  </div>
+                </template>
+              </div>
+              <p x-show="authDialog.error" class="mt-4 text-sm text-error-600 dark:text-error-500" x-text="authDialog.error"></p>
+              <div class="mt-6 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  @click="checkedEntries.forEach(e => e.auth = null); authDialog.open = false"
+                  x-show="checkedEntries.some(e => e.auth)"
+                  class="text-sm text-brand-500 hover:underline"
+                  style="margin-right: auto;"
+                >
+                  Remove from Selected
+                </button>
+                <button type="button" @click="authDialog.open = false" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
+                <button type="submit" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Apply</button>
+              </div>
+            </form>
           </div>
         </main>
         <!-- ===== Main Content End ===== -->
@@ -122,16 +251,28 @@
     </div>
     <!-- ===== Page Wrapper End ===== -->
 
+    <!-- include:download-as -->
+
     <script defer src="bundle.js"></script>
     <script>
       function manualDownloadData() {
         return {
           channels: [],
           selectedChannelId: '',
+          selectedURLId: '', // Blank for the channel's manual downloads.
           urlsText: '',
-          submitting: false,
+          entries: [], // Videos added to the list, each with its channel and channel URL.
+          nextKey: 1,
+          downloadAsKey: null, // The row Download As is open for.
+          working: false,
           error: '',
           success: '',
+          authDialog: { open: false, username: '', password: '', login_url: '', error: '' },
+          authFields: [
+            { key: 'username', label: 'Username', type: 'text', placeholder: '' },
+            { key: 'password', label: 'Password', type: 'password', placeholder: '' },
+            { key: 'login_url', label: 'Login URL', type: 'text', placeholder: 'https://example.com/login' }
+          ],
 
           async init() {
             await this.fetchChannels();
@@ -150,63 +291,191 @@
             }
           },
 
-          async submitDownload() {
+          get selectedChannel() {
+            return this.channels.find(c => String(c.id) === String(this.selectedChannelId));
+          },
+
+          get channelURLs() {
+            return this.selectedChannel?.url_models?.filter(u => u.url !== 'manual-downloads') || [];
+          },
+
+          get checkedEntries() {
+            return this.entries.filter(e => e.checked);
+          },
+
+          // Adds the entered URLs to the list, checked, leaving any invalid ones in the box.
+          addEntries() {
             this.error = '';
             this.success = '';
-
-            if (!this.selectedChannelId) {
+            const channel = this.selectedChannel;
+            if (!channel) {
               this.error = 'Please select a channel';
               return;
             }
+            const channelURL = this.channelURLs.find(u => String(u.id) === String(this.selectedURLId));
 
-            if (!this.urlsText.trim()) {
-              this.error = 'Please enter at least one URL';
-              return;
-            }
-
-            // Split URLs by newline and filter out empty lines
-            const urls = this.urlsText
-              .split('\n')
-              .map(url => url.trim())
-              .filter(url => url !== '');
-
-            if (urls.length === 0) {
-              this.error = 'Please enter at least one valid URL';
-              return;
-            }
-
-            this.submitting = true;
-
-            try {
-              const response = await fetch(`/api/v1/channels/${this.selectedChannelId}/download-urls`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ urls }),
+            const lines = this.urlsText.split('\n').map(line => line.trim()).filter(line => line !== '');
+            const invalid = lines.filter(line => !this.isFullURL(line));
+            for (const url of lines.filter(line => this.isFullURL(line))) {
+              if (this.entries.some(e => e.channelId === channel.id && e.url === url)) continue;
+              this.entries.push({
+                key: this.nextKey++,
+                url,
+                channelId: channel.id,
+                channelName: channel.name,
+                channelURLId: channelURL?.id || 0,
+                channelURL: channelURL?.url || '',
+                checked: true,
+                error: '',
               });
+            }
+            this.urlsText = invalid.join('\n');
+            if (invalid.length > 0) {
+              this.error = `Not full http(s) URLs, left in the box:\n${invalid.join('\n')}`;
+            }
+          },
 
-              if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || 'Download request failed');
+          isFullURL(line) {
+            try {
+              const u = new URL(line);
+              return u.protocol === 'http:' || u.protocol === 'https:';
+            } catch {
+              return false;
+            }
+          },
+
+          shortHost(url) {
+            try {
+              return new URL(url).hostname.replace(/^www\./, '');
+            } catch {
+              return url;
+            }
+          },
+
+          // Opens the dialog filled with the first selected video's details, if it has any.
+          openAuthDialog() {
+            const auth = this.checkedEntries.find(e => e.auth)?.auth;
+            this.authDialog = { open: true, username: auth?.username || '', password: auth?.password || '', login_url: auth?.login_url || '', error: '' };
+          },
+
+          // Sets the dialog's login details on the selected videos.
+          applyAuth() {
+            const { username, password, login_url } = this.authDialog;
+            if (!username.trim() || !this.isFullURL(login_url.trim())) {
+              this.authDialog.error = 'Enter a username and a full http(s) login URL.';
+              return;
+            }
+            this.checkedEntries.forEach(e => e.auth = { username: username.trim(), password, login_url: login_url.trim() });
+            this.authDialog = { open: false, username: '', password: '', login_url: '', error: '' };
+          },
+
+          removeEntries(done) {
+            const keys = new Set(done.map(e => e.key));
+            this.entries = this.entries.filter(e => !keys.has(e.key));
+          },
+
+          // Downloads the checked videos, or sends them to Available, with one request per channel.
+          async sendChecked(action) {
+            this.error = '';
+            this.success = '';
+            this.working = true;
+
+            const byChannel = new Map();
+            for (const entry of this.checkedEntries) {
+              byChannel.set(entry.channelId, [...(byChannel.get(entry.channelId) || []), entry]);
+            }
+
+            const done = [];
+            const errors = [];
+            const existing = [];
+            let queued = false;
+            for (const [channelId, group] of byChannel) {
+              group.forEach(e => e.error = '');
+              try {
+                const path = action === 'download'
+                  ? `/api/v1/channels/${channelId}/download-urls`
+                  : `/api/v1/channels/${channelId}/available-urls`;
+                const response = await fetch(path, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ videos: group.map(e => ({ url: e.url, channel_url_id: e.channelURLId, auth: e.auth || undefined })) }),
+                });
+                if (!response.ok) {
+                  throw new Error(await response.text() || response.statusText);
+                }
+                const result = await response.json().catch(() => ({}));
+                queued = queued || result.queued;
+                existing.push(...(result.existing || []));
+                done.push(...group);
+              } catch (err) {
+                errors.push(`${group[0].channelName}: ${err.message}`);
               }
+            }
+            this.removeEntries(done);
+            this.working = false;
 
-              const result = await response.json().catch(() => ({}));
-              this.success = result.queued
-                ? `Queued ${urls.length} URL(s): the download starts when the channel's current crawl or download finishes. The channel's Stop Queue or Abort All button cancels it.`
-                : `Successfully started downloading ${urls.length} URL(s) to the selected channel. Check Downloads for progress.`;
-              this.urlsText = '';
+            if (errors.length > 0) {
+              this.error = `${action === 'download' ? 'Download' : 'Send to Available'} failed for:\n${errors.join('\n')}`;
+            }
+            if (done.length === 0) return;
+            if (action === 'download') {
+              this.success = queued
+                ? `Queued ${done.length} URL(s): downloads start when their channel's current crawl or download finishes. The channel's Stop Queue or Abort All button cancels them.`
+                : `Started downloading ${done.length} URL(s). Check Downloads for progress.`;
+            } else {
+              this.success = `Sent ${done.length - existing.length} video(s) to Available.`;
+              if (existing.length > 0) {
+                this.success += ` Already in their channel, so left as they were:\n${existing.join('\n')}`;
+              }
+            }
+          },
 
-              // Redirect to active downloads after a delay, unless the download is waiting to start.
-              if (!result.queued) {
-                setTimeout(() => {
-                  window.location.href = 'downloads.html';
-                }, 2000);
+          // Opens Download As for the video once it's added to Available, which cancelling undoes.
+          async downloadAs(entry) {
+            entry.error = '';
+            try {
+              const response = await fetch(`/api/v1/channels/${entry.channelId}/available-urls`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ videos: [{ url: entry.url, channel_url_id: entry.channelURLId }] }),
+              });
+              if (!response.ok) {
+                throw new Error(await response.text() || response.statusText);
+              }
+              const { videos } = await response.json();
+              if (!videos?.length) {
+                throw new Error('Already in this channel, see the Available or Downloads page.');
+              }
+              this.downloadAsKey = entry.key;
+              this.$dispatch('download-as', { ...videos[0], auth: entry.auth || undefined }); // Auth goes with the download, unsaved.
+            } catch (err) {
+              entry.error = err.message;
+            }
+          },
+
+          // Removes the row once its Download As download starts.
+          downloadAsDone() {
+            this.removeEntries(this.entries.filter(e => e.key === this.downloadAsKey));
+            this.downloadAsKey = null;
+            this.success = 'Download As started. Check Downloads for progress.';
+          },
+
+          // Takes the video back off Available when Download As is cancelled, leaving its row as it was.
+          async downloadAsCancelled(video) {
+            const entry = this.entries.find(e => e.key === this.downloadAsKey);
+            this.downloadAsKey = null;
+            if (!entry) return;
+            try {
+              const response = await fetch(`/api/v1/channels/${video.channel_id}/delete-videos`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ 'urls[]': video.url }).toString(),
+              });
+              if (!response.ok) {
+                throw new Error(await response.text() || response.statusText);
               }
             } catch (err) {
-              this.error = 'Download failed: ' + err.message;
-            } finally {
-              this.submitting = false;
+              entry.error = `Couldn't take it back off the Available page: ${err.message}`;
             }
           },
         };

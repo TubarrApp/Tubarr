@@ -1,5 +1,6 @@
 <!-- Download As dialog: open with $dispatch('download-as', video), or $dispatch('edit-metarr', video) to edit a downloaded
-video's options and run Metarr. Dispatches download-as-done or edit-metarr-done with the video once it starts. -->
+video's options and run Metarr. Dispatches download-as-done or edit-metarr-done with the video once it starts, or
+download-as-cancel if Download As closes without starting. -->
 <div
   x-data="downloadAsDialog()"
   @download-as.window="open($event.detail, 'download')"
@@ -138,7 +139,10 @@ video's options and run Metarr. Dispatches download-as-done or edit-metarr-done 
       },
 
       close() {
-        if (!this.working) this.video = null;
+        if (this.working || !this.video) return;
+        const video = this.video;
+        this.video = null;
+        if (this.mode === 'download') this.$dispatch('download-as-cancel', video);
       },
 
       // Downloads the video, or runs Metarr on it, with the dialog's options, staying open on errors.
@@ -150,7 +154,7 @@ video's options and run Metarr. Dispatches download-as-done or edit-metarr-done 
         try {
           const response = this.mode === 'metarr'
             ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides: this.form }) })
-            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides: this.form }) });
+            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides: this.form, auth: video.auth }) });
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }
