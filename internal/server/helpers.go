@@ -757,7 +757,7 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	// Bools
 	useGlobalCookies := (useGlobalCookiesStr == "true")
 	paused := (pausedStr == "true")
-	var autoDownload *bool // Unset means true.
+	var autoDownload *bool // Unset means false.
 	if autoDownloadStr != "" {
 		b := autoDownloadStr == "true"
 		autoDownload = &b

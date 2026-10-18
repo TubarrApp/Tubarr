@@ -102,7 +102,7 @@ For example, `--metarr-output-directory '/media/{{channel_name}}/{{year}}/{{mont
 
 Use `tubarr channel add-batch --add-from-directory ./configs` to import multiple channels from config files.
 
-Pass `--auto-download=false` to list new videos under **Available** in the web UI instead of downloading them, and `--ignore-run` to skip a channel's existing backlog.
+New videos wait under **Available** (in the web UI, or `tubarr channel list-available`) for you to choose from. Pass `--auto-download` to download them automatically instead, and `--ignore-run` to skip a channel's existing backlog.
 
 ### File names
 
@@ -118,6 +118,7 @@ Videos download as `Title [video ID]`, so videos with the same title, or a title
 - Use `tubarr channel crawl --channel-name 'Cool Channel'` to manually trigger one channel.
 - `tubarr channel download-video-urls --channel-name 'Cool Channel' --urls "channelURL|videoURL"` downloads ad-hoc videos without enabling the full crawler. A plain video URL (no `channelURL|`) downloads it to the channel's manual downloads.
 - `tubarr channel run-metarr --channel-name 'Cool Channel'` runs Metarr on downloaded videos it failed on or skipped.
+- `tubarr channel list-available` lists videos waiting in **Available** with their IDs (add `--channel-name` for one channel). `tubarr channel download-available --channel-name 'Cool Channel'` lists the channel's videos numbered and asks which to download (e.g. `1,3,5-8` or `all`), or pass `--video-ids`, `--urls` or `--all` to skip the prompt. `dismiss-available` works the same way to dismiss them.
 - `tubarr channel delete-videos --channel-name 'Cool Channel' --urls videoURL` removes videos from the channel's list, so later crawls treat them as new. Their files are kept unless you add `--delete-files`.
 
 In web mode, Tubarr checks channels every few seconds and crawls each one when it's due, so cron isn't needed.

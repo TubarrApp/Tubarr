@@ -74,6 +74,8 @@ const (
 	URLFile                   string = "url-file"
 	URLAdd                    string = "add-url"
 	URLs                      string = "urls"
+	VideoIDs                  string = "video-ids"
+	AllVideos                 string = "all-videos"
 	DeleteFiles               string = "delete-files"
 	ClearSettings             string = "clear-settings"
 	Benchmarking              string = "benchmark"

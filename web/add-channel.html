@@ -1373,7 +1373,7 @@
               extra_ytdlp_crawl_args: '',
               use_global_cookies: false,
               paused: false,
-              auto_download: true,
+              auto_download: false,
               channel_config_file: '',
               from_date: '',
               to_date: '',
@@ -1575,7 +1575,7 @@
                 delete payload.paused; // Remove false value
               }
 
-              // Always send auto_download, as unset means true.
+              // Always send auto_download.
               payload.auto_download = this.formData.settings.auto_download ? 'true' : 'false';
 
               const response = await fetch('/api/v1/channels/add', {

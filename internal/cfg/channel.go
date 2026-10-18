@@ -1,9 +1,11 @@
 package cfg
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"slices"
@@ -49,6 +51,9 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 	channelCmd.AddCommand(unblockChannelCmd(cs))
 	channelCmd.AddCommand(manualDownloadVideoURLs(ctx, cs, s))
 	channelCmd.AddCommand(runMetarrCmd(ctx, cs, s))
+	channelCmd.AddCommand(listAvailableCmd(cs, s))
+	channelCmd.AddCommand(downloadAvailableCmd(ctx, cs, s))
+	channelCmd.AddCommand(dismissAvailableCmd(cs, s))
 	channelCmd.AddCommand(crawlChannelCmd(ctx, cs, s))
 	channelCmd.AddCommand(ignoreCrawl(ctx, cs, s))
 	channelCmd.AddCommand(addVideoURLToIgnore(cs))
@@ -355,6 +360,318 @@ func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.St
 	runCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Only run Metarr on these video URLs (default: all pending/failed videos in the channel)")
 
 	return runCmd
+}
+
+// listAvailableCmd lists videos waiting in Available for the user to download or dismiss.
+func listAvailableCmd(cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+	var (
+		channelID   int
+		channelName string
+	)
+
+	listCmd := &cobra.Command{
+		Use:   "list-available",
+		Short: "List videos waiting in Available.",
+		Long:  "Lists videos waiting to be downloaded or dismissed, for the given channel or all channels.",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			var chanID int64
+			if channelID != 0 || channelName != "" {
+				key, val, err := getChanKeyVal(channelID, channelName)
+				if err != nil {
+					return err
+				}
+				if chanID, err = cs.GetChannelID(key, val); err != nil {
+					return err
+				}
+				if chanID == 0 {
+					return fmt.Errorf("no channel in database with %s %q", key, val)
+				}
+			}
+
+			videos, err := s.VideoStore().GetAvailableVideos(app.AvailableStatuses...)
+			if err != nil {
+				return err
+			}
+			listed := 0
+			for _, v := range videos {
+				if chanID != 0 && v.ChannelID != chanID {
+					continue
+				}
+				listed++
+				printAvailableVideo(fmt.Sprintf("[%d]", v.ID), v, chanID == 0)
+			}
+			if listed == 0 {
+				logger.Pl.I("No videos waiting in Available")
+			}
+			return nil
+		},
+	}
+
+	cmd.SetPrimaryChannelFlags(listCmd, &channelName, nil, &channelID)
+	return listCmd
+}
+
+// downloadAvailableCmd downloads a channel's videos waiting in Available.
+func downloadAvailableCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+	var (
+		channelID   int
+		channelName string
+		urls        []string
+		ids         []int64
+		all         bool
+	)
+
+	downloadCmd := &cobra.Command{
+		Use:   "download-available",
+		Short: "Download videos waiting in Available.",
+		Long: fmt.Sprintf("Downloads the channel's videos waiting in Available given with --%s, --%s or --%s, or asks which to download. Download As overrides set in the web UI are kept.",
+			keys.AllVideos, keys.VideoIDs, keys.URLs),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			c, videos, err := getAvailableVideos(cs, s, channelID, channelName)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			if c.LoadErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", c.LoadErr)
+				return c.LoadErr
+			}
+			if len(videos) == 0 {
+				logger.Pl.I("No videos waiting in Available for channel %q", c.Name)
+				return nil
+			}
+			chosen, err := chooseAvailableVideos(c, videos, all, ids, urls, "Download")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			if len(chosen) == 0 {
+				return nil
+			}
+
+			claimed, err := s.VideoStore().ClaimVideos(c.ID, chosen, app.AvailableStatuses, consts.DLStatusQueued)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			if len(claimed) == 0 {
+				logger.Pl.I("Videos are no longer available for channel %q, they may already be downloading", c.Name)
+				return nil
+			}
+
+			logger.Pl.I("Starting download of %d available video(s) for channel %q", len(claimed), c.Name)
+			if err := app.DownloadAvailable(ctx, s, c, claimed); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			return nil
+		},
+	}
+
+	cmd.SetPrimaryChannelFlags(downloadCmd, &channelName, nil, &channelID)
+	setChooseAvailableFlags(downloadCmd, &urls, &ids, &all, "download")
+
+	return downloadCmd
+}
+
+// dismissAvailableCmd removes videos from a channel's Available list without downloading them.
+func dismissAvailableCmd(cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+	var (
+		channelID   int
+		channelName string
+		urls        []string
+		ids         []int64
+		all         bool
+	)
+
+	dismissCmd := &cobra.Command{
+		Use:   "dismiss-available",
+		Short: "Dismiss videos waiting in Available.",
+		Long: fmt.Sprintf("Removes the channel's videos given with --%s, --%s or --%s from Available without downloading them, or asks which to dismiss. Later crawls skip them.",
+			keys.AllVideos, keys.VideoIDs, keys.URLs),
+		RunE: func(_ *cobra.Command, _ []string) error {
+			c, videos, err := getAvailableVideos(cs, s, channelID, channelName)
+			if err != nil {
+				return err
+			}
+			if len(videos) == 0 {
+				logger.Pl.I("No videos waiting in Available for channel %q", c.Name)
+				return nil
+			}
+			chosen, err := chooseAvailableVideos(c, videos, all, ids, urls, "Dismiss")
+			if err != nil {
+				return err
+			}
+			if len(chosen) == 0 {
+				return nil
+			}
+
+			claimed, err := s.VideoStore().ClaimVideos(c.ID, chosen, app.AvailableStatuses, consts.DLStatusIgnored)
+			if err != nil {
+				return err
+			}
+			dismissedURLs := make([]string, 0, len(claimed))
+			for _, v := range claimed {
+				dismissedURLs = append(dismissedURLs, v.URL)
+			}
+			if err := cs.RemoveNewVideoURLs(c.ID, dismissedURLs); err != nil {
+				logger.Pl.E("Failed to update new video URLs for channel %q: %v", c.Name, err)
+			}
+			logger.Pl.S("Dismissed %d video(s) from Available for channel %q", len(claimed), c.Name)
+			return nil
+		},
+	}
+
+	cmd.SetPrimaryChannelFlags(dismissCmd, &channelName, nil, &channelID)
+	setChooseAvailableFlags(dismissCmd, &urls, &ids, &all, "dismiss")
+
+	return dismissCmd
+}
+
+// setChooseAvailableFlags sets the flags choosing which Available videos to act on.
+func setChooseAvailableFlags(c *cobra.Command, urls *[]string, ids *[]int64, all *bool, verb string) {
+	c.Flags().StringSliceVar(urls, keys.URLs, nil, fmt.Sprintf("Video URLs to %s", verb))
+	c.Flags().Int64SliceVar(ids, keys.VideoIDs, nil, fmt.Sprintf("Video IDs to %s, as shown by 'list-available'", verb))
+	c.Flags().BoolVar(all, keys.AllVideos, false, fmt.Sprintf("%s all of the channel's videos in Available", verb))
+}
+
+// getAvailableVideos returns the channel and its videos waiting in Available.
+func getAvailableVideos(cs contracts.ChannelStore, s contracts.Store, channelID int, channelName string) (*models.Channel, []*models.AvailableVideo, error) {
+	key, val, err := getChanKeyVal(channelID, channelName)
+	if err != nil {
+		return nil, nil, err
+	}
+	c, hasRows, err := cs.GetChannelModel(key, val, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !hasRows {
+		return nil, nil, fmt.Errorf("no channel model in database with %s %q", key, val)
+	}
+
+	all, err := s.VideoStore().GetAvailableVideos(app.AvailableStatuses...)
+	if err != nil {
+		return nil, nil, err
+	}
+	videos := slices.DeleteFunc(all, func(v *models.AvailableVideo) bool { return v.ChannelID != c.ID })
+	return c, videos, nil
+}
+
+// chooseAvailableVideos returns the IDs of the videos chosen with all, ids or urls, or else picked by the user in the terminal.
+func chooseAvailableVideos(c *models.Channel, videos []*models.AvailableVideo, all bool, ids []int64, urls []string, verb string) ([]int64, error) {
+	if !all && len(ids) == 0 && len(urls) == 0 {
+		return pickAvailableVideos(videos, verb)
+	}
+
+	var chosen []int64
+	for _, v := range videos {
+		if all || slices.Contains(ids, v.ID) || slices.Contains(urls, v.URL) {
+			chosen = append(chosen, v.ID)
+		}
+	}
+	for _, id := range ids {
+		if !slices.ContainsFunc(videos, func(v *models.AvailableVideo) bool { return v.ID == id }) {
+			logger.Pl.W("Video ID %d is not in Available for channel %q, skipping", id, c.Name)
+		}
+	}
+	for _, u := range urls {
+		if !slices.ContainsFunc(videos, func(v *models.AvailableVideo) bool { return v.URL == u }) {
+			logger.Pl.W("Video %q is not in Available for channel %q, skipping", u, c.Name)
+		}
+	}
+	return chosen, nil
+}
+
+// pickAvailableVideos lists the videos numbered and asks the user which to choose, until they give a valid choice or none.
+func pickAvailableVideos(videos []*models.AvailableVideo, verb string) ([]int64, error) {
+	if fi, err := os.Stdin.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+		return nil, fmt.Errorf("not running in a terminal, choose videos with --%s, --%s or --%s", keys.AllVideos, keys.VideoIDs, keys.URLs)
+	}
+
+	width := len(strconv.Itoa(len(videos)))
+	for i, v := range videos {
+		printAvailableVideo(fmt.Sprintf("%*d.", width, i+1), v, false)
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("%s which? (e.g. 1,3,5-8 or 'all', blank to cancel): ", verb)
+		line, err := reader.ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		picks, pickErr := parsePicks(strings.TrimSpace(line), len(videos))
+		if pickErr != nil && err == nil {
+			fmt.Printf("%v\n", pickErr)
+			continue
+		}
+		chosen := make([]int64, 0, len(picks))
+		for _, p := range picks {
+			chosen = append(chosen, videos[p-1].ID)
+		}
+		return chosen, pickErr
+	}
+}
+
+// parsePicks parses numbers and ranges like "1,3,5-8" (or "all") into distinct numbers from 1 to n.
+func parsePicks(input string, n int) ([]int, error) {
+	if strings.EqualFold(input, "all") {
+		picks := make([]int, n)
+		for i := range picks {
+			picks[i] = i + 1
+		}
+		return picks, nil
+	}
+
+	var picks []int
+	for _, field := range strings.FieldsFunc(input, func(r rune) bool { return r == ',' || r == ' ' }) {
+		lo, hi, isRange := strings.Cut(field, "-")
+		from, err := strconv.Atoi(lo)
+		if err != nil {
+			return nil, fmt.Errorf("%q isn't a number or range", field)
+		}
+		to := from
+		if isRange {
+			if to, err = strconv.Atoi(hi); err != nil {
+				return nil, fmt.Errorf("%q isn't a number or range", field)
+			}
+		}
+		if from < 1 || to > n || from > to {
+			return nil, fmt.Errorf("%q is outside 1-%d", field, n)
+		}
+		for p := from; p <= to; p++ {
+			if !slices.Contains(picks, p) {
+				picks = append(picks, p)
+			}
+		}
+	}
+	return picks, nil
+}
+
+// printAvailableVideo prints an Available video after label, naming its channel if withChannel.
+func printAvailableVideo(label string, v *models.AvailableVideo, withChannel bool) {
+	var details []string
+	if withChannel {
+		details = append(details, v.ChannelName)
+	}
+	if v.DownloadStatus.Status != consts.DLStatusAvailable {
+		details = append(details, string(v.DownloadStatus.Status))
+	}
+	if !v.UploadDate.IsZero() {
+		details = append(details, v.UploadDate.Format("2006-01-02"))
+	}
+
+	fmt.Printf("%s %s", label, v.Title)
+	if len(details) > 0 {
+		fmt.Printf(" (%s)", strings.Join(details, ", "))
+	}
+	indent := strings.Repeat(" ", len(label)+1)
+	fmt.Printf("\n%s%s\n", indent, v.URL)
+	if v.DownloadStatus.ErrorMsg != "" {
+		fmt.Printf("%sReason: %s\n", indent, v.DownloadStatus.ErrorMsg)
+	}
 }
 
 // deleteNotifyURLs deletes notification URLs from a channel.
@@ -878,7 +1195,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	cmd.SetNotifyFlags(addCmd, &flags.Notification)
 
 	addCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
-	addCmd.Flags().BoolVar(&flags.AutoDownload, keys.AutoDownload, true, "Download new videos automatically (false lists them as available to choose from in the web UI)")
+	addCmd.Flags().BoolVar(&flags.AutoDownload, keys.AutoDownload, false, "Download new videos automatically (otherwise they wait in Available, see 'list-available' or the web UI)")
 	addCmd.Flags().BoolVar(&flags.IgnoreRun, keys.IgnoreRun, false, "Run an 'ignore crawl' first so only new videos are downloaded (rather than the entire channel backlog)")
 	addCmd.Flags().StringVar(&addFromFile, "add-channel-from-file", "", "Add a channel using a prewritten file (.json, .toml, .yml/.yaml).\nFile contents example:\n\nchannel-name: 'Cool Channel'\nchannel-urls:\n  - 'https://www.coolchannel.com/'\n")
 
@@ -1020,7 +1337,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 	cmd.SetNotifyFlags(batchCmd, &flags.Notification)
 
 	batchCmd.Flags().BoolVar(&flags.Pause, "pause", false, "Paused channels won't crawl videos on a normal program run")
-	batchCmd.Flags().BoolVar(&flags.AutoDownload, keys.AutoDownload, true, "Download new videos automatically (false lists them as available to choose from in the web UI)")
+	batchCmd.Flags().BoolVar(&flags.AutoDownload, keys.AutoDownload, false, "Download new videos automatically (otherwise they wait in Available, see 'list-available' or the web UI)")
 	batchCmd.Flags().BoolVar(&flags.IgnoreRun, keys.IgnoreRun, false, "Run an 'ignore crawl' for each channel so only new videos are downloaded")
 
 	return batchCmd
@@ -1489,7 +1806,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		&ytdlpOutExt, &fromDate, &toDate,
 		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
 		&dlFilters, &ytdlpPreferredVideoCodecs, &ytdlpPreferredAudioCodecs)
-	updateSettingsCmd.Flags().BoolVar(&autoDownload, keys.AutoDownload, true, "Download new videos automatically (false lists them as available to choose from in the web UI)")
+	updateSettingsCmd.Flags().BoolVar(&autoDownload, keys.AutoDownload, false, "Download new videos automatically (otherwise they wait in Available, see 'list-available' or the web UI)")
 
 	// Metarr.
 	cmd.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,

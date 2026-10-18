@@ -66,7 +66,7 @@ func (c *Channel) AutoDownloads(cu *ChannelURL) bool {
 	if cu != nil && cu.ChanURLSettings != nil && cu.ChanURLSettings.AutoDownload != nil {
 		return *cu.ChanURLSettings.AutoDownload
 	}
-	return c.ChanSettings == nil || c.ChanSettings.AutoDownload == nil || *c.ChanSettings.AutoDownload
+	return c.ChanSettings != nil && c.ChanSettings.AutoDownload != nil && *c.ChanSettings.AutoDownload
 }
 
 // GetURLs returns all URL models for a channel.

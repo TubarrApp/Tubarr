@@ -44,7 +44,7 @@ type Settings struct {
 
 	// Channel toggles.
 	Paused       bool  `json:"paused"`
-	AutoDownload *bool `json:"auto_download,omitempty"` // Nil inherits (channel URLs) or means true (channels).
+	AutoDownload *bool `json:"auto_download,omitempty"` // Nil inherits (channel URLs) or means false (channels).
 }
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
