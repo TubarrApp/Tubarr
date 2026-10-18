@@ -167,7 +167,7 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	if err := viper.BindPFlag(keys.WebAddress, rootCmd.PersistentFlags().Lookup(keys.WebAddress)); err != nil {
 		return err
 	}
-	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login: 'required' (default) or 'none', e.g. behind a reverse proxy with its own login (env "+consts.EnvWebAuth+")")
+	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login, overriding the Settings page: 'required', 'local' (no login from localhost) or 'none', e.g. behind a reverse proxy with its own login (env "+consts.EnvWebAuth+")")
 	if err := viper.BindPFlag(keys.WebAuth, rootCmd.PersistentFlags().Lookup(keys.WebAuth)); err != nil {
 		return err
 	}
@@ -206,6 +206,7 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	// Add Channel and Video function commands.
 	rootCmd.AddCommand(InitChannelCmds(ctx, s))
 	rootCmd.AddCommand(InitVideoCmds(s))
+	rootCmd.AddCommand(InitAuthCmds(s))
 
 	return nil
 }

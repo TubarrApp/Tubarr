@@ -137,7 +137,7 @@ const (
 const (
 	RunWebInterface = "web"
 	WebAddress      = "web-address"  // Address the web interface listens on.
-	WebAuth         = "web-auth"     // "required" (default) or "none".
+	WebAuth         = "web-auth"     // "required", "local" or "none", overriding the Settings page.
 	WebHTTPS        = "web-https"    // Serve over HTTPS, also a saved setting ("true" or "false", applied on restart).
 	WebTLSCert      = "web-tls-cert" // PEM certificate path (or certificate and key combined), also a saved setting.
 	WebTLSKey       = "web-tls-key"  // PEM key path, empty when combined with the certificate, also a saved setting.
@@ -148,7 +148,8 @@ const (
 	WebUsername       = "web-username"
 	WebPasswordHash   = "web-password-hash"
 	WebAPIKey         = "web-api-key"
-	WebSkipLocalhost  = "web-skip-login-localhost" // "true" or "false".
+	WebAuthMode       = "web-auth-mode"            // "required", "local" or "none".
+	WebSkipLocalhost  = "web-skip-login-localhost" // "true" or "false", replaced by WebAuthMode, which it sets once.
 	WebSkipLogin      = "web-skip-login"           // JSON list of IPs and CIDR ranges.
 	WebAllowedHosts   = "web-allowed-hosts"        // JSON list of extra hostnames the interface is reached by.
 	WebTrustedProxies = "web-trusted-proxies"      // JSON list of proxy IPs and CIDR ranges trusted for X-Forwarded-For.

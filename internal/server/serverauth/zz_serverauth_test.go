@@ -1,6 +1,7 @@
 package serverauth
 
 import (
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,8 +17,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// newTestServer returns a router guarded by a fresh Manager, with /api/v1/ping and /index.html behind the login.
-func newTestServer(t *testing.T, required bool) (*Manager, http.Handler) {
+// newTestDB returns a fresh database in a temporary directory.
+func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	logger.Pl.Console = io.Discard
 	paths.HomeTubarrDir = t.TempDir()
@@ -27,8 +28,14 @@ func newTestServer(t *testing.T, required bool) (*Manager, http.Handler) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
 
-	m, err := New(db, repo.GetTubarrSettingsStore(db), required)
+// newTestServer returns a router guarded by a fresh Manager, with /api/v1/ping and /index.html behind the login.
+func newTestServer(t *testing.T, envMode string) (*Manager, http.Handler) {
+	t.Helper()
+	db := newTestDB(t)
+	m, err := New(db, repo.GetTubarrSettingsStore(db), envMode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +66,7 @@ func request(h http.Handler, method, target, body string, edit func(*http.Reques
 
 // TestLoginFlow tests that a login is required, created once, and lets its session through.
 func TestLoginFlow(t *testing.T) {
-	_, h := newTestServer(t, true)
+	_, h := newTestServer(t, "")
 
 	if w := request(h, http.MethodGet, "/api/v1/ping", "", nil); w.Code != http.StatusUnauthorized {
 		t.Fatalf("API without login = %d, want 401", w.Code)
@@ -92,7 +99,7 @@ func TestLoginFlow(t *testing.T) {
 
 // TestLoginRateLimit tests that repeated wrong passwords lock the address out, even for the right one.
 func TestLoginRateLimit(t *testing.T) {
-	m, h := newTestServer(t, true)
+	m, h := newTestServer(t, "")
 	if err := m.setLogin("admin", "correct horse"); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +115,7 @@ func TestLoginRateLimit(t *testing.T) {
 
 // TestAPIKey tests that the API key lets requests through and a wrong one is refused.
 func TestAPIKey(t *testing.T) {
-	m, h := newTestServer(t, true)
+	m, h := newTestServer(t, "")
 	key, err := m.apiKey()
 	if err != nil {
 		t.Fatal(err)
@@ -123,8 +130,8 @@ func TestAPIKey(t *testing.T) {
 
 // TestSkipLogin tests trusted addresses skip the login, but only when they name a known host.
 func TestSkipLogin(t *testing.T) {
-	m, h := newTestServer(t, true)
-	if err := m.setAccessConfig(true, []string{"192.168.1.0/24"}, []string{"tubarr.home"}, nil); err != nil {
+	m, h := newTestServer(t, "")
+	if err := m.setAccessConfig(ModeLocal,[]string{"192.168.1.0/24"}, []string{"tubarr.home"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if w := request(h, http.MethodGet, "/api/v1/ping", "", nil); w.Code != http.StatusOK {
@@ -143,7 +150,7 @@ func TestSkipLogin(t *testing.T) {
 
 // TestProxyOnThisMachine tests a reverse proxy on this machine doesn't let its visitors skip the login as localhost.
 func TestProxyOnThisMachine(t *testing.T) {
-	m, h := newTestServer(t, true)
+	m, h := newTestServer(t, "")
 	viaProxy := func(client string) func(*http.Request) {
 		return func(r *http.Request) {
 			r.RemoteAddr = "127.0.0.1:41000"
@@ -167,7 +174,7 @@ func TestProxyOnThisMachine(t *testing.T) {
 	}
 
 	// Trusted, the proxy's forwarded address decides instead.
-	if err := m.setAccessConfig(true, nil, nil, []string{"127.0.0.1"}); err != nil {
+	if err := m.setAccessConfig(ModeLocal,nil, nil, []string{"127.0.0.1"}); err != nil {
 		t.Fatal(err)
 	}
 	if w := request(h, http.MethodGet, "/api/v1/ping", "", viaProxy("203.0.113.7")); w.Code != http.StatusUnauthorized {
@@ -180,7 +187,7 @@ func TestProxyOnThisMachine(t *testing.T) {
 
 // TestLoginNotRequired tests --web-auth none lets requests through, still checking the host.
 func TestLoginNotRequired(t *testing.T) {
-	_, h := newTestServer(t, false)
+	_, h := newTestServer(t, ModeNone)
 	if w := request(h, http.MethodGet, "/api/v1/ping", "", nil); w.Code != http.StatusOK {
 		t.Fatalf("no login required = %d, want 200", w.Code)
 	}
@@ -191,7 +198,7 @@ func TestLoginNotRequired(t *testing.T) {
 
 // TestMetarrLogToken tests the Metarr log endpoint takes only the log token.
 func TestMetarrLogToken(t *testing.T) {
-	m, h := newTestServer(t, true)
+	m, h := newTestServer(t, "")
 	if w := request(h, http.MethodPost, MetarrLogsPath, "line\n", nil); w.Code != http.StatusUnauthorized {
 		t.Fatalf("logs without token = %d, want 401", w.Code)
 	}
@@ -202,8 +209,8 @@ func TestMetarrLogToken(t *testing.T) {
 
 // TestClientIP tests X-Forwarded-For is only read from trusted proxies.
 func TestClientIP(t *testing.T) {
-	m, _ := newTestServer(t, true)
-	if err := m.setAccessConfig(true, nil, nil, []string{"10.0.0.2"}); err != nil {
+	m, _ := newTestServer(t, "")
+	if err := m.setAccessConfig(ModeLocal,nil, nil, []string{"10.0.0.2"}); err != nil {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)

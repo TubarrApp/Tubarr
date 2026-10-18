@@ -810,7 +810,7 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/auth/logout"},
 		{path: "/api/v1/auth/setup", keys: []string{"username", "password"}},
 		{path: "/api/v1/auth/status"},
-		{path: "/api/v1/settings/auth", keys: []string{"skip_localhost", "skip_login", "allowed_hosts", "trusted_proxies"}},
+		{path: "/api/v1/settings/auth", keys: []string{"auth_mode", "skip_login", "allowed_hosts", "trusted_proxies"}},
 		{path: "/api/v1/settings/auth/api-key"},
 		{path: "/api/v1/settings/auth/password", keys: []string{"current_password", "username", "new_password"}},
 

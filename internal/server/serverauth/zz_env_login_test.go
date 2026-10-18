@@ -28,7 +28,7 @@ func TestEnvLogin(t *testing.T) {
 	settings := repo.GetTubarrSettingsStore(db)
 	start := func() *Manager {
 		t.Helper()
-		m, err := New(db, settings, true)
+		m, err := New(db, settings, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -36,7 +36,7 @@ func TestEnvLogin(t *testing.T) {
 	}
 
 	t.Setenv(consts.EnvWebPassword, "env password")
-	if _, err := New(db, settings, true); err == nil || !strings.Contains(err.Error(), consts.EnvWebUsername) {
+	if _, err := New(db, settings, ""); err == nil || !strings.Contains(err.Error(), consts.EnvWebUsername) {
 		t.Fatalf("password alone with no login = %v, want an error naming %s", err, consts.EnvWebUsername)
 	}
 

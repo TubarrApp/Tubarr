@@ -3,9 +3,9 @@ package serverauth
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -40,12 +40,13 @@ func (m *Manager) handleStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	session := m.required && m.validSession(w, r)
-	authenticated := !m.required || m.skipsLoginFor(r) || session
+	required := m.loginRequired()
+	session := required && m.validSession(w, r)
+	authenticated := !required || m.skipsLoginFor(r) || session
 	writeJSON(w, map[string]bool{
-		"login_required": m.required,
-		"setup_required": m.required && !hasLogin,
-		"authenticated":  authenticated && (hasLogin || !m.required),
+		"login_required": required,
+		"setup_required": required && !hasLogin,
+		"authenticated":  authenticated && (hasLogin || !required),
 		"session":        session,
 	})
 }
@@ -124,7 +125,7 @@ func (m *Manager) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 // accessSettings are the web interface access settings shown on the settings page.
 type accessSettings struct {
-	SkipLocalhost  bool     `json:"skip_localhost"`
+	AuthMode       string   `json:"auth_mode"`
 	SkipLogin      []string `json:"skip_login"`
 	AllowedHosts   []string `json:"allowed_hosts"`
 	TrustedProxies []string `json:"trusted_proxies"`
@@ -153,15 +154,16 @@ func (m *Manager) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	m.mu.RLock()
-	s.SkipLocalhost = m.cfg.skipLocalhost
+	s.AuthMode = m.cfg.mode
 	m.mu.RUnlock()
 
 	writeJSON(w, map[string]any{
-		"username":       username,
-		"api_key":        apiKey,
-		"login_required": m.required,
-		"login_from_env": os.Getenv(consts.EnvWebPassword) != "", // Set again at each start.
-		"access":         s,
+		"username":           username,
+		"api_key":            apiKey,
+		"login_required":     s.AuthMode != ModeNone,
+		"login_from_env":     os.Getenv(consts.EnvWebPassword) != "", // Set again at each start.
+		"auth_mode_from_env": m.envMode != "",
+		"access":             s,
 	})
 }
 
@@ -172,7 +174,19 @@ func (m *Manager) handleSetSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := m.setAccessConfig(s.SkipLocalhost, s.SkipLogin, s.AllowedHosts, s.TrustedProxies); err != nil {
+	if m.envMode != "" && s.AuthMode != m.envMode {
+		http.Error(w, fmt.Sprintf("the login mode is set by --%s (%s), so it can't be changed here", keys.WebAuth, consts.EnvWebAuth), http.StatusBadRequest)
+		return
+	}
+	// Turning the login on before one exists would let whoever reached the page first create it.
+	if hasLogin, err := m.hasLogin(); err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	} else if !hasLogin && s.AuthMode != ModeNone && !m.loginRequired() {
+		http.Error(w, "create a login with Change login first, then turn the login on", http.StatusBadRequest)
+		return
+	}
+	if err := m.setAccessConfig(s.AuthMode, s.SkipLogin, s.AllowedHosts, s.TrustedProxies); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -186,9 +200,11 @@ func (m *Manager) handleSetSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := m.settings.SetSetting(keys.WebSkipLocalhost, strconv.FormatBool(s.SkipLocalhost)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if m.envMode == "" { // The environment's mode isn't saved, so removing it restores the saved one.
+		if err := m.settings.SetSetting(keys.WebAuthMode, s.AuthMode); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	writeJSON(w, map[string]string{"message": "Access settings saved"})
 }

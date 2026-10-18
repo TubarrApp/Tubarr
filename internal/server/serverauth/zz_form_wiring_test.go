@@ -54,7 +54,7 @@ func hasKey(v any, path string) bool {
 // they send, and that the keys they read come back. The keys they send are checked against the pages in the server
 // package's TestPageRequestsWired.
 func TestAuthPagesWired(t *testing.T) {
-	_, h := newTestServer(t, true)
+	_, h := newTestServer(t, "")
 	header := filepath.Join("partials", "header.html")
 	pages := map[string]string{}
 	for _, name := range []string{"login.html", "settings.html", header} {
@@ -133,12 +133,12 @@ func TestAuthPagesWired(t *testing.T) {
 	refusesUnknownKey(http.MethodPost, "/api/v1/auth/login", login)
 
 	settings := call("settings.html", http.MethodGet, "/api/v1/settings/auth", "", http.StatusOK,
-		"login_required", "login_from_env", "username", "api_key", "access.skip_localhost", "access.skip_login", "access.allowed_hosts", "access.trusted_proxies")
+		"login_from_env", "auth_mode_from_env", "username", "api_key", "access.auth_mode", "access.skip_login", "access.allowed_hosts", "access.trusted_proxies")
 	if settings["username"] != "admin" {
 		t.Errorf("username reads back as %v, want admin", settings["username"])
 	}
 
-	const access = `{"skip_localhost":false,"skip_login":["192.168.2.0/24"],"allowed_hosts":["tubarr.example.com"],"trusted_proxies":["10.0.0.1"]}`
+	const access = `{"auth_mode":"required","skip_login":["192.168.2.0/24"],"allowed_hosts":["tubarr.example.com"],"trusted_proxies":["10.0.0.1"]}`
 	call("settings.html", http.MethodPut, "/api/v1/settings/auth", access, http.StatusOK)
 	refusesUnknownKey(http.MethodPut, "/api/v1/settings/auth", access)
 	var sent map[string]any

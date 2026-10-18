@@ -33,9 +33,10 @@ func init() {
 	}
 }
 
-// isHelp reports whether the arguments only ask for help, which doesn't take the single-instance lock.
-func isHelp(args []string) bool {
-	return (len(args) > 0 && args[0] == "help") || slices.Contains(args, "-h") || slices.Contains(args, "--help")
+// skipsInstanceLock reports whether the arguments only ask for help or a login reset, which run alongside a running Tubarr.
+func skipsInstanceLock(args []string) bool {
+	return (len(args) > 0 && args[0] == "help") || slices.Contains(args, "-h") || slices.Contains(args, "--help") ||
+		slices.Equal(args, []string{"auth", "reset"})
 }
 
 // main is the main entrypoint of the program (duh!).
@@ -62,8 +63,8 @@ func main() {
 	logger.Pl = pl
 
 	// Initialize application (DB, stores, etc).
-	help := isHelp(os.Args[1:])
-	store, db, progControl, err := initializeApplication(!help)
+	noLock := skipsInstanceLock(os.Args[1:])
+	store, db, progControl, err := initializeApplication(!noLock)
 	if err != nil {
 		logger.Pl.E("Error initializing Tubarr: %v", err)
 		os.Exit(1)
@@ -87,9 +88,9 @@ func main() {
 	// heartbeat shutdown channel.
 	heartbeatDone := make(chan struct{})
 
-	// run heartbeat goroutine, unless only showing help.
+	// run heartbeat goroutine, unless running without the single-instance lock.
 	go func() {
-		if !help {
+		if !noLock {
 			startHeartbeat(ctx, progControl)
 		}
 		close(heartbeatDone)

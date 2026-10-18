@@ -47,9 +47,20 @@
             <!-- Web Interface Access Card -->
             <div x-data="accessSettings()" x-init="init()" class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Web Interface Access</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4" x-show="!loginRequired">
-                Login is turned off (--web-auth none). Anyone who can reach Tubarr can control it, so only use this behind a reverse proxy with its own login.
-              </p>
+
+              <!-- Login mode -->
+              <div class="py-3 border-b border-gray-100 dark:border-gray-800">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Login Mode</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Who has to log in. Saved with Save access settings below. A forgotten password can be reset with <code>tubarr auth reset</code>, or TUBARR_WEB_PASSWORD.</p>
+                <select x-model="access.auth_mode" :disabled="authModeFromEnv"
+                  class="h-9 max-w-full rounded-lg border border-gray-300 bg-transparent pl-3 pr-10 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                  <option value="required">Required for everyone</option>
+                  <option value="local">Required, except from localhost</option>
+                  <option value="none">Off (a reverse proxy handles login)</option>
+                </select>
+                <p x-show="authModeFromEnv" class="mt-2 text-xs text-warning-600 dark:text-warning-500">Set by TUBARR_WEB_AUTH (or --web-auth), so it can't be changed here.</p>
+                <p x-show="access.auth_mode === 'none'" class="mt-2 text-xs text-warning-600 dark:text-warning-500">Anyone who can reach Tubarr can control it, so only use this behind a reverse proxy with its own login.</p>
+              </div>
 
               <!-- Login -->
               <div class="py-3 border-b border-gray-100 dark:border-gray-800">
@@ -83,14 +94,13 @@
               <div class="py-3">
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Skip Login For</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  Requests from these addresses need no login. One IP or CIDR range per line (e.g. 192.168.1.0/24).
-                  In Docker, requests from the host arrive from the Docker gateway (e.g. 172.17.0.1), so adding 172.16.0.0/12 would skip login for everything reaching the port.
-                  Behind a reverse proxy, add it under Trusted Proxies below: requests it relays otherwise always need the login, unless it sends no forwarding headers, which look like this machine.
+                  Devices at these addresses don't need to log in. One address or range per line, e.g. 192.168.1.0/24 for every device on a typical home network.
+                  <br><br>
+                  <strong>Docker:</strong> everything from the host computer arrives from the Docker network (e.g. 172.17.0.1), so listing the Docker range (172.16.0.0/12) turns the login off for everyone who can reach Tubarr.
+                  <br><br>
+                  <strong>Reverse proxy</strong> (e.g. Nginx Proxy Manager, Caddy, Traefik): add the proxy's address under Trusted Proxies below. Until you do, everyone coming through the proxy has to log in, even from the addresses listed here.
+                  If the proxy runs on the same machine as Tubarr, it must pass on each visitor's address (the X-Forwarded-For header). Otherwise every visitor looks like localhost, and with "Required, except from localhost" nobody has to log in.
                 </p>
-                <label class="flex items-center gap-2 mb-3 text-sm text-gray-700 dark:text-gray-300">
-                  <input type="checkbox" x-model="access.skip_localhost" />
-                  This machine (localhost)
-                </label>
                 <textarea x-model="skipLoginText" rows="3" placeholder="192.168.1.0/24"
                   class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
 
@@ -336,7 +346,7 @@
                 <span x-show="!tlsHTTPS">HTTPS is currently off.</span>
                 <span x-show="tlsHTTPS && tlsActive === 'self-signed'">Serving the self-signed certificate.</span>
                 <span x-show="tlsHTTPS && tlsActive === 'custom'">Serving the certificate below.</span>
-                <span x-show="tlsEnabled !== tlsHTTPS" class="font-medium">Restart Tubarr to apply the change.</span>
+                <span x-show="tlsEnabled !== tlsHTTPS" class="font-medium text-warning-600 dark:text-warning-500">Restart Tubarr to apply the change.</span>
               </p>
 
               <label class="flex items-center gap-2 mb-1 text-sm text-gray-700 dark:text-gray-300" :class="tlsLocked && 'opacity-50 cursor-not-allowed'">
@@ -406,7 +416,6 @@
       function accessSettings() {
         const lines = (text) => text.split('\n').map(l => l.trim()).filter(l => l);
         return {
-          loginRequired: true,
           username: '',
           newUsername: '',
           currentPassword: '',
@@ -415,7 +424,9 @@
           apiKey: '',
           showKey: false,
           loginFromEnv: false,
-          access: { skip_localhost: true },
+          authModeFromEnv: false,
+          savedAuthMode: 'local',
+          access: { auth_mode: 'local' },
           skipLoginText: '',
           allowedHostsText: '',
           trustedProxiesText: '',
@@ -428,8 +439,9 @@
               return;
             }
             const data = await response.json();
-            this.loginRequired = data.login_required;
             this.loginFromEnv = data.login_from_env;
+            this.authModeFromEnv = data.auth_mode_from_env;
+            this.savedAuthMode = data.access.auth_mode;
             this.username = data.username;
             this.newUsername = data.username;
             this.apiKey = data.api_key;
@@ -467,17 +479,24 @@
 
           async saveAccess() {
             this.accessMessage = '';
+            if (this.access.auth_mode === 'none' && this.savedAuthMode !== 'none' &&
+              !confirm('Turn the login off? Anyone who can reach Tubarr will be able to control it.')) return;
             const response = await fetch('/api/v1/settings/auth', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                skip_localhost: this.access.skip_localhost,
+                auth_mode: this.access.auth_mode,
                 skip_login: lines(this.skipLoginText),
                 allowed_hosts: lines(this.allowedHostsText),
                 trusted_proxies: lines(this.trustedProxiesText)
               })
             });
-            this.accessMessage = response.ok ? 'Saved' : (await response.text()).trim();
+            if (!response.ok) {
+              this.accessMessage = (await response.text()).trim();
+              return;
+            }
+            this.savedAuthMode = this.access.auth_mode;
+            this.accessMessage = 'Saved';
           }
         };
       }

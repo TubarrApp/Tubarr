@@ -95,7 +95,7 @@ podman run -d \
 | `PUID` | `1000` | User ID for running Tubarr (matches host user to avoid permission issues) |
 | `PGID` | `1000` | Group ID for running Tubarr (matches host group to avoid permission issues) |
 | `TUBARR_WEB_ADDRESS` | `:8827` | Address the web interface listens on inside the container |
-| `TUBARR_WEB_AUTH` | `required` | `none` turns the web login off, e.g. behind a reverse proxy with its own login |
+| `TUBARR_WEB_AUTH` | (Settings page) | Overrides the login mode in Settings: `required`, `local` (no login from inside the container) or `none`, e.g. behind a reverse proxy with its own login |
 | `TUBARR_WEB_HTTPS` | | `true` or `false`, overriding the **Use HTTPS** setting. Uses a self-signed certificate unless one is set below or in Settings |
 | `TUBARR_WEB_TLS_CERT` | | Path inside the container to a PEM certificate (or certificate and key combined), e.g. a read-only mount of `/certs/fullchain.pem` |
 | `TUBARR_WEB_TLS_KEY` | | Path to the PEM private key, if not combined with the certificate |
@@ -276,7 +276,7 @@ docker run -d \
 2. No unnecessary packages are installed
 3. All volumes should use restrictive permissions on the host
 4. Consider using Docker secrets for sensitive configuration
-5. The web interface asks for a login, created on the first visit. To reset a forgotten password, set `TUBARR_WEB_PASSWORD` in the compose file and restart (add `TUBARR_WEB_USERNAME` to change the username too). It's applied at every start while set, so remove it afterwards to manage the login in Settings.
+5. The web interface asks for a login, created on the first visit. To reset a forgotten password, run `docker exec -u tubarr tubarr tubarr auth reset` and create a new login on the next visit, or set `TUBARR_WEB_PASSWORD` in the compose file and restart (add `TUBARR_WEB_USERNAME` to change the username too). It's applied at every start while set, so remove it afterwards to manage the login in Settings.
 6. Requests from the host reach the container from the Docker gateway (e.g. `172.17.0.1`), not localhost. Listing the whole Docker range under **Skip Login For** skips the login for everything reaching the published port.
 
 ## Backup and Restore

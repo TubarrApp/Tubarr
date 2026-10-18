@@ -40,6 +40,18 @@ const (
 	MetarrLogsPath = "/metarr-logs"
 )
 
+// Login modes, chosen on the Settings page or by --web-auth (TUBARR_WEB_AUTH).
+const (
+	ModeRequired = "required" // Every request needs a login.
+	ModeLocal    = "local"    // Requests from localhost need no login.
+	ModeNone     = "none"     // No login, e.g. behind a reverse proxy with its own.
+)
+
+// validMode reports whether mode is a login mode.
+func validMode(mode string) bool {
+	return mode == ModeRequired || mode == ModeLocal || mode == ModeNone
+}
+
 // errNoLogin is returned when no login has been set up yet.
 var errNoLogin = errors.New("no login has been set up")
 
@@ -47,7 +59,7 @@ var errNoLogin = errors.New("no login has been set up")
 type Manager struct {
 	db       *sql.DB
 	settings contracts.TubarrSettingsStore
-	required bool
+	envMode  string // Login mode set by --web-auth or TUBARR_WEB_AUTH, which overrides the saved one.
 	logToken string
 
 	mu  sync.RWMutex
@@ -56,16 +68,19 @@ type Manager struct {
 	limiter loginLimiter
 }
 
-// accessConfig holds the addresses and hostnames trusted by the interface.
+// accessConfig holds the login mode, and the addresses and hostnames trusted by the interface.
 type accessConfig struct {
-	skipLocalhost  bool
+	mode           string
 	skipLogin      []netip.Prefix
 	allowedHosts   map[string]struct{}
 	trustedProxies []netip.Prefix
 }
 
-// New returns a Manager. With required false, no login is asked for, but requests must still name a known host.
-func New(db *sql.DB, settings contracts.TubarrSettingsStore, required bool) (*Manager, error) {
+// New returns a Manager. envMode, if set, overrides the login mode saved on the Settings page.
+func New(db *sql.DB, settings contracts.TubarrSettingsStore, envMode string) (*Manager, error) {
+	if envMode = strings.ToLower(strings.TrimSpace(envMode)); envMode != "" && !validMode(envMode) {
+		return nil, fmt.Errorf("invalid --%s (%s) %q: must be %q, %q or %q", keys.WebAuth, consts.EnvWebAuth, envMode, ModeRequired, ModeLocal, ModeNone)
+	}
 	token, err := randomToken()
 	if err != nil {
 		return nil, err
@@ -73,7 +88,7 @@ func New(db *sql.DB, settings contracts.TubarrSettingsStore, required bool) (*Ma
 	m := &Manager{
 		db:       db,
 		settings: settings,
-		required: required,
+		envMode:  envMode,
 		logToken: token,
 		limiter:  loginLimiter{failures: make(map[netip.Addr]*loginFailures)},
 	}
@@ -86,10 +101,17 @@ func New(db *sql.DB, settings contracts.TubarrSettingsStore, required bool) (*Ma
 	if _, err := m.apiKey(); err != nil {
 		return nil, err
 	}
-	if !required {
-		logger.Pl.W("Web interface login is disabled (--%s none): anyone who can reach it can control Tubarr", keys.WebAuth)
+	if !m.loginRequired() {
+		logger.Pl.W("Web interface login is turned off: anyone who can reach it can control Tubarr")
 	}
 	return m, nil
+}
+
+// loginRequired reports whether the login mode asks for a login at all.
+func (m *Manager) loginRequired() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.cfg.mode != ModeNone
 }
 
 // LogToken returns the token Metarr must send with its logs.
@@ -107,7 +129,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 				return
 			}
 		case isPublicPath(r.URL.Path):
-		case !m.required || m.skipsLoginFor(r):
+		case !m.loginRequired() || m.skipsLoginFor(r):
 			// No login, so the host must be checked: another site's page could otherwise reach Tubarr by DNS rebinding.
 			if !m.hostAllowed(r.Host) {
 				http.Error(w, fmt.Sprintf("host %q is not allowed: add it under Settings > Web Interface Access or to %s, or use the server's IP address", r.Host, consts.EnvWebAllowedHosts), http.StatusForbidden)
@@ -214,7 +236,7 @@ func (m *Manager) skipsLogin(ip netip.Addr) bool {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if m.cfg.skipLocalhost && ip.IsLoopback() {
+	if m.cfg.mode == ModeLocal && ip.IsLoopback() {
 		return true
 	}
 	return containsAddr(m.cfg.skipLogin, ip)
@@ -283,13 +305,22 @@ func parsePrefixes(entries []string) ([]netip.Prefix, error) {
 
 // ---- Stored settings ----
 
-// loadAccessConfig loads the trusted addresses and hostnames from the settings table.
+// loadAccessConfig loads the login mode, and the trusted addresses and hostnames, from the settings table.
 func (m *Manager) loadAccessConfig() error {
-	skipLocalhost := true
-	if v, found, err := m.settings.GetSetting(keys.WebSkipLocalhost); err != nil {
+	mode, found, err := m.settings.GetSetting(keys.WebAuthMode)
+	if err != nil {
 		return err
-	} else if found {
-		skipLocalhost = v == "true"
+	}
+	if !found { // Saved before login modes, as the localhost setting, which was on by default.
+		mode = ModeLocal
+		if v, found, err := m.settings.GetSetting(keys.WebSkipLocalhost); err != nil {
+			return err
+		} else if found && v != "true" {
+			mode = ModeRequired
+		}
+	}
+	if m.envMode != "" {
+		mode = m.envMode
 	}
 
 	lists := make(map[string][]string, 3)
@@ -300,11 +331,14 @@ func (m *Manager) loadAccessConfig() error {
 		}
 		lists[key] = list
 	}
-	return m.setAccessConfig(skipLocalhost, lists[keys.WebSkipLogin], lists[keys.WebAllowedHosts], lists[keys.WebTrustedProxies])
+	return m.setAccessConfig(mode, lists[keys.WebSkipLogin], lists[keys.WebAllowedHosts], lists[keys.WebTrustedProxies])
 }
 
-// setAccessConfig validates and applies trusted addresses and hostnames.
-func (m *Manager) setAccessConfig(skipLocalhost bool, skipLogin, allowedHosts, trustedProxies []string) error {
+// setAccessConfig validates and applies the login mode, and trusted addresses and hostnames.
+func (m *Manager) setAccessConfig(mode string, skipLogin, allowedHosts, trustedProxies []string) error {
+	if !validMode(mode) {
+		return fmt.Errorf("login mode %q must be %q, %q or %q", mode, ModeRequired, ModeLocal, ModeNone)
+	}
 	skip, err := parsePrefixes(skipLogin)
 	if err != nil {
 		return fmt.Errorf("skip login: %w", err)
@@ -321,7 +355,7 @@ func (m *Manager) setAccessConfig(skipLocalhost bool, skipLogin, allowedHosts, t
 	}
 
 	m.mu.Lock()
-	m.cfg = accessConfig{skipLocalhost: skipLocalhost, skipLogin: skip, allowedHosts: hosts, trustedProxies: proxies}
+	m.cfg = accessConfig{mode: mode, skipLogin: skip, allowedHosts: hosts, trustedProxies: proxies}
 	m.mu.Unlock()
 	return nil
 }
@@ -374,6 +408,19 @@ func (m *Manager) applyEnvLogin() error {
 		return fmt.Errorf("failed to set web login from %s: %w", consts.EnvWebPassword, err)
 	}
 	logger.Pl.I("Web interface login for %q set from %s", username, consts.EnvWebPassword)
+	return nil
+}
+
+// ResetLogin removes the login and ends all sessions, so the next visit to the web interface sets up a new one.
+func ResetLogin(db *sql.DB, settings contracts.TubarrSettingsStore) error {
+	for _, key := range []string{keys.WebUsername, keys.WebPasswordHash} {
+		if err := settings.SetSetting(key, ""); err != nil {
+			return err
+		}
+	}
+	if _, err := db.Exec(`DELETE FROM web_sessions`); err != nil {
+		return fmt.Errorf("failed to end sessions: %w", err)
+	}
 	return nil
 }
 
