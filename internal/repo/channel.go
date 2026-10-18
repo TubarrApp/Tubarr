@@ -273,6 +273,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string, delet
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
+	// Read the file paths before their rows are deleted.
 	var files []string
 	if deleteFiles {
 		var err error
@@ -280,13 +281,6 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string, delet
 			return err
 		}
 	}
-	defer func() {
-		for _, f := range files {
-			if err := os.Remove(f); err != nil && !errors.Is(err, os.ErrNotExist) {
-				logger.Pl.W("Could not delete file %q: %v", f, err)
-			}
-		}
-	}()
 
 	// Remove videos from database.
 	deletePlaceholders := make([]string, len(urls))
@@ -308,8 +302,12 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string, delet
 
 	deleteResult, err := cs.q.Exec(deleteQuery, deleteArgs...)
 	if err != nil {
-		files = nil // Kept, as their videos are.
 		return err
+	}
+	for _, f := range files {
+		if err := os.Remove(f); err != nil && !errors.Is(err, os.ErrNotExist) {
+			logger.Pl.W("Could not delete file %q: %v", f, err)
+		}
 	}
 
 	deletedRows, err := deleteResult.RowsAffected()
@@ -928,14 +926,19 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	if err := unmarshalChannelJSON(&c, settings, metarrJSON); err != nil {
 		return nil, true, err
 	}
-	settingsErr := validateLoadedSettings(&c)
+	loadErr := validateLoadedSettings(&c) // Before the URLs are merged with them, as validation normalizes values.
 
 	// Get URL models.
 	c.URLModels, err = cs.GetChannelURLModels(&c, mergeURLsWithParent)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to fetch URL models for channel: %w", err)
 	}
-	setLoadErr(&c, settingsErr)
+	if loadErr == nil {
+		loadErr = validateLoadedURLSettings(&c)
+	}
+	if loadErr != nil {
+		setLoadErr(&c, loadErr)
+	}
 
 	return &c, true, nil
 }
@@ -967,29 +970,27 @@ func validateLoadedSettings(c *models.Channel) error {
 	return nil
 }
 
-// setLoadErr validates a loaded channel's per-URL settings unless its own failed with settingsErr, setting LoadErr to
-// any failure.
-func setLoadErr(c *models.Channel, settingsErr error) {
-	err := settingsErr
+// validateLoadedURLSettings validates a loaded channel's per-URL settings, skipping blank ones and those matching the channel's.
+func validateLoadedURLSettings(c *models.Channel) error {
 	for _, cu := range c.URLModels {
-		if err != nil {
-			break
-		}
 		if !models.SettingsAllZero(cu.ChanURLSettings) && !models.ChildSettingsMatchParent(c.ChanSettings, cu.ChanURLSettings) {
-			if vErr := validation.ValidateSettingsModel(cu.ChanURLSettings, false); vErr != nil {
-				err = fmt.Errorf("invalid settings for URL %q: %w", cu.URL, vErr)
+			if err := validation.ValidateSettingsModel(cu.ChanURLSettings, false); err != nil {
+				return fmt.Errorf("invalid settings for URL %q: %w", cu.URL, err)
 			}
 		}
-		if err == nil && !models.MetarrArgsAllZero(cu.ChanURLMetarrArgs) && !models.ChildMetarrArgsMatchParent(c.ChanMetarrArgs, cu.ChanURLMetarrArgs) {
-			if vErr := validation.ValidateMetarrArgsModel(cu.ChanURLMetarrArgs, false); vErr != nil {
-				err = fmt.Errorf("invalid Metarr settings for URL %q: %w", cu.URL, vErr)
+		if !models.MetarrArgsAllZero(cu.ChanURLMetarrArgs) && !models.ChildMetarrArgsMatchParent(c.ChanMetarrArgs, cu.ChanURLMetarrArgs) {
+			if err := validation.ValidateMetarrArgsModel(cu.ChanURLMetarrArgs, false); err != nil {
+				return fmt.Errorf("invalid Metarr settings for URL %q: %w", cu.URL, err)
 			}
 		}
 	}
-	if err != nil {
-		c.LoadErr = fmt.Errorf("channel %q has invalid saved settings, fix them on its edit page: %w", c.Name, err)
-		logger.Pl.D(1, "%v", c.LoadErr)
-	}
+	return nil
+}
+
+// setLoadErr marks a loaded channel with invalid saved settings, so it's kept but can't run until they're fixed.
+func setLoadErr(c *models.Channel, err error) {
+	c.LoadErr = fmt.Errorf("channel %q has invalid saved settings, fix them on its edit page: %w", c.Name, err)
+	logger.Pl.D(1, "%v", c.LoadErr)
 }
 
 // GetAllChannels retrieves all channels in the database.
@@ -1044,14 +1045,19 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 			logger.Pl.E("Skipping channel %q: %v", c.Name, err)
 			continue
 		}
-		settingsErr := validateLoadedSettings(&c)
+		loadErr := validateLoadedSettings(&c) // Before the URLs are merged with them, as validation normalizes values.
 		urlModels, err := cs.GetChannelURLModels(&c, mergeURLsWithParent)
 		if err != nil {
 			logger.Pl.E("Skipping channel %q: %v", c.Name, err)
 			continue
 		}
 		c.URLModels = urlModels
-		setLoadErr(&c, settingsErr)
+		if loadErr == nil {
+			loadErr = validateLoadedURLSettings(&c)
+		}
+		if loadErr != nil {
+			setLoadErr(&c, loadErr)
+		}
 		channels = append(channels, &c)
 	}
 	if err := rows.Err(); err != nil {
@@ -1244,8 +1250,8 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 	if !cs.channelExists(key, val) {
 		return fmt.Errorf("channel with key %q and value %q does not exist", key, val)
 	}
-	if name := fmt.Sprint(newVal); col == consts.QChanName && cs.channelExists(consts.QChanName, name) {
-		return fmt.Errorf("%w: channel with name %q already exists", contracts.ErrInvalidChannel, name)
+	if col == consts.QChanName && cs.channelExists(consts.QChanName, fmt.Sprint(newVal)) {
+		return fmt.Errorf("%w: channel with name %q already exists", contracts.ErrInvalidChannel, newVal)
 	}
 
 	query := fmt.Sprintf(

@@ -170,10 +170,8 @@ func buildVideoCodecList(codecs []string) (arg string) {
 	}
 
 	// Add video codecs in order.
-	for i, c := range codecs {
-		if i == 0 {
-			arg = "("
-		}
+	arg = "("
+	for _, c := range codecs {
 		arg += "bv*[vcodec~='" + ytdlpCodecRegex(c) + "']/"
 	}
 	arg += "bv*)"
@@ -188,10 +186,8 @@ func buildAudioCodecList(codecs []string) (arg string) {
 	}
 
 	// Add audio codecs in order.
-	for i, c := range codecs {
-		if i == 0 {
-			arg = "("
-		}
+	arg = "("
+	for _, c := range codecs {
 		arg += "ba[acodec~='" + ytdlpCodecRegex(c) + "']/"
 	}
 	arg += "ba)"

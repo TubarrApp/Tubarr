@@ -98,7 +98,7 @@ func TestResetLogin(t *testing.T) {
 	}
 	cookie := w.Result().Cookies()[0]
 
-	if err := ResetLogin(m.db, m.settings); err != nil {
+	if err := ResetLogin(m.settings); err != nil {
 		t.Fatal(err)
 	}
 	if w := request(h, http.MethodGet, "/api/v1/ping", "", func(r *http.Request) { r.AddCookie(cookie) }); w.Code != http.StatusUnauthorized {

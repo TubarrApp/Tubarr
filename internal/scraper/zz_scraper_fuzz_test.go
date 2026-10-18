@@ -98,10 +98,13 @@ func FuzzDescribeHeaders(f *testing.F) {
 	f.Add("cf_clearance", "secret-value", "accept", "text/html")
 	f.Add("a", "b=c=d", "x", "")
 	f.Add("", "", "", "")
+	f.Add("0", "00000a", "00000A", "0") // Another header's name matches the value once lowercased.
+	f.Add("0", "00000:", "00000", "0")  // Another header's name and separator match the value.
 	f.Fuzz(func(t *testing.T, cookieName, cookieValue, headerName, headerValue string) {
+		// Only check values that can't appear on the cookie line for other reasons.
 		if len(cookieValue) < 6 || strings.ContainsAny(cookieValue, ";= \t") || strings.Contains(cookieName, cookieValue) ||
-			strings.Contains(headerName, cookieValue) || strings.Contains(headerValue, cookieValue) {
-			return // Only check values that can't appear in the output for other reasons.
+			strings.Contains(headerValue, cookieValue) {
+			return
 		}
 		h := fhttp.Header{}
 		h.Set("Cookie", cookieName+"="+cookieValue)
@@ -110,8 +113,11 @@ func FuzzDescribeHeaders(f *testing.F) {
 		}
 		h[fhttp.HeaderOrderKey] = []string{"host", "cookie", strings.ToLower(headerName)}
 
-		if out := describeHeaders(h); strings.Contains(out, cookieValue) {
-			t.Errorf("describeHeaders printed cookie value %q: %s", cookieValue, out)
+		out := describeHeaders(h)
+		for _, line := range strings.Split(out, " | ") {
+			if cookies, ok := strings.CutPrefix(line, "cookie: "); ok && strings.Contains(cookies, cookieValue) {
+				t.Errorf("describeHeaders printed cookie value %q: %s", cookieValue, out)
+			}
 		}
 	})
 }

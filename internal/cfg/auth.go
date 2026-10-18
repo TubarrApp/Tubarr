@@ -35,7 +35,7 @@ func resetLoginCmd(ss contracts.TubarrSettingsStore) *cobra.Command {
 		Long: "Removes the web interface username and password and signs out every browser, so the next visit to the web interface " +
 			"asks for a new login. Works while Tubarr is running, e.g. 'docker exec -u tubarr tubarr tubarr auth reset'.",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			if err := serverauth.ResetLogin(ss.GetDB(), ss); err != nil {
+			if err := serverauth.ResetLogin(ss); err != nil {
 				return err
 			}
 			logger.Pl.S("Web interface login removed: the next visit to the web interface will ask for a new one")

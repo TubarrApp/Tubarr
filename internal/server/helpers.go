@@ -262,17 +262,15 @@ var notificationEscaper = strings.NewReplacer(`\`, `\\`, `|`, `\|`)
 
 // notificationLine renders a notification as parseNotificationLines reads it.
 func notificationLine(n *models.Notification) string {
-	fields := []string{n.NotifyURL}
-	if n.ChannelURL != "" || n.Name != n.NotifyURL {
-		fields = append(fields, n.Name)
+	esc := notificationEscaper.Replace
+	switch {
+	case n.ChannelURL != "":
+		return esc(n.ChannelURL) + "|" + esc(n.NotifyURL) + "|" + esc(n.Name)
+	case n.Name != n.NotifyURL:
+		return esc(n.NotifyURL) + "|" + esc(n.Name)
+	default:
+		return esc(n.NotifyURL)
 	}
-	if n.ChannelURL != "" {
-		fields = append([]string{n.ChannelURL}, fields...)
-	}
-	for i := range fields {
-		fields[i] = notificationEscaper.Replace(fields[i])
-	}
-	return strings.Join(fields, "|")
 }
 
 // formConfigFile returns the channel_config_file form value, checking the file exists.
@@ -509,10 +507,17 @@ func setString(dst *string, v *string) {
 
 // nilWhitespaceStrings unsets a per-URL input struct's string fields holding only whitespace, so they inherit.
 func nilWhitespaceStrings(in any) {
-	v := reflect.ValueOf(in).Elem()
+	v := reflect.ValueOf(in).Elem() // The struct the pointer points to.
 	for i := range v.NumField() {
-		if f := v.Field(i); f.Type() == reflect.TypeFor[*string]() && !f.IsNil() && strings.TrimSpace(f.Elem().String()) == "" {
-			f.SetZero()
+		f := v.Field(i)
+		if f.Type() != reflect.TypeFor[*string]() {
+			continue // Only string fields.
+		}
+		if f.IsNil() {
+			continue // Not sent.
+		}
+		if strings.TrimSpace(f.Elem().String()) == "" {
+			f.SetZero() // Sent blank, so unset it.
 		}
 	}
 }

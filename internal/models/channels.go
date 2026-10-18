@@ -47,10 +47,14 @@ func (c *Channel) DueURLs(now time.Time, extra time.Duration, scheduled bool) (d
 		if freq < 0 || (scheduled && freq == 0) {
 			freq = DefaultCrawlFreq
 		}
-		switch wait := time.Duration(freq)*time.Minute + extra - now.Sub(cu.LastScan); {
-		case freq == 0 || wait <= 0:
+		if freq == 0 { // Crawled on every terminal run.
 			due = append(due, cu)
-		case next < 0 || wait < next:
+			continue
+		}
+		wait := time.Duration(freq)*time.Minute + extra - now.Sub(cu.LastScan)
+		if wait <= 0 {
+			due = append(due, cu)
+		} else if next < 0 || wait < next {
 			next = wait
 		}
 	}

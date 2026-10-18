@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -120,7 +121,7 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 		}
 		switch s := formValue(v); {
 		case k == "auto_download":
-			form.Set(k, boolText(s != "false"))
+			form.Set(k, strconv.FormatBool(s != "false"))
 		case k == "paused" || k == "use_global_cookies":
 			if s == "true" {
 				form.Set(k, s)
@@ -176,14 +177,6 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 		form.Set("notifications", strings.Join(got.Notifications, "\n"))
 	}
 	return form
-}
-
-// boolText formats a bool as the pages send it.
-func boolText(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }
 
 // shownValue renders a value read back as the edit page shows it, where an unset Metarr CPU limit reads back as 0.

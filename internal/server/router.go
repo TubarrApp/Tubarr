@@ -83,11 +83,6 @@ func metarrLogURL(scheme, addr string) string {
 	return scheme + "://" + net.JoinHostPort(host, port) + serverauth.MetarrLogsPath
 }
 
-// webAuthMode returns the login mode set by the --web-auth flag or TUBARR_WEB_AUTH, or "" to use the saved one.
-func webAuthMode() string {
-	return cmp.Or(viper.GetString(keys.WebAuth), os.Getenv(consts.EnvWebAuth))
-}
-
 // healthPath is the container healthcheck endpoint.
 const healthPath = "/health"
 
@@ -236,7 +231,8 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
 func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, d *sql.DB) error {
-	access, err := serverauth.New(d, store.TubarrSettingsStore(), webAuthMode())
+	// The --web-auth flag or TUBARR_WEB_AUTH override the login mode saved on the Settings page.
+	access, err := serverauth.New(d, store.TubarrSettingsStore(), cmp.Or(viper.GetString(keys.WebAuth), os.Getenv(consts.EnvWebAuth)))
 	if err != nil {
 		return fmt.Errorf("failed to set up web interface access: %w", err)
 	}

@@ -78,7 +78,8 @@ type accessConfig struct {
 
 // New returns a Manager. envMode, if set, overrides the login mode saved on the Settings page.
 func New(db *sql.DB, settings contracts.TubarrSettingsStore, envMode string) (*Manager, error) {
-	if envMode = strings.ToLower(strings.TrimSpace(envMode)); envMode != "" && !validMode(envMode) {
+	envMode = strings.ToLower(strings.TrimSpace(envMode))
+	if envMode != "" && !validMode(envMode) {
 		return nil, fmt.Errorf("invalid --%s (%s) %q: must be %q, %q or %q", keys.WebAuth, consts.EnvWebAuth, envMode, ModeRequired, ModeLocal, ModeNone)
 	}
 	token, err := randomToken()
@@ -312,10 +313,12 @@ func (m *Manager) loadAccessConfig() error {
 		return err
 	}
 	if !found { // Saved before login modes, as the localhost setting, which was on by default.
-		mode = ModeLocal
-		if v, found, err := m.settings.GetSetting(keys.WebSkipLocalhost); err != nil {
+		skipLocalhost, found, err := m.settings.GetSetting(keys.WebSkipLocalhost)
+		if err != nil {
 			return err
-		} else if found && v != "true" {
+		}
+		mode = ModeLocal
+		if found && skipLocalhost != "true" {
 			mode = ModeRequired
 		}
 	}
@@ -412,13 +415,13 @@ func (m *Manager) applyEnvLogin() error {
 }
 
 // ResetLogin removes the login and ends all sessions, so the next visit to the web interface sets up a new one.
-func ResetLogin(db *sql.DB, settings contracts.TubarrSettingsStore) error {
+func ResetLogin(settings contracts.TubarrSettingsStore) error {
 	for _, key := range []string{keys.WebUsername, keys.WebPasswordHash} {
 		if err := settings.SetSetting(key, ""); err != nil {
 			return err
 		}
 	}
-	if _, err := db.Exec(`DELETE FROM web_sessions`); err != nil {
+	if _, err := settings.GetDB().Exec(`DELETE FROM web_sessions`); err != nil {
 		return fmt.Errorf("failed to end sessions: %w", err)
 	}
 	return nil

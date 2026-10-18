@@ -179,12 +179,16 @@ func (m *Manager) handleSetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Turning the login on before one exists would let whoever reached the page first create it.
-	if hasLogin, err := m.hasLogin(); err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	} else if !hasLogin && s.AuthMode != ModeNone && !m.loginRequired() {
-		http.Error(w, "create a login with Change login first, then turn the login on", http.StatusBadRequest)
-		return
+	if s.AuthMode != ModeNone && !m.loginRequired() {
+		hasLogin, err := m.hasLogin()
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if !hasLogin {
+			http.Error(w, "create a login with Change login first, then turn the login on", http.StatusBadRequest)
+			return
+		}
 	}
 	if err := m.setAccessConfig(s.AuthMode, s.SkipLogin, s.AllowedHosts, s.TrustedProxies); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

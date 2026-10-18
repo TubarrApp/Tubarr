@@ -131,7 +131,7 @@ func TestAPIKey(t *testing.T) {
 // TestSkipLogin tests trusted addresses skip the login, but only when they name a known host.
 func TestSkipLogin(t *testing.T) {
 	m, h := newTestServer(t, "")
-	if err := m.setAccessConfig(ModeLocal,[]string{"192.168.1.0/24"}, []string{"tubarr.home"}, nil); err != nil {
+	if err := m.setAccessConfig(ModeLocal, []string{"192.168.1.0/24"}, []string{"tubarr.home"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if w := request(h, http.MethodGet, "/api/v1/ping", "", nil); w.Code != http.StatusOK {
@@ -174,7 +174,7 @@ func TestProxyOnThisMachine(t *testing.T) {
 	}
 
 	// Trusted, the proxy's forwarded address decides instead.
-	if err := m.setAccessConfig(ModeLocal,nil, nil, []string{"127.0.0.1"}); err != nil {
+	if err := m.setAccessConfig(ModeLocal, nil, nil, []string{"127.0.0.1"}); err != nil {
 		t.Fatal(err)
 	}
 	if w := request(h, http.MethodGet, "/api/v1/ping", "", viaProxy("203.0.113.7")); w.Code != http.StatusUnauthorized {
@@ -210,7 +210,7 @@ func TestMetarrLogToken(t *testing.T) {
 // TestClientIP tests X-Forwarded-For is only read from trusted proxies.
 func TestClientIP(t *testing.T) {
 	m, _ := newTestServer(t, "")
-	if err := m.setAccessConfig(ModeLocal,nil, nil, []string{"10.0.0.2"}); err != nil {
+	if err := m.setAccessConfig(ModeLocal, nil, nil, []string{"10.0.0.2"}); err != nil {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)

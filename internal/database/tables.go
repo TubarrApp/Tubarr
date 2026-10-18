@@ -72,8 +72,12 @@ func migrateURLLastScan(tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("failed to record the channel URL last scan migration: %w", err)
 	}
-	if n, err := res.RowsAffected(); err != nil || n == 0 {
-		return err // Already migrated.
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return nil // Already migrated.
 	}
 	if _, err := tx.Exec(`UPDATE channel_urls SET last_scan = (SELECT last_scan FROM channels WHERE channels.id = channel_urls.channel_id)`); err != nil {
 		return fmt.Errorf("failed to migrate channel URL last scan times: %w", err)
