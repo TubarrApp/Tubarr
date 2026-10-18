@@ -2,6 +2,7 @@ package metarr
 
 import (
 	"fmt"
+	"slices"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -40,6 +41,17 @@ func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.C
 
 	// Convert to slice and deduplicate
 	return getDedupedFilenameOpStrings(channelMatchedOps)
+}
+
+// overrideFilenameOps returns the video's Download As filename ops, with its matched filtered filename ops and any
+// chosen filename. Metarr keeps only one set op, so a chosen filename replaces the others.
+func overrideFilenameOps(v *models.Video, c *models.Channel) []string {
+	ops := applyFilteredFilenameOps(v.Overrides.FilenameOps, v.FilteredFilenameOps, v.URL, c.Name)
+	if v.Overrides.Filename != "" {
+		ops = slices.DeleteFunc(ops, func(op models.FilenameOps) bool { return op.OpType == sharedconsts.OpSet })
+		ops = append(ops, models.FilenameOps{OpType: sharedconsts.OpSet, OpValue: v.Overrides.Filename})
+	}
+	return getDedupedFilenameOpStrings(ops)
 }
 
 // LoadFilenameOpsFromFile loads in file operations from the given file.

@@ -23,10 +23,10 @@ import (
 // videos with the same (or a non-Latin) title.
 const defaultFilenameSet = sharedconsts.OpSet + ":{{" + sharedtags.JFulltitle + "}}"
 
-// withDefaultFilenameSet returns the filename ops to run: the channel URL's, else the global ones, with
-// defaultFilenameSet added when none of them sets the name.
-func withDefaultFilenameSet(cu *models.ChannelURL, ops []string) []string {
-	if len(ops) == 0 && abstractions.IsSet(keys.MFilenameOps) {
+// withDefaultFilenameSet returns the filename ops to run: the video's overrides or channel URL's, else the global ones,
+// with defaultFilenameSet added when none of them sets the name.
+func withDefaultFilenameSet(v *models.Video, cu *models.ChannelURL, ops []string) []string {
+	if len(ops) == 0 && v.Overrides == nil && abstractions.IsSet(keys.MFilenameOps) {
 		ops = abstractions.GetStringSlice(keys.MFilenameOps)
 	}
 	parsed, err := parsing.ParseFilenameOps(ops)
@@ -76,9 +76,16 @@ const (
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
-	// Load and merge meta ops: file ops override DB ops, then apply filtering.
-	validMetaOps := loadAndMergeMetaOps(v, cu, c, dirParser)
-	validFilenameOps := withDefaultFilenameSet(cu, loadAndMergeFilenameOps(v, cu, c, dirParser))
+	// Download As overrides replace the channel URL's and global ops. Otherwise file ops override DB ops, then apply filtering.
+	var validMetaOps, validFilenameOps []string
+	metaOpsKey, filenameOpsKey := keys.MMetaOps, keys.MFilenameOps
+	if v.Overrides != nil {
+		validMetaOps, validFilenameOps = overrideMetaOps(v, c), overrideFilenameOps(v, c)
+		metaOpsKey, filenameOpsKey = "", ""
+	} else {
+		validMetaOps, validFilenameOps = loadAndMergeMetaOps(v, cu, c, dirParser), loadAndMergeFilenameOps(v, cu, c, dirParser)
+	}
+	validFilenameOps = withDefaultFilenameSet(v, cu, validFilenameOps)
 
 	mOutDirParser := parsing.NewDirectoryParser(c, cu, parsing.AllTags)
 	// Define fields to process.
@@ -87,7 +94,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		{
 			metarrValue: metVals{strSlice: validFilenameOps},
 			valType:     strSlice,
-			viperKey:    keys.MFilenameOps,
+			viperKey:    filenameOpsKey,
 			cmdKey:      metkeys.FilenameOps,
 		},
 		{
@@ -99,7 +106,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		{
 			metarrValue: metVals{strSlice: validMetaOps},
 			valType:     strSlice,
-			viperKey:    keys.MMetaOps,
+			viperKey:    metaOpsKey,
 			cmdKey:      metkeys.MetaOps,
 		},
 		{

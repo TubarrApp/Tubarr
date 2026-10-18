@@ -47,6 +47,11 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	return getDedupedMetaOpStrings(channelMatchedOps)
 }
 
+// overrideMetaOps returns the video's Download As meta ops, with its matched filtered meta ops.
+func overrideMetaOps(v *models.Video, c *models.Channel) []string {
+	return getDedupedMetaOpStrings(applyFilteredMetaOps(v.Overrides.MetaOps, v.FilteredMetaOps, v.URL, c.Name))
+}
+
 // LoadMetaOpsFromFile loads in meta operations from the given file.
 //
 // File ops take precedence and will replace any matching DB ops. Returns an error if the file is set but can't be read

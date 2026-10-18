@@ -175,22 +175,13 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 
 // handleFilters uses user input filters to check if the video should be downloaded.
 func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	// Check filtered meta ops (an unusable file holds back Metarr for the whole batch, see app.metarrSkip).
-	fileFilteredMetaOps, fileErr := LoadFilteredMetaOpsFromFile(cu, dirParser)
-	if fileErr != nil {
-		logger.Pl.E("Filtered meta ops file for %q can't be used: %v", cu.URL, fileErr)
-	}
-	filteredMetaOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, fileFilteredMetaOps)
+	filteredMetaOps, filteredFilenameOps := loadFilteredOps(v, cu, dirParser)
 
+	// Check filtered meta ops.
 	relevantFilteredMetaOps := getRelevantFilteredMetaOps(filteredMetaOps, cu.URL)
 	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, relevantFilteredMetaOps, c.Name)
 
 	// Check filtered filename ops.
-	fileFilteredFilenameOps, fileErr := LoadFilteredFilenameOpsFromFile(cu, dirParser)
-	if fileErr != nil {
-		logger.Pl.E("Filtered filename ops file for %q can't be used: %v", cu.URL, fileErr)
-	}
-	filteredFilenameOps := slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, fileFilteredFilenameOps)
 
 	relevantFilteredFilenameOps := getRelevantFilteredFilenameOps(filteredFilenameOps, cu.URL)
 	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
@@ -224,6 +215,25 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 
 	logger.Pl.S("Video %q for channel %q passed all filter checks", v.URL, c.Name)
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
+}
+
+// loadFilteredOps returns the video's Download As filtered ops if set, else the channel URL's and its files'.
+func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) ([]models.FilteredMetaOps, []models.FilteredFilenameOps) {
+	if v.Overrides != nil {
+		return v.Overrides.FilteredMetaOps, v.Overrides.FilteredFilenameOps
+	}
+
+	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
+	fileFilteredMetaOps, fileErr := LoadFilteredMetaOpsFromFile(cu, dirParser)
+	if fileErr != nil {
+		logger.Pl.E("Filtered meta ops file for %q can't be used: %v", cu.URL, fileErr)
+	}
+	fileFilteredFilenameOps, fileErr := LoadFilteredFilenameOpsFromFile(cu, dirParser)
+	if fileErr != nil {
+		logger.Pl.E("Filtered filename ops file for %q can't be used: %v", cu.URL, fileErr)
+	}
+	return slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, fileFilteredMetaOps),
+		slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, fileFilteredFilenameOps)
 }
 
 // getRelevantFilters returns filters applicable to the given URL.

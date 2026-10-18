@@ -104,8 +104,13 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 	result := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
 	dedupMetaOpsMap := make(map[string]bool)
 
+	metaOps := cu.ChanURLMetarrArgs.MetaOps
+	if v.Overrides != nil {
+		metaOps = v.Overrides.MetaOps
+	}
+
 	// Use buildKey for consistency.
-	for _, mo := range cu.ChanURLMetarrArgs.MetaOps {
+	for _, mo := range metaOps {
 		dedupMetaOpsMap[sharedparsing.FormatMetaOp(mo, true)] = true
 	}
 
@@ -152,7 +157,12 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 	result := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
 	dedupFilenameOpsMap := make(map[string]bool)
 
-	for _, fo := range cu.ChanURLMetarrArgs.FilenameOps {
+	filenameOps := cu.ChanURLMetarrArgs.FilenameOps
+	if v.Overrides != nil {
+		filenameOps = v.Overrides.FilenameOps
+	}
+
+	for _, fo := range filenameOps {
 		dedupFilenameOpsMap[sharedparsing.FormatFilenameOp(fo, true)] = true
 	}
 

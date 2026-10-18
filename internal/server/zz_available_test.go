@@ -11,6 +11,7 @@ import (
 	"testing"
 	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/repo"
 )
 
@@ -36,6 +37,7 @@ func TestAvailableVideosAPI(t *testing.T) {
 		jsonkeys.SettingsCrawlFreq:       {"30"},
 		jsonkeys.SettingsDownloadRetries: {"1"},
 		jsonkeys.SettingsAutoDownload:    {"false"},
+		jsonkeys.MetarrMetaOps:           {"https://example.com/@review|artist:set:Cats"},
 	}
 	if w := serve(http.MethodPost, "/api/v1/channels/add", "application/x-www-form-urlencoded", form.Encode()); w.Code >= 300 {
 		t.Fatalf("adding channel: %d %s", w.Code, w.Body.String())
@@ -81,6 +83,53 @@ func TestAvailableVideosAPI(t *testing.T) {
 	videos := listAvailable()
 	if len(videos) != 2 || videos[0].ChannelName != "Review Channel" {
 		t.Fatalf("expected 2 available videos from Review Channel, got %+v", videos)
+	}
+
+	// Download As is filled with the channel URL's ops, without their channel URL prefix.
+	w = serve(http.MethodGet, fmt.Sprintf("/api/v1/channels/%d/override-ops/%d", chanID, cuID), "", "")
+	var lines models.OverrideLines
+	if err := json.Unmarshal(w.Body.Bytes(), &lines); w.Code != http.StatusOK || err != nil || lines.MetaOps != "artist:set:Cats" {
+		t.Errorf("override ops: %d %s, want meta ops %q", w.Code, w.Body.String(), "artist:set:Cats")
+	}
+	if w := serve(http.MethodGet, fmt.Sprintf("/api/v1/channels/%d/override-ops/%d", chanID, cuID+1000), "", ""); w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for another channel's URL, got %d", w.Code)
+	}
+
+	// Overrides are rejected when invalid, or not for downloading one video, leaving the videos available.
+	for name, body := range map[string]string{
+		"invalid op":  fmt.Sprintf(`{"action":"download","video_ids":[%d],"overrides":{"meta_ops":"artist:bogus:x"}}`, videos[0].ID),
+		"two videos":  fmt.Sprintf(`{"action":"download","video_ids":[%d,%d],"overrides":{"filename":"x"}}`, videos[0].ID, videos[1].ID),
+		"dismiss":     fmt.Sprintf(`{"action":"dismiss","video_ids":[%d],"overrides":{"filename":"x"}}`, videos[0].ID),
+		"unknown key": fmt.Sprintf(`{"action":"download","video_ids":[%d],"overrides":{"name":"x"}}`, videos[0].ID),
+	} {
+		if w := serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/available", chanID), "application/json", body); w.Code != http.StatusBadRequest {
+			t.Errorf("%s: expected 400, got %d %s", name, w.Code, w.Body.String())
+		}
+	}
+	if remaining := listAvailable(); len(remaining) != 2 {
+		t.Fatalf("expected rejected overrides to leave 2 videos available, got %d", len(remaining))
+	}
+
+	// A video's earlier overrides fill the dialog in place of the channel URL's ops.
+	metaOps, err := parsing.ParseMetaOps([]string{"album:set:Pets"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vs.SetVideoOverrides([]int64{videos[0].ID}, &models.VideoOverrides{Filename: "Chosen", MetaOps: metaOps}); err != nil {
+		t.Fatal(err)
+	}
+	w = serve(http.MethodGet, fmt.Sprintf("/api/v1/channels/%d/override-ops/%d?video=%d", chanID, cuID, videos[0].ID), "", "")
+	lines = models.OverrideLines{}
+	if err := json.Unmarshal(w.Body.Bytes(), &lines); err != nil || lines.Filename != "Chosen" || lines.MetaOps != "album:set:Pets" {
+		t.Errorf("earlier overrides: %d %s", w.Code, w.Body.String())
+	}
+	w = serve(http.MethodGet, fmt.Sprintf("/api/v1/channels/%d/override-ops/%d?video=%d", chanID, cuID, videos[1].ID), "", "")
+	lines = models.OverrideLines{}
+	if err := json.Unmarshal(w.Body.Bytes(), &lines); err != nil || lines.MetaOps != "artist:set:Cats" {
+		t.Errorf("video without overrides: %d %s, want the channel URL's ops", w.Code, w.Body.String())
+	}
+	if w := serve(http.MethodGet, fmt.Sprintf("/api/v1/channels/%d/override-ops/%d?video=999999", chanID, cuID), "", ""); w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for an unknown video, got %d", w.Code)
 	}
 
 	// Unknown actions are rejected, and dismissing removes the video from the list.

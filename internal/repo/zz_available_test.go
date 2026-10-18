@@ -11,6 +11,7 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 )
 
 // TestAvailableVideos checks Available videos are stored once, count as seen by crawls, and can only be claimed once.
@@ -111,6 +112,67 @@ func TestAvailableVideos(t *testing.T) {
 	// Videos can't be claimed through another channel.
 	if claimed, err := vs.ClaimVideos(chanID+1, ids[1:], app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(claimed) != 0 {
 		t.Errorf("other channel claim: got %d, %v, want 0", len(claimed), err)
+	}
+}
+
+// TestVideoOverrides checks Download As overrides are stored, kept through the download's video updates, loaded for
+// Run Metarr, and cleared.
+func TestVideoOverrides(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	res, err := db.Exec("INSERT INTO channels (name) VALUES ('Test')")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chanID, _ := res.LastInsertId()
+	if res, err = db.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
+		t.Fatal(err)
+	}
+	cuID, _ := res.LastInsertId()
+	vs := GetVideoStore(db)
+
+	v := &models.Video{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1", Title: "One"}
+	if _, err := vs.AddAvailableVideos([]*models.Video{v}, chanID); err != nil {
+		t.Fatal(err)
+	}
+	if o, err := vs.GetVideoOverrides(v.ID); err != nil || o != nil {
+		t.Fatalf("new video: got overrides %+v, %v, want none", o, err)
+	}
+
+	metaOps, err := parsing.ParseMetaOps([]string{"artist:set:Cats"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vs.SetVideoOverrides([]int64{v.ID}, &models.VideoOverrides{Filename: "Chosen", MetaOps: metaOps}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The download stores the video without its overrides loaded, which must not clear them.
+	v.Finished = true
+	v.MetarrStatus = consts.MetarrStatusPending
+	if err := vs.UpdateVideo(v, chanID); err != nil {
+		t.Fatal(err)
+	}
+	awaiting, err := vs.GetVideosAwaitingMetarr(chanID)
+	if err != nil || len(awaiting) != 1 {
+		t.Fatalf("got %d videos awaiting Metarr, %v, want 1", len(awaiting), err)
+	}
+	if o := awaiting[0].Overrides; o == nil || o.Filename != "Chosen" || len(o.MetaOps) != 1 || o.MetaOps[0].OpValue != "Cats" {
+		t.Errorf("video awaiting Metarr: got overrides %+v", o)
+	}
+
+	if err := vs.SetVideoOverrides([]int64{v.ID}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if o, err := vs.GetVideoOverrides(v.ID); err != nil || o != nil {
+		t.Errorf("cleared: got overrides %+v, %v, want none", o, err)
 	}
 }
 

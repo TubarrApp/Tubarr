@@ -852,7 +852,10 @@ func pageRequests() []pageRequest {
 		}},
 		{path: "/api/v1/channels/all", replay: readsJSON("/api/v1/channels/all")},
 		{path: "/api/v1/channels/{}/all-videos", replay: readsJSON("/api/v1/channels/1/all-videos")},
-		{path: "/api/v1/channels/{}/available", keys: []string{"action", "video_ids"}, replay: func(t *testing.T) {
+		{path: "/api/v1/channels/{}/override-ops/{}?video={}", keys: []string{"video"}, replay: func(t *testing.T) {
+			readsJSON(fmt.Sprintf("/api/v1/channels/1/override-ops/%d", fuzzChannelURLID(t)))(t)
+		}},
+		{path: "/api/v1/channels/{}/available", keys: []string{"action", "video_ids", "overrides"}, replay: func(t *testing.T) {
 			vs := repo.GetVideoStore(fuzzServer.db)
 			const videoURL = "https://example.com/v/wiring-available"
 			if _, err := vs.AddAvailableVideos([]*models.Video{{ChannelURLID: fuzzChannelURLID(t), ChannelURL: "https://example.com/@fuzz", URL: videoURL, Title: "Wiring"}}, 1); err != nil {

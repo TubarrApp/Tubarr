@@ -3,6 +3,7 @@ package repo
 import (
 	"cmp"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -382,7 +383,7 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 // GetVideosAwaitingMetarr returns finished videos in a channel which Metarr has not yet successfully processed.
 func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models.Video, err error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s "+
 			"WHERE %s = ? AND %s = 1 AND %s = 0 AND %s != ?",
 		consts.QVidID,
 		consts.QVidChanID,
@@ -396,6 +397,7 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models
 		consts.QVidVideoPath,
 		consts.QVidJSONPath,
 		consts.QVidMetarrStatus,
+		consts.QVidOverrides,
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidFinished,
@@ -418,7 +420,7 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models
 			v                                            models.Video
 			channelURLID                                 sql.NullInt64
 			channelURL, title, description, thumbnailURL sql.NullString
-			videoPath, jsonPath, metarrStatus            sql.NullString
+			videoPath, jsonPath, metarrStatus, overrides sql.NullString
 			uploadDate                                   sql.NullTime
 		)
 		if err := rows.Scan(
@@ -434,8 +436,12 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models
 			&videoPath,
 			&jsonPath,
 			&metarrStatus,
+			&overrides,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan video: %w", err)
+		}
+		if v.Overrides, err = unmarshalVideoOverrides(overrides); err != nil {
+			return nil, fmt.Errorf("failed to read overrides for video %q: %w", v.URL, err)
 		}
 
 		v.ChannelURLID = channelURLID.Int64
@@ -716,4 +722,67 @@ func (vs *VideoStore) VideoExists(v *models.Video, channelID int64) (int64, bool
 	return id, true
 }
 
+// GetVideoOverrides returns a video's Download As overrides, nil if it has none.
+func (vs *VideoStore) GetVideoOverrides(videoID int64) (*models.VideoOverrides, error) {
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QVidOverrides,
+		consts.DBVideos,
+		consts.QVidID,
+	)
+
+	var overrides sql.NullString
+	if err := vs.DB.QueryRow(query, videoID).Scan(&overrides); err != nil {
+		return nil, fmt.Errorf("failed to read overrides for video %d: %w", videoID, err)
+	}
+	return unmarshalVideoOverrides(overrides)
+}
+
+// SetVideoOverrides stores the given videos' Download As overrides, clearing them if o is nil.
+func (vs *VideoStore) SetVideoOverrides(videoIDs []int64, o *models.VideoOverrides) error {
+	var overrides any // NULL when cleared.
+	if o != nil {
+		b, err := json.Marshal(o)
+		if err != nil {
+			return fmt.Errorf("failed to marshal overrides: %w", err)
+		}
+		overrides = string(b)
+	}
+
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer rollback(tx)
+
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ?",
+		consts.DBVideos,
+		consts.QVidOverrides,
+		consts.QVidID,
+	)
+	for _, id := range videoIDs {
+		if _, err := tx.Exec(query, overrides, id); err != nil {
+			return fmt.Errorf("failed to store overrides for video %d: %w", id, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
 // ******************************** Private ***************************************************************************************
+
+// unmarshalVideoOverrides decodes a stored overrides column, nil if it is unset.
+func unmarshalVideoOverrides(raw sql.NullString) (*models.VideoOverrides, error) {
+	if !raw.Valid || raw.String == "" {
+		return nil, nil
+	}
+	var o models.VideoOverrides
+	if err := json.Unmarshal([]byte(raw.String), &o); err != nil {
+		return nil, err
+	}
+	return &o, nil
+}

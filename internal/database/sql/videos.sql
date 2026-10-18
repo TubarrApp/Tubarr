@@ -20,6 +20,7 @@
     download_status TEXT DEFAULT "Queued",
     download_pct INTEGER,
     metarr_status TEXT DEFAULT 'done',
+    overrides JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(channel_id, url)

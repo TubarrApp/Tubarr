@@ -101,6 +101,7 @@ type VideoStore interface {
 	VideoExists(v *models.Video, channelID int64) (videoID int64, exists bool)
 	GetVideosAwaitingMetarr(channelID int64) (videos []*models.Video, err error)
 	GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error)
+	GetVideoOverrides(videoID int64) (*models.VideoOverrides, error)
 
 	// Add operations.
 	AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error)
@@ -110,4 +111,5 @@ type VideoStore interface {
 	// Update operations.
 	UpdateVideo(v *models.Video, channelID int64) error
 	ClaimVideos(channelID int64, videoIDs []int64, from []consts.DownloadStatus, status consts.DownloadStatus) (claimed []*models.Video, err error)
+	SetVideoOverrides(videoIDs []int64, o *models.VideoOverrides) error
 }

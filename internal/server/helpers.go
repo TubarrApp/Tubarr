@@ -984,6 +984,36 @@ func splitOpLines(s string) []string {
 	return result
 }
 
+// parseOverrideLines parses the Download As dialog's ops into a video's overrides.
+func parseOverrideLines(l *models.OverrideLines) (o *models.VideoOverrides, err error) {
+	o = &models.VideoOverrides{Filename: strings.TrimSpace(l.Filename)}
+	if o.MetaOps, err = parsing.ParseMetaOps(splitOpLines(l.MetaOps)); err != nil {
+		return nil, fmt.Errorf("invalid meta ops: %w", err)
+	}
+	if err := validation.ValidateMetaOps(o.MetaOps); err != nil {
+		return nil, fmt.Errorf("invalid meta ops: %w", err)
+	}
+	if o.FilteredMetaOps, err = parsing.ParseFilteredMetaOps(splitOpLines(l.FilteredMetaOps)); err != nil {
+		return nil, fmt.Errorf("invalid filtered meta ops: %w", err)
+	}
+	if err := validation.ValidateFilteredMetaOps(o.FilteredMetaOps); err != nil {
+		return nil, fmt.Errorf("invalid filtered meta ops: %w", err)
+	}
+	if o.FilenameOps, err = parsing.ParseFilenameOps(splitOpLines(l.FilenameOps)); err != nil {
+		return nil, fmt.Errorf("invalid filename ops: %w", err)
+	}
+	if err := validation.ValidateFilenameOps(o.FilenameOps); err != nil {
+		return nil, fmt.Errorf("invalid filename ops: %w", err)
+	}
+	if o.FilteredFilenameOps, err = parsing.ParseFilteredFilenameOps(splitOpLines(l.FilteredFilenameOps)); err != nil {
+		return nil, fmt.Errorf("invalid filtered filename ops: %w", err)
+	}
+	if err := validation.ValidateFilteredFilenameOps(o.FilteredFilenameOps); err != nil {
+		return nil, fmt.Errorf("invalid filtered filename ops: %w", err)
+	}
+	return o, nil
+}
+
 // splitNonEmptyLines splits a string by newlines and filters out empty lines.
 func splitNonEmptyLines(s string) []string {
 	lines := strings.Split(s, "\n")

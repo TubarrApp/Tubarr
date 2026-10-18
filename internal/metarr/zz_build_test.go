@@ -72,9 +72,15 @@ func TestWithDefaultFilenameSet(t *testing.T) {
 		if tc.global != nil {
 			viper.Set(keys.MFilenameOps, tc.global)
 		}
-		if got := withDefaultFilenameSet(cu, tc.ops); !slices.Equal(got, tc.want) {
+		if got := withDefaultFilenameSet(&models.Video{}, cu, tc.ops); !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
 		}
+	}
+
+	// Download As overrides replace the global ops, even when they have none.
+	viper.Set(keys.MFilenameOps, []string{"set:{{title}}"})
+	if got := withDefaultFilenameSet(&models.Video{Overrides: &models.VideoOverrides{}}, cu, nil); !slices.Equal(got, []string{defaultFilenameSet}) {
+		t.Errorf("overridden: got %q, want only %q", got, defaultFilenameSet)
 	}
 }
 

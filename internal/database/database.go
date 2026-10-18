@@ -121,6 +121,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := addColumnIfMissing(tx, "videos", "overrides", "JSON"); err != nil {
+		return err
+	}
+
 	if err := initDownloadsTable(tx); err != nil {
 		return err
 	}

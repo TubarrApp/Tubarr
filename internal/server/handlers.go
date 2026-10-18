@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -27,6 +28,7 @@ import (
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/limits"
+	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
@@ -1205,8 +1207,9 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.R
 // Downloads start once any running crawl or download of the channel finishes, so the channel's Stop Queue and Abort All buttons cover them.
 func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
-		Action   string  `json:"action"`
-		VideoIDs []int64 `json:"video_ids"`
+		Action    string                `json:"action"`
+		VideoIDs  []int64               `json:"video_ids"`
+		Overrides *models.OverrideLines `json:"overrides"` // Download As, for one video.
 	}
 	if err := decodeJSON(r, &requestBody); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
@@ -1226,6 +1229,19 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	default:
 		http.Error(w, fmt.Sprintf("unknown action %q (expected 'download' or 'dismiss')", requestBody.Action), http.StatusBadRequest)
 		return
+	}
+
+	var overrides *models.VideoOverrides
+	if requestBody.Overrides != nil {
+		if status != consts.DLStatusQueued || len(requestBody.VideoIDs) != 1 {
+			http.Error(w, "overrides need a download of one video", http.StatusBadRequest)
+			return
+		}
+		var err error
+		if overrides, err = parseOverrideLines(requestBody.Overrides); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
@@ -1259,6 +1275,19 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	}
 
 	if status == consts.DLStatusQueued && len(claimed) > 0 {
+		// Download As overrides replace any earlier ones, and a plain download clears them.
+		claimedIDs := make([]int64, 0, len(claimed))
+		for _, v := range claimed {
+			claimedIDs = append(claimedIDs, v.ID)
+		}
+		if err := ss.vs.SetVideoOverrides(claimedIDs, overrides); err != nil {
+			if _, resetErr := ss.vs.ClaimVideos(c.ID, claimedIDs, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); resetErr != nil {
+				logger.Pl.E("Failed to return videos to the Available list for channel %q: %v", c.Name, resetErr)
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		//nolint:contextcheck
 		go func() {
 			logger.Pl.I("Starting download of %d available video(s) for channel %q via web request", len(claimed), c.Name)
@@ -1273,6 +1302,62 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	if err := json.NewEncoder(w).Encode(map[string]int{"count": len(claimed)}); err != nil {
+		logger.Pl.E("Failed to encode response: %v", err)
+	}
+}
+
+// handleGetOverrideOps fills the Download As dialog: with the given video's earlier overrides if it has any, else
+// the ops its channel URL's videos run with.
+func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Request) {
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if !found || c == nil {
+		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+	file.UpdateFromConfigFile(ss.cs, c) // As a download does, so the ops shown are the ones it would run.
+	urlID, err := strconv.ParseInt(chi.URLParam(r, "urlID"), 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
+		return
+	}
+	i := slices.IndexFunc(c.URLModels, func(cu *models.ChannelURL) bool { return cu.ID == urlID })
+	if i < 0 {
+		http.Error(w, "channel URL not found", http.StatusNotFound)
+		return
+	}
+	cu := c.URLModels[i]
+
+	var overrides *models.VideoOverrides
+	if videoParam := r.URL.Query().Get("video"); videoParam != "" {
+		videoID, err := strconv.ParseInt(videoParam, 10, 64)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid video ID: %v", err), http.StatusBadRequest)
+			return
+		}
+		if overrides, err = ss.vs.GetVideoOverrides(videoID); err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, sql.ErrNoRows) {
+				status = http.StatusNotFound
+			}
+			http.Error(w, err.Error(), status)
+			return
+		}
+	}
+
+	var lines models.OverrideLines
+	if overrides != nil {
+		lines = metarr.VideoOverrideLines(overrides, cu.URL)
+	} else if lines, err = metarr.ChannelURLOpLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(lines); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }

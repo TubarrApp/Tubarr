@@ -39,6 +39,25 @@ type Video struct {
 	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
 	SkipMetarr          SkipMetarr            `json:"-" db:"-"`
 	SkipDownloads       SkipDownloads         `json:"-" db:"-"`
+	Overrides           *VideoOverrides       `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's ops.
+}
+
+// VideoOverrides holds a video's Metarr ops chosen with Download As, used instead of its channel URL's (and global) ops.
+type VideoOverrides struct {
+	Filename            string                `json:"filename,omitempty"`
+	MetaOps             []MetaOps             `json:"meta_ops"`
+	FilteredMetaOps     []FilteredMetaOps     `json:"filtered_meta_ops"`
+	FilenameOps         []FilenameOps         `json:"filename_ops"`
+	FilteredFilenameOps []FilteredFilenameOps `json:"filtered_filename_ops"`
+}
+
+// OverrideLines holds a video's overrides as newline-separated ops, as edited in the Download As dialog.
+type OverrideLines struct {
+	Filename            string `json:"filename"`
+	MetaOps             string `json:"meta_ops"`
+	FilteredMetaOps     string `json:"filtered_meta_ops"`
+	FilenameOps         string `json:"filename_ops"`
+	FilteredFilenameOps string `json:"filtered_filename_ops"`
 }
 
 // SkipMetarr skips Metarr processing with a given reason.

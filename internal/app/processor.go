@@ -155,7 +155,10 @@ func InitProcess(
 			logger.Pl.W("Skipping download of %q: %s", video.URL, video.SkipDownloads.Reason)
 			continue
 		}
-		video.SkipMetarr = skipMetarr
+		// Download As videos don't use the ops files, so only Metarr being unusable holds them back.
+		if video.Overrides == nil || skipMetarr.Reason == models.SkipMetarrNoPath {
+			video.SkipMetarr = skipMetarr
+		}
 
 		// Get video paths.
 		video.JSONDir = cu.ChanURLSettings.JSONDir

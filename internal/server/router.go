@@ -168,6 +168,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 			r.Post("/{id}/ignore-crawl", ss.handleIgnoreCrawlChannel)
 			r.Post("/{id}/download-urls", ss.handleDownloadURLs)
 			r.Post("/{id}/available", ss.handleAvailableAction)
+			r.Get("/{id}/override-ops/{urlID}", ss.handleGetOverrideOps)
 			r.Post("/{id}/run-metarr", ss.handleRunMetarr)
 			r.Post("/{id}/notification-seen", ss.handleNewVideoNotificationSeen)
 			r.Post("/{id}/toggle-pause", ss.handleTogglePauseChannel)

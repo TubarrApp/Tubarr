@@ -235,6 +235,11 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		// Known videos (e.g. chosen from Available) keep their ID, so they show on the Downloads page from the start.
 		if id, exists := s.VideoStore().VideoExists(v, c.ID); exists {
 			v.ID = id
+			var overridesErr error
+			if v.Overrides, overridesErr = s.VideoStore().GetVideoOverrides(id); overridesErr != nil {
+				logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, overridesErr)
+				continue
+			}
 		}
 		customVideoRequests = append(customVideoRequests, v)
 	}

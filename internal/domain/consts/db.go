@@ -124,6 +124,7 @@ const (
 	QVidDLStatus     = "download_status"
 	QVidDLPercentage = "download_pct"
 	QVidMetarrStatus = "metarr_status"
+	QVidOverrides    = "overrides"
 	QVidCreatedAt    = "created_at"
 	QVidUpdatedAt    = "updated_at"
 	QVidChanName     = "channel_name"
@@ -149,6 +150,7 @@ var ValidVideoKeys = map[string]struct{}{
 	QVidDLStatus:     {},
 	QVidDLPercentage: {},
 	QVidMetarrStatus: {},
+	QVidOverrides:    {},
 	QVidCreatedAt:    {},
 	QVidUpdatedAt:    {},
 	QVidChanName:     {},

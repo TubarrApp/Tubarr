@@ -199,7 +199,7 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 			continue
 		}
 
-		// An unusable ops file leaves the URL's videos pending rather than run without its ops.
+		// An unusable ops file leaves the URL's videos pending rather than run without its ops. Download As videos don't use them.
 		skipErr, checked := skips[cu.ID]
 		if !checked {
 			var skip models.SkipMetarr
@@ -209,7 +209,7 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 			}
 			skips[cu.ID] = skipErr
 		}
-		if skipErr != nil {
+		if skipErr != nil && v.Overrides == nil {
 			mu.Lock()
 			errs = append(errs, fmt.Errorf("video %q: %w", v.URL, skipErr))
 			mu.Unlock()
