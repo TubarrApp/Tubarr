@@ -487,7 +487,7 @@ func TestValidateFilterOps_EmptyField(t *testing.T) {
 
 // TestValidateMetaFilterMoveOps ----------------------------------------------------------------------------------------
 func TestValidateMetaFilterMoveOps_EmptySliceOK(t *testing.T) {
-	if err := validation.ValidateMetaFilterMoveOps(nil); err != nil {
+	if err := validation.ValidateMetaFilterMoveOps(nil, true); err != nil {
 		t.Fatalf("expected nil error for empty slice, got %v", err)
 	}
 }
@@ -502,7 +502,7 @@ func TestValidateMetaFilterMoveOps_Valid(t *testing.T) {
 		},
 	}
 
-	if err := validation.ValidateMetaFilterMoveOps(moveOps); err != nil {
+	if err := validation.ValidateMetaFilterMoveOps(moveOps, true); err != nil {
 		t.Fatalf("expected moveOps to be valid, got %v", err)
 	}
 }
@@ -517,7 +517,7 @@ func TestValidateMetaFilterMoveOps_EmptyField(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateMetaFilterMoveOps(moveOps)
+	err := validation.ValidateMetaFilterMoveOps(moveOps, true)
 	if err == nil {
 		t.Fatalf("expected error for empty field")
 	}
@@ -542,7 +542,7 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateMetaFilterMoveOps(moveOps)
+	err := validation.ValidateMetaFilterMoveOps(moveOps, true)
 	if err == nil {
 		t.Fatalf("expected error for invalid directory")
 	}
@@ -551,9 +551,25 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 
+	// Loading doesn't check paths, so one channel's folder becoming a file can't stop every channel loading.
+	if err := validation.ValidateMetaFilterMoveOps(moveOps, false); err != nil {
+		t.Fatalf("expected paths to be left unchecked, got %v", err)
+	}
+
 	moveOps[0].OutputDir = filepath.Join(tmp, "missing_dir")
-	if err := validation.ValidateMetaFilterMoveOps(moveOps); err != nil {
+	if err := validation.ValidateMetaFilterMoveOps(moveOps, true); err != nil {
 		t.Fatalf("expected a missing directory to be accepted, got %v", err)
+	}
+}
+
+// TestValidateMetarrArgsModelGPUNode tests that a missing GPU node fails saving but not loading.
+func TestValidateMetarrArgsModelGPUNode(t *testing.T) {
+	m := &models.MetarrArgs{TranscodeGPU: "vaapi", TranscodeGPUNode: filepath.Join(t.TempDir(), "missing-renderD128")}
+	if err := validation.ValidateMetarrArgsModel(m, false); err != nil {
+		t.Errorf("loading with a missing GPU node failed: %v", err)
+	}
+	if err := validation.ValidateMetarrArgsModel(m, true); err == nil {
+		t.Error("saving with a missing GPU node succeeded")
 	}
 }
 

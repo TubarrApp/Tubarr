@@ -81,6 +81,10 @@ tubarr channel add \
 
 Repeat `--metarr-meta-ops` (and the other operation flags) once per operation.
 
+For a login on every URL, use `--auth-username`, `--auth-password` and `--auth-url`. For a login on one URL, repeat `--auth-details` with JSON: `--auth-details '{"channel_url":"https://www.tubesite.com/@CoolChannel","username":"me","password":"secret","login_url":"https://www.tubesite.com/login"}'`.
+
+`--download-concurrency` sets how many videos a channel downloads at once (`download-concurrency` in config files). The old `--concurrency` flag and `concurrency-limit` config key still work, with a warning.
+
 Templates are resolved per channel or per video:
 
 - **Any directory:** `{{channel_name}}`, `{{channel_id}}`, `{{channel_url}}`.
@@ -100,14 +104,21 @@ Use `tubarr channel add-batch --add-from-directory ./configs` to import multiple
 
 Pass `--auto-download=false` to list new videos under **Available** in the web UI instead of downloading them, and `--ignore-run` to skip a channel's existing backlog.
 
+### File names
+
+Videos download as `Title [video ID]`, so videos with the same title, or a title in a non-Latin script, don't overwrite each other. When Metarr runs, it renames each finished video to its full title, keeping the extension and numbering a name that's already taken. To name files another way, give the channel its own `set` filename operation, e.g. `--metarr-filename-ops 'set:{{artist}} - {{fulltitle}}'`. Without Metarr, files keep their download names.
+
+`--metarr-purge-metafile` (`all`, `json` or `nfo`) makes Metarr delete a video's metadata files once it has processed it.
+
 ---
 
 ## Running the Crawler
 
-- Default behavior (`tubarr`) crawls every channel that isn't paused and is due for a crawl (based on its `--crawl-freq`), then exits.
+- Default behavior (`tubarr`) crawls every channel that isn't paused and is due for a crawl, then exits. Each channel URL is due on its own crawl frequency if it has one, or the channel's `--crawl-freq`, and a crawl only checks the URLs that are due.
 - Use `tubarr channel crawl --channel-name 'Cool Channel'` to manually trigger one channel.
 - `tubarr channel download-video-urls --channel-name 'Cool Channel' --urls "channelURL|videoURL"` downloads ad-hoc videos without enabling the full crawler. A plain video URL (no `channelURL|`) downloads it to the channel's manual downloads.
 - `tubarr channel run-metarr --channel-name 'Cool Channel'` runs Metarr on downloaded videos it failed on or skipped.
+- `tubarr channel delete-videos --channel-name 'Cool Channel' --urls videoURL` removes videos from the channel's list, so later crawls treat them as new. Their files are kept unless you add `--delete-files`.
 
 In web mode, Tubarr checks channels every few seconds and crawls each one when it's due, so cron isn't needed.
 
@@ -149,9 +160,9 @@ The interface listens on `127.0.0.1:8827` by default (all addresses in Docker). 
 - **First visit:** create a username and password. Tubarr asks for them on every new browser after that.
 - **Skip login for trusted addresses:** under **Settings > Web Interface Access**, list IPs or ranges (e.g. `192.168.1.0/24`) that need no login. This machine (localhost) is on the list by default.
 - **Scripts:** send the API key from the same page in an `X-Api-Key` header.
-- **Forgotten password:** open Tubarr from the machine it runs on (localhost skips the login) and change it in Settings, or set `TUBARR_WEB_PASSWORD` (and optionally `TUBARR_WEB_USERNAME`) and restart.
+- **Forgotten password:** open Tubarr from the machine it runs on (localhost skips the login) and change it in Settings, or set `TUBARR_WEB_PASSWORD` and restart. The saved username is kept unless `TUBARR_WEB_USERNAME` is also set, and it must be when no login exists yet. While these are set they're applied at every start, replacing a login changed in Settings, but browsers stay signed in if nothing changed. In Docker, requests from the host come from the Docker network, so the localhost login skip doesn't apply.
 - **Reverse proxy:** add the proxy's address under **Trusted Proxies** (e.g. `127.0.0.1` for one on the same machine), and have it send `X-Forwarded-For`, so Tubarr sees each visitor's real address. Requests relayed by a proxy that isn't trusted always need the login. A proxy that sends no forwarding headers at all (e.g. nginx with only `proxy_pass`) can't be told apart from a browser on this machine, so add `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` or untick **This machine (localhost)**.
-- **Reverse proxy with its own login:** `--web-auth none` (or `TUBARR_WEB_AUTH=none`) turns Tubarr's login off. Add the proxy under **Trusted Proxies** so client addresses are read correctly.
+- **Reverse proxy with its own login:** `--web-auth none` (or `TUBARR_WEB_AUTH=none`) turns Tubarr's login off. Add the proxy under **Trusted Proxies** so client addresses are read correctly. Without a login, Tubarr only answers its own hostnames and IP addresses, so add the proxy's hostname under **Allowed Hostnames**, or in `TUBARR_WEB_ALLOWED_HOSTS` (comma-separated, e.g. `tubarr.example.com`).
 
 ### HTTPS
 
@@ -195,9 +206,9 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 
 ## Configuration Highlights
 
-- **Settings**: per-channel concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads.
-- **Metarr args**: filename/meta operations, filtered operations, metadata-based move rules, FFmpeg transcode settings, per-URL output directories.
-- **Notifications**: entries formatted as `NotifyURL|Friendly Name` or `ChannelURL|NotifyURL|Friendly Name`.
+- **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's.
+- **Metarr args**: filename/meta operations, filtered operations, metadata-based move rules, FFmpeg transcode settings, metadata file deletion, per-URL output directories.
+- **Notifications**: entries formatted as `NotifyURL`, `NotifyURL|Friendly Name` or `ChannelURL|NotifyURL|Friendly Name`, one per line in the web UI.
 - **Global settings**: crawl concurrency, global and per-domain download limits, FlareSolverr URL, and custom site scraping rules (`--scrape-config-file`), also editable on the web UI's Settings page.
 - **Security**: credentials are encrypted via `~/.tubarr/.passwords/aes.txt`.
 

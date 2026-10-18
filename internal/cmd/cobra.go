@@ -35,7 +35,7 @@ func SetAuthFlags(cmd *cobra.Command, username, password, loginURL *string, auth
 	}
 
 	if authDetails != nil {
-		cmd.Flags().StringSliceVar(authDetails, keys.AuthDetails, nil, "Fully qualified authentication details: 'channel URL|username|password|login URL'")
+		cmd.Flags().StringArrayVar(authDetails, keys.AuthDetails, nil, `Login details as JSON, one per flag: '{"channel_url":"https://...","username":"...","password":"...","login_url":"https://..."}' (channel_url can be left out for a channel with one URL)`)
 	}
 }
 
@@ -63,7 +63,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 	}
 
 	if cookiesFromBrowser != nil {
-		cmd.Flags().StringVar(cookiesFromBrowser, keys.CookiesFromBrowser, "", "Cookie source to use for downloading videos (e.g. firefox)")
+		cmd.Flags().StringVar(cookiesFromBrowser, keys.CookiesFromBrowser, "", "Browser to read cookies from for yt-dlp crawls and downloads, when there's no login cookie file (e.g. firefox). Custom crawl rules don't use it")
 	}
 
 	if maxFilesize != nil {
@@ -79,7 +79,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 	}
 
 	if ytdlpPreferredVideoCodecs != nil {
-		cmd.Flags().StringSliceVar(ytdlpPreferredVideoCodecs, keys.YTDLPPreferredVideoCodecs, nil, "Preferred video codec(s) for downloads (comma-separated: vp9,av01,h264,hevc)")
+		cmd.Flags().StringSliceVar(ytdlpPreferredVideoCodecs, keys.YTDLPPreferredVideoCodecs, nil, "Preferred video codec(s) for downloads (comma-separated: vp9,av1,h264,hevc)")
 	}
 
 	if ytdlpPreferredAudioCodecs != nil {
@@ -89,7 +89,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 
 // SetMetarrFlags sets flags for interaction with the Metarr software.
 func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
-	outputExt, extraFFmpegargs, minFreeMem, outDir, renameStyle, metaOpsFile,
+	outputExt, extraFFmpegargs, minFreeMem, outDir, metaPurge, renameStyle, metaOpsFile,
 	filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile *string,
 	filenameOps, filteredFilenameOps, metaOps, filteredMetaOps *[]string) {
 
@@ -113,6 +113,9 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	}
 	if outDir != nil {
 		cmd.Flags().StringVar(outDir, keys.MOutputDir, "", "Metarr will move files to this location on completion (some {{}} templating commands available)")
+	}
+	if metaPurge != nil {
+		cmd.Flags().StringVar(metaPurge, keys.MMetaPurge, "", "Metadata files Metarr deletes after processing a video: all, json or nfo")
 	}
 	if renameStyle != nil {
 		cmd.Flags().StringVar(renameStyle, keys.MRenameStyle, "", "Renaming style applied by Metarr (skip, fixes-only, underscores, spaces)")
@@ -167,7 +170,7 @@ func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode, videoFilter, quality *s
 	}
 
 	if quality != nil {
-		cmd.Flags().StringVar(quality, keys.TranscodeQuality, "", "Transcode quality profile from p1 (worst) to p7 (best).")
+		cmd.Flags().StringVar(quality, keys.TranscodeQuality, "", "Transcode quality from 0 to 51, lower is better (e.g. 23).")
 	}
 
 	if audioCodec != nil {
@@ -188,14 +191,16 @@ func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) 
 		cmd.Flags().StringVar(videoDir, keys.VideoDir, "", "This is where videos will be saved (some {{}} templating commands available)")
 	}
 	if jsonDir != nil {
-		cmd.Flags().StringVar(jsonDir, keys.JSONDir, "", "This is where metadata files will be saved (some {{}} templating commands available)")
+		cmd.Flags().StringVar(jsonDir, keys.JSONDir, "", "This is where metadata files will be saved, defaulting to the video directory (some {{}} templating commands available)")
 	}
 }
 
 // SetProgramRelatedFlags sets flags for the Tubarr instance.
 func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd, moveOpsFile *string, moveOps *[]string, pause *bool) {
 	if concurrency != nil {
-		cmd.Flags().IntVar(concurrency, keys.ChanOrURLConcurrencyLimit, 0, "Maximum concurrent videos to download/process for this Tubarr instance")
+		cmd.Flags().IntVar(concurrency, keys.DownloadConcurrency, 0, "Maximum videos this channel downloads at once (0 = 1)")
+		cmd.Flags().IntVar(concurrency, keys.ChanOrURLConcurrencyLimit, 0, "Old name of --"+keys.DownloadConcurrency)
+		_ = cmd.Flags().MarkDeprecated(keys.ChanOrURLConcurrencyLimit, "use --"+keys.DownloadConcurrency)
 	}
 
 	if crawlFreq != nil {

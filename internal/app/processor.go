@@ -35,11 +35,13 @@ func InitProcess(
 	AddRunningProcess()
 	defer SubtractRunningProcess()
 
-	// Initialize variables.
-	var (
-		errs []error
-		conc = sharedvalidation.ValidateConcurrencyLimit(c.ChanSettings.Concurrency)
-	)
+	// Initialize variables. The URL's download limit is the channel's unless it sets its own.
+	var errs []error
+	limit := c.ChanSettings.Concurrency
+	if cu.ChanURLSettings != nil && cu.ChanURLSettings.Concurrency > 0 {
+		limit = cu.ChanURLSettings.Concurrency
+	}
+	conc := sharedvalidation.ValidateConcurrencyLimit(limit)
 
 	// Metarr and download status tracking outlive the job, but not shutdown.
 	jobParent := state.JobParent(ctx)
@@ -296,6 +298,9 @@ func videoJob(
 	}
 	if err != nil {
 		handleBotBlock(cs, cu, v.URL, botBlockChannel)
+		if v.ID == 0 && !botBlockChannel && vidCtx.Err() == nil {
+			storeFailedVideo(vs, dlTracker, v, c, cu, err)
+		}
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
 	}
 	if !proceed {
@@ -394,10 +399,19 @@ func isClosed(ch <-chan struct{}) bool {
 	}
 }
 
+// storeFailedVideo stores a new video whose metadata download failed as Failed with its error, listing it in Available.
+func storeFailedVideo(vs contracts.VideoStore, dlTracker *downloads.DownloadTracker, v *models.Video, c *models.Channel, cu *models.ChannelURL, failure error) {
+	v.DownloadStatus = models.DLStatus{Status: consts.DLStatusFailed}
+	if _, err := vs.AddVideo(v, c.ID, cu.ID); err != nil {
+		logger.Pl.E("Failed to store failed video %q: %v", v.URL, err)
+		return
+	}
+	dlTracker.SetStatus(v, consts.DLStatusFailed, 0, "", failure)
+}
+
 // completeAndStoreVideo marks a video as complete.
 func completeAndStoreVideo(cs contracts.ChannelStore, vs contracts.VideoStore, v *models.Video, c *models.Channel) error {
 	v.MarkVideoAsComplete()
-	purgeMetaFileIfSet(v)
 
 	// Update video in database.
 	if err := vs.UpdateVideo(v, c.ID); err != nil {

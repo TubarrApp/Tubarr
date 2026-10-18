@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
 	"github.com/spf13/cobra"
 )
+
+// urlFlag names the channel URL to update.
+const urlFlag = "url"
 
 // updateChannelURLSettingsCmd updates settings for specific URL(s) within a channel.
 func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
@@ -21,7 +25,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		vDir, jDir, outDir                                                                                    string
 		videoCodec, audioCodec                                                                                []string
 		cookiesFromBrowser                                                                                    string
-		minFreeMem, renameStyle, metarrExt                                                                    string
+		minFreeMem, renameStyle, metarrExt, metaPurge                                                         string
 		maxFilesize, externalDownloader, externalDownloaderArgs                                               string
 		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps, filteredFilenameOps                        []string
 		dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
@@ -36,7 +40,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	updateURLSettingsCmd := &cobra.Command{
 		Use:   "update-url-settings",
 		Short: "Update settings for URL(s) within a channel.",
-		Long:  "Update settings for a specific channel URL, or all URLs if --url is not specified. Use --reset-settings to clear URL-specific overrides and inherit from channel defaults.",
+		Long:  fmt.Sprintf("Update settings for a specific channel URL, or all URLs if --%s is not specified. Use --%s to clear URL-specific overrides and inherit from channel defaults.", urlFlag, keys.ClearSettings),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Validate channel name or ID is present.
 			key, val, err := getChanKeyVal(channelID, channelName)
@@ -136,11 +140,13 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				filteredFilenameOpsFile: filteredFilenameOpsFile,
 
 				outputDir: outDir,
+				metaPurge: metaPurge,
 
 				concurrency:          metarrConcurrency,
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
 				useGPU:               useGPU,
+				gpuNode:              gpuNode,
 				transcodeVideoCodec:  videoCodec,
 				transcodeAudioCodec:  audioCodec,
 				transcodeQuality:     transcodeQuality,
@@ -197,7 +203,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	// Primary identifiers.
 	updateURLSettingsCmd.Flags().StringVarP(&channelName, "channel-name", "n", "", "Channel name")
 	updateURLSettingsCmd.Flags().IntVar(&channelID, "channel-id", 0, "Channel ID")
-	updateURLSettingsCmd.Flags().StringVar(&url, "url", "", "Specific URL to update (if not provided, updates all URLs in channel)")
+	updateURLSettingsCmd.Flags().StringVar(&url, urlFlag, "", "Specific URL to update (if not provided, updates all URLs in channel)")
 
 	// Files/dirs.
 	cmd.SetFileDirFlags(updateURLSettingsCmd, nil, &jDir, &vDir)
@@ -216,7 +222,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	// Metarr.
 	cmd.SetMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
-		&outDir, &renameStyle, &metaOpsFile,
+		&outDir, &metaPurge, &renameStyle, &metaOpsFile,
 		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
 		&filenameOps, &filteredFilenameOps, &metaOps,
 		&filteredMetaOps)
@@ -230,7 +236,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	cmd.SetCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs, &extraYTDLPCrawlArgs)
 
 	// Reset flag.
-	updateURLSettingsCmd.Flags().BoolVar(&resetSettings, "clear-settings", false, "Clear all URL-specific settings and inherit from channel defaults")
+	updateURLSettingsCmd.Flags().BoolVar(&resetSettings, keys.ClearSettings, false, "Clear all URL-specific settings and inherit from channel defaults")
 
 	return updateURLSettingsCmd
 }

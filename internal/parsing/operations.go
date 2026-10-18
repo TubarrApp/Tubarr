@@ -61,9 +61,9 @@ func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error)
 	return sharedparsing.ParseFilterOps(ops, requireMustAny)
 }
 
-// ParseNotifications parses notification string pairs into models.
+// ParseNotifications parses notification strings into models.
 //
-// Format: "URL|friendly name" or "Channel URL|Notify URL|Name"
+// Format: "Notify URL", "Notify URL|Name" or "Channel URL|Notify URL|Name". The name defaults to the notify URL.
 func ParseNotifications(notifications []string) ([]*models.Notification, error) {
 	if len(notifications) == 0 {
 		return nil, nil
@@ -73,45 +73,27 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 
 	notificationModels := make([]*models.Notification, 0, len(notifications))
 	for _, n := range notifications {
-		if !strings.ContainsRune(n, '|') {
-			return nil, fmt.Errorf("notification entry %q does not contain a '|' separator (should be in 'URL|friendly name' format", n)
-		}
-
 		entry := sharedparsing.EscapedSplit(n, '|')
 
 		// Check entries for validity and fill field details.
 		var chanURL, nURL, name string
-		switch {
-		case len(entry) > 3 || len(entry) < 2:
-			return nil, fmt.Errorf("malformed notification entry %q, should be in 'Channel URL|Notify URL|Friendly Name' or 'Notify URL|Friendly Name' format", n)
-
-		// 'Notify URL|Name'
-		case len(entry) == 2:
-			if entry[0] == "" {
-				return nil, fmt.Errorf("missing URL from notification entry %q, should be in 'Notify URL|Friendly Name' format", n)
-			}
+		switch len(entry) {
+		case 1:
 			nURL = entry[0]
-			name = entry[1]
+		case 2:
+			nURL, name = entry[0], entry[1]
+		case 3:
+			chanURL, nURL, name = entry[0], entry[1], entry[2]
+			if _, err := url.Parse(chanURL); err != nil || chanURL == "" {
+				return nil, fmt.Errorf("channel URL %q in notification entry %q is not valid", chanURL, n)
+			}
+		default:
+			return nil, fmt.Errorf("malformed notification entry %q, should be in 'Notify URL', 'Notify URL|Name' or 'Channel URL|Notify URL|Name' format", n)
+		}
 
-			if _, err := url.Parse(nURL); err != nil {
-				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
-			}
-
-		// 'Channel URL|Notify URL|Name'
-		case len(entry) == 3:
-			if entry[0] == "" || entry[1] == "" {
-				return nil, fmt.Errorf("missing channel URL or notification URL from notification entry %q, should be in 'Channel URL|Notify URL|Friendly Name' format", n)
-			}
-			chanURL = entry[0]
-			nURL = entry[1]
-			name = entry[2]
-
-			if _, err := url.Parse(chanURL); err != nil {
-				return nil, fmt.Errorf("channel URL %q not valid: %w", chanURL, err)
-			}
-			if _, err := url.Parse(nURL); err != nil {
-				return nil, fmt.Errorf("notification URL %q not valid: %w", nURL, err)
-			}
+		// Notifications are sent as HTTP POST requests (url.Parse allows characters URLs can't contain, like spaces).
+		if u, err := url.Parse(nURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || strings.ContainsAny(nURL, " \"<>\\^`{}") {
+			return nil, fmt.Errorf("notification URL %q in entry %q must be a valid http(s) URL", nURL, n)
 		}
 
 		// Use URL as name if name field is missing.

@@ -39,7 +39,7 @@ func FuzzValidateStrings(f *testing.F) {
 		_ = ValidateYtdlpOutputExtension(s)
 		_ = ValidateRenameFlag(s)
 		_ = ValidateDateFormat(s)
-		_ = ValidatePurgeMetafiles(s)
+		_, _ = ValidatePurgeMetafiles(s)
 		_, _ = ValidateGPUAcceleration(s)
 		_, _ = ValidateTranscodeVideoFilter(s)
 		_, _ = CheckForOpURL(s)

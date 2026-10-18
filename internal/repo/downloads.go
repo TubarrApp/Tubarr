@@ -56,18 +56,24 @@ func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models
 	normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
 
 	query := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
+		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
 		consts.DBDownloads,
 		consts.QDLStatus,
 		consts.QDLPct,
+		consts.QDLError,
 		consts.QDLVidID,
 	)
 
+	var errMsg string
+	if update.Error != nil {
+		errMsg = update.Error.Error()
+	}
 	if _, err := ds.DB.ExecContext(
 		ctx,
 		query,
 		update.Status,
 		update.Percent,
+		errMsg,
 		update.VideoID,
 	); err != nil {
 		return fmt.Errorf("failed to update download status for video %q: %w", update.VideoURL, err)

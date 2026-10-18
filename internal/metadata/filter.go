@@ -516,7 +516,7 @@ func loadMoveOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []m
 	}
 
 	// Validate the parsed ops
-	if err := validation.ValidateMetaFilterMoveOps(parsedMoves); err != nil {
+	if err := validation.ValidateMetaFilterMoveOps(parsedMoves, true); err != nil {
 		logger.Pl.E("Error validating filter move operations from file %q: %v", moveOpFile, err)
 		return nil
 	}

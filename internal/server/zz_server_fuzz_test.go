@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -71,8 +72,13 @@ var fuzzRoutes = []fuzzRoute{
 // create (directory settings are created when validated). Removed when the tests finish.
 var testDir string
 
+// pkgDir is this package's source directory (fuzz workers start in the coordinator's temporary directory, not here).
+var pkgDir string
+
 // TestMain runs the package's tests from a temporary directory, so nothing is created in the source tree.
 func TestMain(m *testing.M) {
+	_, file, _, _ := runtime.Caller(0)
+	pkgDir = filepath.Dir(file)
 	dir, err := os.MkdirTemp("", "tubarr-server-test")
 	if err != nil {
 		log.Fatal(err)

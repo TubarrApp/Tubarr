@@ -2,8 +2,10 @@ package cfg
 
 import (
 	"errors"
+	"fmt"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 
 	"github.com/spf13/cobra"
@@ -29,15 +31,16 @@ func InitVideoCmds(s contracts.Store) *cobra.Command {
 // deleteCmdVideo deletes a channel from the database.
 func deleteCmdVideo(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		chanName string
-		urls     []string
-		chanID   int
+		chanName    string
+		urls        []string
+		chanID      int
+		deleteFiles bool
 	)
 
 	delCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete video entry",
-		Long:  "Delete a video entry from a channel by URL",
+		Long:  fmt.Sprintf("Deletes video entries from a channel by URL, so later crawls treat them as new. Their video and metadata files are kept unless --%s is given.", keys.DeleteFiles),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Get channel key and value.
 			key, val, err := getChanKeyVal(chanID, chanName)
@@ -56,7 +59,7 @@ func deleteCmdVideo(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Delete video.
-			if err := cs.DeleteVideosByURLs(cID, urls); err != nil {
+			if err := cs.DeleteVideosByURLs(cID, urls, deleteFiles); err != nil {
 				return err
 			}
 			logger.Pl.S("Successfully deleted videos with URLs: %v", urls)
@@ -67,6 +70,7 @@ func deleteCmdVideo(cs contracts.ChannelStore) *cobra.Command {
 	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(delCmd, &chanName, nil, &chanID)
 	delCmd.Flags().StringSliceVar(&urls, "delete-urls", []string{}, "Video URLs to delete")
+	delCmd.Flags().BoolVar(&deleteFiles, keys.DeleteFiles, false, "Also delete the videos' video and metadata files from disk.")
 
 	return delCmd
 }

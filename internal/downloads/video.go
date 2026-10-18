@@ -34,11 +34,11 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Restrict filenames.
 	args = append(args, command.RestrictFilenames)
 
-	// Infer video filename from JSON filename.
+	// Infer video filename from JSON filename, escaping '%' so yt-dlp writes it as named.
 	var outputSyntax string
 	if d.Video.JSONCustomFile != "" {
 		JSONFileName := strings.TrimSuffix(filepath.Base(d.Video.JSONCustomFile), ".json")
-		outputSyntax = JSONFileName + ".%(ext)s"
+		outputSyntax = strings.ReplaceAll(JSONFileName, "%", "%%") + ".%(ext)s"
 	} else {
 		outputSyntax = command.FilenameSyntax
 	}
@@ -62,8 +62,8 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
 
-	// Cookie source.
-	if abstractions.IsSet(keys.CookiesFromBrowser) {
+	// Cookie source, for channel URLs without their own.
+	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" && abstractions.IsSet(keys.CookiesFromBrowser) {
 		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
 		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
 		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)
@@ -143,13 +143,13 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Add preferred codecs.
 	switch {
 	case len(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) > 0 && len(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) > 0:
-		pref := buildVideoCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) + "+" + buildAudioCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs)
+		pref := buildVideoCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) + "+" + buildAudioCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) + "/b"
 		args = append(args, "-f", pref)
 	case len(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) > 0:
-		pref := buildVideoCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) + "+ba*"
+		pref := buildVideoCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredVideoCodecs) + "+ba/b"
 		args = append(args, "-f", pref)
 	case len(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) > 0:
-		pref := buildAudioCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) + "+bv*"
+		pref := buildAudioCodecList(d.ChannelURL.ChanURLSettings.YTDLPPreferredAudioCodecs) + "+bv*/b"
 		args = append(args, "-f", pref)
 	}
 
@@ -296,17 +296,9 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 			continue
 		}
 
-		// Collect error messages.
-		lowerLine := strings.ToLower(line)
-		if strings.HasPrefix(lowerLine, "error:") {
-
-			if strings.Contains(lowerLine, "forbidden") ||
-				strings.Contains(lowerLine, "error 403") ||
-				strings.Contains(lowerLine, "error 404") ||
-				strings.Contains(lowerLine, "unable to download") ||
-				strings.Contains(lowerLine, "http error") {
-				errorLines = append(errorLines, strings.TrimSpace(line))
-			}
+		// Collect error messages, and the notice of a file skipped for --max-filesize.
+		if strings.HasPrefix(strings.ToLower(line), "error:") || strings.Contains(line, "File is larger than max-filesize") {
+			errorLines = append(errorLines, strings.TrimSpace(line))
 		}
 
 		// yt-dlp and external downloader progress parsing.

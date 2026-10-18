@@ -78,6 +78,14 @@ func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ign
 //
 //nolint:contextcheck
 func (ss *serverStore) startIgnoreCrawl(c *models.Channel) {
+	// Reload the saved channel, merged so its per-URL settings apply.
+	saved, found, err := ss.cs.GetChannelModel(consts.QChanID, strconv.FormatInt(c.ID, 10), true)
+	if err != nil || !found {
+		logger.Pl.E("Failed to load channel %q for its ignore crawl (found: %t): %v", c.Name, found, err)
+		return
+	}
+	c = saved
+
 	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID)
 	if !ok {
 		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
@@ -229,6 +237,7 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, _ *http.Request
 			UpdatedAt:            c.UpdatedAt,
 			ChannelConfigFile:    c.ChannelConfigFile,
 			NewVideoNotification: c.NewVideoNotification,
+			LoadError:            loadError(c),
 			Settings:             newSettingsResponse(c.ChanSettings),
 			Metarr:               newMetarrArgsResponse(c.ChanMetarrArgs),
 		}
@@ -271,13 +280,15 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		URLs: slices.DeleteFunc(c.GetURLs(), func(url string) bool {
 			return url == consts.ManualDownloadsCol
 		}),
-		LastScan:    c.LastScan,
-		CreatedAt:   c.CreatedAt,
-		UpdatedAt:   c.UpdatedAt,
-		Settings:    newSettingsResponse(c.ChanSettings),
-		Metarr:      newMetarrArgsResponse(c.ChanMetarrArgs),
-		AuthDetails: []authDetailResponse{},
-		URLSettings: map[string]urlSettingsResponse{},
+		LastScan:          c.LastScan,
+		CreatedAt:         c.CreatedAt,
+		UpdatedAt:         c.UpdatedAt,
+		ChannelConfigFile: c.ChannelConfigFile,
+		LoadError:         loadError(c),
+		Settings:          newSettingsResponse(c.ChanSettings),
+		Metarr:            newMetarrArgsResponse(c.ChanMetarrArgs),
+		AuthDetails:       []authDetailResponse{},
+		URLSettings:       map[string]urlSettingsResponse{},
 	}
 
 	// Logins and custom settings per URL, leaving out manual downloads. Passwords are never sent back, only whether one is saved.
@@ -308,7 +319,7 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	}
 	for _, n := range notifications {
 		if n.NotifyURL != "" {
-			response.Notifications = append(response.Notifications, n.NotifyURL)
+			response.Notifications = append(response.Notifications, notificationLine(n))
 		}
 	}
 
@@ -325,6 +336,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
 		return
 	}
+	blankWhitespaceValues(r)
 
 	// Get form values.
 	name := r.FormValue("name")
@@ -333,6 +345,10 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 	loginURL := r.FormValue("login_url")
 	password := r.FormValue("password")
 	now := time.Now()
+	if name == "" {
+		http.Error(w, "channel name is required", http.StatusBadRequest)
+		return
+	}
 
 	// Parse authentication details.
 	authDetails, err := splitAuthDetails(r.FormValue("auth_details"))
@@ -348,6 +364,16 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Parse per-URL settings JSON if provided.
 	urlSettingsMap, err := parseURLSettings(r.FormValue("url_settings"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	notifications, err := parseNotificationLines(r.FormValue("notifications"), urls)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	configFile, err := formConfigFile(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -392,11 +418,12 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Create model.
 	c := &models.Channel{
-		Name:      name,
-		URLModels: chanURLs,
-		CreatedAt: now,
-		LastScan:  now,
-		UpdatedAt: now,
+		Name:              name,
+		ChannelConfigFile: configFile,
+		URLModels:         chanURLs,
+		CreatedAt:         now,
+		LastScan:          now,
+		UpdatedAt:         now,
 	}
 
 	// Get and validate settings.
@@ -412,8 +439,8 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Add to database.
-	if c.ID, err = ss.cs.AddChannel(c); err != nil {
+	// Add to database, with its notifications.
+	if err := ss.cs.AddChannelWithDetails(c, nil, notifications); err != nil {
 		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), channelErrStatus(err))
 		return
 	}
@@ -443,6 +470,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
 		return
 	}
+	blankWhitespaceValues(r)
 
 	// -- Parse and validate everything before writing, so a rejected update changes nothing. --
 	name := r.FormValue("name")
@@ -493,10 +521,15 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	notificationURLs := strings.Fields(r.FormValue("notifications"))
-	notifications := make([]*models.Notification, 0, len(notificationURLs))
-	for _, notifyURL := range notificationURLs {
-		notifications = append(notifications, &models.Notification{ChannelID: channelID, NotifyURL: notifyURL})
+	notifications, err := parseNotificationLines(r.FormValue("notifications"), urls)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	configFile, err := formConfigFile(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// -- Read and write in one transaction, so the update applies to the current channel and a failure changes nothing. --
@@ -512,6 +545,11 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		if name != "" && name != existingChannel.Name {
 			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
 				return fmt.Errorf("failed to update channel name: %w", err)
+			}
+		}
+		if configFile != existingChannel.ChannelConfigFile {
+			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanConfigFile, configFile); err != nil {
+				return fmt.Errorf("failed to update channel config file: %w", err)
 			}
 		}
 		if _, err := cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
@@ -549,9 +587,11 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			urlSettings := urlSettingsMap[u]
 
 			if existingURLModel, exists := existingURLMap[u]; exists {
-				// A blank password keeps the saved one, as passwords aren't sent to the edit page.
+				// A blank password keeps the saved one, as passwords aren't sent to the edit page. Clearing the ciphertext
+				// makes a new password get encrypted, and a cleared login get stored blank.
 				if parsedPassword != "" || parsedUsername == "" {
 					existingURLModel.Password = parsedPassword
+					existingURLModel.EncryptedPassword = ""
 				}
 				existingURLModel.Username = parsedUsername
 				existingURLModel.LoginURL = parsedLoginURL
@@ -709,7 +749,7 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := ss.cs.DeleteVideosByURLs(id, urls); err != nil {
+	if err := ss.cs.DeleteVideosByURLs(id, urls, values.Get("delete_files") == "true"); err != nil {
 		http.Error(w, fmt.Sprintf("failed to delete video URLs: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -790,7 +830,7 @@ func (ss *serverStore) handleCancelDownloads(w http.ResponseWriter, r *http.Requ
 	var body struct {
 		VideoIDs []int64 `json:"video_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(r, &body); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -837,6 +877,10 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 	if !found || c == nil {
 		http.Error(w, "channel nil or not found", http.StatusNotFound)
+		return
+	}
+	if c.LoadErr != nil {
+		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
 
@@ -920,7 +964,7 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		VideoIDs []int64 `json:"video_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+	if err := decodeJSON(r, &body); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -981,13 +1025,17 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true) // Merged, so per-URL settings apply.
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	if !found || c == nil {
 		http.Error(w, "channel nil or not found", http.StatusNotFound)
+		return
+	}
+	if c.LoadErr != nil {
+		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
 
@@ -1038,7 +1086,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		URLs []string `json:"urls"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+	if err := decodeJSON(r, &requestBody); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -1056,6 +1104,14 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	}
 	if !found || c == nil {
 		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+	if c.LoadErr != nil {
+		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
+		return
+	}
+	if bad := app.CheckManualURLs(c, requestBody.URLs); len(bad) > 0 {
+		http.Error(w, "can't download:\n"+strings.Join(bad, "\n"), http.StatusBadRequest)
 		return
 	}
 
@@ -1085,9 +1141,9 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// handleGetAvailableVideos returns videos awaiting the user's choice to download them, across all channels.
+// handleGetAvailableVideos returns videos awaiting the user's choice to download or dismiss them, across all channels.
 //
-// Failed and canceled videos are only included from channel URLs which don't auto download, as others retry on crawls.
+// Failed and canceled videos from channel URLs which auto download are marked as retried by their next crawl.
 func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.Request) {
 	videos, err := ss.vs.GetAvailableVideos(app.AvailableStatuses...)
 	if err != nil {
@@ -1100,22 +1156,18 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.R
 		return
 	}
 
-	autoDownloads := make(map[int64]bool)
+	retried := make(map[int64]bool)
 	for _, c := range channels {
 		for _, cu := range c.URLModels {
-			autoDownloads[cu.ID] = c.AutoDownloads(cu)
+			retried[cu.ID] = !cu.IsManual && c.AutoDownloads(cu)
 		}
 	}
-	out := make([]*models.AvailableVideo, 0, len(videos))
 	for _, v := range videos {
-		if v.DownloadStatus.Status != consts.DLStatusAvailable && autoDownloads[v.ChannelURLID] {
-			continue
-		}
-		out = append(out, v)
+		v.RetriesOnCrawl = v.DownloadStatus.Status != consts.DLStatusAvailable && retried[v.ChannelURLID]
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(out); err != nil {
+	if err := json.NewEncoder(w).Encode(videos); err != nil {
 		logger.Pl.E("Failed to encode available videos: %v", err)
 	}
 }
@@ -1128,7 +1180,7 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		Action   string  `json:"action"`
 		VideoIDs []int64 `json:"video_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+	if err := decodeJSON(r, &requestBody); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -1155,6 +1207,10 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	}
 	if !found || c == nil {
 		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+	if c.LoadErr != nil && status == consts.DLStatusQueued {
+		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
 
@@ -1200,7 +1256,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
 		VideoIDs []int64 `json:"video_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil && !errors.Is(err, io.EOF) {
+	if err := decodeJSON(r, &requestBody); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -1212,6 +1268,10 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	}
 	if !found || c == nil {
 		http.Error(w, "channel not found", http.StatusNotFound)
+		return
+	}
+	if c.LoadErr != nil {
+		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
 
@@ -1266,6 +1326,9 @@ func (ss *serverStore) handleSetLogLevel(w http.ResponseWriter, r *http.Request)
 	}
 	level = min(max(level, -1), 5)
 	logging.SetLevel(level)
+	if err := ss.tss.SetSetting(keys.DebugLevel, strconv.Itoa(level)); err != nil {
+		logger.Pl.W("Failed to save logging level: %v", err)
+	}
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(fmt.Appendf(nil, "Logging level set to %d", level)); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
@@ -1719,7 +1782,7 @@ func (ss *serverStore) handleSetDomainLimit(w http.ResponseWriter, r *http.Reque
 
 // handleDeleteDomainLimit removes the download and crawl concurrency limits for a specific domain.
 func (ss *serverStore) handleDeleteDomainLimit(w http.ResponseWriter, r *http.Request) {
-	hostname := chi.URLParam(r, "hostname")
+	hostname := limits.NormalizeDomain(chi.URLParam(r, "hostname"))
 	if hostname == "" {
 		http.Error(w, "hostname is required", http.StatusBadRequest)
 		return

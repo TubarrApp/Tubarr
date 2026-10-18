@@ -159,6 +159,7 @@ const (
 	QDLVidID     = "video_id"
 	QDLStatus    = "status"
 	QDLPct       = "percentage"
+	QDLError     = "error"
 	QDLCreatedAt = "created_at"
 	QDLUpdatedAt = "updated_at"
 )
@@ -168,6 +169,7 @@ var ValidDownloadKeys = map[string]struct{}{
 	QDLVidID:     {},
 	QDLStatus:    {},
 	QDLPct:       {},
+	QDLError:     {},
 	QDLCreatedAt: {},
 	QDLUpdatedAt: {},
 }

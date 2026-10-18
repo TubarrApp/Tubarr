@@ -55,6 +55,7 @@ type ChannelFlagValues struct {
 	MetarrExt   string
 	RenameStyle string
 	MinFreeMem  string
+	MetaPurge   string
 
 	// Transcoding settings
 	TranscodeGPU         string

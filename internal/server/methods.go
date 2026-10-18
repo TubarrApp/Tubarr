@@ -30,6 +30,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 	ticker := time.NewTicker(timeBetweenCheck) // check every minute
 	defer ticker.Stop()
 	logger.Pl.I("Crawl watchdog started, checking every %s", timeBetweenCheck.String())
+	reported := make(map[int64]string) // Channel load errors already logged, so each is logged once, not every check.
 
 	for {
 		select {
@@ -59,17 +60,23 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 			logger.Pl.D(3, "Crawl watchdog: Checking %d channel(s) for scheduled crawls", len(freshChannels))
 			now := time.Now()
 			for _, c := range freshChannels {
+				if c.LoadErr != nil {
+					if msg := c.LoadErr.Error(); reported[c.ID] != msg {
+						reported[c.ID] = msg
+						logger.Pl.E("Crawl watchdog: skipping crawls until fixed: %v", c.LoadErr)
+					}
+					continue
+				}
+				delete(reported, c.ID)
+
 				// Skip paused channels
 				if c.ChanSettings.Paused {
 					logger.Pl.D(3, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
 					continue
 				}
 
-				// Calculate elapsed time since last scan
-				elapsed := now.Sub(c.LastScan)
-				interval := time.Duration(c.ScheduledCrawlFreq()) * time.Minute
-
 				// Add jitter
+				var jitter time.Duration
 				if !abstractions.IsSet(keys.SkipAllWaits) {
 					jitterInt := state.GetOrComputeJitter(c.ID, len(c.URLModels), func() int {
 						j := 5
@@ -88,16 +95,18 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 					})
 
 					if jitterInt > 0 {
-						jitter := times.RandomMinsDuration(jitterInt) // Probability, with re-rolls, expect ~half the time added
-						interval += jitter
+						jitter = times.RandomMinsDuration(jitterInt) // Probability, with re-rolls, expect ~half the time added
 					}
-
 				}
 
-				logger.Pl.D(4, " channel %q - last scan: %s ago, interval: %s",
-					c.Name, elapsed.Round(time.Second), interval)
+				// Crawl the URLs due, each on its own crawl frequency or the channel's.
+				due, next := c.DueURLs(now, jitter, true)
+				logger.Pl.D(4, " channel %q - %d URL(s) due, next in %s", c.Name, len(due), next.Round(time.Second))
 
-				if elapsed >= interval {
+				if len(due) > 0 {
+					ch := *c
+					ch.URLModels = due
+
 					// Crawl goroutine
 					go func(ch *models.Channel) {
 						crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.ID)
@@ -119,7 +128,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 						} else if performedCrawls {
 							logger.Pl.S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
 						}
-					}(c)
+					}(&ch)
 				}
 			}
 		}
@@ -244,6 +253,10 @@ func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Vide
 		// Only include Queued or Downloading statuses
 		if statusUpdate.Status == consts.DLStatusQueued || statusUpdate.Status == consts.DLStatusDownloading {
 			// Build a Video model from the StatusUpdate
+			var errMsg string
+			if statusUpdate.Error != nil {
+				errMsg = statusUpdate.Error.Error()
+			}
 			video := models.Video{
 				ID:           statusUpdate.VideoID,
 				Title:        statusUpdate.VideoTitle,
@@ -252,10 +265,11 @@ func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Vide
 				ChannelURL:   statusUpdate.ChannelURL,
 				URL:          statusUpdate.VideoURL,
 				DownloadStatus: models.DLStatus{
-					Status:  statusUpdate.Status,
-					Percent: statusUpdate.Percent,
-					Stage:   statusUpdate.Stage,
-					Error:   statusUpdate.Error,
+					Status:   statusUpdate.Status,
+					Percent:  statusUpdate.Percent,
+					Stage:    statusUpdate.Stage,
+					Error:    statusUpdate.Error,
+					ErrorMsg: errMsg,
 				},
 			}
 			videos = append(videos, video)

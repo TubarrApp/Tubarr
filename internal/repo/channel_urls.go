@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -146,6 +147,29 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 	}
 
 	logger.Pl.S("Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
+	return nil
+}
+
+// UpdateChannelURLsLastScan records that channel URLs were just crawled, which starts their crawl frequency again.
+func (cs *ChannelStore) UpdateChannelURLsLastScan(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, time.Now())
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s IN (%s)",
+		consts.DBChannelURLs,
+		consts.QChanURLLastScan,
+		consts.QChanURLID,
+		strings.TrimSuffix(strings.Repeat("?,", len(ids)), ","),
+	)
+	if _, err := cs.q.Exec(query, args...); err != nil {
+		return fmt.Errorf("failed to update channel URL last scan times: %w", err)
+	}
 	return nil
 }
 
@@ -374,9 +398,11 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, merge
 
 		// Handle Settings
 		if cu.ChanURLSettings == nil {
-			// Struct-level inheritance: use entire channel settings
+			// Struct-level inheritance: use a copy of the channel settings, as GetChannelURLModels does
 			if c != nil && c.ChanSettings != nil {
-				cu.ChanURLSettings = c.ChanSettings
+				settingsCopy := *c.ChanSettings
+				settingsCopy.Paused = false // Pausing is per URL.
+				cu.ChanURLSettings = &settingsCopy
 			} else {
 				cu.ChanURLSettings = &models.Settings{}
 			}
@@ -391,9 +417,10 @@ func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, merge
 
 		// Handle MetarrArgs
 		if cu.ChanURLMetarrArgs == nil {
-			// Struct-level inheritance: use entire channel metarr args
+			// Struct-level inheritance: use a copy of the channel metarr args
 			if c != nil && c.ChanMetarrArgs != nil {
-				cu.ChanURLMetarrArgs = c.ChanMetarrArgs
+				metarrCopy := *c.ChanMetarrArgs
+				cu.ChanURLMetarrArgs = &metarrCopy
 			} else {
 				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 			}
@@ -515,7 +542,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.CookiesFromBrowser, c = mergeStringSettings(urlSettings.CookiesFromBrowser, channelSettings.CookiesFromBrowser)
 	changed = changed || c
 
-	urlSettings.CrawlFreq, c = mergeNumSettings(urlSettings.CrawlFreq, channelSettings.CrawlFreq, -1)
+	urlSettings.CrawlFreq, c = mergeNumSettings(urlSettings.CrawlFreq, channelSettings.CrawlFreq, 0) // A blank field saves as 0.
 	changed = changed || c
 
 	urlSettings.ExternalDownloader, c = mergeStringSettings(urlSettings.ExternalDownloader, channelSettings.ExternalDownloader)
@@ -531,6 +558,12 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	changed = changed || c
 
 	urlSettings.YtdlpOutputExt, c = mergeStringSettings(urlSettings.YtdlpOutputExt, channelSettings.YtdlpOutputExt)
+	changed = changed || c
+
+	urlSettings.YTDLPPreferredVideoCodecs, c = mergeSliceSettings(urlSettings.YTDLPPreferredVideoCodecs, channelSettings.YTDLPPreferredVideoCodecs)
+	changed = changed || c
+
+	urlSettings.YTDLPPreferredAudioCodecs, c = mergeSliceSettings(urlSettings.YTDLPPreferredAudioCodecs, channelSettings.YTDLPPreferredAudioCodecs)
 	changed = changed || c
 
 	// Custom args
@@ -576,7 +609,7 @@ func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool)
 	urlSettings.AutoDownload, c = mergePtrBoolSettings(urlSettings.AutoDownload, channelSettings.AutoDownload)
 	changed = changed || c
 
-	// Note: Paused and BotBlocked fields are per-URL, not cascaded
+	// Note: Paused is per-URL, not cascaded
 	return changed
 }
 
@@ -603,14 +636,32 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 	urlMetarr.FilenameOps, c = mergeSliceSettings(urlMetarr.FilenameOps, channelMetarr.FilenameOps)
 	changed = changed || c
 
+	urlMetarr.FilenameOpsFile, c = mergeStringSettings(urlMetarr.FilenameOpsFile, channelMetarr.FilenameOpsFile)
+	changed = changed || c
+
 	urlMetarr.FilteredFilenameOps, c = mergeSliceSettings(urlMetarr.FilteredFilenameOps, channelMetarr.FilteredFilenameOps)
+	changed = changed || c
+
+	urlMetarr.FilteredFilenameOpsFile, c = mergeStringSettings(urlMetarr.FilteredFilenameOpsFile, channelMetarr.FilteredFilenameOpsFile)
 	changed = changed || c
 
 	// Metarr metadata operations
 	urlMetarr.MetaOps, c = mergeSliceSettings(urlMetarr.MetaOps, channelMetarr.MetaOps)
 	changed = changed || c
 
+	urlMetarr.MetaOpsFile, c = mergeStringSettings(urlMetarr.MetaOpsFile, channelMetarr.MetaOpsFile)
+	changed = changed || c
+
+	urlMetarr.FilteredMetaOps, c = mergeSliceSettings(urlMetarr.FilteredMetaOps, channelMetarr.FilteredMetaOps)
+	changed = changed || c
+
+	urlMetarr.FilteredMetaOpsFile, c = mergeStringSettings(urlMetarr.FilteredMetaOpsFile, channelMetarr.FilteredMetaOpsFile)
+	changed = changed || c
+
 	urlMetarr.OutputDir, c = mergeStringSettings(urlMetarr.OutputDir, channelMetarr.OutputDir)
+	changed = changed || c
+
+	urlMetarr.MetaPurge, c = mergeStringSettings(urlMetarr.MetaPurge, channelMetarr.MetaPurge)
 	changed = changed || c
 
 	// Program operations
@@ -625,6 +676,9 @@ func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool)
 
 	// Transcoding
 	urlMetarr.TranscodeGPU, c = mergeStringSettings(urlMetarr.TranscodeGPU, channelMetarr.TranscodeGPU)
+	changed = changed || c
+
+	urlMetarr.TranscodeGPUNode, c = mergeStringSettings(urlMetarr.TranscodeGPUNode, channelMetarr.TranscodeGPUNode)
 	changed = changed || c
 
 	urlMetarr.TranscodeVideoFilter, c = mergeStringSettings(urlMetarr.TranscodeVideoFilter, channelMetarr.TranscodeVideoFilter)

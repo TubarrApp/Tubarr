@@ -58,6 +58,24 @@
                 <p class="text-red-600 dark:text-red-400" x-text="error"></p>
               </div>
 
+              <!-- Delete Confirmation -->
+              <div x-show="deleteDialog" x-cloak @keydown.escape.window="deleteDialog = false" class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4">
+                <div @click.outside="deleteDialog = false" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-900">
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+                    Delete <span x-text="selectedVideos.length"></span> video<span x-show="selectedVideos.length !== 1">s</span>?
+                  </h3>
+                  <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">They're removed from this channel's list, so later crawls treat them as new.</p>
+                  <label class="mt-4 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" x-model="deleteFiles" class="mt-1 h-4 w-4 rounded border-gray-300" />
+                    <span>Also delete the video and metadata files from disk</span>
+                  </label>
+                  <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="deleteDialog = false" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
+                    <button type="button" @click="deleteDialog = false; deleteSelected()" class="rounded-lg bg-error-500 px-4 py-2 text-sm font-medium text-white hover:bg-error-600">Delete</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Videos Table -->
               <div x-show="!loading && !error" class="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <!-- Channel Info Header -->
@@ -111,9 +129,9 @@
                         Run Metarr on Selected
                       </button>
                       <button
-                        @click="deleteSelected()"
+                        @click="deleteFiles = false; deleteDialog = true"
                         :disabled="deleting"
-                        class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-600 dark:hover:bg-red-700"
+                        class="px-4 py-2 text-sm font-medium text-white bg-error-500 rounded-lg hover:bg-error-600 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <span x-show="!deleting">Delete Selected</span>
                         <span x-show="deleting">Deleting...</span>
@@ -288,6 +306,8 @@
           loading: true,
           error: null,
           deleting: false,
+          deleteDialog: false,
+          deleteFiles: false,
           runningMetarr: false,
           metarrActive: false,
           stoppingMetarr: false,
@@ -513,21 +533,20 @@
             this.selectedVideos = [];
           },
 
+          // Deletes the selected videos, as confirmed in the delete dialog.
           async deleteSelected() {
             if (this.selectedVideos.length === 0) return;
 
-            if (!confirm(`Are you sure you want to delete ${this.selectedVideos.length} video(s)?`)) {
-              return;
-            }
-
             this.deleting = true;
             try {
-              // Create form data with video URLs only
               // Channel ID is passed in the URL path: /api/v1/channels/{id}/delete-videos
               const formData = new URLSearchParams();
               this.selectedVideos.forEach(url => {
                 formData.append('urls[]', url);
               });
+              if (this.deleteFiles) {
+                formData.append('delete_files', 'true');
+              }
 
               const response = await fetch(`/api/v1/channels/${this.channelId}/delete-videos`, {
                 method: 'DELETE',
@@ -572,7 +591,9 @@
               dateStr = dateString + 'Z';
             }
 
-            const date = new Date(dateStr);
+            // An upload date is a calendar day, so its YYYY-MM-DD part is read as a local date.
+            const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+            const date = ymd ? new Date(+ymd[1], ymd[2] - 1, +ymd[3]) : new Date(dateStr);
 
             // Validate the date
             if (isNaN(date.getTime())) {

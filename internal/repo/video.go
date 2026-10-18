@@ -531,7 +531,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		return nil, nil
 	}
 	query := fmt.Sprintf(
-		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, c.%s "+
+		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, d.%s, c.%s "+
 			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
 			"WHERE v.%s = 0 AND v.%s = 0 AND d.%s IN (?%s) "+
 			"ORDER BY v.%s DESC, v.%s DESC, v.%s DESC",
@@ -546,6 +546,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		consts.QVidDuration,
 		consts.QVidCreatedAt,
 		consts.QDLStatus,
+		consts.QDLError,
 		consts.QChanName,
 		consts.DBVideos,
 		consts.DBDownloads, consts.QDLVidID, consts.QVidID,
@@ -574,11 +575,11 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 
 	for rows.Next() {
 		var (
-			v                               models.AvailableVideo
-			channelURLID                    sql.NullInt64
-			channelURL, title, thumbnailURL sql.NullString
-			uploadDate                      sql.NullTime
-			duration                        sql.NullInt64
+			v                                         models.AvailableVideo
+			channelURLID                              sql.NullInt64
+			channelURL, title, thumbnailURL, errorMsg sql.NullString
+			uploadDate                                sql.NullTime
+			duration                                  sql.NullInt64
 		)
 		if err := rows.Scan(
 			&v.ID,
@@ -592,10 +593,12 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 			&duration,
 			&v.CreatedAt,
 			&v.DownloadStatus.Status,
+			&errorMsg,
 			&v.ChannelName,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan available video: %w", err)
 		}
+		v.DownloadStatus.ErrorMsg = errorMsg.String
 		v.ChannelURLID = channelURLID.Int64
 		v.ChannelURL = channelURL.String
 		v.Title = cmp.Or(title.String, v.URL)

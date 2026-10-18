@@ -66,6 +66,21 @@ func initWebSessionsTable(tx *sql.Tx) error {
 	return executeSQLFile(tx, webSessionsSQL, "web sessions table")
 }
 
+// migrateURLLastScan sets each channel URL's last crawl to its channel's, once.
+func migrateURLLastScan(tx *sql.Tx) error {
+	res, err := tx.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('migrated-url-last-scan', 'true')`)
+	if err != nil {
+		return fmt.Errorf("failed to record the channel URL last scan migration: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 0 {
+		return err // Already migrated.
+	}
+	if _, err := tx.Exec(`UPDATE channel_urls SET last_scan = (SELECT last_scan FROM channels WHERE channels.id = channel_urls.channel_id)`); err != nil {
+		return fmt.Errorf("failed to migrate channel URL last scan times: %w", err)
+	}
+	return nil
+}
+
 // addColumnIfMissing adds a column to an existing table (for databases created by older versions).
 func addColumnIfMissing(tx *sql.Tx, table, column, definition string) (err error) {
 	rows, err := tx.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))

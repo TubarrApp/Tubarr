@@ -38,8 +38,8 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
 
-	// Cookie source.
-	if abstractions.IsSet(keys.CookiesFromBrowser) {
+	// Cookie source, for channel URLs without their own.
+	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" && abstractions.IsSet(keys.CookiesFromBrowser) {
 		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
 		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
 		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)

@@ -184,6 +184,26 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 		input.YTDLPOutputExt = &v
 	}
 
+	if input.MetaPurge != nil {
+		p, err := validation.ValidatePurgeMetafiles(*input.MetaPurge)
+		if err != nil {
+			return nil, nil, err
+		}
+		input.MetaPurge = &p
+	}
+
+	var preferredVideoCodecs, preferredAudioCodecs []string
+	if input.YTDLPPreferredVideoCodecs != nil {
+		if preferredVideoCodecs, err = validation.ValidatePreferredVideoCodecs(*input.YTDLPPreferredVideoCodecs); err != nil {
+			return nil, nil, err
+		}
+	}
+	if input.YTDLPPreferredAudioCodecs != nil {
+		if preferredAudioCodecs, err = validation.ValidatePreferredAudioCodecs(*input.YTDLPPreferredAudioCodecs); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// ===============================
 	// Authentication
 	// ===============================
@@ -267,28 +287,30 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 		ChannelConfigFile: NilOrZeroValue(input.ChannelConfigFile),
 
 		ChanSettings: &models.Settings{
-			Concurrency:            NilOrZeroValue(input.Concurrency),
-			CookiesFromBrowser:     NilOrZeroValue(input.CookiesFromBrowser),
-			CrawlFreq:              NilOrZeroValue(input.CrawlFreq),
-			ExternalDownloader:     NilOrZeroValue(input.ExternalDownloader),
-			ExternalDownloaderArgs: NilOrZeroValue(input.ExternalDownloaderArgs),
-			Filters:                dlFilterModels,
-			FilterFile:             NilOrZeroValue(input.DLFilterFile),
-			FromDate:               NilOrZeroValue(input.FromDate),
-			JSONDir:                *input.JSONDir,
-			MaxFilesize:            NilOrZeroValue(input.MaxFilesize),
-			MetaFilterMoveOps:      moveOpsModels,
-			MetaFilterMoveOpFile:   NilOrZeroValue(input.MoveOpFile),
-			Paused:                 NilOrZeroValue(input.Pause),
-			Retries:                NilOrZeroValue(input.Retries),
-			ToDate:                 NilOrZeroValue(input.ToDate),
-			UseGlobalCookies:       input.UseGlobalCookies,
-			AutoDownload:           input.AutoDownload,
-			VideoDir:               *input.VideoDir,
-			YtdlpOutputExt:         NilOrZeroValue(input.YTDLPOutputExt),
-			ExtraYTDLPVideoArgs:    NilOrZeroValue(input.ExtraYTDLPVideoArgs),
-			ExtraYTDLPMetaArgs:     NilOrZeroValue(input.ExtraYTDLPMetaArgs),
-			ExtraYTDLPCrawlArgs:    NilOrZeroValue(input.ExtraYTDLPCrawlArgs),
+			Concurrency:               NilOrZeroValue(input.Concurrency),
+			CookiesFromBrowser:        NilOrZeroValue(input.CookiesFromBrowser),
+			CrawlFreq:                 NilOrZeroValue(input.CrawlFreq),
+			ExternalDownloader:        NilOrZeroValue(input.ExternalDownloader),
+			ExternalDownloaderArgs:    NilOrZeroValue(input.ExternalDownloaderArgs),
+			Filters:                   dlFilterModels,
+			FilterFile:                NilOrZeroValue(input.DLFilterFile),
+			FromDate:                  NilOrZeroValue(input.FromDate),
+			JSONDir:                   *input.JSONDir,
+			MaxFilesize:               NilOrZeroValue(input.MaxFilesize),
+			MetaFilterMoveOps:         moveOpsModels,
+			MetaFilterMoveOpFile:      NilOrZeroValue(input.MoveOpFile),
+			Paused:                    NilOrZeroValue(input.Pause),
+			Retries:                   NilOrZeroValue(input.Retries),
+			ToDate:                    NilOrZeroValue(input.ToDate),
+			UseGlobalCookies:          input.UseGlobalCookies,
+			AutoDownload:              input.AutoDownload,
+			VideoDir:                  *input.VideoDir,
+			YtdlpOutputExt:            NilOrZeroValue(input.YTDLPOutputExt),
+			YTDLPPreferredVideoCodecs: preferredVideoCodecs,
+			YTDLPPreferredAudioCodecs: preferredAudioCodecs,
+			ExtraYTDLPVideoArgs:       NilOrZeroValue(input.ExtraYTDLPVideoArgs),
+			ExtraYTDLPMetaArgs:        NilOrZeroValue(input.ExtraYTDLPMetaArgs),
+			ExtraYTDLPCrawlArgs:       NilOrZeroValue(input.ExtraYTDLPCrawlArgs),
 		},
 
 		ChanMetarrArgs: &models.MetarrArgs{
@@ -306,6 +328,7 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 			MaxCPU:                  NilOrZeroValue(input.MaxCPU),
 			MinFreeMem:              NilOrZeroValue(input.MinFreeMem),
 			OutputDir:               NilOrZeroValue(input.OutDir),
+			MetaPurge:               NilOrZeroValue(input.MetaPurge),
 			Concurrency:             NilOrZeroValue(input.MetarrConcurrency),
 			TranscodeGPU:            NilOrZeroValue(input.TranscodeGPU),
 			TranscodeGPUNode:        NilOrZeroValue(input.TranscodeGPUNode),
@@ -474,18 +497,37 @@ func LoadViperIntoStruct(v interface {
 	return nil
 }
 
-// viperPtr returns a pointer to a value from a local viper instance if successful, or nil.
+// viperPtr returns a pointer to the value for a viper tag from a local viper instance if successful, or nil.
 //
-// Supports both kebab-case and snake_case keys.
+// The tag is a key, then any deprecated aliases, comma-separated. Supports both kebab-case and snake_case keys.
 func viperPtr[T any](v interface {
 	IsSet(string) bool
 	Get(string) any
-}, key string) (*T, bool) {
-	val, ok := GetConfigValue[T](v, key)
+}, tag string) (*T, bool) {
+	key, aliases, _ := strings.Cut(tag, ",")
+	val, ok := GetConfigValueOrAlias[T](v, key, strings.FieldsFunc(aliases, func(r rune) bool { return r == ',' })...)
 	if !ok {
 		return nil, false
 	}
 	return &val, true
+}
+
+// GetConfigValueOrAlias returns GetConfigValue for key, else for the first deprecated alias set, with a warning.
+func GetConfigValueOrAlias[T any](v interface {
+	IsSet(string) bool
+	Get(string) any
+}, key string, aliases ...string) (T, bool) {
+	if val, ok := GetConfigValue[T](v, key); ok {
+		return val, true
+	}
+	for _, alias := range aliases {
+		if val, ok := GetConfigValue[T](v, alias); ok {
+			logger.Pl.W("Config key %q is deprecated, use %q", alias, key)
+			return val, true
+		}
+	}
+	var zero T
+	return zero, false
 }
 
 // GetConfigValue retrieves values from a local viper instance.
@@ -813,6 +855,22 @@ func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, e
 		settings.MetaFilterMoveOps = m
 	}
 
+	// Validate and set codec preferences if provided.
+	if input.YTDLPPreferredVideoCodecs != nil {
+		c, err := validation.ValidatePreferredVideoCodecs(*input.YTDLPPreferredVideoCodecs)
+		if err != nil {
+			return nil, fmt.Errorf("invalid preferred video codecs for per-URL settings: %w", err)
+		}
+		settings.YTDLPPreferredVideoCodecs = c
+	}
+	if input.YTDLPPreferredAudioCodecs != nil {
+		c, err := validation.ValidatePreferredAudioCodecs(*input.YTDLPPreferredAudioCodecs)
+		if err != nil {
+			return nil, fmt.Errorf("invalid preferred audio codecs for per-URL settings: %w", err)
+		}
+		settings.YTDLPPreferredAudioCodecs = c
+	}
+
 	return settings, nil
 }
 
@@ -858,6 +916,13 @@ func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArg
 			return nil, fmt.Errorf("invalid Metarr output directory for per-URL settings: %w", err)
 		}
 		metarr.OutputDir = *input.OutDir
+	}
+	if input.MetaPurge != nil {
+		p, err := validation.ValidatePurgeMetafiles(*input.MetaPurge)
+		if err != nil {
+			return nil, fmt.Errorf("invalid metadata purge for per-URL settings: %w", err)
+		}
+		metarr.MetaPurge = p
 	}
 	if input.TranscodeVideoFilter != nil {
 		metarr.TranscodeVideoFilter = *input.TranscodeVideoFilter

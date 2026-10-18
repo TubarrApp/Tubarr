@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,9 +31,25 @@ type channelResponse struct {
 	UpdatedAt            time.Time            `json:"updated_at"`
 	ChannelConfigFile    string               `json:"channel_config_file"`
 	NewVideoNotification bool                 `json:"new_video_notification"`
+	LoadError            string               `json:"load_error,omitempty"` // Why it won't run until its settings are fixed.
 	Settings             *settingsResponse    `json:"settings,omitempty"`
 	Metarr               *metarrArgsResponse  `json:"metarr,omitempty"`
 	URLModels            []channelURLResponse `json:"url_models,omitempty"`
+}
+
+// decodeJSON decodes a JSON request body into v, refusing unknown keys.
+func decodeJSON(r *http.Request, v any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
+
+// loadError returns a channel's load error as text, or "" if it loaded cleanly.
+func loadError(c *models.Channel) string {
+	if c.LoadErr == nil {
+		return ""
+	}
+	return c.LoadErr.Error()
 }
 
 // channelURLResponse is a channel URL as listed in the web UI.
@@ -46,17 +64,19 @@ type channelURLResponse struct {
 
 // channelDetailResponse is a channel as loaded into the edit form.
 type channelDetailResponse struct {
-	ID            int64                          `json:"id"`
-	Name          string                         `json:"name"`
-	URLs          []string                       `json:"urls"`
-	LastScan      time.Time                      `json:"last_scan"`
-	CreatedAt     time.Time                      `json:"created_at"`
-	UpdatedAt     time.Time                      `json:"updated_at"`
-	Settings      *settingsResponse              `json:"settings,omitempty"`
-	Metarr        *metarrArgsResponse            `json:"metarr,omitempty"`
-	AuthDetails   []authDetailResponse           `json:"auth_details"`
-	URLSettings   map[string]urlSettingsResponse `json:"url_settings"`
-	Notifications []string                       `json:"notifications,omitempty"`
+	ID                int64                          `json:"id"`
+	Name              string                         `json:"name"`
+	URLs              []string                       `json:"urls"`
+	LastScan          time.Time                      `json:"last_scan"`
+	CreatedAt         time.Time                      `json:"created_at"`
+	UpdatedAt         time.Time                      `json:"updated_at"`
+	ChannelConfigFile string                         `json:"channel_config_file"`
+	LoadError         string                         `json:"load_error,omitempty"`
+	Settings          *settingsResponse              `json:"settings,omitempty"`
+	Metarr            *metarrArgsResponse            `json:"metarr,omitempty"`
+	AuthDetails       []authDetailResponse           `json:"auth_details"`
+	URLSettings       map[string]urlSettingsResponse `json:"url_settings"`
+	Notifications     []string                       `json:"notifications,omitempty"` // One line each, as the form takes them.
 }
 
 // authDetailResponse is a channel URL's login, without its password.
@@ -76,6 +96,7 @@ type urlSettingsResponse struct {
 // metarrArgsResponse is MetarrArgs as sent to the web UI, with operations as newline-separated text. Unset fields are left out.
 type metarrArgsResponse struct {
 	OutputDir               string   `json:"metarr_output_directory,omitempty"`
+	MetaPurge               string   `json:"metarr_purge_metafile,omitempty"`
 	OutputExt               string   `json:"metarr_output_ext,omitempty"`
 	RenameStyle             string   `json:"metarr_rename_style,omitempty"`
 	Concurrency             int      `json:"metarr_concurrency,omitempty"`
@@ -105,6 +126,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 	}
 	r := &metarrArgsResponse{
 		OutputDir:               m.OutputDir,
+		MetaPurge:               m.MetaPurge,
 		OutputExt:               m.OutputExt,
 		RenameStyle:             m.RenameStyle,
 		Concurrency:             max(m.Concurrency, 0),
@@ -219,6 +241,52 @@ func splitAuthDetails(s string) ([]string, error) {
 	return out, nil
 }
 
+// parseNotificationLines parses the notifications form value, one per line, checking scoped ones name one of urls.
+func parseNotificationLines(s string, urls []string) ([]*models.Notification, error) {
+	notifications, err := parsing.ParseNotifications(splitNonEmptyLines(s))
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range notifications {
+		if n.ChannelURL != "" && !slices.ContainsFunc(urls, func(u string) bool {
+			return sharedparsing.NormalizeChannelURL(u) == sharedparsing.NormalizeChannelURL(n.ChannelURL)
+		}) {
+			return nil, fmt.Errorf("notification %q is for channel URL %q, which this channel doesn't have", n.Name, n.ChannelURL)
+		}
+	}
+	return notifications, nil
+}
+
+// notificationEscaper escapes notification fields for parsing.ParseNotifications, leaving colons so URLs stay readable.
+var notificationEscaper = strings.NewReplacer(`\`, `\\`, `|`, `\|`)
+
+// notificationLine renders a notification as parseNotificationLines reads it.
+func notificationLine(n *models.Notification) string {
+	fields := []string{n.NotifyURL}
+	if n.ChannelURL != "" || n.Name != n.NotifyURL {
+		fields = append(fields, n.Name)
+	}
+	if n.ChannelURL != "" {
+		fields = append([]string{n.ChannelURL}, fields...)
+	}
+	for i := range fields {
+		fields[i] = notificationEscaper.Replace(fields[i])
+	}
+	return strings.Join(fields, "|")
+}
+
+// formConfigFile returns the channel_config_file form value, checking the file exists.
+func formConfigFile(r *http.Request) (string, error) {
+	path := strings.TrimSpace(r.FormValue("channel_config_file"))
+	if path == "" {
+		return "", nil
+	}
+	if _, _, err := sharedvalidation.ValidateFile(path, false, sharedtemplates.NoTemplateTags); err != nil {
+		return "", fmt.Errorf("invalid channel config file: %w", err)
+	}
+	return path, nil
+}
+
 // urlSettingsInput is the per-URL settings JSON sent by the web UI, keyed by channel URL.
 type urlSettingsInput struct {
 	Settings *settingsInput   `json:"settings"`
@@ -266,6 +334,7 @@ type metarrArgsInput struct {
 	GPU                     *string  `json:"metarr_gpu"`
 	GPUNode                 *string  `json:"metarr_transcode_gpu_node"`
 	OutputDir               *string  `json:"metarr_output_directory"`
+	MetaPurge               *string  `json:"metarr_purge_metafile"`
 	TranscodeVideoFilter    *string  `json:"metarr_transcode_video_filter"`
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
@@ -294,11 +363,13 @@ func parseURLSettings(raw string) (map[string]urlSettings, error) {
 			err error
 		)
 		if in.Settings != nil {
+			nilWhitespaceStrings(in.Settings)
 			if out.Settings, err = parseSettingsInput(in.Settings); err != nil {
 				return nil, fmt.Errorf("invalid Settings for URL %q: %w", channelURL, err)
 			}
 		}
 		if in.Metarr != nil {
+			nilWhitespaceStrings(in.Metarr)
 			if out.Metarr, err = parseMetarrArgsInput(in.Metarr); err != nil {
 				return nil, fmt.Errorf("invalid Metarr Args for URL %q: %w", channelURL, err)
 			}
@@ -379,7 +450,7 @@ func parseSettingsInput(in *settingsInput) (*models.Settings, error) {
 	}
 
 	if v := in.MaxConcurrency; v != nil {
-		settings.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*v)
+		settings.Concurrency = max(*v, 0)
 	}
 	if v := in.CrawlFreq; v != nil {
 		settings.CrawlFreq = max(*v, 0)
@@ -433,6 +504,27 @@ func parseSettingsInput(in *settingsInput) (*models.Settings, error) {
 func setString(dst *string, v *string) {
 	if v != nil {
 		*dst = *v
+	}
+}
+
+// nilWhitespaceStrings unsets a per-URL input struct's string fields holding only whitespace, so they inherit.
+func nilWhitespaceStrings(in any) {
+	v := reflect.ValueOf(in).Elem()
+	for i := range v.NumField() {
+		if f := v.Field(i); f.Type() == reflect.TypeFor[*string]() && !f.IsNil() && strings.TrimSpace(f.Elem().String()) == "" {
+			f.SetZero()
+		}
+	}
+}
+
+// blankWhitespaceValues clears form values holding only whitespace, so they read as blank fields.
+func blankWhitespaceValues(r *http.Request) {
+	for _, vals := range r.Form {
+		for i, v := range vals {
+			if strings.TrimSpace(v) == "" {
+				vals[i] = ""
+			}
+		}
 	}
 }
 
@@ -493,6 +585,12 @@ func parseMetarrArgsInput(in *metarrArgsInput) (*models.MetarrArgs, error) {
 			return nil, err
 		}
 		metarr.OutputDir = *v
+	}
+	if v := in.MetaPurge; v != nil {
+		var err error
+		if metarr.MetaPurge, err = validation.ValidatePurgeMetafiles(*v); err != nil {
+			return nil, err
+		}
 	}
 	if v := in.VideoCodecs; v != nil {
 		validPairs, err := validation.ValidateVideoTranscodeCodecSlice(splitNonEmptyLines(*v), metarr.TranscodeGPU)
@@ -589,9 +687,16 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 
 	// -- Validation --
 	// Strings
+	if vDir == "" {
+		http.Error(w, "video directory is required", http.StatusBadRequest)
+		return nil
+	}
 	if err := validation.CheckDirectory(vDir, sharedtemplates.TubarrTemplateTags); err != nil {
 		http.Error(w, fmt.Sprintf("video directory %q is invalid: %v", vDir, err), http.StatusBadRequest)
 		return nil
+	}
+	if jDir == "" {
+		jDir = vDir // Crawls need a JSON directory, so blank means the video directory, as when adding a channel.
 	}
 	if err := validation.CheckDirectory(jDir, sharedtemplates.TubarrTemplateTags); err != nil {
 		http.Error(w, fmt.Sprintf("JSON directory %q is invalid: %v", jDir, err), http.StatusBadRequest)
@@ -618,21 +723,30 @@ func getSettingsStrings(w http.ResponseWriter, r *http.Request) *models.Settings
 	}
 
 	// Integers
-	maxConcurrency, err := strconv.Atoi(maxConcurrencyStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
-		return nil
+	maxConcurrency := 0
+	if maxConcurrencyStr != "" {
+		maxConcurrency, err = strconv.Atoi(maxConcurrencyStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to convert max concurrency string %q: %v", maxConcurrencyStr, err), http.StatusBadRequest)
+			return nil
+		}
 	}
-	maxConcurrency = sharedvalidation.ValidateConcurrencyLimit(maxConcurrency)
-	crawlFreq, err := strconv.Atoi(crawlFreqStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert crawl frequency string %q: %v", crawlFreqStr, err), http.StatusBadRequest)
-		return nil
+	maxConcurrency = max(maxConcurrency, 0)
+	crawlFreq := 0
+	if crawlFreqStr != "" {
+		crawlFreq, err = strconv.Atoi(crawlFreqStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to convert crawl frequency string %q: %v", crawlFreqStr, err), http.StatusBadRequest)
+			return nil
+		}
 	}
-	retries, err := strconv.Atoi(retriesStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to convert retries string %q: %v", retriesStr, err), http.StatusBadRequest)
-		return nil
+	retries := 0
+	if retriesStr != "" {
+		retries, err = strconv.Atoi(retriesStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to convert retries string %q: %v", retriesStr, err), http.StatusBadRequest)
+			return nil
+		}
 	}
 
 	// Bools
@@ -717,6 +831,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 	transcodeGPUStr := r.FormValue(jsonkeys.MetarrGPU)
 	transcodeGPUNodeStr := r.FormValue(jsonkeys.MetarrGPUNode)
 	outputDir := r.FormValue(jsonkeys.MetarrOutputDirectory)
+	metaPurgeStr := r.FormValue(jsonkeys.MetarrMetaPurge)
 	transcodeVideoFilterStr := r.FormValue(jsonkeys.MetarrTranscodeVideoFilter)
 	transcodeCodecStr := r.FormValue(jsonkeys.MetarrVideoCodecs)
 	transcodeAudioCodecStr := r.FormValue(jsonkeys.MetarrAudioCodecs)
@@ -776,6 +891,11 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		http.Error(w, fmt.Sprintf("cannot get output directories. Input string %q. Error: %v", outputDir, err), http.StatusBadRequest)
 		return nil
 	}
+	metaPurge, err := validation.ValidatePurgeMetafiles(metaPurgeStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil
+	}
 
 	// Integers & floats.
 	maxConcurrency := 0
@@ -832,6 +952,7 @@ func getMetarrArgsStrings(w http.ResponseWriter, r *http.Request) *models.Metarr
 		FilteredMetaOps:         filteredMetaOps,
 		FilteredMetaOpsFile:     filteredMetaOpsFile,
 		OutputDir:               outputDir,
+		MetaPurge:               metaPurge,
 		Concurrency:             maxConcurrency,
 		MaxCPU:                  maxCPU,
 		MinFreeMem:              minFreeMem,

@@ -259,6 +259,7 @@
                           <span x-show="!channel.expanded">Click to view latest videos</span>
                           <span x-show="channel.expanded">Latest 10 videos</span>
                         </p>
+                        <p x-show="channel.load_error" class="text-sm text-error-600 dark:text-error-500 mt-1" x-text="channel.load_error"></p>
                       </div>
                     </button>
                     <div class="relative flex items-center gap-4">
@@ -470,7 +471,7 @@
                               <div class="p-4 bg-white dark:bg-white/[0.03]">
                                 <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-2 line-clamp-2 min-h-[2.5rem]" x-text="video.title"></h4>
                                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-2" x-show="video.upload_date">
-                                  <span x-text="formatDate(video.upload_date)"></span>
+                                  <span x-text="formatDate(video.upload_date, true)"></span>
                                 </p>
                                 <a
                                   :href="safeURL(video.url)"
@@ -749,7 +750,7 @@
           // Shows the upload date, or when the crawl found the video if the listing had no date.
           availableDate(video) {
             const known = (d) => d && !d.startsWith('0001-01-01');
-            if (known(video.upload_date)) return this.formatDate(video.upload_date);
+            if (known(video.upload_date)) return this.formatDate(video.upload_date, true);
             return known(video.created_at) ? `Found ${this.formatDate(video.created_at).toLowerCase()}` : '';
           },
 
@@ -1005,7 +1006,7 @@
             }
           },
 
-          formatDate(dateString) {
+          formatDate(dateString, dateOnly) {
             if (!dateString) return 'Unknown';
 
             // Parse the date ensuring proper timezone handling
@@ -1019,7 +1020,9 @@
               dateStr = dateString + 'Z';
             }
 
-            const date = new Date(dateStr);
+            // An upload date is a calendar day, so its YYYY-MM-DD part is read as a local date.
+            const ymd = dateOnly && /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+            const date = ymd ? new Date(+ymd[1], ymd[2] - 1, +ymd[3]) : new Date(dateStr);
 
             // Validate the date
             if (isNaN(date.getTime())) {

@@ -40,9 +40,11 @@ func cleanup(progControl *repo.ProgControl, startTime time.Time) {
 		// Close benchmarking.
 		benchmark.CloseBenchFiles(logger.Pl, vars.BenchmarkFiles, "", nil)
 
-		// Graceful shutdown of Tubarr.
-		if err := progControl.QuitTubarr(startTime); err != nil {
-			logger.Pl.E("Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (%s)", consts.StaleProcessThreshold.String())
+		// Graceful shutdown of Tubarr, releasing the single-instance lock if this run took it.
+		if progControl.ProcessID != 0 {
+			if err := progControl.QuitTubarr(startTime); err != nil {
+				logger.Pl.E("Failed to mark Tubarr as exited, won't run again until heartbeat goes stale (%s)", consts.StaleProcessThreshold.String())
+			}
 		}
 
 		// Re-panic if necessary

@@ -174,7 +174,7 @@ func buildVideoCodecList(codecs []string) (arg string) {
 		if i == 0 {
 			arg = "("
 		}
-		arg += "bv*[vcodec=" + c + "]/"
+		arg += "bv*[vcodec~='" + ytdlpCodecRegex(c) + "']/"
 	}
 	arg += "bv*)"
 
@@ -192,11 +192,20 @@ func buildAudioCodecList(codecs []string) (arg string) {
 		if i == 0 {
 			arg = "("
 		}
-		arg += "ba*[acodec=" + c + "]/"
+		arg += "ba[acodec~='" + ytdlpCodecRegex(c) + "']/"
 	}
-	arg += "ba*)"
+	arg += "ba)"
 
 	return arg
+}
+
+// ytdlpCodecRegex returns a regex matching the codec strings yt-dlp reports for a codec, which sites give under other
+// names (e.g. "avc1.640028" for h264, "hvc1" or "hev1" for hevc). The patterns follow yt-dlp's own format sorting.
+func ytdlpCodecRegex(codec string) string {
+	if c, exists := consts.YtdlpCodecRegex[codec]; exists {
+		return c
+	}
+	return codec
 }
 
 // refreshFlareSolverr solves through FlareSolverr again if Cloudflare blocked a download for a FlareSolverr site,

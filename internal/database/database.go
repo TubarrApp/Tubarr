@@ -125,6 +125,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := addColumnIfMissing(tx, "downloads", "error", "TEXT DEFAULT ''"); err != nil {
+		return err
+	}
+
 	if err := initNotifyTable(tx); err != nil {
 		return err
 	}
@@ -134,6 +138,10 @@ func (d *Database) initTables() error {
 	}
 
 	if err := initSettingsTable(tx); err != nil {
+		return err
+	}
+
+	if err := migrateURLLastScan(tx); err != nil {
 		return err
 	}
 

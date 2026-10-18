@@ -27,7 +27,6 @@ import (
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -91,7 +90,8 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Valid items set?
 			if len(authDetails) == 0 && (username == "" || loginURL == "") {
-				return errors.New("must enter a username and login URL, or fully qualified authentication detail string ('channel URL|username|password|login URL')")
+				return fmt.Errorf(`must enter --%s and --%s, or --%s as JSON ('{"channel_url":"...","username":"...","password":"...","login_url":"..."}')`,
+					keys.AuthUsername, keys.AuthURL, keys.AuthDetails)
 			}
 
 			// Get and check key/val pair.
@@ -150,18 +150,17 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 		channelID   int
 		channelName string
 
-		// URLs and files.
-		cFile string
-		urls  []string
+		urls        []string
+		deleteFiles bool
 	)
 
 	deleteURLsCmd := &cobra.Command{
 		Use:   "delete-videos",
-		Short: "Remove video URLs from the database.",
-		Long:  "If using a file, the file should contain one URL per line.",
+		Short: "Remove videos from a channel's database list.",
+		Long:  fmt.Sprintf("Removes videos from a channel's database list, so later crawls treat them as new. Their video and metadata files are kept unless --%s is given.", keys.DeleteFiles),
 		RunE: func(_ *cobra.Command, _ []string) error {
-			if cFile == "" && len(urls) == 0 {
-				return errors.New("must enter a URL source")
+			if len(urls) == 0 {
+				return errors.New("must enter video URLs to delete")
 			}
 			// Get key/val pair.
 			key, val, err := getChanKeyVal(channelID, channelName)
@@ -176,15 +175,13 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Delete videos based on URL list.
-			if err := cs.DeleteVideosByURLs(chanID, urls); err != nil {
-				return err
-			}
-			return nil
+			return cs.DeleteVideosByURLs(chanID, urls, deleteFiles)
 		},
 	}
 
 	cmd.SetPrimaryChannelFlags(deleteURLsCmd, &channelName, nil, &channelID)
-	deleteURLsCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Enter a list of URLs to delete from the database.")
+	deleteURLsCmd.Flags().StringSliceVar(&urls, keys.URLs, nil, "Video URLs to remove from the database.")
+	deleteURLsCmd.Flags().BoolVar(&deleteFiles, keys.DeleteFiles, false, "Also delete the videos' video and metadata files from disk.")
 
 	return deleteURLsCmd
 }
@@ -551,19 +548,13 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 				return err
 			}
 
-			// Get channel model.
+			// Get channel model, merged so per-URL settings apply.
 			c, hasRows, err := cs.GetChannelModel(key, val, true)
 			if !hasRows {
 				return fmt.Errorf("no rows in the database for channel with %s %q", key, val)
 			}
 			if err != nil {
 				return err
-			}
-
-			// Fetch URL models.
-			c.URLModels, err = cs.GetChannelURLModels(c, false)
-			if err != nil {
-				return fmt.Errorf("failed to fetch URL models for channel: %w", err)
 			}
 
 			// Log retrieved URLs.
@@ -698,6 +689,13 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	return unPauseCmd
 }
 
+// Flags for unblocking domains.
+const (
+	unblockDomainFlag  = "domain"
+	unblockContextFlag = "context"
+	unblockAllFlag     = "all"
+)
+
 // unblockChannelCmd unblocks domains which were locked (usually due to bot activity detection).
 func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
@@ -710,14 +708,14 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 		Use:   "unblock",
 		Short: "Unblock a domain globally.",
 		Long:  "Unblocks a domain globally (usually blocked due to sites detecting Tubarr as a bot), allowing channels to access it again.",
-		Example: `  # Unblock a domain for all authentication contexts
-  tubarr unblock --domain "youtube.com"
+		Example: fmt.Sprintf(`  # Unblock a domain for all authentication contexts
+  tubarr channel unblock --%[1]s "youtube.com"
 
   # Unblock a domain for a specific authentication context
-  tubarr unblock --domain "youtube.com" --context "auth"
+  tubarr channel unblock --%[1]s "youtube.com" --%[2]s "auth"
 
   # Unblock all domains
-  tubarr unblock --all`,
+  tubarr channel unblock --%[3]s`, unblockDomainFlag, unblockContextFlag, unblockAllFlag),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			db := cs.GetDB()
 
@@ -739,7 +737,7 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			if domain == "" {
-				return fmt.Errorf("either --domain or --all must be specified")
+				return fmt.Errorf("either --%s or --%s must be specified", unblockDomainFlag, unblockAllFlag)
 			}
 
 			// Determine context.
@@ -762,9 +760,9 @@ func unblockChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	}
 
 	// Flags.
-	unblockCmd.Flags().StringVar(&domain, "domain", "", "Domain to unblock (e.g. youtube.com)")
-	unblockCmd.Flags().StringVar(&context, "context", "", "Authentication context to unblock (unauth/cookie/auth). If not specified, unblocks all contexts for the domain.")
-	unblockCmd.Flags().BoolVar(&all, "all", false, "Unblock all domains")
+	unblockCmd.Flags().StringVar(&domain, unblockDomainFlag, "", "Domain to unblock (e.g. youtube.com)")
+	unblockCmd.Flags().StringVar(&context, unblockContextFlag, "", "Authentication context to unblock (unauth/cookie/auth). If not specified, unblocks all contexts for the domain.")
+	unblockCmd.Flags().BoolVar(&all, unblockAllFlag, false, "Unblock all domains")
 
 	return unblockCmd
 }
@@ -775,7 +773,6 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 		input       models.ChannelInputPtrs
 		flags       models.ChannelFlagValues
 		addFromFile string
-		configFile  string
 		fileToUse   string
 	)
 
@@ -787,8 +784,8 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			if addFromFile != "" {
 				fileToUse = addFromFile
 			}
-			if configFile != "" {
-				fileToUse = configFile
+			if flags.ChannelConfigFile != "" { // Loaded now, and saved to be reloaded on each run.
+				fileToUse = flags.ChannelConfigFile
 			}
 			if fileToUse == "" {
 				mergeFlagsIntoInput(cmd, &flags, &input)
@@ -852,7 +849,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	cmd.SetPrimaryChannelFlags(addCmd, &flags.Name, &flags.URLs, nil)
 
-	cmd.SetFileDirFlags(addCmd, &configFile, &flags.JSONDir, &flags.VideoDir)
+	cmd.SetFileDirFlags(addCmd, &flags.ChannelConfigFile, &flags.JSONDir, &flags.VideoDir)
 
 	cmd.SetProgramRelatedFlags(addCmd, &flags.Concurrency, &flags.CrawlFreq,
 		&flags.ExternalDownloaderArgs, &flags.ExternalDownloader,
@@ -865,7 +862,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 
 	cmd.SetMetarrFlags(addCmd, &flags.MaxCPU, &flags.MetarrConcurrency,
 		&flags.MetarrExt, &flags.ExtraFFmpegArgs, &flags.MinFreeMem,
-		&flags.OutDir, &flags.RenameStyle, &flags.MetaOpsFile,
+		&flags.OutDir, &flags.MetaPurge, &flags.RenameStyle, &flags.MetaOpsFile,
 		&flags.FilteredMetaOpsFile, &flags.FilenameOpsFile, &flags.FilteredFilenameOpsFile,
 		&flags.FilenameOps, &flags.FilteredFilenameOps,
 		&flags.MetaOps, &flags.FilteredMetaOps)
@@ -892,7 +889,6 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
 	var (
 		configDirectory string
-		input           models.ChannelInputPtrs
 		flags           models.ChannelFlagValues
 	)
 
@@ -926,34 +922,25 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 				failures  []failure
 			)
 
-			// Process each config file.
-			for i, batchConfigFile := range batchConfigFiles {
+			// Process each config file, as 'channel add --add-channel-from-file' does: flags given override each file.
+			for _, batchConfigFile := range batchConfigFiles {
 				logger.Pl.I("Processing config file: %s", batchConfigFile)
 
-				if i > 0 {
-					input = models.ChannelInputPtrs{}
-					flags = models.ChannelFlagValues{}
-				}
-
-				// Reset all flags to not changed.
-				cmd.Flags().VisitAll(func(f *pflag.Flag) {
-					f.Changed = false
-				})
-
+				var input models.ChannelInputPtrs
 				v := viper.New()
 				if err := file.LoadConfigFile(v, batchConfigFile); err != nil {
 					failures = append(failures, failure{batchConfigFile, err})
 					continue
 				}
-				if err := resetCobraFlagsAndLoadViper(cmd, v); err != nil {
+				if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
 					failures = append(failures, failure{batchConfigFile, fmt.Errorf("failed to apply config: %w", err)})
 					continue
 				}
-				mergeFlagsIntoInput(cmd, &flags, &input)
 				if input.URLSettings, err = parsing.ParseURLSettingsFromViper(v); err != nil {
 					failures = append(failures, failure{batchConfigFile, fmt.Errorf("failed to parse url-settings: %w", err)})
 					continue
 				}
+				mergeFlagsIntoInput(cmd, &flags, &input)
 
 				c, authMap, err := parsing.BuildChannelFromInput(input)
 				if err != nil {
@@ -1020,7 +1007,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 		&flags.DLFilterFile, &flags.DLFilters, &flags.YTDLPPreferredVideoCodecs, &flags.YTDLPPreferredAudioCodecs)
 
 	cmd.SetMetarrFlags(batchCmd, &flags.MaxCPU, &flags.MetarrConcurrency, &flags.MetarrExt,
-		&flags.ExtraFFmpegArgs, &flags.MinFreeMem, &flags.OutDir, &flags.RenameStyle,
+		&flags.ExtraFFmpegArgs, &flags.MinFreeMem, &flags.OutDir, &flags.MetaPurge, &flags.RenameStyle,
 		&flags.MetaOpsFile, &flags.FilteredMetaOpsFile, &flags.FilenameOpsFile, &flags.FilteredFilenameOpsFile,
 		&flags.FilenameOps, &flags.FilteredFilenameOps, &flags.MetaOps, &flags.FilteredMetaOps)
 
@@ -1053,7 +1040,7 @@ func deleteChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 	delCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete channels.",
-		Long:  "Delete a channel by ID, name, or URL.",
+		Long:  "Delete a channel by ID or name.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 
 			// Get and check key/val pair.
@@ -1265,6 +1252,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 		metarrExt   string
 		renameStyle string
 		minFreeMem  string
+		metaPurge   string
 
 		// Transcoding settings.
 		useGPU               string
@@ -1401,6 +1389,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				retries:                   retries,
 				toDate:                    toDate,
 				videoDir:                  vDir,
+				jsonDir:                   jDir,
 				useGlobalCookies:          useGlobalCookies,
 				autoDownload:              autoDownload,
 				ytdlpOutputExt:            ytdlpOutExt,
@@ -1447,6 +1436,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				filteredFilenameOpsFile: filteredFilenameOpsFile,
 
 				outputDir:            outDir,
+				metaPurge:            metaPurge,
 				concurrency:          metarrConcurrency,
 				maxCPU:               maxCPU,
 				minFreeMem:           minFreeMem,
@@ -1504,7 +1494,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	// Metarr.
 	cmd.SetMetarrFlags(updateSettingsCmd, &maxCPU, &metarrConcurrency,
 		&metarrExt, &extraFFmpegArgs, &minFreeMem,
-		&outDir, &renameStyle, &metaOpsFile,
+		&outDir, &metaPurge, &renameStyle, &metaOpsFile,
 		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
 		&filenameOps, &filteredFilenameOps, &metaOps,
 		&filteredMetaOps)
@@ -1596,6 +1586,7 @@ type cobraMetarrArgs struct {
 	filteredFilenameOpsFile string
 
 	outputDir            string
+	metaPurge            string
 	concurrency          int
 	maxCPU               float64
 	minFreeMem           string
@@ -1724,6 +1715,18 @@ func getMetarrArgFns(cmd *cobra.Command, c cobraMetarrArgs) (fns []func(*models.
 		}
 		fns = append(fns, func(m *models.MetarrArgs) error {
 			m.OutputDir = c.outputDir
+			return nil
+		})
+	}
+
+	// Metadata files to delete after processing.
+	if f.Changed(keys.MMetaPurge) {
+		metaPurge, err := validation.ValidatePurgeMetafiles(c.metaPurge)
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, func(m *models.MetarrArgs) error {
+			m.MetaPurge = metaPurge
 			return nil
 		})
 	}
@@ -1922,7 +1925,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 	f := cmd.Flags()
 
 	// Concurrency.
-	if f.Changed(keys.ChanOrURLConcurrencyLimit) {
+	if f.Changed(keys.DownloadConcurrency) || f.Changed(keys.ChanOrURLConcurrencyLimit) {
 		fns = append(fns, func(s *models.Settings) error {
 			s.Concurrency = sharedvalidation.ValidateConcurrencyLimit(c.concurrency)
 			return nil

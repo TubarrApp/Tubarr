@@ -50,18 +50,17 @@ func ValidateDateFormat(dateFmt string) bool {
 	return true
 }
 
-// ValidatePurgeMetafiles checks and sets the type of metafile purge to perform.
-func ValidatePurgeMetafiles(purgeType string) bool {
+// ValidatePurgeMetafiles returns the normalized type of metafile purge for Metarr to perform: all, json, nfo or "".
+func ValidatePurgeMetafiles(purgeType string) (string, error) {
 	purgeType = strings.TrimSpace(purgeType)
 	purgeType = strings.ToLower(purgeType)
 	purgeType = strings.ReplaceAll(purgeType, ".", "")
 
 	switch purgeType {
-	case "all", "json", "nfo":
-		logger.Pl.P("Purge metafiles post-Metarr: %s\n", purgeType)
-		return true
+	case "", "all", "json", "nfo":
+		return purgeType, nil
 	}
-	return false
+	return "", fmt.Errorf("invalid metadata purge type %q (all, json or nfo)", purgeType)
 }
 
 // ValidateGPUAcceleration validates the GPU selection.

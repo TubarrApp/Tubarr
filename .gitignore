@@ -1,4 +1,2 @@
-.golangci.yaml
-.vscode
-.claude
+/.vscode
 /tubarr

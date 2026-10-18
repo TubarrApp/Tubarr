@@ -167,6 +167,7 @@
                             <span x-show="isDownloading(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">Downloading</span>
                             <span x-show="!isDownloading(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Queued</span>
                             <p x-show="download.download_status.stage" class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-text="download.download_status.stage"></p>
+                            <p x-show="download.download_status.error" class="mt-1 text-xs text-error-600 dark:text-error-500 break-words" x-text="download.download_status.error"></p>
                           </td>
                           <td class="px-4 py-3 progress-col">
                             <div class="flex items-center gap-2">

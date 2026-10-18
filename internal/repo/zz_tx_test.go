@@ -164,7 +164,7 @@ func TestDeleteVideoLinksCascade(t *testing.T) {
 		t.Errorf("deleting the URL left its video linked to it, or deleted the video (%d unlinked rows, want 1)", n)
 	}
 
-	if err := cs.DeleteVideosByURLs(c.ID, []string{v.URL}); err != nil {
+	if err := cs.DeleteVideosByURLs(c.ID, []string{v.URL}, false); err != nil {
 		t.Fatal(err)
 	}
 	if n := count("SELECT COUNT(*) FROM " + consts.DBDownloads + " WHERE video_id = ?"); n != 0 {

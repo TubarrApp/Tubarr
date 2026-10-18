@@ -179,7 +179,8 @@
                           x-show="video.download_status.status !== 'Available'"
                           class="available-overlay"
                           style="top: 0.5rem; right: 0.5rem; background: #b91c1c;"
-                          x-text="video.download_status.status"
+                          :title="video.download_status.error || ''"
+                          x-text="video.retries_on_crawl ? `${video.download_status.status}: retries on next crawl` : video.download_status.status"
                         ></span>
                         <span
                           x-show="video.duration > 0"
@@ -202,6 +203,7 @@
                           <span x-text="video.channel_name"></span> · <span x-text="shortURL(video.channel_url)"></span>
                         </p>
                         <p class="text-xs text-gray-500 dark:text-gray-400" x-text="formatDate(video.upload_date, video.created_at)"></p>
+                        <p x-show="video.download_status.error" class="mt-1 truncate text-xs text-error-600 dark:text-error-500" :title="video.download_status.error" x-text="video.download_status.error"></p>
                       </div>
                     </div>
                   </template>
@@ -485,15 +487,17 @@
 
           // Shows the upload date, or when the crawl found the video if the listing had no date.
           formatDate(uploadDate, foundDate) {
-            const upload = this.parseDate(uploadDate);
+            const upload = this.parseDate(uploadDate, true);
             if (upload) return this.relativeDay(upload);
             const found = this.parseDate(foundDate);
             return found ? `Found ${this.relativeDay(found).toLowerCase()}` : '';
           },
 
-          parseDate(dateString) {
+          // An upload date (dateOnly) is a calendar day, so its YYYY-MM-DD part is read as a local date.
+          parseDate(dateString, dateOnly) {
             if (!dateString || dateString.startsWith('0001-01-01')) return null;
-            const date = new Date(dateString);
+            const ymd = dateOnly && /^(\d{4})-(\d{2})-(\d{2})/.exec(dateString);
+            const date = ymd ? new Date(+ymd[1], ymd[2] - 1, +ymd[3]) : new Date(dateString);
             return isNaN(date.getTime()) ? null : date;
           },
 

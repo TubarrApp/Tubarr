@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 	"tubarr/internal/app"
@@ -28,8 +29,13 @@ import (
 func init() {
 	if err := paths.InitProgFilesDirs(); err != nil {
 		fmt.Printf("Tubarr exiting with error: %v\n", err)
-		return
+		os.Exit(1)
 	}
+}
+
+// isHelp reports whether the arguments only ask for help, which doesn't take the single-instance lock.
+func isHelp(args []string) bool {
+	return (len(args) > 0 && args[0] == "help") || slices.Contains(args, "-h") || slices.Contains(args, "--help")
 }
 
 // main is the main entrypoint of the program (duh!).
@@ -51,15 +57,16 @@ func main() {
 	pl, err := logging.SetupLogging(logConfig)
 	if err != nil {
 		fmt.Printf("Tubarr exiting with error: %v\n", err)
-		return
+		os.Exit(1)
 	}
 	logger.Pl = pl
 
 	// Initialize application (DB, stores, etc).
-	store, db, progControl, err := initializeApplication()
+	help := isHelp(os.Args[1:])
+	store, db, progControl, err := initializeApplication(!help)
 	if err != nil {
 		logger.Pl.E("Error initializing Tubarr: %v", err)
-		return
+		os.Exit(1)
 	}
 
 	// Load in Metarr logs.
@@ -80,9 +87,11 @@ func main() {
 	// heartbeat shutdown channel.
 	heartbeatDone := make(chan struct{})
 
-	// run heartbeat goroutine.
+	// run heartbeat goroutine, unless only showing help.
 	go func() {
-		startHeartbeat(ctx, progControl)
+		if !help {
+			startHeartbeat(ctx, progControl)
+		}
 		close(heartbeatDone)
 	}()
 
@@ -92,7 +101,7 @@ func main() {
 		cancel()
 		<-heartbeatDone
 		cleanup(progControl, startTime)
-		return
+		os.Exit(1)
 	}
 
 	// ---- RUN PROGRAM ----
@@ -101,7 +110,7 @@ func main() {
 			return err
 		}
 
-		if abstractions.IsSet(keys.RunWebInterface) {
+		if abstractions.GetBool(keys.RunWebInterface) {
 			return server.StartServer(ctx, cancel, store, db)
 		}
 
@@ -121,5 +130,6 @@ func main() {
 
 	if runErr != nil {
 		logger.Pl.E("Error: %v", runErr)
+		os.Exit(1)
 	}
 }

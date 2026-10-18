@@ -44,7 +44,9 @@ const (
 
 // Downloading.
 const (
-	ChanOrURLConcurrencyLimit string = "concurrency"
+	DownloadConcurrency       string = "download-concurrency"
+	ChanOrURLConcurrencyLimit string = "concurrency"       // Deprecated name of DownloadConcurrency.
+	ConcurrencyLimit          string = "concurrency-limit" // Deprecated config file name of DownloadConcurrency.
 	YtdlpOutputExt            string = "ytdlp-output-extension"
 	MaxFilesize               string = "max-filesize"
 	CookiesFromBrowser        string = "cookies-from-browser"
@@ -72,6 +74,8 @@ const (
 	URLFile                   string = "url-file"
 	URLAdd                    string = "add-url"
 	URLs                      string = "urls"
+	DeleteFiles               string = "delete-files"
+	ClearSettings             string = "clear-settings"
 	Benchmarking              string = "benchmark"
 	SkipInitialWait           string = "skip-initial-wait"
 	SkipAllWaits              string = "skip-all-waits"

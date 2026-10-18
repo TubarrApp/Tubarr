@@ -19,7 +19,11 @@ const (
 	flagTypeBool        = "bool"
 	flagTypeFloat64     = "float64"
 	flagTypeStringSlice = "stringSlice"
+	flagTypeStringArray = "stringArray"
 )
+
+// configAliases lists deprecated config file keys still read for a flag.
+var configAliases = map[string][]string{keys.DownloadConcurrency: {keys.ConcurrencyLimit}}
 
 // resetCobraFlagsAndLoadViper loads in variables from config file(s).
 func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
@@ -27,10 +31,10 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 	var errOrNil error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if !f.Changed {
-			key := f.Name
+			key, aliases := f.Name, configAliases[f.Name]
 			switch f.Value.Type() {
 			case flagTypeString:
-				if val, ok := parsing.GetConfigValue[string](v, key); ok {
+				if val, ok := parsing.GetConfigValueOrAlias[string](v, key, aliases...); ok {
 					if err := f.Value.Set(val); err != nil {
 						errOrNil = err
 					} else {
@@ -38,13 +42,15 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 					}
 				}
 			case flagTypeInt:
-				if val, ok := parsing.GetConfigValue[int](v, key); ok {
+				if val, ok := parsing.GetConfigValueOrAlias[int](v, key, aliases...); ok {
 					if err := f.Value.Set(strconv.Itoa(val)); err != nil {
 						errOrNil = err
+					} else {
+						f.Changed = true
 					}
 				}
 			case flagTypeBool:
-				if val, ok := parsing.GetConfigValue[bool](v, key); ok {
+				if val, ok := parsing.GetConfigValueOrAlias[bool](v, key, aliases...); ok {
 					if err := f.Value.Set(strconv.FormatBool(val)); err != nil {
 						errOrNil = err
 					} else {
@@ -52,15 +58,15 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 					}
 				}
 			case flagTypeFloat64:
-				if val, ok := parsing.GetConfigValue[float64](v, key); ok {
+				if val, ok := parsing.GetConfigValueOrAlias[float64](v, key, aliases...); ok {
 					if err := f.Value.Set(fmt.Sprintf("%f", val)); err != nil {
 						errOrNil = err
 					} else {
 						f.Changed = true
 					}
 				}
-			case flagTypeStringSlice:
-				if slice, ok := parsing.GetConfigValue[[]string](v, key); ok && len(slice) > 0 {
+			case flagTypeStringSlice, flagTypeStringArray:
+				if slice, ok := parsing.GetConfigValueOrAlias[[]string](v, key, aliases...); ok && len(slice) > 0 {
 					// Try to type assert pflag.Value to pflag.SliceValue.
 					if sv, ok := f.Value.(pflag.SliceValue); ok {
 						if err := sv.Replace(slice); err != nil {
@@ -190,8 +196,20 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.MMinFreeMem) {
 		in.MinFreeMem = &f.MinFreeMem
 	}
+	if cmd.Flags().Changed(keys.MMetaPurge) {
+		in.MetaPurge = &f.MetaPurge
+	}
 	if cmd.Flags().Changed(keys.TranscodeGPU) {
 		in.TranscodeGPU = &f.TranscodeGPU
+	}
+	if cmd.Flags().Changed(keys.TranscodeGPUNode) {
+		in.TranscodeGPUNode = &f.TranscodeGPUNode
+	}
+	if cmd.Flags().Changed(keys.YTDLPPreferredVideoCodecs) {
+		in.YTDLPPreferredVideoCodecs = &f.YTDLPPreferredVideoCodecs
+	}
+	if cmd.Flags().Changed(keys.YTDLPPreferredAudioCodecs) {
+		in.YTDLPPreferredAudioCodecs = &f.YTDLPPreferredAudioCodecs
 	}
 	if cmd.Flags().Changed(keys.TranscodeQuality) {
 		in.TranscodeQuality = &f.TranscodeQuality
@@ -220,7 +238,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.CrawlFreq) {
 		in.CrawlFreq = &f.CrawlFreq
 	}
-	if cmd.Flags().Changed(keys.ChanOrURLConcurrencyLimit) {
+	if cmd.Flags().Changed(keys.DownloadConcurrency) || cmd.Flags().Changed(keys.ChanOrURLConcurrencyLimit) {
 		in.Concurrency = &f.Concurrency
 	}
 	if cmd.Flags().Changed(keys.MConcurrency) {
@@ -232,7 +250,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.MMaxCPU) {
 		in.MaxCPU = &f.MaxCPU
 	}
-	if cmd.Flags().Changed(keys.Pause) {
+	if cmd.Flags().Changed(keys.Pause) || cmd.Flags().Changed("pause") { // Both set f.Pause.
 		in.Pause = &f.Pause
 	}
 	if cmd.Flags().Changed(keys.IgnoreRun) {

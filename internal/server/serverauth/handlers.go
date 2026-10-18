@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 
@@ -60,8 +62,8 @@ func (m *Manager) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var c credentials
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := decodeJSON(r, &c); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := m.setLogin(c.Username, c.Password); err != nil {
@@ -85,8 +87,8 @@ func (m *Manager) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var c credentials
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := decodeJSON(r, &c); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	ok, err := m.checkLogin(c.Username, c.Password)
@@ -158,6 +160,7 @@ func (m *Manager) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"username":       username,
 		"api_key":        apiKey,
 		"login_required": m.required,
+		"login_from_env": os.Getenv(consts.EnvWebPassword) != "", // Set again at each start.
 		"access":         s,
 	})
 }
@@ -165,8 +168,8 @@ func (m *Manager) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 // handleSetSettings validates, applies and stores the access settings.
 func (m *Manager) handleSetSettings(w http.ResponseWriter, r *http.Request) {
 	var s accessSettings
-	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := decodeJSON(r, &s); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := m.setAccessConfig(s.SkipLocalhost, s.SkipLogin, s.AllowedHosts, s.TrustedProxies); err != nil {
@@ -197,8 +200,8 @@ func (m *Manager) handleSetPassword(w http.ResponseWriter, r *http.Request) {
 		Username        string `json:"username"`
 		NewPassword     string `json:"new_password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := decodeJSON(r, &body); err != nil {
+		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	username, _, err := m.settings.GetSetting(keys.WebUsername)
@@ -241,6 +244,13 @@ func (m *Manager) handleRegenerateAPIKey(w http.ResponseWriter, _ *http.Request)
 		return
 	}
 	writeJSON(w, map[string]string{"api_key": key})
+}
+
+// decodeJSON decodes a JSON request body into v, refusing unknown keys.
+func decodeJSON(r *http.Request, v any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
 }
 
 // writeJSON writes v as a JSON response.

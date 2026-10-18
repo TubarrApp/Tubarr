@@ -63,8 +63,9 @@ type MetarrArgs struct {
 	FilteredMetaOps     []FilteredMetaOps `json:"metarr_filtered_meta_ops"`
 	FilteredMetaOpsFile string            `json:"metarr_filtered_meta_ops_file"`
 
-	// Metarr output directories.
+	// Metarr output directories, and metadata files to delete after processing (all, json or nfo).
 	OutputDir string `json:"metarr_output_directory"`
+	MetaPurge string `json:"metarr_purge_metafile"`
 
 	// Program operations.
 	Concurrency int     `json:"metarr_concurrency"`
@@ -313,6 +314,11 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 			return false
 		}
 	}
+	if child.MetaPurge != "" {
+		if parent.MetaPurge != child.MetaPurge {
+			return false
+		}
+	}
 	if child.MinFreeMem != "" {
 		if parent.MinFreeMem != child.MinFreeMem {
 			return false
@@ -498,7 +504,10 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 		return false
 	}
 
-	// Metarr output directories.
+	// Metarr output directories, and metadata purge.
+	if m.MetaPurge != "" {
+		return false
+	}
 	if m.OutputDir != "" {
 		return false
 	}

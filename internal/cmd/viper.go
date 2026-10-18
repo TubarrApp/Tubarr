@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"tubarr/internal/domain/keys"
 
 	"github.com/spf13/cobra"
@@ -11,9 +12,9 @@ import (
 
 // InitFileTransformers initializes user flag settings for transformations applying to all files.
 func InitFileTransformers(rootCmd *cobra.Command) error {
-	// Prefix file with metafield
+	// Prefix file with metafield (no longer used)
 	rootCmd.PersistentFlags().StringSlice(keys.MFilenamePfx, nil, "Adds a specified metatag's value onto the start of the filename")
-	if err := viper.BindPFlag(keys.MFilenamePfx, rootCmd.PersistentFlags().Lookup(keys.MFilenamePfx)); err != nil {
+	if err := rootCmd.PersistentFlags().MarkDeprecated(keys.MFilenamePfx, fmt.Sprintf("use a channel filename op, e.g. --%s 'set:{{artist}} - {{fulltitle}}'", keys.MFilenameOps)); err != nil {
 		return err
 	}
 
@@ -29,9 +30,9 @@ func InitFileTransformers(rootCmd *cobra.Command) error {
 		return err
 	}
 
-	// Purge metafile
+	// Purge metafile (no longer used)
 	rootCmd.PersistentFlags().String(keys.PurgeMetaFile, "", "Purge metadata files upon completion.")
-	if err := viper.BindPFlag(keys.PurgeMetaFile, rootCmd.PersistentFlags().Lookup(keys.PurgeMetaFile)); err != nil {
+	if err := rootCmd.PersistentFlags().MarkDeprecated(keys.PurgeMetaFile, fmt.Sprintf("use --%s (all, json or nfo)", keys.MMetaPurge)); err != nil {
 		return err
 	}
 
@@ -56,18 +57,18 @@ func InitMetaTransformers(rootCmd *cobra.Command) error {
 		return err
 	}
 
-	// Prefix or append description fields with dates
+	// Prefix or append description fields with dates (no longer used)
 	rootCmd.PersistentFlags().Bool(keys.MDescDatePfx, false, "Adds the date to the start of the description field.")
-	if err := viper.BindPFlag(keys.MDescDatePfx, rootCmd.PersistentFlags().Lookup(keys.MDescDatePfx)); err != nil {
+	if err := rootCmd.PersistentFlags().MarkDeprecated(keys.MDescDatePfx, fmt.Sprintf("use --%s 'description:date-tag:prefix:ymd'", keys.MMetaOps)); err != nil {
 		return err
 	}
 
 	rootCmd.PersistentFlags().Bool(keys.MDescDateSfx, false, "Adds the date to the end of the description field.")
-	if err := viper.BindPFlag(keys.MDescDateSfx, rootCmd.PersistentFlags().Lookup(keys.MDescDateSfx)); err != nil {
+	if err := rootCmd.PersistentFlags().MarkDeprecated(keys.MDescDateSfx, fmt.Sprintf("use --%s 'description:date-tag:suffix:ymd'", keys.MMetaOps)); err != nil {
 		return err
 	}
 
-	rootCmd.PersistentFlags().String(keys.MMetaPurge, "", "Delete metadata files (e.g. .json, .nfo) after the video is successfully processed")
+	rootCmd.PersistentFlags().String(keys.MMetaPurge, "", "Metadata files Metarr deletes after processing a video, for channels without their own setting: all, json or nfo")
 	if err := viper.BindPFlag(keys.MMetaPurge, rootCmd.PersistentFlags().Lookup(keys.MMetaPurge)); err != nil {
 		return err
 	}

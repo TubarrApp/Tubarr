@@ -76,10 +76,11 @@ func ValidateChannelURL(u string) error {
 func ValidateViperFlags() error {
 	// Meta purge.
 	if abstractions.IsSet(keys.MMetaPurge) {
-		purge := abstractions.GetString(keys.MMetaPurge)
-		if purge != "" && !ValidatePurgeMetafiles(purge) {
-			return fmt.Errorf("invalid meta purge type %q", purge)
+		purge, err := ValidatePurgeMetafiles(abstractions.GetString(keys.MMetaPurge))
+		if err != nil {
+			return err
 		}
+		abstractions.Set(keys.MMetaPurge, purge)
 	}
 
 	// Logging.
@@ -172,8 +173,9 @@ func ValidateFilterOps(filters []models.Filters) error {
 	return sharedvalidation.ValidateFilterOps(filters)
 }
 
-// ValidateMetaFilterMoveOps validates meta filter move operation models.
-func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
+// ValidateMetaFilterMoveOps validates meta filter move operation models. checkPaths checks their output directories,
+// as for ValidateSettingsModel.
+func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps, checkPaths bool) error {
 	if len(moveOps) == 0 {
 		return nil
 	}
@@ -185,8 +187,8 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps) error {
 			return fmt.Errorf("move operation at position %d has empty field", i)
 		}
 
-		// Validate output directory exists
-		if op.OutputDir != "" {
+		// Validate output directory
+		if checkPaths && op.OutputDir != "" {
 			if err := CheckDirectory(op.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
 				return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 			}

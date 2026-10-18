@@ -16,6 +16,28 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// TestCheckManualURLs tests manual download lines must be full http(s) URLs, with piped ones naming one of the
+// channel's URLs, matched ignoring case and a trailing slash.
+func TestCheckManualURLs(t *testing.T) {
+	c := &models.Channel{URLModels: []*models.ChannelURL{{URL: "https://example.com/@Cats/"}}}
+	for line, ok := range map[string]bool{
+		"https://example.com/v/1":                           true,
+		"https://example.com/@cats|https://example.com/v/2": true,
+		"not a url":       false,
+		"example.com/v/3": false,
+		"https://example.com/@dogs|https://example.com/v/4": false,
+		"https://example.com/@cats|not a url":               false,
+		"https://example.com/@cats|a|b":                     false,
+	} {
+		if bad := CheckManualURLs(c, []string{line}); (len(bad) == 0) != ok {
+			t.Errorf("CheckManualURLs(%q) = %v, want accepted: %t", line, bad, ok)
+		}
+	}
+	if cu, videoURL, err := parsePipedVideoURL("https://EXAMPLE.com/@cats|https://example.com/v/5", c); err != nil || cu != c.URLModels[0] || videoURL != "https://example.com/v/5" {
+		t.Errorf("parsePipedVideoURL = %v, %q, %v; want the channel's URL", cu, videoURL, err)
+	}
+}
+
 // TestFilterSkipsUnavailableDestinations tests that a channel URL is only crawled when its destinations are available.
 func TestFilterSkipsUnavailableDestinations(t *testing.T) {
 	dir := t.TempDir()

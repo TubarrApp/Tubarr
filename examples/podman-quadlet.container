@@ -43,9 +43,11 @@ Environment=UMASK=022
 # Your own certificate. Ensure the certificate path is mounted.
 #Environment=TUBARR_WEB_TLS_CERT=/certs/fullchain.pem
 #Environment=TUBARR_WEB_TLS_KEY=/certs/privkey.pem
-# Turn Tubarr's login off, only behind a proxy with its own login.
+# Turn Tubarr's login off, only behind a proxy with its own login, and allow the proxy's hostname(s), comma-separated.
 #Environment=TUBARR_WEB_AUTH=none
-# Set the login at startup (can also be used to reset a forgotten password).
+#Environment=TUBARR_WEB_ALLOWED_HOSTS=tubarr.example.com
+# Set the login at startup, e.g. to reset a forgotten password. The username can be left out once a login exists.
+# Applied at every start while set.
 #Environment=TUBARR_WEB_USERNAME=admin
 #Environment=TUBARR_WEB_PASSWORD=change-me
 

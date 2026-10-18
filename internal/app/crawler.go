@@ -25,6 +25,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 
 	"golang.org/x/net/publicsuffix"
 )
@@ -79,6 +80,11 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 
 	// Iterate over channels.
 	for _, c := range channels {
+		if c.LoadErr != nil {
+			logger.Pl.W("Skipping crawl: %v", c.LoadErr)
+			continue
+		}
+
 		// Load in config file.
 		file.UpdateFromConfigFile(s.ChannelStore(), c)
 
@@ -88,24 +94,17 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 			continue
 		}
 
-		// Time for a scan?
-		crawlFreq := c.GetCrawlFreq()
-		timeSinceLastScan := time.Since(c.LastScan)
-
-		logger.Pl.I("Time since last check for channel %q: %s\nCrawl frequency: %d minutes",
-			c.Name,
-			timeSinceLastScan.Round(time.Second),
-			crawlFreq)
-
-		if crawlFreq > 0 {
-			crawlFreqDuration := time.Duration(crawlFreq) * time.Minute
-			if timeSinceLastScan < crawlFreqDuration {
-				remainingTime := crawlFreqDuration - timeSinceLastScan
-				logger.Pl.P("Next check in: %s", remainingTime.Round(time.Second))
-				fmt.Println()
-				continue
+		// Crawl the URLs due, each on its own crawl frequency or the channel's.
+		due, next := c.DueURLs(time.Now(), 0, false)
+		if len(due) == 0 {
+			if next >= 0 {
+				logger.Pl.P("Channel %q: next check in %s\n", c.Name, next.Round(time.Second))
 			}
+			continue
 		}
+		logger.Pl.I("Channel %q: %d URL(s) due a crawl", c.Name, len(due))
+		ch := *c
+		ch.URLModels = due
 
 		// Run concurrent jobs.
 		wg.Add(1)
@@ -122,7 +121,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 			} else if performedCrawls {
 				logger.Pl.S("Completed crawl for channel %q", c.Name)
 			}
-		}(c)
+		}(&ch)
 	}
 
 	wg.Wait()
@@ -146,6 +145,12 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	if c == nil || c.ChanSettings == nil {
 		return fmt.Errorf("invalid nil parameters (channel: %v, channel settings: %v)", c == nil, c.ChanSettings == nil)
 	}
+	if c.LoadErr != nil {
+		return c.LoadErr
+	}
+	if bad := CheckManualURLs(c, videoURLs); len(bad) > 0 {
+		return fmt.Errorf("can't download:\n%s", strings.Join(bad, "\n"))
+	}
 	queueCtx := state.QueueCtx(ctx)
 
 	// Add random sleep before processing (added bot detection).
@@ -158,12 +163,6 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 
 	// Spawn scraper.
 	scrape := scraper.New()
-
-	// Build a map of channel URL -> ChannelURL model for quick lookup.
-	channelURLMap := make(map[string]*models.ChannelURL, len(c.URLModels))
-	for _, cu := range c.URLModels {
-		channelURLMap[cu.URL] = cu
-	}
 
 	// Video request model slice.
 	customVideoRequests := make([]*models.Video, 0, len(videoURLs))
@@ -182,7 +181,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 
 		// Parse pipe-delimited format: "channelURL|videoURL".
 		if strings.Contains(videoURL, "|") {
-			targetChannelURLModel, actualVideoURL, err = parsePipedVideoURL(videoURL, channelURLMap)
+			targetChannelURLModel, actualVideoURL, err = parsePipedVideoURL(videoURL, c)
 			if err != nil {
 				return err
 			}
@@ -352,16 +351,33 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	if c == nil {
 		return false, fmt.Errorf("channel cannot be nil")
 	}
+	if c.LoadErr != nil {
+		return false, c.LoadErr
+	}
 	if len(c.URLModels) == 0 {
 		return false, nil
+	}
+
+	// The URLs given count as crawled however the crawl ends, so each waits its crawl frequency again.
+	urlIDs := make([]int64, 0, len(c.URLModels))
+	for _, cu := range c.URLModels {
+		if !cu.IsManual {
+			urlIDs = append(urlIDs, cu.ID)
+		}
+	}
+	markScanned := func() error {
+		if err := s.ChannelStore().UpdateChannelURLsLastScan(urlIDs); err != nil {
+			return err
+		}
+		return s.ChannelStore().UpdateLastScan(c.ID)
 	}
 
 	// Filter out any URLs that are blocked globally for their authentication context.
 	var hasAllowed bool
 	if c.URLModels, hasAllowed = filterAllowedValidURLs(c); !hasAllowed {
 		logger.Pl.D(4, "No URLs for channel %q can be crawled (blocked, or destination unavailable), skipping crawl", c.Name)
-		// Counts as a scan, so the channel waits for its next crawl instead of being retried every check.
-		if err := s.ChannelStore().UpdateLastScan(c.ID); err != nil {
+		// Counts as a scan, so the URLs wait for their next crawl instead of being retried every check.
+		if err := markScanned(); err != nil {
 			return false, fmt.Errorf("failed to update last scan time: %w", err)
 		}
 		return false, nil
@@ -404,7 +420,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	scrape := scraper.New()
 	videos, crawlErr := scrape.GetNewReleases(queueCtx, cs, c, false)
 	if crawlErr != nil && len(videos) == 0 {
-		if updateErr := cs.UpdateLastScan(c.ID); updateErr != nil {
+		if updateErr := markScanned(); updateErr != nil {
 			logger.Pl.E("Failed to update channel %q last scan time after failure to crawl channel: %v", c.Name, updateErr)
 		}
 		return false, crawlErr
@@ -412,7 +428,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 
 	if len(videos) == 0 {
 		logger.Pl.I("No new releases found for channel %q", c.Name)
-		if err := cs.UpdateLastScan(c.ID); err != nil {
+		if err := markScanned(); err != nil {
 			return true, fmt.Errorf("no new releases found for channel %q. Failed to update last scan time: %w", c.Name, err)
 		}
 		return true, nil
@@ -482,7 +498,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	}
 
 	// Last scan time update.
-	if err := cs.UpdateLastScan(c.ID); err != nil {
+	if err := markScanned(); err != nil {
 		return true, fmt.Errorf("failed to update last scan time: %w", err)
 	}
 
@@ -510,6 +526,9 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channel) error {
 	if c == nil {
 		return fmt.Errorf("channel cannot be nil")
+	}
+	if c.LoadErr != nil {
+		return c.LoadErr
 	}
 	cs := s.ChannelStore()
 
@@ -683,22 +702,37 @@ func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, v
 	return nil
 }
 
-// parsePipedVideoURL parses a video URL in the format "channelURL|videoURL".
-func parsePipedVideoURL(videoURL string, channelURLMap map[string]*models.ChannelURL) (*models.ChannelURL, string, error) {
+// CheckManualURLs returns the lines ManualDownloadToChannel can't download, with why. Each must be a full http(s)
+// video URL, or "channel URL|video URL" naming one of the channel's URLs.
+func CheckManualURLs(c *models.Channel, lines []string) (bad []string) {
+	for _, line := range lines {
+		videoURL := line
+		if strings.Contains(line, "|") {
+			var err error
+			if _, videoURL, err = parsePipedVideoURL(line, c); err != nil {
+				bad = append(bad, fmt.Sprintf("%q: %v", line, err))
+				continue
+			}
+		}
+		if u, err := url.Parse(videoURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			bad = append(bad, fmt.Sprintf("%q: not a full http(s) URL", line))
+		}
+	}
+	return bad
+}
+
+// parsePipedVideoURL parses a video URL in the format "channelURL|videoURL", matching the channel URL normalized.
+func parsePipedVideoURL(videoURL string, c *models.Channel) (*models.ChannelURL, string, error) {
 	parts := strings.Split(videoURL, "|")
 	if len(parts) != 2 {
 		return nil, "", fmt.Errorf("invalid video URL format %q, expected 'channelURL|videoURL'", videoURL)
 	}
-
-	channelURLStr := parts[0]
-	actualVideoURL := parts[1]
-
-	targetChannelURLModel, found := channelURLMap[channelURLStr]
-	if !found {
-		return nil, "", fmt.Errorf("channel URL %q not found in channel's URL models", channelURLStr)
+	for _, cu := range c.URLModels {
+		if sharedparsing.NormalizeChannelURL(cu.URL) == sharedparsing.NormalizeChannelURL(parts[0]) {
+			return cu, parts[1], nil
+		}
 	}
-
-	return targetChannelURLModel, actualVideoURL, nil
+	return nil, "", fmt.Errorf("channel URL %q isn't one of this channel's", parts[0])
 }
 
 // parseManualVideoURL handles video URLs without a channel URL prefix.

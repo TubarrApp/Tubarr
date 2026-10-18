@@ -4,10 +4,11 @@ import "tubarr/internal/domain/consts"
 
 // DLStatus holds the data related to download progress etc.
 type DLStatus struct {
-	Status  consts.DownloadStatus `json:"status"`
-	Percent float64               `json:"percentage"`
-	Stage   string                `json:"stage,omitempty"` // What a queued video is waiting on, not stored.
-	Error   error                 `json:"error"`
+	Status   consts.DownloadStatus `json:"status"`
+	Percent  float64               `json:"percentage"`
+	Stage    string                `json:"stage,omitempty"` // What a queued video is waiting on, not stored.
+	Error    error                 `json:"-"`
+	ErrorMsg string                `json:"error,omitempty"` // Why the last attempt failed, as shown in the web UI.
 }
 
 // StatusUpdate models updates to the download status of a video.

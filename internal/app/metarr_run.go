@@ -10,10 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"tubarr/internal/abstractions"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/limits"
 	"tubarr/internal/metadata"
@@ -160,6 +158,9 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 	if c == nil {
 		return errors.New("invalid nil channel")
 	}
+	if c.LoadErr != nil {
+		return c.LoadErr
+	}
 
 	AddRunningProcess()
 	defer SubtractRunningProcess()
@@ -275,7 +276,6 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 	}
 
 	v.MarkVideoAsComplete()
-	purgeMetaFileIfSet(v)
 
 	if err := vs.UpdateVideo(v, c.ID); err != nil {
 		return fmt.Errorf("failed to update video DB entry: %w", err)
@@ -297,21 +297,6 @@ func execMetarr(ctx context.Context, v *models.Video, cu *models.ChannelURL, c *
 		return consts.MetarrStatusFailed
 	}
 	return consts.MetarrStatusDone
-}
-
-// purgeMetaFileIfSet deletes the metadata file if configured, once Metarr no longer needs it.
-func purgeMetaFileIfSet(v *models.Video) {
-	if v.MetarrStatus != consts.MetarrStatusDone || !abstractions.IsSet(keys.PurgeMetaFile) || !abstractions.GetBool(keys.PurgeMetaFile) {
-		return
-	}
-
-	logger.Pl.I("Purging metadata file for video with URL %q as per configuration", v.URL)
-	if err := os.Remove(v.JSONFilePath); err != nil && !os.IsNotExist(err) {
-		logger.Pl.W("Failed to delete metadata file %q: %v", v.JSONFilePath, err)
-		return
-	}
-	logger.Pl.D(1, "Deleted metadata file %q successfully", v.JSONFilePath)
-	v.JSONFilePath = ""
 }
 
 // metarrSkip returns why Metarr can't run for a channel URL's videos, with the error behind it: metarrErr from

@@ -47,7 +47,7 @@ type ChannelInputPtrs struct {
 
 	// Concurrency and performance settings.
 	CrawlFreq   *int `viper:"crawl-freq"`
-	Concurrency *int `viper:"concurrency-limit"`
+	Concurrency *int `viper:"download-concurrency,concurrency-limit,concurrency"` // Then deprecated aliases.
 	Retries     *int `viper:"dl-retries"`
 
 	// Boolean flags.
@@ -60,6 +60,7 @@ type ChannelInputPtrs struct {
 	// -- METARR --
 	// Output settings.
 	OutDir      *string `viper:"metarr-output-directory"`
+	MetaPurge   *string `viper:"metarr-purge-metafile"`
 	MetarrExt   *string `viper:"metarr-output-ext"`
 	RenameStyle *string `viper:"metarr-rename-style"`
 

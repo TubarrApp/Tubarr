@@ -70,7 +70,8 @@ const (
 // AvailableVideo is a video awaiting the user's choice to download it, with its channel's name.
 type AvailableVideo struct {
 	Video
-	ChannelName string `json:"channel_name"`
+	ChannelName    string `json:"channel_name"`
+	RetriesOnCrawl bool   `json:"retries_on_crawl,omitempty"` // A failed or canceled video the channel URL's next crawl downloads again.
 }
 
 // StoreFilenamesFromMetarr stores filenames after Metarr completion.

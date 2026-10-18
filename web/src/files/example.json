@@ -6,7 +6,7 @@
 
   "external_downloader": "aria2c",
   "external_downloader_args": "-x 16 -s 16",
-  "concurrency": 3,
+  "download_concurrency": 3,
   "crawl_freq": 30,
 
   "metarr_meta_ops": [

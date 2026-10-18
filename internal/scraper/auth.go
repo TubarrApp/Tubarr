@@ -87,13 +87,37 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 		}
 	}()
 
-	// A cookie without a domain belongs to the host that sent it.
+	// A rejected login often answers with an error, or redirects back to the login page.
+	final := postResp.Request.URL
+	switch {
+	case postResp.StatusCode >= 400:
+		logger.Pl.W("Login to %q answered %q: check the username and password", a.LoginURL, postResp.Status)
+	case postResp.Request.Method == http.MethodGet && final.Host == req.URL.Host &&
+		strings.TrimSuffix(final.Path, "/") == strings.TrimSuffix(req.URL.Path, "/"):
+		logger.Pl.W("Login to %q redirected back to the login page: check the username and password", a.LoginURL)
+	}
+
+	// Cookies from the final response keep their attributes. The jar's others for the login and final URLs (e.g. a
+	// session cookie set on a redirect) get their URL's host as domain, as the jar keeps only names and values.
 	cookies := postResp.Cookies()
+	have := make(map[string]bool, len(cookies))
 	for _, cookie := range cookies {
 		if cookie.Domain == "" {
-			cookie.Domain = postResp.Request.URL.Hostname()
+			cookie.Domain = final.Hostname()
 		}
-		if logging.Level() > 1 {
+		have[cookie.Name] = true
+	}
+	for _, u := range []*url.URL{final, req.URL} {
+		for _, cookie := range jar.Cookies(u) {
+			if !have[cookie.Name] {
+				have[cookie.Name] = true
+				cookie.Domain, cookie.Path = u.Hostname(), "/"
+				cookies = append(cookies, cookie)
+			}
+		}
+	}
+	if logging.Level() > 1 {
+		for _, cookie := range cookies {
 			logger.Pl.I("Cookie received: %s; Expires=%s", cookie.Name, cookie.Expires) // Value omitted, it's a session secret.
 		}
 	}

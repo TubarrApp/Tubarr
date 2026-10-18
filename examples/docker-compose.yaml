@@ -33,8 +33,9 @@ services:
       # - TUBARR_WEB_TLS_CERT=/certs/fullchain.pem  # Ensure certificate path is mounted.
       # - TUBARR_WEB_TLS_KEY=/certs/privkey.pem
       # - TUBARR_WEB_AUTH=none                      # Turn Tubarr's login off, only behind a proxy with its own login.
-      # - TUBARR_WEB_USERNAME=admin                 # Set the login at startup (can also be used to reset a forgotten password).
-      # - TUBARR_WEB_PASSWORD=change-me
+      # - TUBARR_WEB_ALLOWED_HOSTS=tubarr.example.com  # The proxy's hostname(s), comma-separated, needed with the login off.
+      # - TUBARR_WEB_USERNAME=admin                 # Set the login at startup, e.g. to reset a forgotten password. The username
+      # - TUBARR_WEB_PASSWORD=change-me             # can be left out once a login exists. Applied at every start while set.
 
     labels:
       # Optional: lets Watchtower update the image automatically if it is installed.

@@ -62,6 +62,9 @@
                 <!-- Error Display -->
                 <div x-show="error" x-text="error" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
 
+                <!-- Saved settings failing validation, which stop the channel running until saved valid -->
+                <div x-show="loadError" x-text="loadError" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+
                 <!-- Success Display -->
                 <div x-show="success" x-text="success" class="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"></div>
                 <!-- Loading Display -->
@@ -279,10 +282,6 @@
                               <input type="text" x-model="urlEntry.custom.to_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Channel Config File</label>
-                              <input type="text" x-model="urlEntry.custom.channel_config_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-                            </div>
-                            <div class="col-span-2">
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filter File</label>
                               <input type="text" x-model="urlEntry.custom.filter_file" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
@@ -379,6 +378,15 @@
                               <input type="text" x-model="urlEntry.custom.metarr_output_directory" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
+                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
+                              <select x-model="urlEntry.custom.metarr_purge_metafile" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="">Use global</option>
+                                <option value="json">JSON</option>
+                                <option value="nfo">NFO</option>
+                                <option value="all">All</option>
+                              </select>
+                            </div>
+                            <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
                               <select x-model="urlEntry.custom.metarr_output_ext" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use global</option>
@@ -448,7 +456,7 @@
                             </div>
                             <div>
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_transcode_quality" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <input type="number" min="0" max="51" x-model="urlEntry.custom.metarr_transcode_quality" placeholder="Use global" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
                               <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Video Filter</label>
@@ -555,15 +563,15 @@
 
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          JSON Directory <span class="text-red-500">*</span>
+                          JSON Directory
                         </label>
                         <input
                           type="text"
                           x-model="formData.settings.json_directory"
-                          required
-                          placeholder="/path/to/save/metadata"
+                          placeholder="Same as video directory"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave empty to save metadata in the video directory.</p>
                       </div>
 
                       <div>
@@ -574,7 +582,7 @@
                           type="number"
                           x-model.number="formData.settings.max_concurrency"
                           min="1"
-                          placeholder="3"
+                          placeholder="1"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
                         <p x-show="capNote(formData.settings.max_concurrency, globalDownloadLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(formData.settings.max_concurrency, globalDownloadLimit)"></p>
@@ -603,7 +611,7 @@
                           type="number"
                           x-model.number="formData.settings.download_retries"
                           min="0"
-                          placeholder="3"
+                          placeholder="10 (yt-dlp default)"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
                       </div>
@@ -749,6 +757,7 @@
                           placeholder="e.g. Firefox"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Used by yt-dlp crawls and downloads when there's no login cookie file. Custom crawl rules don't use it.</p>
                         <label class="mt-2 mb-4 inline-flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer gap-2">
                           <input
                             type="checkbox"
@@ -922,6 +931,22 @@
                           <option value="mp4">mp4</option>
                           <option value="webm">webm</option>
                         </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Delete Metadata Files
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_purge_metafile"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="">Keep</option>
+                          <option value="json">JSON</option>
+                          <option value="nfo">NFO</option>
+                          <option value="all">All</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Metadata files Metarr deletes once it has processed a video.</p>
                       </div>
 
                       <div>
@@ -1271,9 +1296,9 @@
             settings: {
               video_directory: '',
               json_directory: '',
-              max_concurrency: 1,
-              crawl_freq: 30,
-              download_retries: 3,
+              max_concurrency: '',
+              crawl_freq: '',
+              download_retries: '',
               max_filesize: '',
               ytdlp_output_ext: '',
               cookies_from_browser: '',
@@ -1297,6 +1322,7 @@
             },
             metarr: {
               metarr_output_directory: '',
+              metarr_purge_metafile: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: '',
@@ -1311,15 +1337,16 @@
               metarr_extra_ffmpeg_args: '',
               metarr_filename_ops: '',
               metarr_filename_ops_file: '',
-              filtered_filename_ops: '',
-              filtered_filename_ops_file: '',
+              metarr_filtered_filename_ops: '',
+              metarr_filtered_filename_ops_file: '',
               metarr_meta_ops: '',
               metarr_meta_ops_file: '',
-              filtered_meta_ops: '',
-              filtered_meta_ops_file: ''
+              metarr_filtered_meta_ops: '',
+              metarr_filtered_meta_ops_file: ''
             }
           },
           error: '',
+          loadError: '',
           success: '',
           submitting: false,
           globalPostProcessLimit: 0,
@@ -1398,13 +1425,11 @@
             };
             // Populate basic info
             this.formData.name = data.name || '';
+            this.formData.settings.channel_config_file = data.channel_config_file || '';
+            this.loadError = data.load_error || '';
 
-            // Populate notifications (convert from space-separated to newline-separated)
-            if (data.notifications) {
-              this.formData.notifications = Array.isArray(data.notifications) 
-                ? data.notifications.join('\n')
-                : data.notifications.split(' ').filter(n => n).join('\n');
-            }
+            // Populate notifications, one per line.
+            this.formData.notifications = (data.notifications || []).join('\n');
 
             // Populate URLs
             if (data.urls && data.urls.length > 0) {
@@ -1534,7 +1559,6 @@
               max_filesize: '',
               from_date: '',
               to_date: '',
-              channel_config_file: '',
               filter_file: '',
               filters: '',
               ytdlp_output_ext: '',
@@ -1549,6 +1573,7 @@
               ytdlp_preferred_video_codecs: '',
               ytdlp_preferred_audio_codecs: '',
               metarr_output_directory: '',
+              metarr_purge_metafile: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: null,
@@ -1636,13 +1661,13 @@
                 }
               });
 
-              // Add notifications (split by newlines and filter empty)
+              // Add notifications, one per line, as names can hold spaces.
               if (this.formData.notifications && this.formData.notifications.trim()) {
                 payload.notifications = this.formData.notifications
                   .split('\n')
                   .map(n => n.trim())
                   .filter(n => n)
-                  .join(' ');
+                  .join('\n');
               }
 
               // Build per-URL custom settings as JSON object
@@ -1687,9 +1712,9 @@
 
               this.success = 'Channel updated successfully!';
 
-              // Redirect after a short delay
+              // Reload after a short delay
               setTimeout(() => {
-                window.location.href = 'list-channels.html';
+                window.location.reload();
               }, 1500);
 
             } catch (err) {
@@ -1789,7 +1814,7 @@
                 const settingsFields = [
                   'video_directory', 'json_directory', 'max_concurrency', 'crawl_freq',
                   'download_retries', 'max_filesize', 'from_date', 'to_date',
-                  'channel_config_file', 'filter_file', 'filters',
+                  'filter_file', 'filters',
                   'ytdlp_output_ext', 'cookies_from_browser',
                   'external_downloader', 'external_downloader_args',
                   'extra_ytdlp_video_args', 'extra_ytdlp_meta_args', 'extra_ytdlp_crawl_args',
@@ -1818,7 +1843,7 @@
 
                 // Process metarr settings
                 const metarrFields = [
-                  'metarr_output_directory', 'metarr_output_ext', 'metarr_rename_style',
+                  'metarr_output_directory', 'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style',
                   'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
                   'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
                   'metarr_transcode_quality', 'metarr_transcode_video_filter',

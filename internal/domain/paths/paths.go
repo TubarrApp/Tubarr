@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"tubarr/internal/domain/keys"
 
-	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
@@ -59,15 +57,8 @@ func InitProgFilesDirs() error {
 	TubarrLogFilePath = filepath.Join(HomeTubarrDir, tubarrLogFile)
 	MetarrLogFilePath = filepath.Join(HomeMetarrDir, metarrLogFile)
 
-	// Benchmark directory
-	if abstractions.GetBool(keys.Benchmarking) {
-		BenchmarkDir = filepath.Join(HomeTubarrDir, benchmarkDir)
-		if _, err := os.Stat(BenchmarkDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(BenchmarkDir, sharedconsts.PermsGenericDir); err != nil {
-				return fmt.Errorf("failed to make benchmark directory: %w", err)
-			}
-		}
-	}
+	// Benchmark directory, made once flags are parsed if benchmarking.
+	BenchmarkDir = filepath.Join(HomeTubarrDir, benchmarkDir)
 
 	return nil
 }

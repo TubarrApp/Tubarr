@@ -3,12 +3,12 @@ channel_name: "Cool Channel"
 channel_urls:
   - "https://www.tubesite.com/@CoolChannel"
 video_directory: "/home/user/tubarr/{{channel_name}}"
-json_directory: "/home/user/tubarr/{{channel_name}}"
+json_directory: "/home/user/tubarr/{{channel_name}}" # Optional, defaults to video_directory
 
 # Tubarr crawling and downloading
 external_downloader: "aria2c"
 external_downloader_args: "-x 16 -s 16"
-concurrency: 3
+download_concurrency: 3
 crawl_freq: 30
 
 # Metarr operations

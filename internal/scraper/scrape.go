@@ -3,7 +3,9 @@ package scraper
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -106,11 +108,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Fetch new episode URLs
-		var chanCrawlArgs string
-		if cu.ChanURLSettings != nil {
-			chanCrawlArgs = cu.ChanURLSettings.ExtraYTDLPCrawlArgs
-		}
-		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu.URL, existingURLs, nil, cu.Cookies, cu.CookiePath, chanCrawlArgs, cu.FlareSolverr)
+		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu, existingURLs, nil)
 		limits.Release(crawlSem)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -188,8 +186,14 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 		return fmt.Errorf("missing required metadata fields (title: %q)", v.Title)
 	}
 
-	// Write metadata to file.
-	filename := fmt.Sprintf("%s.json", sanitizeFilename(v.Title))
+	// Metarr renames videos to their full title by default, which yt-dlp always fills.
+	if fulltitle, _ := metadata[sharedtags.JFulltitle].(string); fulltitle == "" {
+		metadata[sharedtags.JFulltitle] = v.Title
+	}
+
+	// Write metadata to file, named like yt-dlp's downloads: a hash of the URL keeps apart videos with the same title.
+	sum := sha256.Sum256([]byte(v.URL))
+	filename := fmt.Sprintf("%s [%s].json", sanitizeFilename(v.Title), hex.EncodeToString(sum[:4]))
 	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v); err != nil {
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}
@@ -225,20 +229,16 @@ func (s *Scraper) ScraperURLCookies(ctx context.Context, cs contracts.ChannelSto
 }
 
 // newEpisodeURLs returns new episode URLs not yet downloaded, ignored, or Available, with what the listing shows of each.
-func (s *Scraper) newEpisodeURLs(
-	ctx context.Context,
-	channelName, channelURL string,
-	existingURLs, fileURLs []string,
-	cookies []*http.Cookie, cookiePath string,
-	crawlArgs string,
-	fs *models.FlareSolverrSolution) (map[string]*listedVideo, error) {
+func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName string, cu *models.ChannelURL, existingURLs, fileURLs []string) (map[string]*listedVideo, error) {
+	channelURL := cu.URL
+
 	// Custom crawl rules and built-in scrapers take priority over yt-dlp.
-	_, episodes, crawled, err := s.crawlChannelURLs(ctx, channelURL, cookies)
+	_, episodes, crawled, err := s.crawlChannelURLs(ctx, channelURL, cu.Cookies)
 	if err != nil {
 		return nil, err
 	}
 	if !crawled {
-		if episodes, err = ytDlpURLFetch(ctx, channelName, channelURL, nil, cookiePath, crawlArgs, fs); err != nil {
+		if episodes, err = ytDlpURLFetch(ctx, channelName, cu, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -295,10 +295,18 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 	return newURLs
 }
 
-// ytDlpURLFetch fetches URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEpisodeURLs map[string]*listedVideo, cookiePath string, crawlArgs string, fs *models.FlareSolverrSolution) (map[string]*listedVideo, error) {
+// ytDlpURLFetch fetches a channel URL's video URLs using yt-dlp.
+func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelURL, uniqueEpisodeURLs map[string]*listedVideo) (map[string]*listedVideo, error) {
 	if uniqueEpisodeURLs == nil {
 		uniqueEpisodeURLs = make(map[string]*listedVideo)
+	}
+	channelURL, fs := cu.URL, cu.FlareSolverr
+	var crawlArgs, browser string
+	if cu.ChanURLSettings != nil {
+		crawlArgs, browser = cu.ChanURLSettings.ExtraYTDLPCrawlArgs, cu.ChanURLSettings.CookiesFromBrowser
+	}
+	if browser == "" && abstractions.IsSet(keys.CookiesFromBrowser) {
+		browser = abstractions.GetString(keys.CookiesFromBrowser)
 	}
 
 	// Run yt-dlp, refreshing the FlareSolverr solve and retrying once if Cloudflare blocks a FlareSolverr site.
@@ -314,9 +322,11 @@ func ytDlpURLFetch(ctx context.Context, channelName, channelURL string, uniqueEp
 			args = append(args, parsing.SplitArgs(crawlArgs)...)
 		}
 
-		// Cookies
-		if cookiePath != "" {
-			args = append(args, command.CookiePath, cookiePath)
+		// Cookies: the cookie file, else the browser's.
+		if cu.CookiePath != "" {
+			args = append(args, command.CookiePath, cu.CookiePath)
+		} else if browser != "" {
+			args = append(args, command.CookiesFromBrowser, browser)
 		}
 
 		// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).

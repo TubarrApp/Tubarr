@@ -99,7 +99,8 @@ podman run -d \
 | `TUBARR_WEB_HTTPS` | | `true` or `false`, overriding the **Use HTTPS** setting. Uses a self-signed certificate unless one is set below or in Settings |
 | `TUBARR_WEB_TLS_CERT` | | Path inside the container to a PEM certificate (or certificate and key combined), e.g. a read-only mount of `/certs/fullchain.pem` |
 | `TUBARR_WEB_TLS_KEY` | | Path to the PEM private key, if not combined with the certificate |
-| `TUBARR_WEB_USERNAME` / `TUBARR_WEB_PASSWORD` | | Sets the web login at startup, e.g. to reset a forgotten password |
+| `TUBARR_WEB_USERNAME` / `TUBARR_WEB_PASSWORD` | | Sets the web login at every start while set, e.g. to reset a forgotten password. The password alone keeps the saved username, but both are needed when no login exists yet |
+| `TUBARR_WEB_ALLOWED_HOSTS` | | Comma-separated hostnames allowed alongside those under **Settings > Web Interface Access**, e.g. a reverse proxy's when the login is off |
 
 ## Port Mapping
 
@@ -236,14 +237,14 @@ podman inspect tubarr | grep -A 10 Healthcheck
 
 ### Using a Custom Command
 
-To run Tubarr with different flags:
+Arguments after the image name replace the default `--web`, so include it to keep the web interface running:
 
 ```bash
 docker run -d \
   --name tubarr \
   -p 8827:8827 \
   -v $(pwd)/.tubarr:/home/tubarr/.tubarr \
-  tubarr:latest --web --some-other-flag
+  tubarr:latest --web --debug 3
 ```
 
 ### Resource Limits
@@ -271,11 +272,11 @@ docker run -d \
 
 ## Security Considerations
 
-1. The container runs as non-root user `tubarr` (UID 1000)
+1. The container runs as the non-root user `tubarr`, with the `PUID` and `PGID` IDs (1000 by default)
 2. No unnecessary packages are installed
 3. All volumes should use restrictive permissions on the host
 4. Consider using Docker secrets for sensitive configuration
-5. The web interface asks for a login, created on the first visit. To reset a forgotten password, set `TUBARR_WEB_PASSWORD` (and optionally `TUBARR_WEB_USERNAME`) in the compose file and restart.
+5. The web interface asks for a login, created on the first visit. To reset a forgotten password, set `TUBARR_WEB_PASSWORD` in the compose file and restart (add `TUBARR_WEB_USERNAME` to change the username too). It's applied at every start while set, so remove it afterwards to manage the login in Settings.
 6. Requests from the host reach the container from the Docker gateway (e.g. `172.17.0.1`), not localhost. Listing the whole Docker range under **Skip Login For** skips the login for everything reaching the published port.
 
 ## Backup and Restore

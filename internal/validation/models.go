@@ -15,7 +15,7 @@ import (
 func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	var err error
 
-	s.Concurrency = sharedvalidation.ValidateConcurrencyLimit(s.Concurrency)
+	s.Concurrency = max(s.Concurrency, 0)
 	s.CrawlFreq = max(s.CrawlFreq, 0)
 
 	if checkPaths && s.FilterFile != "" {
@@ -55,7 +55,7 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	}
 
 	if s.MetaFilterMoveOps != nil {
-		if err = ValidateMetaFilterMoveOps(s.MetaFilterMoveOps); err != nil {
+		if err = ValidateMetaFilterMoveOps(s.MetaFilterMoveOps, checkPaths); err != nil {
 			return fmt.Errorf("invalid move ops in settings: %w", err)
 		}
 	}
@@ -142,7 +142,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 			return fmt.Errorf("invalid GPU config in Metarr Settings: %w", err)
 		}
 	}
-	if m.TranscodeGPUNode != "" {
+	if checkPaths && m.TranscodeGPUNode != "" {
 		if _, err := sharedvalidation.ValidateAccelTypeDeviceNode(m.TranscodeGPU, m.TranscodeGPUNode); err != nil {
 			return fmt.Errorf("invalid GPU node config in Metarr Settings: %w", err)
 		}
@@ -171,6 +171,10 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 		if err := CheckDirectory(m.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
 			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
 		}
+	}
+	var err error
+	if m.MetaPurge, err = ValidatePurgeMetafiles(m.MetaPurge); err != nil {
+		return fmt.Errorf("invalid metadata purge in Metarr settings: %w", err)
 	}
 
 	// Codecs

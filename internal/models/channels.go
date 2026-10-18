@@ -20,37 +20,41 @@ type Channel struct {
 	CreatedAt            time.Time `db:"created_at"`
 	UpdatedAt            time.Time `db:"updated_at"`
 	NewVideoNotification bool      `db:"new_video_notification"`
+	LoadErr              error     // Why its saved settings failed validation on load: it can be listed, fixed or deleted, but not run.
 }
 
 // DefaultCrawlFreq is the crawl frequency in minutes for a channel without one.
 const DefaultCrawlFreq = 30
 
-// GetCrawlFreq returns the program's crawl frequency (-1 is unset). 0 means every terminal run.
-func (c *Channel) GetCrawlFreq() int {
-	if c.ChanSettings.CrawlFreq < 0 {
-		return DefaultCrawlFreq
+// URLCrawlFreq returns a URL's crawl frequency setting in minutes: its own, else the channel's.
+func (c *Channel) URLCrawlFreq(cu *ChannelURL) int {
+	if cu.ChanURLSettings != nil && cu.ChanURLSettings.CrawlFreq > 0 {
+		return cu.ChanURLSettings.CrawlFreq
 	}
 	return c.ChanSettings.CrawlFreq
 }
 
-// ScheduledCrawlFreq returns the web scheduler's crawl frequency in minutes, using the default for 0 or less (e.g. a
-// channel added from the terminal without --crawl-freq), which would otherwise be crawled constantly.
-func (c *Channel) ScheduledCrawlFreq() int {
-	if c.ChanSettings.CrawlFreq <= 0 {
-		return DefaultCrawlFreq
+// DueURLs returns the crawlable URLs (not manual or paused) whose crawl frequency, plus extra, has passed since their
+// last crawl, and the wait until the next is due (-1 if none). A frequency of 0 or less is the default frequency on
+// the web scheduler (scheduled), and every run in the terminal.
+func (c *Channel) DueURLs(now time.Time, extra time.Duration, scheduled bool) (due []*ChannelURL, next time.Duration) {
+	next = -1
+	for _, cu := range c.URLModels {
+		if cu.IsManual || (cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused) {
+			continue
+		}
+		freq := c.URLCrawlFreq(cu)
+		if freq < 0 || (scheduled && freq == 0) {
+			freq = DefaultCrawlFreq
+		}
+		switch wait := time.Duration(freq)*time.Minute + extra - now.Sub(cu.LastScan); {
+		case freq == 0 || wait <= 0:
+			due = append(due, cu)
+		case next < 0 || wait < next:
+			next = wait
+		}
 	}
-	return c.ChanSettings.CrawlFreq
-}
-
-// ShouldCrawl determines if a channel should be included in the default crawl or not.
-//
-// Returns true if ChanSettings 'Paused' is true OR the time since last scan exceeds the crawl frequency.
-func (c *Channel) ShouldCrawl() bool {
-	if c.ChanSettings.Paused {
-		return false
-	}
-	timeSince := time.Since(c.LastScan)
-	return timeSince >= time.Duration(c.GetCrawlFreq())*time.Minute
+	return due, next
 }
 
 // AutoDownloads reports whether new videos found at cu download without the user choosing them.

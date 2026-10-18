@@ -102,7 +102,7 @@ func FuzzParseMetaFilterMoveOps(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, s string) {
 		ops, err := ParseMetaFilterMoveOps(fuzzOps(s))
 		if err == nil {
-			_ = validation.ValidateMetaFilterMoveOps(ops)
+			_ = validation.ValidateMetaFilterMoveOps(ops, true)
 		}
 	})
 }

@@ -23,6 +23,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/benchmark"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -34,9 +35,20 @@ var settingsStore contracts.TubarrSettingsStore
 var rootCmd = &cobra.Command{
 	Use:   "tubarr",
 	Short: "Tubarr is a video downloading and metatagging tool.",
-	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		cmd.SilenceUsage = true // Flags have parsed, so later errors aren't usage errors.
+
+		// Load the saved log level, unless set by flag.
+		if settingsStore != nil && !cmd.Flags().Changed(keys.DebugLevel) {
+			if val, found, err := settingsStore.GetSetting(keys.DebugLevel); err != nil {
+				logger.Pl.W("Failed to load setting %q from DB: %v", keys.DebugLevel, err)
+			} else if n, err := strconv.Atoi(val); found && err == nil {
+				viper.Set(keys.DebugLevel, n)
+			}
+		}
+
 		if err := validation.ValidateViperFlags(); err != nil {
-			return
+			return err
 		}
 
 		// Load persisted settings from DB, applying them only if the CLI flag was not explicitly set.
@@ -84,13 +96,12 @@ var rootCmd = &cobra.Command{
 		downloads.InitGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
 		app.InitGlobalMetarrLimit(viper.GetInt(keys.PostProcessConcurrency))
 
-		// Setup benchmarking if flag is set.
+		// Setup benchmarking if flag is set. A failure only skips benchmarking.
 		if viper.GetBool(keys.Benchmarking) {
-			var err error
-			vars.BenchmarkFiles, err = benchmark.SetupBenchmarking(logger.Pl, paths.BenchmarkDir)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to setup benchmarking: %v\n", err)
-				return
+			if err := os.MkdirAll(paths.BenchmarkDir, sharedconsts.PermsGenericDir); err != nil {
+				logger.Pl.W("Failed to make benchmark directory, not benchmarking: %v", err)
+			} else if vars.BenchmarkFiles, err = benchmark.SetupBenchmarking(logger.Pl, paths.BenchmarkDir); err != nil {
+				logger.Pl.W("Failed to set up benchmarking: %v", err)
 			}
 		}
 
@@ -99,20 +110,15 @@ var rootCmd = &cobra.Command{
 			configFile := viper.GetString(keys.ChannelConfigFile)
 			cInfo, err := os.Stat(configFile)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed check for config file path: %v", err)
-				fmt.Println()
-				os.Exit(1)
+				return fmt.Errorf("failed check for config file path: %w", err)
 			} else if cInfo.IsDir() {
-				fmt.Fprintf(os.Stderr, "config file entered is a directory, should be a file")
-				fmt.Println()
-				os.Exit(1)
+				return fmt.Errorf("config file %q is a directory, should be a file", configFile)
 			}
 			if configFile != "" {
 				// load and normalize keys from any Viper-supported config file.
 				v := viper.New()
 				if err := file.LoadConfigFile(v, configFile); err != nil {
-					fmt.Fprintf(os.Stderr, "failed loading config file: %v\n", err)
-					os.Exit(1)
+					return fmt.Errorf("failed loading config file: %w", err)
 				}
 			}
 		}
@@ -122,23 +128,17 @@ var rootCmd = &cobra.Command{
 		siterules.Reset()
 		if scrapeConfigFile := viper.GetString(keys.ScrapeConfigFile); scrapeConfigFile != "" {
 			if _, statErr := os.Stat(scrapeConfigFile); os.IsNotExist(statErr) {
-				// File not found (could have been moved or deleted).
-				logger.Pl.W("Scrape config file %q no longer exists, clearing setting and falling back to built-in scrape rules", scrapeConfigFile)
-				viper.Set(keys.ScrapeConfigFile, "")
-				if settingsStore != nil {
-					if err := settingsStore.SetSetting(keys.ScrapeConfigFile, ""); err != nil {
-						logger.Pl.W("Failed to clear setting %q in DB: %v", keys.ScrapeConfigFile, err)
-					}
-				}
+				// File not found (e.g. on a drive not yet mounted). The setting is kept for when it's back.
+				logger.Pl.W("Scrape config file %q doesn't exist, using built-in scrape rules", scrapeConfigFile)
 			} else {
 				sites, err := parsing.ParseScrapeSelectorsFile(scrapeConfigFile)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "failed loading scrape config file: %v\n", err)
-					os.Exit(1)
+					return fmt.Errorf("failed loading scrape config file: %w", err)
 				}
 				siterules.Register(sites)
 			}
 		}
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Lookup("help").Changed {
@@ -185,7 +185,7 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	}
 
 	// Only true here when set by env, skip CLI flags and commands.
-	if viper.IsSet(keys.RunWebInterface) {
+	if viper.GetBool(keys.RunWebInterface) {
 		return nil
 	}
 

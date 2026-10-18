@@ -55,6 +55,7 @@
               <div class="py-3 border-b border-gray-100 dark:border-gray-800">
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Login</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Signed in as <span x-text="username || '(not set up)'"></span>. Changing the login signs out every other browser.</p>
+                <p x-show="loginFromEnv" class="text-xs text-warning-600 dark:text-warning-500 mb-3">This login is set by TUBARR_WEB_PASSWORD, so a change made here is replaced when Tubarr restarts.</p>
                 <div class="flex flex-wrap items-center gap-3">
                   <input type="text" x-model="newUsername" placeholder="Username" autocomplete="username"
                     class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
@@ -117,7 +118,7 @@
             <!-- Global Concurrency Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Concurrency</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">0 = unlimited for all settings<br><br>A channel or channel URL left at 0 is limited only by this.</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">0 = unlimited for all settings<br><br>A channel with download concurrency 0 downloads one video at a time. Post-processing for a channel or channel URL left at 0 is limited only by this.</p>
 
               <!-- Crawl Concurrency -->
               <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
@@ -413,6 +414,7 @@
           loginMessage: '',
           apiKey: '',
           showKey: false,
+          loginFromEnv: false,
           access: { skip_localhost: true },
           skipLoginText: '',
           allowedHostsText: '',
@@ -427,6 +429,7 @@
             }
             const data = await response.json();
             this.loginRequired = data.login_required;
+            this.loginFromEnv = data.login_from_env;
             this.username = data.username;
             this.newUsername = data.username;
             this.apiKey = data.api_key;
@@ -661,7 +664,8 @@
                 this.addError = text || 'Failed to add domain limit';
                 return;
               }
-              this.domainLimits = { ...this.domainLimits, [hostname]: { download, crawl } };
+              const saved = (await response.json()).hostname || hostname; // The server saves the base domain.
+              this.domainLimits = { ...this.domainLimits, [saved]: { download, crawl } };
               this.newHostname = '';
               this.newDownloadLimit = '';
               this.newCrawlLimit = '';

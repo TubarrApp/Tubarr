@@ -16,6 +16,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -109,7 +110,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 		case !m.required || m.skipsLoginFor(r):
 			// No login, so the host must be checked: another site's page could otherwise reach Tubarr by DNS rebinding.
 			if !m.hostAllowed(r.Host) {
-				http.Error(w, fmt.Sprintf("host %q is not allowed: add it under Settings > Web Interface Access, or use the server's IP address", r.Host), http.StatusForbidden)
+				http.Error(w, fmt.Sprintf("host %q is not allowed: add it under Settings > Web Interface Access or to %s, or use the server's IP address", r.Host, consts.EnvWebAllowedHosts), http.StatusForbidden)
 				return
 			}
 		case r.Header.Get(apiKeyHeader) != "":
@@ -313,7 +314,7 @@ func (m *Manager) setAccessConfig(skipLocalhost bool, skipLogin, allowedHosts, t
 		return fmt.Errorf("trusted proxies: %w", err)
 	}
 	hosts := make(map[string]struct{}, len(allowedHosts))
-	for _, h := range allowedHosts {
+	for _, h := range slices.Concat(allowedHosts, strings.Split(os.Getenv(consts.EnvWebAllowedHosts), ",")) {
 		if h = strings.ToLower(strings.TrimSpace(h)); h != "" {
 			hosts[h] = struct{}{}
 		}
@@ -349,7 +350,7 @@ func (m *Manager) setStringList(key string, list []string) error {
 
 // ---- Credentials ----
 
-// applyEnvLogin sets the login from the environment if a password is given there.
+// applyEnvLogin sets the login from the environment if a password is given there, with the saved username by default.
 func (m *Manager) applyEnvLogin() error {
 	password := os.Getenv(consts.EnvWebPassword)
 	if password == "" {
@@ -357,11 +358,17 @@ func (m *Manager) applyEnvLogin() error {
 	}
 	username := os.Getenv(consts.EnvWebUsername)
 	if username == "" {
-		if current, _, err := m.settings.GetSetting(keys.WebUsername); err == nil && current != "" {
-			username = current
-		} else {
-			username = "admin"
+		current, _, err := m.settings.GetSetting(keys.WebUsername)
+		if err != nil {
+			return err
 		}
+		if current == "" {
+			return fmt.Errorf("%s also needs %s when no login has been set up yet", consts.EnvWebPassword, consts.EnvWebUsername)
+		}
+		username = current
+	}
+	if ok, err := m.checkLogin(username, password); err == nil && ok {
+		return nil // The stored login already matches, so sessions are kept.
 	}
 	if err := m.setLogin(username, password); err != nil {
 		return fmt.Errorf("failed to set web login from %s: %w", consts.EnvWebPassword, err)

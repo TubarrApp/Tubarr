@@ -4,6 +4,7 @@ package metarr
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/keys"
@@ -13,7 +14,32 @@ import (
 	"tubarr/internal/parsing"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
+	"github.com/TubarrApp/gocommon/sharedtags"
 )
+
+// defaultFilenameSet renames finished videos to their full title. Downloads are named "title [id]", keeping apart
+// videos with the same (or a non-Latin) title.
+const defaultFilenameSet = sharedconsts.OpSet + ":{{" + sharedtags.JFulltitle + "}}"
+
+// withDefaultFilenameSet returns the filename ops to run: the channel URL's, else the global ones, with
+// defaultFilenameSet added when none of them sets the name.
+func withDefaultFilenameSet(cu *models.ChannelURL, ops []string) []string {
+	if len(ops) == 0 && abstractions.IsSet(keys.MFilenameOps) {
+		ops = abstractions.GetStringSlice(keys.MFilenameOps)
+	}
+	parsed, err := parsing.ParseFilenameOps(ops)
+	if err != nil {
+		return ops // Metarr reports the invalid op.
+	}
+	if slices.ContainsFunc(parsed, func(op models.FilenameOps) bool {
+		return op.OpType == sharedconsts.OpSet && sharedparsing.AppliesToChannel(op.ChannelURL, cu.URL)
+	}) {
+		return ops
+	}
+	return append(slices.Clip(ops), defaultFilenameSet)
+}
 
 // metCmdMapping holds mapping data for building Metarr commands.
 //
@@ -52,13 +78,7 @@ const (
 func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 	// Load and merge meta ops: file ops override DB ops, then apply filtering.
 	validMetaOps := loadAndMergeMetaOps(v, cu, c, dirParser)
-	validFilenameOps := loadAndMergeFilenameOps(v, cu, c, dirParser)
-
-	// Purge meta file flag.
-	purgeMetaFile := false
-	if abstractions.IsSet(keys.PurgeMetaFile) {
-		purgeMetaFile = abstractions.GetBool(keys.PurgeMetaFile)
-	}
+	validFilenameOps := withDefaultFilenameSet(cu, loadAndMergeFilenameOps(v, cu, c, dirParser))
 
 	mOutDirParser := parsing.NewDirectoryParser(c, cu, parsing.AllTags)
 	// Define fields to process.
@@ -157,9 +177,9 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.Debug,
 		},
 		{
-			metarrValue: metVals{b: purgeMetaFile},
-			valType:     b,
-			viperKey:    keys.PurgeMetaFile,
+			metarrValue: metVals{str: cu.ChanURLMetarrArgs.MetaPurge},
+			valType:     str,
+			viperKey:    keys.MMetaPurge,
 			cmdKey:      metkeys.PurgeMetaFile,
 		},
 	}
