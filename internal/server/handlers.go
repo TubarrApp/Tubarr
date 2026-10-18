@@ -884,6 +884,34 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// An optional body picks which URLs to crawl; picked paused URLs are crawled too.
+	var requestBody struct {
+		URLIDs []int64 `json:"url_ids"`
+	}
+	if err := decodeJSON(r, &requestBody); err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+	if requestBody.URLIDs != nil {
+		selected := make([]*models.ChannelURL, 0, len(requestBody.URLIDs))
+		for _, cu := range c.URLModels {
+			if cu.IsManual || !slices.Contains(requestBody.URLIDs, cu.ID) {
+				continue
+			}
+			if cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused {
+				unpaused := *cu.ChanURLSettings // Copied, so the URL stays paused.
+				unpaused.Paused = false
+				cu.ChanURLSettings = &unpaused
+			}
+			selected = append(selected, cu)
+		}
+		if len(selected) == 0 {
+			http.Error(w, "no channel URLs selected to crawl", http.StatusBadRequest)
+			return
+		}
+		c.URLModels = selected
+	}
+
 	// Start crawl in background.
 	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID); ok {
 		// Clean expired blocks first.

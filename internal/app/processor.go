@@ -282,7 +282,7 @@ func videoJob(
 	// Bot detection avoidance wait time.
 	waitCtx, waitCancel := context.WithCancelCause(queueCtx)
 	stopWait := context.AfterFunc(vidCtx, func() { waitCancel(context.Cause(vidCtx)) })
-	err = times.WaitTime(waitCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, v.URL)
+	err = times.WaitTime(waitCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, "", v.URL)
 	stopWait()
 	waitCancel(nil)
 	if err != nil {

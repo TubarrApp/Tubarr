@@ -67,24 +67,25 @@ func StartupWait(ctx context.Context) error {
 	}
 }
 
-// WaitTime adds a specified wait time.
-func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL string) error {
+// WaitTime adds a specified wait time before processing a channel, one of its URLs, or one of its videos.
+func WaitTime(ctx context.Context, stagger time.Duration, channelName, channelURL, videoURL string) error {
+	var target string
+	switch {
+	case videoURL != "":
+		target = fmt.Sprintf("video %q for channel %q", videoURL, channelName)
+	case channelURL != "":
+		target = fmt.Sprintf("URL %q for channel %q", channelURL, channelName)
+	default:
+		target = fmt.Sprintf("channel %q", channelName)
+	}
+
 	if abstractions.GetBool(keys.SkipAllWaits) {
-		if videoURL == "" {
-			logger.Pl.D(3, "Skipping wait time call for channel %q (video URL: %q)", channelName, videoURL)
-		} else {
-			logger.Pl.D(3, "Skipping wait time call for channel %q", channelName)
-		}
+		logger.Pl.D(3, "Skipping wait time call for %s", target)
 		return nil
 	}
 
-	if videoURL == "" {
-		fmt.Println()
-		logger.Pl.I("Sleeping %v before processing channel %q", stagger.Round(time.Second), channelName)
-	} else {
-		fmt.Println()
-		logger.Pl.I("Sleeping %v before processing video %q for channel %q", stagger.Round(time.Second), videoURL, channelName)
-	}
+	fmt.Println()
+	logger.Pl.I("Sleeping %v before processing %s", stagger.Round(time.Second), target)
 
 	waitTimer := time.NewTimer(stagger)
 	defer waitTimer.Stop()
@@ -93,10 +94,7 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, videoURL 
 	case <-waitTimer.C:
 		return nil
 	case <-ctx.Done():
-		if videoURL == "" {
-			return fmt.Errorf("context canceled during stagger wait for channel %q", channelName)
-		}
-		return fmt.Errorf("context canceled during stagger wait for video %q in channel %q", videoURL, channelName)
+		return fmt.Errorf("context canceled during stagger wait for %s", target)
 	}
 }
 

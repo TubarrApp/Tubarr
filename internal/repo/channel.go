@@ -626,13 +626,17 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 	})
 }
 
-// createDownloadDirs creates plain (untemplated) video and JSON directories when settings are saved. They're never created
-// when channels load, so a missing destination (e.g. an unmounted drive) is reported before downloading, not recreated.
+// createDownloadDirs creates plain (untemplated) video, JSON and move op directories when settings are saved. They're never
+// created when channels load, so a missing destination (e.g. an unmounted drive) is reported before downloading, not recreated.
 func createDownloadDirs(s *models.Settings) error {
 	if s == nil {
 		return nil
 	}
-	for _, dir := range []string{s.VideoDir, s.JSONDir} {
+	dirs := []string{s.VideoDir, s.JSONDir}
+	for _, op := range s.MetaFilterMoveOps {
+		dirs = append(dirs, op.OutputDir)
+	}
+	for _, dir := range dirs {
 		if dir == "" || strings.Contains(dir, "{{") {
 			continue
 		}
@@ -1432,25 +1436,30 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	return videos, true, nil
 }
 
-// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, or Available URLs from the database.
-func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls []string, err error) {
+// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, or Available URLs from the database, and failed or canceled ones separately.
+func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls, failedURLs []string, err error) {
 	if c.ID == 0 {
-		return nil, errors.New("model entered has no ID")
+		return nil, nil, errors.New("model entered has no ID")
 	}
 
-	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s = ?))",
-		consts.QVidURL,
-		consts.DBVideos,
-		consts.QVidChanID,
+	seen := fmt.Sprintf(
+		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s = ?)",
 		consts.QVidFinished,
 		consts.QVidIgnored,
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
 	)
+	query := fmt.Sprintf(
+		"SELECT %s, %s FROM %s WHERE %s = ? AND (%s OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?)))",
+		consts.QVidURL, seen,
+		consts.DBVideos,
+		consts.QVidChanID,
+		seen,
+		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
+	)
 
-	rows, err := cs.q.Query(query, c.ID, consts.DLStatusAvailable)
+	rows, err := cs.q.Query(query, consts.DLStatusAvailable, c.ID, consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCanceled)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
+		return nil, nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -1459,20 +1468,27 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 	}()
 
 	for rows.Next() {
-		var url string
-		if err := rows.Scan(&url); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
+		var (
+			url    string
+			isSeen bool
+		)
+		if err := rows.Scan(&url, &isSeen); err != nil {
+			return nil, nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		if !isSeen {
+			failedURLs = append(failedURLs, url)
+			continue
 		}
 		urls = append(urls, url)
 		logger.Pl.D(2, "Found downloaded video: %s", url)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("row iteration error: %w", err)
+		return nil, nil, fmt.Errorf("row iteration error: %w", err)
 	}
 
 	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
-	return urls, nil
+	return urls, failedURLs, nil
 }
 
 // DisplaySettings displays fields relevant to a channel.

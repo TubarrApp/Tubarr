@@ -218,6 +218,34 @@
                 <br>
               </div>
 
+              <!-- Crawl Dialog -->
+              <div x-show="crawlDialog" x-cloak @keydown.escape.window="crawlDialog = null" class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4">
+                <div @click.outside="crawlDialog = null" class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                  <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+                    Crawl <span x-text="crawlDialog?.name"></span>
+                  </h3>
+                  <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Checked URLs are crawled now, including paused ones.</p>
+                  <div class="mt-4 flex gap-2 text-sm">
+                    <button type="button" @click="crawlSelectedURLs = crawlableURLs(crawlDialog).map(u => u.id)" class="text-brand-500 hover:underline">Select All</button>
+                    <span class="text-gray-400">|</span>
+                    <button type="button" @click="crawlSelectedURLs = []" class="text-brand-500 hover:underline">Select None</button>
+                  </div>
+                  <div class="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                    <template x-for="urlModel in crawlableURLs(crawlDialog)" :key="urlModel.id">
+                      <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" :value="urlModel.id" x-model.number="crawlSelectedURLs" class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300" />
+                        <span class="break-all" x-text="urlModel.url"></span>
+                        <span x-show="urlModel.settings?.paused" class="shrink-0 text-xs text-gray-500 dark:text-gray-400">(paused)</span>
+                      </label>
+                    </template>
+                  </div>
+                  <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="crawlDialog = null" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
+                    <button type="button" @click="crawlChannel(crawlDialog.id, crawlSelectedURLs); crawlDialog = null" :disabled="crawlSelectedURLs.length === 0" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed">Crawl</button>
+                  </div>
+                </div>
+              </div>
+
               <!-- Channels List -->
               <template x-for="channel in channels" :key="channel.id">
                 <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -265,7 +293,7 @@
                     <div class="relative flex items-center gap-4">
                       <!-- Desktop Actions (hidden on mobile) -->
                       <button
-                        @click="isCrawling(channel) ? stopQueue(channel) : crawlChannel(channel.id)"
+                        @click="isCrawling(channel) ? stopQueue(channel) : openCrawlDialog(channel)"
                         :disabled="crawling === channel.id || isStopping(channel)"
                         :title="isCrawling(channel) ? 'Start nothing new for this channel, letting in-progress downloads and transcodes finish' : ''"
                         :class="isCrawling(channel) ? 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500' : 'bg-brand-600 hover:bg-brand-700 text-white'"
@@ -340,7 +368,7 @@
                       >
                         <div class="py-1">
                           <button
-                            @click="isCrawling(channel) ? stopQueue(channel) : crawlChannel(channel.id); actionsMenuOpen = null"
+                            @click="isCrawling(channel) ? stopQueue(channel) : openCrawlDialog(channel); actionsMenuOpen = null"
                             :disabled="crawling === channel.id || isStopping(channel)"
                             :title="isCrawling(channel) ? 'Start nothing new for this channel, letting in-progress downloads and transcodes finish' : ''"
                             :class="isCrawling(channel) ? 'text-error-600 dark:text-error-500' : 'text-gray-700 dark:text-gray-300'"
@@ -1104,14 +1132,29 @@
             }
           },
 
-          async crawlChannel(channelId) {
+          crawlDialog: null, // Channel whose URLs are being picked to crawl.
+          crawlSelectedURLs: [],
+
+          crawlableURLs(channel) {
+            return channel?.url_models?.filter(u => u.url !== 'manual-downloads') || [];
+          },
+
+          // Opens the crawl dialog with every unpaused URL checked.
+          openCrawlDialog(channel) {
+            this.crawlSelectedURLs = this.crawlableURLs(channel).filter(u => !u.settings?.paused).map(u => u.id);
+            this.crawlDialog = channel;
+          },
+
+          async crawlChannel(channelId, urlIDs) {
             if (this.crawling) return;
 
             this.crawling = channelId;
 
             try {
               const response = await fetch(`/api/v1/channels/${channelId}/crawl`, {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url_ids: urlIDs })
               });
 
               if (!response.ok && response.status !== 409) { // 409: a crawl is already running, the message says so.

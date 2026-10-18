@@ -28,6 +28,7 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
+	"tubarr/internal/times"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -49,11 +50,11 @@ func New() *Scraper {
 	}
 }
 
-// GetExistingReleases returns releases already in the database.
-func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs []string, err error) {
-	existingURLs, err = cs.GetDownloadedOrIgnoredVideoURLs(c)
+// GetExistingReleases returns releases already in the database, and failed or canceled ones separately.
+func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs, failedURLs []string, err error) {
+	existingURLs, failedURLs, err = cs.GetDownloadedOrIgnoredVideoURLs(c)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	existingMap := make(map[string]struct{}, len(existingURLs))
@@ -62,7 +63,7 @@ func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Chann
 	}
 
 	logger.Pl.D(2, "Loaded %d existing downloaded video URLs for channel %q", len(existingMap), c.Name)
-	return existingMap, existingURLs, nil
+	return existingMap, existingURLs, failedURLs, nil
 }
 
 // GetNewReleases checks a channel's URLs for new video URLs, returning those found alongside any per-URL errors.
@@ -72,7 +73,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		return []*models.Video{}, nil
 	}
 
-	existingMap, existingURLs, err := s.GetExistingReleases(cs, c)
+	existingMap, existingURLs, failedURLs, err := s.GetExistingReleases(cs, c)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +81,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 	var (
 		newRequests []*models.Video
 		urlErrs     error
+		crawledAny  bool
 	)
 
 	// Process each ChannelURL
@@ -88,6 +90,14 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			continue
 		}
 		logger.Pl.D(1, "Processing channel URL %q", cu.URL)
+
+		// Stagger crawls of the channel's URLs (the channel already waited before the first).
+		if crawledAny {
+			if err := times.WaitTime(ctx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, cu.URL, ""); err != nil {
+				return nil, err
+			}
+		}
+		crawledAny = true
 
 		// Hold a domain crawl slot (no-op if the domain has no crawl limit).
 		crawlSem, err := limits.DomainCrawls.Acquire(ctx, cu.URL)
@@ -107,8 +117,14 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			continue
 		}
 
+		// Failed or canceled videos wait in the Available list, so only auto-downloading URLs retry them.
+		seenURLs := existingURLs
+		if !c.AutoDownloads(cu) {
+			seenURLs = slices.Concat(existingURLs, failedURLs)
+		}
+
 		// Fetch new episode URLs
-		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu, existingURLs, nil)
+		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu, seenURLs, nil)
 		limits.Release(crawlSem)
 		if err != nil {
 			if ctx.Err() != nil {

@@ -868,7 +868,7 @@ func pageRequests() []pageRequest {
 				t.Errorf("dismissed video's status = %q (%v), want %q", status, err, consts.DLStatusIgnored)
 			}
 		}},
-		{path: "/api/v1/channels/{}/crawl", replay: routed(post, "/api/v1/channels/999999/crawl", http.StatusNotFound)},
+		{path: "/api/v1/channels/{}/crawl", keys: []string{"url_ids"}, replay: routed(post, "/api/v1/channels/999999/crawl", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/delete", replay: routed(del, "/api/v1/channels/999999/delete", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/delete-videos", keys: []string{"urls[]", "delete_files"}, replay: func(t *testing.T) {
 			vs := repo.GetVideoStore(fuzzServer.db)

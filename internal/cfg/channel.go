@@ -2021,7 +2021,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 			c.jsonDir = c.videoDir
 		}
 
-		if _, _, err = sharedvalidation.ValidateDirectory(c.jsonDir, false, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err = validation.CheckDirectory(c.jsonDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 
@@ -2076,7 +2076,7 @@ func getSettingsArgFns(cmd *cobra.Command, c chanSettings) (fns []func(m *models
 			return nil, fmt.Errorf("video directory cannot be empty")
 		}
 
-		if _, _, err = sharedvalidation.ValidateDirectory(c.videoDir, false, sharedtemplates.TubarrTemplateTags); err != nil {
+		if err = validation.CheckDirectory(c.videoDir, sharedtemplates.TubarrTemplateTags); err != nil {
 			return nil, err
 		}
 		fns = append(fns, func(s *models.Settings) error {

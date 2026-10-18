@@ -154,7 +154,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	queueCtx := state.QueueCtx(ctx)
 
 	// Add random sleep before processing (added bot detection).
-	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
+	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, "", ""); err != nil {
 		return err
 	}
 
@@ -404,7 +404,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	queueCtx := state.QueueCtx(ctx)
 
 	// Add random sleep before processing (added bot detection).
-	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, ""); err != nil {
+	if err := times.WaitTime(queueCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, "", ""); err != nil {
 		return false, err
 	}
 
@@ -503,7 +503,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 	}
 
 	// All videos failed.
-	if nSucceeded == 0 && nAvailable == 0 {
+	if nSucceeded == 0 && nAvailable == 0 && procError != nil {
 		return true, fmt.Errorf("failed to process %d video downloads. Got errors: %w", len(videos), procError)
 	}
 

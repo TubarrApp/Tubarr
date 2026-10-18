@@ -66,7 +66,7 @@ type ChannelStore interface {
 	// 'Get' operations.
 	GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error)
 	GetDownloadedOrIgnoredVideos(c *models.Channel) (videos []*models.Video, hasRows bool, err error)
-	GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls []string, err error)
+	GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls, failedURLs []string, err error)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetChannelID(key, val string) (int64, error)
 	GetChannelName(key, val string) (string, error)

@@ -56,7 +56,7 @@ func TestAvailableVideos(t *testing.T) {
 	}
 
 	// Available videos count as seen, so crawls don't find them as new.
-	seen, err := cs.GetDownloadedOrIgnoredVideoURLs(c)
+	seen, _, err := cs.GetDownloadedOrIgnoredVideoURLs(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,8 +104,8 @@ func TestAvailableVideos(t *testing.T) {
 	if dismissed, err := vs.ClaimVideos(chanID, ids[:1], app.AvailableStatuses, consts.DLStatusIgnored); err != nil || len(dismissed) != 1 {
 		t.Fatalf("dismiss: got %d, %v, want 1", len(dismissed), err)
 	}
-	if seen, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 1 {
-		t.Errorf("expected the dismissed video to be seen, got %v", seen)
+	if seen, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 1 || !slices.Equal(failed, []string{"https://example.com/v/2"}) {
+		t.Errorf("expected the dismissed video to be seen and the other failed, got %v and %v", seen, failed)
 	}
 
 	// Videos can't be claimed through another channel.
