@@ -91,7 +91,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 	// Meta ops
 	// Filtered:
 	if m.FilteredMetaOps != nil {
-		if err := ValidateFilteredMetaOps(m.FilteredMetaOps); err != nil {
+		if err := sharedvalidation.ValidateFilteredMetaOps(m.FilteredMetaOps); err != nil {
 			return fmt.Errorf("invalid filtered meta ops in Metarr settings: %w", err)
 		}
 	}
@@ -102,7 +102,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 	}
 	// Unfiltered:
 	if m.MetaOps != nil {
-		if err := ValidateMetaOps(m.MetaOps); err != nil {
+		if err := sharedvalidation.ValidateMetaOps(m.MetaOps); err != nil {
 			return fmt.Errorf("invalid meta op(s) in Metarr settings: %w", err)
 		}
 	}
@@ -115,7 +115,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 	// Filename ops
 	// Filtered:
 	if m.FilteredFilenameOps != nil {
-		if err := ValidateFilteredFilenameOps(m.FilteredFilenameOps); err != nil {
+		if err := sharedvalidation.ValidateFilteredFilenameOps(m.FilteredFilenameOps); err != nil {
 			return fmt.Errorf("invalid filtered filename ops in Metarr settings: %w", err)
 		}
 	}
@@ -126,7 +126,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 	}
 	// Unfiltered:
 	if m.FilenameOps != nil {
-		if err := ValidateFilenameOps(m.FilenameOps); err != nil {
+		if err := sharedvalidation.ValidateFilenameOps(m.FilenameOps); err != nil {
 			return fmt.Errorf("invalid filename ops in Metarr settings: %w", err)
 		}
 	}

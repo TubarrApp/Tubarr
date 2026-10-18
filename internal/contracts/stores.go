@@ -110,6 +110,9 @@ type VideoStore interface {
 
 	// Update operations.
 	UpdateVideo(v *models.Video, channelID int64) error
+	UpdateVideoPaths(videoID int64, oldVideo, oldJSON, newVideo, newJSON string) (updated bool, err error)
 	ClaimVideos(channelID int64, videoIDs []int64, from []consts.DownloadStatus, status consts.DownloadStatus) (claimed []*models.Video, err error)
 	SetVideoOverrides(videoIDs []int64, o *models.VideoOverrides) error
+	SetQueuedVideoError(channelID int64, videoURL, errMsg string) error
+	SetMissingVideoErrors(videoIDs []int64, errMsg string) error
 }

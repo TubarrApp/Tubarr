@@ -45,6 +45,10 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	// Run command and grab stdout.
 	metarrStdout, err := cmd.Output()
 	if err != nil {
+		// Metarr still reports where the files are after a failed rename or move.
+		if storeErr := v.StoreFilenamesFromMetarr(string(metarrStdout)); storeErr != nil {
+			logger.Pl.D(1, "No file paths stored from failed Metarr run for %q: %v", v.URL, storeErr)
+		}
 		return err
 	}
 

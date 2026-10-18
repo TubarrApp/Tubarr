@@ -1,0 +1,168 @@
+<!-- Download As dialog: open with $dispatch('download-as', video), or $dispatch('edit-metarr', video) to edit a downloaded
+video's options and run Metarr. Dispatches download-as-done or edit-metarr-done with the video once it starts. -->
+<div
+  x-data="downloadAsDialog()"
+  @download-as.window="open($event.detail, 'download')"
+  @edit-metarr.window="open($event.detail, 'metarr')"
+  @keydown.escape.window="close()"
+  @click.self="close()"
+  x-show="video"
+  x-cloak
+  class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4"
+>
+  <div class="w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900" style="max-height: 90vh;">
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="mode === 'metarr' ? 'Edit & Run Metarr' : 'Download As'"></h3>
+    <p class="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" :title="video?.title" x-text="video?.title"></p>
+
+    <div x-show="loading" class="py-8 text-center">
+      <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
+    </div>
+
+    <div x-show="!loading" class="mt-4 space-y-4">
+      <div>
+        <div class="mb-1 flex items-center justify-between">
+          <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Filename</label>
+          <button type="button" @click="form.filename = video.title" class="text-xs text-brand-500 hover:underline">Use title</button>
+        </div>
+        <input
+          type="text"
+          x-model="form.filename"
+          placeholder="Blank keeps the usual naming"
+          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+        />
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Without the extension. Template tags like {{upload_date}} work. Replaces any set filename op.</p>
+      </div>
+      <p class="text-xs text-gray-500 dark:text-gray-400">
+        Blank directories use the usual ones, shown faded. Metarr moves the finished video to the output directory, if there is one.
+      </p>
+      <template x-for="dir in visibleDirs" :key="dir.key">
+        <div>
+          <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300" x-text="dir.label"></label>
+          <input
+            type="text"
+            x-model="form[dir.key]"
+            :placeholder="defaults[dir.key] || dir.none"
+            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          />
+        </div>
+      </template>
+      <p class="text-xs text-gray-500 dark:text-gray-400">
+        The ops below are this video's channel URL's (or its last edits), one per line. Edits apply to this video only, and are kept for later Metarr runs. Filtered ops still apply only if their filter matches the video's metadata.
+      </p>
+      <template x-for="box in boxes" :key="box.key">
+        <div>
+          <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300" x-text="box.label"></label>
+          <textarea x-model="form[box.key]" rows="3" :placeholder="box.placeholder" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300" style="font-family: monospace;"></textarea>
+        </div>
+      </template>
+    </div>
+
+    <p x-show="error" class="mt-4 text-sm text-error-600 dark:text-error-500" x-text="error"></p>
+
+    <div class="mt-6 flex flex-wrap items-center justify-end gap-3">
+      <button
+        type="button"
+        @click="revert()"
+        :disabled="!loaded || working"
+        title="Clear the filename and directories, and put back the channel URL's ops."
+        class="text-sm text-brand-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+        style="margin-right: auto;"
+      >
+        Revert to Defaults
+      </button>
+      <button type="button" @click="close()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
+      <button type="button" @click="submit()" :disabled="!loaded || working" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed" x-text="mode === 'metarr' ? 'Run Metarr' : 'Download'"></button>
+    </div>
+  </div>
+</div>
+<script>
+  function downloadAsDialog() {
+    return {
+      video: null,
+      mode: 'download', // Or 'metarr', for a downloaded video.
+      form: {},
+      defaults: {}, // The channel URL's directories and ops.
+      loading: false,
+      loaded: false, // Ops filled, so empty boxes mean the user cleared them.
+      working: false,
+      error: null,
+      dirs: [
+        { key: 'video_dir', label: 'Video Directory', none: "The channel URL's" },
+        { key: 'json_dir', label: 'JSON Directory', none: "The channel URL's" },
+        { key: 'output_dir', label: 'Metarr Output Directory', none: 'None, or a move op\'s' }
+      ],
+      boxes: [
+        { key: 'meta_ops', label: 'Meta Ops', placeholder: 'title:prefix:[Cats] ' },
+        { key: 'filtered_meta_ops', label: 'Filtered Meta Ops', placeholder: 'title:contains:cat|genre:set:Cats' },
+        { key: 'filename_ops', label: 'Filename Ops', placeholder: 'date-tag:prefix:ymd' },
+        { key: 'filtered_filename_ops', label: 'Filtered Filename Ops', placeholder: 'title:contains:cat|prefix:[Cats] ' }
+      ],
+
+      // A downloaded video's files are already in place, so only Metarr's output directory applies.
+      get visibleDirs() {
+        return this.mode === 'metarr' ? this.dirs.filter(d => d.key === 'output_dir') : this.dirs;
+      },
+
+      // Opens for a video, filled with its earlier edits, else its channel URL's ops.
+      async open(video, mode) {
+        this.video = video;
+        this.mode = mode;
+        this.defaults = {};
+        this.form = {};
+        this.error = null;
+        this.loaded = false;
+        this.loading = true;
+        try {
+          const response = await fetch(`/api/v1/channels/${video.channel_id}/override-ops/${video.channel_url_id}?video=${video.id}`);
+          if (!response.ok) {
+            throw new Error(await response.text() || response.statusText);
+          }
+          const { defaults, saved } = await response.json();
+          this.defaults = defaults;
+          this.form = saved || this.defaultForm();
+          this.loaded = true;
+        } catch (err) {
+          this.error = `Couldn't load the channel URL's ops: ${err.message}`;
+        } finally {
+          this.loading = false;
+        }
+      },
+
+      // The channel URL's ops, with no filename and the usual directories (blank, so move ops still apply).
+      defaultForm() {
+        return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '' };
+      },
+
+      revert() {
+        this.form = this.defaultForm();
+      },
+
+      close() {
+        if (!this.working) this.video = null;
+      },
+
+      // Downloads the video, or runs Metarr on it, with the dialog's options, staying open on errors.
+      async submit() {
+        const video = this.video;
+        const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+        this.working = true;
+        this.error = null;
+        try {
+          const response = this.mode === 'metarr'
+            ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides: this.form }) })
+            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides: this.form }) });
+          if (!response.ok) {
+            throw new Error(await response.text() || response.statusText);
+          }
+        } catch (err) {
+          this.error = err.message;
+          return;
+        } finally {
+          this.working = false;
+        }
+        this.video = null;
+        this.$dispatch(this.mode === 'metarr' ? 'edit-metarr-done' : 'download-as-done', video);
+      }
+    };
+  }
+</script>

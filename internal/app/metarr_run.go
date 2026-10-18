@@ -261,6 +261,7 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 		}
 	}
 
+	oldVideo, oldJSON := v.VideoFilePath, v.JSONFilePath
 	dirParser := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
 
 	// Video already passed filters on download, only the filtered ops are needed.
@@ -272,6 +273,14 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 	// Canceled (stopped, new download of this video, or shutdown), leave the database entry as it was.
 	if ctx.Err() != nil {
 		logger.Pl.I("Metarr run for video %q was canceled, not storing result", v.URL)
+		// Metarr may have moved files before stopping, so keep where they are unless a newer download changed the row.
+		if v.VideoFilePath != oldVideo || v.JSONFilePath != oldJSON {
+			if updated, err := vs.UpdateVideoPaths(v.ID, oldVideo, oldJSON, v.VideoFilePath, v.JSONFilePath); err != nil {
+				logger.Pl.E("Failed to store file paths for canceled Metarr run of video %q: %v", v.URL, err)
+			} else if updated {
+				logger.Pl.I("Stored file paths Metarr reported before it was canceled for video %q", v.URL)
+			}
+		}
 		return nil //nolint:nilerr // Cancellation is not a failure.
 	}
 

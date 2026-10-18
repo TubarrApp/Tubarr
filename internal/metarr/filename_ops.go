@@ -7,7 +7,6 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedparsing"
@@ -74,14 +73,9 @@ func LoadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser)
 		return nil, fmt.Errorf("failed to read filename ops file: %w", err)
 	}
 
-	// Parse filename operations from strings
+	// Parse and validate filename operations from strings
 	parsedOps, err := parsing.ParseFilenameOps(ops)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse filename ops in %q: %w", filenameOpsFile, err)
-	}
-
-	// Validate the parsed operations
-	if err := validation.ValidateFilenameOps(parsedOps); err != nil {
 		return nil, fmt.Errorf("invalid filename ops in %q: %w", filenameOpsFile, err)
 	}
 

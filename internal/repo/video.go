@@ -277,6 +277,31 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	return videoID, nil
 }
 
+// UpdateVideoPaths stores a video's file paths only while its row still holds oldVideo and oldJSON, so paths from a
+// newer download are never overwritten. It reports whether the row was updated.
+func (vs *VideoStore) UpdateVideoPaths(videoID int64, oldVideo, oldJSON, newVideo, newJSON string) (bool, error) {
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ? AND %s = ?",
+		consts.DBVideos,
+		consts.QVidVideoPath,
+		consts.QVidJSONPath,
+		consts.QVidUpdatedAt,
+		consts.QVidID,
+		consts.QVidVideoPath,
+		consts.QVidJSONPath,
+	)
+
+	result, err := vs.DB.Exec(query, newVideo, newJSON, time.Now(), videoID, oldVideo, oldJSON)
+	if err != nil {
+		return false, fmt.Errorf("failed to update paths for video with ID %d: %w", videoID, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	return rows > 0, nil
+}
+
 // UpdateVideo updates the status of the video in the database.
 func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	metadataJSON, err := marshalVideoMetadataJSON(v)
@@ -634,11 +659,12 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	defer rollback(tx)
 
 	claimQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = 0, %s = ? WHERE %s = ? AND %s IN (?%s) "+
+		"UPDATE %s SET %s = ?, %s = 0, %s = CASE WHEN ? THEN '' ELSE %s END, %s = ? WHERE %s = ? AND %s IN (?%s) "+
 			"AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = 0)",
 		consts.DBDownloads,
 		consts.QDLStatus,
 		consts.QDLPct,
+		consts.QDLError, consts.QDLError, // A new download attempt clears the last one's error.
 		consts.QDLUpdatedAt,
 		consts.QDLVidID,
 		consts.QDLStatus, strings.Repeat(", ?", len(from)-1),
@@ -662,7 +688,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 
 	now := time.Now()
 	for _, id := range videoIDs {
-		args := []any{status, now, id}
+		args := []any{status, status == consts.DLStatusQueued, now, id}
 		for _, s := range from {
 			args = append(args, s)
 		}
@@ -697,6 +723,48 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 	return claimed, nil
+}
+
+// SetQueuedVideoError stores why a channel's queued video wasn't downloaded, shown once it's back in the Available list.
+func (vs *VideoStore) SetQueuedVideoError(channelID int64, videoURL, errMsg string) error {
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ? AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = ?)",
+		consts.DBDownloads,
+		consts.QDLError,
+		consts.QDLStatus,
+		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID, consts.QVidURL,
+	)
+	if _, err := vs.DB.Exec(query, errMsg, consts.DLStatusQueued, channelID, videoURL); err != nil {
+		return fmt.Errorf("failed to store error for video %q: %w", videoURL, err)
+	}
+	return nil
+}
+
+// SetMissingVideoErrors stores errMsg as the error of the given videos which have none.
+func (vs *VideoStore) SetMissingVideoErrors(videoIDs []int64, errMsg string) error {
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer rollback(tx)
+
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ? AND COALESCE(%s, '') = ''",
+		consts.DBDownloads,
+		consts.QDLError,
+		consts.QDLVidID,
+		consts.QDLError,
+	)
+	for _, id := range videoIDs {
+		if _, err := tx.Exec(query, errMsg, id); err != nil {
+			return fmt.Errorf("failed to store error for video %d: %w", id, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
 // VideoExists returns the video's ID and true if the channel already has a video with its URL.

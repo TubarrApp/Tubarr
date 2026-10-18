@@ -6,7 +6,6 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedparsing"
@@ -75,11 +74,6 @@ func LoadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]
 	// Parse meta operations from strings
 	parsedOps, err := parsing.ParseMetaOps(ops)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse meta ops in %q: %w", metaOpsFile, err)
-	}
-
-	// Validate the parsed operations
-	if err := validation.ValidateMetaOps(parsedOps); err != nil {
 		return nil, fmt.Errorf("invalid meta ops in %q: %w", metaOpsFile, err)
 	}
 

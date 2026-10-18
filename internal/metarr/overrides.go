@@ -12,9 +12,10 @@ import (
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
-// ChannelURLOpLines returns the ops Metarr runs for a channel URL's videos, without their channel URL prefix, for
-// editing as a video's Download As overrides. Filtered ops are listed with their filters, as matching needs metadata.
-func ChannelURLOpLines(cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (lines models.OverrideLines, err error) {
+// ChannelURLOverrideLines returns the directories and ops a channel URL's videos use, ops without their channel URL
+// prefix, as the defaults for a video's Download As overrides. Filtered ops are listed with their filters, as matching
+// needs metadata, and the output directory leaves out move ops for the same reason.
+func ChannelURLOverrideLines(cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (lines models.OverrideLines, err error) {
 	fileMetaOps, err := LoadMetaOpsFromFile(cu, dirParser)
 	if err != nil {
 		return lines, err
@@ -44,7 +45,15 @@ func ChannelURLOpLines(cu *models.ChannelURL, dirParser *parsing.DirectoryParser
 		filenameOpLines = globalOpLines(keys.MFilenameOps, cu.URL)
 	}
 
+	outputDir := cu.ChanURLMetarrArgs.OutputDir
+	if abstractions.IsSet(keys.MoveOnComplete) {
+		outputDir = abstractions.GetString(keys.MoveOnComplete)
+	}
+
 	return models.OverrideLines{
+		VideoDir:            cu.ChanURLSettings.VideoDir,
+		JSONDir:             cu.ChanURLSettings.JSONDir,
+		OutputDir:           outputDir,
 		MetaOps:             strings.Join(metaOpLines, "\n"),
 		FilteredMetaOps:     strings.Join(filteredMetaOpLines(slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, fileFilteredMetaOps), cu.URL), "\n"),
 		FilenameOps:         strings.Join(filenameOpLines, "\n"),
@@ -56,6 +65,9 @@ func ChannelURLOpLines(cu *models.ChannelURL, dirParser *parsing.DirectoryParser
 func VideoOverrideLines(o *models.VideoOverrides, chanURL string) models.OverrideLines {
 	return models.OverrideLines{
 		Filename:            o.Filename,
+		VideoDir:            o.VideoDir,
+		JSONDir:             o.JSONDir,
+		OutputDir:           o.OutputDir,
 		MetaOps:             strings.Join(getDedupedMetaOpStrings(o.MetaOps), "\n"),
 		FilteredMetaOps:     strings.Join(filteredMetaOpLines(o.FilteredMetaOps, chanURL), "\n"),
 		FilenameOps:         strings.Join(getDedupedFilenameOpStrings(o.FilenameOps), "\n"),

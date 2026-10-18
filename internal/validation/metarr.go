@@ -5,24 +5,11 @@ import (
 	"slices"
 	"strings"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedenums"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
-
-// ValidateFilenameOps validates filename transformation operation models.
-func ValidateFilenameOps(filenameOps []models.FilenameOps) error {
-	logger.Pl.D(5, "Validating %d filename operations...", len(filenameOps))
-	return sharedvalidation.ValidateFilenameOps(filenameOps)
-}
-
-// ValidateMetaOps validates meta transformation operation models.
-func ValidateMetaOps(metaOps []models.MetaOps) error {
-	logger.Pl.D(5, "Validating %d meta operations...", len(metaOps))
-	return sharedvalidation.ValidateMetaOps(metaOps)
-}
 
 // ValidateRenameFlag validates the rename style to apply.
 func ValidateRenameFlag(flag string) error {

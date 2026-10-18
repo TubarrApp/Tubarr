@@ -300,6 +300,15 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *par
 	mArgs := cu.ChanURLMetarrArgs
 
 	switch {
+	// Download As output directory, chosen for this video.
+	case v.Overrides != nil && v.Overrides.OutputDir != "":
+		parsed, err := dirParser.ParseDirectory(v.Overrides.OutputDir, "Download As output directory")
+		if err != nil {
+			logger.Pl.E("Failed to parse directory %q for video with URL %q: %v", v.Overrides.OutputDir, v.URL, err)
+			break
+		}
+		return parsed
+
 	// #1 Priority: Explicit Viper flag set.
 	case abstractions.IsSet(keys.MoveOnComplete):
 		d := abstractions.GetString(keys.MoveOnComplete)

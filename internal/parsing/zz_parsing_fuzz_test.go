@@ -47,10 +47,7 @@ func FuzzParseMetaOps(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(_ *testing.T, s string) {
-		ops, err := ParseMetaOps(fuzzOps(s))
-		if err == nil {
-			_ = validation.ValidateMetaOps(ops)
-		}
+		_, _ = ParseMetaOps(fuzzOps(s))
 	})
 }
 
@@ -60,10 +57,7 @@ func FuzzParseFilenameOps(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(_ *testing.T, s string) {
-		ops, err := ParseFilenameOps(fuzzOps(s))
-		if err == nil {
-			_ = validation.ValidateFilenameOps(ops)
-		}
+		_, _ = ParseFilenameOps(fuzzOps(s))
 	})
 }
 
@@ -113,10 +107,7 @@ func FuzzParseFilteredMetaOps(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(_ *testing.T, s string) {
-		ops, err := ParseFilteredMetaOps(fuzzOps(s))
-		if err == nil {
-			_ = validation.ValidateFilteredMetaOps(ops)
-		}
+		_, _ = ParseFilteredMetaOps(fuzzOps(s))
 	})
 }
 
@@ -126,10 +117,7 @@ func FuzzParseFilteredFilenameOps(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(_ *testing.T, s string) {
-		ops, err := ParseFilteredFilenameOps(fuzzOps(s))
-		if err == nil {
-			_ = validation.ValidateFilteredFilenameOps(ops)
-		}
+		_, _ = ParseFilteredFilenameOps(fuzzOps(s))
 	})
 }
 

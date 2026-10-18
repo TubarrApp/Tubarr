@@ -5,6 +5,8 @@
       [x-cloak] { display: none !important; }
       .available-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
       .available-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .available-error { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; cursor: pointer; }
+      .available-error.expanded { display: block; }
       .available-overlay { position: absolute; padding: 0.125rem 0.375rem; border-radius: 0.25rem; background: rgba(0, 0, 0, 0.75); color: #fff; font-size: 0.75rem; line-height: 1rem; }
     </style>
     <meta charset="UTF-8" />
@@ -50,51 +52,7 @@
               </p>
             </div>
 
-            <div x-data="availableData()" x-init="init()">
-              <!-- Download As Dialog -->
-              <div x-show="asVideo" x-cloak @keydown.escape.window="closeDownloadAs()" class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4">
-                <div @click.outside="closeDownloadAs()" class="w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900" style="max-height: 90vh;">
-                  <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Download As</h3>
-                  <p class="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" :title="asVideo?.title" x-text="asVideo?.title"></p>
-
-                  <div x-show="asLoading" class="py-8 text-center">
-                    <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
-                  </div>
-
-                  <div x-show="!asLoading" class="mt-4 space-y-4">
-                    <div>
-                      <div class="mb-1 flex items-center justify-between">
-                        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Filename</label>
-                        <button type="button" @click="asForm.filename = asVideo.title" class="text-xs text-brand-500 hover:underline">Use title</button>
-                      </div>
-                      <input
-                        type="text"
-                        x-model="asForm.filename"
-                        placeholder="Blank keeps the usual naming"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      />
-                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Without the extension. Template tags like {{upload_date}} work. Replaces any set filename op.</p>
-                    </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                      The ops below are this video's channel URL's (or its last Download As edits), one per line. Edits apply to this video only. Filtered ops still apply only if their filter matches the video's metadata.
-                    </p>
-                    <template x-for="box in asBoxes" :key="box.key">
-                      <div>
-                        <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300" x-text="box.label"></label>
-                        <textarea x-model="asForm[box.key]" rows="3" :placeholder="box.placeholder" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300" style="font-family: monospace;"></textarea>
-                      </div>
-                    </template>
-                  </div>
-
-                  <p x-show="asError" class="mt-4 text-sm text-error-600 dark:text-error-500" x-text="asError"></p>
-
-                  <div class="mt-6 flex justify-end gap-3">
-                    <button type="button" @click="closeDownloadAs()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
-                    <button type="button" @click="downloadAs()" :disabled="!asLoaded || working" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed">Download</button>
-                  </div>
-                </div>
-              </div>
-
+            <div x-data="availableData()" x-init="init()" @download-as-done.window="delete selected[$event.detail.id]; refreshAfterAction()">
               <!-- Loading State -->
               <div x-show="loading" class="text-center py-12">
                 <div class="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
@@ -155,6 +113,8 @@
                   >
                     <option value="newest">Newest first</option>
                     <option value="oldest">Oldest first</option>
+                    <option value="longest">Longest first</option>
+                    <option value="shortest">Shortest first</option>
                   </select>
                 </div>
 
@@ -176,14 +136,6 @@
                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       Dismiss
-                    </button>
-                    <button
-                      @click="openDownloadAs()"
-                      :disabled="selectedCount !== 1 || working"
-                      title="Download one video with its own filename and Metarr ops."
-                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
-                    >
-                      Download As…
                     </button>
                     <button
                       @click="act('download')"
@@ -255,7 +207,22 @@
                           <span x-text="video.channel_name"></span> · <span x-text="shortURL(video.channel_url)"></span>
                         </p>
                         <p class="text-xs text-gray-500 dark:text-gray-400" x-text="formatDate(video.upload_date, video.created_at)"></p>
-                        <p x-show="video.download_status.error" class="mt-1 truncate text-xs text-error-600 dark:text-error-500" :title="video.download_status.error" x-text="video.download_status.error"></p>
+                        <p
+                          x-show="video.download_status.error"
+                          @click.stop="expandedErrors[video.id] = !expandedErrors[video.id]"
+                          class="available-error mt-1 text-xs text-error-600 dark:text-error-500"
+                          :class="expandedErrors[video.id] && 'expanded'"
+                          :title="expandedErrors[video.id] ? 'Click to show less' : 'Click to show the whole error'"
+                          x-text="video.download_status.error"
+                        ></p>
+                        <button
+                          type="button"
+                          @click.stop="$dispatch('download-as', video)"
+                          title="Download this video with its own filename and Metarr ops."
+                          class="mt-2 text-xs text-brand-500 hover:underline dark:text-brand-400"
+                        >
+                          Download As…
+                        </button>
                       </div>
                     </div>
                   </template>
@@ -303,6 +270,8 @@
     </div>
     <!-- ===== Page Wrapper End ===== -->
 
+    <!-- include:download-as -->
+
     <script defer src="bundle.js"></script>
     <script>
       function availableData() {
@@ -319,17 +288,7 @@
           currentPage: 1,
           itemsPerPage: 24,
           lastClickedIndex: null,
-          asVideo: null, // Video in the Download As dialog.
-          asForm: {},
-          asLoading: false,
-          asLoaded: false, // Ops filled, so empty boxes mean the user cleared them.
-          asError: null,
-          asBoxes: [
-            { key: 'meta_ops', label: 'Meta Ops', placeholder: 'title:prefix:[Cats] ' },
-            { key: 'filtered_meta_ops', label: 'Filtered Meta Ops', placeholder: 'title:contains:cat|genre:set:Cats' },
-            { key: 'filename_ops', label: 'Filename Ops', placeholder: 'date-tag:prefix:ymd' },
-            { key: 'filtered_filename_ops', label: 'Filtered Filename Ops', placeholder: 'title:contains:cat|prefix:[Cats] ' }
-          ],
+          expandedErrors: {}, // Video ID -> whether its whole error shows.
 
           init() {
             const params = new URLSearchParams(window.location.search);
@@ -400,8 +359,18 @@
             if (title) {
               list = list.filter(v => (v.title || '').toLowerCase().includes(title));
             }
-            // The server sends newest first.
-            return this.sortOrder === 'oldest' ? [...list].reverse() : list;
+            // The server sends newest first. Videos without a known duration go last when sorting by it, and equal
+            // durations stay newest first.
+            switch (this.sortOrder) {
+              case 'oldest':
+                return [...list].reverse();
+              case 'longest':
+                return [...list].sort((a, b) => (b.duration || -1) - (a.duration || -1));
+              case 'shortest':
+                return [...list].sort((a, b) => (a.duration || Infinity) - (b.duration || Infinity));
+              default:
+                return list;
+            }
           },
 
           get selectedCount() {
@@ -477,15 +446,15 @@
               }
             }
             this.working = false;
+            this.selected = {};
             await this.refreshAfterAction();
             if (errors.length > 0) {
               alert(`Some videos could not be updated:\n\n${errors.join('\n')}`);
             }
           },
 
-          // Clears the selection and reloads the list, keeping the filters and page valid.
+          // Reloads the list, keeping the filters and page valid.
           async refreshAfterAction() {
-            this.selected = {};
             this.lastClickedIndex = null;
 
             await this.loadVideos();
@@ -497,57 +466,6 @@
             if (this.currentPage > this.totalPages) {
               this.currentPage = Math.max(1, this.totalPages);
             }
-          },
-
-          // Opens Download As for the selected video, filled with its earlier Download As edits, else its channel URL's ops.
-          async openDownloadAs() {
-            const video = Object.values(this.selected)[0];
-            if (!video) return;
-            this.asVideo = video;
-            this.asForm = { filename: '', meta_ops: '', filtered_meta_ops: '', filename_ops: '', filtered_filename_ops: '' };
-            this.asError = null;
-            this.asLoaded = false;
-            this.asLoading = true;
-            try {
-              const response = await fetch(`/api/v1/channels/${video.channel_id}/override-ops/${video.channel_url_id}?video=${video.id}`);
-              if (!response.ok) {
-                throw new Error(await response.text() || response.statusText);
-              }
-              this.asForm = { ...this.asForm, ...await response.json() };
-              this.asLoaded = true;
-            } catch (err) {
-              this.asError = `Couldn't load the channel URL's ops: ${err.message}`;
-            } finally {
-              this.asLoading = false;
-            }
-          },
-
-          closeDownloadAs() {
-            if (!this.working) this.asVideo = null;
-          },
-
-          // Downloads the Download As video with the dialog's filename and ops, keeping the dialog open on errors.
-          async downloadAs() {
-            const video = this.asVideo;
-            this.working = true;
-            this.asError = null;
-            try {
-              const response = await fetch(`/api/v1/channels/${video.channel_id}/available`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides: this.asForm })
-              });
-              if (!response.ok) {
-                throw new Error(await response.text() || response.statusText);
-              }
-            } catch (err) {
-              this.asError = err.message;
-              return;
-            } finally {
-              this.working = false;
-            }
-            this.asVideo = null;
-            await this.refreshAfterAction();
           },
 
           get totalPages() {

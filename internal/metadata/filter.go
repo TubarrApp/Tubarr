@@ -434,14 +434,9 @@ func LoadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryPar
 		return nil, nil
 	}
 
-	// Parse filtered meta ops from strings
+	// Parse and validate filtered meta ops from strings
 	parsedFilters, err := parsing.ParseFilteredMetaOps(filters)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse filtered meta ops in %q: %w", filterFile, err)
-	}
-
-	// Validate the parsed ops
-	if err := validation.ValidateFilteredMetaOps(parsedFilters); err != nil {
 		return nil, fmt.Errorf("invalid filtered meta ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
@@ -475,14 +470,9 @@ func LoadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.Director
 		return nil, nil
 	}
 
-	// Parse filtered filename ops from strings
+	// Parse and validate filtered filename ops from strings
 	parsedFilters, err := parsing.ParseFilteredFilenameOps(filters)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse filtered filename ops in %q: %w", filterFile, err)
-	}
-
-	// Validate the parsed ops
-	if err := validation.ValidateFilteredFilenameOps(parsedFilters); err != nil {
 		return nil, fmt.Errorf("invalid filtered filename ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {

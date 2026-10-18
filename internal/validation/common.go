@@ -197,18 +197,6 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps, checkPaths bo
 	return nil
 }
 
-// ValidateFilteredMetaOps validates filtered meta operation models.
-func ValidateFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps) error {
-	logger.Pl.D(5, "Validating %d filtered meta operations...", len(filteredMetaOps))
-	return sharedvalidation.ValidateFilteredMetaOps(filteredMetaOps)
-}
-
-// ValidateFilteredFilenameOps validates filtered filename operation models.
-func ValidateFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps) error {
-	logger.Pl.D(5, "Validating %d filtered filename operations...", len(filteredFilenameOps))
-	return sharedvalidation.ValidateFilteredFilenameOps(filteredFilenameOps)
-}
-
 // ValidateToFromDate validates a date string in yyyymmdd or formatted like "2025y12m31d".
 func ValidateToFromDate(d string) (string, error) {
 	if d == "" {

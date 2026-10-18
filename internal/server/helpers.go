@@ -986,29 +986,31 @@ func splitOpLines(s string) []string {
 
 // parseOverrideLines parses the Download As dialog's ops into a video's overrides.
 func parseOverrideLines(l *models.OverrideLines) (o *models.VideoOverrides, err error) {
-	o = &models.VideoOverrides{Filename: strings.TrimSpace(l.Filename)}
-	if o.MetaOps, err = parsing.ParseMetaOps(splitOpLines(l.MetaOps)); err != nil {
-		return nil, fmt.Errorf("invalid meta ops: %w", err)
+	o = &models.VideoOverrides{
+		Filename:  strings.TrimSpace(l.Filename),
+		VideoDir:  strings.TrimSpace(l.VideoDir),
+		JSONDir:   strings.TrimSpace(l.JSONDir),
+		OutputDir: strings.TrimSpace(l.OutputDir),
 	}
-	if err := validation.ValidateMetaOps(o.MetaOps); err != nil {
+	if err := validation.CheckDirectory(o.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
+		return nil, fmt.Errorf("invalid video directory %q: %w", o.VideoDir, err)
+	}
+	if err := validation.CheckDirectory(o.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
+		return nil, fmt.Errorf("invalid JSON directory %q: %w", o.JSONDir, err)
+	}
+	if err := validation.CheckDirectory(o.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
+		return nil, fmt.Errorf("invalid output directory %q: %w", o.OutputDir, err)
+	}
+	if o.MetaOps, err = parsing.ParseMetaOps(splitOpLines(l.MetaOps)); err != nil {
 		return nil, fmt.Errorf("invalid meta ops: %w", err)
 	}
 	if o.FilteredMetaOps, err = parsing.ParseFilteredMetaOps(splitOpLines(l.FilteredMetaOps)); err != nil {
 		return nil, fmt.Errorf("invalid filtered meta ops: %w", err)
 	}
-	if err := validation.ValidateFilteredMetaOps(o.FilteredMetaOps); err != nil {
-		return nil, fmt.Errorf("invalid filtered meta ops: %w", err)
-	}
 	if o.FilenameOps, err = parsing.ParseFilenameOps(splitOpLines(l.FilenameOps)); err != nil {
 		return nil, fmt.Errorf("invalid filename ops: %w", err)
 	}
-	if err := validation.ValidateFilenameOps(o.FilenameOps); err != nil {
-		return nil, fmt.Errorf("invalid filename ops: %w", err)
-	}
 	if o.FilteredFilenameOps, err = parsing.ParseFilteredFilenameOps(splitOpLines(l.FilteredFilenameOps)); err != nil {
-		return nil, fmt.Errorf("invalid filtered filename ops: %w", err)
-	}
-	if err := validation.ValidateFilteredFilenameOps(o.FilteredFilenameOps); err != nil {
 		return nil, fmt.Errorf("invalid filtered filename ops: %w", err)
 	}
 	return o, nil

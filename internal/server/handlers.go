@@ -1263,6 +1263,10 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("failed to update videos: %v", err), http.StatusInternalServerError)
 		return
 	}
+	if overrides != nil && len(claimed) == 0 {
+		http.Error(w, "video is no longer available, it may already be downloading", http.StatusConflict)
+		return
+	}
 
 	if status == consts.DLStatusIgnored && len(claimed) > 0 {
 		dismissedURLs := make([]string, 0, len(claimed))
@@ -1306,8 +1310,8 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// handleGetOverrideOps fills the Download As dialog: with the given video's earlier overrides if it has any, else
-// the ops its channel URL's videos run with.
+// handleGetOverrideOps fills the Download As dialog with the directories and ops a channel URL's videos use, and the
+// given video's earlier overrides if it has any.
 func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Request) {
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
 	if err != nil {
@@ -1348,30 +1352,50 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	var lines models.OverrideLines
-	if overrides != nil {
-		lines = metarr.VideoOverrideLines(overrides, cu.URL)
-	} else if lines, err = metarr.ChannelURLOpLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
+	var response struct {
+		Defaults models.OverrideLines  `json:"defaults"` // The channel URL's, for Revert to Defaults.
+		Saved    *models.OverrideLines `json:"saved"`    // The video's earlier overrides, if any.
+	}
+	if response.Defaults, err = metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	if overrides != nil {
+		saved := metarr.VideoOverrideLines(overrides, cu.URL)
+		response.Saved = &saved
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(lines); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }
 
-// handleRunMetarr runs Metarr on the given videos, or all pending/failed videos if none are given.
+// handleRunMetarr runs Metarr on the given videos, or all pending/failed videos if none are given. Overrides, for one
+// video, replace its options for this and later runs.
 func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 
 	var requestBody struct {
-		VideoIDs []int64 `json:"video_ids"`
+		VideoIDs  []int64               `json:"video_ids"`
+		Overrides *models.OverrideLines `json:"overrides"` // Edit & Run, for one video.
 	}
 	if err := decodeJSON(r, &requestBody); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
+	}
+
+	var overrides *models.VideoOverrides
+	if requestBody.Overrides != nil {
+		if len(requestBody.VideoIDs) != 1 {
+			http.Error(w, "overrides need one video", http.StatusBadRequest)
+			return
+		}
+		var err error
+		if overrides, err = parseOverrideLines(requestBody.Overrides); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true)
@@ -1386,6 +1410,23 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	if c.LoadErr != nil {
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
+	}
+
+	// Edited options replace the video's earlier ones, kept for later runs.
+	if overrides != nil {
+		awaiting, err := ss.vs.GetVideosAwaitingMetarr(c.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if !slices.ContainsFunc(awaiting, func(v *models.Video) bool { return v.ID == requestBody.VideoIDs[0] }) {
+			http.Error(w, "video isn't waiting for Metarr in this channel", http.StatusConflict)
+			return
+		}
+		if err := ss.vs.SetVideoOverrides(requestBody.VideoIDs, overrides); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	//nolint:contextcheck

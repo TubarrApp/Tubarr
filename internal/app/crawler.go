@@ -210,10 +210,12 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		if isBlocked {
 			logger.Pl.W("Skipping video %q for channel %q. Domain is blocked for context %q (Blocked at: %v, Time remaining: %v)",
 				actualVideoURL, c.Name, blockCtx, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
+			recordSkip(s.VideoStore(), c, actualVideoURL, fmt.Errorf("%s is blocked for %s requests, %v left", hostname, blockCtx, remaining.Round(time.Second)))
 			continue
 		}
 		if err := checkDestinations(c, targetChannelURLModel); err != nil {
 			logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, err)
+			recordSkip(s.VideoStore(), c, actualVideoURL, err)
 			continue
 		}
 
@@ -238,6 +240,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 			var overridesErr error
 			if v.Overrides, overridesErr = s.VideoStore().GetVideoOverrides(id); overridesErr != nil {
 				logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, overridesErr)
+				recordSkip(s.VideoStore(), c, actualVideoURL, overridesErr)
 				continue
 			}
 		}
@@ -277,6 +280,9 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		// Get access details only for channel URLs with videos to download (e.g. avoids needless FlareSolverr solves).
 		if cu.Cookies, cu.CookiePath, err = scrape.ScraperURLCookies(queueCtx, cs, c, cu); err != nil {
 			procError = errors.Join(procError, err)
+			for _, v := range videos {
+				recordSkip(s.VideoStore(), c, v.URL, err)
+			}
 			continue
 		}
 
@@ -310,6 +316,13 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	return nil
 }
 
+// recordSkip stores why a claimed video wasn't downloaded, shown once it's back in the Available list.
+func recordSkip(vs contracts.VideoStore, c *models.Channel, videoURL string, reason error) {
+	if err := vs.SetQueuedVideoError(c.ID, videoURL, reason.Error()); err != nil {
+		logger.Pl.E("Failed to store why video %q was skipped: %v", videoURL, err)
+	}
+}
+
 // AvailableStatuses are the statuses of videos the user can choose to download or dismiss.
 var AvailableStatuses = []consts.DownloadStatus{consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCanceled}
 
@@ -332,8 +345,24 @@ func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Chan
 	if errors.Is(err, state.ErrStoppedWaiting) || (ctx != nil && state.QueueCtx(ctx).Err() != nil) {
 		unreached = consts.DLStatusCanceled
 	}
-	if _, resetErr := s.VideoStore().ClaimVideos(c.ID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, unreached); resetErr != nil {
+	reset, resetErr := s.VideoStore().ClaimVideos(c.ID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, unreached)
+	if resetErr != nil {
 		err = errors.Join(err, resetErr)
+	}
+
+	// Failed videos without a reason of their own get the batch's.
+	if unreached == consts.DLStatusFailed && len(reset) > 0 {
+		reason := "skipped before downloading, see the Tubarr log for why"
+		if err != nil {
+			reason = err.Error()
+		}
+		resetIDs := make([]int64, 0, len(reset))
+		for _, v := range reset {
+			resetIDs = append(resetIDs, v.ID)
+		}
+		if reasonErr := s.VideoStore().SetMissingVideoErrors(resetIDs, reason); reasonErr != nil {
+			err = errors.Join(err, reasonErr)
+		}
 	}
 	return err
 }

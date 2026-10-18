@@ -46,6 +46,7 @@
             <div
               x-data="videosData()"
               x-init="init()"
+              @edit-metarr-done.window="loadActivity(); setTimeout(() => loadVideos(), 3000)"
             >
               <!-- Loading State -->
               <div x-show="loading" class="text-center py-12">
@@ -238,6 +239,14 @@
                             >
                               Run Metarr
                             </button>
+                            <button
+                              @click="$dispatch('edit-metarr', { ...video, channel_id: channelId })"
+                              :disabled="!needsMetarr(video) || runningMetarr"
+                              title="See and edit the filename, output directory and ops Metarr runs with, then run it."
+                              class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
+                            >
+                              Edit &amp; Run
+                            </button>
                             <a
                               :href="safeURL(video.url)"
                               target="_blank"
@@ -294,6 +303,8 @@
       <!-- ===== Content Area End ===== -->
     </div>
     <!-- ===== Page Wrapper End ===== -->
+
+    <!-- include:download-as -->
 
     <script defer src="bundle.js"></script>
     <script>

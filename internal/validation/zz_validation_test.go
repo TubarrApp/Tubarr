@@ -575,7 +575,7 @@ func TestValidateMetarrArgsModelGPUNode(t *testing.T) {
 
 // TestValidateFilteredMetaOps ----------------------------------------------------------------------------------------
 func TestValidateFilteredMetaOps_EmptySliceOK(t *testing.T) {
-	if err := validation.ValidateFilteredMetaOps(nil); err != nil {
+	if err := sharedvalidation.ValidateFilteredMetaOps(nil); err != nil {
 		t.Fatalf("expected nil error for empty slice, got %v", err)
 	}
 }
@@ -603,7 +603,7 @@ func TestValidateFilteredMetaOps_Valid(t *testing.T) {
 		},
 	}
 
-	if err := validation.ValidateFilteredMetaOps(input); err != nil {
+	if err := sharedvalidation.ValidateFilteredMetaOps(input); err != nil {
 		t.Fatalf("expected valid filtered meta ops, got %v", err)
 	}
 }
@@ -631,7 +631,7 @@ func TestValidateFilteredMetaOps_InvalidFilters(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilteredMetaOps(input)
+	err := sharedvalidation.ValidateFilteredMetaOps(input)
 	if err == nil {
 		t.Fatalf("expected error for invalid filters")
 	}
@@ -655,7 +655,7 @@ func TestValidateFilteredMetaOps_NoFilters(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilteredMetaOps(input)
+	err := sharedvalidation.ValidateFilteredMetaOps(input)
 	if err == nil {
 		t.Fatalf("expected error for no filters")
 	}
@@ -680,7 +680,7 @@ func TestValidateFilteredMetaOps_NoMetaOps(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilteredMetaOps(input)
+	err := sharedvalidation.ValidateFilteredMetaOps(input)
 	if err == nil {
 		t.Fatalf("expected error for no meta operations")
 	}
@@ -691,7 +691,7 @@ func TestValidateFilteredMetaOps_NoMetaOps(t *testing.T) {
 
 // TestValidateFilteredFilenameOps -----------------------------------------------------------------------------------------------
 func TestValidateFilteredFilenameOps_EmptySliceOK(t *testing.T) {
-	if err := validation.ValidateFilteredFilenameOps(nil); err != nil {
+	if err := sharedvalidation.ValidateFilteredFilenameOps(nil); err != nil {
 		t.Fatalf("expected nil error for empty slice, got %v", err)
 	}
 }
@@ -718,7 +718,7 @@ func TestValidateFilteredFilenameOps_Valid(t *testing.T) {
 		},
 	}
 
-	if err := validation.ValidateFilteredFilenameOps(input); err != nil {
+	if err := sharedvalidation.ValidateFilteredFilenameOps(input); err != nil {
 		t.Fatalf("expected valid filtered filename ops, got %v", err)
 	}
 }
@@ -744,7 +744,7 @@ func TestValidateFilteredFilenameOps_InvalidFilters(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilteredFilenameOps(input)
+	err := sharedvalidation.ValidateFilteredFilenameOps(input)
 	if err == nil {
 		t.Fatalf("expected error for invalid filters")
 	}
@@ -767,7 +767,7 @@ func TestValidateFilteredFilenameOps_NoFilters(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilteredFilenameOps(input)
+	err := sharedvalidation.ValidateFilteredFilenameOps(input)
 	if err == nil {
 		t.Fatalf("expected error for no filters")
 	}
@@ -792,7 +792,7 @@ func TestValidateFilteredFilenameOps_NoFilenameOps(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilteredFilenameOps(input)
+	err := sharedvalidation.ValidateFilteredFilenameOps(input)
 	if err == nil {
 		t.Fatalf("expected error for no filename operations")
 	}

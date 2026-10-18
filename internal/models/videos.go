@@ -39,21 +39,28 @@ type Video struct {
 	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
 	SkipMetarr          SkipMetarr            `json:"-" db:"-"`
 	SkipDownloads       SkipDownloads         `json:"-" db:"-"`
-	Overrides           *VideoOverrides       `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's ops.
+	Overrides           *VideoOverrides       `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's settings.
 }
 
-// VideoOverrides holds a video's Metarr ops chosen with Download As, used instead of its channel URL's (and global) ops.
+// VideoOverrides holds a video's directories and Metarr ops chosen with Download As, used instead of its channel URL's
+// (and global) ones.
 type VideoOverrides struct {
 	Filename            string                `json:"filename,omitempty"`
+	VideoDir            string                `json:"video_dir,omitempty"`  // Blank uses the channel URL's.
+	JSONDir             string                `json:"json_dir,omitempty"`   // Blank uses the channel URL's.
+	OutputDir           string                `json:"output_dir,omitempty"` // Metarr's. Blank uses the usual output directory.
 	MetaOps             []MetaOps             `json:"meta_ops"`
 	FilteredMetaOps     []FilteredMetaOps     `json:"filtered_meta_ops"`
 	FilenameOps         []FilenameOps         `json:"filename_ops"`
 	FilteredFilenameOps []FilteredFilenameOps `json:"filtered_filename_ops"`
 }
 
-// OverrideLines holds a video's overrides as newline-separated ops, as edited in the Download As dialog.
+// OverrideLines holds a video's overrides as edited in the Download As dialog, with ops newline-separated.
 type OverrideLines struct {
 	Filename            string `json:"filename"`
+	VideoDir            string `json:"video_dir"`
+	JSONDir             string `json:"json_dir"`
+	OutputDir           string `json:"output_dir"`
 	MetaOps             string `json:"meta_ops"`
 	FilteredMetaOps     string `json:"filtered_meta_ops"`
 	FilenameOps         string `json:"filename_ops"`
@@ -107,19 +114,17 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 			continue
 		}
 
-		// Video path.
-		if after, ok := strings.CutPrefix(l, "final video path: "); ok {
-			if after != "" {
+		// Video path, reported as soon as it changes and again once final, so the last line wins.
+		for _, prefix := range []string{"current video path: ", "final video path: "} {
+			if after, ok := strings.CutPrefix(l, prefix); ok && after != "" {
 				v.VideoFilePath = after
 				gotVideo = true
 			}
 		}
 
-		// JSON path.
+		// JSON path, empty once the metafile was purged or is gone.
 		if after, ok := strings.CutPrefix(l, "final json path: "); ok {
-			if after != "" {
-				v.JSONFilePath = after
-			}
+			v.JSONFilePath = after
 		}
 	}
 

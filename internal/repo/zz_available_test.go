@@ -176,6 +176,82 @@ func TestVideoOverrides(t *testing.T) {
 	}
 }
 
+// TestQueuedVideoErrors checks why a claimed video wasn't downloaded is kept when it returns to the Available list,
+// videos without a reason get the fallback, and a new download attempt clears the last one's error.
+func TestQueuedVideoErrors(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	res, err := db.Exec("INSERT INTO channels (name) VALUES ('Test')")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chanID, _ := res.LastInsertId()
+	if res, err = db.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, 'https://example.com/@a')", chanID); err != nil {
+		t.Fatal(err)
+	}
+	cuID, _ := res.LastInsertId()
+	vs := GetVideoStore(db)
+
+	videos := []*models.Video{
+		{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1"},
+		{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/2"},
+	}
+	if _, err := vs.AddAvailableVideos(videos, chanID); err != nil {
+		t.Fatal(err)
+	}
+	ids := []int64{videos[0].ID, videos[1].ID}
+	errorsByURL := func() map[string]string {
+		t.Helper()
+		available, err := vs.GetAvailableVideos(app.AvailableStatuses...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]string{}
+		for _, v := range available {
+			got[v.URL] = v.DownloadStatus.ErrorMsg
+		}
+		return got
+	}
+
+	// Video 1 is skipped with a reason, and video 2 returns without one, getting the fallback.
+	if _, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued); err != nil {
+		t.Fatal(err)
+	}
+	if err := vs.SetQueuedVideoError(chanID, videos[0].URL, "domain blocked"); err != nil {
+		t.Fatal(err)
+	}
+	if err := vs.SetQueuedVideoError(chanID+1, videos[1].URL, "another channel's"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vs.ClaimVideos(chanID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil {
+		t.Fatal(err)
+	}
+	if err := vs.SetMissingVideoErrors(ids, "fallback"); err != nil {
+		t.Fatal(err)
+	}
+	if got := errorsByURL(); got[videos[0].URL] != "domain blocked" || got[videos[1].URL] != "fallback" {
+		t.Errorf("after failing: got errors %v", got)
+	}
+
+	// Trying again clears the last attempt's errors.
+	if _, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vs.ClaimVideos(chanID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusCanceled); err != nil {
+		t.Fatal(err)
+	}
+	if got := errorsByURL(); got[videos[0].URL] != "" || got[videos[1].URL] != "" {
+		t.Errorf("after trying again: got errors %v, want none", got)
+	}
+}
+
 // TestAvailableVideosListingOrder checks undated videos are listed in the order their channel lists them, with later
 // crawls' videos above earlier ones.
 func TestAvailableVideosListingOrder(t *testing.T) {

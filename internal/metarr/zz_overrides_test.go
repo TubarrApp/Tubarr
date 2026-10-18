@@ -19,9 +19,10 @@ const (
 	otherURL = "https://example.com/@b"
 )
 
-// TestChannelURLOpLines tests the Download As dialog gets the channel URL's ops without their channel URL prefix, leaves
-// out other channel URLs' ops, falls back to the global ops like Metarr does, and that its lines parse back.
-func TestChannelURLOpLines(t *testing.T) {
+// TestChannelURLOverrideLines tests the Download As dialog gets the channel URL's directories, and its ops without their
+// channel URL prefix, leaves out other channel URLs' ops, falls back to the global ops like Metarr does, and that its
+// lines parse back.
+func TestChannelURLOverrideLines(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
 
@@ -40,17 +41,25 @@ func TestChannelURLOpLines(t *testing.T) {
 	viper.Set(keys.MFilenameOps, []string{ownURL + "|append: [G]", otherURL + "|append: [H]"})
 
 	c := &models.Channel{ID: 1, Name: "Test"}
-	cu := &models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{
-		MetaOps:         metaOps,
-		FilenameOps:     filenameOps,
-		FilteredMetaOps: filteredMetaOps,
-	}}
-	lines, err := ChannelURLOpLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
+	cu := &models.ChannelURL{
+		URL:             ownURL,
+		ChanURLSettings: &models.Settings{VideoDir: "/videos/{{channel_name}}", JSONDir: "/json"},
+		ChanURLMetarrArgs: &models.MetarrArgs{
+			OutputDir:       "/out",
+			MetaOps:         metaOps,
+			FilenameOps:     filenameOps,
+			FilteredMetaOps: filteredMetaOps,
+		},
+	}
+	lines, err := ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	want := models.OverrideLines{
+		VideoDir:        "/videos/{{channel_name}}", // Shown as written, as the user would enter it.
+		JSONDir:         "/json",
+		OutputDir:       "/out",
 		MetaOps:         "title:prefix:[A] \nartist:set:Cats",
 		FilteredMetaOps: "title:contains:cat|genre:set:Cats",
 		FilenameOps:     "append: [G]", // The channel URL has none of its own.
@@ -64,6 +73,26 @@ func TestChannelURLOpLines(t *testing.T) {
 	}
 	if parsed, err := parsing.ParseFilteredMetaOps(strings.Split(lines.FilteredMetaOps, "\n")); err != nil || len(parsed) != 1 {
 		t.Errorf("filtered meta op lines parse back as %d ops, %v, want 1", len(parsed), err)
+	}
+
+	// --move-on-complete takes over the output directory, as it does for Metarr.
+	viper.Set(keys.MoveOnComplete, "/library")
+	if lines, err := ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil || lines.OutputDir != "/library" {
+		t.Errorf("with --move-on-complete: output directory %q, %v, want /library", lines.OutputDir, err)
+	}
+}
+
+// TestParseMetarrOutputDirOverride tests a Download As output directory comes before --move-on-complete and move ops.
+func TestParseMetarrOutputDirOverride(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	viper.Set(keys.MoveOnComplete, "/library")
+
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := &models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: "/out"}}
+	v := &models.Video{MoveOpOutputDir: "/moved", Overrides: &models.VideoOverrides{OutputDir: "/chosen/{{channel_name}}"}}
+	if got := parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); got != "/chosen/Cats" {
+		t.Errorf("got %q, want /chosen/Cats", got)
 	}
 }
 

@@ -19,9 +19,9 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// TestMetaOpsRoundTripThroughTubarr checks the pipeline Tubarr actually runs: parse
-// user input, validate it, format it for Metarr's argv, and confirm Metarr would parse
-// back the identical operation.
+// TestMetaOpsRoundTripThroughTubarr checks the pipeline Tubarr actually runs: parse and
+// validate user input, format it for Metarr's argv, and confirm Metarr would parse back
+// the identical operation.
 func TestMetaOpsRoundTripThroughTubarr(t *testing.T) {
 	in := []string{
 		`title:set:cats`,
@@ -38,9 +38,6 @@ func TestMetaOpsRoundTripThroughTubarr(t *testing.T) {
 	}
 	if len(parsed) != len(in) {
 		t.Fatalf("parsed %d ops, want %d: %+v", len(parsed), len(in), parsed)
-	}
-	if err := validation.ValidateMetaOps(parsed); err != nil {
-		t.Fatalf("ValidateMetaOps: %v", err)
 	}
 
 	formatted := make([]string, 0, len(parsed))
@@ -82,9 +79,6 @@ func TestFilenameOpsRoundTripThroughTubarr(t *testing.T) {
 	parsed, err := parsing.ParseFilenameOps(in)
 	if err != nil {
 		t.Fatalf("ParseFilenameOps: %v", err)
-	}
-	if err := validation.ValidateFilenameOps(parsed); err != nil {
-		t.Fatalf("ValidateFilenameOps: %v", err)
 	}
 
 	formatted := make([]string, 0, len(parsed))

@@ -20,6 +20,7 @@ import (
 	"tubarr/internal/scraper"
 	"tubarr/internal/state"
 	"tubarr/internal/times"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
@@ -163,10 +164,22 @@ func InitProcess(
 		// Get video paths.
 		video.JSONDir = cu.ChanURLSettings.JSONDir
 		video.VideoDir = cu.ChanURLSettings.VideoDir
+		if o := video.Overrides; o != nil {
+			if video.VideoDir, err = overrideDir(dirParser, o.VideoDir, video.VideoDir, "Download As video directory"); err == nil {
+				video.JSONDir, err = overrideDir(dirParser, o.JSONDir, video.JSONDir, "Download As JSON directory")
+			}
+			if err != nil {
+				logger.Pl.E("Skipping download of %q: %v", video.URL, err)
+				recordSkip(s.VideoStore(), c, video.URL, err)
+				errs = append(errs, err)
+				continue
+			}
+		}
 
 		// Use custom scraper if needed.
 		if video.JSONFilePath, err = executeCustomScraper(queueCtx, scrape, video); err != nil {
 			logger.Pl.E("Custom scraper failed for %q: %v", video.URL, err)
+			recordSkip(s.VideoStore(), c, video.URL, fmt.Errorf("custom scraper failed: %w", err))
 			errs = append(errs, err)
 			continue
 		}
@@ -205,6 +218,18 @@ func InitProcess(
 		return nSucceeded, nDownloaded, joined
 	}
 	return nSucceeded, nDownloaded, nil
+}
+
+// overrideDir returns a Download As directory filled in, or dir if override is blank.
+func overrideDir(dp *parsing.DirectoryParser, override, dir, name string) (string, error) {
+	if override == "" {
+		return dir, nil
+	}
+	// Don't download anywhere unexpected (e.g. onto the local disk under an unmounted drive's mount point).
+	if err := validation.CheckDestination(override); err != nil {
+		return "", fmt.Errorf("%s: %w", name, err)
+	}
+	return dp.ParseDirectory(override, name)
 }
 
 // executeCustomScraper checks if a custom scraper should be used for this release.
