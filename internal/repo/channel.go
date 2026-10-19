@@ -626,20 +626,27 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 	})
 }
 
-// createDownloadDirs creates the plain (untemplated) video, JSON and move op directories that saving s adds to old (all of
-// them if old is nil). Unchanged ones are never recreated, so a missing destination (e.g. an unmounted drive) is reported
-// before downloading, not recreated on the local disk.
-func createDownloadDirs(old, s *models.Settings) error {
+// checkDownloadDirs returns an error if a video, JSON or move op directory that saving s adds to old (all of them if old
+// is nil) isn't available. Tubarr never creates them, as a missing one may be on an unmounted drive.
+func checkDownloadDirs(old, s *models.Settings) error {
 	existing := downloadDirs(old)
 	for _, dir := range downloadDirs(s) {
-		if dir == "" || strings.Contains(dir, "{{") || slices.Contains(existing, dir) {
+		if slices.Contains(existing, dir) {
 			continue
 		}
-		if err := os.MkdirAll(dir, sharedconsts.PermsGenericDir); err != nil {
-			return fmt.Errorf("failed to create directory %q: %w", dir, err)
+		if err := validation.CheckDestination(dir); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// checkOutputDir returns an error if the Metarr output directory that saving m adds or changes isn't available.
+func checkOutputDir(old, m *models.MetarrArgs) error {
+	if m == nil || (old != nil && old.OutputDir == m.OutputDir) {
+		return nil
+	}
+	return validation.CheckDestination(m.OutputDir)
 }
 
 // downloadDirs returns the video, JSON and move op directories of s.
@@ -702,12 +709,12 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, fmt.Errorf("%w: invalid metarr config: %w", contracts.ErrInvalidChannel, err)
 	}
 
-	// Everything is valid, so create the destination directories.
-	if err := createDownloadDirs(nil, c.ChanSettings); err != nil {
-		return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
-	}
+	// Channel URL destinations aren't checked by the validation above.
 	for _, cu := range c.URLModels {
-		if err := createDownloadDirs(nil, cu.ChanURLSettings); err != nil {
+		if err := checkDownloadDirs(nil, cu.ChanURLSettings); err != nil {
+			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+		}
+		if err := checkOutputDir(nil, cu.ChanURLMetarrArgs); err != nil {
 			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 		}
 	}
@@ -1215,11 +1222,6 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 	// channel works while its filter file or drive is unavailable.
 	if err := validation.ValidateSettingsModel(&settings, settingsPathsChanged(&old, &settings)); err != nil {
 		return 0, fmt.Errorf("%w: updated settings are invalid: %w", contracts.ErrInvalidChannel, err)
-	}
-
-	// Create changed destination directories (only changed ones, so e.g. pausing never recreates a missing destination).
-	if err := createDownloadDirs(&old, &settings); err != nil {
-		return 0, err
 	}
 
 	// Marshal updated settings.

@@ -7,42 +7,50 @@ import (
 	"tubarr/internal/models"
 )
 
-// TestCreateDownloadDirs tests that saving creates only the plain folders the save adds, so a missing folder (e.g. on an
-// unmounted drive) is never recreated by saving unchanged settings.
-func TestCreateDownloadDirs(t *testing.T) {
+// TestCheckDownloadDirs tests that saving refuses a missing folder it adds without creating it, but accepts unchanged
+// ones, so e.g. a channel can be saved while an unchanged folder's drive is unmounted.
+func TestCheckDownloadDirs(t *testing.T) {
 	dir := t.TempDir()
-	videos, json, moved := filepath.Join(dir, "videos"), filepath.Join(dir, "json"), filepath.Join(dir, "moved")
+	missing := filepath.Join(dir, "missing")
 	exists := func(path string) bool {
 		_, err := os.Stat(path)
 		return err == nil
 	}
 
-	// New settings: every plain folder is created, templated ones aren't.
-	s := &models.Settings{VideoDir: videos, JSONDir: filepath.Join(dir, "{{channel_name}}")}
-	if err := createDownloadDirs(nil, s); err != nil {
-		t.Fatal(err)
-	}
-	if !exists(videos) || exists(filepath.Join(dir, "{{channel_name}}")) {
-		t.Fatalf("new settings: video folder exists: %t, templated folder exists: %t; want true, false", exists(videos), exists(filepath.Join(dir, "{{channel_name}}")))
+	// Existing and templated (with an existing fixed part) folders are accepted.
+	s := &models.Settings{VideoDir: dir, JSONDir: filepath.Join(dir, "{{channel_name}}")}
+	if err := checkDownloadDirs(nil, s); err != nil {
+		t.Fatalf("existing folders: %v", err)
 	}
 
-	// Saved again unchanged while the folder is missing: not recreated.
-	if err := os.Remove(videos); err != nil {
-		t.Fatal(err)
+	// New missing folders are refused and not created, whether plain, templated or a move op's.
+	for name, added := range map[string]*models.Settings{
+		"video":     {VideoDir: missing},
+		"templated": {JSONDir: filepath.Join(missing, "{{channel_name}}")},
+		"move op":   {MetaFilterMoveOps: []models.MetaFilterMoveOps{{Field: "title", ContainsValue: "cats", OutputDir: missing}}},
+	} {
+		if err := checkDownloadDirs(nil, added); err == nil {
+			t.Errorf("%s: missing folder accepted", name)
+		}
 	}
-	if err := createDownloadDirs(s, s); err != nil {
-		t.Fatal(err)
-	}
-	if exists(videos) {
-		t.Error("saving unchanged settings recreated the missing video folder")
+	if exists(missing) {
+		t.Fatal("checking created the missing folder")
 	}
 
-	// A new JSON folder and move op folder are created, the unchanged missing video folder still isn't.
-	updated := &models.Settings{VideoDir: videos, JSONDir: json, MetaFilterMoveOps: []models.MetaFilterMoveOps{{Field: "title", ContainsValue: "cats", OutputDir: moved}}}
-	if err := createDownloadDirs(s, updated); err != nil {
-		t.Fatal(err)
+	// Saved again unchanged while a folder is missing: accepted, and still not created.
+	unchanged := &models.Settings{VideoDir: missing}
+	if err := checkDownloadDirs(unchanged, unchanged); err != nil {
+		t.Errorf("unchanged missing folder: %v", err)
 	}
-	if !exists(json) || !exists(moved) || exists(videos) {
-		t.Errorf("after adding folders: JSON %t, move op %t, video %t; want true, true, false", exists(json), exists(moved), exists(videos))
+
+	// Metarr output folder: a new missing one is refused, an unchanged one accepted.
+	if err := checkOutputDir(nil, &models.MetarrArgs{OutputDir: missing}); err == nil {
+		t.Error("output folder: missing folder accepted")
+	}
+	if err := checkOutputDir(&models.MetarrArgs{OutputDir: missing}, &models.MetarrArgs{OutputDir: missing}); err != nil {
+		t.Errorf("output folder: unchanged missing folder: %v", err)
+	}
+	if exists(missing) {
+		t.Error("checking created the missing folder")
 	}
 }

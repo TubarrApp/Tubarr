@@ -178,19 +178,20 @@ func TestAvailableVideosAPI(t *testing.T) {
 	runMetarr := func(body string) int {
 		return serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/run-metarr", chanID), "application/json", body).Code
 	}
-	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"output_dir":"/x"}}`, pendingID, videos[1].ID)); code != http.StatusBadRequest {
+	out := filepath.Join(fuzzServer.dir, "videos") // An output folder must exist.
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"output_dir":%q}}`, pendingID, videos[1].ID, out)); code != http.StatusBadRequest {
 		t.Errorf("overrides for two videos: got %d, want 400", code)
 	}
 	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"meta_ops":"artist:bogus:x"}}`, pendingID)); code != http.StatusBadRequest {
 		t.Errorf("invalid op: got %d, want 400", code)
 	}
-	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"output_dir":"/x"}}`, videos[1].ID)); code != http.StatusConflict {
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"output_dir":%q}}`, videos[1].ID, out)); code != http.StatusConflict {
 		t.Errorf("video not waiting for Metarr: got %d, want 409", code)
 	}
-	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"output_dir":"/fixed","meta_ops":"album:set:Pets"}}`, pendingID)); code != http.StatusAccepted {
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"output_dir":%q,"meta_ops":"album:set:Pets"}}`, pendingID, out)); code != http.StatusAccepted {
 		t.Fatalf("edit & run: got %d, want 202", code)
 	}
-	if o, err := vs.GetVideoOverrides(pendingID); err != nil || o == nil || o.OutputDir != "/fixed" || len(o.MetaOps) != 1 {
+	if o, err := vs.GetVideoOverrides(pendingID); err != nil || o == nil || o.OutputDir != out || len(o.MetaOps) != 1 {
 		t.Errorf("edit & run stored overrides %+v, %v", o, err)
 	}
 

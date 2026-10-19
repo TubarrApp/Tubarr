@@ -203,7 +203,7 @@ func FuzzChannelForm(f *testing.F) {
 	f.Fuzz(func(t *testing.T, edit bool, choices []byte, junk string) {
 		setupFuzzServer(t)
 		if pathOutsideDir(junk) {
-			return // Directory settings are created when validated, so junk can't name a path outside the test directory.
+			return // Junk can't name a path outside the test directory.
 		}
 		samples := formSamples(t)
 		page := "add-channel.html"

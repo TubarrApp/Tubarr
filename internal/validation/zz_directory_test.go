@@ -66,34 +66,29 @@ func TestCheckDestination(t *testing.T) {
 	}
 }
 
-// TestCheckTemplatedBase tests that only a templated directory is checked, by the fixed part before its first tag.
-func TestCheckTemplatedBase(t *testing.T) {
+// TestSettingsRefuseMissingFolder tests saving settings refuses a missing plain folder, or a templated one whose fixed
+// part is missing.
+func TestSettingsRefuseMissingFolder(t *testing.T) {
 	dir := t.TempDir()
-	for path, wantErr := range map[string]bool{
-		filepath.Join(dir, "missing"):                     false, // Plain, so created when saved.
-		filepath.Join(dir, "{{channel_name}}", "videos"):  false,
-		filepath.Join(dir, "missing", "{{channel_name}}"): true,
-	} {
-		if err := CheckTemplatedBase(path); (err != nil) != wantErr {
-			t.Errorf("CheckTemplatedBase(%q) error = %v, want error: %v", path, err, wantErr)
+	for _, missing := range []string{filepath.Join(dir, "missing"), filepath.Join(dir, "missing", "{{channel_name}}")} {
+		if err := ValidateSettingsModel(&models.Settings{VideoDir: missing}, true); err == nil {
+			t.Errorf("video folder %q: accepted", missing)
+		}
+		if err := ValidateSettingsModel(&models.Settings{JSONDir: missing}, true); err == nil {
+			t.Errorf("JSON folder %q: accepted", missing)
+		}
+		moveOps := []models.MetaFilterMoveOps{{Field: "title", ContainsValue: "cats", OutputDir: missing}}
+		if err := ValidateSettingsModel(&models.Settings{MetaFilterMoveOps: moveOps}, true); err == nil {
+			t.Errorf("move op folder %q: accepted", missing)
+		}
+		if err := ValidateMetarrArgsModel(&models.MetarrArgs{OutputDir: missing}, true); err == nil {
+			t.Errorf("Metarr output folder %q: accepted", missing)
+		}
+		if err := ValidateSettingsModel(&models.Settings{VideoDir: missing}, false); err != nil {
+			t.Errorf("loading %q (paths unchecked): %v", missing, err)
 		}
 	}
-}
-
-// TestSettingsRefuseTemplatedFolderWithoutBase tests saving settings refuses a templated folder whose fixed part is missing.
-func TestSettingsRefuseTemplatedFolderWithoutBase(t *testing.T) {
-	missing := filepath.Join(t.TempDir(), "missing", "{{channel_name}}")
-	if err := ValidateSettingsModel(&models.Settings{VideoDir: missing}, true); err == nil {
-		t.Error("video folder: accepted")
-	}
-	if err := ValidateSettingsModel(&models.Settings{JSONDir: missing}, true); err == nil {
-		t.Error("JSON folder: accepted")
-	}
-	moveOps := []models.MetaFilterMoveOps{{Field: "title", ContainsValue: "cats", OutputDir: missing}}
-	if err := ValidateSettingsModel(&models.Settings{MetaFilterMoveOps: moveOps}, true); err == nil {
-		t.Error("move op folder: accepted")
-	}
-	if err := ValidateSettingsModel(&models.Settings{VideoDir: missing}, false); err != nil {
-		t.Errorf("loading (paths unchecked): %v", err)
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("validation created something: %v", entries)
 	}
 }

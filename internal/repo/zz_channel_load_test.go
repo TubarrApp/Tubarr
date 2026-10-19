@@ -132,6 +132,11 @@ func TestURLSettingsInheritBlankFields(t *testing.T) {
 		FilenameOpsFile:         file("filename-ops.txt"),
 		FilteredFilenameOpsFile: file("filtered-filename-ops.txt"),
 	}
+	for _, d := range []string{"own", "own-out"} { // Folders must exist to be saved.
+		if err := os.Mkdir(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	c.URLModels[0].ChanURLSettings = &models.Settings{VideoDir: filepath.Join(dir, "own")}
 	c.URLModels[0].ChanURLMetarrArgs = &models.MetarrArgs{OutputDir: filepath.Join(dir, "own-out")}
 	id, err := cs.AddChannel(c)

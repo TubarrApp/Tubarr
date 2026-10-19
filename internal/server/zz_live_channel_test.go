@@ -599,8 +599,10 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 
 	sc.auto = pick("true", "false") == "true"
 	videoDir := pick(filepath.Join(dir, "videos"), filepath.Join(dir, "{{channel_name}}", "videos"), filepath.Join(dir, "videos", "{{channel_id}}"))
-	if err := os.MkdirAll(filepath.Join(dir, "videos"), 0o755); err != nil { // A templated folder's fixed part must exist.
-		t.Fatal(err)
+	for _, d := range []string{"videos", "json", "cats", "dogs", "metarr", "videos-b", "metarr-b"} { // Folders must exist to be saved.
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	form := url.Values{
 		"name":                           {sc.name},
@@ -1092,9 +1094,11 @@ func (sc *liveScenario) crawl(feeds []string, ignore bool, path string, body any
 func (sc *liveScenario) download(us []string, o *liveOverrides) {
 	before := liveRows(sc.t, sc.id)
 	missing := ""
-	if o != nil && o.videoDir != "" {
-		if _, err := os.Stat(o.videoDir); err != nil {
-			missing = o.videoDir
+	if o != nil {
+		for _, d := range []string{o.videoDir, o.outputDir} {
+			if _, err := os.Stat(d); d != "" && missing == "" && err != nil {
+				missing = d
+			}
 		}
 	}
 	want := map[string][]consts.DownloadStatus{}
@@ -1331,6 +1335,11 @@ var liveActions = [...]struct {
 		}
 		if p&4 != 0 {
 			o.outputDir = filepath.Join(sc.dir, "as-out")
+			if !sc.unmounted {
+				if err := os.MkdirAll(o.outputDir, 0o755); err != nil {
+					sc.t.Fatal(err)
+				}
+			}
 		}
 		if p&8 != 0 {
 			o.metaOps = "artist:set:Chosen Artist"

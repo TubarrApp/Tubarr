@@ -65,7 +65,7 @@ func TestFilterSkipsUnavailableDestinations(t *testing.T) {
 	for _, cu := range got {
 		urls = append(urls, cu.URL)
 	}
-	want := []string{"https://ok.example/@a", "https://metarr.example/@c", "https://templated.example/@d"} // Metarr creates its output dir.
+	want := []string{"https://ok.example/@a", "https://templated.example/@d"}
 	if !slices.Equal(urls, want) {
 		t.Errorf("crawled URLs = %q, want %q", urls, want)
 	}

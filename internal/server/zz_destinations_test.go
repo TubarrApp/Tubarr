@@ -18,6 +18,9 @@ import (
 func TestUnavailableDestinationsRefused(t *testing.T) {
 	setupFuzzServer(t)
 	videoDir := filepath.Join(t.TempDir(), "videos")
+	if err := os.Mkdir(videoDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	form := url.Values{
 		"name":                           {"Unmounted"},
 		"urls":                           {"https://example.com/@unmounted"},

@@ -25,7 +25,10 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 		if err := validation.ValidateChannelURL(cu.URL); err != nil {
 			return 0, err
 		}
-		if err := createDownloadDirs(nil, cu.ChanURLSettings); err != nil {
+		if err := checkDownloadDirs(nil, cu.ChanURLSettings); err != nil {
+			return 0, err
+		}
+		if err := checkOutputDir(nil, cu.ChanURLMetarrArgs); err != nil {
 			return 0, err
 		}
 	}
@@ -98,11 +101,12 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 
 // UpdateChannelURLSettings updates the settings of a single ChannelURL model.
 func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
-	// Only folders this save adds are created, so e.g. saving the channel never recreates one on an unmounted drive.
+	// Only folders this save adds are checked, so e.g. saving the channel works while an unchanged one's drive is unmounted.
 	var old *models.Settings
-	var oldJSON sql.NullString
-	oldQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QChanURLSettings, consts.DBChannelURLs, consts.QChanURLID)
-	if err := cs.q.QueryRow(oldQuery, cu.ID).Scan(&oldJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	var oldMetarr *models.MetarrArgs
+	var oldJSON, oldMetarrJSON sql.NullString
+	oldQuery := fmt.Sprintf("SELECT %s, %s FROM %s WHERE %s = ?", consts.QChanURLSettings, consts.QChanURLMetarr, consts.DBChannelURLs, consts.QChanURLID)
+	if err := cs.q.QueryRow(oldQuery, cu.ID).Scan(&oldJSON, &oldMetarrJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to read settings of channel URL %q: %w", cu.URL, err)
 	}
 	if oldJSON.Valid && oldJSON.String != "" {
@@ -110,7 +114,15 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 			return fmt.Errorf("failed to read settings of channel URL %q: %w", cu.URL, err)
 		}
 	}
-	if err := createDownloadDirs(old, cu.ChanURLSettings); err != nil {
+	if oldMetarrJSON.Valid && oldMetarrJSON.String != "" {
+		if err := json.Unmarshal([]byte(oldMetarrJSON.String), &oldMetarr); err != nil {
+			return fmt.Errorf("failed to read Metarr settings of channel URL %q: %w", cu.URL, err)
+		}
+	}
+	if err := checkDownloadDirs(old, cu.ChanURLSettings); err != nil {
+		return err
+	}
+	if err := checkOutputDir(oldMetarr, cu.ChanURLMetarrArgs); err != nil {
 		return err
 	}
 	metarrJSON, err := json.Marshal(cu.ChanURLMetarrArgs)

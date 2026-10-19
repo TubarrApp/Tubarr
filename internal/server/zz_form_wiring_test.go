@@ -348,7 +348,13 @@ func urlSettingValue(key, v string, number bool) any {
 // pages send them, chosen to pass validation and read back unchanged. Per-URL settings use them the other way round.
 func formSamples(t *testing.T) map[string][2]string {
 	t.Helper()
-	sub := func(name string) string { return filepath.Join(fuzzServer.dir, "wiring", name) }
+	sub := func(name string) string {
+		dir := filepath.Join(fuzzServer.dir, "wiring", name)
+		if err := os.MkdirAll(dir, 0o755); err != nil { // Folders must exist to be saved.
+			t.Fatal(err)
+		}
+		return dir
+	}
 	file := func(name, content string) string { return wiringFile(t, name, content) }
 	auth := func(user, pass, login string) string {
 		data, err := json.Marshal([]map[string]string{{"channel_url": wiringURLA, "username": user, "password": pass, "login_url": login}})
@@ -642,7 +648,7 @@ func TestEditChangesURLPassword(t *testing.T) {
 	base := url.Values{
 		"name":            {"Password Change"},
 		"urls":            {"https://example.com/@password"},
-		"video_directory": {filepath.Join(fuzzServer.dir, "wiring", "password")},
+		"video_directory": {filepath.Join(fuzzServer.dir, "videos")},
 		"max_concurrency": {"1"}, "crawl_freq": {"30"}, "download_retries": {"1"},
 	}
 	authFor := func(pass string) string {
@@ -837,14 +843,14 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/channels/{}", replay: readsJSON("/api/v1/channels/1")},
 		{path: "/api/v1/channels/activity", replay: readsJSON("/api/v1/channels/activity")},
 		{path: "/api/v1/channels/add-from-directory", keys: []string{"add_from_config_dir"}, replay: func(t *testing.T) {
-			path := wiringFile(t, filepath.Join("config-dir", "channel.yaml"), "channel-name: Wiring From Folder\nchannel-urls:\n  - https://example.com/@wiring-folder\nvideo-directory: "+filepath.Join(fuzzServer.dir, "wiring", "folder")+"\n")
+			path := wiringFile(t, filepath.Join("config-dir", "channel.yaml"), "channel-name: Wiring From Folder\nchannel-urls:\n  - https://example.com/@wiring-folder\nvideo-directory: "+filepath.Join(fuzzServer.dir, "videos")+"\n")
 			if w := sendForm(t, post, "/api/v1/channels/add-from-directory", url.Values{"add_from_config_dir": {filepath.Dir(path)}}); w.Code != http.StatusCreated {
 				t.Fatalf("adding from a folder = %d %s", w.Code, w.Body.String())
 			}
 			deleteChannelNamed(t, "Wiring From Folder")
 		}},
 		{path: "/api/v1/channels/add-from-file", keys: []string{"add_from_config_file"}, replay: func(t *testing.T) {
-			path := wiringFile(t, "channel.yaml", "channel-name: Wiring From File\nchannel-urls:\n  - https://example.com/@wiring-file\nvideo-directory: "+filepath.Join(fuzzServer.dir, "wiring", "file")+"\n")
+			path := wiringFile(t, "channel.yaml", "channel-name: Wiring From File\nchannel-urls:\n  - https://example.com/@wiring-file\nvideo-directory: "+filepath.Join(fuzzServer.dir, "videos")+"\n")
 			if w := sendForm(t, post, "/api/v1/channels/add-from-file", url.Values{"add_from_config_file": {path}}); w.Code != http.StatusCreated {
 				t.Fatalf("adding from a file = %d %s", w.Code, w.Body.String())
 			}

@@ -1008,6 +1008,9 @@ func parseOverrideLines(l *models.OverrideLines) (o *models.VideoOverrides, err 
 	if err := validation.CheckDirectory(o.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
 		return nil, fmt.Errorf("invalid output directory %q: %w", o.OutputDir, err)
 	}
+	if err := validation.CheckDestination(o.OutputDir); err != nil {
+		return nil, fmt.Errorf("invalid output directory %q: %w", o.OutputDir, err)
+	}
 	if o.MetaOps, err = parsing.ParseMetaOps(splitOpLines(l.MetaOps)); err != nil {
 		return nil, fmt.Errorf("invalid meta ops: %w", err)
 	}

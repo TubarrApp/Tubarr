@@ -236,29 +236,10 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 			recordSkip(s.VideoStore(), c, actualVideoURL, fmt.Errorf("%s is blocked for %s requests, %v left", hostname, blockCtx, remaining.Round(time.Second)))
 			continue
 		}
-		if err := checkDestinations(c, targetChannelURLModel); err != nil {
-			logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, err)
-			// A video not yet in the channel is kept as failed, so the URL the user entered isn't lost.
-			if _, exists := s.VideoStore().VideoExists(&models.Video{URL: actualVideoURL}, c.ID); !exists {
-				failed := &models.Video{ChannelID: c.ID, ChannelURLID: targetChannelURLModel.ID, ChannelURL: targetChannelURLModel.URL,
-					URL: actualVideoURL, DownloadStatus: models.DLStatus{Status: consts.DLStatusFailed}}
-				if id, addErr := s.VideoStore().AddVideo(failed, c.ID, targetChannelURLModel.ID); addErr != nil {
-					logger.Pl.E("Failed to store skipped video %q: %v", actualVideoURL, addErr)
-				} else if setErr := s.VideoStore().SetMissingVideoErrors([]int64{id}, err.Error()); setErr != nil {
-					logger.Pl.E("Failed to store why video %q was skipped: %v", actualVideoURL, setErr)
-				}
-			}
-			recordSkip(s.VideoStore(), c, actualVideoURL, err)
-			continue
-		}
-
 		// // Check if already downloaded.
 		// if _, exists := existingVideoURLsMap[actualVideoURL]; exists {
 		// 	return fmt.Errorf("video %q already downloaded to this channel, please delete it using 'delete-videos' first if you wish to re-download it", actualVideoURL)
 		// }
-
-		// Store the model for later use.
-		channelURLModels[batch] = targetChannelURLModel
 
 		v := &models.Video{
 			ChannelID:    c.ID,
@@ -277,8 +258,30 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 				continue
 			}
 		}
+		if err := checkDestinations(c, targetChannelURLModel, v.Overrides); err != nil {
+			logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, err)
+			// A video not yet in the channel is kept as failed, so the URL the user entered isn't lost.
+			if v.ID == 0 {
+				failed := &models.Video{ChannelID: c.ID, ChannelURLID: targetChannelURLModel.ID, ChannelURL: targetChannelURLModel.URL,
+					URL: actualVideoURL, DownloadStatus: models.DLStatus{Status: consts.DLStatusFailed}}
+				if id, addErr := s.VideoStore().AddVideo(failed, c.ID, targetChannelURLModel.ID); addErr != nil {
+					logger.Pl.E("Failed to store skipped video %q: %v", actualVideoURL, addErr)
+				} else if setErr := s.VideoStore().SetMissingVideoErrors([]int64{id}, err.Error()); setErr != nil {
+					logger.Pl.E("Failed to store why video %q was skipped: %v", actualVideoURL, setErr)
+				}
+			}
+			recordSkip(s.VideoStore(), c, actualVideoURL, err)
+			continue
+		}
+
+		// Store the model for later use.
+		channelURLModels[batch] = targetChannelURLModel
 		customVideoRequests = append(customVideoRequests, v)
 		videosByBatch[batch] = append(videosByBatch[batch], v)
+	}
+
+	if len(customVideoRequests) == 0 {
+		return fmt.Errorf("all %d video(s) were skipped, see the errors above", len(videos))
 	}
 
 	// Main process.
@@ -352,7 +355,7 @@ func UnavailableDestinations(c *models.Channel, videos []models.ManualVideo) (ba
 		if i := slices.IndexFunc(c.URLModels, func(u *models.ChannelURL) bool { return mv.ChannelURLID != 0 && u.ID == mv.ChannelURLID }); i >= 0 {
 			cu = c.URLModels[i]
 		}
-		if err := checkDestinations(c, cu); err != nil {
+		if err := checkDestinations(c, cu, nil); err != nil {
 			bad = append(bad, fmt.Sprintf("%s: %v", mv.URL, err))
 		}
 	}
@@ -676,7 +679,7 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 		}
 
 		// Don't download anywhere unexpected (e.g. onto the local disk under an unmounted drive's mount point).
-		if err := checkDestinations(c, cu); err != nil {
+		if err := checkDestinations(c, cu, nil); err != nil {
 			logger.Pl.E("Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
 			continue
 		}
@@ -687,14 +690,31 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 	return allowedURLModels, len(allowedURLModels) > 0
 }
 
-// checkDestinations returns an error if any of a channel URL's download destinations isn't available.
-func checkDestinations(c *models.Channel, cu *models.ChannelURL) error {
+// checkDestinations returns an error if any of a channel URL's download destinations (or a video's overrides) isn't available.
+func checkDestinations(c *models.Channel, cu *models.ChannelURL, o *models.VideoOverrides) error {
 	s := cmp.Or(cu.ChanURLSettings, c.ChanSettings)
 	var dirs []string
 	if s != nil {
-		dirs = append(dirs, s.VideoDir, s.JSONDir)
-		for _, op := range s.MetaFilterMoveOps {
-			dirs = append(dirs, op.OutputDir)
+		videoDir, jsonDir := s.VideoDir, s.JSONDir
+		if o != nil {
+			videoDir, jsonDir = cmp.Or(o.VideoDir, videoDir), cmp.Or(o.JSONDir, jsonDir)
+		}
+		dirs = append(dirs, videoDir, jsonDir)
+	}
+	// Metarr's output directory, in the order metarr.parseMetarrOutputDir picks it.
+	switch {
+	case o != nil && o.OutputDir != "":
+		dirs = append(dirs, o.OutputDir)
+	case abstractions.IsSet(keys.MoveOnComplete):
+		dirs = append(dirs, abstractions.GetString(keys.MoveOnComplete))
+	default:
+		if s != nil {
+			for _, op := range s.MetaFilterMoveOps {
+				dirs = append(dirs, op.OutputDir)
+			}
+		}
+		if m := cmp.Or(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); m != nil {
+			dirs = append(dirs, m.OutputDir)
 		}
 	}
 	for _, dir := range dirs {

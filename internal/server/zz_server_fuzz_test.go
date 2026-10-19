@@ -68,8 +68,8 @@ var fuzzRoutes = []fuzzRoute{
 	{http.MethodDelete, "/api/v1/channels/{p}/delete"},
 }
 
-// testDir is the working directory for this package's tests, holding the test database and any directories requests
-// create (directory settings are created when validated). Removed when the tests finish.
+// testDir is the working directory for this package's tests, holding the test database and the "videos" and "json"
+// folders channels are saved with (folders must exist to be saved). Removed when the tests finish.
 var testDir string
 
 // pkgDir is this package's source directory (fuzz workers start in the coordinator's temporary directory, not here).
@@ -86,6 +86,11 @@ func TestMain(m *testing.M) {
 	testDir = dir
 	if err := os.Chdir(dir); err != nil {
 		log.Fatal(err)
+	}
+	for _, d := range []string{"videos", "json"} {
+		if err := os.Mkdir(filepath.Join(dir, d), 0o755); err != nil {
+			log.Fatal(err)
+		}
 	}
 	code := m.Run()
 	_ = os.RemoveAll(dir)
@@ -281,8 +286,9 @@ func TestUpdateRejectsMissingOrNonHTTPURLs(t *testing.T) {
 	}
 }
 
-// TestRejectedAddCreatesNoDirectories tests that a channel's directories are only created once it's accepted.
-func TestRejectedAddCreatesNoDirectories(t *testing.T) {
+// TestAddNeverCreatesDirectories tests that adding a channel with a missing folder is refused without creating it (it may
+// be on an unmounted drive), and accepted once the folder exists.
+func TestAddNeverCreatesDirectories(t *testing.T) {
 	setupFuzzServer(t)
 	videoDir := filepath.Join(fuzzServer.dir, "new-videos")
 	form := url.Values{
@@ -292,7 +298,6 @@ func TestRejectedAddCreatesNoDirectories(t *testing.T) {
 		jsonkeys.SettingsMaxConcurrency:  {"1"},
 		jsonkeys.SettingsCrawlFreq:       {"30"},
 		jsonkeys.SettingsDownloadRetries: {"1"},
-		jsonkeys.MetarrRenameStyle:       {"not-a-style"}, // Rejected after the directories are checked.
 	}
 	add := func() int {
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/channels/add", strings.NewReader(form.Encode()))
@@ -303,18 +308,17 @@ func TestRejectedAddCreatesNoDirectories(t *testing.T) {
 	}
 
 	if code := add(); code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for an invalid rename style, got %d", code)
+		t.Fatalf("expected 400 for a missing video folder, got %d", code)
 	}
 	if _, err := os.Stat(videoDir); !os.IsNotExist(err) {
-		t.Errorf("rejected add created video directory %q (stat error: %v)", videoDir, err)
+		t.Errorf("refused add created video directory %q (stat error: %v)", videoDir, err)
 	}
 
-	form.Del(jsonkeys.MetarrRenameStyle)
-	if code := add(); code >= 300 {
-		t.Fatalf("expected the corrected add to succeed, got %d", code)
+	if err := os.Mkdir(videoDir, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if info, err := os.Stat(videoDir); err != nil || !info.IsDir() {
-		t.Errorf("accepted add didn't create video directory %q: %v", videoDir, err)
+	if code := add(); code >= 300 {
+		t.Fatalf("expected the add to succeed once the folder exists, got %d", code)
 	}
 }
 
@@ -365,7 +369,7 @@ func FuzzAPI(f *testing.F) {
 		}
 		form.Del("ignore_run")
 
-		// Directory settings are created when validated, so only allow paths inside the test's working directory.
+		// Only allow paths inside the test's working directory.
 		for _, vals := range form {
 			if slices.ContainsFunc(vals, pathOutsideDir) {
 				return

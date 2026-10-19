@@ -24,7 +24,7 @@ import (
 )
 
 // CheckDirectory validates a directory path like sharedvalidation.ValidateDirectory, but without creating it or
-// requiring it to exist (whether it's available is checked before downloading, by CheckDestination). A blank dir is unset.
+// requiring it to exist (whether it's available is checked by CheckDestination). A blank dir is unset.
 func CheckDirectory(dir string, templateMap map[string]struct{}) error {
 	if dir == "" {
 		return nil
@@ -58,15 +58,6 @@ func CheckDestination(dir string) error {
 		return fmt.Errorf("destination %q isn't available: it's a file, not a directory", base)
 	}
 	return nil
-}
-
-// CheckTemplatedBase returns an error if a templated download directory's fixed part (before its first tag) doesn't
-// exist, as crawls won't download there until it does. Plain directories are created when saved, so aren't checked.
-func CheckTemplatedBase(dir string) error {
-	if !strings.Contains(dir, "{{") {
-		return nil
-	}
-	return CheckDestination(dir)
 }
 
 // ValidateChannelURL checks a channel URL is an absolute http(s) URL, so it can't be read as a yt-dlp option or local file.
@@ -201,7 +192,7 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps, checkPaths bo
 			if err := CheckDirectory(op.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
 				return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 			}
-			if err := CheckTemplatedBase(op.OutputDir); err != nil {
+			if err := CheckDestination(op.OutputDir); err != nil {
 				return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 			}
 		}
