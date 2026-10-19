@@ -992,10 +992,17 @@ func parseOverrideLines(l *models.OverrideLines) (o *models.VideoOverrides, err 
 		JSONDir:   strings.TrimSpace(l.JSONDir),
 		OutputDir: strings.TrimSpace(l.OutputDir),
 	}
+	// Downloads need these to exist, so say so now rather than fail the download.
 	if err := validation.CheckDirectory(o.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
 		return nil, fmt.Errorf("invalid video directory %q: %w", o.VideoDir, err)
 	}
+	if err := validation.CheckDestination(o.VideoDir); err != nil {
+		return nil, fmt.Errorf("invalid video directory %q: %w", o.VideoDir, err)
+	}
 	if err := validation.CheckDirectory(o.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
+		return nil, fmt.Errorf("invalid JSON directory %q: %w", o.JSONDir, err)
+	}
+	if err := validation.CheckDestination(o.JSONDir); err != nil {
 		return nil, fmt.Errorf("invalid JSON directory %q: %w", o.JSONDir, err)
 	}
 	if err := validation.CheckDirectory(o.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {

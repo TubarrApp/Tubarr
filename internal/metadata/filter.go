@@ -87,7 +87,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 		logger.Pl.D(2, "%s mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", filterType, v.URL, mustPassed, mustTotal)
 		return false
 	}
-	if anyTotal > 0 && anyPassed == 0 && mustPassed == 0 {
+	if anyTotal > 0 && anyPassed == 0 { // At least one 'any' filter must pass, whatever the 'must' filters did.
 		logger.Pl.D(2, "%s mismatch: Video %q did not pass any 'any' filters (passed %d out of %d)", filterType, v.URL, anyPassed, anyTotal)
 		return false
 	}

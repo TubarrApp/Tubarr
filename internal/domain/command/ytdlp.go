@@ -14,7 +14,7 @@ const (
 	EndOfOptions         = "--" // Placed before the URL, so a URL starting with "-" can't be read as an option.
 	ExternalDLer         = "--external-downloader"
 	ExternalDLArgs       = "--external-downloader-args"
-	FilenameSyntax       = "%(title)s [%(id)s].%(ext)s" // The ID keeps apart videos with the same (or a non-Latin) title.
+	FilenameSyntax       = "%(title).200B [%(id)s].%(ext)s" // The ID keeps apart same-titled videos. 200 bytes fits the 255 byte name limit.
 	Impersonate          = "--impersonate"
 	UserAgent            = "--user-agent"
 	MaxFilesize          = "--max-filesize"

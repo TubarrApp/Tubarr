@@ -72,7 +72,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 ############ NVENC headers ############
-RUN git clone https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
+# Pinned: newer headers raise the minimum host driver (n13.1 needs 610+, dropping Maxwell/Pascal/Volta cards).
+# n12.2.72.0 needs driver 550.54.14+, and newer drivers keep supporting it.
+RUN git clone --depth 1 --branch n12.2.72.0 https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
     make -C /tmp/nv install && rm -rf /tmp/nv
 
 ############ Build SVT-AV1 ############
@@ -93,6 +95,7 @@ RUN set -e && \
         --enable-gpl \
         --enable-nonfree \
         --enable-shared \
+        --disable-static \
         --disable-debug \
         \
         --enable-libx264 \
@@ -164,13 +167,6 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Add multiverse and universe repos
-RUN sed -i 's/^# deb .*universe/deb &/' /etc/apt/sources.list \
- && sed -i 's/^# deb-src .*universe/deb-src &/' /etc/apt/sources.list \
- && sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
- && sed -i 's/^# deb-src .*multiverse/deb-src &/' /etc/apt/sources.list \
- && apt-get update
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # External downloaders for yt-dlp (ffmpeg is built above, httpie is installed below)
     aria2 \
@@ -221,11 +217,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libdrm2 \
     libze-intel-gpu1 \
     libmfx-gen1.2 \
-    # NVIDIA NVENC/NVDEC runtime stack
-    libnvidia-encode-550 \
-    libnvidia-decode-550 \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
+
+# The NVIDIA Container Toolkit mounts the host driver's NVENC/NVDEC libraries when the video capability is requested.
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
 
 # Fix /tmp permissions for non-root usage
 RUN chmod 1777 /tmp
@@ -261,7 +257,6 @@ RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* &&
 ######## Copy Tubarr + Metarr ########
 COPY --from=builder /build/tubarr /app/tubarr
 COPY --from=builder /build/metarr /usr/local/bin/metarr
-RUN chmod +x /app/tubarr /usr/local/bin/metarr
 
 ######## Auto-updater ########
 # Updates yt-dlp and curl_cffi together at start and daily.

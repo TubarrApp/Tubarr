@@ -218,6 +218,16 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		}
 		if err := checkDestinations(c, targetChannelURLModel); err != nil {
 			logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, err)
+			// A video not yet in the channel is kept as failed, so the URL the user entered isn't lost.
+			if _, exists := s.VideoStore().VideoExists(&models.Video{URL: actualVideoURL}, c.ID); !exists {
+				failed := &models.Video{ChannelID: c.ID, ChannelURLID: targetChannelURLModel.ID, ChannelURL: targetChannelURLModel.URL,
+					URL: actualVideoURL, DownloadStatus: models.DLStatus{Status: consts.DLStatusFailed}}
+				if id, addErr := s.VideoStore().AddVideo(failed, c.ID, targetChannelURLModel.ID); addErr != nil {
+					logger.Pl.E("Failed to store skipped video %q: %v", actualVideoURL, addErr)
+				} else if setErr := s.VideoStore().SetMissingVideoErrors([]int64{id}, err.Error()); setErr != nil {
+					logger.Pl.E("Failed to store why video %q was skipped: %v", actualVideoURL, setErr)
+				}
+			}
 			recordSkip(s.VideoStore(), c, actualVideoURL, err)
 			continue
 		}
@@ -312,6 +322,21 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		return fmt.Errorf("encountered errors during processing: %w", procError)
 	}
 	return nil
+}
+
+// UnavailableDestinations returns why videos can't be downloaded now, as their channel URL's destination is unavailable
+// (e.g. an unmounted drive).
+func UnavailableDestinations(c *models.Channel, videos []models.ManualVideo) (bad []string) {
+	for _, mv := range videos {
+		cu := &models.ChannelURL{} // Manual downloads use the channel's settings.
+		if i := slices.IndexFunc(c.URLModels, func(u *models.ChannelURL) bool { return mv.ChannelURLID != 0 && u.ID == mv.ChannelURLID }); i >= 0 {
+			cu = c.URLModels[i]
+		}
+		if err := checkDestinations(c, cu); err != nil {
+			bad = append(bad, fmt.Sprintf("%s: %v", mv.URL, err))
+		}
+	}
+	return bad
 }
 
 // recordSkip stores why a claimed video wasn't downloaded, shown once it's back in the Available list.

@@ -626,18 +626,13 @@ func (cs ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Chan
 	})
 }
 
-// createDownloadDirs creates plain (untemplated) video, JSON and move op directories when settings are saved. They're never
-// created when channels load, so a missing destination (e.g. an unmounted drive) is reported before downloading, not recreated.
-func createDownloadDirs(s *models.Settings) error {
-	if s == nil {
-		return nil
-	}
-	dirs := []string{s.VideoDir, s.JSONDir}
-	for _, op := range s.MetaFilterMoveOps {
-		dirs = append(dirs, op.OutputDir)
-	}
-	for _, dir := range dirs {
-		if dir == "" || strings.Contains(dir, "{{") {
+// createDownloadDirs creates the plain (untemplated) video, JSON and move op directories that saving s adds to old (all of
+// them if old is nil). Unchanged ones are never recreated, so a missing destination (e.g. an unmounted drive) is reported
+// before downloading, not recreated on the local disk.
+func createDownloadDirs(old, s *models.Settings) error {
+	existing := downloadDirs(old)
+	for _, dir := range downloadDirs(s) {
+		if dir == "" || strings.Contains(dir, "{{") || slices.Contains(existing, dir) {
 			continue
 		}
 		if err := os.MkdirAll(dir, sharedconsts.PermsGenericDir); err != nil {
@@ -645,6 +640,18 @@ func createDownloadDirs(s *models.Settings) error {
 		}
 	}
 	return nil
+}
+
+// downloadDirs returns the video, JSON and move op directories of s.
+func downloadDirs(s *models.Settings) []string {
+	if s == nil {
+		return nil
+	}
+	dirs := []string{s.VideoDir, s.JSONDir}
+	for _, op := range s.MetaFilterMoveOps {
+		dirs = append(dirs, op.OutputDir)
+	}
+	return dirs
 }
 
 // AddChannelWithDetails adds a channel with its logins and notifications in one transaction, setting c.ID.
@@ -696,11 +703,11 @@ func (cs ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 	}
 
 	// Everything is valid, so create the destination directories.
-	if err := createDownloadDirs(c.ChanSettings); err != nil {
+	if err := createDownloadDirs(nil, c.ChanSettings); err != nil {
 		return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
 	for _, cu := range c.URLModels {
-		if err := createDownloadDirs(cu.ChanURLSettings); err != nil {
+		if err := createDownloadDirs(nil, cu.ChanURLSettings); err != nil {
 			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 		}
 	}
@@ -1211,10 +1218,8 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 	}
 
 	// Create changed destination directories (only changed ones, so e.g. pausing never recreates a missing destination).
-	if settings.VideoDir != old.VideoDir || settings.JSONDir != old.JSONDir {
-		if err := createDownloadDirs(&settings); err != nil {
-			return 0, err
-		}
+	if err := createDownloadDirs(&old, &settings); err != nil {
+		return 0, err
 	}
 
 	// Marshal updated settings.

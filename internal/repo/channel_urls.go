@@ -25,7 +25,7 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 		if err := validation.ValidateChannelURL(cu.URL); err != nil {
 			return 0, err
 		}
-		if err := createDownloadDirs(cu.ChanURLSettings); err != nil {
+		if err := createDownloadDirs(nil, cu.ChanURLSettings); err != nil {
 			return 0, err
 		}
 	}
@@ -98,7 +98,19 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 
 // UpdateChannelURLSettings updates the settings of a single ChannelURL model.
 func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
-	if err := createDownloadDirs(cu.ChanURLSettings); err != nil {
+	// Only folders this save adds are created, so e.g. saving the channel never recreates one on an unmounted drive.
+	var old *models.Settings
+	var oldJSON sql.NullString
+	oldQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QChanURLSettings, consts.DBChannelURLs, consts.QChanURLID)
+	if err := cs.q.QueryRow(oldQuery, cu.ID).Scan(&oldJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("failed to read settings of channel URL %q: %w", cu.URL, err)
+	}
+	if oldJSON.Valid && oldJSON.String != "" {
+		if err := json.Unmarshal([]byte(oldJSON.String), &old); err != nil {
+			return fmt.Errorf("failed to read settings of channel URL %q: %w", cu.URL, err)
+		}
+	}
+	if err := createDownloadDirs(old, cu.ChanURLSettings); err != nil {
 		return err
 	}
 	metarrJSON, err := json.Marshal(cu.ChanURLMetarrArgs)

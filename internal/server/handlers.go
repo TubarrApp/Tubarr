@@ -1144,6 +1144,10 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		http.Error(w, "can't download:\n"+strings.Join(bad, "\n"), http.StatusBadRequest)
 		return
 	}
+	if bad := app.UnavailableDestinations(c, requestBody.Videos); len(bad) > 0 {
+		http.Error(w, "can't download now:\n"+strings.Join(bad, "\n"), http.StatusConflict)
+		return
+	}
 
 	// Start download in background, once any running crawl or download of the channel finishes.
 	queued := state.CrawlStateActive(c.ID)

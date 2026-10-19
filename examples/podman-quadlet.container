@@ -23,6 +23,8 @@ PublishPort=8827:8827
 # GPU for hardware transcoding. Leave these commented out if there's no /dev/dri,
 # otherwise the container won't start.
 #AddDevice=/dev/dri:/dev/dri:rwm
+# NVIDIA GPU (NVENC/CUDA). Needs the NVIDIA Container Toolkit's CDI spec (nvidia-ctk cdi generate) and driver 550.54.14+.
+#AddDevice=nvidia.com/gpu=all
 
 # Tubarr and Metarr data (database, settings, logs). Create these first, owned by PUID/PGID.
 Volume=/opt/containers/tubarr/.tubarr:/home/tubarr/.tubarr:Z

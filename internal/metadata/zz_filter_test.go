@@ -61,3 +61,32 @@ func TestUnusableFilterFileSkipsVideo(t *testing.T) {
 		t.Errorf("empty filter file: passed = %v, err = %v; want passed", pass, err)
 	}
 }
+
+// TestMustAndAnyFilters tests a video passes when every 'must' filter passes and, if there are 'any' filters, at least
+// one of them does.
+func TestMustAndAnyFilters(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	f := func(op, value, mustAny string) models.Filters {
+		return models.Filters{Field: "title", FilterType: op, Value: value, MustAny: mustAny}
+	}
+	tutorial := f("contains", "tutorial", "must")
+	beginner, intro := f("contains", "beginner", "any"), f("contains", "intro", "any")
+	tests := []struct {
+		title   string
+		filters []models.Filters
+		want    bool
+	}{
+		{"tutorial for beginners", []models.Filters{tutorial, beginner, intro}, true},
+		{"advanced tutorial", []models.Filters{tutorial, beginner, intro}, false}, // No 'any' filter passed.
+		{"intro for beginners", []models.Filters{tutorial, beginner, intro}, false},
+		{"intro", []models.Filters{beginner, intro}, true},
+		{"advanced", []models.Filters{beginner, intro}, false},
+		{"tutorial", []models.Filters{tutorial}, true},
+	}
+	for _, tt := range tests {
+		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: map[string]any{"title": tt.title}}
+		if got := checkFilters(v, "Download filters", tt.filters); got != tt.want {
+			t.Errorf("checkFilters(%q, %v) = %v, want %v", tt.title, tt.filters, got, tt.want)
+		}
+	}
+}

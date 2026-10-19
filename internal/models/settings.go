@@ -212,9 +212,17 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 		}
 	}
 
-	// Boolean pointer comparisons
+	// Boolean comparisons (pausing is per URL, never inherited).
+	if child.Paused {
+		return false
+	}
 	if child.UseGlobalCookies != nil {
 		if parent.UseGlobalCookies == nil || *parent.UseGlobalCookies != *child.UseGlobalCookies {
+			return false
+		}
+	}
+	if child.AutoDownload != nil {
+		if parent.AutoDownload == nil || *parent.AutoDownload != *child.AutoDownload {
 			return false
 		}
 	}
