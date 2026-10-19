@@ -19,7 +19,7 @@ var (
 
 // DomainLimiter limits concurrent operations per domain. A domain with no entry is unlimited.
 type DomainLimiter struct {
-	kind string
+	kind string // The type of thing being limited (e.g. downloads, or crawls)
 	mu   sync.RWMutex
 	sems map[string]chan struct{}
 }
@@ -53,16 +53,23 @@ func (l *DomainLimiter) Set(hostname string, limit int) {
 
 // Acquire blocks until a slot is free for rawURL's domain, or ctx is done. Pass the returned semaphore to Release.
 func (l *DomainLimiter) Acquire(ctx context.Context, rawURL string) (chan struct{}, error) {
+	// Grab the URL's hostname for map lookup.
 	hostname := Hostname(rawURL)
 	if hostname == "" {
 		return nil, nil
 	}
+
+	// Acquire sem from hostname (each hostname can have a different concurrency limit).
 	l.mu.RLock()
 	sem := l.sems[hostname]
 	l.mu.RUnlock()
+
+	// No semaphore exists for this hostname.
 	if sem == nil {
 		return nil, nil
 	}
+
+	// Grab a semaphore slot.
 	if err := AcquireSlot(ctx, sem, hostname+" "+l.kind, rawURL); err != nil {
 		return nil, err
 	}
@@ -71,18 +78,21 @@ func (l *DomainLimiter) Acquire(ctx context.Context, rawURL string) (chan struct
 
 // AcquireSlot takes a slot on sem, logging if it has to wait for one.
 func AcquireSlot(ctx context.Context, sem chan struct{}, limitDesc, target string) error {
+	// Try to acquire a slot immediately without waiting.
 	select {
 	case sem <- struct{}{}:
 		return nil
 	default:
+		// Continue below.
 	}
 
+	// No slots were available:
 	logger.Pl.I("Waiting for a free %s slot for %q (all %d in use)...", limitDesc, target, cap(sem))
 	select {
-	case sem <- struct{}{}:
+	case sem <- struct{}{}: // Slot got released, can continue.
 		logger.Pl.D(1, "Got a %s slot for %q", limitDesc, target)
 		return nil
-	case <-ctx.Done():
+	case <-ctx.Done(): // Context was cancelled or its deadline expired, so abort.
 		return ctx.Err()
 	}
 }

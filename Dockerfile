@@ -73,8 +73,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ############ NVENC headers ############
 # Pinned: newer headers raise the minimum host driver (n13.1 needs 610+, dropping Maxwell/Pascal/Volta cards).
-# n12.2.72.0 needs driver 550.54.14+, and newer drivers keep supporting it.
-RUN git clone --depth 1 --branch n12.2.72.0 https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
+# n13.0.19.1 needs driver 570+ (Maxwell/Pascal/Volta run up to 580), and newer drivers keep supporting it.
+RUN git clone --depth 1 --branch n13.0.19.1 https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
     make -C /tmp/nv install && rm -rf /tmp/nv
 
 ############ Build SVT-AV1 ############

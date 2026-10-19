@@ -37,15 +37,35 @@ var crawlSems sync.Map
 // Returns a function releasing the slot.
 func AcquireCrawlSlot(ctx context.Context, channelName string) (release func(), err error) {
 	n := abstractions.GetInt(keys.CrawlConcurrency)
+
+	// Limit is 0 or less, don't create semaphore or release function.
 	if n <= 0 {
 		return func() {}, nil
 	}
-	v, _ := crawlSems.LoadOrStore(n, make(chan struct{}, n))
-	sem, _ := v.(chan struct{})
+
+	// Create channel of the capacity (int value) of CrawlConcurrency.
+	// i.e. it can hold only 'n' items at a time.
+	semChan := make(chan struct{}, n)
+
+	// Store the semaphore in the sync map, reusing the existing channel if the limit is already present.
+	v, _ := crawlSems.LoadOrStore(n, semChan)
+
+	// Type assert 'v' from 'any' back to 'chan struct{}'.
+	sem, ok := v.(chan struct{})
+	if !ok {
+		return nil, fmt.Errorf("type assertion failed for semaphore 'chan struct{}' in channel %q", channelName)
+	}
+
+	// Acquire a slot from sem, waiting if necessary until one is available or ctx ends.
 	if err := limits.AcquireSlot(ctx, sem, "crawl", channelName); err != nil {
 		return nil, err
 	}
-	return func() { <-sem }, nil
+
+	// Running this 'release()' function removes a value from sem, freeing the slot.
+	release = func() { <-sem }
+
+	// Return the release function to the caller to free the slot when the crawl finishes.
+	return release, nil
 }
 
 // CheckChannels checks channels and whether they are due for a crawl.

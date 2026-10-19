@@ -13,8 +13,16 @@ if [ "$(id -u tubarr)" != "$PUID" ] || [ "$(id -g tubarr)" != "$PGID" ]; then
 fi
 chown "$PUID":"$PGID" /home/tubarr /home/tubarr/.tubarr 2>/dev/null || true
 
-# Required for hardware acceleration
-usermod -aG video tubarr 2>/dev/null || true
+# Required for hardware acceleration: join the groups owning the GPU device nodes. Hosts differ on the render node's
+# group and its ID, so a group is made for any ID the image doesn't have.
+for dev in /dev/dri/*; do
+    [ -c "$dev" ] || continue
+    gid=$(stat -c %g "$dev")
+    { [ "$gid" = 0 ] || [ "$gid" = 65534 ]; } && continue
+    group=$(getent group "$gid" | cut -d: -f1)
+    [ -n "$group" ] || { group="gpu$gid"; groupadd -g "$gid" "$group"; }
+    usermod -aG "$group" tubarr
+done
 
 # Fix /tmp permissions
 chmod 1777 /tmp

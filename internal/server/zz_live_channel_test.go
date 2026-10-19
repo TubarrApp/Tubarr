@@ -165,9 +165,7 @@ func setupLive(t *testing.T) {
 }
 
 // liveTail makes fuzzed text safe to add to titles without changing which filters match them: no "c" or "d" (so no
-// "cats" or "dogs"), no "&" (an HTML entity could spell one), and only characters XML allows. Control characters are
-// left out too until Metarr is built with gocommon's SanitizePathComponent that replaces them, as a newline in a file
-// name cuts short the paths Metarr reports to Tubarr.
+// "cats" or "dogs"), no "&" (an HTML entity could spell one), and only characters XML allows.
 func liveTail(s string) string {
 	var b strings.Builder
 	for _, r := range strings.ToValidUTF8(s, "") {
@@ -176,7 +174,7 @@ func liveTail(s string) string {
 			r = '_'
 		case r == '&':
 			r = '+'
-		case r < 0x20, r == 0x7f, r == 0xfffe, r == 0xffff:
+		case r < 0x20 && r != '\n' && r != '\t', r == 0x7f, r == 0xfffe, r == 0xffff:
 			continue
 		}
 		if b.Len()+utf8.RuneLen(r) > liveMaxTail {
@@ -1521,6 +1519,7 @@ var liveSeeds = []struct {
 		"Ünïcödé ✓ ‘quotes’ / slashes \\ and {{video_title}}"},
 	{[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, []byte{actCrawl, 0, actRerunMetarr, 0, actUpload, 1, actEditAuto, 0, actCrawl, 0, actDownloadAs, 1},
 		strings.Repeat("A very long title ", 20)},
+	{[]byte{0}, []byte{actCrawl, 0, actRerunMetarr, 0}, `Hello, "World"`},
 }
 
 // FuzzLiveChannel adds a channel with fuzzed settings whose URLs are local feeds of tiny videos, then does what a user

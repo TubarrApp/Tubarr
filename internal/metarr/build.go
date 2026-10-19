@@ -3,10 +3,8 @@ package metarr
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"strconv"
-	"strings"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/metkeys"
@@ -197,13 +195,13 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	argSlicesMap := make(map[string][]string, sliceLen)
 	argFlags := make([]string, 0, flagLen)
 
-	// Viper slice comma parsing issue workaround.
-	argMap[metkeys.VideoFile] = cleanAndWrapCommaPaths(v.VideoFilePath)
+	// Metarr takes each path whole, so commas and quotes in file names need no escaping.
+	argMap[metkeys.VideoFile] = v.VideoFilePath
 
 	if v.JSONCustomFile == "" {
-		argMap[metkeys.MetaFile] = cleanAndWrapCommaPaths(v.JSONFilePath)
+		argMap[metkeys.MetaFile] = v.JSONFilePath
 	} else {
-		argMap[metkeys.MetaFile] = cleanAndWrapCommaPaths(v.JSONCustomFile)
+		argMap[metkeys.MetaFile] = v.JSONCustomFile
 	}
 
 	// Build argument list.
@@ -358,30 +356,4 @@ func calcNumElements(fields []metCmdMapping) (singles, slices, flags int) {
 		}
 	}
 	return singleElements, sliceElements, flagElements
-}
-
-// cleanAndWrapCommaPaths performs escaping for strings containing commas (can be misinterpreted in slices).
-func cleanAndWrapCommaPaths(path string) string {
-
-	if strings.ContainsRune(path, ',') {
-		// Escape quotes if needed.
-		if strings.ContainsRune(path, '"') {
-			escaped := strings.ReplaceAll(path, `"`, `\"`)
-			if err := os.Rename(path, escaped); err != nil {
-				logger.Pl.E("Failed to escape quotes in filename %q: %v", path, err)
-			} else {
-				path = escaped
-			}
-		}
-
-		// Prefix and suffix with double quotes.
-		b := strings.Builder{}
-		b.Grow(len(path) + 2)
-		b.WriteByte('"')
-		b.WriteString(path)
-		b.WriteByte('"')
-
-		return b.String()
-	}
-	return path
 }

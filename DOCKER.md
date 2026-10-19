@@ -4,7 +4,7 @@ This guide explains how to run Tubarr in Docker or Podman containers.
 
 ## Prerequisites
 
-- **Docker** (version 20.10+) OR **Podman** (version 3.0+)
+- **Docker** (version 20.10+) OR **Podman** (version 3.0+; 4.4+ for the Quadlet example, 4.1+ for NVIDIA GPUs)
 - **Docker Compose** (optional, for easier deployment)
 - At least 2GB of available disk space
 
@@ -118,7 +118,7 @@ Pass the GPU's device nodes through: uncomment `devices: - /dev/dri:/dev/dri` in
 
 The image doesn't include NVIDIA's driver libraries. The [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) mounts the host driver's own when the container starts, so they always match the installed driver. The host needs:
 
-- NVIDIA driver 550.54.14 or newer (GTX 900-series/Maxwell cards and newer)
+- NVIDIA driver 570 or newer (GTX 900-series/Maxwell cards and newer)
 - The NVIDIA Container Toolkit. For Docker, run `sudo nvidia-ctk runtime configure --runtime=docker` after installing it, then restart Docker. Podman uses the toolkit's CDI spec, which newer versions generate automatically (otherwise run `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`)
 
 Then uncomment the `deploy:` block in the compose example, add `--gpus all` to `docker run`, or uncomment `AddDevice=nvidia.com/gpu=all` in the Podman Quadlet.

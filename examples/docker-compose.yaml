@@ -14,7 +14,7 @@ services:
     # devices:
     #   - /dev/dri:/dev/dri
 
-    # Optional NVIDIA GPU (NVENC/CUDA). Needs the NVIDIA Container Toolkit on the host and driver 550.54.14+.
+    # Optional NVIDIA GPU (NVENC/CUDA). Needs the NVIDIA Container Toolkit on the host and driver 570+.
     # deploy:
     #   resources:
     #     reservations:
