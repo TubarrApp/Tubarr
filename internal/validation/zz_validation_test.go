@@ -527,8 +527,7 @@ func TestValidateMetaFilterMoveOps_EmptyField(t *testing.T) {
 }
 
 func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
-	// A file where a directory should be is invalid. (A missing directory is fine here: whether it's available is
-	// checked before downloading.)
+	// A file where a directory should be is invalid, as is a missing directory (it may be on an unmounted drive).
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "file.txt")
 	if err := os.WriteFile(file, nil, 0o600); err != nil {
@@ -557,8 +556,11 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 	}
 
 	moveOps[0].OutputDir = filepath.Join(tmp, "missing_dir")
-	if err := validation.ValidateMetaFilterMoveOps(moveOps, true); err != nil {
-		t.Fatalf("expected a missing directory to be accepted, got %v", err)
+	if err := validation.ValidateMetaFilterMoveOps(moveOps, true); err == nil {
+		t.Fatal("expected a missing directory to be refused")
+	}
+	if _, err := os.Stat(moveOps[0].OutputDir); err == nil {
+		t.Error("validation created the missing directory")
 	}
 }
 
