@@ -945,7 +945,7 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/channels/{}/ignore-crawl", replay: routed(post, "/api/v1/channels/999999/ignore-crawl", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/latest-downloads", replay: readsJSON("/api/v1/channels/1/latest-downloads")},
 		{path: "/api/v1/channels/{}/notification-seen", replay: routed(post, "/api/v1/channels/1/notification-seen", http.StatusOK)},
-		{path: "/api/v1/channels/{}/run-metarr", keys: []string{"video_ids", "overrides"}, replay: strictJSON(post, "/api/v1/channels/999999/run-metarr", `{"video_ids":[1]}`, http.StatusNotFound)},
+		{path: "/api/v1/channels/{}/run-metarr", keys: []string{"video_ids", "overrides", "rerun"}, replay: strictJSON(post, "/api/v1/channels/999999/run-metarr", `{"video_ids":[1]}`, http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/stop-metarr", keys: []string{"video_ids"}, replay: strictJSON(post, "/api/v1/channels/1/stop-metarr", `{"video_ids":[999999]}`, http.StatusConflict)},
 		{path: "/api/v1/channels/{}/toggle-pause", replay: func(t *testing.T) {
 			var first, second struct {

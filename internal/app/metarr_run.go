@@ -151,10 +151,11 @@ func acquireMetarrSlots(ctx context.Context, stop <-chan struct{}, c *models.Cha
 	}, true
 }
 
-// RunMetarr runs Metarr on finished videos in a channel which Metarr has not yet processed.
+// RunMetarr runs Metarr on finished videos in a channel which Metarr has not yet processed, and with rerun on given
+// videos it already has, using their finished files.
 //
 // If videoIDs is empty, all videos awaiting Metarr in the channel are processed.
-func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoIDs []int64) error {
+func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoIDs []int64, rerun bool) error {
 	if c == nil {
 		return errors.New("invalid nil channel")
 	}
@@ -169,7 +170,10 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 		return fmt.Errorf("cannot run 'metarr': %w", err)
 	}
 
-	videos, err := s.VideoStore().GetVideosAwaitingMetarr(c.ID)
+	if rerun && len(videoIDs) == 0 {
+		return errors.New("a Metarr re-run needs the videos to run on")
+	}
+	videos, err := s.VideoStore().GetVideosAwaitingMetarr(c.ID, rerun)
 	if err != nil {
 		return err
 	}

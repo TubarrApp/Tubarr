@@ -363,7 +363,7 @@ func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.St
 			// Resolve URLs to video IDs.
 			var ids []int64
 			if len(urls) > 0 {
-				videos, err := s.VideoStore().GetVideosAwaitingMetarr(c.ID)
+				videos, err := s.VideoStore().GetVideosAwaitingMetarr(c.ID, false)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					return err
@@ -382,7 +382,7 @@ func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.St
 			}
 
 			file.UpdateFromConfigFile(cs, c)
-			if err := app.RunMetarr(ctx, s, c, ids); err != nil {
+			if err := app.RunMetarr(ctx, s, c, ids, false); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return err
 			}

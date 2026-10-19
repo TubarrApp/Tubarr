@@ -1118,12 +1118,12 @@
           },
 
           async stopQueue(channel) {
-            if (!confirm(`Stop the queue for "${channel.name}"?\n\nNothing new will start: crawling stops, and queued downloads are canceled. In-progress downloads and transcodes will finish. Downloaded videos not yet transcoded can be finished later with Run Metarr.`)) return;
+            if (!confirm(`Stop the queue for "${channel.name}"?\n\nNothing new will start: crawling stops, and queued downloads are canceled. In-progress downloads and transcodes will finish. Downloaded videos not yet transcoded can be finished later with Post-Process on the channel's videos page.`)) return;
             await this.postStop(channel, 'stop-queue');
           },
 
           async abortAll(channel) {
-            if (!confirm(`Abort everything for "${channel.name}"?\n\nCrawling, queued and in-progress downloads, and running transcodes will all be stopped now. Downloads are picked up by the next crawl, and transcodes can be finished later with Run Metarr.`)) return;
+            if (!confirm(`Abort everything for "${channel.name}"?\n\nCrawling, queued and in-progress downloads, and running transcodes will all be stopped now. Downloads are picked up by the next crawl, and transcodes can be finished later with Post-Process on the channel's videos page.`)) return;
             this.aborting = channel.id;
             try {
               await this.postStop(channel, 'abort');

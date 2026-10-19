@@ -46,7 +46,7 @@
           <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
             <div class="mb-6">
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                Videos queued for or running in Metarr. Canceled videos stay downloaded and can be finished later with Run Metarr.
+                Videos queued for or running in Metarr. Canceled videos stay downloaded and can be finished later with Post-Process on the channel's videos page.
               </p>
             </div>
 
@@ -333,7 +333,7 @@
             if (chosen.length === 0) return;
             const running = chosen.filter(j => j.started_at).length;
             const detail = running > 0 ? `\n\n${running} running Metarr process(es) will be stopped and their progress lost.` : '';
-            if (!confirm(`Cancel post-processing for ${chosen.length} video(s)?${detail}\n\nThe videos can be finished later with Run Metarr.`)) return;
+            if (!confirm(`Cancel post-processing for ${chosen.length} video(s)?${detail}\n\nThe videos can be finished later with Post-Process on the channel's videos page.`)) return;
 
             const byChannel = new Map();
             for (const j of chosen) {

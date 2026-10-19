@@ -160,12 +160,24 @@ func TestVideoOverrides(t *testing.T) {
 	if err := vs.UpdateVideo(v, chanID); err != nil {
 		t.Fatal(err)
 	}
-	awaiting, err := vs.GetVideosAwaitingMetarr(chanID)
+	awaiting, err := vs.GetVideosAwaitingMetarr(chanID, false)
 	if err != nil || len(awaiting) != 1 {
 		t.Fatalf("got %d videos awaiting Metarr, %v, want 1", len(awaiting), err)
 	}
 	if o := awaiting[0].Overrides; o == nil || o.Filename != "Chosen" || len(o.MetaOps) != 1 || o.MetaOps[0].OpValue != "Cats" {
 		t.Errorf("video awaiting Metarr: got overrides %+v", o)
+	}
+
+	// A video Metarr processed is only returned for re-runs.
+	v.MetarrStatus = consts.MetarrStatusDone
+	if err := vs.UpdateVideo(v, chanID); err != nil {
+		t.Fatal(err)
+	}
+	if awaiting, err := vs.GetVideosAwaitingMetarr(chanID, false); err != nil || len(awaiting) != 0 {
+		t.Errorf("got %d videos awaiting Metarr after it ran, %v, want 0", len(awaiting), err)
+	}
+	if awaiting, err := vs.GetVideosAwaitingMetarr(chanID, true); err != nil || len(awaiting) != 1 {
+		t.Errorf("got %d videos for a re-run, %v, want 1", len(awaiting), err)
 	}
 
 	if err := vs.SetVideoOverrides([]int64{v.ID}, nil); err != nil {

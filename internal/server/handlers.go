@@ -1429,9 +1429,15 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
 		VideoIDs  []int64               `json:"video_ids"`
 		Overrides *models.OverrideLines `json:"overrides"` // Edit & Run, for one video.
+		Rerun     bool                  `json:"rerun"`     // Also runs on given videos Metarr already processed.
 	}
 	if err := decodeJSON(r, &requestBody); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if requestBody.Rerun && len(requestBody.VideoIDs) == 0 {
+		http.Error(w, "a re-run needs the videos to run on", http.StatusBadRequest)
 		return
 	}
 
@@ -1464,7 +1470,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 
 	// Edited options replace the video's earlier ones, kept for later runs.
 	if overrides != nil {
-		awaiting, err := ss.vs.GetVideosAwaitingMetarr(c.ID)
+		awaiting, err := ss.vs.GetVideosAwaitingMetarr(c.ID, requestBody.Rerun)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1482,7 +1488,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	//nolint:contextcheck
 	go func(ctx context.Context) {
 		file.UpdateFromConfigFile(ss.cs, c)
-		if err := app.RunMetarr(ctx, ss.s, c, requestBody.VideoIDs); err != nil {
+		if err := app.RunMetarr(ctx, ss.s, c, requestBody.VideoIDs, requestBody.Rerun); err != nil {
 			logger.Pl.E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
 		} else {
 			logger.Pl.S("Completed Metarr run for channel %q", c.Name)

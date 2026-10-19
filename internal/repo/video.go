@@ -405,11 +405,12 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 	return videoURL, nil
 }
 
-// GetVideosAwaitingMetarr returns finished videos in a channel which Metarr has not yet successfully processed.
-func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models.Video, err error) {
+// GetVideosAwaitingMetarr returns finished videos in a channel which Metarr has not yet successfully processed, and with
+// includeDone those it has too (for re-runs).
+func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error) {
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s "+
-			"WHERE %s = ? AND %s = 1 AND %s = 0 AND %s != ?",
+			"WHERE %s = ? AND %s = 1 AND %s = 0 AND (? OR %s != ?)",
 		consts.QVidID,
 		consts.QVidChanID,
 		consts.QVidChanURLID,
@@ -430,7 +431,7 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64) (videos []*models
 		consts.QVidMetarrStatus,
 	)
 
-	rows, err := vs.DB.Query(query, channelID, consts.MetarrStatusDone)
+	rows, err := vs.DB.Query(query, channelID, includeDone, consts.MetarrStatusDone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query videos awaiting Metarr: %w", err)
 	}

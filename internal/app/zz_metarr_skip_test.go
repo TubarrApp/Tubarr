@@ -100,13 +100,13 @@ func TestRunMetarrLeavesPendingForMissingOpsFile(t *testing.T) {
 	if err := os.Remove(opsFile); err != nil {
 		t.Fatal(err)
 	}
-	if err := RunMetarr(context.Background(), store, c, nil); err == nil {
+	if err := RunMetarr(context.Background(), store, c, nil, false); err == nil {
 		t.Error("RunMetarr with a missing meta ops file succeeded, want an error")
 	}
 	if _, err := os.Stat(ran); err == nil {
 		t.Error("Metarr ran without the channel URL's meta ops file")
 	}
-	waiting, err := store.VideoStore().GetVideosAwaitingMetarr(c.ID)
+	waiting, err := store.VideoStore().GetVideosAwaitingMetarr(c.ID, false)
 	if err != nil || len(waiting) != 1 {
 		t.Fatalf("videos awaiting Metarr = %d, %v; want the video still pending", len(waiting), err)
 	}
@@ -115,7 +115,7 @@ func TestRunMetarrLeavesPendingForMissingOpsFile(t *testing.T) {
 	if err := store.VideoStore().SetVideoOverrides([]int64{waiting[0].ID}, &models.VideoOverrides{}); err != nil {
 		t.Fatal(err)
 	}
-	_ = RunMetarr(context.Background(), store, c, nil) // The stand-in Metarr gives no final paths, so this fails after running.
+	_ = RunMetarr(context.Background(), store, c, nil, false) // The stand-in Metarr gives no final paths, so this fails after running.
 	if _, err := os.Stat(ran); err != nil {
 		t.Error("Metarr didn't run for a Download As video, which doesn't use the ops file")
 	}

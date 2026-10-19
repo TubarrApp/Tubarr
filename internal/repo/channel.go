@@ -1326,7 +1326,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
 			"ORDER BY %s DESC",
 		consts.QVidID,
@@ -1342,6 +1342,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidUploadDate,
 		consts.QVidMetadata,
 		consts.QVidMetarrStatus,
+		consts.QVidJSONPath,
 		consts.QVidCreatedAt,
 		consts.QVidUpdatedAt,
 		consts.DBVideos,
@@ -1375,6 +1376,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			channelURLID sql.NullInt64
 			channelURL   sql.NullString
 			metarrStatus sql.NullString
+			jsonPath     sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -1391,12 +1393,14 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			&uploadDate,
 			&metadataStr,
 			&metarrStatus,
+			&jsonPath,
 			&v.CreatedAt,
 			&v.UpdatedAt,
 		); err != nil {
 			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 		}
 		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
+		v.JSONFilePath = jsonPath.String // Edit & Re-Run needs the metadata file.
 
 		// Handle nullable fields.
 		if channelURLID.Valid {

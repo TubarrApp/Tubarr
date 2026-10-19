@@ -193,4 +193,24 @@ func TestAvailableVideosAPI(t *testing.T) {
 	if o, err := vs.GetVideoOverrides(pendingID); err != nil || o == nil || o.OutputDir != "/fixed" || len(o.MetaOps) != 1 {
 		t.Errorf("edit & run stored overrides %+v, %v", o, err)
 	}
+
+	// Edit & Re-Run takes a video Metarr already processed, only as a re-run of given videos.
+	res, err = fuzzServer.db.Exec(`INSERT INTO videos (channel_id, channel_url_id, channel_url, finished, ignored, url, metarr_status)
+		VALUES (?, ?, 'https://example.com/@review', 1, 0, 'https://example.com/v/processed', ?)`, chanID, cuID, consts.MetarrStatusDone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doneID, _ := res.LastInsertId()
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"meta_ops":"album:set:Fixed"}}`, doneID)); code != http.StatusConflict {
+		t.Errorf("edit & run on a processed video: got %d, want 409", code)
+	}
+	if code := runMetarr(`{"rerun":true}`); code != http.StatusBadRequest {
+		t.Errorf("re-run without videos: got %d, want 400", code)
+	}
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"meta_ops":"album:set:Fixed"},"rerun":true}`, doneID)); code != http.StatusAccepted {
+		t.Fatalf("edit & re-run: got %d, want 202", code)
+	}
+	if o, err := vs.GetVideoOverrides(doneID); err != nil || o == nil || len(o.MetaOps) != 1 || o.MetaOps[0].OpValue != "Fixed" {
+		t.Errorf("edit & re-run stored overrides %+v, %v", o, err)
+	}
 }

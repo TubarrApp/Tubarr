@@ -1,5 +1,5 @@
 <!-- Download As dialog: open with $dispatch('download-as', video), or $dispatch('edit-metarr', video) to edit a downloaded
-video's options and run Metarr. Dispatches download-as-done or edit-metarr-done with the video once it starts, or
+video's options and run Metarr (again, on its finished files, if video.rerun). Dispatches download-as-done or edit-metarr-done with the video once it starts, or
 download-as-cancel if Download As closes without starting. -->
 <div
   x-data="downloadAsDialog()"
@@ -12,7 +12,7 @@ download-as-cancel if Download As closes without starting. -->
   class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4"
 >
   <div class="w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900" style="max-height: 90vh;">
-    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="mode === 'metarr' ? 'Edit & Run Metarr' : 'Download As'"></h3>
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="mode === 'metarr' ? 'Customize Post-Processing' : 'Download As'"></h3>
     <p class="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" :title="video?.title" x-text="video?.title"></p>
 
     <div x-show="loading" class="py-8 text-center">
@@ -48,7 +48,7 @@ download-as-cancel if Download As closes without starting. -->
         </div>
       </template>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        The ops below are this video's channel URL's (or its last edits), one per line. Edits apply to this video only, and are kept for later Metarr runs. Filtered ops still apply only if their filter matches the video's metadata.
+        The ops below are this video's channel URL's (or its last edits), one per line. Edits apply to this video only, and are kept for later post-processing runs. Filtered ops still apply only if their filter matches the video's metadata.
       </p>
       <template x-for="box in boxes" :key="box.key">
         <div>
@@ -72,7 +72,7 @@ download-as-cancel if Download As closes without starting. -->
         Revert to Defaults
       </button>
       <button type="button" @click="close()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
-      <button type="button" @click="submit()" :disabled="!loaded || working" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed" x-text="mode === 'metarr' ? 'Run Metarr' : 'Download'"></button>
+      <button type="button" @click="submit()" :disabled="!loaded || working" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed" x-text="mode === 'metarr' ? (video?.rerun ? 'Re-Process' : 'Post-Process') : 'Download'"></button>
     </div>
   </div>
 </div>
@@ -90,7 +90,7 @@ download-as-cancel if Download As closes without starting. -->
       dirs: [
         { key: 'video_dir', label: 'Video Directory', none: "The channel URL's" },
         { key: 'json_dir', label: 'JSON Directory', none: "The channel URL's" },
-        { key: 'output_dir', label: 'Metarr Output Directory', none: 'None, or a move op\'s' }
+        { key: 'output_dir', label: 'Post-Process Directory', none: 'None, or a move op\'s' }
       ],
       boxes: [
         { key: 'meta_ops', label: 'Meta Ops', placeholder: 'title:prefix:[Cats] ' },
@@ -153,7 +153,7 @@ download-as-cancel if Download As closes without starting. -->
         this.error = null;
         try {
           const response = this.mode === 'metarr'
-            ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides: this.form }) })
+            ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides: this.form, rerun: video.rerun }) })
             : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides: this.form, auth: video.auth }) });
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
