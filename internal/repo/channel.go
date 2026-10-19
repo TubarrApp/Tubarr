@@ -1324,14 +1324,14 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	return nil
 }
 
-// GetDownloadedOrIgnoredVideos loads already downloaded or ignored videos from the database.
+// GetDownloadedOrIgnoredVideos loads already downloaded or ignored videos from the database, without metadata.
 func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos []*models.Video, hasRows bool, err error) {
 	if c.ID == 0 {
 		return nil, false, errors.New("model entered has no ID")
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
 			"ORDER BY %s DESC",
 		consts.QVidID,
@@ -1345,7 +1345,6 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidTitle,
 		consts.QVidDescription,
 		consts.QVidUploadDate,
-		consts.QVidMetadata,
 		consts.QVidMetarrStatus,
 		consts.QVidJSONPath,
 		consts.QVidCreatedAt,
@@ -1377,7 +1376,6 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			thumbnailURL sql.NullString
 			description  sql.NullString
 			uploadDate   sql.NullTime
-			metadataStr  sql.NullString
 			channelURLID sql.NullInt64
 			channelURL   sql.NullString
 			metarrStatus sql.NullString
@@ -1396,7 +1394,6 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			&title,
 			&description,
 			&uploadDate,
-			&metadataStr,
 			&metarrStatus,
 			&jsonPath,
 			&v.CreatedAt,
@@ -1428,11 +1425,6 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		}
 		if uploadDate.Valid {
 			v.UploadDate = uploadDate.Time
-		}
-		if metadataStr.Valid && metadataStr.String != "" {
-			if err := json.Unmarshal([]byte(metadataStr.String), &v.MetadataMap); err != nil {
-				logger.Pl.W("Failed to unmarshal metadata for video %d: %v", v.ID, err)
-			}
 		}
 
 		videos = append(videos, &v)
