@@ -214,7 +214,7 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 }
 
 // handleListChannels lists Tubarr channels.
-func (ss *serverStore) handleListChannels(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request) {
 	channels, found, err := ss.cs.GetAllChannels(false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -257,7 +257,7 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, _ *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode channels: %v", err)
 	}
 }
@@ -708,7 +708,7 @@ func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(videos); err != nil {
+	if err := json.NewEncoder(w).Encode(videos); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode videos: %v", err)
 	}
 }
@@ -760,7 +760,7 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 }
 
 // handleGetDownloads retrieves active downloads for all channels.
-func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request) {
 	channels, found, err := ss.cs.GetAllChannels(false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -798,7 +798,7 @@ func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, _ *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(allDownloads); err != nil {
+	if err := json.NewEncoder(w).Encode(allDownloads); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Could not encode videos to JSON: %v", err)
 	}
 }
@@ -1215,7 +1215,7 @@ func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"videos": added, "existing": existing}); err != nil {
+	if err := json.NewEncoder(w).Encode(map[string]any{"videos": added, "existing": existing}); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode response: %v", err)
 	}
 }
@@ -1223,7 +1223,7 @@ func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Req
 // handleGetAvailableVideos returns videos awaiting the user's choice to download or dismiss them, across all channels.
 //
 // Failed and canceled videos from channel URLs which auto download are marked as retried by their next crawl.
-func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.Request) {
 	videos, err := ss.vs.GetAvailableVideos(app.AvailableStatuses...)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve available videos: %v", err), http.StatusInternalServerError)
@@ -1246,7 +1246,7 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, _ *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(videos); err != nil {
+	if err := json.NewEncoder(w).Encode(videos); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode available videos: %v", err)
 	}
 }
@@ -1525,7 +1525,7 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(videos); err != nil {
+	if err := json.NewEncoder(w).Encode(videos); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Could not encode videos to JSON: %v", err)
 	}
 }
@@ -2228,7 +2228,7 @@ func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, _ *ht
 // handleGetScrapeConfigContent returns the configured scrape config file's contents, for editing in the web UI.
 //
 // Includes a version (hash of the contents), so a later save can detect edits made elsewhere in the meantime.
-func (ss *serverStore) handleGetScrapeConfigContent(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetScrapeConfigContent(w http.ResponseWriter, r *http.Request) {
 	path := viper.GetString(keys.ScrapeConfigFile)
 	resp := map[string]any{"path": path, "content": "", "version": ""}
 	if path != "" {
@@ -2241,7 +2241,7 @@ func (ss *serverStore) handleGetScrapeConfigContent(w http.ResponseWriter, _ *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode scrape config file content: %v", err)
 	}
 }
@@ -2290,7 +2290,7 @@ func contentVersion(content []byte) string {
 
 // handleGetScrapeSites returns every currently registered scrape site (built-in and custom)
 // along with its selectors, for display in the web UI.
-func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, r *http.Request) {
 	sites := siterules.List()
 
 	type fetchResp struct {
@@ -2374,7 +2374,7 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, _ *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode scrape sites: %v", err)
 	}
 }
@@ -2396,7 +2396,7 @@ func (ss *serverStore) handleTestScrapeSite(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	resp := map[string]any{"matched": matched, "site": site, "metadata": metadata}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode scrape test response: %v", err)
 	}
 }
@@ -2421,7 +2421,7 @@ func (ss *serverStore) handleTestCrawlSite(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Content-Type", "application/json")
 	resp := map[string]any{"matched": matched, "source": source, "urls": urls, "videos": videos}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
 		logger.Pl.E("Failed to encode crawl test response: %v", err)
 	}
 }
