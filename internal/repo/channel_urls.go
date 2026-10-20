@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"time"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -34,11 +35,17 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		if err := validation.ValidateChannelURL(cu.URL); err != nil {
 			return 0, err
 		}
+		if err := validateURLSettings(cu); err != nil {
+			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+		}
+		if err := checkFiles(nil, settingsFiles(cu.ChanURLSettings, cu.ChanURLMetarrArgs)); err != nil {
+			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
+		}
 		if err := checkDownloadDirs(nil, cu.ChanURLSettings); err != nil {
-			return 0, err
+			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 		}
 		if err := checkOutputDir(nil, cu.ChanURLMetarrArgs); err != nil {
-			return 0, err
+			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 		}
 	}
 
@@ -140,16 +147,16 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		}
 	}
 	if err := validateURLSettings(cu); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
 	if err := checkFiles(settingsFiles(old, oldMetarr), settingsFiles(cu.ChanURLSettings, cu.ChanURLMetarrArgs)); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
 	if err := checkDownloadDirs(old, cu.ChanURLSettings); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
 	if err := checkOutputDir(oldMetarr, cu.ChanURLMetarrArgs); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
 	metarrJSON, err := json.Marshal(cu.ChanURLMetarrArgs)
 	if err != nil {

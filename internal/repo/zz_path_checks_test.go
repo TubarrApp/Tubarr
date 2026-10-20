@@ -1,10 +1,12 @@
 package repo
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 )
@@ -24,6 +26,31 @@ func addChannelMissingDirs(t *testing.T, cs *ChannelStore) *models.Channel {
 		}
 	}
 	return c
+}
+
+// TestURLSaveRefusesMissingFile tests that adding or updating a URL whose own settings name a missing file is refused
+// as invalid, not as a server fault.
+func TestURLSaveRefusesMissingFile(t *testing.T) {
+	cs := newTestChannelStore(t)
+	c := testChannel(t, "chan", "https://example.com/@a")
+	if err := cs.AddChannelWithDetails(c, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	missing := &models.MetarrArgs{FilteredMetaOpsFile: filepath.Join(t.TempDir(), "missing.txt")}
+
+	added := &models.ChannelURL{URL: "https://example.com/@b", ChanURLMetarrArgs: missing}
+	if _, err := cs.AddChannelURL(c.ID, added, false); !errors.Is(err, contracts.ErrInvalidChannel) {
+		t.Errorf("AddChannelURL with a missing ops file: got %v, want an invalid channel error", err)
+	}
+
+	urls, err := cs.GetChannelURLModels(c, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	urls[0].ChanURLMetarrArgs = missing
+	if err := cs.UpdateChannelURLSettings(urls[0]); !errors.Is(err, contracts.ErrInvalidChannel) {
+		t.Errorf("UpdateChannelURLSettings with a missing ops file: got %v, want an invalid channel error", err)
+	}
 }
 
 // writeTestFile writes an operations file, returning its path.
