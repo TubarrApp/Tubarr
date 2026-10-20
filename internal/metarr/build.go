@@ -196,12 +196,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			viperKey:    keys.DebugLevel,
 			cmdKey:      metkeys.Debug,
 		},
-		{
-			metarrValue: metVals{str: cmp.Or(o.MetaPurge, m.MetaPurge)},
-			valType:     str,
-			viperKey:    keys.MMetaPurge,
-			cmdKey:      metkeys.PurgeMetaFile,
-		},
+		// No metadata purge: Tubarr purges once it has read the file, see finishMetafile.
 	}
 	singlesLen, sliceLen, flagLen := calcNumElements(fields)
 

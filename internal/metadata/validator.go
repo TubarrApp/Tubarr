@@ -2,6 +2,7 @@
 package metadata
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,85 +48,79 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
-// parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
-func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
-	f, err := os.Open(v.JSONFilePath)
+// RefreshFromMetarr reloads v's metadata from the file Metarr finished with, taking the title, description and date it
+// has over the stored ones, as Metarr's meta ops may have changed them.
+func RefreshFromMetarr(v *models.Video) error {
+	m, err := readJSONFile(v.JSONFilePath)
 	if err != nil {
-		return false, err
+		return err
+	}
+	v.MetadataMap = m
+	v.Title = cmp.Or(sharedtags.FirstString(m, sharedtags.TitleKeys), v.Title)
+	v.Description = cmp.Or(sharedtags.FirstString(m, sharedtags.DescriptionKeys), v.Description)
+	if d := metadataDate(m); !d.IsZero() {
+		v.UploadDate = d
+	}
+	return nil
+}
+
+// readJSONFile decodes a JSON metadata file.
+func readJSONFile(path string) (map[string]any, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			logger.Pl.E("Failed to close file at %q", v.JSONFilePath)
+			logger.Pl.E("Failed to close file at %q", path)
 		}
 	}()
 
-	logger.Pl.D(1, "About to decode JSON to metamap")
-
-	m := make(map[string]any)
-	decoder := json.NewDecoder(f)
-	if err := decoder.Decode(&m); err != nil {
-		return false, fmt.Errorf("failed to decode JSON: %w", err)
+	var m map[string]any
+	if err := json.NewDecoder(f).Decode(&m); err != nil {
+		return nil, fmt.Errorf("failed to decode JSON %q: %w", path, err)
 	}
+	return m, nil
+}
 
+// metadataDate returns the first date in m by sharedtags.DateKeys, as YYYY-MM-DD or YYYYMMDD with any time after it
+// ignored, or the zero time if none parses.
+func metadataDate(m map[string]any) time.Time {
+	for _, k := range sharedtags.DateKeys {
+		s, ok := m[k].(string)
+		if !ok {
+			continue
+		}
+		s, _, _ = strings.Cut(s, "T")
+		for _, layout := range []string{"2006-01-02", "20060102"} {
+			if t, err := time.Parse(layout, s); err == nil {
+				return t
+			}
+		}
+	}
+	return time.Time{}
+}
+
+// parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
+func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
+	m, err := readJSONFile(v.JSONFilePath)
+	if err != nil {
+		return false, err
+	}
 	if len(m) == 0 {
 		return false, nil
 	}
 	v.MetadataMap = m
 
-	// Titles.
+	// Title, date and description, by the precedence Metarr embeds them with.
 	if v.Title == "" {
-		for _, key := range []string{"fulltitle", "title", "full_title"} {
-			if titleVal, exists := m[key]; exists {
-				if title, ok := titleVal.(string); ok {
-					v.Title = title
-					logger.Pl.D(2, "Extracted title %q from metadata (Video URL: %q)", title, v.URL)
-					break
-				}
-			}
-		}
-		if v.Title == "" && v.URL != "" {
-			v.Title = v.URL
-		}
+		v.Title = cmp.Or(sharedtags.FirstString(m, sharedtags.TitleKeys), v.URL)
 	}
-
-	// Upload date
 	if v.UploadDate.IsZero() {
-		for _, key := range []string{"upload_date", "release_date", "originally_available_at", "date"} {
-			if uploadDateVal, exists := m[key]; exists {
-				if uploadDate, ok := uploadDateVal.(string); ok {
-					if strings.Contains(uploadDate, "-") {
-						if t, err := time.Parse("2006-01-02", uploadDate); err == nil { // If err IS nil.
-							v.UploadDate = t
-							if v.UploadDate.IsZero() {
-								logger.Pl.E("Failed to parse upload date %q: %v", uploadDate, err)
-							}
-							break
-						}
-					} else if !strings.Contains(uploadDate, "-") {
-						if t, err := time.Parse("20060102", uploadDate); err == nil { // If err IS nil.
-							v.UploadDate = t
-							if v.UploadDate.IsZero() {
-								logger.Pl.E("Failed to parse upload date %q: %v", uploadDate, err)
-							}
-							break
-						}
-					}
-				}
-			}
-		}
+		v.UploadDate = metadataDate(m)
 	}
-
-	// Description.
 	if v.Description == "" {
-		for _, key := range []string{"description", "longdescription", "long_description", "summary", "synopsis"} {
-			if descriptionVal, exists := m[key]; exists {
-				if description, ok := descriptionVal.(string); ok {
-					v.Description = description
-					logger.Pl.D(2, "Extracted description %q from metadata (Video URL: %q)", description, v.URL)
-					break
-				}
-			}
-		}
+		v.Description = sharedtags.FirstString(m, sharedtags.DescriptionKeys)
 	}
 
 	// Thumbnails.

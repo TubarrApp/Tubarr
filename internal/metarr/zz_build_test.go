@@ -1,7 +1,11 @@
 package metarr
 
 import (
+	"errors"
 	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"tubarr/internal/domain/keys"
@@ -13,35 +17,62 @@ import (
 	"github.com/spf13/viper"
 )
 
-// TestMakeMetarrCommandPurge tests a channel URL's metadata purge is passed to Metarr with its value, falling back to the
+// TestMetaPurge tests the metadata purge isn't passed to Metarr, and is Download As's, else the channel URL's, else the
 // global one.
-func TestMakeMetarrCommandPurge(t *testing.T) {
+func TestMetaPurge(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{MetaPurge: "json"}}
 	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
-	purge := func() string {
-		t.Helper()
-		args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags))
-		i := slices.Index(args, metkeys.PurgeMetaFile)
-		if i < 0 || i+1 >= len(args) {
-			return ""
-		}
-		return args[i+1]
+	viper.Set(keys.MMetaPurge, "nfo")
+	if args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); slices.Contains(args, metkeys.PurgeMetaFile) {
+		t.Errorf("purge passed to Metarr: %q", args)
 	}
 
-	if got := purge(); got != "json" {
-		t.Errorf("channel URL purge passed as %q, want json", got)
+	for _, tc := range []struct {
+		name, override, url, global, want string
+	}{
+		{"Download As", "all", "json", "nfo", "all"},
+		{"channel URL", "", "json", "nfo", "json"},
+		{"global", "", "", "NFO", "nfo"},
+		{"none", "", "", "", ""},
+	} {
+		v.Overrides = &models.VideoOverrides{MetarrArgs: models.MetarrArgs{MetaPurge: tc.override}}
+		cu.ChanURLMetarrArgs.MetaPurge = tc.url
+		viper.Set(keys.MMetaPurge, tc.global)
+		if got, err := metaPurge(v, cu); err != nil || got != tc.want {
+			t.Errorf("%s: got %q, %v, want %q", tc.name, got, err, tc.want)
+		}
 	}
-	cu.ChanURLMetarrArgs.MetaPurge = ""
-	viper.Set(keys.MMetaPurge, "nfo")
-	if got := purge(); got != "nfo" {
-		t.Errorf("global purge passed as %q, want nfo", got)
-	}
-	viper.Reset()
-	if got := purge(); got != "" {
-		t.Errorf("purge passed as %q with none set", got)
+}
+
+// TestFinishMetafile tests the title, description and date are taken from the metadata file Metarr finished with, and
+// the file is purged only when set to.
+func TestFinishMetafile(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	for _, tc := range []struct {
+		purge  string
+		purged bool
+	}{{"", false}, {"nfo", false}, {"json", true}, {"all", true}} {
+		path := filepath.Join(t.TempDir(), "v.json")
+		body := `{"title": "Old", "fulltitle": "[2024-01-02] New", "description": "Short", "longdescription": "Long", "upload_date": "20240102"}`
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cu := &models.ChannelURL{ChanURLMetarrArgs: &models.MetarrArgs{MetaPurge: tc.purge}}
+		v := &models.Video{URL: "https://example.com/v/1", Title: "Stored", Description: "Stored", JSONFilePath: path}
+		if err := finishMetafile(v, cu); err != nil {
+			t.Fatal(err)
+		}
+		if v.Title != "[2024-01-02] New" || v.Description != "Long" || v.UploadDate.Format("2006-01-02") != "2024-01-02" {
+			t.Errorf("purge %q: got title %q, description %q, date %v", tc.purge, v.Title, v.Description, v.UploadDate)
+		}
+		_, statErr := os.Stat(path)
+		if purged := errors.Is(statErr, fs.ErrNotExist); purged != tc.purged || (v.JSONFilePath == "") != tc.purged {
+			t.Errorf("purge %q: file purged %t, path stored %q, want purged %t", tc.purge, purged, v.JSONFilePath, tc.purged)
+		}
 	}
 }
 

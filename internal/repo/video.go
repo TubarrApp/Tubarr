@@ -307,6 +307,10 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON for video with URL %q: %w", v.URL, err)
 	}
+	var metadataArg any // NULL without loaded metadata, keeping the stored metadata.
+	if metadataJSON != nil {
+		metadataArg = metadataJSON
+	}
 
 	tx, err := vs.DB.Begin()
 	if err != nil {
@@ -317,7 +321,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	// Update videos table. Metarr's error changes only with its status, which only changes when given.
 	videoQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = COALESCE(NULLIF(?, ''), %s), %s = COALESCE(NULLIF(?, ''), %s), "+
-			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, "+
+			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = COALESCE(?, %s), %s = ?, "+
 			"%s = COALESCE(NULLIF(?, ''), %s), %s = CASE WHEN ? = '' THEN %s ELSE ? END "+
 			"WHERE %s = ? AND %s = ?",
 		consts.DBVideos,
@@ -329,7 +333,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		consts.QVidFinished,
 		consts.QVidIgnored,
 		consts.QVidUploadDate,
-		consts.QVidMetadata,
+		consts.QVidMetadata, consts.QVidMetadata,
 		consts.QVidUpdatedAt,
 		consts.QVidMetarrStatus, consts.QVidMetarrStatus,
 		consts.QVidMetarrError, consts.QVidMetarrError,
@@ -347,7 +351,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		v.Finished,
 		v.Ignored,
 		v.UploadDate,
-		metadataJSON,
+		metadataArg,
 		time.Now(),
 		v.MetarrStatus,
 		v.MetarrStatus, v.MetarrError,

@@ -1,18 +1,26 @@
 package metarr
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
 	"syscall"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
+	"tubarr/internal/metadata"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 // InitMetarr begins processing with Metarr.
@@ -36,7 +44,42 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 	if err := runMetarr(cmd, v); err != nil {
 		return err
 	}
+	return finishMetafile(v, cu)
+}
+
+// finishMetafile takes the title, description and date from the metadata file Metarr finished with, then deletes the
+// file if the purge setting says to. Tubarr purges rather than Metarr, so it can read the file first.
+func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
+	if v.JSONFilePath == "" {
+		return nil
+	}
+	if err := metadata.RefreshFromMetarr(v); err != nil {
+		logger.Pl.E("Failed to read the metadata Metarr wrote for %q, keeping the stored title and description: %v", v.URL, err)
+	}
+
+	purge, err := metaPurge(v, cu)
+	if err != nil {
+		return err
+	}
+	if purge != "all" && purge != "json" { // Tubarr's metadata files are JSON.
+		return nil
+	}
+	if err := os.Remove(v.JSONFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("failed to purge metadata file %q: %w", v.JSONFilePath, err)
+	}
+	logger.Pl.I("Purged metadata file %q", v.JSONFilePath)
+	v.JSONFilePath = ""
 	return nil
+}
+
+// metaPurge returns which metadata files to delete once Metarr finishes with v: Download As's setting, else the channel
+// URL's, else the global one.
+func metaPurge(v *models.Video, cu *models.ChannelURL) (string, error) {
+	var o string
+	if v.Overrides != nil {
+		o = v.Overrides.MetaPurge
+	}
+	return validation.ValidatePurgeMetafiles(cmp.Or(o, cu.ChanURLMetarrArgs.MetaPurge, abstractions.GetString(keys.MMetaPurge)))
 }
 
 // runMetarr runs a Metarr command with a built argument list.
