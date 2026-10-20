@@ -365,6 +365,24 @@ func StopMetarr(channelID int64, videoIDs []int64) (n int) {
 	return n
 }
 
+// WaitMetarr waits up to timeout on shutdown for canceled Metarr runs to stop and store their videos' status.
+func WaitMetarr(timeout time.Duration) {
+	deadline := time.After(timeout)
+	metarrClaims.Range(func(_, v any) bool {
+		claim, ok := v.(*metarrClaim)
+		if !ok || !claim.inMetarr.Load() {
+			return true
+		}
+		select {
+		case <-claim.done:
+			return true
+		case <-deadline:
+			logger.Pl.W("Metarr runs still stopping after %v, exiting without storing their videos' status", timeout)
+			return false
+		}
+	})
+}
+
 // MetarrJobs returns the videos queued for or running in Metarr, oldest first.
 func MetarrJobs() []MetarrJob {
 	jobs := []MetarrJob{}
@@ -412,7 +430,7 @@ func MetarrActivity() []int64 {
 	return ids
 }
 
-// preemptMetarr takes a hold on a video for the download pipeline, cancelling and awaiting any separate Metarr run on it.
+// preemptMetarr takes a hold on a video for the download pipeline, canceling and awaiting any separate Metarr run on it.
 //
 // Returns false if another download already holds the video.
 func preemptMetarr(ctx context.Context, key metarrKey, claim *metarrClaim) (bool, error) {

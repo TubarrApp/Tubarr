@@ -137,8 +137,6 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 		}
 
 		// Insert or update download status using SQLite UPSERT (INSERT ... ON CONFLICT)
-		//
-		// Squirrel doesn't support ON CONFLICT clause natively
 		sqlQuery := fmt.Sprintf(
 			"INSERT INTO %s (%s, %s, %s, %s, %s) "+
 				"VALUES (?, ?, ?, ?, ?) "+
@@ -791,6 +789,30 @@ func (vs *VideoStore) SetMissingVideoErrors(videoIDs []int64, errMsg string) err
 	return nil
 }
 
+// RecoverInterrupted repairs videos a stopped Tubarr left mid-download or mid-Metarr, for startup.
+//
+// Downloaded videos with a stored file become finished with Metarr pending, the rest Failed so they return to Available.
+func (vs *VideoStore) RecoverInterrupted() (pending, failed int64, err error) {
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer rollback(tx)
+
+	if pending, err = vs.recoverInterruptedPending(tx); err != nil {
+		return 0, 0, err
+	}
+
+	if failed, err = vs.recoverInterruptedFailed(tx); err != nil {
+		return 0, 0, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return pending, failed, nil
+}
+
 // VideoExists returns the video's ID and true if the channel already has a video with its URL.
 func (vs *VideoStore) VideoExists(v *models.Video, channelID int64) (int64, bool) {
 	var id int64
@@ -866,6 +888,51 @@ func (vs *VideoStore) SetVideoOverrides(videoIDs []int64, o *models.VideoOverrid
 }
 
 // ******************************** Private ***************************************************************************************
+
+// recoverInterruptedPending marks unfinished videos with a finished download and a stored file as finished, Metarr pending.
+func (vs *VideoStore) recoverInterruptedPending(tx *sql.Tx) (pending int64, err error) {
+	pendingQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = 1, %s = ?, %s = ? WHERE %s = 0 AND %s = 0 AND COALESCE(%s, '') != '' "+
+			"AND %s IN (SELECT %s FROM %s WHERE %s = ?)",
+		consts.DBVideos,
+		consts.QVidFinished, consts.QVidMetarrStatus, consts.QVidUpdatedAt,
+		consts.QVidFinished, consts.QVidIgnored, consts.QVidVideoPath,
+		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
+	)
+	result, err := tx.Exec(pendingQuery, consts.MetarrStatusPending, time.Now(), consts.DLStatusCompleted)
+	if err != nil {
+		return 0, fmt.Errorf("failed to mark interrupted Metarr runs pending: %w", err)
+	}
+	if pending, err = result.RowsAffected(); err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return pending, nil
+}
+
+// recoverInterruptedFailed marks unfinished videos still Queued, Downloading or with a finished download as Failed.
+//
+// Run after recoverInterruptedPending, so the finished downloads left are the ones with no stored file.
+func (vs *VideoStore) recoverInterruptedFailed(tx *sql.Tx) (failed int64, err error) {
+	failedQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = CURRENT_TIMESTAMP WHERE %s IN (?, ?, ?) "+
+			"AND %s IN (SELECT %s FROM %s WHERE %s = 0 AND %s = 0)",
+		consts.DBDownloads,
+		consts.QDLStatus, consts.QDLError, consts.QDLUpdatedAt,
+		consts.QDLStatus,
+		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidFinished, consts.QVidIgnored,
+	)
+	result, err := tx.Exec(failedQuery, consts.DLStatusFailed, "Tubarr stopped before this video finished",
+		consts.DLStatusQueued, consts.DLStatusDownloading, consts.DLStatusCompleted)
+	if err != nil {
+		return 0, fmt.Errorf("failed to mark interrupted downloads failed: %w", err)
+	}
+	if failed, err = result.RowsAffected(); err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return failed, nil
+}
 
 // unmarshalVideoOverrides decodes a stored overrides column, nil if it is unset.
 func unmarshalVideoOverrides(raw sql.NullString) (*models.VideoOverrides, error) {

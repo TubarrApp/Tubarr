@@ -136,7 +136,7 @@ func FuzzDates(f *testing.F) {
 var channelConfigSeeds = []struct{ ext, content string }{
 	{".yaml", "channel_name: \"Cool\"\nchannel_urls:\n  - \"https://www.tubesite.com/@Cool\"\nvideo_directory: \"x\"\nurl-settings:\n  \"https://www.tubesite.com/@Cool\":\n    settings:\n      crawl_freq: 60\n    metarr:\n      metarr_output_directory: \"y\"\n"},
 	{".toml", "channel_name = \"Cool\"\nchannel_urls = [\"https://www.tubesite.com/@Cool\"]\nvideo_directory = \"x\"\nmetarr_meta_ops = [\"title:date-tag:prefix:ymd\"]\n"},
-	{".json", `{"channel_name":"Cool","channel_urls":["https://www.tubesite.com/@Cool"],"video_directory":"x","crawl_freq":30,"notify":["https://x.example|n"]}`},
+	{".json", `{"channel_name":"Cool","channel_urls":["https://www.tubesite.com/@Cool"],"video_directory":"x","crawl_freq":30,"notify":["https://x.example"]}`},
 }
 
 // urlPattern matches URLs, whose slashes are part of the address rather than a file path.

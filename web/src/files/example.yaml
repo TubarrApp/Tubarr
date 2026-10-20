@@ -37,7 +37,7 @@ metarr_transcode_audio_codecs:
 
 # Notify services
 notify:
-  - "https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh?X-Plex-Token=< YOUR PLEX TOKEN >|Plex"
+  - "https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh?X-Plex-Token=< YOUR PLEX TOKEN >"
 
 # Ignore videos to date (only download new videos after now)
 ignore_run: true

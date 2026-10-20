@@ -85,7 +85,7 @@
                   <div>
                     <h2 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="channelName"></h2>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Total: <span x-text="totalVideos"></span> video<span x-show="totalVideos !== 1">s</span>
+                      Total: <span x-text="videos.length"></span> video<span x-show="videos.length !== 1">s</span>
                     </p>
                   </div>
                   <div class="flex items-center gap-3">
@@ -108,6 +108,52 @@
                     <span x-text="stoppingMetarr ? 'Stopping...' : 'Stop Post-Processing'"></span>
                   </button>
                   </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex flex-wrap items-center gap-4 border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+                  <input
+                    type="search"
+                    x-model="titleFilter"
+                    @input="filterChanged()"
+                    placeholder="Filter by title"
+                    class="w-56 max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+
+                  <select
+                    x-show="urlOptions.length > 1"
+                    x-model="urlFilter"
+                    @change="filterChanged()"
+                    class="max-w-full rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="" x-text="`All URLs (${videos.length})`"></option>
+                    <template x-for="u in urlOptions" :key="u.id">
+                      <option :value="u.id" :selected="urlFilter === u.id" x-text="`${shortURL(u.url)} (${u.count})`"></option>
+                    </template>
+                  </select>
+
+                  <select
+                    x-model="statusFilter"
+                    @change="filterChanged()"
+                    class="rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="" x-text="`All statuses (${urlVideos.length})`"></option>
+                    <option value="finished" x-text="`Finished (${statusCount('finished')})`"></option>
+                    <option value="pending" x-text="`Not post-processed (${statusCount('pending')})`"></option>
+                    <option value="failed" x-text="`Post-processing failed (${statusCount('failed')})`"></option>
+                    <option value="ignored" x-text="`Ignored (${statusCount('ignored')})`"></option>
+                  </select>
+
+                  <select
+                    x-model="sortOrder"
+                    @change="currentPage = 1; lastClickedIndex = null"
+                    class="rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="longest">Longest first</option>
+                    <option value="shortest">Shortest first</option>
+                  </select>
                 </div>
 
                 <!-- Bulk Actions Bar -->
@@ -367,12 +413,19 @@
           currentPage: 1,
           itemsPerPage: 25,
           lastClickedIndex: null,
+          urlFilter: '',
+          titleFilter: '',
+          statusFilter: '',
+          sortOrder: 'newest',
           missingFileHint: "The video file isn't at its saved path any more (moved or renamed?), so it can't be processed.",
 
           init() {
             // Get channel ID from URL params
             const urlParams = new URLSearchParams(window.location.search);
             this.channelId = urlParams.get('channel');
+            this.urlFilter = urlParams.get('url') || '';
+            this.titleFilter = urlParams.get('q') || '';
+            this.statusFilter = urlParams.get('status') || '';
 
             if (!this.channelId) {
               this.error = 'No channel ID provided';
@@ -458,6 +511,80 @@
             return video.finished && !video.ignored && video.metarr_status === 'done';
           },
 
+          // The video's Status column badge, as a status filter value.
+          statusOf(video) {
+            if (video.ignored) return 'ignored';
+            if (!this.needsMetarr(video)) return 'finished';
+            return video.metarr_status === 'failed' ? 'failed' : 'pending';
+          },
+
+          // The channel's URLs with videos, and their counts.
+          get urlOptions() {
+            const byID = new Map();
+            for (const v of this.videos) {
+              const u = byID.get(v.channel_url_id) || { id: String(v.channel_url_id), url: v.channel_url, count: 0 };
+              u.count++;
+              byID.set(v.channel_url_id, u);
+            }
+            return [...byID.values()];
+          },
+
+          // The selected channel URL's videos, before the status and title filters.
+          get urlVideos() {
+            if (this.urlFilter === '') return this.videos;
+            return this.videos.filter(v => String(v.channel_url_id) === this.urlFilter);
+          },
+
+          // How many of the selected channel URL's videos have the status.
+          statusCount(status) {
+            return this.urlVideos.filter(v => this.statusOf(v) === status).length;
+          },
+
+          get filteredVideos() {
+            let list = this.urlVideos;
+            if (this.statusFilter !== '') {
+              list = list.filter(v => this.statusOf(v) === this.statusFilter);
+            }
+            const title = this.titleFilter.trim().toLowerCase();
+            if (title) {
+              list = list.filter(v => (v.title || '').toLowerCase().includes(title));
+            }
+            // The server sends most recently updated first. Videos without a known duration go last when sorting by it,
+            // and equal durations stay in that order.
+            switch (this.sortOrder) {
+              case 'oldest':
+                return [...list].reverse();
+              case 'longest':
+                return [...list].sort((a, b) => (b.duration || -1) - (a.duration || -1));
+              case 'shortest':
+                return [...list].sort((a, b) => (a.duration || Infinity) - (b.duration || Infinity));
+              default:
+                return list;
+            }
+          },
+
+          // Applies a filter change: back to page 1 with nothing selected, so actions only touch videos on show.
+          filterChanged() {
+            this.currentPage = 1;
+            this.lastClickedIndex = null;
+            this.selectedVideos = [];
+            const params = new URLSearchParams({ channel: this.channelId });
+            if (this.urlFilter) params.set('url', this.urlFilter);
+            if (this.titleFilter.trim()) params.set('q', this.titleFilter.trim());
+            if (this.statusFilter) params.set('status', this.statusFilter);
+            history.replaceState(null, '', `?${params}`);
+          },
+
+          shortURL(url) {
+            if (!url) return '';
+            try {
+              const u = new URL(url);
+              return (u.hostname.replace(/^www\./, '') + u.pathname).replace(/\/$/, '');
+            } catch {
+              return url;
+            }
+          },
+
           get awaitingMetarr() {
             return this.videos.filter(v => this.needsMetarr(v));
           },
@@ -499,7 +626,7 @@
           },
 
           get totalVideos() {
-            return this.videos.length;
+            return this.filteredVideos.length;
           },
 
           get totalPages() {
@@ -515,7 +642,7 @@
           },
 
           get paginatedVideos() {
-            return this.videos.slice(this.startIndex, this.endIndex);
+            return this.filteredVideos.slice(this.startIndex, this.endIndex);
           },
 
           get visiblePages() {
@@ -543,7 +670,7 @@
           },
 
           handleCheckboxClick(videoUrl, event) {
-            const currentIndex = this.videos.findIndex(v => v.url === videoUrl);
+            const currentIndex = this.filteredVideos.findIndex(v => v.url === videoUrl);
             if (currentIndex === -1) return;
 
             const shouldSelect = event.target.checked;
@@ -554,8 +681,9 @@
               const selectedSet = new Set(this.selectedVideos);
 
               // Mirror typical multi-select behavior by applying the current click to the whole range
+              const shown = this.filteredVideos;
               for (let i = start; i <= end; i++) {
-                const url = this.videos[i].url;
+                const url = shown[i].url;
                 if (shouldSelect) {
                   selectedSet.add(url);
                 } else {
@@ -579,8 +707,8 @@
 
           toggleSelectAll(checked) {
             if (checked) {
-              // Select all videos across all pages
-              this.selectedVideos = this.videos.map(v => v.url);
+              // Select all filtered videos across all pages
+              this.selectedVideos = this.filteredVideos.map(v => v.url);
             } else {
               // Deselect all videos
               this.selectedVideos = [];

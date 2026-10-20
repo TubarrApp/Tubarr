@@ -147,9 +147,8 @@ func checkIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
 	}
 
 	blockCtx := blocking.GetBlockContext(cu)
-	if isBlocked, blockedAt, remainingTime := blocking.IsBlocked(siteHost, blockCtx); isBlocked {
-		return fmt.Errorf("skipping download for %q due to site %q blocked for context %q (blocked at %v, %v remaining)",
-			uri, siteHost, blockCtx, blockedAt, remainingTime)
+	if isBlocked, _, remaining := blocking.IsBlocked(siteHost, blockCtx); isBlocked {
+		return fmt.Errorf("%s is blocked for %s requests until %s", siteHost, blockCtx, time.Now().Add(remaining).Format("2006-01-02 15:04 MST"))
 	}
 	return nil
 }

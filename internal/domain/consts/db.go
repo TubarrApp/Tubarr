@@ -183,7 +183,6 @@ var ValidDownloadKeys = map[string]struct{}{
 // Notification database entry keys.
 const (
 	QNotifyChanID    = "channel_id"
-	QNotifyName      = "name"
 	QNotifyURL       = "notify_url"
 	QNotifyChanURL   = "channel_url"
 	QNotifyCreatedAt = "created_at"
@@ -193,7 +192,6 @@ const (
 // ValidNotificationKeys holds valid keys for the notification database.
 var ValidNotificationKeys = map[string]struct{}{
 	QNotifyChanID:    {},
-	QNotifyName:      {},
 	QNotifyURL:       {},
 	QNotifyChanURL:   {},
 	QNotifyCreatedAt: {},

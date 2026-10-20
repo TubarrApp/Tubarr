@@ -107,6 +107,17 @@
                   </select>
 
                   <select
+                    x-model="statusFilter"
+                    @change="filterChanged()"
+                    class="rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="" x-text="`All statuses (${urlVideos.length})`"></option>
+                    <option value="Available" x-text="`Untried (${statusCount('Available')})`"></option>
+                    <option value="Failed" x-text="`Failed (${statusCount('Failed')})`"></option>
+                    <option value="Canceled" x-text="`Canceled (${statusCount('Canceled')})`"></option>
+                  </select>
+
+                  <select
                     x-model="sortOrder"
                     @change="currentPage = 1"
                     class="rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -279,6 +290,7 @@
           channelFilter: '',
           urlFilter: '',
           titleFilter: '',
+          statusFilter: '',
           sortOrder: 'newest',
           loading: true,
           error: null,
@@ -293,6 +305,7 @@
             this.channelFilter = params.get('channel') || '';
             this.urlFilter = params.get('url') || '';
             this.titleFilter = params.get('q') || '';
+            this.statusFilter = params.get('status') || '';
             this.loadVideos();
             new ResizeObserver(() => this.fitPageToRows()).observe(this.$refs.grid);
           },
@@ -348,10 +361,21 @@
             return [...byID.values()];
           },
 
+          // The selected channel URL's videos, before the status and title filters.
+          get urlVideos() {
+            if (this.urlFilter === '') return this.channelVideos;
+            return this.channelVideos.filter(v => String(v.channel_url_id) === this.urlFilter);
+          },
+
+          // How many of the selected channel URL's videos have the download status.
+          statusCount(status) {
+            return this.urlVideos.filter(v => v.download_status.status === status).length;
+          },
+
           get filteredVideos() {
-            let list = this.channelVideos;
-            if (this.urlFilter !== '') {
-              list = list.filter(v => String(v.channel_url_id) === this.urlFilter);
+            let list = this.urlVideos;
+            if (this.statusFilter !== '') {
+              list = list.filter(v => v.download_status.status === this.statusFilter);
             }
             const title = this.titleFilter.trim().toLowerCase();
             if (title) {
@@ -382,6 +406,7 @@
             if (this.channelFilter) params.set('channel', this.channelFilter);
             if (this.urlFilter) params.set('url', this.urlFilter);
             if (this.titleFilter.trim()) params.set('q', this.titleFilter.trim());
+            if (this.statusFilter) params.set('status', this.statusFilter);
             const query = params.toString();
             history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
           },

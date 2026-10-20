@@ -76,7 +76,7 @@ tubarr channel add \
   --metarr-meta-ops 'title:date-tag:prefix:ymd' \
   --metarr-meta-ops 'fulltitle:date-tag:prefix:ymd' \
   --metarr-output-directory /home/user/Videos/{{channel_name}}/{{year}} \
-  --notify 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE|Plex'
+  --notify 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE'
 ```
 
 Repeat `--metarr-meta-ops` (and the other operation flags) once per operation.
@@ -210,7 +210,7 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 
 - **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's.
 - **Metarr args**: filename/meta operations, filtered operations, metadata-based move rules, FFmpeg transcode settings, metadata file deletion, per-URL output directories.
-- **Notifications**: entries formatted as `NotifyURL`, `NotifyURL|Friendly Name` or `ChannelURL|NotifyURL|Friendly Name`, one per line in the web UI.
+- **Notifications**: URLs called when new videos are downloaded, for every channel URL or just one. On the CLI and in config files, entries are `NotifyURL` or `ChannelURL|NotifyURL`. The web UI picks the channel URL from a list.
 - **Global settings**: crawl concurrency, global and per-domain download limits, FlareSolverr URL, and custom site scraping rules (`--scrape-config-file`), also editable on the web UI's Settings page.
 - **Security**: credentials are encrypted via `~/.tubarr/.passwords/aes.txt`.
 

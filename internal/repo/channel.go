@@ -542,9 +542,8 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 // GetNotifyURLs returns all notification URLs for a given channel.
 func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QNotifyChanID,
-		consts.QNotifyName,
 		consts.QNotifyChanURL,
 		consts.QNotifyURL,
 		consts.DBNotifications,
@@ -570,7 +569,6 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 
 		err := rows.Scan(
 			&nModel.ChannelID,
-			&nModel.Name,
 			&nModel.ChannelURL,
 			&nModel.NotifyURL,
 		)
@@ -589,26 +587,24 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 	return notificationModels, nil
 }
 
-// DeleteNotifyURLs deletes notify URLs from the channel.
-func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) error {
+// DeleteNotifyURLs deletes notify URLs from the channel, for every channel URL they're set for.
+func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls []string) error {
 
 	if !cs.channelExistsID(channelID) {
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
 	query := fmt.Sprintf(
-		"DELETE FROM %s WHERE %s = ? AND ((%s IN (%s)) OR (%s IN (%s)))",
+		"DELETE FROM %s WHERE %s = ? AND %s IN (%s)",
 		consts.DBNotifications,
 		consts.QNotifyChanID,
 		consts.QNotifyURL,
 		placeholders(len(urls)),
-		consts.QNotifyName,
-		placeholders(len(names)),
 	)
 
-	args := make([]any, 0, 1+len(urls)+len(names))
+	args := make([]any, 0, 1+len(urls))
 	args = append(args, channelID)
-	for _, s := range slices.Concat(urls, names) {
+	for _, s := range urls {
 		args = append(args, s)
 	}
 
@@ -616,9 +612,9 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 		return err
 	}
 
-	// Counts only, since notification URLs (and names, which default to them) can hold tokens.
-	if len(urls) > 0 || len(names) > 0 {
-		logger.Pl.S("Deleted notifications for channel with ID '%d' (%d by URL, %d by name).", channelID, len(urls), len(names))
+	// Counts only, since notification URLs can hold tokens.
+	if len(urls) > 0 {
+		logger.Pl.S("Deleted %d notify URL(s) for channel with ID '%d'.", len(urls), channelID)
 	} else {
 		logger.Pl.S("No notify URLs to delete.")
 	}
@@ -629,7 +625,7 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls, names []string) 
 func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.Notification) error {
 	return cs.inTx(func(tcs *ChannelStore) error {
 		for _, n := range notifications {
-			if err := tcs.addNotifyURL(channelID, n.ChannelURL, n.NotifyURL, n.Name); err != nil {
+			if err := tcs.addNotifyURL(channelID, n.ChannelURL, n.NotifyURL); err != nil {
 				return err
 			}
 		}
@@ -1839,22 +1835,18 @@ func (cs *ChannelStore) applyConfigURLSettings(c *models.Channel, cfgFile string
 }
 
 // addNotifyURL sets a notification table entry for a channel with a given ID.
-func (cs *ChannelStore) addNotifyURL(id int64, chanURL, notifyURL, notifyName string) error {
+func (cs *ChannelStore) addNotifyURL(id int64, chanURL, notifyURL string) error {
 	if notifyURL == "" {
 		return errors.New("please enter a notification URL")
 	}
-	if notifyName == "" {
-		notifyName = notifyURL
-	}
 
-	const querySuffix = "ON CONFLICT (channel_id, notify_url) DO UPDATE SET name = EXCLUDED.name, channel_url = EXCLUDED.channel_url, updated_at = EXCLUDED.updated_at"
+	const querySuffix = "ON CONFLICT (channel_id, channel_url, notify_url) DO UPDATE SET updated_at = EXCLUDED.updated_at"
 
 	now := time.Now()
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?) %s",
+		"INSERT INTO %s (%s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?) %s",
 		consts.DBNotifications,
 		consts.QNotifyChanID,
-		consts.QNotifyName,
 		consts.QNotifyChanURL,
 		consts.QNotifyURL,
 		consts.QNotifyCreatedAt,
@@ -1865,7 +1857,6 @@ func (cs *ChannelStore) addNotifyURL(id int64, chanURL, notifyURL, notifyName st
 	_, err := cs.q.Exec(
 		query,
 		id,
-		notifyName,
 		chanURL,
 		notifyURL,
 		now,

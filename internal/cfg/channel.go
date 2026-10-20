@@ -619,19 +619,18 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 		channelName string
 
 		// Notification details.
-		notifyURLs  []string
-		notifyNames []string
+		notifyURLs []string
 	)
 
 	deleteNotifyCmd := &cobra.Command{
 		Use:   "notify-delete",
 		Short: "Deletes a notify function from a channel.",
-		Long:  "Enter a fully qualified notification URL here to delete from the database.",
+		Long:  "Enter a fully qualified notification URL here to delete it from the database, for every channel URL it's set for.",
 		RunE: func(_ *cobra.Command, _ []string) error {
 
 			// Valid items set?
-			if len(notifyURLs) == 0 && len(notifyNames) == 0 {
-				return errors.New("must enter at least one notify URL or name to delete")
+			if len(notifyURLs) == 0 {
+				return errors.New("must enter at least one notify URL to delete")
 			}
 
 			chanID, key, val, err := lookupChannelID(cs, channelID, channelName)
@@ -640,12 +639,12 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Run command.
-			if err := cs.DeleteNotifyURLs(chanID, notifyURLs, notifyNames); err != nil {
+			if err := cs.DeleteNotifyURLs(chanID, notifyURLs); err != nil {
 				return err
 			}
 
 			// Success.
-			logger.Pl.S("Deleted %d notify URL(s) for channel with %s %q", len(notifyURLs)+len(notifyNames), key, val)
+			logger.Pl.S("Deleted %d notify URL(s) for channel with %s %q", len(notifyURLs), key, val)
 			return nil
 		},
 	}
@@ -653,7 +652,6 @@ func deleteNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(deleteNotifyCmd, &channelName, nil, &channelID)
 	deleteNotifyCmd.Flags().StringSliceVar(&notifyURLs, "notify-urls", nil, "Full notification URLs (e.g. 'http://YOUR_PLEX_SERVER_IP:32400/library/sections/LIBRARY_ID_NUMBER/refresh?X-Plex-Token=YOUR_PLEX_TOKEN_HERE')")
-	deleteNotifyCmd.Flags().StringSliceVar(&notifyNames, "notify-names", nil, "Full notification names")
 
 	return deleteNotifyCmd
 }
@@ -672,11 +670,11 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	addNotifyCmd := &cobra.Command{
 		Use:   "notify-add",
 		Short: "Adds notify function to a channel.",
-		Long:  "Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. (notification pair format is 'URL|Friendly Name')",
+		Long:  "Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. (format is 'Notify URL', or 'Channel URL|Notify URL' for one channel URL only)",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Valid items set?
 			if len(notification) == 0 {
-				return errors.New("no notification URL|Name pairs entered")
+				return errors.New("no notification URLs entered")
 			}
 
 			chanID, key, val, err := lookupChannelID(cs, channelID, channelName)

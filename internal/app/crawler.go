@@ -211,7 +211,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		if isBlocked {
 			logger.Pl.W("Skipping video %q for channel %q. Domain is blocked for context %q (Blocked at: %v, Time remaining: %v)",
 				actualVideoURL, c.Name, blockCtx, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
-			recordSkip(s.VideoStore(), c, actualVideoURL, fmt.Errorf("%s is blocked for %s requests, %v left", hostname, blockCtx, remaining.Round(time.Second)))
+			recordSkip(s.VideoStore(), c, actualVideoURL, fmt.Errorf("%s is blocked for %s requests until %s", hostname, blockCtx, time.Now().Add(remaining).Format("2006-01-02 15:04 MST")))
 			continue
 		}
 

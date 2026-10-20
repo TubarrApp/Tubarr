@@ -1230,32 +1230,7 @@
 
                   <!-- Notifications Tab -->
                   <div x-show="activeTab === 'notifications'" class="space-y-4">
-                    <div class="space-y-4">
-                      <div class="text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                        <p class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notification Format:</p>
-                        <ul class="list-disc list-inside space-y-1">
-                          <li><code class="bg-white dark:bg-gray-800 px-2 py-0.5 rounded">Notify URL|Friendly Name</code> - Applies to all channel URLs</li>
-                          <li><code class="bg-white dark:bg-gray-800 px-2 py-0.5 rounded">Channel URL|Notify URL|Friendly Name</code> - Applies only to specific channel URL</li>
-                        </ul>
-                        <p class="mt-2 break-words">Example: <code class="bg-white dark:bg-gray-800 px-2 py-0.5 rounded">http://plex:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex Library Refresh</code></p>
-                      </div>
-
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Notification URLs
-                        </label>
-                        <textarea
-                          x-model="formData.notifications"
-                          rows="6"
-                          placeholder="http://plex:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex Library&#10;https://example.com/webhook|My Webhook&#10;https://tubesite.com/@channel|http://notify.com/hook|Tube Site Only"
-                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
-                        ></textarea>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Enter one notification per line. These URLs will be called when new videos are downloaded.<br>
-                          Use for Plex library refreshes, webhooks, or other notification services.
-                        </p>
-                      </div>
-                    </div>
+                    <!-- include:notifications -->
                   </div>
                 </div>
 
@@ -1295,7 +1270,7 @@
           formData: {
             name: '',
             ignore_run: false,
-            notifications: '',
+            notifications: [],
             urls: [
               {
                 url: '',
@@ -1538,13 +1513,9 @@
                 }
               });
 
-              // Add notifications, one per line, as names can hold spaces.
-              if (this.formData.notifications && this.formData.notifications.trim()) {
-                payload.notifications = this.formData.notifications
-                  .split('\n')
-                  .map(n => n.trim())
-                  .filter(n => n)
-                  .join('\n');
+              // Add notifications, one per line.
+              if (this.formData.notifications.length > 0) {
+                payload.notifications = this.formData.notifications.map(notificationLine).join('\n');
               }
 
               // Build per-URL custom settings as JSON object

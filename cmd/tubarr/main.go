@@ -130,6 +130,7 @@ func main() {
 	// ---- SHUTDOWN ----
 	cancel()        // stop goroutines.
 	<-heartbeatDone // wait for heartbeat to flush DB state.
+	app.WaitMetarr(5 * time.Second)
 	cleanup(progControl, startTime)
 
 	if runErr != nil {

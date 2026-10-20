@@ -151,7 +151,7 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 // SetNotifyFlags sets flags related to notification URLs (e.g. Plex library URL to ping for an update).
 func SetNotifyFlags(cmd *cobra.Command, notification *[]string) {
 	if notification != nil {
-		cmd.Flags().StringSliceVar(notification, keys.NotifyPair, nil, "URL to notify on completion (format is 'URL|Name', 'Name' can be empty)")
+		cmd.Flags().StringSliceVar(notification, keys.NotifyPair, nil, "URL to notify on completion (format is 'Notify URL', or 'Channel URL|Notify URL' for one channel URL only)")
 	}
 }
 

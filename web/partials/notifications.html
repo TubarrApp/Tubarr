@@ -1,0 +1,185 @@
+<!-- Notifications editor for the channel forms: edits the page's formData.notifications, a list of
+{channel_url, notify_url, checked} rows, offering the channel URLs in formData.urls. -->
+<div x-data="notificationEditor()" class="space-y-4">
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Channel URLs</label>
+    <div class="max-h-48 overflow-y-auto rounded-lg border border-gray-300 px-4 py-2 dark:border-gray-700">
+      <label class="flex items-center gap-3 py-1 text-sm text-gray-800 dark:text-white/90">
+        <input
+          type="checkbox"
+          :checked="selected.includes('')"
+          @change="selected = $event.target.checked ? [''] : []"
+          class="h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+        />
+        All Channel URLs
+      </label>
+      <template x-for="(u, i) in formData.urls.filter(u => u.url)" :key="i">
+        <label class="flex items-center gap-3 py-1 text-sm text-gray-800 dark:text-white/90" :class="selected.includes('') && 'opacity-50'">
+          <input
+            type="checkbox"
+            :value="u.url"
+            x-model="selected"
+            :disabled="selected.includes('')"
+            class="h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+          />
+          <span class="break-all" x-text="u.url"></span>
+        </label>
+      </template>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      Notification URLs <span class="text-gray-400 text-xs">(one per line)</span>
+    </label>
+    <textarea
+      x-model="notifyText"
+      rows="4"
+      placeholder="http://plex:32400/library/sections/1/refresh?X-Plex-Token=abc&#10;https://example.com/webhook"
+      class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+    ></textarea>
+    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      Called when new videos are downloaded from any of the chosen channel URLs, e.g. for Plex library refreshes or webhooks.
+    </p>
+    <p x-show="error" class="mt-1 text-xs text-error-600 dark:text-error-500 whitespace-pre-line" x-text="error"></p>
+    <p x-show="notifyText.trim() && !error" class="mt-1 text-xs text-warning-600 dark:text-warning-500">
+      These URLs aren't on the list yet. Click Add before saving the channel.
+    </p>
+  </div>
+
+  <div class="flex justify-end">
+    <button
+      type="button"
+      @click="add()"
+      class="px-6 py-3 bg-brand-500 text-white rounded-lg font-medium hover:bg-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/50 transition-colors"
+    >
+      Add
+    </button>
+  </div>
+
+  <div x-show="formData.notifications.length > 0" class="rounded-lg border border-gray-200 dark:border-gray-800">
+    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800">
+      <div class="flex flex-wrap items-center gap-4 text-sm">
+        <span class="font-medium text-gray-900 dark:text-white">
+          <span x-text="groups().filter(g => g.rows.every(r => r.checked)).length"></span> of <span x-text="groups().length"></span> selected
+        </span>
+        <button type="button" @click="formData.notifications.forEach(n => n.checked = true)" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Select All</button>
+        <button type="button" @click="formData.notifications.forEach(n => n.checked = false)" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Select None</button>
+      </div>
+      <button
+        type="button"
+        @click="formData.notifications = formData.notifications.filter(n => !n.checked)"
+        :disabled="!formData.notifications.some(n => n.checked)"
+        class="text-sm font-medium text-error-600 hover:text-error-700 disabled:opacity-50 disabled:cursor-not-allowed dark:text-error-500"
+      >
+        Remove Selected
+      </button>
+    </div>
+
+    <!-- One row per notify URL, listing every channel URL it's set for. -->
+    <ul class="divide-y divide-gray-200 dark:divide-gray-800">
+      <template x-for="g in groups()" :key="g.url">
+        <li class="flex items-start gap-4 px-4 py-3">
+          <input
+            type="checkbox"
+            :checked="g.rows.every(r => r.checked)"
+            @change="g.rows.forEach(r => r.checked = $event.target.checked)"
+            class="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+          />
+          <div class="min-w-0 flex-1">
+            <p class="break-all font-mono text-sm text-gray-900 dark:text-white" x-text="g.url"></p>
+            <p class="mt-1 break-all text-xs text-gray-500 dark:text-gray-400" x-text="g.rows.map(r => r.channel_url || 'All Channel URLs').join(', ')"></p>
+            <p x-show="missingChannelURLs(g).length > 0" class="mt-1 break-all text-xs text-error-600 dark:text-error-500"
+              x-text="`No longer on the channel: ${missingChannelURLs(g).join(', ')}. Edit or remove this before saving.`"></p>
+          </div>
+          <button type="button" @click="edit(g)" class="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400">Edit</button>
+        </li>
+      </template>
+    </ul>
+  </div>
+</div>
+
+<script>
+  function notificationEditor() {
+    return {
+      selected: [''], // Chosen channel URLs, where '' is all of them.
+      notifyText: '',
+      error: '',
+
+      // Puts each typed URL on the list for each chosen channel URL, skipping ones already there.
+      add() {
+        const urls = this.notifyText.split('\n').map(s => s.trim()).filter(s => s);
+        const bad = urls.filter(u => !/^https?:\/\/[^\s"<>\\^`{}]+$/i.test(u));
+        if (bad.length > 0) {
+          this.error = `Not a valid http(s) URL:\n${bad.join('\n')}`;
+          return;
+        }
+        if (this.selected.length === 0) {
+          this.error = 'Choose at least one channel URL.';
+          return;
+        }
+        this.error = '';
+        for (const u of urls) {
+          for (const c of this.selected) {
+            if (!this.formData.notifications.some(n => n.channel_url === c && n.notify_url === u)) {
+              this.formData.notifications.push({ channel_url: c, notify_url: u, checked: false });
+            }
+          }
+        }
+        this.notifyText = '';
+      },
+
+      // Takes a notify URL off the list and back into the inputs, with its channel URLs chosen.
+      edit(g) {
+        if (this.notifyText.trim()) {
+          this.error = 'Add or clear the URLs typed above before editing another.';
+          return;
+        }
+        this.error = '';
+        const chans = g.rows.map(r => r.channel_url);
+        this.selected = chans.includes('') ? [''] : chans;
+        this.notifyText = g.url;
+        this.formData.notifications = this.formData.notifications.filter(n => n.notify_url !== g.url);
+      },
+
+      // Groups the rows by notify URL, in list order.
+      groups() {
+        const byURL = new Map();
+        for (const n of this.formData.notifications) {
+          if (!byURL.has(n.notify_url)) byURL.set(n.notify_url, []);
+          byURL.get(n.notify_url).push(n);
+        }
+        return [...byURL].map(([url, rows]) => ({ url, rows }));
+      },
+
+      missingChannelURLs(g) {
+        const norm = s => s.trim().replace(/\/+$/, '').toLowerCase();
+        const have = this.formData.urls.filter(e => e.url).map(e => norm(e.url));
+        return g.rows.map(r => r.channel_url).filter(c => c && !have.includes(norm(c)));
+      },
+    };
+  }
+
+  // notificationLine renders a notification row as the server reads it, escaping '\' and '|'.
+  function notificationLine(n) {
+    const esc = s => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+    return n.channel_url ? `${esc(n.channel_url)}|${esc(n.notify_url)}` : esc(n.notify_url);
+  }
+
+  // notificationRow reads a notification line from the server into a row, splitting at unescaped '|'.
+  function notificationRow(line) {
+    const parts = [''];
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '\\' && '\\:|'.includes(line[i + 1])) {
+        parts[parts.length - 1] += line[++i];
+      } else if (line[i] === '|') {
+        parts.push('');
+      } else {
+        parts[parts.length - 1] += line[i];
+      }
+    }
+    return parts.length === 2
+      ? { channel_url: parts[0], notify_url: parts[1], checked: false }
+      : { channel_url: '', notify_url: parts[0], checked: false };
+  }
+</script>

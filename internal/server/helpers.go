@@ -305,7 +305,7 @@ func parseNotificationLines(s string, urls []string) ([]*models.Notification, er
 		if n.ChannelURL != "" && !slices.ContainsFunc(urls, func(u string) bool {
 			return sharedparsing.NormalizeChannelURL(u) == sharedparsing.NormalizeChannelURL(n.ChannelURL)
 		}) {
-			return nil, fmt.Errorf("notification %q is for channel URL %q, which this channel doesn't have", n.Name, n.ChannelURL)
+			return nil, fmt.Errorf("a notification is for channel URL %q, which this channel doesn't have", n.ChannelURL)
 		}
 	}
 	return notifications, nil
@@ -317,14 +317,10 @@ var notificationEscaper = strings.NewReplacer(`\`, `\\`, `|`, `\|`)
 // notificationLine renders a notification as parseNotificationLines reads it.
 func notificationLine(n *models.Notification) string {
 	esc := notificationEscaper.Replace
-	switch {
-	case n.ChannelURL != "":
-		return esc(n.ChannelURL) + "|" + esc(n.NotifyURL) + "|" + esc(n.Name)
-	case n.Name != n.NotifyURL:
-		return esc(n.NotifyURL) + "|" + esc(n.Name)
-	default:
-		return esc(n.NotifyURL)
+	if n.ChannelURL != "" {
+		return esc(n.ChannelURL) + "|" + esc(n.NotifyURL)
 	}
+	return esc(n.NotifyURL)
 }
 
 // formConfigFile returns the channel_config_file form value, checking the file exists.

@@ -85,11 +85,56 @@ func migrateURLLastScan(tx *sql.Tx) error {
 	return nil
 }
 
+// migrateNotificationNames rebuilds a notifications table from older versions, which had a name column and allowed
+// a notify URL only once per channel, into the current schema.
+func migrateNotificationNames(tx *sql.Tx) error {
+	has, err := hasColumn(tx, "notifications", "name")
+	if err != nil || !has {
+		return err
+	}
+
+	// The old indexes go with the renamed table, so they're dropped for the new table to create its own.
+	for _, stmt := range []string{
+		"ALTER TABLE notifications RENAME TO notifications_old",
+		"DROP INDEX IF EXISTS idx_notification_channel",
+		"DROP INDEX IF EXISTS idx_notification_url",
+	} {
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("failed to migrate notifications table: %w", err)
+		}
+	}
+	if err := initNotifyTable(tx); err != nil {
+		return err
+	}
+	for _, stmt := range []string{
+		`INSERT INTO notifications (id, channel_id, channel_url, notify_url, created_at, updated_at)
+			SELECT id, channel_id, COALESCE(channel_url, ''), notify_url, created_at, updated_at FROM notifications_old`,
+		"DROP TABLE notifications_old",
+	} {
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("failed to migrate notifications table: %w", err)
+		}
+	}
+	return nil
+}
+
 // addColumnIfMissing adds a column to an existing table (for databases created by older versions).
-func addColumnIfMissing(tx *sql.Tx, table, column, definition string) (err error) {
+func addColumnIfMissing(tx *sql.Tx, table, column, definition string) error {
+	has, err := hasColumn(tx, table, column)
+	if err != nil || has {
+		return err
+	}
+	if _, err := tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)); err != nil {
+		return fmt.Errorf("failed to add column %s to table %s: %w", column, table, err)
+	}
+	return nil
+}
+
+// hasColumn reports whether a table has a column.
+func hasColumn(tx *sql.Tx, table, column string) (has bool, err error) {
 	rows, err := tx.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
-		return fmt.Errorf("failed to read columns of table %s: %w", table, err)
+		return false, fmt.Errorf("failed to read columns of table %s: %w", table, err)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil && err == nil {
@@ -104,20 +149,16 @@ func addColumnIfMissing(tx *sql.Tx, table, column, definition string) (err error
 			defaultVal       sql.NullString
 		)
 		if err := rows.Scan(&cid, &name, &colType, &notNull, &defaultVal, &pk); err != nil {
-			return fmt.Errorf("failed to scan columns of table %s: %w", table, err)
+			return false, fmt.Errorf("failed to scan columns of table %s: %w", table, err)
 		}
 		if name == column {
-			return nil
+			return true, nil
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("failed to read columns of table %s: %w", table, err)
+		return false, fmt.Errorf("failed to read columns of table %s: %w", table, err)
 	}
-
-	if _, err := tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition)); err != nil {
-		return fmt.Errorf("failed to add column %s to table %s: %w", column, table, err)
-	}
-	return nil
+	return false, nil
 }
 
 // readSQLFile reads the SQL file stored in memory from go:embed.

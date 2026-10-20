@@ -146,6 +146,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := migrateNotificationNames(tx); err != nil {
+		return err
+	}
+
 	if err := initBlockedDomainsTable(tx); err != nil {
 		return err
 	}

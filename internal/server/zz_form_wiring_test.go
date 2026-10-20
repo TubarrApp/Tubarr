@@ -367,7 +367,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		// Request fields outside the models.
 		"name":          {"Wiring Add", "Wiring Edit"},
 		"auth_details":  {auth("user-a", "pass-a", "https://example.com/login"), auth("user-b", "pass-b", "https://example.com/login-b")},
-		"notifications": {"http://plex.local:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex Library\n" + wiringURLB + "|http://notify.local/hook|Scoped hook", "http://jellyfin.local/Library/Refresh|Jellyfin\nhttp://bare.local/hook"},
+		"notifications": {"http://plex.local:32400/library/sections/1/refresh?X-Plex-Token=abc\n" + wiringURLB + "|http://notify.local/hook", "http://jellyfin.local/Library/Refresh\nhttp://bare.local/hook"},
 
 		// Settings.
 		"video_directory":              {sub("videos-a"), sub("videos-b")},
@@ -484,7 +484,7 @@ func TestChannelFormModels(t *testing.T) {
 			}
 		}
 
-		// Notifications are sent one per line, as their names can hold spaces.
+		// Notifications are sent one per line.
 		if !regexp.MustCompile(`payload\.notifications = [^;]*\.join\('\\n'\)`).MatchString(src) {
 			t.Errorf("%s: notifications aren't sent newline-separated", page)
 		}

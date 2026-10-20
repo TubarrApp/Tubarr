@@ -463,17 +463,13 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("failed to fetch existing notifications: %w", err)
 		}
 		existingURLs := make([]string, 0, len(existingNotifications))
-		existingNames := make([]string, 0, len(existingNotifications))
 		for _, n := range existingNotifications {
 			if n.NotifyURL != "" {
 				existingURLs = append(existingURLs, n.NotifyURL)
 			}
-			if n.Name != "" {
-				existingNames = append(existingNames, n.Name)
-			}
 		}
-		if len(existingURLs) > 0 || len(existingNames) > 0 {
-			if err := cs.DeleteNotifyURLs(channelID, existingURLs, existingNames); err != nil {
+		if len(existingURLs) > 0 {
+			if err := cs.DeleteNotifyURLs(channelID, existingURLs); err != nil {
 				return fmt.Errorf("failed to delete existing notifications: %w", err)
 			}
 		}

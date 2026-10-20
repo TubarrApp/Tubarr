@@ -663,10 +663,10 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	var notifications []string
 	n := pickIndex(4)
 	if sc.notify["all"] = n&1 != 0; sc.notify["all"] {
-		notifications = append(notifications, site.srv.URL+"/notify/all|All")
+		notifications = append(notifications, site.srv.URL+"/notify/all")
 	}
 	if sc.notify["b"] = n&2 != 0; sc.notify["b"] {
-		notifications = append(notifications, site.feedURL("b")+"|"+site.srv.URL+"/notify/b|B only")
+		notifications = append(notifications, site.feedURL("b")+"|"+site.srv.URL+"/notify/b")
 	}
 	set("notifications", strings.Join(notifications, "\n"))
 

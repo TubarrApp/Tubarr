@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"tubarr/internal/database"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/repo"
 )
 
@@ -30,6 +31,13 @@ func initializeApplication(lock bool) (store *repo.Store, db *sql.DB, progContro
 			err = fmt.Errorf("DB %w", err) // "DB failure: reason"
 		}
 		return nil, nil, nil, err
+	}
+
+	// Holding the lock, so any video still mid-download or mid-Metarr was left by a previous run.
+	if pending, failed, recoverErr := store.VideoStore().RecoverInterrupted(); recoverErr != nil {
+		logger.Pl.E("Failed to recover videos the last run stopped partway: %v", recoverErr)
+	} else if pending+failed > 0 {
+		logger.Pl.I("Recovered videos the last run stopped partway: %d finished with Metarr pending, %d back in Available as failed", pending, failed)
 	}
 
 	return store, db, progControl, err

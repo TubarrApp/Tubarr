@@ -25,7 +25,7 @@
   "metarr_transcode_video_codecs": ["h264:hevc", "vp9:h264"],
   "metarr_transcode_audio_codecs": ["aac:ac3", "dts:eac3", "flac:mp3"],
 
-  "notify": ["https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh?X-Plex-Token=< YOUR PLEX TOKEN >|Plex"],
+  "notify": ["https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh?X-Plex-Token=< YOUR PLEX TOKEN >"],
 
   "ignore_run": true,
 

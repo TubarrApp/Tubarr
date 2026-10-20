@@ -313,7 +313,6 @@ func TestValidateNotifications(t *testing.T) {
 			ChannelID:  1,
 			NotifyURL:  "http://www.google.com",
 			ChannelURL: "http://www.example.com",
-			Name:       "Google",
 		},
 	}
 	if err := validation.ValidateNotifications(valid); err != nil {
@@ -324,20 +323,9 @@ func TestValidateNotifications(t *testing.T) {
 		{
 			ChannelID: 1,
 			NotifyURL: "http://www.google.com",
-			Name:      "Google",
 		},
 	}
 	if err := validation.ValidateNotifications(validNoURL); err != nil {
-		t.Fatalf("Failed test")
-	}
-
-	var validNoURLNoName = []*models.Notification{
-		{
-			ChannelID: 1,
-			NotifyURL: "http://www.google.com",
-		},
-	}
-	if err := validation.ValidateNotifications(validNoURLNoName); err != nil {
 		t.Fatalf("Failed test")
 	}
 
@@ -347,7 +335,6 @@ func TestValidateNotifications(t *testing.T) {
 			ChannelID:  1,
 			NotifyURL:  "http://example.com/%😃",
 			ChannelURL: "http://www.example.com",
-			Name:       "Google",
 		},
 	}
 	if err := validation.ValidateNotifications(invalidNotifyURL); err == nil {

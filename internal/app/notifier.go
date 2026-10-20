@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
@@ -63,6 +64,10 @@ func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWit
 			urls = append(urls, n.NotifyURL)
 		}
 	}
+
+	// A notify URL set for several channel URLs that all got new videos is still only notified once.
+	slices.Sort(urls)
+	urls = slices.Compact(urls)
 
 	// Check if any valid URLs.
 	if len(urls) == 0 {

@@ -61,7 +61,7 @@ type ChannelStore interface {
 	DeleteChannel(key, val string) error
 	DeleteChannelURL(channelURLID int64) error
 	DeleteVideosByURLs(channelID int64, urls []string, deleteFiles bool) error
-	DeleteNotifyURLs(channelID int64, urls, names []string) error
+	DeleteNotifyURLs(channelID int64, urls []string) error
 
 	// 'Get' operations.
 	GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error)
@@ -116,4 +116,5 @@ type VideoStore interface {
 	SetVideoOverrides(videoIDs []int64, o *models.VideoOverrides) error
 	SetQueuedVideoError(channelID int64, videoURL, errMsg string) error
 	SetMissingVideoErrors(videoIDs []int64, errMsg string) error
+	RecoverInterrupted() (pending, failed int64, err error)
 }

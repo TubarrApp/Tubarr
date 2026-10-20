@@ -3,7 +3,6 @@ package parsing
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -57,7 +56,7 @@ func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error)
 
 // ParseNotifications parses notification strings into models.
 //
-// Format: "Notify URL", "Notify URL|Name" or "Channel URL|Notify URL|Name". The name defaults to the notify URL.
+// Format: "Notify URL" or "Channel URL|Notify URL".
 func ParseNotifications(notifications []string) ([]*models.Notification, error) {
 	if len(notifications) == 0 {
 		return nil, nil
@@ -70,19 +69,18 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 		entry := sharedparsing.EscapedSplit(n, '|')
 
 		// Check entries for validity and fill field details.
-		var chanURL, nURL, name string
+		var chanURL, nURL string
 		switch len(entry) {
 		case 1:
 			nURL = entry[0]
 		case 2:
-			nURL, name = entry[0], entry[1]
-		case 3:
-			chanURL, nURL, name = entry[0], entry[1], entry[2]
-			if _, err := url.Parse(chanURL); err != nil || chanURL == "" {
-				return nil, fmt.Errorf("channel URL %q in notification entry %q is not valid", chanURL, n)
-			}
+			chanURL, nURL = entry[0], entry[1]
 		default:
-			return nil, fmt.Errorf("malformed notification entry %q, should be in 'Notify URL', 'Notify URL|Name' or 'Channel URL|Notify URL|Name' format", n)
+			return nil, fmt.Errorf("malformed notification entry %q, should be in 'Notify URL' or 'Channel URL|Notify URL' format", n)
+		}
+
+		if chanURL != "" && !validation.IsHTTPURL(chanURL) {
+			return nil, fmt.Errorf("channel URL %q in notification entry %q must be a valid http(s) URL", chanURL, n)
 		}
 
 		// Notifications are sent as HTTP POST requests (url.Parse allows characters URLs can't contain, like spaces).
@@ -90,16 +88,10 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 			return nil, fmt.Errorf("notification URL %q in entry %q must be a valid http(s) URL", nURL, n)
 		}
 
-		// Use URL as name if name field is missing.
-		if name == "" {
-			name = nURL
-		}
-
 		// Create model.
 		newNotificationModel := models.Notification{
 			ChannelURL: chanURL,
 			NotifyURL:  nURL,
-			Name:       name,
 		}
 
 		// Append to collection.

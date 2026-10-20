@@ -4,6 +4,5 @@ package models
 type Notification struct {
 	ChannelID int64
 	ChannelURL,
-	NotifyURL,
-	Name string
+	NotifyURL string
 }

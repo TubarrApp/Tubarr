@@ -25,6 +25,19 @@ import (
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
+// videoBatch holds what the video jobs of one channel URL's batch share.
+type videoBatch struct {
+	stopRequested <-chan struct{}
+	vs            contracts.VideoStore
+	cs            contracts.ChannelStore
+	dlTracker     *downloads.DownloadTracker
+	dirParser     *parsing.DirectoryParser
+	cu            *models.ChannelURL
+	c             *models.Channel
+	metarrWg      *sync.WaitGroup // Running Metarr processes outlive the batch.
+	downloaded    *atomic.Int32
+}
+
 // InitProcess begins processing metadata/videos and respective downloads.
 func InitProcess(
 	ctx context.Context,
@@ -241,37 +254,33 @@ func executeCustomScraper(ctx context.Context, s *scraper.Scraper, v *models.Vid
 	return v.JSONCustomFile, nil
 }
 
-// videoBatch holds what the video jobs of one channel URL's batch share.
-type videoBatch struct {
-	stopRequested <-chan struct{}
-	vs            contracts.VideoStore
-	cs            contracts.ChannelStore
-	dlTracker     *downloads.DownloadTracker
-	dirParser     *parsing.DirectoryParser
-	cu            *models.ChannelURL
-	c             *models.Channel
-	metarrWg      *sync.WaitGroup // Running Metarr processes, which outlive the batch.
-	downloaded    *atomic.Int32
-}
-
 // videoJob starts a worker's process for a video.
 func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *models.Video) (err error) {
 	c, cu := b.c, b.cu
 
-	// Take hold of video before touching its files, cancelling any separate Metarr run on it.
+	// Take hold of video before touching its files, canceling any separate Metarr run on it.
+	// The hold stops a Run Metarr re-run and this download using the video's files at the same time.
 	key := metarrKey{c.ID, v.URL}
+
+	// This video's own Metarr context, so Stop on the Post-processing page can cancel just its run.
 	vMetarrCtx, vMetarrCancel := context.WithCancel(metarrCtx)
+
+	// pipeline marks the hold as a download's, which other downloads can't take over.
 	claim := &metarrClaim{channelName: c.Name, cancel: vMetarrCancel, pipeline: true, done: make(chan struct{})}
 	held, err := preemptMetarr(queueCtx, key, claim)
+
+	// Errors if the job is stopped while waiting for the canceled Metarr run to finish.
 	if err != nil {
 		vMetarrCancel()
 		return err
 	}
+	// Not held: another download of this video in the channel already has it.
 	if !held {
 		vMetarrCancel()
 		logger.Pl.W("Video %q is already being downloaded elsewhere in channel %q, skipping", v.URL, c.Name)
 		return nil
 	}
+	// Released here on return until Metarr starts, then by the Metarr goroutine once it finishes.
 	handedOff := false
 	defer func() {
 		if !handedOff {
@@ -357,6 +366,11 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 		return completeAndStoreVideo(b.cs, b.vs, v, c)
 	}
 
+	// Store the downloaded file's path first, so startup can recover the video if Tubarr stops during Metarr.
+	if err := b.vs.UpdateVideo(v, c.ID); err != nil {
+		logger.Pl.E("Failed to store downloaded file path for video %q before Metarr: %v", v.URL, err)
+	}
+
 	// Run metarr step.
 	handedOff = true
 	b.metarrWg.Add(1)
@@ -404,12 +418,16 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 // canceled it, so it returns to the Available list.
 func finishTracking(vidCtx context.Context, dlTracker *downloads.DownloadTracker, v *models.Video, err error) {
 	status := v.DownloadStatus.Status
+
+	// Finish tracking video which is queued or downloading = set 'Failed'
 	if status == consts.DLStatusQueued || status == consts.DLStatusDownloading {
 		status = consts.DLStatusFailed
 		if errors.Is(context.Cause(vidCtx), downloads.ErrCanceledByUser) {
 			status = consts.DLStatusCanceled
 		}
 	}
+
+	// Finish tracking video which is NOT queued or downloading = inherit status from model
 	dlTracker.SetStatus(v, status, v.DownloadStatus.Percent, "", err)
 }
 
