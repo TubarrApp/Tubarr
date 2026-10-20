@@ -660,8 +660,11 @@
                                   <span x-text="formatDate(video.upload_date, true)"></span>
                                 </p>
                                 <p
-                                  class="mb-2 truncate text-xs text-gray-500 dark:text-gray-400"
+                                  x-data="{ full: false }"
+                                  class="mb-2 text-xs text-gray-500 dark:text-gray-400"
+                                  :class="full ? 'break-words' : 'truncate'"
                                   @mouseenter="$el.title = $el.scrollWidth > $el.clientWidth ? video.video_path : ''"
+                                  @click="if (!window.getSelection().toString() && (full || $el.scrollWidth > $el.clientWidth)) full = !full"
                                   x-text="video.video_path || 'File path: N/A'"
                                 ></p>
                                 <a
