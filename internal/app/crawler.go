@@ -177,7 +177,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 
 	for _, mv := range videos {
 		actualVideoURL := mv.URL
-		targetChannelURLModel, err := manualChannelURL(cs, c, mv.ChannelURLID)
+		targetChannelURLModel, err := ManualChannelURL(cs, c, mv.ChannelURLID)
 		if err != nil {
 			return err
 		}
@@ -801,8 +801,9 @@ func ValidManualAuth(a *models.ManualAuth) bool {
 	return a.Username != "" && validation.IsHTTPURL(a.LoginURL)
 }
 
-// manualChannelURL returns the channel's URL with the given ID, or its manual downloads URL for 0.
-func manualChannelURL(cs contracts.ChannelStore, c *models.Channel, id int64) (*models.ChannelURL, error) {
+// ManualChannelURL returns the channel's URL with the given ID, or its manual downloads URL for 0. A video whose channel
+// URL was removed has ID 0, so it's treated as a manual download.
+func ManualChannelURL(cs contracts.ChannelStore, c *models.Channel, id int64) (*models.ChannelURL, error) {
 	if id == 0 {
 		return ensureManualDownloadsChannelURL(cs, c)
 	}
@@ -823,7 +824,7 @@ func AddManualAvailable(s contracts.Store, c *models.Channel, videos []models.Ma
 		if slices.ContainsFunc(requests, func(v *models.Video) bool { return v.URL == mv.URL }) {
 			continue
 		}
-		cu, err := manualChannelURL(s.ChannelStore(), c, mv.ChannelURLID)
+		cu, err := ManualChannelURL(s.ChannelStore(), c, mv.ChannelURLID)
 		if err != nil {
 			return nil, nil, err
 		}

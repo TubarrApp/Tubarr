@@ -818,6 +818,26 @@ func (ss *serverStore) channelFromRequest(w http.ResponseWriter, r *http.Request
 	return c, true
 }
 
+// channelURLFromRequest returns the channel URL named in the request path, where ID 0 is the channel's manual
+// downloads URL (the ID of a video whose channel URL was removed).
+func (ss *serverStore) channelURLFromRequest(w http.ResponseWriter, r *http.Request, c *models.Channel) (*models.ChannelURL, bool) {
+	urlID, err := strconv.ParseInt(chi.URLParam(r, "urlID"), 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
+		return nil, false
+	}
+	cu, err := app.ManualChannelURL(ss.cs, c, urlID)
+	if err != nil {
+		if urlID != 0 {
+			http.Error(w, "channel URL not found", http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return nil, false
+	}
+	return cu, true
+}
+
 // handleIgnoreCrawlChannel initiates a crawl for a specific channel.
 func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
 	c, ok := ss.channelFromRequest(w, r)
@@ -1020,7 +1040,7 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := checkOverridesFit(c, channelURLID, overrides); err != nil {
+		if err := checkOverridesFit(ss.cs, c, channelURLID, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -1076,14 +1096,8 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	file.UpdateFromConfigFile(ss.cs, c) // As a download does, so the ops shown are the ones it would run.
-	urlID, err := strconv.ParseInt(chi.URLParam(r, "urlID"), 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
-		return
-	}
-	cu := c.URLByID(urlID)
-	if cu == nil {
-		http.Error(w, "channel URL not found", http.StatusNotFound)
+	cu, ok := ss.channelURLFromRequest(w, r, c)
+	if !ok {
 		return
 	}
 
@@ -1110,6 +1124,7 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 		DefaultsMetarr *metarrArgsResponse   `json:"defaults_metarr"` // The channel URL's other Metarr args.
 		SavedMetarr    *metarrArgsResponse   `json:"saved_metarr"`    // The video's earlier other Metarr args, if any.
 	}
+	var err error
 	if response.Defaults, err = metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -1134,14 +1149,8 @@ func (ss *serverStore) handleGetOverrideOpsFile(w http.ResponseWriter, r *http.R
 	if !ok {
 		return
 	}
-	urlID, err := strconv.ParseInt(chi.URLParam(r, "urlID"), 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
-		return
-	}
-	cu := c.URLByID(urlID)
-	if cu == nil {
-		http.Error(w, "channel URL not found", http.StatusNotFound)
+	cu, ok := ss.channelURLFromRequest(w, r, c)
+	if !ok {
 		return
 	}
 
@@ -1207,7 +1216,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "video isn't waiting for Metarr in this channel", http.StatusConflict)
 			return
 		}
-		if err := checkOverridesFit(c, awaiting[i].ChannelURLID, overrides); err != nil {
+		if err := checkOverridesFit(ss.cs, c, awaiting[i].ChannelURLID, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

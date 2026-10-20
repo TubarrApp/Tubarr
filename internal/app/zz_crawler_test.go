@@ -36,11 +36,11 @@ func TestCheckManualVideos(t *testing.T) {
 			t.Errorf("CheckManualVideos(%+v) = %v, want accepted: %t", tc.mv, bad, tc.ok)
 		}
 	}
-	if cu, err := manualChannelURL(nil, c, 4); err != nil || cu != c.URLModels[0] {
-		t.Errorf("manualChannelURL(4) = %v, %v; want the channel's URL", cu, err)
+	if cu, err := ManualChannelURL(nil, c, 4); err != nil || cu != c.URLModels[0] {
+		t.Errorf("ManualChannelURL(4) = %v, %v; want the channel's URL", cu, err)
 	}
-	if _, err := manualChannelURL(nil, c, 5); err == nil {
-		t.Error("manualChannelURL(5) found a URL the channel doesn't have")
+	if _, err := ManualChannelURL(nil, c, 5); err == nil {
+		t.Error("ManualChannelURL(5) found a URL the channel doesn't have")
 	}
 }
 

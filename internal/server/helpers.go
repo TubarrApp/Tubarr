@@ -11,7 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"tubarr/internal/app"
 	"tubarr/internal/auth"
+	"tubarr/internal/contracts"
 	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -779,9 +781,9 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 
 // checkOverridesFit returns an error if Download As options, with blank ones using the video's channel URL's as Metarr
 // gets them, can't work together.
-func checkOverridesFit(c *models.Channel, channelURLID int64, o *models.VideoOverrides) error {
+func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLID int64, o *models.VideoOverrides) error {
 	m := o.MetarrArgs
-	if cu := c.URLByID(channelURLID); cu != nil && cu.ChanURLMetarrArgs != nil {
+	if cu, err := app.ManualChannelURL(cs, c, channelURLID); err == nil && cu.ChanURLMetarrArgs != nil {
 		u := cu.ChanURLMetarrArgs
 		m.OutputExt = cmp.Or(m.OutputExt, u.OutputExt)
 		m.TranscodeGPU = cmp.Or(m.TranscodeGPU, u.TranscodeGPU)
