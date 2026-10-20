@@ -307,8 +307,10 @@ func execMetarr(ctx context.Context, v *models.Video, cu *models.ChannelURL, c *
 			return consts.MetarrStatusPending
 		}
 		logger.Pl.E("Metarr processing error for video %q: %v", v.URL, err)
+		v.MetarrError = err.Error()
 		return consts.MetarrStatusFailed
 	}
+	v.MetarrError = ""
 	return consts.MetarrStatusDone
 }
 

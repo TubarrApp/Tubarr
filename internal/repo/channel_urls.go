@@ -17,9 +17,19 @@ import (
 
 // AddChannelURL adds a new channel URL to the database.
 func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error) {
+	err = cs.inTx(func(tcs *ChannelStore) (err error) {
+		chanURLID, err = tcs.addChannelURL(channelID, cu, isManual)
+		return err
+	})
+	return chanURLID, err
+}
+
+// addChannelURL adds a new channel URL to the database.
+func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error) {
 	if !cs.channelExistsID(channelID) {
 		return 0, fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
+	cs.touch(channelID)
 	if !isManual {
 		if err := validation.ValidateChannelURL(cu.URL); err != nil {
 			return 0, err
@@ -100,15 +110,25 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 
 // UpdateChannelURLSettings updates the settings of a single ChannelURL model.
 func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
+	return cs.inTx(func(tcs *ChannelStore) error { return tcs.updateChannelURLSettings(cu) })
+}
+
+// updateChannelURLSettings updates the settings of a single ChannelURL model.
+func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 	// Only files and folders this save adds are checked, so e.g. saving the channel works while an unchanged one's drive
 	// is unmounted.
-	var old *models.Settings
-	var oldMetarr *models.MetarrArgs
-	var oldJSON, oldMetarrJSON sql.NullString
-	oldQuery := fmt.Sprintf("SELECT %s, %s FROM %s WHERE %s = ?", consts.QChanURLSettings, consts.QChanURLMetarr, consts.DBChannelURLs, consts.QChanURLID)
-	if err := cs.q.QueryRow(oldQuery, cu.ID).Scan(&oldJSON, &oldMetarrJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	var (
+		old                    *models.Settings
+		oldMetarr              *models.MetarrArgs
+		oldJSON, oldMetarrJSON sql.NullString
+		channelID              int64
+	)
+	oldQuery := fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s = ?", consts.QChanURLChannelID, consts.QChanURLSettings,
+		consts.QChanURLMetarr, consts.DBChannelURLs, consts.QChanURLID)
+	if err := cs.q.QueryRow(oldQuery, cu.ID).Scan(&channelID, &oldJSON, &oldMetarrJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to read settings of channel URL %q: %w", cu.URL, err)
 	}
+	cs.touch(channelID)
 	if oldJSON.Valid && oldJSON.String != "" {
 		if err := json.Unmarshal([]byte(oldJSON.String), &old); err != nil {
 			return fmt.Errorf("failed to read settings of channel URL %q: %w", cu.URL, err)

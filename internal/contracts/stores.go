@@ -98,6 +98,7 @@ type VideoStore interface {
 
 	// Get operations.
 	GetVideoURLByID(videoID int64) (videoURL string, err error)
+	GetVideoChannelURLID(videoID int64) (channelURLID int64, err error)
 	VideoExists(v *models.Video, channelID int64) (videoID int64, exists bool)
 	GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error)
 	GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error)

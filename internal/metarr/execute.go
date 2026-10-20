@@ -2,8 +2,11 @@ package metarr
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
+	"slices"
+	"strings"
 	"syscall"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -49,6 +52,10 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 		if storeErr := v.StoreFilenamesFromMetarr(string(metarrStdout)); storeErr != nil {
 			logger.Pl.D(1, "No file paths stored from failed Metarr run for %q: %v", v.URL, storeErr)
 		}
+		// Metarr's own account of why it failed, rather than just its exit status.
+		if msgs := metarrErrors(string(metarrStdout)); len(msgs) > 0 {
+			return errors.New(strings.Join(msgs, "; "))
+		}
 		return err
 	}
 
@@ -60,4 +67,15 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	// Success.
 	logger.Pl.S("Metarr successfully processed video %q (file path: %q)", v.URL, v.VideoFilePath)
 	return nil
+}
+
+// metarrErrors returns the errors Metarr reported on stdout, from its "metarr error: " lines.
+func metarrErrors(stdout string) []string {
+	var msgs []string
+	for l := range strings.SplitSeq(stdout, "\n") {
+		if msg, ok := strings.CutPrefix(l, "metarr error: "); ok && msg != "" && !slices.Contains(msgs, msg) {
+			msgs = append(msgs, msg)
+		}
+	}
+	return msgs
 }

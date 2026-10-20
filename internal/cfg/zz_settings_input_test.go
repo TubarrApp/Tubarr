@@ -194,7 +194,14 @@ func TestClearSettingClearsEachURLSetting(t *testing.T) {
 		if _, err := addSettingsChannel(t, cs, name, nil, full); err != nil {
 			t.Fatal(err)
 		}
-		if err := runSettingsCmd(updateChannelURLSettingsCmd(cs), name, []settingsKey{{key: keys.ClearSetting, val: k.key}}); err != nil {
+		err := runSettingsCmd(updateChannelURLSettingsCmd(cs), name, []settingsKey{{key: keys.ClearSetting, val: k.key}})
+		if k.key == keys.TranscodeGPUNode { // The URL's GPU still needs a node.
+			if err == nil {
+				t.Errorf("%s: cleared, leaving a GPU without the node it needs", k.key)
+			}
+			continue
+		}
+		if err != nil {
 			t.Errorf("%s: %v", k.key, err)
 			continue
 		}

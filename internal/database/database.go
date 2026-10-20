@@ -125,6 +125,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := addColumnIfMissing(tx, "videos", "metarr_error", "TEXT DEFAULT ''"); err != nil {
+		return err
+	}
+
 	if err := initDownloadsTable(tx); err != nil {
 		return err
 	}

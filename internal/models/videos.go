@@ -34,9 +34,10 @@ type Video struct {
 	MoveOpOutputDir     string                `json:"-" db:"-"`
 	Ignored             bool                  `json:"ignored" db:"ignored"`
 	MetarrStatus        consts.MetarrStatus   `json:"metarr_status" db:"metarr_status"`
-	FilteredMetaOps     []FilteredMetaOps     `json:"-" db:"-"` // Per-video filtered meta operations
-	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"` // Per-video filtered filename operations
-	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
+	MetarrError         string                `json:"metarr_error,omitempty" db:"metarr_error"` // Why Metarr last failed.
+	FilteredMetaOps     []FilteredMetaOps     `json:"-" db:"-"`                                 // Per-video filtered meta operations
+	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"`                                 // Per-video filtered filename operations
+	SkipFilters         bool                  `json:"-" db:"-"`                                 // Chosen by the user, so download filters don't apply.
 	SkipMetarr          SkipMetarr            `json:"-" db:"-"`
 	SkipDownloads       SkipDownloads         `json:"-" db:"-"`
 	Overrides           *VideoOverrides       `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's settings.

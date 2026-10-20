@@ -35,6 +35,7 @@ type ChannelStore struct {
 	q           querier
 	tx          *sql.Tx
 	PasswordMgr *auth.PasswordManager
+	touched     map[int64]struct{} // Channels whose Metarr args the transaction changed, checked before it commits.
 }
 
 // GetChannelStore returns a channel store instance with injected database.
@@ -69,8 +70,80 @@ func (cs *ChannelStore) inTx(fn func(tcs *ChannelStore) error) error {
 		return fn(cs)
 	}
 	return inTx(cs.db, func(tx *sql.Tx) error {
-		return fn(&ChannelStore{db: cs.db, q: tx, tx: tx, PasswordMgr: cs.PasswordMgr})
+		tcs := &ChannelStore{db: cs.db, q: tx, tx: tx, PasswordMgr: cs.PasswordMgr, touched: map[int64]struct{}{}}
+		if err := fn(tcs); err != nil {
+			return err
+		}
+		return tcs.checkTouchedMetarrArgs()
 	})
+}
+
+// touch records that the transaction changed a channel's (or one of its URLs') Metarr args.
+func (cs *ChannelStore) touch(channelID int64) {
+	if cs.touched != nil {
+		cs.touched[channelID] = struct{}{}
+	}
+}
+
+// checkTouchedMetarrArgs checks the Metarr args of each channel the transaction changed, alone and under each of its
+// URLs', once all are written, so settings saved together (e.g. by the edit page) are judged together.
+func (cs *ChannelStore) checkTouchedMetarrArgs() error {
+	for id := range cs.touched {
+		var raw sql.NullString
+		query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QChanMetarr, consts.DBChannels, consts.QChanID)
+		if err := cs.q.QueryRow(query, id).Scan(&raw); err != nil {
+			return fmt.Errorf("failed to read Metarr settings of channel %d: %w", id, err)
+		}
+		var ch models.MetarrArgs
+		if raw.String != "" {
+			if err := json.Unmarshal([]byte(raw.String), &ch); err != nil {
+				return fmt.Errorf("failed to read Metarr settings of channel %d: %w", id, err)
+			}
+		}
+		if err := validation.ValidateMetarrArgsCombination(&ch); err != nil {
+			return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidChannel, err)
+		}
+
+		query = fmt.Sprintf("SELECT %s, %s FROM %s WHERE %s = ?", consts.QChanURLURL, consts.QChanURLMetarr,
+			consts.DBChannelURLs, consts.QChanURLChannelID)
+		rows, err := cs.q.Query(query, id)
+		if err != nil {
+			return fmt.Errorf("failed to read Metarr settings of channel %d's URLs: %w", id, err)
+		}
+		if err := checkURLMetarrArgs(rows, &ch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkURLMetarrArgs checks each URL row's Metarr args over its channel's, closing rows.
+func checkURLMetarrArgs(rows *sql.Rows, ch *models.MetarrArgs) error {
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Pl.E("Failed to close rows: %v", err)
+		}
+	}()
+	for rows.Next() {
+		var (
+			u   string
+			raw sql.NullString
+			m   models.MetarrArgs
+		)
+		if err := rows.Scan(&u, &raw); err != nil {
+			return fmt.Errorf("failed to read a URL's Metarr settings: %w", err)
+		}
+		if raw.String != "" && raw.String != "null" {
+			if err := json.Unmarshal([]byte(raw.String), &m); err != nil {
+				return fmt.Errorf("failed to read Metarr settings of URL %q: %w", u, err)
+			}
+		}
+		mergeMetarrArgs(&m, ch)
+		if err := validation.ValidateMetarrArgsCombination(&m); err != nil {
+			return fmt.Errorf("%w: Metarr settings for URL %q: %w", contracts.ErrInvalidChannel, u, err)
+		}
+	}
+	return rows.Err()
 }
 
 // GetNewVideoURLs returns the slice of new video URLs from the database (used for notification dot).
@@ -820,6 +893,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 	if err != nil {
 		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
+	cs.touch(id)
 
 	// Insert URLs into the channel_urls table.
 	logger.Pl.D(1, "Inserting %d channel URLs for channel ID %d", len(c.URLModels), id)
@@ -1098,20 +1172,25 @@ func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn fu
 		return 0, err
 	}
 
-	var metarrArgs json.RawMessage
+	var (
+		channelID  int64
+		metarrArgs json.RawMessage
+	)
 	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s FROM %s WHERE %s = ?",
+		consts.QChanID,
 		consts.QChanMetarr,
 		consts.DBChannels,
 		key,
 	)
 
-	err := cs.q.QueryRow(query, val).Scan(&metarrArgs)
+	err := cs.q.QueryRow(query, val).Scan(&channelID, &metarrArgs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
 		return 0, fmt.Errorf("failed to get channel settings: %w", err)
 	}
+	cs.touch(channelID)
 
 	// Unmarshal current settings.
 	var args models.MetarrArgs
@@ -1325,7 +1404,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
 			"ORDER BY %s DESC",
 		consts.QVidID,
@@ -1340,8 +1419,10 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidDescription,
 		consts.QVidUploadDate,
 		consts.QVidMetarrStatus,
+		consts.QVidMetarrError,
 		consts.QVidVideoPath,
 		consts.QVidJSONPath,
+		consts.QVidDuration,
 		consts.QVidCreatedAt,
 		consts.QVidUpdatedAt,
 		consts.DBVideos,
@@ -1374,8 +1455,10 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			channelURLID sql.NullInt64
 			channelURL   sql.NullString
 			metarrStatus sql.NullString
+			metarrError  sql.NullString
 			videoPath    sql.NullString
 			jsonPath     sql.NullString
+			duration     sql.NullInt64
 		)
 
 		if err := rows.Scan(
@@ -1391,16 +1474,20 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			&description,
 			&uploadDate,
 			&metarrStatus,
+			&metarrError,
 			&videoPath,
 			&jsonPath,
+			&duration,
 			&v.CreatedAt,
 			&v.UpdatedAt,
 		); err != nil {
 			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
 		}
 		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
+		v.MetarrError = metarrError.String
 		v.VideoFilePath = videoPath.String
 		v.JSONFilePath = jsonPath.String // Edit & Re-Run needs the metadata file.
+		v.Duration = int(duration.Int64)
 
 		// Handle nullable fields.
 		if channelURLID.Valid {

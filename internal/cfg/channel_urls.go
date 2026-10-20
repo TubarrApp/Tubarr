@@ -2,6 +2,7 @@ package cfg
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -70,18 +71,19 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// If reset flag is set, clear settings to inherit from channel.
 			if resetSettings {
+				var errs []error
 				for _, cu := range urlsToUpdate {
 					cu.ChanURLSettings = nil
 					cu.ChanURLMetarrArgs = nil
 
 					if err := cs.UpdateChannelURLSettings(cu); err != nil {
-						logger.Pl.E("Failed to reset settings for URL %s: %v", cu.URL, err)
+						errs = append(errs, fmt.Errorf("failed to reset settings for URL %q: %w", cu.URL, err))
 						continue
 					}
 
 					logger.Pl.S("Reset settings for URL %q - will now inherit from channel defaults", cu.URL)
 				}
-				return nil
+				return errors.Join(errs...)
 			}
 
 			// Apply the settings given to every URL before saving any, so invalid ones leave all unchanged.
@@ -110,9 +112,10 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 			// Save to database.
 			updatedCount := 0
+			var errs []error
 			for _, cu := range changed {
 				if err := cs.UpdateChannelURLSettings(cu); err != nil {
-					logger.Pl.E("Failed to update URL %s: %v", cu.URL, err)
+					errs = append(errs, fmt.Errorf("failed to update URL %q: %w", cu.URL, err))
 					continue
 				}
 
@@ -120,8 +123,10 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				updatedCount++
 			}
 
-			logger.Pl.S("Successfully updated settings for %d URL(s) in channel %q", updatedCount, c.Name)
-			return nil
+			if updatedCount > 0 || len(errs) == 0 {
+				logger.Pl.S("Successfully updated settings for %d URL(s) in channel %q", updatedCount, c.Name)
+			}
+			return errors.Join(errs...)
 		},
 	}
 

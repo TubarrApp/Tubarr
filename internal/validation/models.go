@@ -91,6 +91,23 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	return nil
 }
 
+// ValidateMetarrArgsCombination returns an error if Metarr args, as Metarr gets them (a URL's over its channel's, or
+// Download As options over those), can't work together: codecs their output container can't hold, or a GPU without
+// the device node it needs.
+func ValidateMetarrArgsCombination(m *models.MetarrArgs) error {
+	if m.OutputExt != "" {
+		if err := sharedvalidation.ValidateCodecsForContainer(m.OutputExt, m.TranscodeVideoCodecs, m.TranscodeAudioCodecs); err != nil {
+			return err
+		}
+	}
+	if m.TranscodeGPUNode == "" {
+		if _, err := sharedvalidation.ValidateAccelTypeDeviceNode(m.TranscodeGPU, ""); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ValidateMetarrArgsModel validates correct Metarr Args values.
 //
 // Ensures all metarr settings are valid before storage/after retrieval. checkPaths is as for ValidateSettingsModel.

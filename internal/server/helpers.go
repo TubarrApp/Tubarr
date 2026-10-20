@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -778,6 +779,28 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 		return nil, fmt.Errorf("invalid post-processing options: %w", err)
 	}
 	return o, nil
+}
+
+// checkOverridesFit returns an error if Download As options, with blank ones using the video's channel URL's as Metarr
+// gets them, can't work together.
+func checkOverridesFit(c *models.Channel, channelURLID int64, o *models.VideoOverrides) error {
+	m := o.MetarrArgs
+	if cu := c.URLByID(channelURLID); cu != nil && cu.ChanURLMetarrArgs != nil {
+		u := cu.ChanURLMetarrArgs
+		m.OutputExt = cmp.Or(m.OutputExt, u.OutputExt)
+		m.TranscodeGPU = cmp.Or(m.TranscodeGPU, u.TranscodeGPU)
+		m.TranscodeGPUNode = cmp.Or(m.TranscodeGPUNode, u.TranscodeGPUNode)
+		if len(m.TranscodeVideoCodecs) == 0 {
+			m.TranscodeVideoCodecs = u.TranscodeVideoCodecs
+		}
+		if len(m.TranscodeAudioCodecs) == 0 {
+			m.TranscodeAudioCodecs = u.TranscodeAudioCodecs
+		}
+	}
+	if err := validation.ValidateMetarrArgsCombination(&m); err != nil {
+		return fmt.Errorf("invalid post-processing options: %w", err)
+	}
+	return nil
 }
 
 // splitNonEmptyLines splits a string by newlines and filters out empty lines.

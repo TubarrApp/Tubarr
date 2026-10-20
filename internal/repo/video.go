@@ -314,11 +314,11 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	}
 	defer rollback(tx)
 
-	// Update videos table
+	// Update videos table. Metarr's error changes only with its status, which only changes when given.
 	videoQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = COALESCE(NULLIF(?, ''), %s), %s = COALESCE(NULLIF(?, ''), %s), "+
 			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, "+
-			"%s = COALESCE(NULLIF(?, ''), %s) "+
+			"%s = COALESCE(NULLIF(?, ''), %s), %s = CASE WHEN ? = '' THEN %s ELSE ? END "+
 			"WHERE %s = ? AND %s = ?",
 		consts.DBVideos,
 		consts.QVidThumbnailURL, consts.QVidThumbnailURL, // Keep any found by the crawl until metadata has one.
@@ -332,6 +332,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		consts.QVidMetadata,
 		consts.QVidUpdatedAt,
 		consts.QVidMetarrStatus, consts.QVidMetarrStatus,
+		consts.QVidMetarrError, consts.QVidMetarrError,
 		consts.QVidURL,
 		consts.QVidChanID,
 	)
@@ -349,6 +350,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		metadataJSON,
 		time.Now(),
 		v.MetarrStatus,
+		v.MetarrStatus, v.MetarrError,
 		v.URL,
 		channelID,
 	)
@@ -402,6 +404,22 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 	}
 
 	return videoURL, nil
+}
+
+// GetVideoChannelURLID returns the ID of the channel URL a video belongs to.
+func (vs *VideoStore) GetVideoChannelURLID(videoID int64) (int64, error) {
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ?",
+		consts.QVidChanURLID,
+		consts.DBVideos,
+		consts.QVidID,
+	)
+
+	var channelURLID sql.NullInt64
+	if err := vs.DB.QueryRow(query, videoID).Scan(&channelURLID); err != nil {
+		return 0, fmt.Errorf("failed to read channel URL of video %d: %w", videoID, err)
+	}
+	return channelURLID.Int64, nil
 }
 
 // GetVideosAwaitingMetarr returns finished videos in a channel which Metarr has not yet successfully processed, and with

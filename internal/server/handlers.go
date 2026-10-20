@@ -1018,6 +1018,17 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
+	if overrides != nil {
+		channelURLID, err := ss.vs.GetVideoChannelURLID(requestBody.VideoIDs[0])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := checkOverridesFit(c, channelURLID, overrides); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 
 	claimed, err := ss.vs.ClaimVideos(c.ID, requestBody.VideoIDs, app.AvailableStatuses, status)
 	if err != nil {
@@ -1195,8 +1206,13 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if !slices.ContainsFunc(awaiting, func(v *models.Video) bool { return v.ID == requestBody.VideoIDs[0] }) {
+		i := slices.IndexFunc(awaiting, func(v *models.Video) bool { return v.ID == requestBody.VideoIDs[0] })
+		if i < 0 {
 			http.Error(w, "video isn't waiting for Metarr in this channel", http.StatusConflict)
+			return
+		}
+		if err := checkOverridesFit(c, awaiting[i].ChannelURLID, overrides); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if err := ss.vs.SetVideoOverrides(requestBody.VideoIDs, overrides); err != nil {
@@ -1229,6 +1245,16 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
+	}
+
+	// Blank paths for files moved or deleted outside Tubarr, so the page shows them as missing.
+	for i := range videos {
+		if videos[i].VideoFilePath == "" {
+			continue
+		}
+		if _, err := os.Stat(videos[i].VideoFilePath); err != nil {
+			videos[i].VideoFilePath = ""
+		}
 	}
 	writeJSON(w, r, http.StatusOK, videos)
 }
