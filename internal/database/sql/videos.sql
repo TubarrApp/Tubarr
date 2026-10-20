@@ -12,6 +12,7 @@
     thumbnail_url TEXT,
     upload_date TIMESTAMP,
     duration INTEGER DEFAULT 0,
+    filesize INTEGER DEFAULT 0,
     metadata JSON,
     video_directory TEXT,
     json_directory TEXT,

@@ -27,6 +27,7 @@ type Video struct {
 	Description         string                `json:"description" db:"description"`
 	UploadDate          time.Time             `json:"upload_date" db:"upload_date"`
 	Duration            int                   `json:"duration" db:"duration"` // Seconds, if the crawl listing gave it.
+	Filesize            int64                 `json:"filesize" db:"filesize"` // Size in bytes.
 	MetadataMap         map[string]any        `json:"-" db:"-"`
 	DownloadStatus      DLStatus              `json:"download_status" db:"download_status"`
 	CreatedAt           time.Time             `json:"created_at" db:"created_at"`

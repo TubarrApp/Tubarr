@@ -1404,7 +1404,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
 			"ORDER BY %s DESC",
 		consts.QVidID,
@@ -1423,6 +1423,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		consts.QVidVideoPath,
 		consts.QVidJSONPath,
 		consts.QVidDuration,
+		consts.QVidFilesize,
 		consts.QVidCreatedAt,
 		consts.QVidUpdatedAt,
 		consts.DBVideos,
@@ -1459,6 +1460,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			videoPath    sql.NullString
 			jsonPath     sql.NullString
 			duration     sql.NullInt64
+			filesize     sql.NullInt64
 		)
 
 		if err := rows.Scan(
@@ -1478,6 +1480,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 			&videoPath,
 			&jsonPath,
 			&duration,
+			&filesize,
 			&v.CreatedAt,
 			&v.UpdatedAt,
 		); err != nil {
@@ -1488,6 +1491,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		v.VideoFilePath = videoPath.String
 		v.JSONFilePath = jsonPath.String // Edit & Re-Run needs the metadata file.
 		v.Duration = int(duration.Int64)
+		v.Filesize = filesize.Int64
 
 		// Handle nullable fields.
 		if channelURLID.Valid {

@@ -321,7 +321,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	// Update videos table. Metarr's error changes only with its status, which only changes when given.
 	videoQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = COALESCE(NULLIF(?, ''), %s), %s = COALESCE(NULLIF(?, ''), %s), "+
-			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = COALESCE(?, %s), %s = ?, "+
+			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = COALESCE(NULLIF(?, 0), %s), %s = COALESCE(?, %s), %s = ?, "+
 			"%s = COALESCE(NULLIF(?, ''), %s), %s = CASE WHEN ? = '' THEN %s ELSE ? END "+
 			"WHERE %s = ? AND %s = ?",
 		consts.DBVideos,
@@ -333,6 +333,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		consts.QVidFinished,
 		consts.QVidIgnored,
 		consts.QVidUploadDate,
+		consts.QVidFilesize, consts.QVidFilesize, // Keep the stored size when this run didn't read one.
 		consts.QVidMetadata, consts.QVidMetadata,
 		consts.QVidUpdatedAt,
 		consts.QVidMetarrStatus, consts.QVidMetarrStatus,
@@ -351,6 +352,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		v.Finished,
 		v.Ignored,
 		v.UploadDate,
+		v.Filesize,
 		metadataArg,
 		time.Now(),
 		v.MetarrStatus,

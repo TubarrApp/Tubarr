@@ -212,6 +212,11 @@
                             <div class="max-w-md">
                               <p class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" x-text="video.title"></p>
                               <p
+                                x-show="video.finished && video.filesize > 0"
+                                class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                x-text="formatFilesize(video.filesize)"
+                              ></p>
+                              <p
                                 x-show="video.finished"
                                 x-data="{ full: false }"
                                 class="mt-1 text-xs text-gray-500 dark:text-gray-400"
@@ -635,6 +640,16 @@
             const m = Math.floor((seconds % 3600) / 60);
             const s = String(seconds % 60).padStart(2, '0');
             return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+          },
+
+          formatFilesize(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) {
+              bytes /= 1024;
+              i++;
+            }
+            return i === 0 ? `${bytes} B` : `${bytes.toFixed(1)} ${units[i]}`;
           },
 
           formatDate(dateString) {

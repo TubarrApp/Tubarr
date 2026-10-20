@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
+	"tubarr/internal/file"
 	"tubarr/internal/metadata"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -105,6 +106,11 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	// Retrieve filenames.
 	if err := v.StoreFilenamesFromMetarr(string(metarrStdout)); err != nil {
 		return err
+	}
+
+	// Get file size.
+	if size := file.Size(v.VideoFilePath); size > 0 {
+		v.Filesize = size
 	}
 
 	// Success.

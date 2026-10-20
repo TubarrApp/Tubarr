@@ -120,6 +120,7 @@ const (
 	QVidJSONPath     = "json_path"
 	QVidUploadDate   = "upload_date"
 	QVidDuration     = "duration"
+	QVidFilesize     = "filesize"
 	QVidMetadata     = "metadata"
 	QVidDLStatus     = "download_status"
 	QVidDLPercentage = "download_pct"
@@ -147,6 +148,7 @@ var ValidVideoKeys = map[string]struct{}{
 	QVidJSONPath:     {},
 	QVidUploadDate:   {},
 	QVidDuration:     {},
+	QVidFilesize:     {},
 	QVidMetadata:     {},
 	QVidDLStatus:     {},
 	QVidDLPercentage: {},

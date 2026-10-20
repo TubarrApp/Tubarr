@@ -660,6 +660,11 @@
                                   <span x-text="formatDate(video.upload_date, true)"></span>
                                 </p>
                                 <p
+                                  x-show="video.filesize > 0"
+                                  class="mb-2 text-xs text-gray-500 dark:text-gray-400"
+                                  x-text="formatFilesize(video.filesize)"
+                                ></p>
+                                <p
                                   x-data="{ full: false }"
                                   class="mb-2 text-xs text-gray-500 dark:text-gray-400"
                                   :class="full ? 'break-words' : 'truncate'"
@@ -826,6 +831,16 @@
             const m = Math.floor((seconds % 3600) / 60);
             const s = String(seconds % 60).padStart(2, '0');
             return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+          },
+
+          formatFilesize(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) {
+              bytes /= 1024;
+              i++;
+            }
+            return i === 0 ? `${bytes} B` : `${bytes.toFixed(1)} ${units[i]}`;
           },
 
           async loadChannels() {

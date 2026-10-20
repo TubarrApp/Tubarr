@@ -19,6 +19,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads/downloaders"
+	"tubarr/internal/file"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 	"tubarr/internal/state"
@@ -268,6 +269,12 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	if err := d.waitForFile(d.Video.VideoFilePath, 10*time.Second); err != nil {
 		return err
 	}
+
+	// Poll filesize.
+	if size := file.Size(d.Video.VideoFilePath); size > 0 {
+		d.Video.Filesize = size
+	}
+
 	return verifyVideoDownload(d.Video.VideoFilePath)
 }
 

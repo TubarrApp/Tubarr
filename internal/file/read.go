@@ -3,6 +3,7 @@ package file
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,24 @@ import (
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/viper"
 )
+
+// Info returns FileInfo for a given filepath.
+func Info(f string) (fInfo os.FileInfo, err error) {
+	if fInfo, err = os.Stat(f); err != nil {
+		return nil, fmt.Errorf("could not grab file info for path %q: %w", f, err)
+	}
+	return fInfo, nil
+}
+
+// Size returns size in bytes for a given filepath.
+func Size(f string) (s int64) {
+	fInfo, err := Info(f)
+	if err != nil {
+		logger.Pl.E("Failed to grab file size: %v", err)
+		return 0
+	}
+	return fInfo.Size()
+}
 
 // UpdateFromConfigFile loads in config file data.
 func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {

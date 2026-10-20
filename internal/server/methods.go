@@ -138,7 +138,7 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 // getHomepageCarouselVideos returns the latest 'n' downloaded videos.
 func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int) (videos []models.Video, err error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s "+
 			"WHERE %s = ? AND %s = 1 "+ // Only finished downloads.
 			"ORDER BY %s DESC "+
@@ -157,6 +157,7 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 		consts.QVidUpdatedAt,
 		consts.QVidVideoPath,
 		consts.QVidDuration,
+		consts.QVidFilesize,
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidFinished,
@@ -184,6 +185,7 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 		var channelURL sql.NullString
 		var videoPath sql.NullString
 		var duration sql.NullInt64
+		var filesize sql.NullInt64
 
 		err := rows.Scan(
 			&video.ID,
@@ -200,6 +202,7 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 			&video.UpdatedAt,
 			&videoPath,
 			&duration,
+			&filesize,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan video row: %w", err)
@@ -225,6 +228,7 @@ func (ss *serverStore) getHomepageCarouselVideos(channel *models.Channel, n int)
 			video.VideoFilePath = videoPath.String
 		}
 		video.Duration = int(duration.Int64)
+		video.Filesize = filesize.Int64
 		videos = append(videos, video)
 	}
 

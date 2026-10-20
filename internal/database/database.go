@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 
@@ -113,19 +114,23 @@ func (d *Database) initTables() error {
 		return err
 	}
 
-	if err := addColumnIfMissing(tx, "videos", "metarr_status", "TEXT DEFAULT 'done'"); err != nil {
+	if err := addColumnIfMissing(tx, "videos", consts.QVidDuration, "INTEGER DEFAULT 0"); err != nil {
 		return err
 	}
 
-	if err := addColumnIfMissing(tx, "videos", "duration", "INTEGER DEFAULT 0"); err != nil {
+	if err := addColumnIfMissing(tx, "videos", consts.QVidFilesize, "INTEGER DEFAULT 0"); err != nil {
 		return err
 	}
 
-	if err := addColumnIfMissing(tx, "videos", "overrides", "JSON"); err != nil {
+	if err := addColumnIfMissing(tx, "videos", consts.QVidOverrides, "JSON"); err != nil {
 		return err
 	}
 
-	if err := addColumnIfMissing(tx, "videos", "metarr_error", "TEXT DEFAULT ''"); err != nil {
+	if err := addColumnIfMissing(tx, "videos", consts.QVidMetarrStatus, "TEXT DEFAULT 'done'"); err != nil {
+		return err
+	}
+
+	if err := addColumnIfMissing(tx, "videos", consts.QVidMetarrError, "TEXT DEFAULT ''"); err != nil {
 		return err
 	}
 
