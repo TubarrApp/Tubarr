@@ -213,8 +213,11 @@
                               <p class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" x-text="video.title"></p>
                               <p
                                 x-show="video.finished"
-                                class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400"
-                                :title="video.video_path"
+                                x-data="{ full: false }"
+                                class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                                :class="full ? 'break-words' : 'truncate'"
+                                @mouseenter="$el.title = $el.scrollWidth > $el.clientWidth ? video.video_path : ''"
+                                @click="if (!window.getSelection().toString() && (full || $el.scrollWidth > $el.clientWidth)) full = !full"
                                 x-text="video.video_path || 'File path: N/A'"
                               ></p>
                             </div>
