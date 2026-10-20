@@ -83,7 +83,7 @@ Repeat `--metarr-meta-ops` (and the other operation flags) once per operation.
 
 For a login on every URL, use `--auth-username`, `--auth-password` and `--auth-url`. For a login on one URL, repeat `--auth-details` with JSON: `--auth-details '{"channel_url":"https://www.tubesite.com/@CoolChannel","username":"me","password":"secret","login_url":"https://www.tubesite.com/login"}'`.
 
-`--download-concurrency` sets how many videos a channel downloads at once (`download-concurrency` in config files). The old `--concurrency` flag and `concurrency-limit` config key still work, with a warning.
+`--download-concurrency` sets how many videos a channel downloads at once (`download-concurrency` in config files).
 
 Templates are resolved per channel or per video:
 

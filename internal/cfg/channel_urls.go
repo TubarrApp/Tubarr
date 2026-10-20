@@ -1,12 +1,16 @@
 package cfg
 
 import (
+	"cmp"
 	"fmt"
+	"reflect"
+	"strings"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 
 	"github.com/spf13/cobra"
 )
@@ -17,38 +21,25 @@ const urlFlag = "url"
 // updateChannelURLSettingsCmd updates settings for specific URL(s) within a channel.
 func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	var (
-		channelName                                                                                           string
-		channelID                                                                                             int
-		url                                                                                                   string
-		concurrency, crawlFreq, metarrConcurrency, retries                                                    int
-		maxCPU                                                                                                float64
-		vDir, jDir, outDir                                                                                    string
-		videoCodec, audioCodec                                                                                []string
-		cookiesFromBrowser                                                                                    string
-		minFreeMem, renameStyle, metarrExt, metaPurge                                                         string
-		maxFilesize, externalDownloader, externalDownloaderArgs                                               string
-		dlFilters, metaOps, moveOps, filteredMetaOps, filenameOps, filteredFilenameOps                        []string
-		dlFilterFile, moveOpsFile, metaOpsFile, filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile string
-		useGPU, gpuNode, transcodeQuality, transcodeVideoFilter                                               string
-		fromDate, toDate                                                                                      string
-		ytdlpOutExt                                                                                           string
-		ytdlpPreferredVideoCodecs, ytdlpPreferredAudioCodecs                                                  []string
-		useGlobalCookies, pause, resetSettings                                                                bool
-		extraYTDLPVideoArgs, extraYTDLPMetaArgs, extraYTDLPCrawlArgs, extraFFmpegArgs                         string
+		flags         models.ChannelFlagValues
+		channelID     int
+		url           string
+		resetSettings bool
+		clearNames    []string
 	)
 
 	updateURLSettingsCmd := &cobra.Command{
 		Use:   "update-url-settings",
 		Short: "Update settings for URL(s) within a channel.",
-		Long:  fmt.Sprintf("Update settings for a specific channel URL, or all URLs if --%s is not specified. Use --%s to clear URL-specific overrides and inherit from channel defaults.", urlFlag, keys.ClearSettings),
+		Long:  fmt.Sprintf("Update settings for a specific channel URL, or all URLs if --%s is not specified. Use --%s to clear a URL's own settings so it uses the channel's, or --%s to clear only those named.", urlFlag, keys.ClearAllSettings, keys.ClearSetting),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Validate channel name or ID is present.
-			key, val, err := getChanKeyVal(channelID, channelName)
+			key, val, err := getChanKeyVal(channelID, flags.Name)
 			if err != nil {
 				return err
 			}
 
-			// Get channel model.
+			// As saved, as the URLs' settings are saved back.
 			c, hasRows, err := cs.GetChannelModel(key, val, false)
 			if err != nil {
 				return err
@@ -93,99 +84,33 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				return nil
 			}
 
-			// Gather settings update functions.
-			fnSettingsArgs, err := getSettingsArgFns(cmd, chanSettings{
-				concurrency:               concurrency,
-				cookiesFromBrowser:        cookiesFromBrowser,
-				crawlFreq:                 crawlFreq,
-				externalDownloader:        externalDownloader,
-				externalDownloaderArgs:    externalDownloaderArgs,
-				filters:                   dlFilters,
-				filterFile:                dlFilterFile,
-				fromDate:                  fromDate,
-				maxFilesize:               maxFilesize,
-				metaFilterMoveOps:         moveOps,
-				metaFilterMoveOpsFile:     moveOpsFile,
-				paused:                    pause,
-				retries:                   retries,
-				toDate:                    toDate,
-				videoDir:                  vDir,
-				jsonDir:                   jDir,
-				useGlobalCookies:          useGlobalCookies,
-				ytdlpOutputExt:            ytdlpOutExt,
-				extraYtdlpVideoArgs:       extraYTDLPVideoArgs,
-				extraYtdlpMetaArgs:        extraYTDLPMetaArgs,
-				extraYtdlpCrawlArgs:       extraYTDLPCrawlArgs,
-				ytdlpPreferredVideoCodecs: ytdlpPreferredVideoCodecs,
-				ytdlpPreferredAudioCodecs: ytdlpPreferredAudioCodecs,
-			})
-			if err != nil {
-				return err
-			}
-
-			// Gather metarr update functions.
-			fnMetarrArray, err := getMetarrArgFns(cmd, cobraMetarrArgs{
-				renameStyle:     renameStyle,
-				extraFFmpegArgs: extraFFmpegArgs,
-				metarrExt:       metarrExt,
-
-				metaOps:             metaOps,
-				metaOpsFile:         metaOpsFile,
-				filteredMetaOps:     filteredMetaOps,
-				filteredMetaOpsFile: filteredMetaOpsFile,
-
-				filenameOps:             filenameOps,
-				filenameOpsFile:         filenameOpsFile,
-				filteredFilenameOps:     filteredFilenameOps,
-				filteredFilenameOpsFile: filteredFilenameOpsFile,
-
-				outputDir: outDir,
-				metaPurge: metaPurge,
-
-				concurrency:          metarrConcurrency,
-				maxCPU:               maxCPU,
-				minFreeMem:           minFreeMem,
-				useGPU:               useGPU,
-				gpuNode:              gpuNode,
-				transcodeVideoCodec:  videoCodec,
-				transcodeAudioCodec:  audioCodec,
-				transcodeQuality:     transcodeQuality,
-				transcodeVideoFilter: transcodeVideoFilter,
-			})
-			if err != nil {
-				return err
-			}
-
-			// Apply updates to each URL.
-			updatedCount := 0
+			// Apply the settings given to every URL before saving any, so invalid ones leave all unchanged.
+			var input models.ChannelInput
+			mergeFlagsIntoInput(cmd, &flags, &input)
+			var changed []*models.ChannelURL
 			for _, cu := range urlsToUpdate {
-				// Initialize settings if nil.
-				if cu.ChanURLSettings == nil {
-					cu.ChanURLSettings = &models.Settings{}
+				oldS := cmp.Or(cu.ChanURLSettings, &models.Settings{})
+				oldM := cmp.Or(cu.ChanURLMetarrArgs, &models.MetarrArgs{})
+				s, m := *oldS, *oldM
+				if err := clearURLSettings(&s, &m, clearNames); err != nil {
+					return err
 				}
-				if cu.ChanURLMetarrArgs == nil {
-					cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+				if err := parsing.ApplySettingsInput(&s, &input.SettingsInput); err != nil {
+					return fmt.Errorf("URL %q: %w", cu.URL, err)
 				}
+				if err := parsing.ApplyMetarrArgsInput(&m, &input.MetarrArgsInput); err != nil {
+					return fmt.Errorf("URL %q: %w", cu.URL, err)
+				}
+				if reflect.DeepEqual(s, *oldS) && reflect.DeepEqual(m, *oldM) {
+					continue
+				}
+				cu.ChanURLSettings, cu.ChanURLMetarrArgs = &s, &m
+				changed = append(changed, cu)
+			}
 
-				// Apply settings updates.
-				if len(fnSettingsArgs) > 0 {
-					for _, fn := range fnSettingsArgs {
-						if err := fn(cu.ChanURLSettings); err != nil {
-							return err
-						}
-					}
-				}
-
-				// Apply metarr updates.
-				if len(fnMetarrArray) > 0 {
-					for _, fn := range fnMetarrArray {
-						if err := fn(cu.ChanURLMetarrArgs); err != nil {
-							return err
-						}
-					}
-				}
-
-				// Save to database.
+			// Save to database.
+			updatedCount := 0
+			for _, cu := range changed {
 				if err := cs.UpdateChannelURLSettings(cu); err != nil {
 					logger.Pl.E("Failed to update URL %s: %v", cu.URL, err)
 					continue
@@ -201,42 +126,126 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 	}
 
 	// Primary identifiers.
-	updateURLSettingsCmd.Flags().StringVarP(&channelName, "channel-name", "n", "", "Channel name")
+	updateURLSettingsCmd.Flags().StringVarP(&flags.Name, "channel-name", "n", "", "Channel name")
 	updateURLSettingsCmd.Flags().IntVar(&channelID, "channel-id", 0, "Channel ID")
 	updateURLSettingsCmd.Flags().StringVar(&url, urlFlag, "", "Specific URL to update (if not provided, updates all URLs in channel)")
 
 	// Files/dirs.
-	cmd.SetFileDirFlags(updateURLSettingsCmd, nil, &jDir, &vDir)
+	cmd.SetFileDirFlags(updateURLSettingsCmd, nil, &flags.JSONDir, &flags.VideoDir)
 
-	// Program related.
-	cmd.SetProgramRelatedFlags(updateURLSettingsCmd, &concurrency, &crawlFreq,
-		&externalDownloaderArgs, &externalDownloader, &moveOpsFile,
-		&moveOps, &pause)
+	// Settings.
+	setChannelSettingsFlags(updateURLSettingsCmd, &flags)
 
-	// Download.
-	cmd.SetDownloadFlags(updateURLSettingsCmd, &retries, &useGlobalCookies,
-		&ytdlpOutExt, &fromDate, &toDate,
-		&cookiesFromBrowser, &maxFilesize, &dlFilterFile,
-		&dlFilters, &ytdlpPreferredVideoCodecs, &ytdlpPreferredAudioCodecs)
-
-	// Metarr.
-	cmd.SetMetarrFlags(updateURLSettingsCmd, &maxCPU, &metarrConcurrency,
-		&metarrExt, &extraFFmpegArgs, &minFreeMem,
-		&outDir, &metaPurge, &renameStyle, &metaOpsFile,
-		&filteredMetaOpsFile, &filenameOpsFile, &filteredFilenameOpsFile,
-		&filenameOps, &filteredFilenameOps, &metaOps,
-		&filteredMetaOps)
-
-	// Transcoding.
-	cmd.SetTranscodeFlags(updateURLSettingsCmd, &useGPU, &gpuNode,
-		&transcodeVideoFilter, &transcodeQuality, &videoCodec,
-		&audioCodec)
-
-	// Additional YTDLP args.
-	cmd.SetCustomYDLPArgFlags(updateURLSettingsCmd, &extraYTDLPVideoArgs, &extraYTDLPMetaArgs, &extraYTDLPCrawlArgs)
-
-	// Reset flag.
-	updateURLSettingsCmd.Flags().BoolVar(&resetSettings, keys.ClearSettings, false, "Clear all URL-specific settings and inherit from channel defaults")
+	// Reset flags.
+	updateURLSettingsCmd.Flags().BoolVar(&resetSettings, keys.ClearAllSettings, false, "Clear all URL-specific settings and inherit from channel defaults")
+	updateURLSettingsCmd.Flags().StringSliceVar(&clearNames, keys.ClearSetting, nil, fmt.Sprintf("Clear these URL-specific settings, named by flag, so they use the channel's (e.g. %s,%s)", keys.AutoDownload, keys.CrawlFreq))
 
 	return updateURLSettingsCmd
+}
+
+// clearURLSettings clears the URL settings named by flag (with or without "--"), so the URL uses the channel's.
+func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) error {
+	for _, name := range names {
+		switch strings.TrimPrefix(name, "--") {
+		// Settings.
+		case keys.VideoDir:
+			s.VideoDir = ""
+		case keys.JSONDir:
+			s.JSONDir = ""
+		case keys.CookiesFromBrowser:
+			s.CookiesFromBrowser = ""
+		case keys.ExternalDownloader:
+			s.ExternalDownloader = ""
+		case keys.ExternalDownloaderArgs:
+			s.ExternalDownloaderArgs = ""
+		case keys.MaxFilesize:
+			s.MaxFilesize = ""
+		case keys.YtdlpOutputExt:
+			s.YtdlpOutputExt = ""
+		case keys.FromDate:
+			s.FromDate = ""
+		case keys.ToDate:
+			s.ToDate = ""
+		case keys.YTDLPPreferredVideoCodecs:
+			s.YTDLPPreferredVideoCodecs = nil
+		case keys.YTDLPPreferredAudioCodecs:
+			s.YTDLPPreferredAudioCodecs = nil
+		case keys.UseGlobalCookies:
+			s.UseGlobalCookies = nil
+		case keys.AutoDownload:
+			s.AutoDownload = nil
+		case keys.FilterOpsInput:
+			s.Filters = nil
+		case keys.FilterOpsFile:
+			s.FilterFile = ""
+		case keys.MoveOps:
+			s.MetaFilterMoveOps = nil
+		case keys.MoveOpsFile:
+			s.MetaFilterMoveOpFile = ""
+		case keys.ExtraYTDLPVideoArgs:
+			s.ExtraYTDLPVideoArgs = ""
+		case keys.ExtraYTDLPMetaArgs:
+			s.ExtraYTDLPMetaArgs = ""
+		case keys.ExtraYTDLPCrawlArgs:
+			s.ExtraYTDLPCrawlArgs = ""
+		case keys.CrawlFreq:
+			s.CrawlFreq = 0
+		case keys.DownloadConcurrency:
+			s.Concurrency = 0
+		case keys.DLRetries:
+			s.Retries = 0
+		case keys.Pause:
+			s.Paused = false
+
+		// Metarr arguments.
+		case keys.MOutputDir:
+			m.OutputDir = ""
+		case keys.MMetaPurge:
+			m.MetaPurge = ""
+		case keys.MOutputExt:
+			m.OutputExt = ""
+		case keys.MRenameStyle:
+			m.RenameStyle = ""
+		case keys.MMetaOpsFile:
+			m.MetaOpsFile = ""
+		case keys.MFilteredMetaOpsFile:
+			m.FilteredMetaOpsFile = ""
+		case keys.MFilenameOpsFile:
+			m.FilenameOpsFile = ""
+		case keys.MFilteredFilenameOpsFile:
+			m.FilteredFilenameOpsFile = ""
+		case keys.MMetaOps:
+			m.MetaOps = nil
+		case keys.MFilenameOps:
+			m.FilenameOps = nil
+		case keys.MFilteredMetaOps:
+			m.FilteredMetaOps = nil
+		case keys.MFilteredFilenameOps:
+			m.FilteredFilenameOps = nil
+		case keys.TranscodeGPU:
+			m.TranscodeGPU = ""
+		case keys.TranscodeGPUNode:
+			m.TranscodeGPUNode = ""
+		case keys.TranscodeQuality:
+			m.TranscodeQuality = ""
+		case keys.TranscodeVideoFilter:
+			m.TranscodeVideoFilter = ""
+		case keys.TranscodeCodec:
+			m.TranscodeVideoCodecs = nil
+		case keys.TranscodeAudioCodec:
+			m.TranscodeAudioCodecs = nil
+		case keys.MMinFreeMem:
+			m.MinFreeMem = ""
+		case keys.MMaxCPU:
+			m.MaxCPU = 0
+		case keys.MConcurrency:
+			m.Concurrency = 0
+		case keys.MExtraFFmpegArgs:
+			m.ExtraFFmpegArgs = ""
+
+		default:
+			return fmt.Errorf("--%s: %q isn't a URL setting's flag", keys.ClearSetting, name)
+		}
+	}
+	return nil
 }

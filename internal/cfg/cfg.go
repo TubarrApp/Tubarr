@@ -16,7 +16,6 @@ import (
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/downloads"
-	"tubarr/internal/file"
 	"tubarr/internal/limits"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
@@ -33,8 +32,9 @@ var settingsStore contracts.TubarrSettingsStore
 
 // rootCmd is the base command for Tubarr.
 var rootCmd = &cobra.Command{
-	Use:   "tubarr",
-	Short: "Tubarr is a video downloading and metatagging tool.",
+	Use:           "tubarr",
+	Short:         "Tubarr is a video downloading and metatagging tool.",
+	SilenceErrors: true, // main logs the returned error.
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		cmd.SilenceUsage = true // Flags have parsed, so later errors aren't usage errors.
 
@@ -105,24 +105,6 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		// Setup channel flags from config file.
-		if viper.IsSet(keys.ChannelConfigFile) {
-			configFile := viper.GetString(keys.ChannelConfigFile)
-			cInfo, err := os.Stat(configFile)
-			if err != nil {
-				return fmt.Errorf("failed check for config file path: %w", err)
-			} else if cInfo.IsDir() {
-				return fmt.Errorf("config file %q is a directory, should be a file", configFile)
-			}
-			if configFile != "" {
-				// load and normalize keys from any Viper-supported config file.
-				v := viper.New()
-				if err := file.LoadConfigFile(v, configFile); err != nil {
-					return fmt.Errorf("failed loading config file: %w", err)
-				}
-			}
-		}
-
 		// Load custom scrape site selectors from a global config file, if provided.
 		// Reset first so a cleared or changed path doesn't retain stale entries from a prior run.
 		siterules.Reset()
@@ -160,27 +142,12 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 
 	// Web interface flags (always registered, flags aren't parsed until Execute).
 	rootCmd.PersistentFlags().Bool(keys.RunWebInterface, false, "Run Tubarr as a web interface")
-	if err := viper.BindPFlag(keys.RunWebInterface, rootCmd.PersistentFlags().Lookup(keys.RunWebInterface)); err != nil {
-		return err
-	}
 	rootCmd.PersistentFlags().String(keys.WebAddress, "", "Address for the web interface to listen on (default 127.0.0.1:8827, or :8827 in Docker; env "+consts.EnvWebAddress+")")
-	if err := viper.BindPFlag(keys.WebAddress, rootCmd.PersistentFlags().Lookup(keys.WebAddress)); err != nil {
-		return err
-	}
 	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login, overriding the Settings page: 'required', 'local' (no login from localhost) or 'none', e.g. behind a reverse proxy with its own login (env "+consts.EnvWebAuth+")")
-	if err := viper.BindPFlag(keys.WebAuth, rootCmd.PersistentFlags().Lookup(keys.WebAuth)); err != nil {
-		return err
-	}
 	rootCmd.PersistentFlags().Bool(keys.WebHTTPS, false, "Serve the web interface over HTTPS, overriding the Settings page (env "+consts.EnvWebHTTPS+")")
-	if err := viper.BindPFlag(keys.WebHTTPS, rootCmd.PersistentFlags().Lookup(keys.WebHTTPS)); err != nil {
-		return err
-	}
 	rootCmd.PersistentFlags().String(keys.WebTLSCert, "", "HTTPS certificate path, PEM with or without the key, overriding the Settings page (env "+consts.EnvWebTLSCert+")")
-	if err := viper.BindPFlag(keys.WebTLSCert, rootCmd.PersistentFlags().Lookup(keys.WebTLSCert)); err != nil {
-		return err
-	}
 	rootCmd.PersistentFlags().String(keys.WebTLSKey, "", "HTTPS private key path, if not in the --"+keys.WebTLSCert+" file (env "+consts.EnvWebTLSKey+")")
-	if err := viper.BindPFlag(keys.WebTLSKey, rootCmd.PersistentFlags().Lookup(keys.WebTLSKey)); err != nil {
+	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err
 	}
 
@@ -190,16 +157,15 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	}
 
 	// CLI flags.
-	if err := cmd.InitProgramFlags(rootCmd); err != nil {
-		return err
-	}
+	cmd.InitProgramFlags(rootCmd)
 	if err := cmd.InitFileTransformers(rootCmd); err != nil {
 		return err
 	}
 	if err := cmd.InitMetaTransformers(rootCmd); err != nil {
 		return err
 	}
-	if err := cmd.InitVideoTransformers(rootCmd); err != nil {
+	cmd.InitVideoTransformers(rootCmd)
+	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err
 	}
 

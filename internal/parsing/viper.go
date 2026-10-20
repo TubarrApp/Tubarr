@@ -1,46 +1,50 @@
 package parsing
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 	"tubarr/internal/auth"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
+	"github.com/spf13/viper"
 )
 
-// BuildChannelFromInput builds a Channel model from the unified ChannelInputPtrs struct.
-//
-// It performs all validation and returns a fully prepared channel + auth map.
-func BuildChannelFromInput(input models.ChannelInputPtrs) (
+// LoadChannelInputFile reads a channel config file into channel input, with its per-URL settings.
+func LoadChannelInputFile(path string) (models.ChannelInput, error) {
+	var input models.ChannelInput
+	v := viper.New()
+	if err := file.LoadConfigFile(v, path); err != nil {
+		return input, err
+	}
+	if err := LoadViperIntoStruct(v, &input); err != nil {
+		return input, fmt.Errorf("failed to apply config: %w", err)
+	}
+	urlSettings, err := ParseURLSettingsFromViper(v)
+	if err != nil {
+		return input, fmt.Errorf("failed to parse url-settings: %w", err)
+	}
+	input.URLSettings = urlSettings
+	return input, nil
+}
+
+// BuildChannelFromInput builds a new channel and its logins from input, validating them.
+func BuildChannelFromInput(input models.ChannelInput) (
 	*models.Channel,
 	map[string]*models.ChannelAccessDetails,
 	error,
 ) {
-	// Validate required fields.
-	if input.VideoDir == nil || *input.VideoDir == "" ||
-		input.Name == nil || *input.Name == "" {
-		return nil, nil, fmt.Errorf("channels require a video directory and name")
-	}
-
-	// Default JSONDir to VideoDir.
-	if input.JSONDir == nil {
-		input.JSONDir = input.VideoDir
-	}
-
-	// Validate the video directory exists.
-	if err := validation.CheckDirectory(*input.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
-		return nil, nil, err
-	}
-
-	// Validate the JSON directory exists.
-	if err := validation.CheckDirectory(*input.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
-		return nil, nil, err
+	if input.Name == nil || *input.Name == "" {
+		return nil, nil, errors.New("channels require a name")
 	}
 
 	// Channel config file.
@@ -50,163 +54,22 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 		}
 	}
 
-	// ===============================
-	// Parse filter operations
-	// ===============================
-
-	var dlFilterModels []models.Filters
-	if input.DLFilters != nil {
-		m, err := ParseFilterOps(*input.DLFilters, true)
-		if err != nil {
-			return nil, nil, err
-		}
-		dlFilterModels = m
+	now := time.Now()
+	c := &models.Channel{
+		Name:              *input.Name,
+		ChannelConfigFile: NilOrZeroValue(input.ChannelConfigFile),
+		ChanSettings:      &models.Settings{},
+		ChanMetarrArgs:    &models.MetarrArgs{},
+		LastScan:          now,
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
-
-	moveOpsModels, err := ParseMetaFilterMoveOps(NilOrZeroValue(input.MoveOps))
-	if err != nil {
+	if err := ApplyChannelSettingsInput(c.ChanSettings, &input.SettingsInput); err != nil {
 		return nil, nil, err
 	}
-
-	var metaOpsModels []models.MetaOps
-	if input.MetaOps != nil {
-		m, err := ParseMetaOps(*input.MetaOps)
-		if err != nil {
-			return nil, nil, err
-		}
-		metaOpsModels = m
+	if err := ApplyMetarrArgsInput(c.ChanMetarrArgs, &input.MetarrArgsInput); err != nil {
+		return nil, nil, err
 	}
-
-	var filenameOpsModels []models.FilenameOps
-	if input.FilenameOps != nil {
-		m, err := ParseFilenameOps(*input.FilenameOps)
-		if err != nil {
-			return nil, nil, err
-		}
-		filenameOpsModels = m
-	}
-
-	var filteredMetaOpsModels []models.FilteredMetaOps
-	if input.FilteredMetaOps != nil {
-		m, err := ParseFilteredMetaOps(*input.FilteredMetaOps)
-		if err != nil {
-			return nil, nil, err
-		}
-		filteredMetaOpsModels = m
-	}
-
-	var filteredFilenameOpsModels []models.FilteredFilenameOps
-	if input.FilteredFilenameOps != nil {
-		m, err := ParseFilteredFilenameOps(*input.FilteredFilenameOps)
-		if err != nil {
-			return nil, nil, err
-		}
-		filteredFilenameOpsModels = m
-	}
-
-	// ===============================
-	// Validate rename style, dates, GPU, codecs, etc.
-	// ===============================
-
-	if input.RenameStyle != nil && *input.RenameStyle != "" {
-		if err := validation.ValidateRenameFlag(*input.RenameStyle); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	if input.MinFreeMem != nil && *input.MinFreeMem != "" {
-		if _, err := sharedvalidation.ValidateMinFreeMem(*input.MinFreeMem); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	if input.FromDate != nil && *input.FromDate != "" {
-		v, err := validation.ValidateToFromDate(*input.FromDate)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.FromDate = &v
-	}
-
-	if input.ToDate != nil && *input.ToDate != "" {
-		v, err := validation.ValidateToFromDate(*input.ToDate)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.ToDate = &v
-	}
-
-	if input.TranscodeGPU != nil && *input.TranscodeGPU != "" {
-		g, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.TranscodeGPU = &g
-	}
-
-	if input.TranscodeGPU != nil && input.TranscodeGPUNode != nil && *input.TranscodeGPUNode != "" {
-		n, err := sharedvalidation.ValidateAccelTypeDeviceNode(*input.TranscodeGPU, *input.TranscodeGPUNode)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.TranscodeGPUNode = &n
-	}
-
-	if input.TranscodeVideoCodec != nil && len(*input.TranscodeVideoCodec) != 0 {
-		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.TranscodeVideoCodec, NilOrZeroValue(input.TranscodeGPU))
-		if err != nil {
-			return nil, nil, err
-		}
-		input.TranscodeVideoCodec = &c
-	}
-
-	if input.TranscodeAudioCodec != nil && len(*input.TranscodeAudioCodec) != 0 {
-		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.TranscodeAudioCodec)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.TranscodeAudioCodec = &c
-	}
-
-	if input.TranscodeQuality != nil && *input.TranscodeQuality != "" {
-		q, err := sharedvalidation.ValidateTranscodeQuality(*input.TranscodeQuality)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.TranscodeQuality = &q
-	}
-
-	if input.YTDLPOutputExt != nil && *input.YTDLPOutputExt != "" {
-		v := strings.ToLower(*input.YTDLPOutputExt)
-		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
-			return nil, nil, err
-		}
-		input.YTDLPOutputExt = &v
-	}
-
-	if input.MetaPurge != nil {
-		p, err := validation.ValidatePurgeMetafiles(*input.MetaPurge)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.MetaPurge = &p
-	}
-
-	var preferredVideoCodecs, preferredAudioCodecs []string
-	if input.YTDLPPreferredVideoCodecs != nil {
-		if preferredVideoCodecs, err = validation.ValidatePreferredVideoCodecs(*input.YTDLPPreferredVideoCodecs); err != nil {
-			return nil, nil, err
-		}
-	}
-	if input.YTDLPPreferredAudioCodecs != nil {
-		if preferredAudioCodecs, err = validation.ValidatePreferredAudioCodecs(*input.YTDLPPreferredAudioCodecs); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	// ===============================
-	// Authentication
-	// ===============================
 
 	authMap, err := auth.ParseAuthDetails(
 		NilOrZeroValue(input.Username),
@@ -220,130 +83,293 @@ func BuildChannelFromInput(input models.ChannelInputPtrs) (
 		return nil, nil, err
 	}
 
-	// ===============================
-	// Build URLModels with per-URL overrides
-	// ===============================
-
-	now := time.Now()
-	var chanURLs []*models.ChannelURL
-
-	if input.URLs != nil && len(*input.URLs) > 0 {
-		chanURLs = make([]*models.ChannelURL, 0, len(*input.URLs))
-
-		for _, u := range *input.URLs {
-			if u == "" {
-				continue
-			}
-
-			var parsedUsername, parsedPassword, parsedLoginURL string
-			if a, exists := authMap[u]; exists {
-				parsedUsername = a.Username
-				parsedPassword = a.Password
-				parsedLoginURL = a.LoginURL
-			}
-
-			chanURL := &models.ChannelURL{
-				URL:       u,
-				Username:  parsedUsername,
-				Password:  parsedPassword,
-				LoginURL:  parsedLoginURL,
-				LastScan:  now,
-				CreatedAt: now,
-				UpdatedAt: now,
-			}
-
-			// Per-URL overrides
-			if input.URLSettings != nil {
-				nURL := strings.ToLower(u)
-				if override, ok := input.URLSettings[nURL]; ok {
-					if override.Settings != nil {
-						s, err := buildSettingsFromInput(override.Settings)
-						if err != nil {
-							return nil, nil, fmt.Errorf("per-URL settings error for %s: %w", u, err)
-						}
-						chanURL.ChanURLSettings = s
-					}
-					if override.Metarr != nil {
-						m, err := buildMetarrArgsFromInput(override.Metarr)
-						if err != nil {
-							return nil, nil, fmt.Errorf("per-URL metarr error for %s: %w", u, err)
-						}
-						chanURL.ChanURLMetarrArgs = m
-					}
+	// URLs, with their logins and per-URL settings.
+	for _, u := range NilOrZeroValue(input.URLs) {
+		if u == "" {
+			continue
+		}
+		cu := &models.ChannelURL{
+			URL:       u,
+			LastScan:  now,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if a, exists := authMap[u]; exists {
+			cu.Username, cu.Password, cu.LoginURL = a.Username, a.Password, a.LoginURL
+		}
+		if override, ok := input.URLSettings[strings.ToLower(u)]; ok {
+			if override.Settings != nil {
+				cu.ChanURLSettings = &models.Settings{}
+				if err := ApplySettingsInput(cu.ChanURLSettings, override.Settings); err != nil {
+					return nil, nil, fmt.Errorf("per-URL settings error for %s: %w", u, err)
 				}
 			}
+			if override.Metarr != nil {
+				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+				if err := ApplyMetarrArgsInput(cu.ChanURLMetarrArgs, override.Metarr); err != nil {
+					return nil, nil, fmt.Errorf("per-URL metarr error for %s: %w", u, err)
+				}
+			}
+		}
+		c.URLModels = append(c.URLModels, cu)
+	}
+	return c, authMap, nil
+}
 
-			chanURLs = append(chanURLs, chanURL)
+// ApplyChannelSettingsInput is ApplySettingsInput for a channel's own settings, which need a video directory, and save
+// metadata there when there's no JSON directory.
+func ApplyChannelSettingsInput(dst *models.Settings, in *models.SettingsInput) error {
+	if err := ApplySettingsInput(dst, in); err != nil {
+		return err
+	}
+	if dst.VideoDir == "" {
+		return errors.New("channels require a video directory")
+	}
+	dst.JSONDir = cmp.Or(dst.JSONDir, dst.VideoDir)
+	return nil
+}
+
+// ApplySettingsInput validates each setting in gives and sets it in dst, an empty value clearing it.
+//
+// Files and folders needn't exist: saving checks those it adds or changes.
+func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err error) {
+	if v := in.Concurrency; v != nil {
+		dst.Concurrency = max(*v, 0)
+	}
+	if v := in.CookiesFromBrowser; v != nil {
+		dst.CookiesFromBrowser = *v
+	}
+	if v := in.CrawlFreq; v != nil {
+		dst.CrawlFreq = max(*v, 0)
+	}
+	if v := in.ExternalDownloader; v != nil {
+		dst.ExternalDownloader = *v
+	}
+	if v := in.ExternalDownloaderArgs; v != nil {
+		dst.ExternalDownloaderArgs = *v
+	}
+	if v := in.MaxFilesize; v != nil {
+		if dst.MaxFilesize, err = validation.ValidateMaxFilesize(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MaxFilesize, err)
 		}
 	}
-
-	// ===============================
-	// Create the Channel model
-	// ===============================
-
-	c := &models.Channel{
-		URLModels:         chanURLs,
-		Name:              *input.Name,
-		ChannelConfigFile: NilOrZeroValue(input.ChannelConfigFile),
-
-		ChanSettings: &models.Settings{
-			Concurrency:               NilOrZeroValue(input.Concurrency),
-			CookiesFromBrowser:        NilOrZeroValue(input.CookiesFromBrowser),
-			CrawlFreq:                 NilOrZeroValue(input.CrawlFreq),
-			ExternalDownloader:        NilOrZeroValue(input.ExternalDownloader),
-			ExternalDownloaderArgs:    NilOrZeroValue(input.ExternalDownloaderArgs),
-			Filters:                   dlFilterModels,
-			FilterFile:                NilOrZeroValue(input.DLFilterFile),
-			FromDate:                  NilOrZeroValue(input.FromDate),
-			JSONDir:                   *input.JSONDir,
-			MaxFilesize:               NilOrZeroValue(input.MaxFilesize),
-			MetaFilterMoveOps:         moveOpsModels,
-			MetaFilterMoveOpFile:      NilOrZeroValue(input.MoveOpFile),
-			Paused:                    NilOrZeroValue(input.Pause),
-			Retries:                   NilOrZeroValue(input.Retries),
-			ToDate:                    NilOrZeroValue(input.ToDate),
-			UseGlobalCookies:          input.UseGlobalCookies,
-			AutoDownload:              input.AutoDownload,
-			VideoDir:                  *input.VideoDir,
-			YtdlpOutputExt:            NilOrZeroValue(input.YTDLPOutputExt),
-			YTDLPPreferredVideoCodecs: preferredVideoCodecs,
-			YTDLPPreferredAudioCodecs: preferredAudioCodecs,
-			ExtraYTDLPVideoArgs:       NilOrZeroValue(input.ExtraYTDLPVideoArgs),
-			ExtraYTDLPMetaArgs:        NilOrZeroValue(input.ExtraYTDLPMetaArgs),
-			ExtraYTDLPCrawlArgs:       NilOrZeroValue(input.ExtraYTDLPCrawlArgs),
-		},
-
-		ChanMetarrArgs: &models.MetarrArgs{
-			OutputExt:               NilOrZeroValue(input.MetarrExt),
-			ExtraFFmpegArgs:         NilOrZeroValue(input.ExtraFFmpegArgs),
-			MetaOps:                 metaOpsModels,
-			MetaOpsFile:             NilOrZeroValue(input.MetaOpsFile),
-			FilteredMetaOps:         filteredMetaOpsModels,
-			FilteredMetaOpsFile:     NilOrZeroValue(input.FilteredMetaOpsFile),
-			FilenameOps:             filenameOpsModels,
-			FilenameOpsFile:         NilOrZeroValue(input.FilenameOpsFile),
-			FilteredFilenameOps:     filteredFilenameOpsModels,
-			FilteredFilenameOpsFile: NilOrZeroValue(input.FilteredFilenameOpsFile),
-			RenameStyle:             NilOrZeroValue(input.RenameStyle),
-			MaxCPU:                  NilOrZeroValue(input.MaxCPU),
-			MinFreeMem:              NilOrZeroValue(input.MinFreeMem),
-			OutputDir:               NilOrZeroValue(input.OutDir),
-			MetaPurge:               NilOrZeroValue(input.MetaPurge),
-			Concurrency:             NilOrZeroValue(input.MetarrConcurrency),
-			TranscodeGPU:            NilOrZeroValue(input.TranscodeGPU),
-			TranscodeGPUNode:        NilOrZeroValue(input.TranscodeGPUNode),
-			TranscodeVideoCodecs:    NilOrZeroValue(input.TranscodeVideoCodec),
-			TranscodeAudioCodecs:    NilOrZeroValue(input.TranscodeAudioCodec),
-			TranscodeQuality:        NilOrZeroValue(input.TranscodeQuality),
-			TranscodeVideoFilter:    NilOrZeroValue(input.TranscodeVideoFilter),
-		},
-
-		LastScan:  now,
-		CreatedAt: now,
-		UpdatedAt: now,
+	if v := in.Retries; v != nil {
+		dst.Retries = max(*v, 0)
 	}
+	if v := in.UseGlobalCookies; v != nil {
+		b := *v
+		dst.UseGlobalCookies = &b
+	}
+	if v := in.YTDLPOutputExt; v != nil {
+		if err := validation.ValidateYtdlpOutputExtension(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.YtdlpOutputExt, err)
+		}
+		dst.YtdlpOutputExt = *v
+	}
+	if v := in.YTDLPPreferredVideoCodecs; v != nil {
+		if dst.YTDLPPreferredVideoCodecs, err = validation.ValidatePreferredVideoCodecs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.YTDLPPreferredVideoCodecs, err)
+		}
+	}
+	if v := in.YTDLPPreferredAudioCodecs; v != nil {
+		if dst.YTDLPPreferredAudioCodecs, err = validation.ValidatePreferredAudioCodecs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.YTDLPPreferredAudioCodecs, err)
+		}
+	}
+	if v := in.ExtraYTDLPVideoArgs; v != nil {
+		dst.ExtraYTDLPVideoArgs = *v
+	}
+	if v := in.ExtraYTDLPMetaArgs; v != nil {
+		dst.ExtraYTDLPMetaArgs = *v
+	}
+	if v := in.ExtraYTDLPCrawlArgs; v != nil {
+		dst.ExtraYTDLPCrawlArgs = *v
+	}
+	if v := in.DLFilters; v != nil {
+		if dst.Filters, err = ParseFilterOps(nonBlank(*v), true); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.FilterOpsInput, err)
+		}
+	}
+	if v := in.DLFilterFile; v != nil {
+		if err := validation.CheckFile(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.FilterOpsFile, err)
+		}
+		dst.FilterFile = *v
+	}
+	if v := in.MoveOps; v != nil {
+		if dst.MetaFilterMoveOps, err = ParseMetaFilterMoveOps(nonBlank(*v)); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MoveOps, err)
+		}
+	}
+	if v := in.MoveOpFile; v != nil {
+		if err := validation.CheckFile(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MoveOpsFile, err)
+		}
+		dst.MetaFilterMoveOpFile = *v
+	}
+	if v := in.FromDate; v != nil {
+		if dst.FromDate, err = validation.ValidateToFromDate(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.FromDate, err)
+		}
+	}
+	if v := in.ToDate; v != nil {
+		if dst.ToDate, err = validation.ValidateToFromDate(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.ToDate, err)
+		}
+	}
+	if v := in.JSONDir; v != nil {
+		if err := validation.CheckDirectory(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.JSONDir, err)
+		}
+		dst.JSONDir = *v
+	}
+	if v := in.VideoDir; v != nil {
+		if err := validation.CheckDirectory(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.VideoDir, err)
+		}
+		dst.VideoDir = *v
+	}
+	if v := in.Pause; v != nil {
+		dst.Paused = *v
+	}
+	if v := in.AutoDownload; v != nil {
+		b := *v
+		dst.AutoDownload = &b
+	}
+	return nil
+}
 
-	return c, authMap, nil
+// ApplyMetarrArgsInput validates each Metarr argument in gives and sets it in dst, an empty value clearing it.
+//
+// The GPU node and video codecs are checked against the GPU dst ends up with. Files and folders needn't exist: saving
+// checks those it adds or changes.
+func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (err error) {
+	if v := in.MetarrExt; v != nil {
+		if *v != "" {
+			if _, err := sharedvalidation.ValidateFFmpegOutputExt(*v); err != nil {
+				return fmt.Errorf("invalid %s: %w", keys.MOutputExt, err)
+			}
+		}
+		dst.OutputExt = *v
+	}
+	if v := in.FilenameOps; v != nil {
+		if dst.FilenameOps, err = ParseFilenameOps(nonBlank(*v)); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MFilenameOps, err)
+		}
+	}
+	if v := in.FilenameOpsFile; v != nil {
+		if err := validation.CheckFile(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MFilenameOpsFile, err)
+		}
+		dst.FilenameOpsFile = *v
+	}
+	if v := in.FilteredFilenameOps; v != nil {
+		if dst.FilteredFilenameOps, err = ParseFilteredFilenameOps(nonBlank(*v)); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MFilteredFilenameOps, err)
+		}
+	}
+	if v := in.FilteredFilenameOpsFile; v != nil {
+		if err := validation.CheckFile(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MFilteredFilenameOpsFile, err)
+		}
+		dst.FilteredFilenameOpsFile = *v
+	}
+	if v := in.MetaOps; v != nil {
+		if dst.MetaOps, err = ParseMetaOps(nonBlank(*v)); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MMetaOps, err)
+		}
+	}
+	if v := in.MetaOpsFile; v != nil {
+		if err := validation.CheckFile(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MMetaOpsFile, err)
+		}
+		dst.MetaOpsFile = *v
+	}
+	if v := in.FilteredMetaOps; v != nil {
+		if dst.FilteredMetaOps, err = ParseFilteredMetaOps(nonBlank(*v)); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MFilteredMetaOps, err)
+		}
+	}
+	if v := in.FilteredMetaOpsFile; v != nil {
+		if err := validation.CheckFile(*v, sharedtemplates.TubarrTemplateTags); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MFilteredMetaOpsFile, err)
+		}
+		dst.FilteredMetaOpsFile = *v
+	}
+	if v := in.RenameStyle; v != nil {
+		if err := validation.ValidateRenameFlag(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MRenameStyle, err)
+		}
+		dst.RenameStyle = *v
+	}
+	if v := in.ExtraFFmpegArgs; v != nil {
+		dst.ExtraFFmpegArgs = *v
+	}
+	if v := in.OutDir; v != nil {
+		if err := validation.CheckDirectory(*v, sharedtemplates.AllTemplatesMap); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MOutputDir, err)
+		}
+		dst.OutputDir = *v
+	}
+	if v := in.MetaPurge; v != nil {
+		if dst.MetaPurge, err = validation.ValidatePurgeMetafiles(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MMetaPurge, err)
+		}
+	}
+	if v := in.MetarrConcurrency; v != nil {
+		dst.Concurrency = max(*v, 0)
+	}
+	if v := in.MaxCPU; v != nil {
+		dst.MaxCPU = sharedvalidation.ValidateMaxCPU(*v, true)
+	}
+	if v := in.MinFreeMem; v != nil {
+		if _, err := sharedvalidation.ValidateMinFreeMem(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MMinFreeMem, err)
+		}
+		dst.MinFreeMem = *v
+	}
+	if v := in.TranscodeGPU; v != nil {
+		if dst.TranscodeGPU, err = validation.ValidateGPUAcceleration(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeGPU, err)
+		}
+	}
+	if v := in.TranscodeGPUNode; v != nil {
+		if dst.TranscodeGPUNode, err = sharedvalidation.ValidateAccelTypeDeviceNode(dst.TranscodeGPU, *v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeGPUNode, err)
+		}
+	}
+	if v := in.TranscodeVideoCodec; v != nil {
+		if dst.TranscodeVideoCodecs, err = validation.ValidateVideoTranscodeCodecSlice(*v, dst.TranscodeGPU); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeCodec, err)
+		}
+	}
+	if v := in.TranscodeAudioCodec; v != nil {
+		if dst.TranscodeAudioCodecs, err = validation.ValidateAudioTranscodeCodecSlice(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeAudioCodec, err)
+		}
+	}
+	if v := in.TranscodeQuality; v != nil {
+		if dst.TranscodeQuality, err = sharedvalidation.ValidateTranscodeQuality(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeQuality, err)
+		}
+	}
+	if v := in.TranscodeVideoFilter; v != nil {
+		if dst.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeVideoFilter, err)
+		}
+	}
+	return nil
+}
+
+// nonBlank returns ops without blank entries, so a list given as blank clears its ops.
+func nonBlank(ops []string) []string {
+	var kept []string
+	for _, op := range ops {
+		if strings.TrimSpace(op) != "" {
+			kept = append(kept, op)
+		}
+	}
+	return kept
 }
 
 // convertConfigValue handles config entry conversions safely.
@@ -450,6 +476,12 @@ func LoadViperIntoStruct(v interface {
 
 	for i := range typ.NumField() {
 		field := typ.Field(i)
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			if err := LoadViperIntoStruct(v, val.Field(i).Addr().Interface()); err != nil {
+				return err
+			}
+			continue
+		}
 		tag := field.Tag.Get("viper")
 		if tag == "" {
 			continue
@@ -497,37 +529,35 @@ func LoadViperIntoStruct(v interface {
 	return nil
 }
 
+// GivenKeys returns the viper keys of the fields given (non-nil) in the input struct in points to.
+func GivenKeys(in any) []string {
+	var given []string
+	val := reflect.ValueOf(in).Elem()
+	for i := range val.NumField() {
+		field := val.Type().Field(i)
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			given = append(given, GivenKeys(val.Field(i).Addr().Interface())...)
+			continue
+		}
+		if tag := field.Tag.Get("viper"); tag != "" && field.Type.Kind() == reflect.Pointer && !val.Field(i).IsNil() {
+			given = append(given, tag)
+		}
+	}
+	return given
+}
+
 // viperPtr returns a pointer to the value for a viper tag from a local viper instance if successful, or nil.
 //
-// The tag is a key, then any deprecated aliases, comma-separated. Supports both kebab-case and snake_case keys.
+// Supports both kebab-case and snake_case keys.
 func viperPtr[T any](v interface {
 	IsSet(string) bool
 	Get(string) any
 }, tag string) (*T, bool) {
-	key, aliases, _ := strings.Cut(tag, ",")
-	val, ok := GetConfigValueOrAlias[T](v, key, strings.FieldsFunc(aliases, func(r rune) bool { return r == ',' })...)
+	val, ok := GetConfigValue[T](v, tag)
 	if !ok {
 		return nil, false
 	}
 	return &val, true
-}
-
-// GetConfigValueOrAlias returns GetConfigValue for key, else for the first deprecated alias set, with a warning.
-func GetConfigValueOrAlias[T any](v interface {
-	IsSet(string) bool
-	Get(string) any
-}, key string, aliases ...string) (T, bool) {
-	if val, ok := GetConfigValue[T](v, key); ok {
-		return val, true
-	}
-	for _, alias := range aliases {
-		if val, ok := GetConfigValue[T](v, alias); ok {
-			logger.Pl.W("Config key %q is deprecated, use %q", alias, key)
-			return val, true
-		}
-	}
-	var zero T
-	return zero, false
 }
 
 // GetConfigValue retrieves values from a local viper instance.
@@ -583,7 +613,7 @@ func ParseURLSettingsFromViper(v interface {
 
 	// Check if url-settings exists.
 	if !v.IsSet("url-settings") && !v.IsSet("url_settings") {
-		logger.Pl.I("No url-settings found in config file")
+		logger.Pl.D(1, "No url-settings found in config file")
 		return urlSettings, nil
 	}
 
@@ -622,7 +652,7 @@ func ParseURLSettingsFromViper(v interface {
 
 			// Create new Viper instance and load the settings map.
 			settingsViper := &urlConfigSettingsParser{data: settingsMap}
-			settingsInput := &models.ChannelInputPtrs{}
+			settingsInput := &models.SettingsInput{}
 			if err := LoadViperIntoStruct(settingsViper, settingsInput); err != nil {
 				return nil, fmt.Errorf("failed to parse settings for URL %q: %w", channelURL, err)
 			}
@@ -641,7 +671,7 @@ func ParseURLSettingsFromViper(v interface {
 
 			// Create new Viper instance and load the metarr map.
 			metarrViper := &urlConfigSettingsParser{data: metarrMap}
-			metarrInput := &models.ChannelInputPtrs{}
+			metarrInput := &models.MetarrArgsInput{}
 			if err := LoadViperIntoStruct(metarrViper, metarrInput); err != nil {
 				return nil, fmt.Errorf("failed to parse metarr for URL %q: %w", channelURL, err)
 			}
@@ -704,337 +734,4 @@ func (u *urlConfigSettingsParser) Get(key string) any {
 		}
 	}
 	return nil
-}
-
-// buildSettingsFromInput constructs a Settings object from ChannelInputPtrs (for per-URL overrides).
-//
-// Only sets fields that were explicitly provided (non-nil pointers with non-empty values).
-// Returns an error if any validation fails.
-func buildSettingsFromInput(input *models.ChannelInputPtrs) (*models.Settings, error) {
-	settings := &models.Settings{}
-
-	// Set CookiesFromBrowser.
-	if input.CookiesFromBrowser != nil {
-		settings.CookiesFromBrowser = *input.CookiesFromBrowser
-	}
-
-	// Set ExternalDownloader.
-	if input.ExternalDownloader != nil {
-		settings.ExternalDownloader = *input.ExternalDownloader
-	}
-
-	// Set ExternalDownloaderArgs.
-	if input.ExternalDownloaderArgs != nil {
-		settings.ExternalDownloaderArgs = *input.ExternalDownloaderArgs
-	}
-
-	// Validate and set FilterFile if provided.
-	if input.DLFilterFile != nil && *input.DLFilterFile != "" {
-		if _, _, err := sharedvalidation.ValidateFile(*input.DLFilterFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid filter file for per-URL settings: %w", err)
-		}
-		settings.FilterFile = *input.DLFilterFile
-	}
-
-	// Validate and set JSONDir if provided.
-	if input.JSONDir != nil && *input.JSONDir != "" {
-		if err := validation.CheckDirectory(*input.JSONDir, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid JSON directory for per-URL settings: %w", err)
-		}
-		settings.JSONDir = *input.JSONDir
-	}
-
-	// Validate and set MaxFilesize if provided.
-	if input.MaxFilesize != nil && *input.MaxFilesize != "" {
-		v, err := validation.ValidateMaxFilesize(*input.MaxFilesize)
-		if err != nil {
-			return nil, fmt.Errorf("invalid max filesize for per-URL settings: %w", err)
-		}
-		settings.MaxFilesize = v
-	}
-
-	// Validate and set MoveOpFile if provided.
-	if input.MoveOpFile != nil && *input.MoveOpFile != "" {
-		if _, _, err := sharedvalidation.ValidateFile(*input.MoveOpFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid move ops file for per-URL settings: %w", err)
-		}
-		settings.MetaFilterMoveOpFile = *input.MoveOpFile
-	}
-
-	// Validate and set VideoDir if provided.
-	if input.VideoDir != nil && *input.VideoDir != "" {
-		if err := validation.CheckDirectory(*input.VideoDir, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid video directory for per-URL settings: %w", err)
-		}
-		settings.VideoDir = *input.VideoDir
-	}
-
-	// Set ExtraYTDLPVideoArgs.
-	if input.ExtraYTDLPVideoArgs != nil {
-		settings.ExtraYTDLPVideoArgs = *input.ExtraYTDLPVideoArgs
-	}
-
-	// Set ExtraYTDLPMetaArgs.
-	if input.ExtraYTDLPMetaArgs != nil {
-		settings.ExtraYTDLPMetaArgs = *input.ExtraYTDLPMetaArgs
-	}
-
-	// Set ExtraYTDLPCrawlArgs.
-	if input.ExtraYTDLPCrawlArgs != nil {
-		settings.ExtraYTDLPCrawlArgs = *input.ExtraYTDLPCrawlArgs
-	}
-
-	// Validate and set Concurrency if provided.
-	if input.Concurrency != nil {
-		settings.Concurrency = sharedvalidation.ValidateConcurrencyLimit(*input.Concurrency)
-	}
-
-	// Set CrawlFreq.
-	if input.CrawlFreq != nil {
-		settings.CrawlFreq = max(*input.CrawlFreq, 0)
-	}
-
-	// Set Retries.
-	if input.Retries != nil {
-		settings.Retries = max(*input.Retries, 0)
-	}
-
-	// Set bools.
-	if input.Pause != nil {
-		settings.Paused = *input.Pause
-	}
-	if input.UseGlobalCookies != nil {
-		settings.UseGlobalCookies = input.UseGlobalCookies
-	}
-	if input.AutoDownload != nil {
-		settings.AutoDownload = input.AutoDownload
-	}
-
-	// Validate and set FromDate if provided.
-	if input.FromDate != nil && *input.FromDate != "" {
-		v, err := validation.ValidateToFromDate(*input.FromDate)
-		if err != nil {
-			return nil, fmt.Errorf("invalid from date for per-URL settings: %w", err)
-		}
-		settings.FromDate = v
-	}
-
-	// Validate and set ToDate if provided.
-	if input.ToDate != nil && *input.ToDate != "" {
-		v, err := validation.ValidateToFromDate(*input.ToDate)
-		if err != nil {
-			return nil, fmt.Errorf("invalid to date for per-URL settings: %w", err)
-		}
-		settings.ToDate = v
-	}
-
-	// Validate and set YTDLP output extension if provided.
-	if input.YTDLPOutputExt != nil && *input.YTDLPOutputExt != "" {
-		v := strings.ToLower(*input.YTDLPOutputExt)
-		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
-			return nil, fmt.Errorf("invalid ytdlp output extension for per-URL settings: %w", err)
-		}
-		settings.YtdlpOutputExt = v
-	}
-
-	// Parse filter ops if provided.
-	if input.DLFilters != nil {
-		m, err := ParseFilterOps(*input.DLFilters, true)
-		if err != nil {
-			return nil, fmt.Errorf("invalid filter ops for per-URL settings: %w", err)
-		}
-		settings.Filters = m
-	}
-
-	// Parse move ops if provided.
-	if input.MoveOps != nil {
-		m, err := ParseMetaFilterMoveOps(*input.MoveOps)
-		if err != nil {
-			return nil, fmt.Errorf("invalid move ops for per-URL settings: %w", err)
-		}
-		settings.MetaFilterMoveOps = m
-	}
-
-	// Validate and set codec preferences if provided.
-	if input.YTDLPPreferredVideoCodecs != nil {
-		c, err := validation.ValidatePreferredVideoCodecs(*input.YTDLPPreferredVideoCodecs)
-		if err != nil {
-			return nil, fmt.Errorf("invalid preferred video codecs for per-URL settings: %w", err)
-		}
-		settings.YTDLPPreferredVideoCodecs = c
-	}
-	if input.YTDLPPreferredAudioCodecs != nil {
-		c, err := validation.ValidatePreferredAudioCodecs(*input.YTDLPPreferredAudioCodecs)
-		if err != nil {
-			return nil, fmt.Errorf("invalid preferred audio codecs for per-URL settings: %w", err)
-		}
-		settings.YTDLPPreferredAudioCodecs = c
-	}
-
-	return settings, nil
-}
-
-// buildMetarrArgsFromInput constructs a MetarrArgs object from ChannelInputPtrs (for per-URL overrides).
-//
-// Only sets fields that were explicitly provided (non-nil pointers).
-func buildMetarrArgsFromInput(input *models.ChannelInputPtrs) (*models.MetarrArgs, error) {
-	metarr := &models.MetarrArgs{}
-
-	// Only set string fields if explicitly provided.
-	if input.MetarrExt != nil {
-		metarr.OutputExt = *input.MetarrExt
-	}
-	if input.ExtraFFmpegArgs != nil {
-		metarr.ExtraFFmpegArgs = *input.ExtraFFmpegArgs
-	}
-	if input.MetaOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.MetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid meta ops file for per-URL settings: %w", err)
-		}
-		metarr.MetaOpsFile = *input.MetaOpsFile
-	}
-	if input.FilteredMetaOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.FilteredMetaOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid filtered meta ops file for per-URL settings: %w", err)
-		}
-		metarr.FilteredMetaOpsFile = *input.FilteredMetaOpsFile
-	}
-	if input.FilenameOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.FilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid filename ops file for per-URL settings: %w", err)
-		}
-		metarr.FilenameOpsFile = *input.FilenameOpsFile
-	}
-	if input.FilteredFilenameOpsFile != nil {
-		if _, _, err := sharedvalidation.ValidateFile(*input.FilteredFilenameOpsFile, false, sharedtemplates.TubarrTemplateTags); err != nil {
-			return nil, fmt.Errorf("invalid filtered filename ops file for per-URL settings: %w", err)
-		}
-		metarr.FilteredFilenameOpsFile = *input.FilteredFilenameOpsFile
-	}
-	if input.OutDir != nil {
-		if err := validation.CheckDirectory(*input.OutDir, sharedtemplates.AllTemplatesMap); err != nil {
-			return nil, fmt.Errorf("invalid Metarr output directory for per-URL settings: %w", err)
-		}
-		metarr.OutputDir = *input.OutDir
-	}
-	if input.MetaPurge != nil {
-		p, err := validation.ValidatePurgeMetafiles(*input.MetaPurge)
-		if err != nil {
-			return nil, fmt.Errorf("invalid metadata purge for per-URL settings: %w", err)
-		}
-		metarr.MetaPurge = p
-	}
-	if input.TranscodeVideoFilter != nil {
-		metarr.TranscodeVideoFilter = *input.TranscodeVideoFilter
-	}
-
-	// Only set int fields if explicitly provided.
-	if input.MetarrConcurrency != nil {
-		metarr.Concurrency = max(*input.MetarrConcurrency, 0)
-	}
-
-	// Only set float64 fields if explicitly provided.
-	if input.MaxCPU != nil {
-		metarr.MaxCPU = sharedvalidation.ValidateMaxCPU(*input.MaxCPU, true)
-	}
-
-	// Validate and set rename style if provided.
-	if input.RenameStyle != nil {
-		if err := validation.ValidateRenameFlag(*input.RenameStyle); err != nil {
-			return nil, fmt.Errorf("failed to validate rename style for per-URL settings: %w", err)
-		}
-		metarr.RenameStyle = *input.RenameStyle
-	}
-
-	// Validate and set min free mem if provided.
-	if input.MinFreeMem != nil {
-		if _, err := sharedvalidation.ValidateMinFreeMem(*input.MinFreeMem); err != nil {
-			return nil, fmt.Errorf("failed to validate min free mem for per-URL settings: %w", err)
-		}
-		metarr.MinFreeMem = *input.MinFreeMem
-	}
-
-	// Validate and set GPU settings if provided.
-	if input.TranscodeGPU != nil {
-		g, err := validation.ValidateGPUAcceleration(*input.TranscodeGPU)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate GPU settings for per-URL settings: %w", err)
-		}
-		metarr.TranscodeGPU = g
-	}
-
-	// Validate and set GPU node path if provided.
-	if input.TranscodeGPUNode != nil {
-		n, err := sharedvalidation.ValidateAccelTypeDeviceNode(metarr.TranscodeGPU, *input.TranscodeGPUNode)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate GPU node path for per-URL settings: %w", err)
-		}
-		metarr.TranscodeGPUNode = n
-	}
-
-	// Validate and set video codecs if provided.
-	if input.TranscodeVideoCodec != nil {
-		c, err := validation.ValidateVideoTranscodeCodecSlice(*input.TranscodeVideoCodec, metarr.TranscodeGPU)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate video codecs for per-URL settings: %w", err)
-		}
-		metarr.TranscodeVideoCodecs = c
-	}
-
-	// Validate and set audio codecs if provided.
-	if input.TranscodeAudioCodec != nil {
-		logger.Pl.I("Found audio codecs in per-URL override: %v", *input.TranscodeAudioCodec)
-		c, err := validation.ValidateAudioTranscodeCodecSlice(*input.TranscodeAudioCodec)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate audio codecs for per-URL settings: %w", err)
-		}
-		metarr.TranscodeAudioCodecs = c
-	}
-
-	// Validate and set transcode quality if provided.
-	if input.TranscodeQuality != nil {
-		q, err := sharedvalidation.ValidateTranscodeQuality(*input.TranscodeQuality)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate transcode quality for per-URL settings: %w", err)
-		}
-		metarr.TranscodeQuality = q
-	}
-
-	// Parse meta ops if provided.
-	if input.MetaOps != nil {
-		m, err := ParseMetaOps(*input.MetaOps)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse meta ops for per-URL settings: %w", err)
-		}
-		metarr.MetaOps = m
-	}
-
-	// Parse filename ops if provided.
-	if input.FilenameOps != nil {
-		m, err := ParseFilenameOps(*input.FilenameOps)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse filename ops for per-URL settings: %w", err)
-		}
-		metarr.FilenameOps = m
-	}
-
-	// Parse filtered meta ops if provided.
-	if input.FilteredMetaOps != nil {
-		m, err := ParseFilteredMetaOps(*input.FilteredMetaOps)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse filtered meta ops for per-URL settings: %w", err)
-		}
-		metarr.FilteredMetaOps = m
-	}
-
-	// Parse filtered filename ops if provided.
-	if input.FilteredFilenameOps != nil {
-		m, err := ParseFilteredFilenameOps(*input.FilteredFilenameOps)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse filtered filename ops for per-URL settings: %w", err)
-		}
-		metarr.FilteredFilenameOps = m
-	}
-
-	return metarr, nil
 }

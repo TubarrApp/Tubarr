@@ -48,14 +48,110 @@ download-as-cancel if Download As closes without starting. -->
         </div>
       </template>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        The ops below are this video's channel URL's (or its last edits), one per line. Edits apply to this video only, and are kept for later post-processing runs. Filtered ops still apply only if their filter matches the video's metadata.
+        The ops below are this video's channel URL's (or its last edits), one per line. Edits apply to this video only, and are kept for later post-processing runs. Filtered ops still apply only if their filter matches the video's metadata. Load adds an ops file's ops to its box.
       </p>
       <template x-for="box in boxes" :key="box.key">
         <div>
           <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300" x-text="box.label"></label>
+          <div class="mb-1 flex gap-2">
+            <input
+              type="text"
+              x-model="opsFiles[box.key]"
+              placeholder="Ops file path (optional)"
+              class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
+            />
+            <button
+              type="button"
+              @click="loadOpsFile(box.key)"
+              :disabled="!opsFiles[box.key]?.trim() || working"
+              class="shrink-0 rounded border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Load
+            </button>
+          </div>
           <textarea x-model="form[box.key]" rows="3" :placeholder="box.placeholder" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300" style="font-family: monospace;"></textarea>
         </div>
       </template>
+      <details>
+        <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">More post-processing options</summary>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Blank options use the channel URL's.</p>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
+            <select x-model="form.metarr.metarr_purge_metafile" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+              <option value="" x-text="usual('metarr_purge_metafile')"></option>
+              <option value="json">JSON</option>
+              <option value="nfo">NFO</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
+            <select x-model="form.metarr.metarr_output_ext" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+              <option value="" x-text="usual('metarr_output_ext')"></option>
+              <option value="avi">avi</option>
+              <option value="flv">flv</option>
+              <option value="mkv">mkv</option>
+              <option value="mov">mov</option>
+              <option value="mp4">mp4</option>
+              <option value="webm">webm</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Rename Style</label>
+            <select x-model="form.metarr.metarr_rename_style" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+              <option value="" x-text="usual('metarr_rename_style')"></option>
+              <option value="spaces">Spaces</option>
+              <option value="underscores">Underscores</option>
+              <option value="fixes-only">Fixes Only</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
+            <input type="number" x-model.number="form.metarr.metarr_max_cpu_usage" :placeholder="usual('metarr_max_cpu_usage')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Min Free Memory</label>
+            <input type="text" x-model="form.metarr.metarr_min_free_mem" :placeholder="usual('metarr_min_free_mem')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
+            <select x-model="form.metarr.metarr_gpu" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+              <option value="" x-text="usual('metarr_gpu')"></option>
+              <option value="auto">Auto</option>
+              <option value="cuda">Nvidia (Cuda)</option>
+              <option value="qsv">Intel (QSV)</option>
+              <option value="vaapi">VAAPI</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Node Path</label>
+            <input type="text" x-model="form.metarr.metarr_transcode_gpu_node" :placeholder="usual('metarr_transcode_gpu_node')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
+            <input type="number" min="0" max="51" x-model="form.metarr.metarr_transcode_quality" :placeholder="usual('metarr_transcode_quality')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
+            <textarea x-model="form.metarr.metarr_transcode_video_transcode_codecs" :placeholder="usual('metarr_transcode_video_transcode_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., h264:hevc)</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Audio Transcode Codecs</label>
+            <textarea x-model="form.metarr.metarr_transcode_audio_codecs" :placeholder="usual('metarr_transcode_audio_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., dts:ac3)</p>
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Video Filter</label>
+            <input type="text" x-model="form.metarr.metarr_transcode_video_filter" :placeholder="usual('metarr_transcode_video_filter')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
+            <input type="text" x-model="form.metarr.metarr_extra_ffmpeg_args" :placeholder="usual('metarr_extra_ffmpeg_args')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+        </div>
+      </details>
     </div>
 
     <p x-show="error" class="mt-4 text-sm text-error-600 dark:text-error-500" x-text="error"></p>
@@ -65,7 +161,7 @@ download-as-cancel if Download As closes without starting. -->
         type="button"
         @click="revert()"
         :disabled="!loaded || working"
-        title="Clear the filename and directories, and put back the channel URL's ops."
+        title="Clear the filename, directories and other options, and put back the channel URL's ops."
         class="text-sm text-brand-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
         style="margin-right: auto;"
       >
@@ -81,8 +177,15 @@ download-as-cancel if Download As closes without starting. -->
     return {
       video: null,
       mode: 'download', // Or 'metarr', for a downloaded video.
-      form: {},
+      form: { metarr: {} },
       defaults: {}, // The channel URL's directories and ops.
+      metarrDefaults: {}, // The channel URL's other Metarr args.
+      opsFiles: {}, // Ops file paths typed in, by box.
+      metarrKeys: [
+        'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
+        'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_quality', 'metarr_transcode_video_transcode_codecs',
+        'metarr_transcode_audio_codecs', 'metarr_transcode_video_filter', 'metarr_extra_ffmpeg_args'
+      ],
       loading: false,
       loaded: false, // Ops filled, so empty boxes mean the user cleared them.
       working: false,
@@ -109,7 +212,9 @@ download-as-cancel if Download As closes without starting. -->
         this.video = video;
         this.mode = mode;
         this.defaults = {};
-        this.form = {};
+        this.metarrDefaults = {};
+        this.opsFiles = {};
+        this.form = { metarr: {} };
         this.error = null;
         this.loaded = false;
         this.loading = true;
@@ -118,9 +223,10 @@ download-as-cancel if Download As closes without starting. -->
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }
-          const { defaults, saved } = await response.json();
+          const { defaults, saved, defaults_metarr, saved_metarr } = await response.json();
           this.defaults = defaults;
-          this.form = saved || this.defaultForm();
+          this.metarrDefaults = defaults_metarr || {};
+          this.form = saved ? { ...saved, metarr: this.metarrForm(saved_metarr) } : this.defaultForm();
           this.loaded = true;
         } catch (err) {
           this.error = `Couldn't load the channel URL's ops: ${err.message}`;
@@ -129,13 +235,50 @@ download-as-cancel if Download As closes without starting. -->
         }
       },
 
-      // The channel URL's ops, with no filename and the usual directories (blank, so move ops still apply).
+      // The channel URL's ops, with no filename and the usual directories and other args (blank, so move ops still apply).
       defaultForm() {
-        return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '' };
+        return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '', metarr: {} };
+      },
+
+      // The dialog's set Metarr args from saved ones, with codec lists one per line.
+      metarrForm(saved) {
+        const form = {};
+        for (const key of this.metarrKeys) {
+          const v = saved?.[key];
+          if (v) form[key] = Array.isArray(v) ? v.join('\n') : v;
+        }
+        return form;
+      },
+
+      // A blank option's label: the channel URL's value, if it has one.
+      usual(key) {
+        const v = this.metarrDefaults[key];
+        const shown = Array.isArray(v) ? v.join(', ') : v;
+        return shown ? `Usual (${shown})` : 'Usual setting';
       },
 
       revert() {
         this.form = this.defaultForm();
+      },
+
+      // Adds the ops in a file which apply to the video's channel URL to a box, leaving out lines it already has.
+      async loadOpsFile(key) {
+        const video = this.video;
+        this.error = null;
+        try {
+          const params = new URLSearchParams({ box: key, path: this.opsFiles[key].trim() });
+          const response = await fetch(`/api/v1/channels/${video.channel_id}/override-ops/${video.channel_url_id}/file?${params}`);
+          if (!response.ok) {
+            throw new Error(await response.text() || response.statusText);
+          }
+          const { lines } = await response.json();
+          const current = this.form[key] || '';
+          const have = current.split('\n');
+          const added = (lines || []).filter(l => !have.includes(l));
+          this.form[key] = [current.trimEnd(), ...added].filter(Boolean).join('\n');
+        } catch (err) {
+          this.error = `Couldn't load the ops file: ${err.message}`;
+        }
       },
 
       close() {
@@ -149,12 +292,15 @@ download-as-cancel if Download As closes without starting. -->
       async submit() {
         const video = this.video;
         const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+        const { metarr: metarrForm, ...overrides } = this.form;
+        // Blank args are left out, so they use the channel URL's.
+        const metarr = Object.fromEntries(Object.entries(metarrForm).filter(([, v]) => v !== '' && v != null));
         this.working = true;
         this.error = null;
         try {
           const response = this.mode === 'metarr'
-            ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides: this.form, rerun: video.rerun }) })
-            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides: this.form, auth: video.auth }) });
+            ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides, metarr, rerun: video.rerun }) })
+            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides, metarr, auth: video.auth }) });
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }

@@ -79,60 +79,53 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 			return false, err
 		}
 
-		// Continue to attempt download.
-		logger.Pl.I("Starting video download attempt %d/%d for URL: %s",
-			attempt, d.Options.MaxRetries, d.Video.URL)
+		logger.Pl.I("Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxRetries, d.Video.URL)
+		if d.Context.Err() != nil {
+			logger.Pl.W("Download canceled: %v", d.Context.Err())
+			return false, d.cancelVideoDownload()
+		}
 
+		err := d.videoDLAttempt()
+		if err == nil {
+			d.Video.UpdatedAt = time.Now()
+			d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
+			logger.Pl.S("Successfully completed video download for URL: %s", d.Video.URL)
+			return false, nil
+		}
+		if d.Context.Err() != nil {
+			return false, d.cancelVideoDownload()
+		}
+
+		// Check bot detection FIRST - abort immediately if detected.
+		if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
+			return true, botErr // Only 'TRUE' path for bot detected.
+		}
+
+		// Check if URL should be avoided (in case bot was just detected).
+		if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
+			return false, avoidErr
+		}
+
+		// Other errors - retry, unless that was the last attempt.
+		lastErr = err
+		logger.Pl.E("Download attempt %d failed: %v", attempt, err)
+		d.DLTracker.SetStatus(d.Video, consts.DLStatusFailed, d.Video.DownloadStatus.Percent, "", err)
+		if attempt == d.Options.MaxRetries {
+			break
+		}
+		if !fsRefreshed {
+			fsRefreshed = refreshFlareSolverr(d.ChannelURL, d.Video.URL, d.fsGen, err)
+		}
+
+		randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
+		logger.Pl.I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
+		d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0,
+			fmt.Sprintf("Retrying in %.0fs (attempt %d/%d)", randWait.Seconds(), attempt+1, d.Options.MaxRetries), nil)
 		select {
 		case <-d.Context.Done():
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
 			return false, d.cancelVideoDownload()
-		default:
-			if err := d.videoDLAttempt(); err != nil {
-				if d.Context.Err() != nil {
-					return false, d.cancelVideoDownload()
-				}
-
-				// Check bot detection FIRST - abort immediately if detected.
-				if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
-					return true, botErr // Only 'TRUE' path for bot detected.
-				}
-
-				// Check if URL should be avoided (in case bot was just detected).
-				if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
-					return false, avoidErr
-				}
-
-				// Other errors - continue retry logic.
-				lastErr = err
-				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
-				d.DLTracker.SetStatus(d.Video, consts.DLStatusFailed, d.Video.DownloadStatus.Percent, "", err)
-
-				if attempt < d.Options.MaxRetries {
-					if !fsRefreshed {
-						fsRefreshed = refreshFlareSolverr(d.ChannelURL, d.Video.URL, d.fsGen, err)
-					}
-
-					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
-					logger.Pl.I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
-					d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0,
-						fmt.Sprintf("Retrying in %.0fs (attempt %d/%d)", randWait.Seconds(), attempt+1, d.Options.MaxRetries), nil)
-
-					select {
-					case <-d.Context.Done():
-						logger.Pl.W("Download canceled: %v", d.Context.Err())
-						return false, d.cancelVideoDownload()
-					case <-time.After(randWait):
-						continue
-					}
-				}
-			} else {
-				d.Video.UpdatedAt = time.Now()
-				d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
-				logger.Pl.S("Successfully completed video download for URL: %s", d.Video.URL)
-
-				return false, nil
-			}
+		case <-time.After(randWait):
 		}
 	}
 	return false, fmt.Errorf("all %d download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)

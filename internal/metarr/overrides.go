@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"tubarr/internal/domain/keys"
@@ -59,6 +60,32 @@ func ChannelURLOverrideLines(cu *models.ChannelURL, dirParser *parsing.Directory
 		FilenameOps:         strings.Join(filenameOpLines, "\n"),
 		FilteredFilenameOps: strings.Join(filteredFilenameOpLines(slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, fileFilteredFilenameOps), cu.URL), "\n"),
 	}, nil
+}
+
+// FileOverrideLines returns the ops in the file at path which apply to cu, without their channel URL prefix, for the
+// Download As dialog's box (e.g. "meta_ops").
+func FileOverrideLines(box, path string, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) ([]string, error) {
+	args := &models.MetarrArgs{}
+	fileCU := &models.ChannelURL{URL: cu.URL, ChanURLMetarrArgs: args} // The loaders read the file path from a channel URL.
+	switch box {
+	case "meta_ops":
+		args.MetaOpsFile = path
+		ops, err := LoadMetaOpsFromFile(fileCU, dirParser)
+		return getDedupedMetaOpStrings(filterMetaOpsByChannel(ops, cu.URL)), err
+	case "filtered_meta_ops":
+		args.FilteredMetaOpsFile = path
+		ops, err := metadata.LoadFilteredMetaOpsFromFile(fileCU, dirParser)
+		return filteredMetaOpLines(ops, cu.URL), err
+	case "filename_ops":
+		args.FilenameOpsFile = path
+		ops, err := LoadFilenameOpsFromFile(fileCU, dirParser)
+		return getDedupedFilenameOpStrings(filterFilenameOpsByChannel(ops, cu.URL)), err
+	case "filtered_filename_ops":
+		args.FilteredFilenameOpsFile = path
+		ops, err := metadata.LoadFilteredFilenameOpsFromFile(fileCU, dirParser)
+		return filteredFilenameOpLines(ops, cu.URL), err
+	}
+	return nil, fmt.Errorf("unknown ops box %q", box)
 }
 
 // VideoOverrideLines returns a video's stored Download As overrides as lines, to fill the dialog with them again.

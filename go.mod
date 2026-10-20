@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/TubarrApp/gocommon v0.0.0-20261019022212-85dc63b7a893
+	github.com/TubarrApp/gocommon v0.0.0-20261020002029-acd8a3cd32b9
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
@@ -17,7 +17,6 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/tidwall/gjson v1.20.0
 	golang.org/x/crypto v0.58.0
-	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6
 	golang.org/x/net v0.60.0
 )
 

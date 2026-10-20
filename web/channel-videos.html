@@ -184,24 +184,32 @@
                             />
                           </td>
                           <td class="px-6 py-4">
-                            <template x-if="video.thumbnail_url">
-                              <img
-                                :src="safeURL(video.thumbnail_url)"
-                                :alt="video.title"
-                                class="w-32 aspect-video object-cover rounded"
-                              />
-                            </template>
-                            <template x-if="!video.thumbnail_url">
-                              <div class="w-32 aspect-video bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                            <div class="relative w-32 aspect-video overflow-hidden bg-gray-200 dark:bg-gray-700 rounded">
+                              <div class="flex h-full w-full items-center justify-center">
                                 <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                                 </svg>
                               </div>
-                            </template>
+                              <img
+                                x-show="safeURL(video.thumbnail_url)"
+                                :src="safeURL(video.thumbnail_url)"
+                                :alt="video.title"
+                                loading="lazy"
+                                referrerpolicy="no-referrer"
+                                @error="$el.style.display = 'none'"
+                                class="absolute inset-0 h-full w-full object-cover"
+                              />
+                            </div>
                           </td>
                           <td class="px-6 py-4">
                             <div class="max-w-md">
                               <p class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" x-text="video.title"></p>
+                              <p
+                                x-show="video.finished"
+                                class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400"
+                                :title="video.video_path"
+                                x-text="video.video_path || 'File path: N/A'"
+                              ></p>
                             </div>
                           </td>
                           <td class="px-6 py-4">
@@ -235,8 +243,8 @@
                             <button
                               x-show="metarrDone(video)"
                               @click="$dispatch('edit-metarr', { ...video, channel_id: channelId, rerun: true })"
-                              :disabled="!video.json_path || runningMetarr"
-                              :title="video.json_path ? 'Edit the filename, directory and ops, then post-process the finished files again with Metarr, e.g. to fix a date.' : 'Its metadata file was removed when it was post-processed, so it can\'t be processed again.'"
+                              :disabled="!video.json_path || !video.video_path || runningMetarr"
+                              :title="!video.video_path ? missingFileHint : video.json_path ? 'Edit the filename, directory and ops, then post-process the finished files again with Metarr, e.g. to fix a date.' : 'Its metadata file was removed when it was post-processed, so it can\'t be processed again.'"
                               class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
                             >
                               Edit &amp; Re-Process
@@ -244,7 +252,8 @@
                             <button
                               x-show="!metarrDone(video)"
                               @click="runMetarr([video.id])"
-                              :disabled="!needsMetarr(video) || runningMetarr"
+                              :disabled="!needsMetarr(video) || !video.video_path || runningMetarr"
+                              :title="needsMetarr(video) && !video.video_path ? missingFileHint : null"
                               class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
                             >
                               Post-Process
@@ -252,8 +261,8 @@
                             <button
                               x-show="!metarrDone(video)"
                               @click="$dispatch('edit-metarr', { ...video, channel_id: channelId })"
-                              :disabled="!needsMetarr(video) || runningMetarr"
-                              title="See and edit the filename, directory and ops it's post-processed with (by Metarr), then post-process it."
+                              :disabled="!needsMetarr(video) || !video.video_path || runningMetarr"
+                              :title="needsMetarr(video) && !video.video_path ? missingFileHint : 'See and edit the filename, directory and ops it\'s post-processed with (by Metarr), then post-process it.'"
                               class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
                             >
                               Edit &amp; Post-Process
@@ -336,6 +345,7 @@
           currentPage: 1,
           itemsPerPage: 25,
           lastClickedIndex: null,
+          missingFileHint: "The video file isn't at its saved path any more (moved or renamed?), so it can't be processed.",
 
           init() {
             // Get channel ID from URL params

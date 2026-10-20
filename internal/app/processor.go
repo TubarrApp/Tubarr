@@ -111,6 +111,17 @@ func InitProcess(
 		wg         sync.WaitGroup
 		downloaded atomic.Int32
 	)
+	batch := &videoBatch{
+		stopRequested: stopRequested,
+		vs:            s.VideoStore(),
+		cs:            s.ChannelStore(),
+		dlTracker:     dlTracker,
+		dirParser:     dirParser,
+		cu:            cu,
+		c:             c,
+		metarrWg:      &metarrWg,
+		downloaded:    &downloaded,
+	}
 	for range conc {
 		wg.Go(func() {
 			for v := range jobs {
@@ -120,23 +131,7 @@ func InitProcess(
 					continue
 				default:
 				}
-
-				err := videoJob(
-					queueCtx,
-					procCtx,
-					metarrCtx,
-					stopRequested,
-					s.VideoStore(),
-					s.ChannelStore(),
-					dlTracker,
-					dirParser,
-					v,
-					cu,
-					c,
-					&metarrWg,
-					&downloaded)
-
-				results <- err
+				results <- batch.videoJob(queueCtx, procCtx, metarrCtx, v)
 			}
 		})
 	}
@@ -246,22 +241,23 @@ func executeCustomScraper(ctx context.Context, s *scraper.Scraper, v *models.Vid
 	return v.JSONCustomFile, nil
 }
 
+// videoBatch holds what the video jobs of one channel URL's batch share.
+type videoBatch struct {
+	stopRequested <-chan struct{}
+	vs            contracts.VideoStore
+	cs            contracts.ChannelStore
+	dlTracker     *downloads.DownloadTracker
+	dirParser     *parsing.DirectoryParser
+	cu            *models.ChannelURL
+	c             *models.Channel
+	metarrWg      *sync.WaitGroup // Running Metarr processes, which outlive the batch.
+	downloaded    *atomic.Int32
+}
+
 // videoJob starts a worker's process for a video.
-func videoJob(
-	queueCtx context.Context,
-	procCtx context.Context,
-	metarrCtx context.Context,
-	stopRequested <-chan struct{},
-	vs contracts.VideoStore,
-	cs contracts.ChannelStore,
-	dlTracker *downloads.DownloadTracker,
-	dirParser *parsing.DirectoryParser,
-	v *models.Video,
-	cu *models.ChannelURL,
-	c *models.Channel,
-	metarrWg *sync.WaitGroup,
-	downloaded *atomic.Int32,
-) (err error) {
+func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *models.Video) (err error) {
+	c, cu := b.c, b.cu
+
 	// Take hold of video before touching its files, cancelling any separate Metarr run on it.
 	key := metarrKey{c.ID, v.URL}
 	vMetarrCtx, vMetarrCancel := context.WithCancel(metarrCtx)
@@ -296,14 +292,14 @@ func videoJob(
 			downloads.RegisterDownloadContext(v.ID, v.URL, vidCancel)
 			tracked = true
 		}
-		dlTracker.SetStatus(v, consts.DLStatusQueued, 0, stage, nil)
+		b.dlTracker.SetStatus(v, consts.DLStatusQueued, 0, stage, nil)
 	}
 	defer func() {
 		if !tracked {
 			return
 		}
 		downloads.UnregisterDownloadContext(v.ID, v.URL)
-		finishTracking(vidCtx, dlTracker, v, err)
+		finishTracking(vidCtx, b.dlTracker, v, err)
 	}()
 	track("Waiting to start")
 
@@ -319,15 +315,15 @@ func videoJob(
 
 	// Process JSON metadata phase.
 	track("Fetching metadata")
-	proceed, botBlockChannel, err := processJSON(vidCtx, vs, dlTracker, dirParser, c, cu, v)
+	proceed, botBlockChannel, err := processJSON(vidCtx, b.vs, b.dlTracker, b.dirParser, c, cu, v)
 	if errors.Is(err, downloads.ErrDuplicateDownload) {
 		logger.Pl.I("Skipping video %q: %v", v.URL, err)
 		return nil
 	}
 	if err != nil {
-		handleBotBlock(cs, cu, v.URL, botBlockChannel)
+		handleBotBlock(b.cs, cu, v.URL, botBlockChannel)
 		if v.ID == 0 && !botBlockChannel && vidCtx.Err() == nil {
-			storeFailedVideo(vs, dlTracker, v, c, cu, err)
+			storeFailedVideo(b.vs, b.dlTracker, v, c, cu, err)
 		}
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
 	}
@@ -340,32 +336,32 @@ func videoJob(
 	track("Waiting for download slot")
 
 	// Check move operations.
-	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, dirParser)
+	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, b.dirParser)
 
 	// Process video download phase.
-	botBlockChannel, err = processVideo(vidCtx, v, cu, c, dlTracker)
+	botBlockChannel, err = processVideo(vidCtx, v, cu, c, b.dlTracker)
 	if errors.Is(err, downloads.ErrDuplicateDownload) {
 		logger.Pl.I("Skipping video %q: %v", v.URL, err)
 		return nil
 	}
 	if err != nil {
-		handleBotBlock(cs, cu, v.URL, botBlockChannel)
+		handleBotBlock(b.cs, cu, v.URL, botBlockChannel)
 		return fmt.Errorf("video processing error for video URL %q: %w", v.URL, err)
 	}
-	downloaded.Add(1)
+	b.downloaded.Add(1)
 
 	// Metarr held back for the batch: finished with Metarr pending, so Run Metarr can process it once fixed.
 	if v.SkipMetarr.Skip {
 		logger.Pl.W("Skipping Metarr for %q, marking it finished with Metarr pending: %s", v.URL, v.SkipMetarr.Reason)
 		v.MetarrStatus = consts.MetarrStatusPending
-		return completeAndStoreVideo(cs, vs, v, c)
+		return completeAndStoreVideo(b.cs, b.vs, v, c)
 	}
 
 	// Run metarr step.
 	handedOff = true
-	metarrWg.Add(1)
+	b.metarrWg.Add(1)
 	go func(video *models.Video, channelURL *models.ChannelURL, channel *models.Channel) {
-		defer metarrWg.Done()
+		defer b.metarrWg.Done()
 		defer releaseMetarr(key, claim)
 		defer vMetarrCancel()
 		claim.enqueue(video, channelURL)
@@ -374,27 +370,27 @@ func videoJob(
 		storePending := func() {
 			logger.Pl.W("Metarr not started for video %s, marking as pending", video.URL)
 			video.MetarrStatus = consts.MetarrStatusPending
-			if err := completeAndStoreVideo(cs, vs, video, channel); err != nil {
+			if err := completeAndStoreVideo(b.cs, b.vs, video, channel); err != nil {
 				logger.Pl.E("Failed to store video %q after Metarr cancellation: %v", video.URL, err)
 			}
 		}
 
 		// Acquire channel and global Metarr slots.
-		release, ok := acquireMetarrSlots(vMetarrCtx, stopRequested, channel, channelURL)
+		release, ok := acquireMetarrSlots(vMetarrCtx, b.stopRequested, channel, channelURL)
 		if !ok {
 			storePending()
 			return
 		}
 		defer release()
-		if vMetarrCtx.Err() != nil || isClosed(stopRequested) {
+		if vMetarrCtx.Err() != nil || isClosed(b.stopRequested) {
 			storePending()
 			return
 		}
 		claim.startedAt.Store(time.Now().UnixMilli())
 
-		video.MetarrStatus = execMetarr(vMetarrCtx, video, channelURL, channel, dirParser)
+		video.MetarrStatus = execMetarr(vMetarrCtx, video, channelURL, channel, b.dirParser)
 
-		if err := completeAndStoreVideo(cs, vs, video, channel); err != nil {
+		if err := completeAndStoreVideo(b.cs, b.vs, video, channel); err != nil {
 			logger.Pl.E("Failed to complete video %q after metarr: %v", video.URL, err)
 		}
 	}(v, cu, c)

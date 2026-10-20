@@ -57,55 +57,56 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 		lastErr     error
 		fsRefreshed bool
 	)
-	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
-		logger.Pl.I("Starting JSON download attempt %d/%d for URL: %s",
-			attempt, d.Options.MaxRetries, d.Video.URL)
 
+	// JSON download attempt loop
+	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
+		logger.Pl.I("Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxRetries, d.Video.URL)
+		if d.Context.Err() != nil {
+			logger.Pl.W("Download canceled: %v", d.Context.Err())
+			return false, d.cancelJSONDownload()
+		}
+
+		// Download JSON
+		err := d.jsonDLAttempt()
+		if err == nil { // If err IS nil
+			d.Video.UpdatedAt = time.Now()
+			logger.Pl.S("Successfully completed JSON download for URL: %s", d.Video.URL)
+			return false, nil
+		}
+
+		// ERROR PATH:
+
+		// Check bot detection after each attempt.
+		if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
+			return true, botErr // Abort immediately, no retries
+		}
+
+		// Check if URL should be avoided (set by previous videos or persistent blocks).
+		if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
+			return false, avoidErr
+		}
+
+		// Other errors - retry, unless that was the last attempt.
+		lastErr = err
+		logger.Pl.E("Download attempt %d failed: %v", attempt, err)
+		if attempt == d.Options.MaxRetries {
+			break
+		}
+		if !fsRefreshed {
+			fsRefreshed = refreshFlareSolverr(d.ChannelURL, d.Video.URL, d.fsGen, err)
+		}
+
+		randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
+		logger.Pl.I("Waiting %.0f seconds before retrying JSON download for %q...", randWait.Seconds(), d.Video.URL)
 		select {
 		case <-d.Context.Done():
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
 			return false, d.cancelJSONDownload()
-		default:
-			if err := d.jsonDLAttempt(); err != nil {
-				// Check bot detection after each attempt.
-				if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
-					return true, botErr // Abort immediately, no retries
-				}
-
-				// Check if URL should be avoided (set by previous videos or persistent blocks).
-				if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
-					return false, avoidErr
-				}
-
-				// Other errors - continue with retry logic.
-				lastErr = err
-				logger.Pl.E("Download attempt %d failed: %v", attempt, err)
-
-				if attempt < d.Options.MaxRetries {
-					if !fsRefreshed {
-						fsRefreshed = refreshFlareSolverr(d.ChannelURL, d.Video.URL, d.fsGen, err)
-					}
-
-					randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
-					logger.Pl.I("Waiting %.0f seconds before retrying JSON download for %q...", randWait.Seconds(), d.Video.URL)
-
-					select {
-					case <-d.Context.Done():
-						logger.Pl.W("Download canceled: %v", d.Context.Err())
-						return false, d.cancelJSONDownload()
-					case <-time.After(randWait):
-						continue
-					}
-				}
-			} else {
-				// Success.
-				d.Video.UpdatedAt = time.Now()
-
-				logger.Pl.S("Successfully completed JSON download for URL: %s", d.Video.URL)
-				return false, nil
-			}
+		case <-time.After(randWait):
 		}
 	}
+
+	// All failed
 	return false, fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 

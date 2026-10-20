@@ -195,7 +195,7 @@ func RunMetarr(ctx context.Context, s contracts.Store, c *models.Channel, videoI
 	)
 
 	for _, v := range videos {
-		cu := findChannelURL(c, v.ChannelURLID)
+		cu := c.URLByID(v.ChannelURLID)
 		if cu == nil {
 			mu.Lock()
 			errs = append(errs, fmt.Errorf("video %q: channel URL no longer exists", v.URL))
@@ -442,16 +442,6 @@ func releaseMetarr(key metarrKey, claim *metarrClaim) {
 	}
 	metarrClaims.CompareAndDelete(key, claim)
 	close(claim.done)
-}
-
-// findChannelURL returns the channel URL model with the given ID, or nil.
-func findChannelURL(c *models.Channel, id int64) *models.ChannelURL {
-	for _, cu := range c.URLModels {
-		if cu.ID == id {
-			return cu
-		}
-	}
-	return nil
 }
 
 // filterVideosByID returns the videos whose IDs are in ids.

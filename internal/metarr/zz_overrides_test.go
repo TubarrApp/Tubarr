@@ -2,6 +2,8 @@ package metarr
 
 import (
 	"io"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -79,6 +81,51 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	viper.Set(keys.MoveOnComplete, "/library")
 	if lines, err := ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil || lines.OutputDir != "/library" {
 		t.Errorf("with --move-on-complete: output directory %q, %v, want /library", lines.OutputDir, err)
+	}
+}
+
+// TestFileOverrideLines tests a Download As box gets an ops file's ops for its channel URL, without their channel URL
+// prefix, with template tags filled in the path.
+func TestFileOverrideLines(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	dir := filepath.Join(t.TempDir(), "Test")
+	if err := os.Mkdir(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, content string) string {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return filepath.Join(filepath.Dir(dir), "{{channel_name}}", name)
+	}
+	c := &models.Channel{ID: 1, Name: "Test"}
+	cu := &models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{}}
+	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
+
+	for _, tc := range []struct {
+		box, content string
+		want         []string
+	}{
+		{"meta_ops", ownURL + "|title:prefix:[A] \n" + otherURL + "|title:prefix:[B] \nartist:set:Cats\n", []string{"title:prefix:[A] ", "artist:set:Cats"}},
+		{"filtered_meta_ops", "title:contains:cat|genre:set:Cats\n" + otherURL + "|title:contains:dog|genre:set:Dogs\n", []string{"title:contains:cat|genre:set:Cats"}},
+		{"filename_ops", "date-tag:prefix:ymd\n", []string{"date-tag:prefix:ymd"}},
+		{"filtered_filename_ops", "title:contains:cat|prefix:[Cats] \n", []string{"title:contains:cat|prefix:[Cats] "}},
+	} {
+		got, err := FileOverrideLines(tc.box, write(tc.box+".txt", tc.content), cu, dp)
+		if err != nil || !slices.Equal(got, tc.want) {
+			t.Errorf("%s: got %q, %v, want %q", tc.box, got, err, tc.want)
+		}
+	}
+
+	if _, err := FileOverrideLines("meta_ops", write("bad.txt", "artist:bogus:x\n"), cu, dp); err == nil {
+		t.Error("expected an error for an invalid op")
+	}
+	if _, err := FileOverrideLines("meta_ops", filepath.Join(dir, "missing.txt"), cu, dp); err == nil {
+		t.Error("expected an error for a missing file")
+	}
+	if _, err := FileOverrideLines("ops", write("ops.txt", "artist:set:Cats\n"), cu, dp); err == nil {
+		t.Error("expected an error for an unknown box")
 	}
 }
 

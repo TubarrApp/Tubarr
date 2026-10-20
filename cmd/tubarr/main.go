@@ -35,7 +35,10 @@ func init() {
 
 // skipsInstanceLock reports whether the arguments only ask for help or a login reset, which run alongside a running Tubarr.
 func skipsInstanceLock(args []string) bool {
-	return (len(args) > 0 && args[0] == "help") || slices.Contains(args, "-h") || slices.Contains(args, "--help") ||
+	return (len(args) > 0 &&
+		args[0] == "help") ||
+		slices.Contains(args, "-h") ||
+		slices.Contains(args, "--help") ||
 		slices.Equal(args, []string{"auth", "reset"})
 }
 

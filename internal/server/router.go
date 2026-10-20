@@ -170,6 +170,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 			r.Post("/{id}/available-urls", ss.handleAddAvailableURLs)
 			r.Post("/{id}/available", ss.handleAvailableAction)
 			r.Get("/{id}/override-ops/{urlID}", ss.handleGetOverrideOps)
+			r.Get("/{id}/override-ops/{urlID}/file", ss.handleGetOverrideOpsFile)
 			r.Post("/{id}/run-metarr", ss.handleRunMetarr)
 			r.Post("/{id}/notification-seen", ss.handleNewVideoNotificationSeen)
 			r.Post("/{id}/toggle-pause", ss.handleTogglePauseChannel)

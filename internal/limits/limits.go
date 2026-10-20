@@ -110,7 +110,7 @@ func Hostname(rawURL string) string {
 	if err != nil {
 		return ""
 	}
-	return registeredDomain(parsed.Hostname())
+	return RegisteredDomain(parsed.Hostname())
 }
 
 // NormalizeDomain returns the eTLD+1 of a hostname or URL as entered by a user (e.g. "www.youtube.com" → "youtube.com").
@@ -120,13 +120,13 @@ func NormalizeDomain(s string) string {
 		return Hostname(s)
 	}
 	host, _, _ := strings.Cut(s, "/")
-	return registeredDomain(host)
+	return RegisteredDomain(host)
 }
 
-// registeredDomain returns the eTLD+1 of a hostname, or the lowercased hostname if it has none.
+// RegisteredDomain returns the eTLD+1 of a hostname, or the lowercased hostname if it has none.
 //
 // Lowercases first, as the public suffix list is lowercase ("EXAMPLE.CO.UK" would otherwise give "co.uk").
-func registeredDomain(hostname string) string {
+func RegisteredDomain(hostname string) string {
 	hostname = strings.ToLower(hostname)
 	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
 		return domain

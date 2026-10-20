@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"tubarr/internal/domain/logger"
@@ -17,14 +18,11 @@ func ValidateRenameFlag(flag string) error {
 		return nil
 	}
 
-	// Normalize
-	flag = sharedvalidation.GetRenameFlag(flag)
-
-	switch flag {
+	switch sharedvalidation.GetRenameFlag(flag) {
 	case sharedconsts.RenameFixesOnly, sharedconsts.RenameSkip, sharedconsts.RenameSpaces, sharedconsts.RenameUnderscores:
 		return nil
 	default:
-		return fmt.Errorf("invalid renaming style %q, accept: %v", flag, sharedconsts.ValidRenameFlags)
+		return fmt.Errorf("invalid renaming style %q, accept: %v", flag, slices.Sorted(maps.Keys(sharedconsts.ValidRenameFlags)))
 	}
 }
 

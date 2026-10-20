@@ -5,7 +5,6 @@ import (
 	"tubarr/internal/domain/keys"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // Transformers ----------------------------------------------------------------------------------------------------------
@@ -20,42 +19,25 @@ func InitFileTransformers(rootCmd *cobra.Command) error {
 
 	// Rename convention
 	rootCmd.PersistentFlags().StringP(keys.MRenameStyle, "r", "skip", "Rename flag (spaces, underscores, fixes-only, or skip)")
-	if err := viper.BindPFlag(keys.MRenameStyle, rootCmd.PersistentFlags().Lookup(keys.MRenameStyle)); err != nil {
-		return err
-	}
 
 	// Output directory (can be external)
 	rootCmd.PersistentFlags().StringP(keys.MoveOnComplete, "o", "", "Move files to given directory on program completion")
-	if err := viper.BindPFlag(keys.MoveOnComplete, rootCmd.PersistentFlags().Lookup(keys.MoveOnComplete)); err != nil {
-		return err
-	}
 
 	// Purge metafile (no longer used)
 	rootCmd.PersistentFlags().String(keys.PurgeMetaFile, "", "Purge metadata files upon completion.")
-	if err := rootCmd.PersistentFlags().MarkDeprecated(keys.PurgeMetaFile, fmt.Sprintf("use --%s (all, json or nfo)", keys.MMetaPurge)); err != nil {
-		return err
-	}
-
-	return nil
+	return rootCmd.PersistentFlags().MarkDeprecated(keys.PurgeMetaFile, fmt.Sprintf("use --%s (all, json or nfo)", keys.MMetaPurge))
 }
 
 // InitVideoTransformers initializes user flag settings for transformation of video files.
-func InitVideoTransformers(rootCmd *cobra.Command) error {
+func InitVideoTransformers(rootCmd *cobra.Command) {
 	// Output extension type
 	rootCmd.PersistentFlags().String(keys.OutputFiletype, "", "File extension to output files as (mp4 works best for most media servers)")
-	if err := viper.BindPFlag(keys.OutputFiletype, rootCmd.PersistentFlags().Lookup(keys.OutputFiletype)); err != nil {
-		return err
-	}
-	return nil
 }
 
 // InitMetaTransformers initializes user flag settings for manipulation of metadata.
 func InitMetaTransformers(rootCmd *cobra.Command) error {
 	// Metadata transformations
 	rootCmd.PersistentFlags().StringArray(keys.MMetaOps, nil, "Metadata operation (field:operation:value) - e.g. 'title:set:New Title'. Repeat the flag for each operation.")
-	if err := viper.BindPFlag(keys.MMetaOps, rootCmd.PersistentFlags().Lookup(keys.MMetaOps)); err != nil {
-		return err
-	}
 
 	// Prefix or append description fields with dates (no longer used)
 	rootCmd.PersistentFlags().Bool(keys.MDescDatePfx, false, "Adds the date to the start of the description field.")
@@ -69,74 +51,40 @@ func InitMetaTransformers(rootCmd *cobra.Command) error {
 	}
 
 	rootCmd.PersistentFlags().String(keys.MMetaPurge, "", "Metadata files Metarr deletes after processing a video, for channels without their own setting: all, json or nfo")
-	if err := viper.BindPFlag(keys.MMetaPurge, rootCmd.PersistentFlags().Lookup(keys.MMetaPurge)); err != nil {
-		return err
-	}
 	return nil
 }
 
 // Program ----------------------------------------------------------------------------------------------------------
 
 // InitProgramFlags initializes user flag settings related to the core program. E.g. logging level.
-func InitProgramFlags(rootCmd *cobra.Command) error {
+func InitProgramFlags(rootCmd *cobra.Command) {
 	// Skip initial wait
 	rootCmd.PersistentFlags().BoolP(keys.SkipInitialWait, "s", false, "Skip the wait period usually applied before a crawl (helps avoid bot detection)")
-	if err := viper.BindPFlag(keys.SkipInitialWait, rootCmd.PersistentFlags().Lookup(keys.SkipInitialWait)); err != nil {
-		return err
-	}
 
 	// Skip wait
 	rootCmd.PersistentFlags().Bool(keys.SkipAllWaits, false, "Skip all wait periods usually applied before a crawl (helps avoid bot detection)")
-	if err := viper.BindPFlag(keys.SkipAllWaits, rootCmd.PersistentFlags().Lookup(keys.SkipAllWaits)); err != nil {
-		return err
-	}
 
 	// Output benchmarking files
 	rootCmd.PersistentFlags().Bool(keys.Benchmarking, false, "Benchmarks the program")
-	if err := viper.BindPFlag(keys.Benchmarking, rootCmd.PersistentFlags().Lookup(keys.Benchmarking)); err != nil {
-		return err
-	}
 
 	// Global Concurrency
 	rootCmd.PersistentFlags().StringP(keys.CrawlConcurrency, "c", "", "Concurrency for this instance of Tubarr")
-	if err := viper.BindPFlag(keys.CrawlConcurrency, rootCmd.PersistentFlags().Lookup(keys.CrawlConcurrency)); err != nil {
-		return err
-	}
 
 	// Global Download Concurrency
 	rootCmd.PersistentFlags().Int(keys.GlobalDownloadConcurrency, 0, "Maximum concurrent video downloads across all channels (0 = unlimited)")
-	if err := viper.BindPFlag(keys.GlobalDownloadConcurrency, rootCmd.PersistentFlags().Lookup(keys.GlobalDownloadConcurrency)); err != nil {
-		return err
-	}
 
 	// Global Post-processing Concurrency
 	rootCmd.PersistentFlags().Int(keys.PostProcessConcurrency, 0, "Maximum concurrent Metarr post-processing runs across all channels (0 = unlimited)")
-	if err := viper.BindPFlag(keys.PostProcessConcurrency, rootCmd.PersistentFlags().Lookup(keys.PostProcessConcurrency)); err != nil {
-		return err
-	}
 
 	// Custom scrape site config file (global, applies to all channels)
 	rootCmd.PersistentFlags().String(keys.ScrapeConfigFile, "", "Path to a config file (yaml/toml/json) defining custom scraping selectors for additional sites")
-	if err := viper.BindPFlag(keys.ScrapeConfigFile, rootCmd.PersistentFlags().Lookup(keys.ScrapeConfigFile)); err != nil {
-		return err
-	}
 
 	// FlareSolverr instance for scrape sites set to use it (global, applies to all channels)
 	rootCmd.PersistentFlags().String(keys.FlareSolverrURL, "", "URL of a FlareSolverr instance (e.g. http://localhost:8191) for scrape sites set to use it")
-	if err := viper.BindPFlag(keys.FlareSolverrURL, rootCmd.PersistentFlags().Lookup(keys.FlareSolverrURL)); err != nil {
-		return err
-	}
 
 	// Cookies
 	rootCmd.PersistentFlags().String(keys.CookiesFromBrowser, "", "Cookie source for web operations (e.g. 'Firefox')")
-	if err := viper.BindPFlag(keys.CookiesFromBrowser, rootCmd.PersistentFlags().Lookup(keys.CookiesFromBrowser)); err != nil {
-		return err
-	}
 
 	// Debug level
 	rootCmd.PersistentFlags().Int(keys.DebugLevel, -1, "Debugging level (0 - 5)")
-	if err := viper.BindPFlag(keys.DebugLevel, rootCmd.PersistentFlags().Lookup(keys.DebugLevel)); err != nil {
-		return err
-	}
-	return nil
 }

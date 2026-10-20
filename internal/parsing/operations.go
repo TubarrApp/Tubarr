@@ -86,7 +86,7 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 		}
 
 		// Notifications are sent as HTTP POST requests (url.Parse allows characters URLs can't contain, like spaces).
-		if u, err := url.Parse(nURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || strings.ContainsAny(nURL, " \"<>\\^`{}") {
+		if !validation.IsHTTPURL(nURL) || strings.ContainsAny(nURL, " \"<>\\^`{}") {
 			return nil, fmt.Errorf("notification URL %q in entry %q must be a valid http(s) URL", nURL, n)
 		}
 

@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/siterules"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/gocolly/colly"
@@ -73,8 +74,7 @@ func ValidateFlareSolverrURL(baseURL string) error {
 // flareSolverrEndpoint validates a FlareSolverr base URL and returns its API endpoint.
 func flareSolverrEndpoint(baseURL string) (string, error) {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	u, err := url.Parse(baseURL)
-	if err != nil || (!strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https")) || u.Host == "" {
+	if !validation.IsHTTPURL(baseURL) {
 		return "", fmt.Errorf("invalid FlareSolverr URL %q (expected e.g. http://localhost:8191)", baseURL)
 	}
 	if !strings.HasSuffix(baseURL, flareSolverrEndpointSuffix) {

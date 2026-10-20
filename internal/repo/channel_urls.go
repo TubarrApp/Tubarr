@@ -1,19 +1,18 @@
 package repo
 
 import (
+	"cmp"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
-	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
-
-	"golang.org/x/exp/constraints"
 )
 
 // AddChannelURL adds a new channel URL to the database.
@@ -101,7 +100,8 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 
 // UpdateChannelURLSettings updates the settings of a single ChannelURL model.
 func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
-	// Only folders this save adds are checked, so e.g. saving the channel works while an unchanged one's drive is unmounted.
+	// Only files and folders this save adds are checked, so e.g. saving the channel works while an unchanged one's drive
+	// is unmounted.
 	var old *models.Settings
 	var oldMetarr *models.MetarrArgs
 	var oldJSON, oldMetarrJSON sql.NullString
@@ -118,6 +118,12 @@ func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 		if err := json.Unmarshal([]byte(oldMetarrJSON.String), &oldMetarr); err != nil {
 			return fmt.Errorf("failed to read Metarr settings of channel URL %q: %w", cu.URL, err)
 		}
+	}
+	if err := validateURLSettings(cu); err != nil {
+		return err
+	}
+	if err := checkFiles(settingsFiles(old, oldMetarr), settingsFiles(cu.ChanURLSettings, cu.ChanURLMetarrArgs)); err != nil {
+		return err
 	}
 	if err := checkDownloadDirs(old, cu.ChanURLSettings); err != nil {
 		return err
@@ -189,7 +195,7 @@ func (cs *ChannelStore) UpdateChannelURLsLastScan(ids []int64) error {
 		consts.DBChannelURLs,
 		consts.QChanURLLastScan,
 		consts.QChanURLID,
-		strings.TrimSuffix(strings.Repeat("?,", len(ids)), ","),
+		placeholders(len(ids)),
 	)
 	if _, err := cs.q.Exec(query, args...); err != nil {
 		return fmt.Errorf("failed to update channel URL last scan times: %w", err)
@@ -283,188 +289,52 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		return nil, fmt.Errorf("error occurred getting channel URL models: %w", rows.Err())
 	}
 
-	// Apply fallback logic for nil settings.
-	if len(urlModels) > 0 {
-		for _, cu := range urlModels {
-
-			// Merge Settings and MetarrArgs with parent.
-			if mergeWithParent {
-				// Settings.
-				if cu.ChanURLSettings == nil {
-					if c.ChanSettings != nil {
-						// Create a copy of parent Settings.
-						settingsCopy := *c.ChanSettings
-
-						// Set settingsCopy bools to false if inheritance is unwanted.
-						settingsCopy.Paused = false
-
-						// Set copy to ChanURLSettings.
-						cu.ChanURLSettings = &settingsCopy
-					} else {
-						cu.ChanURLSettings = &models.Settings{}
-					}
-				} else {
-					if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-						logger.Pl.D(3, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
-					}
-				}
-
-				// Metarr args.
-				if cu.ChanURLMetarrArgs == nil {
-					if c.ChanMetarrArgs != nil {
-						// Create a copy of parent MetarrArgs.
-						metarrCopy := *c.ChanMetarrArgs
-						cu.ChanURLMetarrArgs = &metarrCopy
-					} else {
-						cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-					}
-				} else {
-					if changed := mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); changed {
-						logger.Pl.D(3, "Set empty channel URL (%q) Metarr arguments from parent channel %q", cu.URL, c.Name)
-					}
-				}
-			}
-
-			// Initialize nil to empty.
-			if cu.ChanURLSettings == nil {
-				cu.ChanURLSettings = &models.Settings{}
-			}
-			if cu.ChanURLMetarrArgs == nil {
-				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-			}
+	for _, cu := range urlModels {
+		if mergeWithParent {
+			inheritChannelSettings(cu, c)
+		}
+		if cu.ChanURLSettings == nil {
+			cu.ChanURLSettings = &models.Settings{}
+		}
+		if cu.ChanURLMetarrArgs == nil {
+			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 		}
 	}
-
 	return urlModels, nil
+}
+
+// inheritChannelSettings fills a channel URL's unset settings from its channel's: a copy of them all if it has none of
+// its own, else field by field. Pausing is per URL, so never inherited.
+func inheritChannelSettings(cu *models.ChannelURL, c *models.Channel) {
+	switch {
+	case cu.ChanURLSettings != nil:
+		mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+	case c.ChanSettings != nil:
+		s := *c.ChanSettings
+		s.Paused = false
+		cu.ChanURLSettings = &s
+	}
+	switch {
+	case cu.ChanURLMetarrArgs != nil:
+		mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
+	case c.ChanMetarrArgs != nil:
+		m := *c.ChanMetarrArgs
+		cu.ChanURLMetarrArgs = &m
+	}
 }
 
 // GetChannelURLModel fetches a single ChannelURL model by channel ID and URL.
 func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, mergeWithParent bool) (chanURL *models.ChannelURL, hasRows bool, err error) {
-	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
-			"FROM %s "+
-			"WHERE %s = ? AND %s = ?",
-		consts.QChanURLID,
-		consts.QChanURLURL,
-		consts.QChanURLUsername,
-		consts.QChanURLPassword,
-		consts.QChanURLLoginURL,
-		consts.QChanURLIsManual,
-		consts.QChanURLSettings,
-		consts.QChanURLMetarr,
-		consts.QChanURLLastScan,
-		consts.QChanURLCreatedAt,
-		consts.QChanURLUpdatedAt,
-		consts.DBChannelURLs,
-		consts.QChanURLChannelID,
-		consts.QChanURLURL,
-	)
-
-	cu := &models.ChannelURL{}
-	var (
-		username, password, loginURL sql.NullString
-		settingsJSON, metarrJSON     []byte
-	)
-
-	if err := cs.q.QueryRow(query, channelID, urlStr).Scan(
-		&cu.ID,
-		&cu.URL,
-		&username,
-		&password,
-		&loginURL,
-		&cu.IsManual,
-		&settingsJSON,
-		&metarrJSON,
-		&cu.LastScan,
-		&cu.CreatedAt,
-		&cu.UpdatedAt,
-	); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, false, nil // Not found, return nil without error
-		}
-		return nil, true, fmt.Errorf("failed to query channel URL: %w", err)
+	c, found, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10), mergeWithParent)
+	if err != nil || !found {
+		return nil, found, err
 	}
-
-	// Fill credentials
-	cu.Username = nullString(username)
-	cu.EncryptedPassword = nullString(password)
-	cu.LoginURL = nullString(loginURL)
-
-	if cu.Password == "" && cu.EncryptedPassword != "" {
-		if cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword); err != nil {
-			logger.Pl.W("Failed to decrypt password for channel URL %q: %v", cu.URL, err)
+	for _, cu := range c.URLModels {
+		if cu.URL == urlStr {
+			return cu, true, nil
 		}
 	}
-
-	// Unmarshal settings
-	if len(settingsJSON) > 0 {
-		if err := json.Unmarshal(settingsJSON, &cu.ChanURLSettings); err != nil {
-			return nil, true, fmt.Errorf("failed to unmarshal channel URL settings: %w", err)
-		}
-	}
-
-	// Unmarshal metarr args
-	if len(metarrJSON) > 0 {
-		if err := json.Unmarshal(metarrJSON, &cu.ChanURLMetarrArgs); err != nil {
-			return nil, true, fmt.Errorf("failed to unmarshal channel URL metarr args: %w", err)
-		}
-	}
-
-	// Apply fallback logic for empty settings
-	if mergeWithParent {
-		c, hasRows, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10), mergeWithParent)
-		if err != nil {
-			return nil, true, err
-		}
-		if !hasRows {
-			logger.Pl.D(2, "Channel with ID %d not found in database", channelID)
-		}
-
-		// Handle Settings
-		if cu.ChanURLSettings == nil {
-			// Struct-level inheritance: use a copy of the channel settings, as GetChannelURLModels does
-			if c != nil && c.ChanSettings != nil {
-				settingsCopy := *c.ChanSettings
-				settingsCopy.Paused = false // Pausing is per URL.
-				cu.ChanURLSettings = &settingsCopy
-			} else {
-				cu.ChanURLSettings = &models.Settings{}
-			}
-		} else {
-			// Field-level inheritance: merge empty fields from channel
-			if c != nil && c.ChanSettings != nil {
-				if changed := mergeSettings(cu.ChanURLSettings, c.ChanSettings); changed {
-					logger.Pl.D(3, "Set empty channel URL (%q) settings from parent channel %q", cu.URL, c.Name)
-				}
-			}
-		}
-
-		// Handle MetarrArgs
-		if cu.ChanURLMetarrArgs == nil {
-			// Struct-level inheritance: use a copy of the channel metarr args
-			if c != nil && c.ChanMetarrArgs != nil {
-				metarrCopy := *c.ChanMetarrArgs
-				cu.ChanURLMetarrArgs = &metarrCopy
-			} else {
-				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-			}
-		} else {
-			// Field-level inheritance: merge empty fields from channel
-			if c != nil && c.ChanMetarrArgs != nil {
-				mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
-			}
-		}
-	}
-
-	// Initialize nil to empty
-	if cu.ChanURLMetarrArgs == nil {
-		cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-	}
-	if cu.ChanURLSettings == nil {
-		cu.ChanURLSettings = &models.Settings{}
-	}
-
-	return cu, true, nil
+	return nil, false, nil
 }
 
 // DeleteChannelURL deletes a channel URL from the database.
@@ -525,8 +395,8 @@ func (cs *ChannelStore) DeleteChannelURLAuth(cu *models.ChannelURL) error {
 
 // channelURLExists returns true if the channel URL exists in the database.
 func (cs *ChannelStore) channelURLExists(key, val string) bool {
-	if _, ok := consts.ValidChannelURLKeys[key]; !ok {
-		logger.Pl.E("key %q is not valid for table. Valid keys: %v", key, consts.ValidChannelURLKeys)
+	if err := validKey(key, consts.ValidChannelURLKeys); err != nil {
+		logger.Pl.E("%v", err)
 		return false
 	}
 
@@ -545,215 +415,78 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 	return count > 0
 }
 
-// mergeSettings merges channel settings into URL settings, only updating empty fields.
-//
-// Returns true if any changes were made.
-func mergeSettings(urlSettings, channelSettings *models.Settings) (changed bool) {
-	if urlSettings == nil {
-		logger.Pl.E("Dev Error: mergeSettings called with nil urlSettings - this should never happen")
-		return false
+// mergeSettings fills a channel URL's unset settings from the channel's. Pausing is per URL, so never inherited.
+func mergeSettings(u, ch *models.Settings) {
+	if ch == nil {
+		return
 	}
-	if channelSettings == nil {
-		return false
-	}
-
-	var c bool
-	// Configuration fields
-	urlSettings.Concurrency, c = mergeNumSettings(urlSettings.Concurrency, channelSettings.Concurrency, 0)
-	changed = changed || c
-
-	// Download-related operations
-	urlSettings.CookiesFromBrowser, c = mergeStringSettings(urlSettings.CookiesFromBrowser, channelSettings.CookiesFromBrowser)
-	changed = changed || c
-
-	urlSettings.CrawlFreq, c = mergeNumSettings(urlSettings.CrawlFreq, channelSettings.CrawlFreq, 0) // A blank field saves as 0.
-	changed = changed || c
-
-	urlSettings.ExternalDownloader, c = mergeStringSettings(urlSettings.ExternalDownloader, channelSettings.ExternalDownloader)
-	changed = changed || c
-
-	urlSettings.ExternalDownloaderArgs, c = mergeStringSettings(urlSettings.ExternalDownloaderArgs, channelSettings.ExternalDownloaderArgs)
-	changed = changed || c
-
-	urlSettings.MaxFilesize, c = mergeStringSettings(urlSettings.MaxFilesize, channelSettings.MaxFilesize)
-	changed = changed || c
-
-	urlSettings.Retries, c = mergeNumSettings(urlSettings.Retries, channelSettings.Retries, 0)
-	changed = changed || c
-
-	urlSettings.YtdlpOutputExt, c = mergeStringSettings(urlSettings.YtdlpOutputExt, channelSettings.YtdlpOutputExt)
-	changed = changed || c
-
-	urlSettings.YTDLPPreferredVideoCodecs, c = mergeSliceSettings(urlSettings.YTDLPPreferredVideoCodecs, channelSettings.YTDLPPreferredVideoCodecs)
-	changed = changed || c
-
-	urlSettings.YTDLPPreferredAudioCodecs, c = mergeSliceSettings(urlSettings.YTDLPPreferredAudioCodecs, channelSettings.YTDLPPreferredAudioCodecs)
-	changed = changed || c
-
-	// Custom args
-	urlSettings.ExtraYTDLPVideoArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPVideoArgs, channelSettings.ExtraYTDLPVideoArgs)
-	changed = changed || c
-
-	urlSettings.ExtraYTDLPMetaArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPMetaArgs, channelSettings.ExtraYTDLPMetaArgs)
-	changed = changed || c
-
-	urlSettings.ExtraYTDLPCrawlArgs, c = mergeStringSettings(urlSettings.ExtraYTDLPCrawlArgs, channelSettings.ExtraYTDLPCrawlArgs)
-	changed = changed || c
-
-	// Metadata operations
-	urlSettings.Filters, c = mergeSliceSettings(urlSettings.Filters, channelSettings.Filters)
-	changed = changed || c
-
-	urlSettings.FilterFile, c = mergeStringSettings(urlSettings.FilterFile, channelSettings.FilterFile)
-	changed = changed || c
-
-	urlSettings.MetaFilterMoveOps, c = mergeSliceSettings(urlSettings.MetaFilterMoveOps, channelSettings.MetaFilterMoveOps)
-	changed = changed || c
-
-	urlSettings.MetaFilterMoveOpFile, c = mergeStringSettings(urlSettings.MetaFilterMoveOpFile, channelSettings.MetaFilterMoveOpFile)
-	changed = changed || c
-
-	urlSettings.FromDate, c = mergeStringSettings(urlSettings.FromDate, channelSettings.FromDate)
-	changed = changed || c
-
-	urlSettings.ToDate, c = mergeStringSettings(urlSettings.ToDate, channelSettings.ToDate)
-	changed = changed || c
-
-	// JSON and video directories
-	urlSettings.JSONDir, c = mergeStringSettings(urlSettings.JSONDir, channelSettings.JSONDir)
-	changed = changed || c
-
-	urlSettings.VideoDir, c = mergeStringSettings(urlSettings.VideoDir, channelSettings.VideoDir)
-	changed = changed || c
-
-	// Boolean pointer settings (nil will inherit from parent)
-	urlSettings.UseGlobalCookies, c = mergePtrBoolSettings(urlSettings.UseGlobalCookies, channelSettings.UseGlobalCookies)
-	changed = changed || c
-
-	urlSettings.AutoDownload, c = mergePtrBoolSettings(urlSettings.AutoDownload, channelSettings.AutoDownload)
-	changed = changed || c
-
-	// Note: Paused is per-URL, not cascaded
-	return changed
+	u.Concurrency = cmp.Or(u.Concurrency, ch.Concurrency)
+	u.CookiesFromBrowser = cmp.Or(u.CookiesFromBrowser, ch.CookiesFromBrowser)
+	u.CrawlFreq = cmp.Or(u.CrawlFreq, ch.CrawlFreq) // A blank field saves as 0.
+	u.ExternalDownloader = cmp.Or(u.ExternalDownloader, ch.ExternalDownloader)
+	u.ExternalDownloaderArgs = cmp.Or(u.ExternalDownloaderArgs, ch.ExternalDownloaderArgs)
+	u.MaxFilesize = cmp.Or(u.MaxFilesize, ch.MaxFilesize)
+	u.Retries = cmp.Or(u.Retries, ch.Retries)
+	u.UseGlobalCookies = inheritBool(u.UseGlobalCookies, ch.UseGlobalCookies)
+	u.YtdlpOutputExt = cmp.Or(u.YtdlpOutputExt, ch.YtdlpOutputExt)
+	u.YTDLPPreferredVideoCodecs = inheritSlice(u.YTDLPPreferredVideoCodecs, ch.YTDLPPreferredVideoCodecs)
+	u.YTDLPPreferredAudioCodecs = inheritSlice(u.YTDLPPreferredAudioCodecs, ch.YTDLPPreferredAudioCodecs)
+	u.ExtraYTDLPVideoArgs = cmp.Or(u.ExtraYTDLPVideoArgs, ch.ExtraYTDLPVideoArgs)
+	u.ExtraYTDLPMetaArgs = cmp.Or(u.ExtraYTDLPMetaArgs, ch.ExtraYTDLPMetaArgs)
+	u.ExtraYTDLPCrawlArgs = cmp.Or(u.ExtraYTDLPCrawlArgs, ch.ExtraYTDLPCrawlArgs)
+	u.Filters = inheritSlice(u.Filters, ch.Filters)
+	u.FilterFile = cmp.Or(u.FilterFile, ch.FilterFile)
+	u.MetaFilterMoveOps = inheritSlice(u.MetaFilterMoveOps, ch.MetaFilterMoveOps)
+	u.MetaFilterMoveOpFile = cmp.Or(u.MetaFilterMoveOpFile, ch.MetaFilterMoveOpFile)
+	u.FromDate = cmp.Or(u.FromDate, ch.FromDate)
+	u.ToDate = cmp.Or(u.ToDate, ch.ToDate)
+	u.JSONDir = cmp.Or(u.JSONDir, ch.JSONDir)
+	u.VideoDir = cmp.Or(u.VideoDir, ch.VideoDir)
+	u.AutoDownload = inheritBool(u.AutoDownload, ch.AutoDownload)
 }
 
-// mergeMetarrArgs merges channel metarr args into URL metarr args, only updating empty fields.
-//
-// Returns true if any changes were made.
-func mergeMetarrArgs(urlMetarr, channelMetarr *models.MetarrArgs) (changed bool) {
-	if urlMetarr == nil {
-		logger.Pl.E("Dev Error: mergeMetarrArgs called with nil urlMetarr - this should never happen")
-		return false
+// mergeMetarrArgs fills a channel URL's unset Metarr args from the channel's.
+func mergeMetarrArgs(u, ch *models.MetarrArgs) {
+	if ch == nil {
+		return
 	}
-	if channelMetarr == nil {
-		return false
-	}
-
-	var c bool
-	// Metarr file operations
-	urlMetarr.OutputExt, c = mergeStringSettings(urlMetarr.OutputExt, channelMetarr.OutputExt)
-	changed = changed || c
-
-	urlMetarr.RenameStyle, c = mergeStringSettings(urlMetarr.RenameStyle, channelMetarr.RenameStyle)
-	changed = changed || c
-
-	urlMetarr.FilenameOps, c = mergeSliceSettings(urlMetarr.FilenameOps, channelMetarr.FilenameOps)
-	changed = changed || c
-
-	urlMetarr.FilenameOpsFile, c = mergeStringSettings(urlMetarr.FilenameOpsFile, channelMetarr.FilenameOpsFile)
-	changed = changed || c
-
-	urlMetarr.FilteredFilenameOps, c = mergeSliceSettings(urlMetarr.FilteredFilenameOps, channelMetarr.FilteredFilenameOps)
-	changed = changed || c
-
-	urlMetarr.FilteredFilenameOpsFile, c = mergeStringSettings(urlMetarr.FilteredFilenameOpsFile, channelMetarr.FilteredFilenameOpsFile)
-	changed = changed || c
-
-	// Metarr metadata operations
-	urlMetarr.MetaOps, c = mergeSliceSettings(urlMetarr.MetaOps, channelMetarr.MetaOps)
-	changed = changed || c
-
-	urlMetarr.MetaOpsFile, c = mergeStringSettings(urlMetarr.MetaOpsFile, channelMetarr.MetaOpsFile)
-	changed = changed || c
-
-	urlMetarr.FilteredMetaOps, c = mergeSliceSettings(urlMetarr.FilteredMetaOps, channelMetarr.FilteredMetaOps)
-	changed = changed || c
-
-	urlMetarr.FilteredMetaOpsFile, c = mergeStringSettings(urlMetarr.FilteredMetaOpsFile, channelMetarr.FilteredMetaOpsFile)
-	changed = changed || c
-
-	urlMetarr.OutputDir, c = mergeStringSettings(urlMetarr.OutputDir, channelMetarr.OutputDir)
-	changed = changed || c
-
-	urlMetarr.MetaPurge, c = mergeStringSettings(urlMetarr.MetaPurge, channelMetarr.MetaPurge)
-	changed = changed || c
-
-	// Program operations
-	urlMetarr.Concurrency, c = mergeNumSettings(urlMetarr.Concurrency, channelMetarr.Concurrency, 0)
-	changed = changed || c
-
-	urlMetarr.MaxCPU, c = mergeNumSettings(urlMetarr.MaxCPU, channelMetarr.MaxCPU, 0)
-	changed = changed || c
-
-	urlMetarr.MinFreeMem, c = mergeStringSettings(urlMetarr.MinFreeMem, channelMetarr.MinFreeMem)
-	changed = changed || c
-
-	// Transcoding
-	urlMetarr.TranscodeGPU, c = mergeStringSettings(urlMetarr.TranscodeGPU, channelMetarr.TranscodeGPU)
-	changed = changed || c
-
-	urlMetarr.TranscodeGPUNode, c = mergeStringSettings(urlMetarr.TranscodeGPUNode, channelMetarr.TranscodeGPUNode)
-	changed = changed || c
-
-	urlMetarr.TranscodeVideoFilter, c = mergeStringSettings(urlMetarr.TranscodeVideoFilter, channelMetarr.TranscodeVideoFilter)
-	changed = changed || c
-
-	urlMetarr.TranscodeVideoCodecs, c = mergeSliceSettings(urlMetarr.TranscodeVideoCodecs, channelMetarr.TranscodeVideoCodecs)
-	changed = changed || c
-
-	urlMetarr.TranscodeAudioCodecs, c = mergeSliceSettings(urlMetarr.TranscodeAudioCodecs, channelMetarr.TranscodeAudioCodecs)
-	changed = changed || c
-
-	urlMetarr.TranscodeQuality, c = mergeStringSettings(urlMetarr.TranscodeQuality, channelMetarr.TranscodeQuality)
-	changed = changed || c
-
-	urlMetarr.ExtraFFmpegArgs, c = mergeStringSettings(urlMetarr.ExtraFFmpegArgs, channelMetarr.ExtraFFmpegArgs)
-	changed = changed || c
-
-	return changed
+	u.OutputExt = cmp.Or(u.OutputExt, ch.OutputExt)
+	u.FilenameOps = inheritSlice(u.FilenameOps, ch.FilenameOps)
+	u.FilenameOpsFile = cmp.Or(u.FilenameOpsFile, ch.FilenameOpsFile)
+	u.FilteredFilenameOps = inheritSlice(u.FilteredFilenameOps, ch.FilteredFilenameOps)
+	u.FilteredFilenameOpsFile = cmp.Or(u.FilteredFilenameOpsFile, ch.FilteredFilenameOpsFile)
+	u.RenameStyle = cmp.Or(u.RenameStyle, ch.RenameStyle)
+	u.MetaOps = inheritSlice(u.MetaOps, ch.MetaOps)
+	u.MetaOpsFile = cmp.Or(u.MetaOpsFile, ch.MetaOpsFile)
+	u.FilteredMetaOps = inheritSlice(u.FilteredMetaOps, ch.FilteredMetaOps)
+	u.FilteredMetaOpsFile = cmp.Or(u.FilteredMetaOpsFile, ch.FilteredMetaOpsFile)
+	u.OutputDir = cmp.Or(u.OutputDir, ch.OutputDir)
+	u.MetaPurge = cmp.Or(u.MetaPurge, ch.MetaPurge)
+	u.Concurrency = cmp.Or(u.Concurrency, ch.Concurrency)
+	u.MaxCPU = cmp.Or(u.MaxCPU, ch.MaxCPU)
+	u.MinFreeMem = cmp.Or(u.MinFreeMem, ch.MinFreeMem)
+	u.TranscodeGPU = cmp.Or(u.TranscodeGPU, ch.TranscodeGPU)
+	u.TranscodeGPUNode = cmp.Or(u.TranscodeGPUNode, ch.TranscodeGPUNode)
+	u.TranscodeVideoFilter = cmp.Or(u.TranscodeVideoFilter, ch.TranscodeVideoFilter)
+	u.TranscodeVideoCodecs = inheritSlice(u.TranscodeVideoCodecs, ch.TranscodeVideoCodecs)
+	u.TranscodeAudioCodecs = inheritSlice(u.TranscodeAudioCodecs, ch.TranscodeAudioCodecs)
+	u.TranscodeQuality = cmp.Or(u.TranscodeQuality, ch.TranscodeQuality)
+	u.ExtraFFmpegArgs = cmp.Or(u.ExtraFFmpegArgs, ch.ExtraFFmpegArgs)
 }
 
-// mergeStringSettings checks and cascades strings to the URL model if empty.
-func mergeStringSettings(urlStr, chanStr string) (newURLStr string, changed bool) {
-	if urlStr == "" && chanStr != "" {
-		return chanStr, true
+// inheritSlice returns s, or a copy of parent if s is empty.
+func inheritSlice[T any](s, parent []T) []T {
+	if len(s) == 0 && len(parent) > 0 {
+		return slices.Clone(parent)
 	}
-	return urlStr, false
+	return s
 }
 
-// mergeSliceSettings checks and cascades slices to the URL model if empty.
-func mergeSliceSettings[T any](urlSlice, chanSlice []T) ([]T, bool) {
-	if len(urlSlice) == 0 && len(chanSlice) > 0 {
-		newSlice := make([]T, len(chanSlice))
-		copy(newSlice, chanSlice)
-		return newSlice, true
+// inheritBool returns b, or a copy of parent if b is unset.
+func inheritBool(b, parent *bool) *bool {
+	if b == nil && parent != nil {
+		v := *parent
+		return &v
 	}
-	return urlSlice, false
-}
-
-// mergeNumSettings checks and cascades numbers to the URL model if empty.
-func mergeNumSettings[T constraints.Integer | constraints.Float](urlNum, chanNum, defaultNum T) (T, bool) {
-	if urlNum == defaultNum && chanNum != defaultNum {
-		return chanNum, true
-	}
-	return urlNum, false
-}
-
-// mergePtrBoolSettings checks and cascades *bool pointers to the URL model if nil.
-func mergePtrBoolSettings(urlBool, chanBool *bool) (*bool, bool) {
-	if urlBool == nil && chanBool != nil {
-		val := *chanBool
-		return &val, true
-	}
-	return urlBool, false
+	return b
 }

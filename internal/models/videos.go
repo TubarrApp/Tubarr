@@ -42,17 +42,13 @@ type Video struct {
 	Overrides           *VideoOverrides       `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's settings.
 }
 
-// VideoOverrides holds a video's directories and Metarr ops chosen with Download As, used instead of its channel URL's
+// VideoOverrides holds a video's directories and Metarr args chosen with Download As, used instead of its channel URL's
 // (and global) ones.
 type VideoOverrides struct {
-	Filename            string                `json:"filename,omitempty"`
-	VideoDir            string                `json:"video_dir,omitempty"`  // Blank uses the channel URL's.
-	JSONDir             string                `json:"json_dir,omitempty"`   // Blank uses the channel URL's.
-	OutputDir           string                `json:"output_dir,omitempty"` // Metarr's. Blank uses the usual output directory.
-	MetaOps             []MetaOps             `json:"meta_ops"`
-	FilteredMetaOps     []FilteredMetaOps     `json:"filtered_meta_ops"`
-	FilenameOps         []FilenameOps         `json:"filename_ops"`
-	FilteredFilenameOps []FilteredFilenameOps `json:"filtered_filename_ops"`
+	Filename   string `json:"filename,omitempty"`
+	VideoDir   string `json:"video_dir,omitempty"` // Blank uses the channel URL's.
+	JSONDir    string `json:"json_dir,omitempty"`  // Blank uses the channel URL's.
+	MetarrArgs        // Ops replace the channel URL's. Other blank fields use the channel URL's.
 }
 
 // OverrideLines holds a video's overrides as edited in the Download As dialog, with ops newline-separated.

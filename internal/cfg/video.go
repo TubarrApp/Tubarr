@@ -42,18 +42,11 @@ func deleteCmdVideo(cs contracts.ChannelStore) *cobra.Command {
 		Short: "Delete video entry",
 		Long:  fmt.Sprintf("Deletes video entries from a channel by URL, so later crawls treat them as new. Their video and metadata files are kept unless --%s is given.", keys.DeleteFiles),
 		RunE: func(_ *cobra.Command, _ []string) error {
-			// Get channel key and value.
-			key, val, err := getChanKeyVal(chanID, chanName)
-			if err != nil {
-				return errors.New("must enter a channel name/URL, and a video URL to delete")
-			}
-
 			if len(urls) == 0 {
 				return errors.New("must enter a video URL to delete")
 			}
 
-			// Get channel ID.
-			cID, err := cs.GetChannelID(key, val)
+			cID, _, _, err := lookupChannelID(cs, chanID, chanName)
 			if err != nil {
 				return err
 			}

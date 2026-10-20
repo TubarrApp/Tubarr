@@ -1,18 +1,11 @@
 package models
 
-// ChannelInputPtrs contains pointers to variables used for adding channels.
-type ChannelInputPtrs struct {
+// ChannelInput is a channel as given in a config file or flags, its viper tags naming each key. A nil field wasn't given.
+type ChannelInput struct {
 	// Channel identifiers.
 	Name              *string   `viper:"channel-name"`
 	URLs              *[]string `viper:"channel-urls"`
 	ChannelConfigFile *string   `viper:"channel-config-file"`
-
-	// Directory paths.
-	VideoDir *string `viper:"video-directory"`
-	JSONDir  *string `viper:"json-directory"`
-
-	// Configuration files.
-	DLFilterFile *string `viper:"filter-ops-file"`
 
 	// Authentication details.
 	Username    *string   `viper:"auth-username"`
@@ -22,6 +15,23 @@ type ChannelInputPtrs struct {
 
 	// Notification details.
 	Notification *[]string `viper:"notify"`
+
+	// Run an ignore crawl once added.
+	IgnoreRun *bool `viper:"ignore-run"`
+
+	// Per-URL settings overrides (no viper tag - handled manually).
+	URLSettings map[string]*URLSettingsOverride
+
+	// The channel's own settings.
+	SettingsInput
+	MetarrArgsInput
+}
+
+// SettingsInput is Settings as given, its viper tags naming each key. A nil field wasn't given.
+type SettingsInput struct {
+	// Directory paths.
+	VideoDir *string `viper:"video-directory"`
+	JSONDir  *string `viper:"json-directory"`
 
 	// Download settings.
 	CookiesFromBrowser        *string   `viper:"cookies-from-browser"`
@@ -36,9 +46,11 @@ type ChannelInputPtrs struct {
 	UseGlobalCookies          *bool     `viper:"use-global-cookies"`
 	AutoDownload              *bool     `viper:"auto-download"`
 
-	// Filter and operation settings.
-	DLFilters *[]string `viper:"filter-ops"`
-	MoveOps   *[]string `viper:"move-ops"`
+	// Filter and move operations, and their files.
+	DLFilters    *[]string `viper:"filter-ops"`
+	DLFilterFile *string   `viper:"filter-ops-file"`
+	MoveOps      *[]string `viper:"move-ops"`
+	MoveOpFile   *string   `viper:"move-ops-file"`
 
 	// Extra arguments.
 	ExtraYTDLPVideoArgs *string `viper:"extra-ytdlp-video-args"`
@@ -47,17 +59,15 @@ type ChannelInputPtrs struct {
 
 	// Concurrency and performance settings.
 	CrawlFreq   *int `viper:"crawl-freq"`
-	Concurrency *int `viper:"download-concurrency,concurrency-limit,concurrency"` // Then deprecated aliases.
+	Concurrency *int `viper:"download-concurrency"`
 	Retries     *int `viper:"dl-retries"`
 
-	// Boolean flags.
-	Pause     *bool `viper:"pause"`
-	IgnoreRun *bool `viper:"ignore-run"`
+	// Pause toggle.
+	Pause *bool `viper:"pause-toggle"`
+}
 
-	// Per-URL settings overrides (no viper tag - handled manually).
-	URLSettings map[string]*URLSettingsOverride
-
-	// -- METARR --
+// MetarrArgsInput is MetarrArgs as given, its viper tags naming each key. A nil field wasn't given.
+type MetarrArgsInput struct {
 	// Output settings.
 	OutDir      *string `viper:"metarr-output-directory"`
 	MetaPurge   *string `viper:"metarr-purge-metafile"`
@@ -65,14 +75,13 @@ type ChannelInputPtrs struct {
 	RenameStyle *string `viper:"metarr-rename-style"`
 
 	// Op files.
-	MoveOpFile              *string   `viper:"move-ops-file"`
-	MetaOpsFile             *string   `viper:"metarr-meta-ops-file"`
-	FilteredMetaOpsFile     *string   `viper:"metarr-filtered-meta-ops-file"`
-	FilenameOpsFile         *string   `viper:"metarr-filename-ops-file"`
-	FilteredFilenameOpsFile *string   `viper:"metarr-filtered-filename-ops-file"`
-	MetaOps                 *[]string `viper:"metarr-meta-ops"`
+	MetaOpsFile             *string `viper:"metarr-meta-ops-file"`
+	FilteredMetaOpsFile     *string `viper:"metarr-filtered-meta-ops-file"`
+	FilenameOpsFile         *string `viper:"metarr-filename-ops-file"`
+	FilteredFilenameOpsFile *string `viper:"metarr-filtered-filename-ops-file"`
 
 	// Ops.
+	MetaOps             *[]string `viper:"metarr-meta-ops"`
 	FilenameOps         *[]string `viper:"metarr-filename-ops"`
 	FilteredMetaOps     *[]string `viper:"metarr-filtered-meta-ops"`
 	FilteredFilenameOps *[]string `viper:"metarr-filtered-filename-ops"`
@@ -96,6 +105,6 @@ type ChannelInputPtrs struct {
 
 // URLSettingsOverride contains per-URL setting overrides.
 type URLSettingsOverride struct {
-	Settings *ChannelInputPtrs
-	Metarr   *ChannelInputPtrs
+	Settings *SettingsInput
+	Metarr   *MetarrArgsInput
 }

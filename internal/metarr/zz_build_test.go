@@ -45,6 +45,49 @@ func TestMakeMetarrCommandPurge(t *testing.T) {
 	}
 }
 
+// TestMakeMetarrCommandOverrideArgs tests a video's Download As Metarr args replace its channel URL's, and blank ones
+// use the channel URL's.
+func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{
+		OutputExt: "mp4", RenameStyle: "spaces", TranscodeQuality: "23", TranscodeVideoCodecs: []string{"h264:hevc"}, MaxCPU: 50,
+	}}
+	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	values := func(key string) []string {
+		t.Helper()
+		args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags))
+		var got []string
+		for i := 0; i+1 < len(args); i++ {
+			if args[i] == key {
+				got = append(got, args[i+1])
+			}
+		}
+		return got
+	}
+
+	for _, tc := range []struct {
+		key        string
+		plain, own []string
+	}{
+		{metkeys.Ext, []string{"mp4"}, []string{"mkv"}},
+		{metkeys.TranscodeVideoCodecs, []string{"h264:hevc"}, []string{"av1"}},
+		{metkeys.MaxCPU, []string{"50.00"}, []string{"80.00"}},
+		{metkeys.RenameStyle, []string{"spaces"}, []string{"spaces"}},
+		{metkeys.TranscodeQuality, []string{"23"}, []string{"23"}},
+	} {
+		v.Overrides = nil
+		if got := values(tc.key); !slices.Equal(got, tc.plain) {
+			t.Errorf("%s without overrides: got %q, want %q", tc.key, got, tc.plain)
+		}
+		v.Overrides = &models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputExt: "mkv", TranscodeVideoCodecs: []string{"av1"}, MaxCPU: 80}}
+		if got := values(tc.key); !slices.Equal(got, tc.own) {
+			t.Errorf("%s with overrides: got %q, want %q", tc.key, got, tc.own)
+		}
+	}
+}
+
 // TestWithDefaultFilenameSet tests finished videos are renamed to their full title unless an op that applies sets the
 // name, and that channels without ops of their own still get the global ones.
 func TestWithDefaultFilenameSet(t *testing.T) {

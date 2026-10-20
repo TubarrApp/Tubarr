@@ -40,7 +40,7 @@ func (c *Channel) URLCrawlFreq(cu *ChannelURL) int {
 func (c *Channel) DueURLs(now time.Time, extra time.Duration, scheduled bool) (due []*ChannelURL, next time.Duration) {
 	next = -1
 	for _, cu := range c.URLModels {
-		if cu.IsManual || (cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused) {
+		if cu.IsManual || cu.Paused() {
 			continue
 		}
 		freq := c.URLCrawlFreq(cu)
@@ -78,4 +78,14 @@ func (c *Channel) GetURLs() []string {
 		}
 	}
 	return urls
+}
+
+// URLByID returns the channel's URL model with the given ID, or nil.
+func (c *Channel) URLByID(id int64) *ChannelURL {
+	for _, cu := range c.URLModels {
+		if cu.ID == id {
+			return cu
+		}
+	}
+	return nil
 }

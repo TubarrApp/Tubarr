@@ -38,6 +38,21 @@ func CheckDirectory(dir string, templateMap map[string]struct{}) error {
 	return err
 }
 
+// CheckFile validates a file path like sharedvalidation.ValidateFile, but without requiring it to exist (whether it
+// does is checked when a save adds or changes it). A blank path is unset.
+func CheckFile(path string, templateMap map[string]struct{}) error {
+	if path == "" {
+		return nil
+	}
+	hasTemplating, _, err := sharedvalidation.ValidateFile(path, false, templateMap)
+	if err != nil && !hasTemplating {
+		if _, statErr := os.Stat(filepath.Clean(path)); errors.Is(statErr, os.ErrNotExist) {
+			return nil
+		}
+	}
+	return err
+}
+
 // CheckDestination returns an error if a download destination isn't available (e.g. its drive isn't mounted).
 //
 // A plain path must exist. For a templated path, which can't exist until its tags are filled in, the directory holding
@@ -60,13 +75,15 @@ func CheckDestination(dir string) error {
 	return nil
 }
 
+// IsHTTPURL reports whether s is an absolute http or https URL with a host.
+func IsHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
+}
+
 // ValidateChannelURL checks a channel URL is an absolute http(s) URL, so it can't be read as a yt-dlp option or local file.
 func ValidateChannelURL(u string) error {
-	parsed, err := url.Parse(u)
-	if err != nil {
-		return fmt.Errorf("invalid channel URL %q: %w", u, err)
-	}
-	if (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+	if !IsHTTPURL(u) {
 		return fmt.Errorf("invalid channel URL %q: must be a full http:// or https:// URL", u)
 	}
 	return nil

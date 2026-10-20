@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/sharedtemplates"
@@ -10,8 +11,9 @@ import (
 
 // ValidateSettingsModel validates correct Settings values.
 //
-// Ensures all settings are valid before storage/after retrieval. checkPaths checks files and directories, done when
-// saving: loading skips it, so one unavailable path (e.g. a deleted filter file) can't stop every channel loading.
+// Ensures all settings are valid before storage/after retrieval. checkPaths checks every file and directory, done when
+// adding a channel: updates check only those they add or change, and loading none, so one unavailable path (e.g. a
+// deleted filter file) can't stop a channel saving or loading.
 func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	var err error
 
@@ -80,6 +82,7 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	}
 
 	if s.YtdlpOutputExt != "" {
+		s.YtdlpOutputExt = strings.ToLower(s.YtdlpOutputExt)
 		if err = ValidateYtdlpOutputExtension(s.YtdlpOutputExt); err != nil {
 			return fmt.Errorf("invalid YT-DLP extension %q in settings: %w", s.YtdlpOutputExt, err)
 		}
@@ -164,6 +167,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 
 	// File output
 	if m.OutputExt != "" {
+		m.OutputExt = strings.ToLower(m.OutputExt)
 		if _, err := sharedvalidation.ValidateFFmpegOutputExt(m.OutputExt); err != nil {
 			return fmt.Errorf("invalid output filetype in Metarr settings: %w", err)
 		}

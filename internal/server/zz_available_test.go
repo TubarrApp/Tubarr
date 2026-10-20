@@ -113,6 +113,24 @@ func TestAvailableVideosAPI(t *testing.T) {
 		t.Errorf("expected 404 for an unknown video, got %d", w.Code)
 	}
 
+	// Load fills a Download As box from an ops file.
+	opsFile := filepath.Join(t.TempDir(), "meta-ops.txt")
+	if err := os.WriteFile(opsFile, []byte("album:set:Pets\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loadOpsFile := func(query string) *httptest.ResponseRecorder {
+		return serve(http.MethodGet, fmt.Sprintf("/api/v1/channels/%d/override-ops/%d/file?%s", chanID, cuID, query), "", "")
+	}
+	if w := loadOpsFile("box=meta_ops&path=" + url.QueryEscape(opsFile)); w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `{"lines":["album:set:Pets"]}` {
+		t.Errorf("loading an ops file: %d %s", w.Code, w.Body.String())
+	}
+	if w := loadOpsFile("box=meta_ops"); w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 without a path, got %d", w.Code)
+	}
+	if w := loadOpsFile("box=meta_ops&path=" + url.QueryEscape(opsFile+".missing")); w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for a missing file, got %d", w.Code)
+	}
+
 	// Overrides are rejected when invalid, or not for downloading one video, leaving the videos available.
 	notADir := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(notADir, nil, 0o600); err != nil {
@@ -185,13 +203,16 @@ func TestAvailableVideosAPI(t *testing.T) {
 	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"meta_ops":"artist:bogus:x"}}`, pendingID)); code != http.StatusBadRequest {
 		t.Errorf("invalid op: got %d, want 400", code)
 	}
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{},"metarr":{"metarr_rename_style":"bogus"}}`, pendingID)); code != http.StatusBadRequest {
+		t.Errorf("invalid Metarr arg: got %d, want 400", code)
+	}
 	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"output_dir":%q}}`, videos[1].ID, out)); code != http.StatusConflict {
 		t.Errorf("video not waiting for Metarr: got %d, want 409", code)
 	}
-	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"output_dir":%q,"meta_ops":"album:set:Pets"}}`, pendingID, out)); code != http.StatusAccepted {
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"output_dir":%q,"meta_ops":"album:set:Pets"},"metarr":{"metarr_output_ext":"mkv"}}`, pendingID, out)); code != http.StatusAccepted {
 		t.Fatalf("edit & run: got %d, want 202", code)
 	}
-	if o, err := vs.GetVideoOverrides(pendingID); err != nil || o == nil || o.OutputDir != out || len(o.MetaOps) != 1 {
+	if o, err := vs.GetVideoOverrides(pendingID); err != nil || o == nil || o.OutputDir != out || len(o.MetaOps) != 1 || o.OutputExt != "mkv" {
 		t.Errorf("edit & run stored overrides %+v, %v", o, err)
 	}
 

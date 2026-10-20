@@ -5,6 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -88,4 +91,17 @@ func makeSettingsMetarrArgsCopy(settings *models.Settings, metarrArgs *models.Me
 	}
 
 	return settingsCopy, metarrArgsCopy
+}
+
+// placeholders returns n comma-separated SQL parameter placeholders, for an IN list.
+func placeholders(n int) string {
+	return strings.TrimSuffix(strings.Repeat("?,", n), ",")
+}
+
+// validKey returns an error if key isn't one of validKeys, the table's columns a query may name.
+func validKey(key string, validKeys map[string]struct{}) error {
+	if _, ok := validKeys[key]; !ok {
+		return fmt.Errorf("%q is not a valid column for the table (valid: %v)", key, slices.Sorted(maps.Keys(validKeys)))
+	}
+	return nil
 }

@@ -1,6 +1,10 @@
 package models
 
-import "github.com/TubarrApp/gocommon/sharedmodels"
+import (
+	"slices"
+
+	"github.com/TubarrApp/gocommon/sharedmodels"
+)
 
 // DomainLimit holds a domain's concurrent download and crawl limits (0 = unlimited).
 type DomainLimit struct {
@@ -119,357 +123,184 @@ type MetaOps = sharedmodels.MetaOps
 
 // ChildSettingsMatchParent checks if the child Settings are empty/mismatch the parent on each entry.
 func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
-	if (parent == nil && child != nil) || (parent != nil && child == nil) {
-		return false
+	if parent == nil || child == nil {
+		return parent == child
 	}
 
 	// Numeric comparisons
-	if child.Concurrency != 0 {
-		if parent.Concurrency != child.Concurrency {
-			return false
-		}
+	if child.Concurrency != 0 && child.Concurrency != parent.Concurrency {
+		return false
 	}
-	if child.CrawlFreq != 0 {
-		if parent.CrawlFreq != child.CrawlFreq {
-			return false
-		}
+	if child.CrawlFreq != 0 && child.CrawlFreq != parent.CrawlFreq {
+		return false
 	}
-	if child.Retries != 0 {
-		if parent.Retries != child.Retries {
-			return false
-		}
+	if child.Retries != 0 && child.Retries != parent.Retries {
+		return false
 	}
 
 	// String comparisons
-	if child.CookiesFromBrowser != "" {
-		if parent.CookiesFromBrowser != child.CookiesFromBrowser {
-			return false
-		}
+	if child.CookiesFromBrowser != "" && child.CookiesFromBrowser != parent.CookiesFromBrowser {
+		return false
 	}
-	if child.ExternalDownloader != "" {
-		if parent.ExternalDownloader != child.ExternalDownloader {
-			return false
-		}
+	if child.ExternalDownloader != "" && child.ExternalDownloader != parent.ExternalDownloader {
+		return false
 	}
-	if child.ExternalDownloaderArgs != "" {
-		if parent.ExternalDownloaderArgs != child.ExternalDownloaderArgs {
-			return false
-		}
+	if child.ExternalDownloaderArgs != "" && child.ExternalDownloaderArgs != parent.ExternalDownloaderArgs {
+		return false
 	}
-	if child.ExtraYTDLPMetaArgs != "" {
-		if parent.ExtraYTDLPMetaArgs != child.ExtraYTDLPMetaArgs {
-			return false
-		}
+	if child.ExtraYTDLPMetaArgs != "" && child.ExtraYTDLPMetaArgs != parent.ExtraYTDLPMetaArgs {
+		return false
 	}
-	if child.ExtraYTDLPVideoArgs != "" {
-		if parent.ExtraYTDLPVideoArgs != child.ExtraYTDLPVideoArgs {
-			return false
-		}
+	if child.ExtraYTDLPVideoArgs != "" && child.ExtraYTDLPVideoArgs != parent.ExtraYTDLPVideoArgs {
+		return false
 	}
-	if child.ExtraYTDLPCrawlArgs != "" {
-		if parent.ExtraYTDLPCrawlArgs != child.ExtraYTDLPCrawlArgs {
-			return false
-		}
+	if child.ExtraYTDLPCrawlArgs != "" && child.ExtraYTDLPCrawlArgs != parent.ExtraYTDLPCrawlArgs {
+		return false
 	}
-	if child.FilterFile != "" {
-		if parent.FilterFile != child.FilterFile {
-			return false
-		}
+	if child.FilterFile != "" && child.FilterFile != parent.FilterFile {
+		return false
 	}
-	if child.FromDate != "" {
-		if parent.FromDate != child.FromDate {
-			return false
-		}
+	if child.FromDate != "" && child.FromDate != parent.FromDate {
+		return false
 	}
-	if child.JSONDir != "" {
-		if parent.JSONDir != child.JSONDir {
-			return false
-		}
+	if child.JSONDir != "" && child.JSONDir != parent.JSONDir {
+		return false
 	}
-	if child.MaxFilesize != "" {
-		if parent.MaxFilesize != child.MaxFilesize {
-			return false
-		}
+	if child.MaxFilesize != "" && child.MaxFilesize != parent.MaxFilesize {
+		return false
 	}
-	if child.MetaFilterMoveOpFile != "" {
-		if parent.MetaFilterMoveOpFile != child.MetaFilterMoveOpFile {
-			return false
-		}
+	if child.MetaFilterMoveOpFile != "" && child.MetaFilterMoveOpFile != parent.MetaFilterMoveOpFile {
+		return false
 	}
-	if child.ToDate != "" {
-		if parent.ToDate != child.ToDate {
-			return false
-		}
+	if child.ToDate != "" && child.ToDate != parent.ToDate {
+		return false
 	}
-	if child.VideoDir != "" {
-		if parent.VideoDir != child.VideoDir {
-			return false
-		}
+	if child.VideoDir != "" && child.VideoDir != parent.VideoDir {
+		return false
 	}
-	if child.YtdlpOutputExt != "" {
-		if parent.YtdlpOutputExt != child.YtdlpOutputExt {
-			return false
-		}
+	if child.YtdlpOutputExt != "" && child.YtdlpOutputExt != parent.YtdlpOutputExt {
+		return false
 	}
 
 	// Boolean comparisons (pausing is per URL, never inherited).
 	if child.Paused {
 		return false
 	}
-	if child.UseGlobalCookies != nil {
-		if parent.UseGlobalCookies == nil || *parent.UseGlobalCookies != *child.UseGlobalCookies {
-			return false
-		}
+	if child.UseGlobalCookies != nil && (parent.UseGlobalCookies == nil || *parent.UseGlobalCookies != *child.UseGlobalCookies) {
+		return false
 	}
-	if child.AutoDownload != nil {
-		if parent.AutoDownload == nil || *parent.AutoDownload != *child.AutoDownload {
-			return false
-		}
+	if child.AutoDownload != nil && (parent.AutoDownload == nil || *parent.AutoDownload != *child.AutoDownload) {
+		return false
 	}
 
 	// Slice comparisons
-	if len(child.Filters) > 0 {
-		if len(parent.Filters) != len(child.Filters) {
-			return false
-		}
-		for _, parentf := range parent.Filters {
-			for _, childf := range child.Filters {
-				if parentf != childf {
-					return false
-				}
-			}
-		}
+	if len(child.Filters) > 0 && !slices.Equal(parent.Filters, child.Filters) {
+		return false
 	}
-
-	if len(child.MetaFilterMoveOps) > 0 {
-		if len(parent.MetaFilterMoveOps) != len(child.MetaFilterMoveOps) {
-			return false
-		}
-		for _, parentmo := range parent.MetaFilterMoveOps {
-			for _, childmo := range child.MetaFilterMoveOps {
-				if parentmo != childmo {
-					return false
-				}
-			}
-		}
+	if len(child.MetaFilterMoveOps) > 0 && !slices.Equal(parent.MetaFilterMoveOps, child.MetaFilterMoveOps) {
+		return false
 	}
-
-	// Codec preferences.
-	if len(child.YTDLPPreferredVideoCodecs) > 0 {
-		if len(parent.YTDLPPreferredVideoCodecs) != len(child.YTDLPPreferredVideoCodecs) {
-			return false
-		}
-		for i := range parent.YTDLPPreferredVideoCodecs {
-			if parent.YTDLPPreferredVideoCodecs[i] != child.YTDLPPreferredVideoCodecs[i] {
-				return false
-			}
-		}
+	if len(child.YTDLPPreferredVideoCodecs) > 0 && !slices.Equal(parent.YTDLPPreferredVideoCodecs, child.YTDLPPreferredVideoCodecs) {
+		return false
 	}
-
-	if len(child.YTDLPPreferredAudioCodecs) > 0 {
-		if len(parent.YTDLPPreferredAudioCodecs) != len(child.YTDLPPreferredAudioCodecs) {
-			return false
-		}
-		for i := range parent.YTDLPPreferredAudioCodecs {
-			if parent.YTDLPPreferredAudioCodecs[i] != child.YTDLPPreferredAudioCodecs[i] {
-				return false
-			}
-		}
+	if len(child.YTDLPPreferredAudioCodecs) > 0 && !slices.Equal(parent.YTDLPPreferredAudioCodecs, child.YTDLPPreferredAudioCodecs) {
+		return false
 	}
-
 	return true
 }
 
 // ChildMetarrArgsMatchParent checks if the child MetarrArgs are empty/mismatch the parent on each entry.
 func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
-	if (parent == nil && child != nil) || (parent != nil && child == nil) {
-		return false
+	if parent == nil || child == nil {
+		return parent == child
 	}
 
 	// String comparisons
-	if child.OutputExt != "" {
-		if parent.OutputExt != child.OutputExt {
-			return false
-		}
+	if child.OutputExt != "" && child.OutputExt != parent.OutputExt {
+		return false
 	}
-	if child.FilenameOpsFile != "" {
-		if parent.FilenameOpsFile != child.FilenameOpsFile {
-			return false
-		}
+	if child.FilenameOpsFile != "" && child.FilenameOpsFile != parent.FilenameOpsFile {
+		return false
 	}
-	if child.FilteredFilenameOpsFile != "" {
-		if parent.FilteredFilenameOpsFile != child.FilteredFilenameOpsFile {
-			return false
-		}
+	if child.FilteredFilenameOpsFile != "" && child.FilteredFilenameOpsFile != parent.FilteredFilenameOpsFile {
+		return false
 	}
-	if child.RenameStyle != "" {
-		if parent.RenameStyle != child.RenameStyle {
-			return false
-		}
+	if child.RenameStyle != "" && child.RenameStyle != parent.RenameStyle {
+		return false
 	}
-	if child.MetaOpsFile != "" {
-		if parent.MetaOpsFile != child.MetaOpsFile {
-			return false
-		}
+	if child.MetaOpsFile != "" && child.MetaOpsFile != parent.MetaOpsFile {
+		return false
 	}
-	if child.FilteredMetaOpsFile != "" {
-		if parent.FilteredMetaOpsFile != child.FilteredMetaOpsFile {
-			return false
-		}
+	if child.FilteredMetaOpsFile != "" && child.FilteredMetaOpsFile != parent.FilteredMetaOpsFile {
+		return false
 	}
-	if child.OutputDir != "" {
-		if parent.OutputDir != child.OutputDir {
-			return false
-		}
+	if child.OutputDir != "" && child.OutputDir != parent.OutputDir {
+		return false
 	}
-	if child.MetaPurge != "" {
-		if parent.MetaPurge != child.MetaPurge {
-			return false
-		}
+	if child.MetaPurge != "" && child.MetaPurge != parent.MetaPurge {
+		return false
 	}
-	if child.MinFreeMem != "" {
-		if parent.MinFreeMem != child.MinFreeMem {
-			return false
-		}
+	if child.MinFreeMem != "" && child.MinFreeMem != parent.MinFreeMem {
+		return false
 	}
-	if child.TranscodeGPU != "" {
-		if parent.TranscodeGPU != child.TranscodeGPU {
-			return false
-		}
+	if child.TranscodeGPU != "" && child.TranscodeGPU != parent.TranscodeGPU {
+		return false
 	}
-	if child.TranscodeGPUNode != "" {
-		if parent.TranscodeGPUNode != child.TranscodeGPUNode {
-			return false
-		}
+	if child.TranscodeGPUNode != "" && child.TranscodeGPUNode != parent.TranscodeGPUNode {
+		return false
 	}
-	if child.TranscodeVideoFilter != "" {
-		if parent.TranscodeVideoFilter != child.TranscodeVideoFilter {
-			return false
-		}
+	if child.TranscodeVideoFilter != "" && child.TranscodeVideoFilter != parent.TranscodeVideoFilter {
+		return false
 	}
-	if child.TranscodeQuality != "" {
-		if parent.TranscodeQuality != child.TranscodeQuality {
-			return false
-		}
+	if child.TranscodeQuality != "" && child.TranscodeQuality != parent.TranscodeQuality {
+		return false
 	}
-	if child.ExtraFFmpegArgs != "" {
-		if parent.ExtraFFmpegArgs != child.ExtraFFmpegArgs {
-			return false
-		}
+	if child.ExtraFFmpegArgs != "" && child.ExtraFFmpegArgs != parent.ExtraFFmpegArgs {
+		return false
 	}
 
 	// Numeric comparisons
-	if child.Concurrency != 0 {
-		if parent.Concurrency != child.Concurrency {
-			return false
-		}
+	if child.Concurrency != 0 && child.Concurrency != parent.Concurrency {
+		return false
 	}
-	if child.MaxCPU != 0 {
-		if parent.MaxCPU != child.MaxCPU {
-			return false
-		}
+	if child.MaxCPU != 0 && child.MaxCPU != parent.MaxCPU {
+		return false
 	}
 
 	// Slice comparisons
-	if len(child.FilenameOps) > 0 {
-		if len(parent.FilenameOps) != len(child.FilenameOps) {
-			return false
-		}
-		for i := range parent.FilenameOps {
-			if parent.FilenameOps[i] != child.FilenameOps[i] {
-				return false
-			}
-		}
+	if len(child.FilenameOps) > 0 && !slices.Equal(parent.FilenameOps, child.FilenameOps) {
+		return false
 	}
-
-	if len(child.FilteredFilenameOps) > 0 {
-		if len(parent.FilteredFilenameOps) != len(child.FilteredFilenameOps) {
-			return false
-		}
-		for _, parentffo := range parent.FilteredFilenameOps {
-			for _, childffo := range child.FilteredFilenameOps {
-				if parentffo.FiltersMatched != childffo.FiltersMatched {
-					return false
-				}
-				for _, parentf := range parentffo.Filters {
-					for _, childf := range childffo.Filters {
-						if parentf != childf {
-							return false
-						}
-					}
-				}
-				for _, parentfo := range parentffo.FilenameOps {
-					for _, childfo := range childffo.FilenameOps {
-						if parentfo != childfo {
-							return false
-						}
-					}
-				}
-			}
-		}
+	if len(child.FilteredFilenameOps) > 0 && !slices.EqualFunc(parent.FilteredFilenameOps, child.FilteredFilenameOps, filteredFilenameOpsEqual) {
+		return false
 	}
-
-	if len(child.MetaOps) > 0 {
-		if len(parent.MetaOps) != len(child.MetaOps) {
-			return false
-		}
-		for i := range parent.MetaOps {
-			if parent.MetaOps[i] != child.MetaOps[i] {
-				return false
-			}
-		}
+	if len(child.MetaOps) > 0 && !slices.Equal(parent.MetaOps, child.MetaOps) {
+		return false
 	}
-
-	if len(child.FilteredMetaOps) > 0 {
-		if len(parent.FilteredMetaOps) != len(child.FilteredMetaOps) {
-			return false
-		}
-		for _, parentfmo := range parent.FilteredMetaOps {
-			for _, childfmo := range child.FilteredMetaOps {
-				if parentfmo.FiltersMatched != childfmo.FiltersMatched {
-					return false
-				}
-				for _, parentf := range parentfmo.Filters {
-					for _, childf := range childfmo.Filters {
-						if parentf != childf {
-							return false
-						}
-					}
-				}
-				for _, parentmo := range parentfmo.MetaOps {
-					for _, childmo := range childfmo.MetaOps {
-						if parentmo != childmo {
-							return false
-						}
-					}
-				}
-			}
-		}
+	if len(child.FilteredMetaOps) > 0 && !slices.EqualFunc(parent.FilteredMetaOps, child.FilteredMetaOps, filteredMetaOpsEqual) {
+		return false
 	}
-
-	if len(child.TranscodeVideoCodecs) > 0 {
-		if len(parent.TranscodeVideoCodecs) != len(child.TranscodeVideoCodecs) {
-			return false
-		}
-		for i := range parent.TranscodeVideoCodecs {
-			if parent.TranscodeVideoCodecs[i] != child.TranscodeVideoCodecs[i] {
-				return false
-			}
-		}
+	if len(child.TranscodeVideoCodecs) > 0 && !slices.Equal(parent.TranscodeVideoCodecs, child.TranscodeVideoCodecs) {
+		return false
 	}
-
-	if len(child.TranscodeAudioCodecs) > 0 {
-		if len(parent.TranscodeAudioCodecs) != len(child.TranscodeAudioCodecs) {
-			return false
-		}
-		for i := range parent.TranscodeAudioCodecs {
-			if parent.TranscodeAudioCodecs[i] != child.TranscodeAudioCodecs[i] {
-				return false
-			}
-		}
+	if len(child.TranscodeAudioCodecs) > 0 && !slices.Equal(parent.TranscodeAudioCodecs, child.TranscodeAudioCodecs) {
+		return false
 	}
-
 	return true
+}
+
+// filteredFilenameOpsEqual reports whether two filtered filename ops have the same filters and ops.
+func filteredFilenameOpsEqual(a, b FilteredFilenameOps) bool {
+	return a.FiltersMatched == b.FiltersMatched &&
+		slices.Equal(a.Filters, b.Filters) &&
+		slices.Equal(a.FilenameOps, b.FilenameOps)
+}
+
+// filteredMetaOpsEqual reports whether two filtered meta ops have the same filters and ops.
+func filteredMetaOpsEqual(a, b FilteredMetaOps) bool {
+	return a.FiltersMatched == b.FiltersMatched &&
+		slices.Equal(a.Filters, b.Filters) &&
+		slices.Equal(a.MetaOps, b.MetaOps)
 }
 
 // MetarrArgsAllZero checks if every Metarr Args field is its zero value.
@@ -591,6 +422,12 @@ func SettingsAllZero(s *Settings) bool {
 		return false
 	}
 	if s.YtdlpOutputExt != "" {
+		return false
+	}
+	if len(s.YTDLPPreferredVideoCodecs) > 0 {
+		return false
+	}
+	if len(s.YTDLPPreferredAudioCodecs) > 0 {
 		return false
 	}
 

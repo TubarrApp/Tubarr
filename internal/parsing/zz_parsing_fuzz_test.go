@@ -172,7 +172,7 @@ func FuzzChannelConfig(f *testing.F) {
 		if err := v.ReadInConfig(); err != nil {
 			return
 		}
-		var in models.ChannelInputPtrs
+		var in models.ChannelInput
 		if err := LoadViperIntoStruct(v, &in); err != nil {
 			return
 		}

@@ -861,7 +861,11 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/channels/{}/override-ops/{}?video={}", keys: []string{"video"}, replay: func(t *testing.T) {
 			readsJSON(fmt.Sprintf("/api/v1/channels/1/override-ops/%d", fuzzChannelURLID(t)))(t)
 		}},
-		{path: "/api/v1/channels/{}/available", keys: []string{"action", "video_ids", "overrides", "auth"}, replay: func(t *testing.T) {
+		{path: "/api/v1/channels/{}/override-ops/{}/file?{}", keys: []string{"box", "path"}, replay: func(t *testing.T) {
+			path := wiringFile(t, "meta-ops.txt", "album:set:Wiring\n")
+			readsJSON(fmt.Sprintf("/api/v1/channels/1/override-ops/%d/file?box=meta_ops&path=%s", fuzzChannelURLID(t), url.QueryEscape(path)))(t)
+		}},
+		{path: "/api/v1/channels/{}/available", keys: []string{"action", "video_ids", "overrides", "metarr", "auth"}, replay: func(t *testing.T) {
 			vs := repo.GetVideoStore(fuzzServer.db)
 			const videoURL = "https://example.com/v/wiring-available"
 			if _, err := vs.AddAvailableVideos([]*models.Video{{ChannelURLID: fuzzChannelURLID(t), ChannelURL: "https://example.com/@fuzz", URL: videoURL, Title: "Wiring"}}, 1); err != nil {
@@ -951,7 +955,7 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/channels/{}/ignore-crawl", replay: routed(post, "/api/v1/channels/999999/ignore-crawl", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/latest-downloads", replay: readsJSON("/api/v1/channels/1/latest-downloads")},
 		{path: "/api/v1/channels/{}/notification-seen", replay: routed(post, "/api/v1/channels/1/notification-seen", http.StatusOK)},
-		{path: "/api/v1/channels/{}/run-metarr", keys: []string{"video_ids", "overrides", "rerun"}, replay: strictJSON(post, "/api/v1/channels/999999/run-metarr", `{"video_ids":[1]}`, http.StatusNotFound)},
+		{path: "/api/v1/channels/{}/run-metarr", keys: []string{"video_ids", "overrides", "metarr", "rerun"}, replay: strictJSON(post, "/api/v1/channels/999999/run-metarr", `{"video_ids":[1]}`, http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/stop-metarr", keys: []string{"video_ids"}, replay: strictJSON(post, "/api/v1/channels/1/stop-metarr", `{"video_ids":[999999]}`, http.StatusConflict)},
 		{path: "/api/v1/channels/{}/toggle-pause", replay: func(t *testing.T) {
 			var first, second struct {

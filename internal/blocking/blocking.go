@@ -12,10 +12,19 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
-
-	"golang.org/x/net/publicsuffix"
 )
+
+// ParseBlockContext returns the block context named s, or "" (every context) if s is blank.
+func ParseBlockContext(s string) (vars.BlockContext, error) {
+	switch ctx := vars.BlockContext(s); ctx {
+	case "", vars.BlockContextUnauth, vars.BlockContextCookie, vars.BlockContextAuth:
+		return ctx, nil
+	default:
+		return "", fmt.Errorf("invalid context %q (must be one of: %s, %s, %s)", s, vars.BlockContextUnauth, vars.BlockContextCookie, vars.BlockContextAuth)
+	}
+}
 
 // GetBlockContext determines the block context for a channel URL based on authentication settings.
 func GetBlockContext(cu *models.ChannelURL) vars.BlockContext {
@@ -42,7 +51,7 @@ func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) erro
 	now := time.Now()
 
 	// Normalize domain to eTLD+1.
-	normalizedDomain := normalizeDomain(domain)
+	normalizedDomain := limits.RegisteredDomain(domain)
 
 	// Update in-memory state.
 	vars.BlockedDomainsMutex.Lock()
@@ -76,7 +85,7 @@ func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) erro
 //
 // Returns true if blocked and timeout has not expired.
 func IsBlocked(domain string, blockContext vars.BlockContext) (isBlocked bool, blockedAt time.Time, remainingTime time.Duration) {
-	normalizedDomain := normalizeDomain(domain)
+	normalizedDomain := limits.RegisteredDomain(domain)
 
 	vars.BlockedDomainsMutex.RLock()
 	defer vars.BlockedDomainsMutex.RUnlock()
@@ -106,7 +115,7 @@ func IsBlocked(domain string, blockContext vars.BlockContext) (isBlocked bool, b
 
 // UnblockDomain unblocks a domain for a specific context (or all contexts if context is empty).
 func UnblockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) error {
-	normalizedDomain := normalizeDomain(domain)
+	normalizedDomain := limits.RegisteredDomain(domain)
 
 	vars.BlockedDomainsMutex.Lock()
 	defer vars.BlockedDomainsMutex.Unlock()
@@ -291,15 +300,4 @@ func GetAllBlockedDomains() map[string]map[vars.BlockContext]time.Time {
 	}
 
 	return result
-}
-
-// normalizeDomain extracts the eTLD+1 (effective top-level domain + 1 label).
-//
-// e.g., m.google.com -> google.com, www.bbc.co.uk -> bbc.co.uk. Lowercases first, as the public suffix list is lowercase.
-func normalizeDomain(rawDomain string) string {
-	rawDomain = strings.ToLower(rawDomain)
-	if domain, err := publicsuffix.EffectiveTLDPlusOne(rawDomain); err == nil {
-		return domain
-	}
-	return rawDomain
 }

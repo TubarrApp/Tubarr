@@ -1,0 +1,141 @@
+package repo
+
+import (
+	"reflect"
+	"testing"
+	"tubarr/internal/models"
+)
+
+// fullSettings returns Settings with every field set.
+func fullSettings() *models.Settings {
+	yes := true
+	return &models.Settings{
+		Concurrency:               2,
+		CookiesFromBrowser:        "firefox",
+		CrawlFreq:                 30,
+		ExternalDownloader:        "aria2c",
+		ExternalDownloaderArgs:    "-x 4",
+		MaxFilesize:               "1G",
+		Retries:                   3,
+		UseGlobalCookies:          &yes,
+		YtdlpOutputExt:            "mp4",
+		YTDLPPreferredVideoCodecs: []string{"av1"},
+		YTDLPPreferredAudioCodecs: []string{"opus"},
+		ExtraYTDLPVideoArgs:       "--a",
+		ExtraYTDLPMetaArgs:        "--b",
+		ExtraYTDLPCrawlArgs:       "--c",
+		Filters:                   []models.Filters{{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}},
+		FilterFile:                "/filters",
+		MetaFilterMoveOps:         []models.MetaFilterMoveOps{{Field: "title", ContainsValue: "cat", OutputDir: "/cats"}},
+		MetaFilterMoveOpFile:      "/moves",
+		FromDate:                  "20240101",
+		ToDate:                    "20250101",
+		JSONDir:                   "/json",
+		VideoDir:                  "/video",
+		Paused:                    true,
+		AutoDownload:              &yes,
+	}
+}
+
+// fullMetarrArgs returns MetarrArgs with every field set.
+func fullMetarrArgs() *models.MetarrArgs {
+	cat := models.Filters{Field: "title", FilterType: "contains", Value: "cat"}
+	return &models.MetarrArgs{
+		OutputExt:               "mp4",
+		FilenameOps:             []models.FilenameOps{{OpType: "prefix", OpValue: "[A] "}},
+		FilenameOpsFile:         "/filename-ops",
+		FilteredFilenameOps:     []models.FilteredFilenameOps{{Filters: []models.Filters{cat}, FilenameOps: []models.FilenameOps{{OpType: "prefix", OpValue: "[C] "}}}},
+		FilteredFilenameOpsFile: "/filtered-filename-ops",
+		RenameStyle:             "spaces",
+		MetaOps:                 []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "A"}},
+		MetaOpsFile:             "/meta-ops",
+		FilteredMetaOps:         []models.FilteredMetaOps{{Filters: []models.Filters{cat}, MetaOps: []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "C"}}}},
+		FilteredMetaOpsFile:     "/filtered-meta-ops",
+		OutputDir:               "/out",
+		MetaPurge:               "all",
+		Concurrency:             2,
+		MaxCPU:                  50,
+		MinFreeMem:              "1G",
+		TranscodeGPU:            "vaapi",
+		TranscodeGPUNode:        "/dev/dri/renderD128",
+		TranscodeVideoFilter:    "scale=1280:-2",
+		TranscodeVideoCodecs:    []string{"h264"},
+		TranscodeAudioCodecs:    []string{"aac"},
+		TranscodeQuality:        "23",
+		ExtraFFmpegArgs:         "-x",
+	}
+}
+
+// requireAllSet fails if any field of the struct v points to is unset, so a new settings field must be added here.
+func requireAllSet(t *testing.T, v any) {
+	t.Helper()
+	rv := reflect.ValueOf(v).Elem()
+	for i := range rv.NumField() {
+		if rv.Field(i).IsZero() {
+			t.Fatalf("%s.%s isn't set in the test's full model", rv.Type().Name(), rv.Type().Field(i).Name)
+		}
+	}
+}
+
+// TestMergeSettingsInheritsAll tests a channel URL without settings of its own inherits every channel setting but Paused.
+func TestMergeSettingsInheritsAll(t *testing.T) {
+	parent := fullSettings()
+	requireAllSet(t, parent)
+
+	child := &models.Settings{}
+	mergeSettings(child, parent)
+	want := *fullSettings()
+	want.Paused = false
+	if !reflect.DeepEqual(*child, want) {
+		t.Errorf("inherited settings differ:\ngot  %+v\nwant %+v", *child, want)
+	}
+}
+
+// TestMergeSettingsKeepsOwn tests a channel URL keeps the settings it sets itself.
+func TestMergeSettingsKeepsOwn(t *testing.T) {
+	no := false
+	ownFilters := []models.Filters{{Field: "title", FilterType: "omits", Value: "dog", MustAny: "any"}}
+	child := &models.Settings{VideoDir: "/own", Retries: 5, Filters: ownFilters, UseGlobalCookies: &no, Paused: true}
+	mergeSettings(child, fullSettings())
+
+	want := *fullSettings()
+	want.VideoDir, want.Retries, want.Filters, want.UseGlobalCookies = "/own", 5, ownFilters, &no
+	if !reflect.DeepEqual(*child, want) {
+		t.Errorf("merged settings differ:\ngot  %+v\nwant %+v", *child, want)
+	}
+}
+
+// TestMergeMetarrArgsInheritsAll tests a channel URL without Metarr args of its own inherits every channel one.
+func TestMergeMetarrArgsInheritsAll(t *testing.T) {
+	parent := fullMetarrArgs()
+	requireAllSet(t, parent)
+
+	child := &models.MetarrArgs{}
+	mergeMetarrArgs(child, parent)
+	if want := *fullMetarrArgs(); !reflect.DeepEqual(*child, want) {
+		t.Errorf("inherited Metarr args differ:\ngot  %+v\nwant %+v", *child, want)
+	}
+}
+
+// TestMergeMetarrArgsKeepsOwn tests a channel URL keeps the Metarr args it sets itself.
+func TestMergeMetarrArgsKeepsOwn(t *testing.T) {
+	ownOps := []models.MetaOps{{Field: "title", OpType: "prefix", OpValue: "[B] "}}
+	child := &models.MetarrArgs{OutputDir: "/own", MaxCPU: 25, MetaOps: ownOps}
+	mergeMetarrArgs(child, fullMetarrArgs())
+
+	want := *fullMetarrArgs()
+	want.OutputDir, want.MaxCPU, want.MetaOps = "/own", 25, ownOps
+	if !reflect.DeepEqual(*child, want) {
+		t.Errorf("merged Metarr args differ:\ngot  %+v\nwant %+v", *child, want)
+	}
+}
+
+// TestMergeWithoutParent tests merging with no channel settings leaves a channel URL's own unchanged.
+func TestMergeWithoutParent(t *testing.T) {
+	s, m := &models.Settings{VideoDir: "/own"}, &models.MetarrArgs{OutputDir: "/own"}
+	mergeSettings(s, nil)
+	mergeMetarrArgs(m, nil)
+	if !reflect.DeepEqual(*s, models.Settings{VideoDir: "/own"}) || !reflect.DeepEqual(*m, models.MetarrArgs{OutputDir: "/own"}) {
+		t.Errorf("merging with no channel settings changed them: %+v, %+v", *s, *m)
+	}
+}

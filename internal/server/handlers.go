@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,7 +17,6 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/app"
-	"tubarr/internal/auth"
 	"tubarr/internal/blocking"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
@@ -34,7 +32,6 @@ import (
 	"tubarr/internal/scraper"
 	"tubarr/internal/siterules"
 	"tubarr/internal/state"
-	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/logging"
 	"github.com/go-chi/chi/v5"
@@ -45,53 +42,37 @@ import (
 //
 // Errors in the file wrap contracts.ErrInvalidChannel.
 func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ignoreRun bool, err error) {
-	var input models.ChannelInputPtrs
-	v := viper.New()
-	if err := file.LoadConfigFile(v, path); err != nil {
-		return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
-	}
-	if err := parsing.LoadViperIntoStruct(v, &input); err != nil {
-		return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
-	}
-	if input.URLSettings, err = parsing.ParseURLSettingsFromViper(v); err != nil {
-		return nil, false, fmt.Errorf("%w: failed to parse url-settings: %w", contracts.ErrInvalidChannel, err)
-	}
-
-	c, authMap, err := parsing.BuildChannelFromInput(input)
+	input, err := parsing.LoadChannelInputFile(path)
 	if err != nil {
 		return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
-	var notifications []*models.Notification
-	if input.Notification != nil && len(*input.Notification) != 0 {
-		if notifications, err = parsing.ParseNotifications(*input.Notification); err != nil {
-			return nil, false, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
-		}
-	}
-
-	if err := ss.cs.AddChannelWithDetails(c, authMap, notifications); err != nil {
+	if c, err = app.AddChannelFromInput(ss.cs, input); err != nil {
 		return nil, false, err
 	}
 	return c, input.IgnoreRun != nil && *input.IgnoreRun, nil
 }
 
-// startIgnoreCrawl runs an ignore crawl for a new channel in the background, unless one is already running.
-//
-// The crawl outlives the request, so it runs under the server's context.
-//
-//nolint:contextcheck
-func (ss *serverStore) startIgnoreCrawl(c *models.Channel) {
-	// Reload the saved channel, merged so its per-URL settings apply.
+// startNewChannelIgnoreCrawl starts an ignore crawl of a channel just added, reloaded so its per-URL settings apply.
+func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 	saved, found, err := ss.cs.GetChannelModel(consts.QChanID, strconv.FormatInt(c.ID, 10), true)
 	if err != nil || !found {
 		logger.Pl.E("Failed to load channel %q for its ignore crawl (found: %t): %v", c.Name, found, err)
 		return
 	}
-	c = saved
+	ss.startIgnoreCrawl(saved)
+}
 
+// startIgnoreCrawl runs an ignore crawl of a channel in the background, unless one is already running, returning
+// whether it started.
+//
+// The crawl outlives the request, so it runs under the server's context.
+//
+//nolint:contextcheck
+func (ss *serverStore) startIgnoreCrawl(c *models.Channel) bool {
 	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID)
 	if !ok {
 		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
-		return
+		return false
 	}
 	logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
 	go func(ctx context.Context) {
@@ -102,6 +83,7 @@ func (ss *serverStore) startIgnoreCrawl(c *models.Channel) {
 			logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 		}
 	}(crawlCtx)
+	return true
 }
 
 // errChannelNotFound is returned when the channel being changed doesn't exist.
@@ -133,13 +115,9 @@ func (ss *serverStore) handleAddChannelFromFile(w http.ResponseWriter, r *http.R
 		return
 	}
 	if ignoreRun {
-		ss.startIgnoreCrawl(c)
+		ss.startNewChannelIgnoreCrawl(c)
 	}
-
-	w.WriteHeader(http.StatusCreated)
-	if _, err := w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusCreated, fmt.Sprintf("Channel %q added successfully", c.Name))
 }
 
 // handleAddChannelsFromDir adds new channel from all config files in the directory path using Viper.
@@ -159,10 +137,7 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 	}
 
 	if len(batchConfigFiles) == 0 {
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write(fmt.Appendf(nil, "No config files found in directory %q", addFromDir)); err != nil {
-			logger.Pl.E("Failed to write response message: %v", err)
-		}
+		writeText(w, http.StatusOK, fmt.Sprintf("No config files found in directory %q", addFromDir))
 		return
 	}
 
@@ -182,7 +157,7 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 			continue
 		}
 		if ignoreRun {
-			ss.startIgnoreCrawl(c)
+			ss.startNewChannelIgnoreCrawl(c)
 		}
 		successes = append(successes, c.Name)
 	}
@@ -206,11 +181,7 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 	} else {
 		responseMsg = fmt.Sprintf("Successfully added %d channel(s) from directory %q", successLen, addFromDir)
 	}
-
-	w.WriteHeader(http.StatusCreated)
-	if _, err := w.Write([]byte(responseMsg)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusCreated, responseMsg)
 }
 
 // handleListChannels lists Tubarr channels.
@@ -221,10 +192,7 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if !found {
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode([]any{}); err != nil {
-			logger.Pl.E("Failed to encode blank 'any' array: %v", err)
-		}
+		writeJSON(w, r, http.StatusOK, []any{})
 		return
 	}
 
@@ -255,17 +223,14 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request
 		}
 		response = append(response, cr)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode channels: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, response)
 }
 
 // handleGetChannel returns the data for a specific channel.
 func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, consts.QChanID)
 
+	// As saved, so each URL shows only its own settings in the edit form.
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -325,136 +290,60 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "failed to encode JSON", http.StatusInternalServerError)
+	// The settings the channel's config file replaces each run.
+	if c.ChannelConfigFile != "" {
+		response.ConfigFile = newConfigFileResponse(c.ChannelConfigFile)
 	}
+	writeJSON(w, r, http.StatusOK, response)
 }
 
 // handleCreateChannel creates a new channel entry.
 func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Request) {
-	// Parse form data.
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
+	f, err := parseChannelForm(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	blankWhitespaceValues(r)
-
-	// Get form values.
-	name := r.FormValue("name")
-	urls := strings.Fields(r.FormValue("urls"))
-	username := r.FormValue("username")
-	loginURL := r.FormValue("login_url")
-	password := r.FormValue("password")
-	now := time.Now()
-	if name == "" {
+	if f.name == "" {
 		http.Error(w, "channel name is required", http.StatusBadRequest)
 		return
 	}
 
-	// Parse authentication details.
-	authDetails, err := splitAuthDetails(r.FormValue("auth_details"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	// Parse per-URL settings JSON if provided.
-	urlSettingsMap, err := parseURLSettings(r.FormValue("url_settings"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	notifications, err := parseNotificationLines(r.FormValue("notifications"), urls)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	configFile, err := formConfigFile(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Validate and create ChannelURL models.
-	var chanURLs = make([]*models.ChannelURL, 0, len(urls))
-	for _, u := range urls {
-		if u != "" {
-			if err := validation.ValidateChannelURL(u); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			// Get auth details for this URL if they exist.
-			var parsedUsername, parsedPassword, parsedLoginURL string
-			if _, exists := authMap[u]; exists {
-				parsedUsername = authMap[u].Username
-				parsedPassword = authMap[u].Password
-				parsedLoginURL = authMap[u].LoginURL
-			}
-
-			// Create channel URL model.
-			chanURL := &models.ChannelURL{
-				URL:       u,
-				Username:  parsedUsername,
-				Password:  parsedPassword,
-				LoginURL:  parsedLoginURL,
-				LastScan:  now,
-				CreatedAt: now,
-				UpdatedAt: now,
-			}
-
-			// Apply per-URL custom settings if they exist.
-			if urlSettings, hasCustom := urlSettingsMap[u]; hasCustom {
-				chanURL.ChanURLSettings = urlSettings.Settings
-				chanURL.ChanURLMetarrArgs = urlSettings.Metarr
-			}
-
-			chanURLs = append(chanURLs, chanURL)
-		}
-	}
-
-	// Create model.
+	now := time.Now()
 	c := &models.Channel{
-		Name:              name,
-		ChannelConfigFile: configFile,
-		URLModels:         chanURLs,
+		Name:              f.name,
+		ChannelConfigFile: f.configFile,
+		ChanSettings:      f.settings,
+		ChanMetarrArgs:    f.metarr,
 		CreatedAt:         now,
 		LastScan:          now,
 		UpdatedAt:         now,
 	}
+	for _, u := range f.urls {
+		cu := &models.ChannelURL{URL: u, LastScan: now, CreatedAt: now, UpdatedAt: now}
 
-	// Get and validate settings.
-	c.ChanSettings = getSettingsStrings(w, r)
-	if c.ChanSettings == nil {
-		// Validation error already written to response.
-		return
-	}
+		// Auth details for this URL, if any.
+		if a, exists := f.authMap[u]; exists {
+			cu.Username, cu.Password, cu.LoginURL = a.Username, a.Password, a.LoginURL
+		}
 
-	c.ChanMetarrArgs = getMetarrArgsStrings(w, r)
-	if c.ChanMetarrArgs == nil {
-		// Validation error already written to response.
-		return
+		// Apply per-URL custom settings if they exist.
+		if s, hasCustom := f.urlSettings[u]; hasCustom {
+			cu.ChanURLSettings, cu.ChanURLMetarrArgs = s.Settings, s.Metarr
+		}
+		c.URLModels = append(c.URLModels, cu)
 	}
 
 	// Add to database, with its notifications.
-	if err := ss.cs.AddChannelWithDetails(c, nil, notifications); err != nil {
-		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", name, err), channelErrStatus(err))
+	if err := ss.cs.AddChannelWithDetails(c, nil, f.notifications); err != nil {
+		http.Error(w, fmt.Sprintf("failed to add channel with name %q: %v", f.name, err), channelErrStatus(err))
 		return
 	}
 
 	if r.FormValue("ignore_run") == "true" {
-		ss.startIgnoreCrawl(c)
+		ss.startNewChannelIgnoreCrawl(c)
 	}
-
-	w.WriteHeader(http.StatusCreated)
-	if _, err := w.Write(fmt.Appendf(nil, "Channel %q added successfully", c.Name)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusCreated, fmt.Sprintf("Channel %q added successfully", c.Name))
 }
 
 // handleUpdateChannel updates parameters for a given channel.
@@ -467,74 +356,19 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Parse form data.
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, fmt.Sprintf("failed to parse form data: %v", err), http.StatusBadRequest)
+	// Parse and validate everything before writing, so a rejected update changes nothing.
+	f, err := parseChannelForm(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	blankWhitespaceValues(r)
-
-	// -- Parse and validate everything before writing, so a rejected update changes nothing. --
-	name := r.FormValue("name")
-
-	newSettings := getSettingsStrings(w, r)
-	if newSettings == nil {
-		// Validation error already written to response
-		return
-	}
-	newMetarr := getMetarrArgsStrings(w, r)
-	if newMetarr == nil {
-		// Validation error already written to response
-		return
-	}
-
-	urls := strings.Fields(r.FormValue("urls"))
-	if len(urls) == 0 {
+	if len(f.urls) == 0 {
 		http.Error(w, "at least one channel URL is required", http.StatusBadRequest)
 		return
 	}
-	for _, u := range urls {
-		if err := validation.ValidateChannelURL(u); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	username := r.FormValue("username")
-	loginURL := r.FormValue("login_url")
-	password := r.FormValue("password")
 	now := time.Now()
 
-	// Parse authentication details.
-	authDetails, err := splitAuthDetails(r.FormValue("auth_details"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	authMap, err := auth.ParseAuthDetails(username, password, loginURL, authDetails, urls, false)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid authentication details: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	// Parse per-URL settings JSON if provided.
-	urlSettingsMap, err := parseURLSettings(r.FormValue("url_settings"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	notifications, err := parseNotificationLines(r.FormValue("notifications"), urls)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	configFile, err := formConfigFile(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// -- Read and write in one transaction, so the update applies to the current channel and a failure changes nothing. --
+	// Update applies to the current channel and a failure changes nothing.
 	if err := ss.cs.WithTx(func(cs contracts.ChannelStore) error {
 		existingChannel, found, err := cs.GetChannelModel(consts.QChanID, idStr, false)
 		if err != nil {
@@ -544,24 +378,24 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			return errChannelNotFound
 		}
 
-		if name != "" && name != existingChannel.Name {
-			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, name); err != nil {
+		if f.name != "" && f.name != existingChannel.Name {
+			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanName, f.name); err != nil {
 				return fmt.Errorf("failed to update channel name: %w", err)
 			}
 		}
-		if configFile != existingChannel.ChannelConfigFile {
-			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanConfigFile, configFile); err != nil {
+		if f.configFile != existingChannel.ChannelConfigFile {
+			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanConfigFile, f.configFile); err != nil {
 				return fmt.Errorf("failed to update channel config file: %w", err)
 			}
 		}
 		if _, err := cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
-			*s = *newSettings
+			*s = *f.settings
 			return nil
 		}); err != nil {
 			return fmt.Errorf("failed to update channel settings: %w", err)
 		}
 		if _, err := cs.UpdateChannelMetarrArgsJSON(consts.QChanID, idStr, func(m *models.MetarrArgs) error {
-			*m = *newMetarr
+			*m = *f.metarr
 			return nil
 		}); err != nil {
 			return fmt.Errorf("failed to update channel metarr args: %w", err)
@@ -573,7 +407,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			existingURLMap[urlModel.URL] = urlModel
 		}
 		for existingURL, urlModel := range existingURLMap {
-			if !urlModel.IsManual && !slices.Contains(urls, existingURL) {
+			if !urlModel.IsManual && !slices.Contains(f.urls, existingURL) {
 				if err := cs.DeleteChannelURL(urlModel.ID); err != nil {
 					return fmt.Errorf("failed to delete URL %q: %w", existingURL, err)
 				}
@@ -581,12 +415,12 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Add or update listed URLs.
-		for _, u := range urls {
+		for _, u := range f.urls {
 			var parsedUsername, parsedPassword, parsedLoginURL string
-			if a, exists := authMap[u]; exists {
+			if a, exists := f.authMap[u]; exists {
 				parsedUsername, parsedPassword, parsedLoginURL = a.Username, a.Password, a.LoginURL
 			}
-			urlSettings := urlSettingsMap[u]
+			urlSettings := f.urlSettings[u]
 
 			if existingURLModel, exists := existingURLMap[u]; exists {
 				// A blank password keeps the saved one, as passwords aren't sent to the edit page. Clearing the ciphertext
@@ -643,8 +477,8 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 				return fmt.Errorf("failed to delete existing notifications: %w", err)
 			}
 		}
-		if len(notifications) > 0 {
-			if err := cs.AddNotifyURLs(channelID, notifications); err != nil {
+		if len(f.notifications) > 0 {
+			if err := cs.AddNotifyURLs(channelID, f.notifications); err != nil {
 				return fmt.Errorf("failed to add notification URLs: %w", err)
 			}
 		}
@@ -654,23 +488,14 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), channelErrStatus(err))
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte("Channel updated successfully")); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusOK, "Channel updated successfully")
 }
 
 // handleDeleteChannel deletes a channel from Tubarr.
 func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 
@@ -689,28 +514,27 @@ func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Reques
 
 // handleGetAllVideos retrieves all videos, ignored or finished, for a given channel.
 func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel nil or not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 
-	// Get video downloads with full metadata.
 	videos, _, err := ss.cs.GetDownloadedOrIgnoredVideos(c)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(videos); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode videos: %v", err)
+	// Blank paths for files moved or deleted outside Tubarr, so the page shows them as missing.
+	for _, v := range videos {
+		if v.VideoFilePath == "" {
+			continue
+		}
+		if _, err := os.Stat(v.VideoFilePath); err != nil {
+			v.VideoFilePath = ""
+		}
 	}
+	writeJSON(w, r, http.StatusOK, videos)
 }
 
 // handleDeleteChannelVideos deletes given video entries from a channel.
@@ -767,11 +591,7 @@ func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if !found {
-		// No channels found, return empty array
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode([]any{}); err != nil {
-			logger.Pl.E("Failed to encode empty downloads array: %v", err)
-		}
+		writeJSON(w, r, http.StatusOK, []any{})
 		return
 	}
 
@@ -796,11 +616,7 @@ func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request
 			allDownloads = append(allDownloads, videoMap)
 		}
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(allDownloads); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Could not encode videos to JSON: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, allDownloads)
 }
 
 // handleCancelDownload cancels an active download by video ID.
@@ -820,11 +636,7 @@ func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Reque
 		http.Error(w, fmt.Sprintf("failed to cancel download: %v", err), status)
 		return
 	}
-
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(`{"message": "Download canceled successfully"}`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]string{"message": "Download canceled successfully"})
 }
 
 // handleCancelDownloads cancels several downloads by video ID.
@@ -857,28 +669,13 @@ func (ss *serverStore) handleCancelDownloads(w http.ResponseWriter, r *http.Requ
 	}
 
 	logger.Pl.I("Canceled %d download(s) via web request", canceled)
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]int{"canceled": canceled}); err != nil {
-		logger.Pl.E("Failed to encode cancel response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]int{"canceled": canceled})
 }
 
 // handleCrawlChannel initiates a crawl for a specific channel.
 func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
-		return
-	}
-
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel nil or not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 	if c.LoadErr != nil {
@@ -900,7 +697,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			if cu.IsManual || !slices.Contains(requestBody.URLIDs, cu.ID) {
 				continue
 			}
-			if cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused {
+			if cu.Paused() {
 				unpaused := *cu.ChanURLSettings // Copied, so the URL stays paused.
 				unpaused.Paused = false
 				cu.ChanURLSettings = &unpaused
@@ -924,7 +721,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 		//nolint:contextcheck
 		go func(ctx context.Context) {
 			defer unlock()
-			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, id)
+			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, c.ID)
 
 			if performedCrawls, err := app.CrawlChannel(ctx, ss.s, c); err != nil {
 				logger.Pl.E("Encountered errors crawling channel %q: %v", c.Name, err)
@@ -933,23 +730,16 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			}
 		}(crawlCtx)
 
-		w.WriteHeader(http.StatusAccepted)
-		if _, err := w.Write([]byte(`{"message": "Channel crawl started"}`)); err != nil {
-			logger.Pl.E("Failed to write response message: %v", err)
-		}
+		writeJSON(w, r, http.StatusAccepted, map[string]string{"message": "Channel crawl started"})
 		return
 	}
 	logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
-
-	w.WriteHeader(http.StatusConflict)
-	if _, err := w.Write([]byte(`{"message": "Channel crawl already running for channel"}`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "Channel crawl already running for channel"})
 }
 
 // handleStopQueue stops a channel's job from starting queued work, letting in-progress downloads and Metarr processes finish.
 func (ss *serverStore) handleStopQueue(w http.ResponseWriter, r *http.Request) {
-	c, ok := ss.channelFromURL(w, r)
+	c, ok := ss.channelFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -959,15 +749,12 @@ func (ss *serverStore) handleStopQueue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Pl.I("Stopping queued work for channel %q via web request", c.Name)
-	w.WriteHeader(http.StatusAccepted)
-	if _, err := w.Write([]byte(`Stopping.`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
 // handleAbortAll stops all of a channel's work, killing in-progress downloads and Metarr processes.
 func (ss *serverStore) handleAbortAll(w http.ResponseWriter, r *http.Request) {
-	c, ok := ss.channelFromURL(w, r)
+	c, ok := ss.channelFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -979,15 +766,12 @@ func (ss *serverStore) handleAbortAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Pl.I("Aborting all work for channel %q via web request (%d Metarr process(es))", c.Name, n)
-	w.WriteHeader(http.StatusAccepted)
-	if _, err := w.Write([]byte(`Stopping.`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
 // handleStopMetarr stops a channel's queued and running Metarr processes, or only those for the video IDs in the body.
 func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) {
-	c, ok := ss.channelFromURL(w, r)
+	c, ok := ss.channelFromRequest(w, r)
 	if !ok {
 		return
 	}
@@ -1005,36 +789,28 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 	}
 
 	logger.Pl.I("Stopping %d Metarr process(es) for channel %q via web request", n, c.Name)
-	w.WriteHeader(http.StatusAccepted)
-	if _, err := w.Write([]byte(`Stopping.`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
 // handleGetActivity returns the IDs of channels with running crawls/downloads, crawls being stopped, and Metarr processes.
-func (ss *serverStore) handleGetActivity(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetActivity(w http.ResponseWriter, r *http.Request) {
 	crawling, stopping := state.CrawlActivity()
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string][]int64{
+	writeJSON(w, r, http.StatusOK, map[string][]int64{
 		"crawling": crawling,
 		"stopping": stopping,
 		"metarr":   app.MetarrActivity(),
-	}); err != nil {
-		logger.Pl.E("Failed to encode activity: %v", err)
-	}
+	})
 }
 
 // handleGetPostProcessing returns the videos queued for or running in Metarr.
-func (ss *serverStore) handleGetPostProcessing(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(app.MetarrJobs()); err != nil {
-		logger.Pl.E("Failed to encode post-processes: %v", err)
-	}
+func (ss *serverStore) handleGetPostProcessing(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, app.MetarrJobs())
 }
 
-// channelFromURL loads the channel given by the URL's ID, writing an error response if it can't.
-func (ss *serverStore) channelFromURL(w http.ResponseWriter, r *http.Request) (*models.Channel, bool) {
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), false)
+// channelFromRequest loads the channel the request's {id} names, its URLs' unset settings filled in from the channel's
+// as jobs use them, writing an error response if it can't.
+func (ss *serverStore) channelFromRequest(w http.ResponseWriter, r *http.Request) (*models.Channel, bool) {
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return nil, false
@@ -1048,20 +824,8 @@ func (ss *serverStore) channelFromURL(w http.ResponseWriter, r *http.Request) (*
 
 // handleIgnoreCrawlChannel initiates a crawl for a specific channel.
 func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
-		return
-	}
-
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true) // Merged, so per-URL settings apply.
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel nil or not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 	if c.LoadErr != nil {
@@ -1069,48 +833,19 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Start crawl in background.
-	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID); ok {
-		// Clean expired blocks first.
-		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
-			logger.Pl.W("Failed to clean expired blocks: %v", err)
-		}
-
-		//nolint:contextcheck
-		go func(ctx context.Context) {
-			defer unlock()
-			logger.Pl.I("Starting ignore crawl for channel %q (ID: %d) via web request", c.Name, id)
-
-			if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-				logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
-			} else {
-				logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
-			}
-		}(crawlCtx)
-
-		w.WriteHeader(http.StatusAccepted)
-		if _, err := w.Write([]byte(`{"message": "Channel ignore crawl started"}`)); err != nil {
-			logger.Pl.E("Failed to write response message: %v", err)
-		}
+	// Clean expired blocks first.
+	if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
+		logger.Pl.W("Failed to clean expired blocks: %v", err)
+	}
+	if !ss.startIgnoreCrawl(c) {
+		writeJSON(w, r, http.StatusConflict, map[string]string{"message": "Channel ignore crawl already running for channel"})
 		return
 	}
-	logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
-
-	w.WriteHeader(http.StatusConflict)
-	if _, err := w.Write([]byte(`{"message": "Channel ignore crawl already running for channel"}`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeJSON(w, r, http.StatusAccepted, map[string]string{"message": "Channel ignore crawl started"})
 }
 
 // handleDownloadURLs downloads specified video URLs to a channel.
 func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
-		return
-	}
-
 	// Parse request body.
 	var requestBody struct {
 		Videos []models.ManualVideo `json:"videos"`
@@ -1126,14 +861,8 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get channel.
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 	if c.LoadErr != nil {
@@ -1159,7 +888,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 			return
 		}
 		defer unlock()
-		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.Videos), c.Name, id)
+		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.Videos), c.Name, c.ID)
 
 		if err := app.ManualDownloadToChannel(ctx, ss.s, ss.cs, c, requestBody.Videos); err != nil {
 			logger.Pl.E("Encountered errors downloading URLs for channel %q: %v", c.Name, err)
@@ -1167,12 +896,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)
 		}
 	}()
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	if err := json.NewEncoder(w).Encode(map[string]bool{"queued": queued}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusAccepted, map[string]bool{"queued": queued})
 }
 
 // handleAddAvailableURLs adds video URLs to a channel's Available list, returning the added videos and the URLs already
@@ -1190,13 +914,8 @@ func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 	if bad := app.CheckManualVideos(c, requestBody.Videos); len(bad) > 0 {
@@ -1213,11 +932,7 @@ func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Req
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"videos": added, "existing": existing}); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"videos": added, "existing": existing})
 }
 
 // handleGetAvailableVideos returns videos awaiting the user's choice to download or dismiss them, across all channels.
@@ -1244,11 +959,7 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.R
 	for _, v := range videos {
 		v.RetriesOnCrawl = v.DownloadStatus.Status != consts.DLStatusAvailable && retried[v.ChannelURLID]
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(videos); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode available videos: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, videos)
 }
 
 // handleAvailableAction downloads or dismisses a channel's chosen Available videos.
@@ -1259,6 +970,7 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		Action    string                `json:"action"`
 		VideoIDs  []int64               `json:"video_ids"`
 		Overrides *models.OverrideLines `json:"overrides"` // Download As, for one video.
+		Metarr    *metarrArgsInput      `json:"metarr"`    // Download As's other Metarr args, with the overrides.
 		Auth      *models.ManualAuth    `json:"auth"`      // Login details for this download only, never stored.
 	}
 	if err := decodeJSON(r, &requestBody); err != nil {
@@ -1292,19 +1004,14 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		var err error
-		if overrides, err = parseOverrideLines(requestBody.Overrides); err != nil {
+		if overrides, err = parseOverrideLines(requestBody.Overrides, requestBody.Metarr); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
 
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 	if c.LoadErr != nil && status == consts.DLStatusQueued {
@@ -1323,13 +1030,7 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	}
 
 	if status == consts.DLStatusIgnored && len(claimed) > 0 {
-		dismissedURLs := make([]string, 0, len(claimed))
-		for _, v := range claimed {
-			dismissedURLs = append(dismissedURLs, v.URL)
-		}
-		if err := ss.cs.RemoveNewVideoURLs(c.ID, dismissedURLs); err != nil {
-			logger.Pl.E("Failed to update new video URLs for channel %q: %v", c.Name, err)
-		}
+		app.RemoveDismissedFromNew(ss.cs, c, claimed)
 	}
 
 	if status == consts.DLStatusQueued && len(claimed) > 0 {
@@ -1357,23 +1058,14 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		}()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	if err := json.NewEncoder(w).Encode(map[string]int{"count": len(claimed)}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusAccepted, map[string]int{"count": len(claimed)})
 }
 
 // handleGetOverrideOps fills the Download As dialog with the directories and ops a channel URL's videos use, and the
 // given video's earlier overrides if it has any.
 func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Request) {
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 	file.UpdateFromConfigFile(ss.cs, c) // As a download does, so the ops shown are the ones it would run.
@@ -1382,12 +1074,11 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
 		return
 	}
-	i := slices.IndexFunc(c.URLModels, func(cu *models.ChannelURL) bool { return cu.ID == urlID })
-	if i < 0 {
+	cu := c.URLByID(urlID)
+	if cu == nil {
 		http.Error(w, "channel URL not found", http.StatusNotFound)
 		return
 	}
-	cu := c.URLModels[i]
 
 	var overrides *models.VideoOverrides
 	if videoParam := r.URL.Query().Get("video"); videoParam != "" {
@@ -1407,32 +1098,62 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 	}
 
 	var response struct {
-		Defaults models.OverrideLines  `json:"defaults"` // The channel URL's, for Revert to Defaults.
-		Saved    *models.OverrideLines `json:"saved"`    // The video's earlier overrides, if any.
+		Defaults       models.OverrideLines  `json:"defaults"`        // The channel URL's, for Revert to Defaults.
+		Saved          *models.OverrideLines `json:"saved"`           // The video's earlier overrides, if any.
+		DefaultsMetarr *metarrArgsResponse   `json:"defaults_metarr"` // The channel URL's other Metarr args.
+		SavedMetarr    *metarrArgsResponse   `json:"saved_metarr"`    // The video's earlier other Metarr args, if any.
 	}
 	if response.Defaults, err = metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	response.DefaultsMetarr = newMetarrArgsResponse(cu.ChanURLMetarrArgs)
 	if overrides != nil {
 		saved := metarr.VideoOverrideLines(overrides, cu.URL)
 		response.Saved = &saved
+		response.SavedMetarr = newMetarrArgsResponse(&overrides.MetarrArgs)
+	}
+	writeJSON(w, r, http.StatusOK, response)
+}
+
+// handleGetOverrideOpsFile returns the ops in an ops file which apply to a channel URL, for a Download As dialog box.
+func (ss *serverStore) handleGetOverrideOpsFile(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimSpace(r.URL.Query().Get("path"))
+	if path == "" {
+		http.Error(w, "no ops file path given", http.StatusBadRequest)
+		return
+	}
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
+		return
+	}
+	urlID, err := strconv.ParseInt(chi.URLParam(r, "urlID"), 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
+		return
+	}
+	cu := c.URLByID(urlID)
+	if cu == nil {
+		http.Error(w, "channel URL not found", http.StatusNotFound)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
+	lines, err := metarr.FileOverrideLines(r.URL.Query().Get("box"), path, cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+
+	writeJSON(w, r, http.StatusOK, map[string][]string{"lines": lines})
 }
 
 // handleRunMetarr runs Metarr on the given videos, or all pending/failed videos if none are given. Overrides, for one
 // video, replace its options for this and later runs.
 func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
-
 	var requestBody struct {
 		VideoIDs  []int64               `json:"video_ids"`
 		Overrides *models.OverrideLines `json:"overrides"` // Edit & Run, for one video.
+		Metarr    *metarrArgsInput      `json:"metarr"`    // Edit & Run's other Metarr args, with the overrides.
 		Rerun     bool                  `json:"rerun"`     // Also runs on given videos Metarr already processed.
 	}
 	if err := decodeJSON(r, &requestBody); err != nil && !errors.Is(err, io.EOF) {
@@ -1452,19 +1173,14 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var err error
-		if overrides, err = parseOverrideLines(requestBody.Overrides); err != nil {
+		if overrides, err = parseOverrideLines(requestBody.Overrides, requestBody.Metarr); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
 
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 	if c.LoadErr != nil {
@@ -1498,23 +1214,13 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 			logger.Pl.S("Completed Metarr run for channel %q", c.Name)
 		}
 	}(ss.ctx)
-
-	w.WriteHeader(http.StatusAccepted)
-	if _, err := w.Write([]byte(`Metarr run started.`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusAccepted, "Metarr run started.")
 }
 
 // handleLatestDownloads retrieves the latest downloads for a given channel.
 func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel nil or not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 
@@ -1524,10 +1230,7 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(videos); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Could not encode videos to JSON: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, videos)
 }
 
 // handleSetLogLevel sets the logging level in the database.
@@ -1543,10 +1246,7 @@ func (ss *serverStore) handleSetLogLevel(w http.ResponseWriter, r *http.Request)
 	if err := ss.tss.SetSetting(keys.DebugLevel, strconv.Itoa(level)); err != nil {
 		logger.Pl.W("Failed to save logging level: %v", err)
 	}
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(fmt.Appendf(nil, "Logging level set to %d", level)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeText(w, http.StatusOK, fmt.Sprintf("Logging level set to %d", level))
 }
 
 // handleHealth reports whether the server and database are working (not whether jobs are running).
@@ -1554,36 +1254,27 @@ func (ss *serverStore) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 	defer cancel()
 
-	status := "ok"
-	w.Header().Set("Content-Type", "application/json")
 	if err := ss.db.PingContext(ctx); err != nil {
 		logger.Pl.E("Health check failed, database unreachable: %v", err)
-		status = "unhealthy"
-		w.WriteHeader(http.StatusServiceUnavailable)
+		writeJSON(w, r, http.StatusServiceUnavailable, map[string]string{"status": "unhealthy"})
+		return
 	}
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": status}); err != nil {
-		logger.Pl.E("Could not encode health status to JSON: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // handleGetIdle reports running jobs, returning 503 if any are running.
-func (ss *serverStore) handleGetIdle(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetIdle(w http.ResponseWriter, r *http.Request) {
 	running := app.RunningProcesses()
-	w.Header().Set("Content-Type", "application/json")
+	status := http.StatusOK
 	if running > 0 {
-		w.WriteHeader(http.StatusServiceUnavailable)
+		status = http.StatusServiceUnavailable
 	}
-	if err := json.NewEncoder(w).Encode(map[string]int32{"running": running}); err != nil {
-		logger.Pl.E("Could not encode running jobs to JSON: %v", err)
-	}
+	writeJSON(w, r, status, map[string]int32{"running": running})
 }
 
 // handleGetLogLevel retrieves the current logging level.
-func (ss *serverStore) handleGetLogLevel(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]int{"level": logging.Level()}); err != nil {
-		logger.Pl.E("Could not encode log level to JSON: %v", err)
-	}
+func (ss *serverStore) handleGetLogLevel(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string]int{"level": logging.Level()})
 }
 
 // handleGetTubarrLogs serves the log entries from memory.
@@ -1593,44 +1284,30 @@ func (ss *serverStore) handleGetTubarrLogs(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "tubarr logger not initialized", http.StatusNotFound)
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-
-	for _, line := range logs {
-		if len(line) == 0 {
-			continue
-		}
-
-		// Check if client disconnected.
-		if r.Context().Err() != nil {
-			return
-		}
-
-		if _, err := w.Write(line); err != nil {
-			// Client disconnected or network error.
-			return
-		}
-	}
+	writeLogLines(w, r, logs)
 }
 
 // handleGetMetarrLogs serves the Metarr log entries from memory.
 func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-
 	// Copy the lines under the lock, so a slow client doesn't hold up incoming logs (lines are never modified once stored).
 	vars.MetarrLogsMutex.RLock()
 	logs := slices.Clone(vars.MetarrLogs)
 	vars.MetarrLogsMutex.RUnlock()
+	writeLogLines(w, r, logs)
+}
 
-	for _, line := range logs {
-		// Check if client disconnected.
+// writeLogLines sends log lines as plain text, stopping if the client leaves.
+func writeLogLines(w http.ResponseWriter, r *http.Request, lines [][]byte) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
 		if r.Context().Err() != nil {
 			return
 		}
-
 		if _, err := w.Write(line); err != nil {
-			// Client disconnected or network error.
-			return
+			return // Client disconnected or network error.
 		}
 	}
 }
@@ -1681,7 +1358,7 @@ func (ss *serverStore) handlePostMetarrLogs(w http.ResponseWriter, r *http.Reque
 }
 
 // handleGetBlockedDomains returns all currently blocked domains with their contexts and timestamps.
-func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, r *http.Request) {
 	// Clean expired blocks first.
 	if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
 		logger.Pl.W("Failed to clean expired blocks: %v", err)
@@ -1721,11 +1398,7 @@ func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, _ *http.Re
 			TimeRemaining: timeRemaining,
 		})
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Pl.E("Failed to encode blocked domains: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, response)
 }
 
 // handleUnblockDomain unblocks a domain for all contexts or a specific context.
@@ -1740,38 +1413,26 @@ func (ss *serverStore) handleUnblockDomain(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var ctx vars.BlockContext
-	if contextParam != "" {
-		ctx = vars.BlockContext(contextParam)
-		// Validate context.
-		if ctx != vars.BlockContextUnauth && ctx != vars.BlockContextCookie && ctx != vars.BlockContextAuth {
-			http.Error(w, fmt.Sprintf("invalid context %q (must be one of: unauth, cookie, auth)", contextParam), http.StatusBadRequest)
-			return
-		}
+	blockCtx, err := blocking.ParseBlockContext(contextParam)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// Unblock the domain.
-	if err := blocking.UnblockDomain(ss.db, domain, ctx); err != nil {
+	if err := blocking.UnblockDomain(ss.db, domain, blockCtx); err != nil {
 		http.Error(w, fmt.Sprintf("failed to unblock domain: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(`{"message": "Domain unblocked successfully"}`)); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]string{"message": "Domain unblocked successfully"})
 }
 
 // handleNewVideoNotificationSeen marks a new video notification as seen.
 func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 
@@ -1795,13 +1456,7 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 // handleTogglePauseChannel toggles the pause state of a channel.
 func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
-	_, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found {
-		http.Error(w, "channel not found", http.StatusNotFound)
+	if _, ok := ss.channelFromRequest(w, r); !ok {
 		return
 	}
 
@@ -1809,7 +1464,7 @@ func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.R
 	var newPauseState bool
 
 	// Update channel settings with toggled pause state.
-	_, err = ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+	_, err := ss.cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
 		// Toggle the current pause state.
 		newPauseState = !s.Paused
 		s.Paused = newPauseState
@@ -1822,46 +1477,24 @@ func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.R
 	}
 
 	// Return success with new state.
-	var action string
+	action := "resumed"
 	if newPauseState {
 		action = "paused"
-	} else {
-		action = "resumed"
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if _, err := fmt.Fprintf(w, `{"message": "Channel %s successfully.", "paused": %t}`, action, newPauseState); err != nil {
-		logger.Pl.E("Failed to write response message: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": fmt.Sprintf("Channel %s successfully.", action), "paused": newPauseState})
 }
 
 // handleGetCrawlConcurrency returns the current crawl concurrency limit.
-func (ss *serverStore) handleGetCrawlConcurrency(w http.ResponseWriter, _ *http.Request) {
-	limit := viper.GetInt(keys.CrawlConcurrency)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]int{"limit": limit}); err != nil {
-		logger.Pl.E("Failed to encode crawl concurrency: %v", err)
-	}
+func (ss *serverStore) handleGetCrawlConcurrency(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string]int{"limit": viper.GetInt(keys.CrawlConcurrency)})
 }
 
 // handleSetCrawlConcurrency updates the crawl concurrency limit.
 func (ss *serverStore) handleSetCrawlConcurrency(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.FormValue("limit")
-	if limitStr == "" {
-		http.Error(w, "limit parameter is required", http.StatusBadRequest)
-		return
-	}
-
 	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid limit value %q: %v", limitStr, err), http.StatusBadRequest)
-		return
-	}
-
-	if limit < 0 {
-		http.Error(w, "limit must be 0 or greater", http.StatusBadRequest)
+	if err != nil || limit < 0 {
+		http.Error(w, fmt.Sprintf("invalid limit value %q, must be 0 or greater", limitStr), http.StatusBadRequest)
 		return
 	}
 
@@ -1870,39 +1503,20 @@ func (ss *serverStore) handleSetCrawlConcurrency(w http.ResponseWriter, r *http.
 		logger.Pl.W("Failed to persist crawl concurrency to DB: %v", err)
 	}
 	viper.Set(keys.CrawlConcurrency, limit)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Crawl concurrency updated", "limit": limit}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Crawl concurrency updated", "limit": limit})
 }
 
 // handleGetGlobalDownloadConcurrency returns the current global download concurrency limit.
-func (ss *serverStore) handleGetGlobalDownloadConcurrency(w http.ResponseWriter, _ *http.Request) {
-	limit := viper.GetInt(keys.GlobalDownloadConcurrency)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]int{"limit": limit}); err != nil {
-		logger.Pl.E("Failed to encode global download concurrency: %v", err)
-	}
+func (ss *serverStore) handleGetGlobalDownloadConcurrency(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string]int{"limit": viper.GetInt(keys.GlobalDownloadConcurrency)})
 }
 
 // handleSetGlobalDownloadConcurrency updates the global download concurrency limit.
 func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.FormValue("limit")
-	if limitStr == "" {
-		http.Error(w, "limit parameter is required", http.StatusBadRequest)
-		return
-	}
-
 	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid limit value %q: %v", limitStr, err), http.StatusBadRequest)
-		return
-	}
-
-	if limit < 0 {
-		http.Error(w, "limit must be 0 or greater", http.StatusBadRequest)
+	if err != nil || limit < 0 {
+		http.Error(w, fmt.Sprintf("invalid limit value %q, must be 0 or greater", limitStr), http.StatusBadRequest)
 		return
 	}
 
@@ -1912,19 +1526,12 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 	}
 	viper.Set(keys.GlobalDownloadConcurrency, limit)
 	downloads.InitGlobalDownloadLimit(limit)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Global download concurrency updated", "limit": limit}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Global download concurrency updated", "limit": limit})
 }
 
 // handleGetPostProcessConcurrency returns the global post-processing (Metarr) concurrency limit.
-func (ss *serverStore) handleGetPostProcessConcurrency(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]int{"limit": viper.GetInt(keys.PostProcessConcurrency)}); err != nil {
-		logger.Pl.E("Failed to encode post-processing concurrency: %v", err)
-	}
+func (ss *serverStore) handleGetPostProcessConcurrency(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string]int{"limit": viper.GetInt(keys.PostProcessConcurrency)})
 }
 
 // handleSetPostProcessConcurrency updates the global post-processing (Metarr) concurrency limit.
@@ -1941,24 +1548,17 @@ func (ss *serverStore) handleSetPostProcessConcurrency(w http.ResponseWriter, r 
 	}
 	viper.Set(keys.PostProcessConcurrency, limit)
 	app.InitGlobalMetarrLimit(limit)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Post-processing concurrency updated", "limit": limit}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Post-processing concurrency updated", "limit": limit})
 }
 
 // handleGetDomainLimits returns all per-domain download and crawl concurrency limits.
-func (ss *serverStore) handleGetDomainLimits(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetDomainLimits(w http.ResponseWriter, r *http.Request) {
 	limits, err := ss.tss.GetDomainLimits()
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to get domain limits: %v", err), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(limits); err != nil {
-		logger.Pl.E("Failed to encode domain limits: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, limits)
 }
 
 // handleSetDomainLimit sets the download and crawl concurrency limits for a specific domain (0 or blank = unlimited).
@@ -1987,11 +1587,7 @@ func (ss *serverStore) handleSetDomainLimit(w http.ResponseWriter, r *http.Reque
 	}
 	limits.DomainDownloads.Set(hostname, limit.Download)
 	limits.DomainCrawls.Set(hostname, limit.Crawl)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit updated", "hostname": hostname, "download": limit.Download, "crawl": limit.Crawl}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Domain limit updated", "hostname": hostname, "download": limit.Download, "crawl": limit.Crawl})
 }
 
 // handleDeleteDomainLimit removes the download and crawl concurrency limits for a specific domain.
@@ -2007,21 +1603,12 @@ func (ss *serverStore) handleDeleteDomainLimit(w http.ResponseWriter, r *http.Re
 	}
 	limits.DomainDownloads.Set(hostname, 0)
 	limits.DomainCrawls.Set(hostname, 0)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": "Domain limit removed", "hostname": hostname}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Domain limit removed", "hostname": hostname})
 }
 
 // handleGetScrapeConfigFile returns the currently configured custom scrape site config file path.
-func (ss *serverStore) handleGetScrapeConfigFile(w http.ResponseWriter, _ *http.Request) {
-	path := viper.GetString(keys.ScrapeConfigFile)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"path": path}); err != nil {
-		logger.Pl.E("Failed to encode scrape config file path: %v", err)
-	}
+func (ss *serverStore) handleGetScrapeConfigFile(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string]string{"path": viper.GetString(keys.ScrapeConfigFile)})
 }
 
 // handleSetScrapeConfigFile updates (or, given an empty path, clears) the custom scrape site config file.
@@ -2048,20 +1635,12 @@ func (ss *serverStore) handleSetScrapeConfigFile(w http.ResponseWriter, r *http.
 		logger.Pl.W("Failed to persist scrape config file path to DB: %v", err)
 	}
 	viper.Set(keys.ScrapeConfigFile, path)
-
-	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"message": "Scrape config file updated", "path": path, "sites": len(sites)}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Scrape config file updated", "path": path, "sites": len(sites)})
 }
 
 // handleGetFlareSolverrURL returns the currently configured FlareSolverr URL.
-func (ss *serverStore) handleGetFlareSolverrURL(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"url": viper.GetString(keys.FlareSolverrURL)}); err != nil {
-		logger.Pl.E("Failed to encode FlareSolverr URL: %v", err)
-	}
+func (ss *serverStore) handleGetFlareSolverrURL(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string]string{"url": viper.GetString(keys.FlareSolverrURL)})
 }
 
 // handleSetFlareSolverrURL updates (or, given an empty URL, clears) the FlareSolverr URL.
@@ -2078,20 +1657,14 @@ func (ss *serverStore) handleSetFlareSolverrURL(w http.ResponseWriter, r *http.R
 		logger.Pl.W("Failed to persist FlareSolverr URL to DB: %v", err)
 	}
 	viper.Set(keys.FlareSolverrURL, fsURL)
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"message": "FlareSolverr URL updated", "url": fsURL}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]string{"message": "FlareSolverr URL updated", "url": fsURL})
 }
 
 // handleGetTLS returns the HTTPS state and custom certificate paths.
-func (ss *serverStore) handleGetTLS(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleGetTLS(w http.ResponseWriter, r *http.Request) {
 	certPath, keyPath, certLocked := tlsPaths(ss.tss)
 	enabled, locked := httpsSetting(ss.tss)
-
-	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{
+	writeJSON(w, r, http.StatusOK, map[string]any{
 		"https":       ss.certs != nil, // Serving HTTPS now.
 		"enabled":     enabled,         // Serving HTTPS after a restart.
 		"locked":      locked,
@@ -2099,10 +1672,7 @@ func (ss *serverStore) handleGetTLS(w http.ResponseWriter, _ *http.Request) {
 		"key":         keyPath,
 		"cert_locked": certLocked,
 		"active":      ss.certs.active(),
-	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		logger.Pl.E("Failed to encode TLS settings: %v", err)
-	}
+	})
 }
 
 // handleSetTLS updates (or, given an empty certificate path, clears) the custom HTTPS certificate.
@@ -2138,10 +1708,7 @@ func (ss *serverStore) handleSetTLS(w http.ResponseWriter, r *http.Request) {
 	if ss.certs == nil {
 		msg = "Certificate saved, used once HTTPS is on"
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": msg, "active": ss.certs.active()}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": msg, "active": ss.certs.active()})
 }
 
 // handleSetHTTPSEnabled saves whether to serve HTTPS, applied when Tubarr restarts.
@@ -2164,10 +1731,7 @@ func (ss *serverStore) handleSetHTTPSEnabled(w http.ResponseWriter, r *http.Requ
 	if enabled != (ss.certs != nil) {
 		msg = "Saved, restart Tubarr to apply"
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]any{"message": msg, "enabled": enabled}); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": msg, "enabled": enabled})
 }
 
 // handleTestFlareSolverr solves a simple page through FlareSolverr to check it works.
@@ -2188,23 +1752,16 @@ func (ss *serverStore) handleTestFlareSolverr(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"status": status, "user_agent": userAgent, "cookies": cookies, "seconds": elapsed.Seconds()}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"status": status, "user_agent": userAgent, "cookies": cookies, "seconds": elapsed.Seconds()})
 }
 
 // handleReloadScrapeConfigFile re-parses the currently configured scrape config file from disk,
 // without changing which file is configured. Useful if the file was edited and saved while Tubarr is running.
-func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, _ *http.Request) {
+func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, r *http.Request) {
 	path := viper.GetString(keys.ScrapeConfigFile)
 	if path == "" {
 		siterules.Reset()
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]any{"message": "No scrape config file set; using built-in defaults", "sites": 0}); err != nil {
-			logger.Pl.E("Failed to encode response: %v", err)
-		}
+		writeJSON(w, r, http.StatusOK, map[string]any{"message": "No scrape config file set; using built-in defaults", "sites": 0})
 		return
 	}
 
@@ -2217,12 +1774,7 @@ func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, _ *ht
 
 	siterules.Reset()
 	siterules.Register(sites)
-
-	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"message": "Scrape config file reloaded", "path": path, "sites": len(sites)}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Scrape config file reloaded", "path": path, "sites": len(sites)})
 }
 
 // handleGetScrapeConfigContent returns the configured scrape config file's contents, for editing in the web UI.
@@ -2239,11 +1791,7 @@ func (ss *serverStore) handleGetScrapeConfigContent(w http.ResponseWriter, r *ht
 		}
 		resp["content"], resp["version"] = string(content), contentVersion(content)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode scrape config file content: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, resp)
 }
 
 // handleSetScrapeConfigContent validates new contents for the configured scrape config file, then saves and loads them.
@@ -2275,11 +1823,7 @@ func (ss *serverStore) handleSetScrapeConfigContent(w http.ResponseWriter, r *ht
 	siterules.Reset()
 	siterules.Register(sites)
 
-	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"message": "Scrape config file saved", "sites": len(sites), "version": contentVersion([]byte(content))}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		logger.Pl.E("Failed to encode response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Scrape config file saved", "sites": len(sites), "version": contentVersion([]byte(content))})
 }
 
 // contentVersion returns a version string for file contents, which changes whenever the contents do.
@@ -2373,10 +1917,7 @@ func (ss *serverStore) handleGetScrapeSites(w http.ResponseWriter, r *http.Reque
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode scrape sites: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, resp)
 }
 
 // handleTestScrapeSite tests the currently registered custom scraping rules against a URL
@@ -2394,11 +1935,7 @@ func (ss *serverStore) handleTestScrapeSite(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"matched": matched, "site": site, "metadata": metadata}
-	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode scrape test response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"matched": matched, "site": site, "metadata": metadata})
 }
 
 // handleTestCrawlSite runs the crawler Tubarr would use for a channel URL and returns the video URLs found.
@@ -2419,9 +1956,5 @@ func (ss *serverStore) handleTestCrawlSite(w http.ResponseWriter, r *http.Reques
 	for _, v := range videos {
 		urls = append(urls, v.URL)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	resp := map[string]any{"matched": matched, "source": source, "urls": urls, "videos": videos}
-	if err := json.NewEncoder(w).Encode(resp); err != nil && r.Context().Err() == nil { // Not if the client left.
-		logger.Pl.E("Failed to encode crawl test response: %v", err)
-	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"matched": matched, "source": source, "urls": urls, "videos": videos})
 }

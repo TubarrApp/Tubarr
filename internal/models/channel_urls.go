@@ -34,6 +34,11 @@ func (cu *ChannelURL) NeedsAuth() bool {
 	return cu.Username != "" && cu.LoginURL != ""
 }
 
+// Paused reports whether the channel URL's own settings pause it.
+func (cu *ChannelURL) Paused() bool {
+	return cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused
+}
+
 // ToChannelAccessDetails extracts authentication details from a ChannelURL
 func (cu *ChannelURL) ToChannelAccessDetails() *ChannelAccessDetails {
 	return &ChannelAccessDetails{

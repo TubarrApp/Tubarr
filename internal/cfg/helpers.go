@@ -3,7 +3,7 @@ package cfg
 import (
 	"fmt"
 	"strconv"
-	"strings"
+	"tubarr/internal/cmd"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -22,75 +22,69 @@ const (
 	flagTypeStringArray = "stringArray"
 )
 
-// configAliases lists deprecated config file keys still read for a flag.
-var configAliases = map[string][]string{keys.DownloadConcurrency: {keys.ConcurrencyLimit}}
-
-// resetCobraFlagsAndLoadViper loads in variables from config file(s).
+// resetCobraFlagsAndLoadViper sets each flag not given on the command line from its key in the config file, if set.
 func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
-	// Apply defaults for all known flags.
 	var errOrNil error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if !f.Changed {
-			key, aliases := f.Name, configAliases[f.Name]
-			switch f.Value.Type() {
-			case flagTypeString:
-				if val, ok := parsing.GetConfigValueOrAlias[string](v, key, aliases...); ok {
-					if err := f.Value.Set(val); err != nil {
-						errOrNil = err
-					} else {
-						f.Changed = true
-					}
-				}
-			case flagTypeInt:
-				if val, ok := parsing.GetConfigValueOrAlias[int](v, key, aliases...); ok {
-					if err := f.Value.Set(strconv.Itoa(val)); err != nil {
-						errOrNil = err
-					} else {
-						f.Changed = true
-					}
-				}
-			case flagTypeBool:
-				if val, ok := parsing.GetConfigValueOrAlias[bool](v, key, aliases...); ok {
-					if err := f.Value.Set(strconv.FormatBool(val)); err != nil {
-						errOrNil = err
-					} else {
-						f.Changed = true
-					}
-				}
-			case flagTypeFloat64:
-				if val, ok := parsing.GetConfigValueOrAlias[float64](v, key, aliases...); ok {
-					if err := f.Value.Set(fmt.Sprintf("%f", val)); err != nil {
-						errOrNil = err
-					} else {
-						f.Changed = true
-					}
-				}
-			case flagTypeStringSlice, flagTypeStringArray:
-				if slice, ok := parsing.GetConfigValueOrAlias[[]string](v, key, aliases...); ok && len(slice) > 0 {
-					// Try to type assert pflag.Value to pflag.SliceValue.
-					if sv, ok := f.Value.(pflag.SliceValue); ok {
-						if err := sv.Replace(slice); err != nil {
-							errOrNil = err
-						} else {
-							f.Changed = true
-						}
-					} else {
-						// Fallback: Try join on comma for types that only implement Set(string).
-						if err := f.Value.Set(strings.Join(slice, ",")); err != nil {
-							errOrNil = err
-						} else {
-							f.Changed = true
-						}
-					}
-				}
+		if f.Changed {
+			return
+		}
+		set := func(err error) {
+			if err != nil {
+				errOrNil = err
+				return
+			}
+			f.Changed = true
+		}
+		switch f.Value.Type() {
+		case flagTypeString:
+			if val, ok := parsing.GetConfigValue[string](v, f.Name); ok {
+				set(f.Value.Set(val))
+			}
+		case flagTypeInt:
+			if val, ok := parsing.GetConfigValue[int](v, f.Name); ok {
+				set(f.Value.Set(strconv.Itoa(val)))
+			}
+		case flagTypeBool:
+			if val, ok := parsing.GetConfigValue[bool](v, f.Name); ok {
+				set(f.Value.Set(strconv.FormatBool(val)))
+			}
+		case flagTypeFloat64:
+			if val, ok := parsing.GetConfigValue[float64](v, f.Name); ok {
+				set(f.Value.Set(fmt.Sprintf("%f", val)))
+			}
+		case flagTypeStringSlice, flagTypeStringArray: // pflag's slice values all implement SliceValue.
+			if slice, ok := parsing.GetConfigValue[[]string](v, f.Name); ok && len(slice) > 0 {
+				set(f.Value.(pflag.SliceValue).Replace(slice))
 			}
 		}
 	})
 	return errOrNil
 }
 
+// setChannelSettingsFlags registers the flags for a channel's or URL's settings (bar its directories), read into f.
+func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
+	cmd.SetProgramRelatedFlags(c, &f.Concurrency, &f.CrawlFreq, &f.ExternalDownloaderArgs, &f.ExternalDownloader,
+		&f.MoveOpFile, &f.MoveOps, &f.Pause)
+
+	cmd.SetDownloadFlags(c, &f.Retries, &f.UseGlobalCookies, &f.YTDLPOutputExt, &f.FromDate, &f.ToDate,
+		&f.CookiesFromBrowser, &f.MaxFilesize, &f.DLFilterFile, &f.DLFilters,
+		&f.YTDLPPreferredVideoCodecs, &f.YTDLPPreferredAudioCodecs)
+
+	cmd.SetMetarrFlags(c, &f.MaxCPU, &f.MetarrConcurrency, &f.MetarrExt, &f.ExtraFFmpegArgs, &f.MinFreeMem,
+		&f.OutDir, &f.MetaPurge, &f.RenameStyle, &f.MetaOpsFile, &f.FilteredMetaOpsFile, &f.FilenameOpsFile,
+		&f.FilteredFilenameOpsFile, &f.FilenameOps, &f.FilteredFilenameOps, &f.MetaOps, &f.FilteredMetaOps)
+
+	cmd.SetTranscodeFlags(c, &f.TranscodeGPU, &f.TranscodeGPUNode, &f.TranscodeVideoFilter, &f.TranscodeQuality,
+		&f.TranscodeVideoCodec, &f.TranscodeAudioCodec)
+
+	cmd.SetCustomYDLPArgFlags(c, &f.ExtraYTDLPVideoArgs, &f.ExtraYTDLPMetaArgs, &f.ExtraYTDLPCrawlArgs)
+
+	c.Flags().BoolVar(&f.AutoDownload, keys.AutoDownload, false, "Download new videos automatically (otherwise they wait in Available, see 'list-available' or the web UI)")
+}
+
 // mergeFlagsIntoInput merges flag values into the pointer struct.
-func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *models.ChannelInputPtrs) {
+func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *models.ChannelInput) {
 	if cmd.Flags().Changed(keys.Name) {
 		in.Name = &f.Name
 	}
@@ -238,7 +232,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.CrawlFreq) {
 		in.CrawlFreq = &f.CrawlFreq
 	}
-	if cmd.Flags().Changed(keys.DownloadConcurrency) || cmd.Flags().Changed(keys.ChanOrURLConcurrencyLimit) {
+	if cmd.Flags().Changed(keys.DownloadConcurrency) {
 		in.Concurrency = &f.Concurrency
 	}
 	if cmd.Flags().Changed(keys.MConcurrency) {
@@ -250,7 +244,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.MMaxCPU) {
 		in.MaxCPU = &f.MaxCPU
 	}
-	if cmd.Flags().Changed(keys.Pause) || cmd.Flags().Changed("pause") { // Both set f.Pause.
+	if cmd.Flags().Changed(keys.Pause) {
 		in.Pause = &f.Pause
 	}
 	if cmd.Flags().Changed(keys.IgnoreRun) {

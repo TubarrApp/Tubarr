@@ -2,6 +2,7 @@
 package metarr
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strconv"
@@ -85,6 +86,20 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 	validFilenameOps = withDefaultFilenameSet(v, cu, validFilenameOps)
 
+	// Download As args, blank ones using the channel URL's.
+	var o models.MetarrArgs
+	if v.Overrides != nil {
+		o = v.Overrides.MetarrArgs
+	}
+	m := cu.ChanURLMetarrArgs
+	videoCodecs, audioCodecs := m.TranscodeVideoCodecs, m.TranscodeAudioCodecs
+	if len(o.TranscodeVideoCodecs) > 0 {
+		videoCodecs = o.TranscodeVideoCodecs
+	}
+	if len(o.TranscodeAudioCodecs) > 0 {
+		audioCodecs = o.TranscodeAudioCodecs
+	}
+
 	mOutDirParser := parsing.NewDirectoryParser(c, cu, parsing.AllTags)
 	// Define fields to process.
 	fields := []metCmdMapping{
@@ -96,7 +111,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.FilenameOps,
 		},
 		{
-			metarrValue: metVals{f64: cu.ChanURLMetarrArgs.MaxCPU},
+			metarrValue: metVals{f64: cmp.Or(o.MaxCPU, m.MaxCPU)},
 			valType:     f64,
 			viperKey:    "",
 			cmdKey:      metkeys.MaxCPU,
@@ -108,7 +123,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.MetaOps,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.MinFreeMem},
+			metarrValue: metVals{str: cmp.Or(o.MinFreeMem, m.MinFreeMem)},
 			valType:     str,
 			viperKey:    keys.MMinFreeMem,
 			cmdKey:      metkeys.MinFreeMem,
@@ -120,56 +135,56 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.OutputDir,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.OutputExt},
+			metarrValue: metVals{str: cmp.Or(o.OutputExt, m.OutputExt)},
 			valType:     str,
 			viperKey:    keys.OutputFiletype,
 			cmdKey:      metkeys.Ext,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.RenameStyle},
+			metarrValue: metVals{str: cmp.Or(o.RenameStyle, m.RenameStyle)},
 			valType:     str,
 			viperKey:    keys.MRenameStyle,
 			cmdKey:      metkeys.RenameStyle,
 		},
 		// Transcoding.
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.ExtraFFmpegArgs},
+			metarrValue: metVals{str: cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs)},
 			valType:     str,
 			viperKey:    keys.MExtraFFmpegArgs,
 			cmdKey:      metkeys.ExtraFFmpegArgs,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeGPU},
+			metarrValue: metVals{str: cmp.Or(o.TranscodeGPU, m.TranscodeGPU)},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeGPU,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeGPUNode},
+			metarrValue: metVals{str: cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode)},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeGPUNode,
 		},
 		{
-			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.TranscodeVideoCodecs},
+			metarrValue: metVals{strSlice: videoCodecs},
 			valType:     strSlice,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeVideoCodecs,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeQuality},
+			metarrValue: metVals{str: cmp.Or(o.TranscodeQuality, m.TranscodeQuality)},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeQuality,
 		},
 		{
-			metarrValue: metVals{strSlice: cu.ChanURLMetarrArgs.TranscodeAudioCodecs},
+			metarrValue: metVals{strSlice: audioCodecs},
 			valType:     strSlice,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeAudioCodecs,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.TranscodeVideoFilter},
+			metarrValue: metVals{str: cmp.Or(o.TranscodeVideoFilter, m.TranscodeVideoFilter)},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeVideoFilter,
@@ -182,7 +197,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.Debug,
 		},
 		{
-			metarrValue: metVals{str: cu.ChanURLMetarrArgs.MetaPurge},
+			metarrValue: metVals{str: cmp.Or(o.MetaPurge, m.MetaPurge)},
 			valType:     str,
 			viperKey:    keys.MMetaPurge,
 			cmdKey:      metkeys.PurgeMetaFile,

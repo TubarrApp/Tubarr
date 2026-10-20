@@ -156,22 +156,20 @@
                       :class="selected[video.id] ? 'border-brand-500 ring-2 ring-brand-500' : 'border-gray-200 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-gray-800'"
                     >
                       <div class="relative aspect-video bg-gray-200 dark:bg-gray-800">
-                        <template x-if="video.thumbnail_url">
-                          <img
-                            :src="safeURL(video.thumbnail_url)"
-                            :alt="video.title"
-                            loading="lazy"
-                            referrerpolicy="no-referrer"
-                            class="h-full w-full object-cover"
-                          />
-                        </template>
-                        <template x-if="!video.thumbnail_url">
-                          <div class="flex h-full w-full items-center justify-center">
-                            <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                            </svg>
-                          </div>
-                        </template>
+                        <div class="flex h-full w-full items-center justify-center">
+                          <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                          </svg>
+                        </div>
+                        <img
+                          x-show="safeURL(video.thumbnail_url)"
+                          :src="safeURL(video.thumbnail_url)"
+                          :alt="video.title"
+                          loading="lazy"
+                          referrerpolicy="no-referrer"
+                          @error="$el.style.display = 'none'"
+                          class="absolute inset-0 h-full w-full object-cover"
+                        />
                         <input
                           type="checkbox"
                           :checked="!!selected[video.id]"

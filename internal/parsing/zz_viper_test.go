@@ -2,6 +2,7 @@ package parsing
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -17,7 +18,7 @@ func TestExampleConfigFiles(t *testing.T) {
 		if err := file.LoadConfigFile(v, filepath.Join("..", "..", "web", "src", "files", name)); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		var in models.ChannelInputPtrs
+		var in models.ChannelInput
 		if err := LoadViperIntoStruct(v, &in); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -32,15 +33,26 @@ func TestExampleConfigFiles(t *testing.T) {
 	}
 }
 
-// TestDownloadConcurrencyAliases tests the old config keys for download concurrency still load.
-func TestDownloadConcurrencyAliases(t *testing.T) {
-	for _, key := range []string{"download-concurrency", "download_concurrency", "concurrency-limit", "concurrency"} {
+// TestDownloadConcurrencyKey tests only the download-concurrency config key sets download concurrency.
+func TestDownloadConcurrencyKey(t *testing.T) {
+	for key, want := range map[string]int{"download-concurrency": 4, "download_concurrency": 4, "concurrency-limit": 0, "concurrency": 0} {
 		v := viper.New()
 		v.Set(key, 4)
-		var in models.ChannelInputPtrs
-		if err := LoadViperIntoStruct(v, &in); err != nil || NilOrZeroValue(in.Concurrency) != 4 {
-			t.Errorf("config key %q: download concurrency %d, %v; want 4", key, NilOrZeroValue(in.Concurrency), err)
+		var in models.ChannelInput
+		if err := LoadViperIntoStruct(v, &in); err != nil || NilOrZeroValue(in.Concurrency) != want {
+			t.Errorf("config key %q: download concurrency %d, %v; want %d", key, NilOrZeroValue(in.Concurrency), err, want)
 		}
+	}
+}
+
+// TestGivenKeys tests that GivenKeys lists the keys of the fields given, including those of embedded inputs.
+func TestGivenKeys(t *testing.T) {
+	name, freq, ext := "chan", 5, "mkv"
+	var in models.ChannelInput
+	in.Name, in.CrawlFreq, in.MetarrExt = &name, &freq, &ext
+	want := []string{"channel-name", "crawl-freq", "metarr-output-ext"}
+	if got := GivenKeys(&in); !slices.Equal(got, want) {
+		t.Errorf("GivenKeys = %v, want %v", got, want)
 	}
 }
 

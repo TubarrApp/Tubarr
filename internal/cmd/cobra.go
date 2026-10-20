@@ -199,8 +199,6 @@ func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) 
 func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd, moveOpsFile *string, moveOps *[]string, pause *bool) {
 	if concurrency != nil {
 		cmd.Flags().IntVar(concurrency, keys.DownloadConcurrency, 0, "Maximum videos this channel downloads at once (0 = 1)")
-		cmd.Flags().IntVar(concurrency, keys.ChanOrURLConcurrencyLimit, 0, "Old name of --"+keys.DownloadConcurrency)
-		_ = cmd.Flags().MarkDeprecated(keys.ChanOrURLConcurrencyLimit, "use --"+keys.DownloadConcurrency)
 	}
 
 	if crawlFreq != nil {

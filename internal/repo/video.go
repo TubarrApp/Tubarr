@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -565,7 +564,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 	query := fmt.Sprintf(
 		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, d.%s, c.%s "+
 			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
-			"WHERE v.%s = 0 AND v.%s = 0 AND d.%s IN (?%s) "+
+			"WHERE v.%s = 0 AND v.%s = 0 AND d.%s IN (%s) "+
 			"ORDER BY v.%s DESC, v.%s DESC, v.%s DESC",
 		consts.QVidID,
 		consts.QVidChanID,
@@ -585,7 +584,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		consts.DBChannels, consts.QChanID, consts.QVidChanID,
 		consts.QVidFinished,
 		consts.QVidIgnored,
-		consts.QDLStatus, strings.Repeat(", ?", len(statuses)-1),
+		consts.QDLStatus, placeholders(len(statuses)),
 		consts.QVidUploadDate,
 		consts.QVidCreatedAt,
 		consts.QVidID,
@@ -660,7 +659,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	defer rollback(tx)
 
 	claimQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = 0, %s = CASE WHEN ? THEN '' ELSE %s END, %s = ? WHERE %s = ? AND %s IN (?%s) "+
+		"UPDATE %s SET %s = ?, %s = 0, %s = CASE WHEN ? THEN '' ELSE %s END, %s = ? WHERE %s = ? AND %s IN (%s) "+
 			"AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = 0)",
 		consts.DBDownloads,
 		consts.QDLStatus,
@@ -668,7 +667,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		consts.QDLError, consts.QDLError, // A new download attempt clears the last one's error.
 		consts.QDLUpdatedAt,
 		consts.QDLVidID,
-		consts.QDLStatus, strings.Repeat(", ?", len(from)-1),
+		consts.QDLStatus, placeholders(len(from)),
 		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID, consts.QVidFinished, consts.QVidIgnored,
 	)
 	selectQuery := fmt.Sprintf(

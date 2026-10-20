@@ -4,7 +4,6 @@ package scraper
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -29,6 +28,7 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 	"tubarr/internal/times"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -50,22 +50,6 @@ func New() *Scraper {
 	}
 }
 
-// GetExistingReleases returns releases already in the database, and failed or canceled ones separately.
-func (s *Scraper) GetExistingReleases(cs contracts.ChannelStore, c *models.Channel) (existingURLsMap map[string]struct{}, existingURLs, failedURLs []string, err error) {
-	existingURLs, failedURLs, err = cs.GetDownloadedOrIgnoredVideoURLs(c)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, nil, err
-	}
-
-	existingMap := make(map[string]struct{}, len(existingURLs))
-	for _, url := range existingURLs {
-		existingMap[url] = struct{}{}
-	}
-
-	logger.Pl.D(2, "Loaded %d existing downloaded video URLs for channel %q", len(existingMap), c.Name)
-	return existingMap, existingURLs, failedURLs, nil
-}
-
 // GetNewReleases checks a channel's URLs for new video URLs, returning those found alongside any per-URL errors.
 func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, ignoreCrawl bool) ([]*models.Video, error) {
 	if len(c.URLModels) == 0 {
@@ -73,7 +57,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		return []*models.Video{}, nil
 	}
 
-	existingMap, existingURLs, failedURLs, err := s.GetExistingReleases(cs, c)
+	existingURLs, failedURLs, err := cs.GetDownloadedOrIgnoredVideoURLs(c)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +70,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 	// Process each ChannelURL
 	for _, cu := range c.URLModels {
-		if cu.IsManual || (!ignoreCrawl && (cu.ChanURLSettings != nil && cu.ChanURLSettings.Paused)) {
+		if cu.IsManual || (!ignoreCrawl && cu.Paused()) {
 			continue
 		}
 		logger.Pl.D(1, "Processing channel URL %q", cu.URL)
@@ -124,7 +108,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Fetch new episode URLs
-		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu, seenURLs, nil)
+		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu, seenURLs)
 		limits.Release(crawlSem)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -138,27 +122,25 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		// Filter and create video requests, in the order the channel lists them.
 		for _, newURL := range listedInOrder(newEpisodes) {
 			lv := newEpisodes[newURL]
-			if !isHTTPURL(newURL) {
+			if !validation.IsHTTPURL(newURL) {
 				logger.Pl.W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
 				continue
 			}
-			if !isHTTPURL(lv.ThumbnailURL) {
+			if !validation.IsHTTPURL(lv.ThumbnailURL) {
 				lv.ThumbnailURL = ""
 			}
-			if _, exists := existingMap[newURL]; !exists {
-				video := &models.Video{
-					ChannelID:    c.ID,
-					ChannelURLID: cu.ID,
-					ChannelURL:   cu.URL,
-					URL:          newURL,
-					Title:        lv.Title,
-					ThumbnailURL: lv.ThumbnailURL,
-					UploadDate:   lv.UploadDate,
-					Duration:     lv.Duration,
-				}
-				cu.Videos = append(cu.Videos, video)
-				newRequests = append(newRequests, video)
+			video := &models.Video{
+				ChannelID:    c.ID,
+				ChannelURLID: cu.ID,
+				ChannelURL:   cu.URL,
+				URL:          newURL,
+				Title:        lv.Title,
+				ThumbnailURL: lv.ThumbnailURL,
+				UploadDate:   lv.UploadDate,
+				Duration:     lv.Duration,
 			}
+			cu.Videos = append(cu.Videos, video)
+			newRequests = append(newRequests, video)
 		}
 	}
 
@@ -245,7 +227,7 @@ func (s *Scraper) ScraperURLCookies(ctx context.Context, cs contracts.ChannelSto
 }
 
 // newEpisodeURLs returns new episode URLs not yet downloaded, ignored, or Available, with what the listing shows of each.
-func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName string, cu *models.ChannelURL, existingURLs, fileURLs []string) (map[string]*listedVideo, error) {
+func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName string, cu *models.ChannelURL, existingURLs []string) (map[string]*listedVideo, error) {
 	channelURL := cu.URL
 
 	// Custom crawl rules and built-in scrapers take priority over yt-dlp.
@@ -254,22 +236,20 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName string, cu *mo
 		return nil, err
 	}
 	if !crawled {
-		if episodes, err = ytDlpURLFetch(ctx, channelName, cu, nil); err != nil {
+		if episodes, err = ytDlpURLFetch(ctx, channelName, cu); err != nil {
 			return nil, err
 		}
 	}
 
-	// Add URLs from other sources, which have no listing details.
+	// Add URLs given with --add-url, which have no listing details.
 	if episodes == nil {
 		episodes = make(map[string]*listedVideo)
 	}
-	extraURLs := slices.Clone(fileURLs)
 	if abstractions.IsSet(keys.URLAdd) {
-		extraURLs = append(extraURLs, abstractions.GetStringSlice(keys.URLAdd)...)
-	}
-	for _, u := range extraURLs {
-		if _, ok := episodes[u]; !ok {
-			episodes[u] = &listedVideo{Order: len(episodes)}
+		for _, u := range abstractions.GetStringSlice(keys.URLAdd) {
+			if _, ok := episodes[u]; !ok {
+				episodes[u] = &listedVideo{Order: len(episodes)}
+			}
 		}
 	}
 
@@ -291,31 +271,24 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName string, cu *mo
 	return newEpisodes, nil
 }
 
-// ignoreDownloadedURLs filters out already downloaded URLs.
+// ignoreDownloadedURLs filters out already downloaded URLs, compared normalized.
 func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
-	var newURLs = make([]string, 0, len(inputURLs))
-
-	for _, url := range inputURLs {
-		normalizedURL := normalizeURL(url)
-		exists := false
-		for _, existingURL := range existingURLs {
-			if normalizeURL(existingURL) == normalizedURL {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			newURLs = append(newURLs, url)
+	existing := make(map[string]struct{}, len(existingURLs))
+	for _, u := range existingURLs {
+		existing[normalizeURL(u)] = struct{}{}
+	}
+	newURLs := make([]string, 0, len(inputURLs))
+	for _, u := range inputURLs {
+		if _, seen := existing[normalizeURL(u)]; !seen {
+			newURLs = append(newURLs, u)
 		}
 	}
 	return newURLs
 }
 
 // ytDlpURLFetch fetches a channel URL's video URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelURL, uniqueEpisodeURLs map[string]*listedVideo) (map[string]*listedVideo, error) {
-	if uniqueEpisodeURLs == nil {
-		uniqueEpisodeURLs = make(map[string]*listedVideo)
-	}
+func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelURL) (map[string]*listedVideo, error) {
+	uniqueEpisodeURLs := make(map[string]*listedVideo)
 	channelURL, fs := cu.URL, cu.FlareSolverr
 	var crawlArgs, browser string
 	if cu.ChanURLSettings != nil {
