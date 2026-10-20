@@ -33,6 +33,7 @@
       .scroll-carousel-item {
         scroll-snap-align: start;
         flex: 0 0 100%;
+        min-width: 0; /* So long one-line text (e.g. file paths) truncates instead of widening the card. */
       }
 
       @media (min-width: 640px) {
@@ -660,7 +661,7 @@
                                 </p>
                                 <p
                                   class="mb-2 truncate text-xs text-gray-500 dark:text-gray-400"
-                                  :title="video.video_path"
+                                  @mouseenter="$el.title = $el.scrollWidth > $el.clientWidth ? video.video_path : ''"
                                   x-text="video.video_path || 'File path: N/A'"
                                 ></p>
                                 <a
