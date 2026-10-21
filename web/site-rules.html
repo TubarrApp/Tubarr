@@ -165,7 +165,7 @@
                 <div x-show="scrapeSites.length > 0" class="space-y-3">
                   <select
                     x-model="selectedSite"
-                    class="w-full h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="w-full h-9 rounded-lg border border-gray-300 bg-transparent pl-3 pr-8text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                   >
                     <template x-for="site in scrapeSites" :key="site.domain">
                       <option :value="site.domain" x-text="site.domain"></option>

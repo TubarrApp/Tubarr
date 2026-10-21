@@ -127,23 +127,24 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 	}
 
 	// Viper supported extensions.
-	validExts := map[string]bool{
-		".yaml": true,
-		".yml":  true,
-		".toml": true,
-		".json": true,
+	validExts := map[string]struct{}{
+		".yaml": {},
+		".yml":  {},
+		".toml": {},
+		".json": {},
 	}
 
 	var configFiles []string
 	for _, entry := range entries {
 		// Skip directories.
 		if entry.IsDir() {
+			logger.Pl.D(5, "Skipping entry %q in config file scan: is directory", entry.Name())
 			continue
 		}
 
 		// Check if file has valid extension.
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if validExts[ext] {
+		if _, exists := validExts[ext]; exists {
 			fullPath := filepath.Join(dirPath, entry.Name())
 			configFiles = append(configFiles, fullPath)
 		}

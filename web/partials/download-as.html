@@ -64,9 +64,54 @@ download-as-cancel if Download As closes without starting. -->
               type="button"
               @click="loadOpsFile(box.key)"
               :disabled="!opsFiles[box.key]?.trim() || working"
-              class="shrink-0 rounded border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+              class="w-16 shrink-0 rounded border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Load
+            </button>
+          </div>
+          <div x-show="box.key === 'meta_ops'" class="mb-1 flex flex-wrap gap-2">
+            <select
+              x-model="setField"
+              class="h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
+            >
+              <optgroup label="Groups">
+                <option value="all-titles">All titles</option>
+                <option value="all-credits">All credits</option>
+                <option value="all-dates">All dates</option>
+                <option value="all-descriptions">All descriptions</option>
+              </optgroup>
+              <optgroup label="Fields">
+                <option value="title">Title</option>
+                <option value="fulltitle">Full title</option>
+                <option value="description">Description</option>
+                <option value="director">Director</option>
+                <option value="artist">Artist</option>
+                <option value="studio">Studio</option>
+                <option value="genre">Genre</option>
+              </optgroup>
+              <option value="">Other…</option>
+            </select>
+            <input
+              x-show="setField === ''"
+              type="text"
+              x-model="setOther"
+              placeholder="Field name"
+              class="w-32 h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
+            />
+            <input
+              type="text"
+              x-model="setValue"
+              @keydown.enter.prevent="addSetOp()"
+              placeholder="Value"
+              class="min-w-0 flex-1 h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
+            />
+            <button
+              type="button"
+              @click="addSetOp()"
+              :disabled="!(setField || setOther.trim()) || setValue === ''"
+              class="w-16 shrink-0 rounded border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Add
             </button>
           </div>
           <textarea x-model="form[box.key]" rows="3" :placeholder="box.placeholder" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300" style="font-family: monospace;"></textarea>
@@ -78,7 +123,7 @@ download-as-cancel if Download As closes without starting. -->
         <div class="mt-3 grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
-            <select x-model="form.metarr.metarr_purge_metafile" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_purge_metafile" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_purge_metafile')"></option>
               <option value="json">JSON</option>
               <option value="nfo">NFO</option>
@@ -87,7 +132,7 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
-            <select x-model="form.metarr.metarr_output_ext" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_output_ext" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_output_ext')"></option>
               <option value="avi">avi</option>
               <option value="flv">flv</option>
@@ -99,7 +144,7 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Rename Style</label>
-            <select x-model="form.metarr.metarr_rename_style" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_rename_style" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_rename_style')"></option>
               <option value="spaces">Spaces</option>
               <option value="underscores">Underscores</option>
@@ -116,7 +161,7 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
-            <select x-model="form.metarr.metarr_gpu" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_gpu" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_gpu')"></option>
               <option value="auto">Auto</option>
               <option value="cuda">Nvidia (Cuda)</option>
@@ -181,6 +226,9 @@ download-as-cancel if Download As closes without starting. -->
       defaults: {}, // The channel URL's directories and ops.
       metarrDefaults: {}, // The channel URL's other Metarr args.
       opsFiles: {}, // Ops file paths typed in, by box.
+      setField: 'all-titles', // The meta op builder's field, '' for another typed into setOther.
+      setOther: '',
+      setValue: '',
       metarrKeys: [
         'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
         'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_quality', 'metarr_transcode_video_transcode_codecs',
@@ -214,6 +262,7 @@ download-as-cancel if Download As closes without starting. -->
         this.defaults = {};
         this.metarrDefaults = {};
         this.opsFiles = {};
+        this.setValue = '';
         this.form = { metarr: {} };
         this.error = null;
         this.loaded = false;
@@ -236,6 +285,16 @@ download-as-cancel if Download As closes without starting. -->
       },
 
       // The channel URL's ops, with no filename and the usual directories and other args (blank, so move ops still apply).
+      // Adds a field:set:value line to the top of the meta ops, replacing any other set of that field.
+      addSetOp() {
+        const field = (this.setField || this.setOther).trim().replace(/[\\:|]/g, c => `\\${c}`);
+        if (!field || this.setValue === '') return;
+        const prefix = `${field}:set:`.toLowerCase();
+        const kept = (this.form.meta_ops || '').split('\n').filter(l => l.trim() && !l.toLowerCase().startsWith(prefix));
+        this.form.meta_ops = [`${field}:set:${this.setValue.replace(/\\/g, '\\\\')}`, ...kept].join('\n');
+        this.setValue = '';
+      },
+
       defaultForm() {
         return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '', metarr: {} };
       },
