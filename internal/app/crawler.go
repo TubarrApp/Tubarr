@@ -135,14 +135,14 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 }
 
 // ManualDownloadToChannel downloads custom video URLs sent in to the channel.
-func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, videos []models.ManualVideo) (err error) {
+func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, manualVideos []models.ManualVideo) (err error) {
 	if c == nil || c.ChanSettings == nil {
 		return fmt.Errorf("invalid nil parameters (channel: %v, channel settings: %v)", c == nil, c.ChanSettings == nil)
 	}
 	if c.LoadErr != nil {
 		return c.LoadErr
 	}
-	if bad := CheckManualVideos(c, videos); len(bad) > 0 {
+	if bad := CheckManualVideos(c, manualVideos); len(bad) > 0 {
 		return fmt.Errorf("can't download:\n%s", strings.Join(bad, "\n"))
 	}
 	queueCtx := state.QueueCtx(ctx)
@@ -159,7 +159,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	scrape := scraper.New()
 
 	// Video request model slice.
-	customVideoRequests := make([]*models.Video, 0, len(videos))
+	customVideoRequests := make([]*models.Video, 0, len(manualVideos))
 
 	// Videos are batched by channel URL and login, each batch with the ChannelURL model it downloads through.
 	type manualBatch struct {
@@ -170,12 +170,12 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		cu     *models.ChannelURL
 		videos []*models.Video
 	}
-	batches := make(map[manualBatch]*batchVideos, len(videos))
+	batches := make(map[manualBatch]*batchVideos, len(manualVideos))
 
 	// Video URLs already queued, to skip duplicates.
-	queuedURLs := make(map[string]struct{}, len(videos))
+	queuedURLs := make(map[string]struct{}, len(manualVideos))
 
-	for _, mv := range videos {
+	for _, mv := range manualVideos {
 		actualVideoURL := mv.URL
 		targetChannelURLModel, err := ManualChannelURL(cs, c, mv.ChannelURLID)
 		if err != nil {
@@ -220,6 +220,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 			ChannelURLID: targetChannelURLModel.ID,
 			ChannelURL:   targetChannelURLModel.URL,
 			URL:          actualVideoURL,
+			Title:        mv.Title,
 			SkipFilters:  true,
 		}
 		// Known videos (e.g. chosen from Available) keep their ID, so they show on the Downloads page from the start.
@@ -265,7 +266,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 	}
 
 	if len(customVideoRequests) == 0 {
-		return fmt.Errorf("all %d video(s) were skipped, see the errors above", len(videos))
+		return fmt.Errorf("all %d video(s) were skipped, see the errors above", len(manualVideos))
 	}
 
 	// Main process.
@@ -324,8 +325,8 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 
 // UnavailableDestinations returns why videos can't be downloaded now, as their channel URL's destination is unavailable
 // (e.g. an unmounted drive).
-func UnavailableDestinations(c *models.Channel, videos []models.ManualVideo) (bad []string) {
-	for _, mv := range videos {
+func UnavailableDestinations(c *models.Channel, manualVideos []models.ManualVideo) (bad []string) {
+	for _, mv := range manualVideos {
 		cu := &models.ChannelURL{} // Manual downloads use the channel's settings.
 		if found := c.URLByID(mv.ChannelURLID); mv.ChannelURLID != 0 && found != nil {
 			cu = found
@@ -401,15 +402,15 @@ func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Chan
 
 // downloadClaimed downloads claimed videos through their channel URLs.
 func downloadClaimed(ctx context.Context, s contracts.Store, c *models.Channel, claimed []*models.Video, auth *models.ManualAuth) error {
-	videos := make([]models.ManualVideo, 0, len(claimed))
+	manualVideos := make([]models.ManualVideo, 0, len(claimed))
 	for _, v := range claimed {
-		mv := models.ManualVideo{URL: v.URL, Auth: auth} // No channel URL if since removed, to download as a manual video.
+		mv := models.ManualVideo{URL: v.URL, Auth: auth, Title: v.Title} // No channel URL if since removed, to download as a manual video.
 		if c.URLByID(v.ChannelURLID) != nil {
 			mv.ChannelURLID = v.ChannelURLID
 		}
-		videos = append(videos, mv)
+		manualVideos = append(manualVideos, mv)
 	}
-	return ManualDownloadToChannel(ctx, s, s.ChannelStore(), c, videos)
+	return ManualDownloadToChannel(ctx, s, s.ChannelStore(), c, manualVideos)
 }
 
 // CrawlChannel crawls a channel for new URLs.
@@ -782,8 +783,8 @@ func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, v
 
 // CheckManualVideos returns the videos that can't be sent in to the channel, with why. Each must be a full http(s) video
 // URL, with no channel URL or one of the channel's.
-func CheckManualVideos(c *models.Channel, videos []models.ManualVideo) (bad []string) {
-	for _, mv := range videos {
+func CheckManualVideos(c *models.Channel, manualVideos []models.ManualVideo) (bad []string) {
+	for _, mv := range manualVideos {
 		switch {
 		case !validation.IsHTTPURL(mv.URL):
 			bad = append(bad, fmt.Sprintf("%q: not a full http(s) URL", mv.URL))
@@ -815,12 +816,12 @@ func ManualChannelURL(cs contracts.ChannelStore, c *models.Channel, id int64) (*
 
 // AddManualAvailable adds video URLs to the channel's Available list, returning the added videos and the URLs already
 // in the channel.
-func AddManualAvailable(s contracts.Store, c *models.Channel, videos []models.ManualVideo) (added []*models.Video, existing []string, err error) {
-	if bad := CheckManualVideos(c, videos); len(bad) > 0 {
+func AddManualAvailable(s contracts.Store, c *models.Channel, manualVideos []models.ManualVideo) (added []*models.Video, existing []string, err error) {
+	if bad := CheckManualVideos(c, manualVideos); len(bad) > 0 {
 		return nil, nil, fmt.Errorf("can't add:\n%s", strings.Join(bad, "\n"))
 	}
-	requests := make([]*models.Video, 0, len(videos))
-	for _, mv := range videos {
+	requests := make([]*models.Video, 0, len(manualVideos))
+	for _, mv := range manualVideos {
 		if slices.ContainsFunc(requests, func(v *models.Video) bool { return v.URL == mv.URL }) {
 			continue
 		}

@@ -86,6 +86,12 @@ func TestAvailableVideos(t *testing.T) {
 	if err != nil || len(claimed) != 2 {
 		t.Fatalf("first claim: got %d, %v, want 2", len(claimed), err)
 	}
+	// Claimed videos keep their title, so the Downloads page can show it before the metadata arrives.
+	for _, v := range claimed {
+		if v.URL == "https://example.com/v/1" && v.Title != "One" {
+			t.Errorf("claimed video 1's title = %q, want \"One\"", v.Title)
+		}
+	}
 	if again, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(again) != 0 {
 		t.Fatalf("second claim: got %d, %v, want 0", len(again), err)
 	}

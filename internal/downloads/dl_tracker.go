@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -78,6 +79,7 @@ func (t *DownloadTracker) SendUpdate(v *models.Video) {
 		Stage:        v.DownloadStatus.Stage,
 		Error:        v.DownloadStatus.Error,
 	}
+	trackETA(update.VideoID, update.Status, update.Percent, time.Now())
 	select {
 	case <-t.done:
 		logger.Pl.W("Attempted to send update after tracker stopped (Video %q)", v.URL)

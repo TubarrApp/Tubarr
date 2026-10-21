@@ -232,14 +232,14 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 					return fmt.Errorf("--%s %q isn't one of channel %q's URLs: %v", keys.ChannelURL, channelURL, c.Name, valid)
 				}
 			}
-			videos := make([]models.ManualVideo, 0, len(videoURLs))
+			manualVideos := make([]models.ManualVideo, 0, len(videoURLs))
 			for _, u := range videoURLs {
-				videos = append(videos, models.ManualVideo{URL: u, ChannelURLID: channelURLID})
+				manualVideos = append(manualVideos, models.ManualVideo{URL: u, ChannelURLID: channelURLID})
 			}
 
 			// Add to the Available list instead of downloading.
 			if sendToAvailable {
-				added, existing, err := app.AddManualAvailable(s, c, videos)
+				added, existing, err := app.AddManualAvailable(s, c, manualVideos)
 				if err != nil {
 					return err
 				}
@@ -259,7 +259,7 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 			defer unlock()
 
 			// Download URLs.
-			if err := app.ManualDownloadToChannel(crawlCtx, s, cs, c, videos); err != nil {
+			if err := app.ManualDownloadToChannel(crawlCtx, s, cs, c, manualVideos); err != nil {
 				return err
 			}
 

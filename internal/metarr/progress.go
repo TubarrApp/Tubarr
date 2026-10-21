@@ -12,6 +12,7 @@ type Progress struct {
 	Frame   int64   `json:"frame"`
 	FPS     float64 `json:"fps"`
 	Speed   string  `json:"speed"`
+	ETA     int64   `json:"eta"` // Seconds left, -1 when unknown.
 }
 
 // progressByVideo holds running videos' latest progress, by video ID.
@@ -33,7 +34,7 @@ func parseProgress(line string) (p Progress, ok bool) {
 	if !ok {
 		return p, false
 	}
-	p.Percent = -1
+	p.Percent, p.ETA = -1, -1
 	for field := range strings.FieldsSeq(rest) {
 		key, val, _ := strings.Cut(field, "=")
 		switch key {
@@ -47,6 +48,10 @@ func parseProgress(line string) (p Progress, ok bool) {
 			p.FPS, _ = strconv.ParseFloat(val, 64)
 		case "speed":
 			p.Speed = val
+		case "eta":
+			if n, err := strconv.ParseInt(val, 10, 64); err == nil {
+				p.ETA = n
+			}
 		}
 	}
 	return p, true

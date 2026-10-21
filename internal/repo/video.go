@@ -694,10 +694,11 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID, consts.QVidFinished, consts.QVidIgnored,
 	)
 	selectQuery := fmt.Sprintf(
-		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QVidURL,
 		consts.QVidChanURLID,
 		consts.QVidChanURL,
+		consts.QVidTitle,
 		consts.DBVideos,
 		consts.QVidID,
 	)
@@ -725,12 +726,13 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 
 		v := &models.Video{ID: id, ChannelID: channelID}
 		var channelURLID sql.NullInt64
-		var channelURL sql.NullString
-		if err := tx.QueryRow(selectQuery, id).Scan(&v.URL, &channelURLID, &channelURL); err != nil {
+		var channelURL, title sql.NullString
+		if err := tx.QueryRow(selectQuery, id).Scan(&v.URL, &channelURLID, &channelURL, &title); err != nil {
 			return nil, fmt.Errorf("failed to read claimed video %d: %w", id, err)
 		}
 		v.ChannelURLID = channelURLID.Int64
 		v.ChannelURL = channelURL.String
+		v.Title = title.String
 		v.DownloadStatus.Status = status
 
 		if status == consts.DLStatusIgnored {

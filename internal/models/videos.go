@@ -108,6 +108,7 @@ type ManualVideo struct {
 	URL          string      `json:"url"`
 	ChannelURLID int64       `json:"channel_url_id"`
 	Auth         *ManualAuth `json:"auth,omitempty"` // Replaces the channel URL's login for this download only.
+	Title        string      `json:"-"`              // Known from Available, shown until the metadata arrives.
 }
 
 // ManualAuth is login details sent with manual videos, used for their download and never stored.

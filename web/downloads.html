@@ -5,10 +5,11 @@
       [x-cloak] { display: none !important; }
       .downloads-table { width: 100%; }
       .downloads-table .check-col { width: 2.5rem; }
-      .downloads-table .video-col { width: 36%; }
-      .downloads-table .channel-col { width: 18%; }
-      .downloads-table .status-col { width: 14%; }
-      .downloads-table .progress-col { width: 22%; }
+      .downloads-table .video-col { width: 33%; }
+      .downloads-table .channel-col { width: 17%; }
+      .downloads-table .status-col { width: 13%; }
+      .downloads-table .progress-col { width: 21%; }
+      .downloads-table .eta-col { width: 8%; font-variant-numeric: tabular-nums; }
       .scrollable-text { display: block; max-width: 100%; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
       .scrollable-text::-webkit-scrollbar { height: 4px; }
     </style>
@@ -139,6 +140,7 @@
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 channel-col">Channel</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 status-col">Status</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 progress-col">Progress</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 eta-col">ETA</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
                       </tr>
                     </thead>
@@ -179,6 +181,9 @@
                               </div>
                               <span class="text-sm text-gray-600 dark:text-gray-400 w-[3.5rem] text-right" x-text="`${download.download_status.percentage.toFixed(1)}%`"></span>
                             </div>
+                          </td>
+                          <td class="px-4 py-3 eta-col">
+                            <span class="text-sm text-gray-600 dark:text-gray-400" x-text="formatETA(download.download_status.eta)"></span>
                           </td>
                           <td class="px-4 py-3">
                             <button

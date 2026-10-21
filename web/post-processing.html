@@ -5,11 +5,12 @@
       [x-cloak] { display: none !important; }
       .transcodes-table { width: 100%; }
       .transcodes-table .check-col { width: 2.5rem; }
-      .transcodes-table .video-col { width: 32%; }
-      .transcodes-table .channel-col { width: 16%; }
+      .transcodes-table .video-col { width: 30%; }
+      .transcodes-table .channel-col { width: 15%; }
       .transcodes-table .status-col { width: 9%; }
-      .transcodes-table .progress-col { width: 20%; font-variant-numeric: tabular-nums; }
-      .transcodes-table .elapsed-col { width: 11%; font-variant-numeric: tabular-nums; }
+      .transcodes-table .progress-col { width: 18%; font-variant-numeric: tabular-nums; }
+      .transcodes-table .eta-col { width: 8%; font-variant-numeric: tabular-nums; }
+      .transcodes-table .elapsed-col { width: 10%; font-variant-numeric: tabular-nums; }
       .scrollable-text { display: block; max-width: 100%; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
       .scrollable-text::-webkit-scrollbar { height: 4px; }
     </style>
@@ -135,6 +136,7 @@
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 channel-col">Channel</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 status-col">Status</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 progress-col">Progress</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 eta-col">ETA</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 elapsed-col">Time</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
                       </tr>
@@ -177,6 +179,9 @@
                               </div>
                             </template>
                             <span x-show="!job.progress" class="text-sm text-gray-400 dark:text-gray-500">—</span>
+                          </td>
+                          <td class="px-4 py-3 eta-col">
+                            <span class="text-sm text-gray-600 dark:text-gray-400" x-text="formatETA(job.progress?.eta)"></span>
                           </td>
                           <td class="px-4 py-3 elapsed-col">
                             <span

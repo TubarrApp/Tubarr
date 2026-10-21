@@ -2,6 +2,15 @@
   // safeURL returns u if it is an http(s) URL, for binding to href or src, else null (Alpine then drops the attribute).
   window.safeURL = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
 
+  // formatETA renders seconds left as e.g. "1h 02m", "4m 10s" or "12s", or "—" when unknown.
+  window.formatETA = (s) => {
+    if (s == null || s < 0) return '—';
+    s = Math.round(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+    return m > 0 ? `${m}m ${String(sec).padStart(2, '0')}s` : `${sec}s`;
+  };
+
   // videoThumb returns the image to show for a video: its Download As thumbnail if it has one, else the crawled one.
   window.videoThumb = (v) => (v.custom_thumbnail ? `${window.location.origin}/api/v1/videos/${v.id}/thumbnail` : safeURL(v.thumbnail_url));
 

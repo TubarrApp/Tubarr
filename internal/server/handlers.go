@@ -623,6 +623,7 @@ func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request
 			videoMap[consts.QVidChanName] = c.Name
 			videoMap[consts.QVidURL] = video.URL
 			videoMap[consts.QVidThumbnailURL] = video.ThumbnailURL
+			video.DownloadStatus.ETA = downloads.ETA(video.ID, video.DownloadStatus.Percent)
 			videoMap[consts.QVidDLStatus] = video.DownloadStatus
 
 			allDownloads = append(allDownloads, videoMap)
@@ -880,7 +881,7 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request) {
 	// Parse request body.
 	var requestBody struct {
-		Videos []models.ManualVideo `json:"videos"`
+		ManualVideos []models.ManualVideo `json:"videos"`
 	}
 
 	if err := decodeJSON(r, &requestBody); err != nil {
@@ -888,7 +889,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if len(requestBody.Videos) == 0 {
+	if len(requestBody.ManualVideos) == 0 {
 		http.Error(w, "no videos provided", http.StatusBadRequest)
 		return
 	}
@@ -901,11 +902,11 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
-	if bad := app.CheckManualVideos(c, requestBody.Videos); len(bad) > 0 {
+	if bad := app.CheckManualVideos(c, requestBody.ManualVideos); len(bad) > 0 {
 		http.Error(w, "can't download:\n"+strings.Join(bad, "\n"), http.StatusBadRequest)
 		return
 	}
-	if bad := app.UnavailableDestinations(c, requestBody.Videos); len(bad) > 0 {
+	if bad := app.UnavailableDestinations(c, requestBody.ManualVideos); len(bad) > 0 {
 		http.Error(w, "can't download now:\n"+strings.Join(bad, "\n"), http.StatusConflict)
 		return
 	}
@@ -916,13 +917,13 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	go func() {
 		ctx, unlock, err := state.LockCrawl(ss.ctx, c.ID)
 		if err != nil {
-			logger.Pl.W("Manual download of %d URL(s) for channel %q did not start: %v", len(requestBody.Videos), c.Name, err)
+			logger.Pl.W("Manual download of %d URL(s) for channel %q did not start: %v", len(requestBody.ManualVideos), c.Name, err)
 			return
 		}
 		defer unlock()
-		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.Videos), c.Name, c.ID)
+		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
 
-		if err := app.ManualDownloadToChannel(ctx, ss.s, ss.cs, c, requestBody.Videos); err != nil {
+		if err := app.ManualDownloadToChannel(ctx, ss.s, ss.cs, c, requestBody.ManualVideos); err != nil {
 			logger.Pl.E("Encountered errors downloading URLs for channel %q: %v", c.Name, err)
 		} else {
 			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)
@@ -935,13 +936,13 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 // in the channel.
 func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
-		Videos []models.ManualVideo `json:"videos"`
+		ManualVideos []models.ManualVideo `json:"videos"`
 	}
 	if err := decodeJSON(r, &requestBody); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
-	if len(requestBody.Videos) == 0 {
+	if len(requestBody.ManualVideos) == 0 {
 		http.Error(w, "no videos provided", http.StatusBadRequest)
 		return
 	}
@@ -950,16 +951,16 @@ func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	if bad := app.CheckManualVideos(c, requestBody.Videos); len(bad) > 0 {
+	if bad := app.CheckManualVideos(c, requestBody.ManualVideos); len(bad) > 0 {
 		http.Error(w, "can't add:\n"+strings.Join(bad, "\n"), http.StatusBadRequest)
 		return
 	}
-	if slices.ContainsFunc(requestBody.Videos, func(mv models.ManualVideo) bool { return mv.Auth != nil }) {
+	if slices.ContainsFunc(requestBody.ManualVideos, func(mv models.ManualVideo) bool { return mv.Auth != nil }) {
 		http.Error(w, "authentication details aren't stored, so videos with them can only be downloaded directly", http.StatusBadRequest)
 		return
 	}
 
-	added, existing, err := app.AddManualAvailable(ss.s, c, requestBody.Videos)
+	added, existing, err := app.AddManualAvailable(ss.s, c, requestBody.ManualVideos)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
