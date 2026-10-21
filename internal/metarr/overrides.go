@@ -126,7 +126,7 @@ func filteredMetaOpLines(ops []models.FilteredMetaOps, chanURL string) []string 
 				continue
 			}
 			f.ChannelURL = ""
-			lines = append(lines, models.FiltersToString(f, false)+"|"+sharedparsing.FormatMetaOp(op, false))
+			lines = append(lines, sharedparsing.FormatFilter(f, false)+sharedparsing.FilterSeparator+sharedparsing.FormatMetaOp(op, false))
 		}
 	}
 	return lines
@@ -142,7 +142,7 @@ func filteredFilenameOpLines(ops []models.FilteredFilenameOps, chanURL string) [
 				continue
 			}
 			f.ChannelURL = ""
-			lines = append(lines, models.FiltersToString(f, false)+"|"+sharedparsing.FormatFilenameOp(op, false))
+			lines = append(lines, sharedparsing.FormatFilter(f, false)+sharedparsing.FilterSeparator+sharedparsing.FormatFilenameOp(op, false))
 		}
 	}
 	return lines

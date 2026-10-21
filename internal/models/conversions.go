@@ -17,27 +17,9 @@ func FiltersArrayToSlice(fModels []Filters, withMustAny bool) []string {
 	filters := make([]string, 0, len(fModels))
 
 	for _, f := range fModels {
-		filters = append(filters, FiltersToString(f, withMustAny))
+		filters = append(filters, sharedparsing.FormatFilter(f, withMustAny))
 	}
 	return filters
-}
-
-// FiltersToString converts a filter model back into string form.
-//
-// withMustAny must match what the filter's context accepts when parsed back in, i.e. false
-// for filtered meta/filename ops, which carry no condition.
-func FiltersToString(f Filters, withMustAny bool) string {
-	fields := []string{f.Field, f.FilterType, f.Value}
-	if withMustAny {
-		fields = append(fields, f.MustAny)
-	}
-
-	op := sharedparsing.JoinEscaped(fields, ':')
-	// Add channel URL if present. A URL cannot hold an unescaped separator.
-	if f.ChannelURL != "" {
-		op = f.ChannelURL + "|" + op
-	}
-	return op
 }
 
 // ------ Meta Filter Move Ops -----------------------------------------------------------------
@@ -53,20 +35,9 @@ func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 
 // MetaFilterMoveOpsToString converts a meta filter move op back to its string form.
 //
-// url|title:contains:dog|/dogs
+// url|title:contains:dog||/dogs
 func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
-	f := m.Filter()
-	parts := []string{f.Field, f.FilterType}
-	if f.Value != "" {
-		parts = append(parts, f.Value)
-	}
-	// The directory is the rest of the op, so only '\' needs escaping in it.
-	op := sharedparsing.JoinEscaped(parts, ':') + "|" + strings.ReplaceAll(m.OutputDir, `\`, `\\`)
-	// Add channel URL if present.
-	if m.ChannelURL != "" {
-		op = m.ChannelURL + "|" + op
-	}
-	return op
+	return sharedparsing.FormatFilter(m.Filter(), false) + sharedparsing.FilterSeparator + strings.ReplaceAll(m.OutputDir, `\`, `\\`)
 }
 
 // ------ Filtered Meta Ops -----------------------------------------------------------------
@@ -84,7 +55,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	}
 
 	for i := range filterStrings {
-		slice = append(slice, filterStrings[i]+"|"+metaOpStrings[i])
+		slice = append(slice, filterStrings[i]+sharedparsing.FilterSeparator+metaOpStrings[i])
 	}
 	return slice
 }
@@ -104,7 +75,7 @@ func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	}
 
 	for i := range filterStrings {
-		slice = append(slice, filterStrings[i]+"|"+filenameOpStrings[i])
+		slice = append(slice, filterStrings[i]+sharedparsing.FilterSeparator+filenameOpStrings[i])
 	}
 	return slice
 }

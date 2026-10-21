@@ -637,10 +637,10 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	switch pickIndex(3) {
 	case 1:
 		sc.moves = []liveMove{{value: "cats", dir: filepath.Join(dir, "cats")}}
-		form.Set("move_ops", "title:contains:cats|"+sc.moves[0].dir)
+		form.Set("move_ops", "title:contains:cats||"+sc.moves[0].dir)
 	case 2:
 		sc.moves = []liveMove{{feed: "b", value: "dogs", dir: filepath.Join(dir, "dogs")}}
-		form.Set("move_ops", site.feedURL("b")+"|title:contains:dogs|"+sc.moves[0].dir)
+		form.Set("move_ops", site.feedURL("b")+"|title:contains:dogs||"+sc.moves[0].dir)
 	}
 	outputDir := pick("", filepath.Join(dir, "metarr"), filepath.Join(dir, "metarr", "{{year}}"))
 	set("metarr_output_directory", outputDir)
@@ -649,8 +649,8 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	set("metarr_rename_style", pick("", "underscores", "spaces", "fixes-only", "skip"))
 	set("metarr_filename_ops", pick("", "prefix:[Live] ", "append: [Live]"))
 	set("metarr_meta_ops", pick("", "artist:set:Live Band"))
-	set("metarr_filtered_meta_ops", pick("", "title:contains:cats|artist:set:Cat Band"))
-	set("metarr_filtered_filename_ops", pick("", "title:contains:dogs|prefix:[Dog] "))
+	set("metarr_filtered_meta_ops", pick("", "title:contains:cats||artist:set:Cat Band"))
+	set("metarr_filtered_filename_ops", pick("", "title:contains:dogs||prefix:[Dog] "))
 	purge := pick("", "json", "all")
 	set("metarr_purge_metafile", purge)
 	sc.purge = purge != ""

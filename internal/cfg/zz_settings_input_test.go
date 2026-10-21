@@ -255,11 +255,11 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 	videoDir, jsonDir, moveDir, outDir := mkdir("videos"), mkdir("json"), mkdir("moved"), mkdir("out")
 	var (
 		filters             = []string{"title:contains:cat:must"}
-		moveOps             = []string{"title:contains:cat|" + moveDir}
+		moveOps             = []string{"title:contains:cat||" + moveDir}
 		filenameOps         = []string{"prefix:[CAT] "}
-		filteredFilenameOps = []string{"title:contains:cat|prefix:[CAT] "}
+		filteredFilenameOps = []string{"title:contains:cat||prefix:[CAT] "}
 		metaOps             = []string{"title:set:Cats"}
-		filteredMetaOps     = []string{"title:contains:cat|title:set:Cats"}
+		filteredMetaOps     = []string{"title:contains:cat||title:set:Cats"}
 	)
 	filterFile := mkfile("filters.txt", filters[0]+"\n")
 	moveFile := mkfile("moves.txt", moveOps[0]+"\n")

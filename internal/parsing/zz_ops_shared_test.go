@@ -127,7 +127,7 @@ func TestUnescapedPipeInValue(t *testing.T) {
 }
 
 // TestFilteredOpsRoundTripWithChannelURL covers a filtered entry scoped to a channel.
-// Tubarr's own serializer emits the "channelURL|filter|ops" form, so failing to parse
+// Tubarr's own serializer emits the "channelURL|filter||ops" form, so failing to parse
 // it back meant a channel-scoped filtered operation could be saved but never read.
 func TestFilteredOpsRoundTripWithChannelURL(t *testing.T) {
 	const chanURL = "https://example.com"
@@ -163,7 +163,7 @@ func TestFilteredOpsRoundTripWithChannelURL(t *testing.T) {
 // TestFilteredOpsWithoutChannelURL keeps the unscoped form working, which must not be
 // mistaken for a channel URL prefix.
 func TestFilteredOpsWithoutChannelURL(t *testing.T) {
-	got, err := parsing.ParseFilteredMetaOps([]string{"title:contains:cat|director:set:Mr Cat"})
+	got, err := parsing.ParseFilteredMetaOps([]string{"title:contains:cat||director:set:Mr Cat"})
 	if err != nil {
 		t.Fatalf("ParseFilteredMetaOps: %v", err)
 	}

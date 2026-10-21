@@ -124,13 +124,13 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 		cmd.Flags().StringVar(metaOpsFile, keys.MMetaOpsFile, "", "File containing meta operations (one per line)")
 	}
 	if filteredMetaOpsFile != nil {
-		cmd.Flags().StringVar(filteredMetaOpsFile, keys.MFilteredMetaOpsFile, "", "File containing filtered meta operations (one per line, format: Filter|Meta Op)")
+		cmd.Flags().StringVar(filteredMetaOpsFile, keys.MFilteredMetaOpsFile, "", "File containing filtered meta operations (one per line, format: Filter||Meta Op)")
 	}
 	if filenameOpsFile != nil {
 		cmd.Flags().StringVar(filenameOpsFile, keys.MFilenameOpsFile, "", "File containing filename operations (one per line)")
 	}
 	if filteredFilenameOpsFile != nil {
-		cmd.Flags().StringVar(filteredFilenameOpsFile, keys.MFilteredFilenameOpsFile, "", "File containing filtered filename operations (one per line, format: Filter|Filename Op)")
+		cmd.Flags().StringVar(filteredFilenameOpsFile, keys.MFilteredFilenameOpsFile, "", "File containing filtered filename operations (one per line, format: Filter||Filename Op)")
 	}
 
 	// Arrays
@@ -138,13 +138,13 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 		cmd.Flags().StringArrayVar(filenameOps, keys.MFilenameOps, nil, "Filename operation for Metarr (e.g. 'prefix:[CATEGORY] ' or 'date-tag:prefix:ymd'). Repeat the flag for each operation.")
 	}
 	if filteredFilenameOps != nil {
-		cmd.Flags().StringArrayVar(filteredFilenameOps, keys.MFilteredFilenameOps, nil, "Filename operation to perform in Metarr when a filter matches (filter|operation). Repeat the flag for each operation.")
+		cmd.Flags().StringArrayVar(filteredFilenameOps, keys.MFilteredFilenameOps, nil, "Filename operation to perform in Metarr when a filter matches (filter||operation). Repeat the flag for each operation.")
 	}
 	if metaOps != nil {
 		cmd.Flags().StringArrayVar(metaOps, keys.MMetaOps, nil, "Meta operation to perform in Metarr. Repeat the flag for each operation.")
 	}
 	if filteredMetaOps != nil {
-		cmd.Flags().StringArrayVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operation to perform in Metarr when a filter matches (filter|operation). Repeat the flag for each operation.")
+		cmd.Flags().StringArrayVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operation to perform in Metarr when a filter matches (filter||operation). Repeat the flag for each operation.")
 	}
 }
 
@@ -214,11 +214,11 @@ func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 	}
 
 	if moveOpsFile != nil {
-		cmd.Flags().StringVar(moveOpsFile, keys.MoveOpsFile, "", "File containing move filter operations, one per line (format is 'metafield:filter_type:value|output directory', e.g. 'title:contains:dogs|/home/dogs')")
+		cmd.Flags().StringVar(moveOpsFile, keys.MoveOpsFile, "", "File containing move filter operations, one per line (format is 'metafield:filter_type:value||output directory', e.g. 'title:contains:dogs||/home/dogs')")
 	}
 
 	if moveOps != nil {
-		cmd.Flags().StringSliceVar(moveOps, keys.MoveOps, nil, "Move to an output directory in Metarr based on metadata (format is 'metafield:filter_type:value|output directory', e.g. 'title:contains:dogs|/home/dogs')")
+		cmd.Flags().StringSliceVar(moveOps, keys.MoveOps, nil, "Move to an output directory in Metarr based on metadata (format is 'metafield:filter_type:value||output directory', e.g. 'title:contains:dogs||/home/dogs')")
 	}
 
 	if pause != nil {

@@ -36,7 +36,7 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	filteredMetaOps, err := parsing.ParseFilteredMetaOps([]string{ownURL + "|title:contains:cat|genre:set:Cats", otherURL + "|title:contains:dog|genre:set:Dogs"})
+	filteredMetaOps, err := parsing.ParseFilteredMetaOps([]string{ownURL + "|title:contains:cat||genre:set:Cats", otherURL + "|title:contains:dog||genre:set:Dogs"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestChannelURLOverrideLines(t *testing.T) {
 		JSONDir:         "/json",
 		OutputDir:       "/out",
 		MetaOps:         "title:prefix:[A] \nartist:set:Cats",
-		FilteredMetaOps: "title:contains:cat|genre:set:Cats",
+		FilteredMetaOps: "title:contains:cat||genre:set:Cats",
 		FilenameOps:     "append: [G]", // The channel URL has none of its own.
 	}
 	if lines != want {
@@ -108,9 +108,9 @@ func TestFileOverrideLines(t *testing.T) {
 		want         []string
 	}{
 		{"meta_ops", ownURL + "|title:prefix:[A] \n" + otherURL + "|title:prefix:[B] \nartist:set:Cats\n", []string{"title:prefix:[A] ", "artist:set:Cats"}},
-		{"filtered_meta_ops", "title:contains:cat|genre:set:Cats\n" + otherURL + "|title:contains:dog|genre:set:Dogs\n", []string{"title:contains:cat|genre:set:Cats"}},
+		{"filtered_meta_ops", "title:contains:cat||genre:set:Cats\n" + otherURL + "|title:contains:dog||genre:set:Dogs\n", []string{"title:contains:cat||genre:set:Cats"}},
 		{"filename_ops", "date-tag:prefix:ymd\n", []string{"date-tag:prefix:ymd"}},
-		{"filtered_filename_ops", "title:contains:cat|prefix:[Cats] \n", []string{"title:contains:cat|prefix:[Cats] "}},
+		{"filtered_filename_ops", "title:contains:cat||prefix:[Cats] \n", []string{"title:contains:cat||prefix:[Cats] "}},
 	} {
 		got, err := FileOverrideLines(tc.box, write(tc.box+".txt", tc.content), cu, dp)
 		if err != nil || !slices.Equal(got, tc.want) {

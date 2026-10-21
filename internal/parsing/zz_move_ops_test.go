@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 	"tubarr/internal/models"
+	"tubarr/internal/validation"
 )
 
 // TestParseMetaFilterMoveOps tests the filter|directory form, and that it's written back the same way.
@@ -12,13 +13,15 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 		in   string
 		want models.MetaFilterMoveOps
 	}{
-		{"Title:contains:Cats|/home/cats", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/cats"}},
-		{"title:omits:dogs|/home/no dogs", models.MetaFilterMoveOps{Field: "title", FilterType: "omits", Value: "dogs", OutputDir: "/home/no dogs"}},
-		{"duration:morethan:3600|/home/long", models.MetaFilterMoveOps{Field: "duration", FilterType: "morethan", Value: "3600", OutputDir: "/home/long"}},
-		{"director:contains|/home/directed", models.MetaFilterMoveOps{Field: "director", FilterType: "contains", OutputDir: "/home/directed"}},
-		{`title:contains:cats|C:\Videos\Cats`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: `C:\Videos\Cats`}},
-		{"title:contains:cats|/home/a|b", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/a|b"}},
-		{"https://tubesite.com/@cats|title:contains:cats|/home/cats", models.MetaFilterMoveOps{ChannelURL: "https://tubesite.com/@cats", Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/cats"}},
+		{"Title:contains:Cats||/home/cats", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/cats"}},
+		{"title:contains:Ep 5 | Show: Finale||/home/show", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "ep 5 | show: finale", OutputDir: "/home/show"}},
+		{"title:omits:dogs||/home/no dogs", models.MetaFilterMoveOps{Field: "title", FilterType: "omits", Value: "dogs", OutputDir: "/home/no dogs"}},
+		{"duration:morethan:3600||/home/long", models.MetaFilterMoveOps{Field: "duration", FilterType: "morethan", Value: "3600", OutputDir: "/home/long"}},
+		{"director:contains||/home/directed", models.MetaFilterMoveOps{Field: "director", FilterType: "contains", OutputDir: "/home/directed"}},
+		{`title:contains:cats||C:\Videos\Cats`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: `C:\Videos\Cats`}},
+		{"title:contains:cats||/home/a|b||c", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/a|b||c"}},
+		{`title:contains:ends in a pipe\|||/home/pipe`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "ends in a pipe|", OutputDir: "/home/pipe"}},
+		{"https://tubesite.com/@cats|title:contains:cats||/home/cats", models.MetaFilterMoveOps{ChannelURL: "https://tubesite.com/@cats", Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/cats"}},
 	}
 	for _, tt := range tests {
 		got, err := ParseMetaFilterMoveOps([]string{tt.in})
@@ -34,13 +37,22 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 	}
 
 	for _, bad := range []string{
-		"title:contains:cats",             // No directory.
-		"title:cats:/home/cats",           // The old form, with no filter type.
-		"title:contains:cats:extra|/home", // Too many filter parts.
-		"title:morethan|/home",            // A comparison with no value.
+		"title:contains:cats",       // No directory.
+		"title:contains:cats||",     // Empty directory.
+		"title:contains:cats|/home", // A single '|'.
+		"title:morethan||/home",     // A comparison with no value.
 	} {
 		if _, err := ParseMetaFilterMoveOps([]string{bad}); err == nil {
 			t.Errorf("ParseMetaFilterMoveOps(%q) was accepted", bad)
+		}
+	}
+	for _, invalid := range []string{"title:morethan:soon||/home", "title:explodes:cats||/home"} {
+		ops, err := ParseMetaFilterMoveOps([]string{invalid})
+		if err == nil {
+			err = validation.ValidateMetaFilterMoveOps(ops, false)
+		}
+		if err == nil {
+			t.Errorf("%q was accepted", invalid)
 		}
 	}
 }
@@ -57,7 +69,7 @@ func TestMoveOpsOldBlob(t *testing.T) {
 	if f := s.MetaFilterMoveOps[0].Filter(); f.FilterType != "contains" || f.Field != "title" || f.Value != "cats" {
 		t.Errorf("old move op's filter = %+v, want title contains cats", f)
 	}
-	if got := models.MetaFilterMoveOpsToString(s.MetaFilterMoveOps[0]); got != "title:contains:cats|/cats" {
+	if got := models.MetaFilterMoveOpsToString(s.MetaFilterMoveOps[0]); got != "title:contains:cats||/cats" {
 		t.Errorf("old move op written as %q, want the new form", got)
 	}
 }

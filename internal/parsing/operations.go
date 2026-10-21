@@ -3,6 +3,7 @@ package parsing
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -103,7 +104,7 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 
 // ParseMetaFilterMoveOps parses meta filter move operation strings into models.
 //
-// Format: "title:contains:frogs|/home/frogs", a filter and a directory.
+// Format: "title:contains:frogs||/home/frogs", a filter and a directory.
 func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	if len(ops) == 0 {
 		return nil, nil
@@ -111,30 +112,34 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	// Deduplicate.
 	ops = validation.DeduplicateSliceEntries(ops)
 
-	const moveOpFormatError string = "please enter move operations in the format 'field:filter_type:value|output directory'.\n\n" +
-		"'title:contains:frogs|/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
+	const moveOpFormatError string = "please enter move operations in the format 'field:filter_type:value||output directory'.\n\n" +
+		"'title:contains:frogs||/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
 
 	m := make([]models.MetaFilterMoveOps, 0, len(ops))
 	for _, op := range ops {
 		chanURL, op := validation.CheckForOpURL(op)
 
+		// An unescaped "||" leaves an empty part between its two '|'.
 		parts := sharedparsing.SplitUnescaped(op, '|')
-		if len(parts) < 2 {
+		div := slices.Index(parts[1:], "") + 1
+		if div == 0 || div == len(parts)-1 {
 			return nil, errors.New(moveOpFormatError)
 		}
-		filters, err := ParseFilterOps(parts[:1], false)
+		filters, err := ParseFilterOps([]string{strings.Join(parts[:div], "|")}, false)
 		if err != nil {
 			return nil, fmt.Errorf("move operation %q: %w", op, err)
 		}
-		// The directory is the rest of the op, so any further '|' belongs to it.
-		outputDir := strings.Join(sharedparsing.EscapedSplit(strings.Join(parts[1:], "|"), '|'), "|")
+		outputDir := strings.TrimSpace(strings.Join(sharedparsing.EscapedSplit(strings.Join(parts[div+1:], "|"), '|'), "|"))
+		if outputDir == "" {
+			return nil, errors.New(moveOpFormatError)
+		}
 
 		m = append(m, models.MetaFilterMoveOps{
 			ChannelURL: chanURL,
 			Field:      filters[0].Field,
 			FilterType: filters[0].FilterType,
 			Value:      filters[0].Value,
-			OutputDir:  strings.TrimSpace(outputDir),
+			OutputDir:  outputDir,
 		})
 	}
 	return m, nil
@@ -142,7 +147,7 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 
 // ParseFilteredMetaOps parses filter-based meta operation strings into models.
 //
-// Format: "title:contains:cat|director:set:Mr. Cat"
+// Format: "title:contains:cat||director:set:Mr. Cat"
 func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, error) {
 	parsed, warnings, err := sharedparsing.ParseFilteredMetaOps(filteredMetaOps)
 	logWarnings(warnings)
@@ -154,7 +159,7 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 
 // ParseFilteredFilenameOps parses filter-based filename operation strings into models.
 //
-// Format: "title:contains:cat|prefix:[CATS] "
+// Format: "title:contains:cat||prefix:[CATS] "
 func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFilenameOps, error) {
 	parsed, warnings, err := sharedparsing.ParseFilteredFilenameOps(filteredFilenameOps)
 	logWarnings(warnings)

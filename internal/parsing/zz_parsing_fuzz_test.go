@@ -27,7 +27,7 @@ var opSeeds = []string{
 	"title:contains:live:must",
 	"title:omits:clip:any",
 	"title:contains:dsp:/path/{{channel_name}}",
-	"title:contains:live|title:set:x",
+	"title:contains:live||title:set:x",
 	"https://localhost:32400/library/sections/1/refresh?X-Plex-Token=abc|Plex",
 	"",
 	":",

@@ -122,18 +122,18 @@ func TestConfigReloadKeepsSavedURLSettings(t *testing.T) {
 func TestConfigReloadReadsAllFields(t *testing.T) {
 	moveDir := t.TempDir()
 	opsFile := filepath.Join(t.TempDir(), "filtered-filename-ops.txt")
-	if err := os.WriteFile(opsFile, []byte("title:contains:a|prefix:[A] \n"), 0o600); err != nil {
+	if err := os.WriteFile(opsFile, []byte("title:contains:a||prefix:[A] \n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	path := writeChannelConfig(t, strings.Join([]string{
 		"filter-ops:",
 		"  - 'title:contains:cat:must'",
 		"move-ops:",
-		"  - 'title:contains:cat|" + moveDir + "'",
+		"  - 'title:contains:cat||" + moveDir + "'",
 		"ytdlp-preferred-video-codecs: [av1]",
 		"ytdlp-preferred-audio-codecs: [opus]",
 		"metarr-filtered-filename-ops:",
-		"  - 'title:contains:cat|prefix:[CAT] '",
+		"  - 'title:contains:cat||prefix:[CAT] '",
 		"metarr-filtered-filename-ops-file: '" + opsFile + "'",
 	}, "\n")+"\n")
 
