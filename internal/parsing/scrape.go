@@ -43,7 +43,7 @@ type scrapeCrawlConfig struct {
 }
 
 // crawlPreviewFields are the fields a crawl rule can read for previewing videos before download.
-var crawlPreviewFields = []string{sharedtags.JTitle, sharedtags.JThumbnailURL, sharedtags.JUploadDate, consts.CrawlFieldDuration}
+var crawlPreviewFields = []string{sharedtags.JTitle, sharedtags.JThumbnail, sharedtags.JUploadDate, consts.CrawlFieldDuration}
 
 // scrapeSelectorConfig mirrors a single selector entry for a site in a scrape config file.
 type scrapeSelectorConfig struct {
@@ -288,10 +288,10 @@ func parseCrawlConfig(c *scrapeCrawlConfig) (*models.CrawlRule, error) {
 		ItemPath:   strings.TrimSpace(c.ItemPath),
 	}
 	if rule.Selector == "" {
-		return nil, fmt.Errorf("crawl rule is missing a selector")
+		return nil, errors.New("crawl rule is missing a selector")
 	}
 	if rule.ItemPath != "" && rule.JSONPath == "" {
-		return nil, fmt.Errorf("crawl rule with item_path needs a json_path for each item's URL")
+		return nil, errors.New("crawl rule with item_path needs a json_path for each item's URL")
 	}
 
 	var err error

@@ -2,6 +2,7 @@ package file
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -38,7 +39,7 @@ func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, 
 // RemoveMetadataJSON removes a metadata JSON file with safety checks.
 func RemoveMetadataJSON(path string) error {
 	if path == "" {
-		return fmt.Errorf("path is empty, not removing")
+		return errors.New("path is empty, not removing")
 	}
 
 	check, err := os.Stat(path)

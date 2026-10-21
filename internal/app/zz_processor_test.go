@@ -26,6 +26,9 @@ func (s *recordingDownloadStore) UpdateDownloadStatus(_ context.Context, u model
 	s.statuses[u.VideoID] = u.Status
 	return nil
 }
+func (s *recordingDownloadStore) MarkDownloadCanceled(context.Context, int64) (bool, error) {
+	return false, nil
+}
 
 // TestFinishTracking tests that a tracked video always leaves the Downloads page with a final status, and one that
 // left the pipeline unfinished (e.g. skipped as a duplicate download) returns to the Available list.

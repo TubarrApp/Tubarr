@@ -26,14 +26,6 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 	// Filter loop.
 	for _, filter := range filters {
-		// Add to must/any.
-		switch filter.MustAny {
-		case sharedconsts.OpMust:
-			mustTotal++
-		case sharedconsts.OpAny:
-			anyTotal++
-		}
-
 		// Retrieve the metadata value for the filter's field.
 		val, exists := v.MetadataMap[filter.Field]
 		strVal := strings.ToLower(fmt.Sprint(val))
@@ -47,24 +39,23 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 			} else {
 				logger.Pl.D(1, "%s skip: Video %q has an empty value for field %q, skipping numerical filter", filterType, v.URL, filter.Field)
 			}
-			// Decrement must/any since this filter is skipped.
-			switch filter.MustAny {
-			case sharedconsts.OpMust:
-				mustTotal--
-			case sharedconsts.OpAny:
-				anyTotal--
-			}
 			continue
+		}
+
+		// Add to must/any.
+		switch filter.MustAny {
+		case sharedconsts.OpMust:
+			mustTotal++
+		case sharedconsts.OpAny:
+			anyTotal++
 		}
 
 		// Check the filter against the video's metadata value.
 		// equals/notequals with an empty filter value compare the field against "".
 		var passed, failHard bool
-		switch {
-		case filter.Value == "" &&
-			(filter.FilterType != sharedconsts.OpEquals && filter.FilterType != sharedconsts.OpNotEquals):
+		if filter.Value == "" && filter.FilterType != sharedconsts.OpEquals && filter.FilterType != sharedconsts.OpNotEquals {
 			passed, failHard = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
-		default:
+		} else {
 			passed, failHard = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
 		}
 
@@ -220,79 +211,50 @@ func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL strin
 			return false, true
 		}
 		return !exists, false
-		// Dead branch (should not be reached due to isNumericalFilter check in checkFilters).
-	case sharedconsts.OpMoreThan, sharedconsts.OpLessThan, sharedconsts.OpEquals, sharedconsts.OpNotEquals:
-		logger.Pl.I("%s mismatch: Video %q has no value for field %q to compare against, skipping check.", filterType, videoURL, filter.Field)
 	}
 	return false, false
 }
 
 // checkFilterWithValue checks a filter's value against its matching metadata field.
 func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, filterVal string) (passed, failHard bool) {
+	var mismatch string
 	switch filter.FilterType {
 	case sharedconsts.OpContains:
-		if strings.Contains(strVal, filterVal) {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q does not contain desired %q in %q", filterType, videoURL, filter.Value, filter.Field)
-			return false, true
-		}
+		passed = strings.Contains(strVal, filterVal)
+		mismatch = fmt.Sprintf("does not contain desired %q in %q", filter.Value, filter.Field)
 	case sharedconsts.OpOmits:
-		if !strings.Contains(strVal, filterVal) {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q contains unwanted %q in %q", filterType, videoURL, filter.Value, filter.Field)
-			return false, true
-		}
+		passed = !strings.Contains(strVal, filterVal)
+		mismatch = fmt.Sprintf("contains unwanted %q in %q", filter.Value, filter.Field)
 	case sharedconsts.OpEquals:
-		if strVal == filterVal {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which does not equal %q", filterType, videoURL, strVal, filter.Field, filterVal)
-			return false, true
-		}
+		passed = strVal == filterVal
+		mismatch = fmt.Sprintf("has value %q for field %q which does not equal %q", strVal, filter.Field, filterVal)
 	case sharedconsts.OpNotEquals:
-		if strVal != filterVal {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q has value %q for field %q which equals %q", filterType, videoURL, strVal, filter.Field, filterVal)
-			return false, true
-		}
-		// Numerical comparisons (morethan/lessthan) are handled below since they require parsing the values as floats.
-	case sharedconsts.OpMoreThan:
+		passed = strVal != filterVal
+		mismatch = fmt.Sprintf("has value %q for field %q which equals %q", strVal, filter.Field, filterVal)
+	case sharedconsts.OpMoreThan, sharedconsts.OpLessThan:
 		videoNum, err1 := strconv.ParseFloat(strVal, 64)
 		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
 		if err1 != nil || err2 != nil {
 			logger.Pl.E("%s filter error: Video %q has non-numeric value for field %q (video: %q, filter: %q), skipping check", filterType, videoURL, filter.Field, strVal, filter.Value)
-			break
+			return false, false
 		}
-		if videoNum > filterNum {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q has value %g for field %q which is not more than %g", filterType, videoURL, videoNum, filter.Field, filterNum)
-			return false, true
-		}
-	case sharedconsts.OpLessThan:
-		videoNum, err1 := strconv.ParseFloat(strVal, 64)
-		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
-		if err1 != nil || err2 != nil {
-			logger.Pl.E("%s filter error: Video %q has non-numeric value for field %q (video: %q, filter: %q), skipping check", filterType, videoURL, filter.Field, strVal, filter.Value)
-			break
-		}
-		if videoNum < filterNum {
-			return true, false
-		}
-		if filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q has value %g for field %q which is not less than %g", filterType, videoURL, videoNum, filter.Field, filterNum)
-			return false, true
+		if filter.FilterType == sharedconsts.OpMoreThan {
+			passed = videoNum > filterNum
+			mismatch = fmt.Sprintf("has value %g for field %q which is not more than %g", videoNum, filter.Field, filterNum)
+		} else {
+			passed = videoNum < filterNum
+			mismatch = fmt.Sprintf("has value %g for field %q which is not less than %g", videoNum, filter.Field, filterNum)
 		}
 	default:
 		logger.Pl.E("%s mismatch: Video %q has unknown filter type %q for field %q", filterType, videoURL, filter.FilterType, filter.Field)
+		return false, true
+	}
+
+	if passed {
+		return true, false
+	}
+	if filter.MustAny == sharedconsts.OpMust {
+		logger.Pl.I("%s mismatch: Video %q %s", filterType, videoURL, mismatch)
 		return false, true
 	}
 	return false, false
@@ -319,14 +281,7 @@ func uploadDateFilter(v *models.Video, cu *models.ChannelURL, channelName string
 	}
 
 	// 'To date' filter
-	if passed, err = applyToDateFilter(v, cu, uploadDateNum, channelName); err != nil {
-		return false, err
-	}
-	if !passed {
-		return false, nil
-	}
-
-	return true, nil
+	return applyToDateFilter(v, cu, uploadDateNum, channelName)
 }
 
 // applyFromDateFilter checks if the video passes the 'from date' filter.
@@ -341,7 +296,7 @@ func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum i
 	}
 
 	if uploadDateNum < fromDate {
-		logger.Pl.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, fromDate, uploadDateNum)
+		logger.Pl.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %d Video uploaded at: \"%d\"", v.URL, channelName, fromDate, uploadDateNum)
 		return false, nil
 	}
 
@@ -361,11 +316,11 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 	}
 
 	if uploadDateNum > toDate {
-		logger.Pl.I("Video %q failed 'To Date' filter for channel %q. Wanted from: %q Video uploaded at: \"%d\"", v.URL, channelName, toDate, uploadDateNum)
+		logger.Pl.I("Video %q failed 'To Date' filter for channel %q. Wanted to: %d Video uploaded at: \"%d\"", v.URL, channelName, toDate, uploadDateNum)
 		return false, nil
 	}
 
-	logger.Pl.S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
+	logger.Pl.S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.ToDate, uploadDateNum, channelName)
 	return true, nil
 }
 
@@ -484,16 +439,13 @@ func LoadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.Director
 
 // loadMoveOpsFromFile loads move operations from a file (one per line).
 func loadMoveOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaFilterMoveOps {
-	var err error
-
 	if cu.ChanURLSettings.MetaFilterMoveOpFile == "" {
 		return nil
 	}
 
-	moveOpFile := cu.ChanURLSettings.MetaFilterMoveOpFile
-
-	if moveOpFile, err = dp.ParseDirectory(moveOpFile, "move-ops"); err != nil {
-		logger.Pl.E("Failed to parse directory %q: %v", moveOpFile, err)
+	moveOpFile, err := dp.ParseDirectory(cu.ChanURLSettings.MetaFilterMoveOpFile, "move-ops")
+	if err != nil {
+		logger.Pl.E("Failed to parse directory %q: %v", cu.ChanURLSettings.MetaFilterMoveOpFile, err)
 		return nil
 	}
 

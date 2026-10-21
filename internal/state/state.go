@@ -201,17 +201,44 @@ func GetOrComputeJitter(channelID int64, chanURLCount int, compute func() int) i
 
 // --- Status Update --------------------------------------------------------------------------
 
-// StatusUpdateCache holds status updates for downloads.
-var StatusUpdateCache sync.Map
+// statusUpdates holds status updates for downloads.
+var statusUpdates sync.Map
 
 // SetStatusUpdate updates the download state in the map.
 func SetStatusUpdate(videoID int64, update models.StatusUpdate) {
-	StatusUpdateCache.Store(videoID, update)
+	statusUpdates.Store(videoID, update)
+}
+
+// TakeStatusUpdate removes and returns a video's status update, if it has one.
+func TakeStatusUpdate(videoID int64) (models.StatusUpdate, bool) {
+	v, ok := statusUpdates.LoadAndDelete(videoID)
+	if !ok {
+		return models.StatusUpdate{}, false
+	}
+	update, ok := v.(models.StatusUpdate)
+	return update, ok
+}
+
+// DeleteStatusUpdate removes a video's status update.
+func DeleteStatusUpdate(videoID int64) {
+	statusUpdates.Delete(videoID)
+}
+
+// ChannelStatusUpdates returns the status updates held for a channel's videos.
+func ChannelStatusUpdates(channelID int64) []models.StatusUpdate {
+	var updates []models.StatusUpdate
+	statusUpdates.Range(func(_, value any) bool {
+		if update, ok := value.(models.StatusUpdate); ok && update.ChannelID == channelID {
+			updates = append(updates, update)
+		}
+		return true
+	})
+	return updates
 }
 
 // GetStatusUpdate returns the current download status.
 func GetStatusUpdate(videoID int64) (stateFromMap models.StatusUpdate) {
-	s, ok := StatusUpdateCache.Load(videoID)
+	s, ok := statusUpdates.Load(videoID)
 	if !ok {
 		return models.StatusUpdate{}
 	}

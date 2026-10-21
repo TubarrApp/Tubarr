@@ -39,9 +39,10 @@ func TestVideoEntriesNestedTabs(t *testing.T) {
 // TestListedInOrder checks crawled videos come back in the order the channel lists them, with a repeated URL kept at
 // its first position and its details merged.
 func TestListedInOrder(t *testing.T) {
-	var want []string
+	iterationCount := 30
+	want := make([]string, 0, iterationCount)
 	urls := make(map[string]*listedVideo)
-	for i := range 30 {
+	for i := range iterationCount {
 		u := fmt.Sprintf("https://example.com/v/%d", i)
 		want = append(want, u)
 		mergeListed(urls, u, &listedVideo{})

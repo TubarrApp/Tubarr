@@ -72,8 +72,8 @@ var censored = models.SiteRules{
 		Item:     ".episode",
 		PreviewFields: []models.MetadataRule{
 			{Name: sharedtags.JTitle, Selector: "h5"},
-			{Name: sharedtags.JThumbnailURL, Selector: "img[data-src]", Attr: "data-src"},
-			{Name: sharedtags.JThumbnailURL, Selector: "img[src]", Attr: "src"},
+			{Name: sharedtags.JThumbnail, Selector: "img[data-src]", Attr: "data-src"},
+			{Name: sharedtags.JThumbnail, Selector: "img[src]", Attr: "src"},
 			{Name: consts.CrawlFieldDuration, Selector: ".duration"},
 			{Name: sharedtags.JUploadDate, Selector: "time"},
 		},
@@ -83,7 +83,7 @@ var censored = models.SiteRules{
 		{Name: sharedtags.JDescription, Selector: "#about .raised-content"},
 		{Name: sharedtags.JReleaseDate, Selector: "#about time"},
 		{Name: sharedtags.JDirectVideoURL, Selector: "source[src*='master.m3u8']", Attr: "src"},
-		{Name: sharedtags.JThumbnailURL, Selector: "video-js[poster]", Attr: "poster"},
+		{Name: sharedtags.JThumbnail, Selector: "video-js[poster]", Attr: "poster"},
 	},
 }
 
@@ -112,7 +112,7 @@ var rumble = models.SiteRules{
 		StripQuery: true,
 		PreviewFields: []models.MetadataRule{
 			{Name: sharedtags.JTitle, JSONPath: "title"},
-			{Name: sharedtags.JThumbnailURL, JSONPath: "thumb"},
+			{Name: sharedtags.JThumbnail, JSONPath: "thumb"},
 			{Name: consts.CrawlFieldDuration, JSONPath: "duration"},
 			{Name: sharedtags.JUploadDate, JSONPath: "upload_date"},
 		},
@@ -122,6 +122,6 @@ var rumble = models.SiteRules{
 		{Name: sharedtags.JDescription, Selector: `meta[name="description"]`, Attr: "content"},
 		{Name: sharedtags.JDescription, Selector: `meta[property="og:description"]`, Attr: "content"},
 		{Name: sharedtags.JReleaseDate, Selector: "time", Attr: "datetime"},
-		{Name: sharedtags.JThumbnailURL, Selector: `meta[property="og:image"]`, Attr: "content"},
+		{Name: sharedtags.JThumbnail, Selector: `meta[property="og:image"]`, Attr: "content"},
 	},
 }

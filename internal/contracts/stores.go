@@ -91,6 +91,7 @@ type DownloadStore interface {
 
 	// Cancel operations.
 	CancelDownload(videoID int64, videoURL string) bool
+	MarkDownloadCanceled(ctx context.Context, videoID int64) (canceled bool, err error)
 }
 
 // VideoStore allows access to video repo methods.
@@ -102,6 +103,7 @@ type VideoStore interface {
 	GetVideoChannelURLID(videoID int64) (channelURLID int64, err error)
 	VideoExists(v *models.Video, channelID int64) (videoID int64, exists bool)
 	GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error)
+	GetLatestFinishedVideos(ctx context.Context, channelID int64, n int) (videos []*models.Video, err error)
 	GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error)
 	GetVideoOverrides(videoID int64) (*models.VideoOverrides, error)
 	ThumbnailOverrides() (map[int64]models.VideoOverrides, error)

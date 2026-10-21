@@ -160,13 +160,7 @@ func (pc *ProgControl) checkProgRunning() (int, bool, error) {
 		return 0, false, fmt.Errorf("failed to query program running row: %w", err)
 	}
 
-	// Extract the int value, defaulting to 0 if NULL.
-	pidValue := int(0)
-	if pid.Valid {
-		pidValue = int(pid.Int64)
-	}
-
-	return pidValue, running, nil
+	return int(pid.Int64), running, nil
 }
 
 // resetStaleProcess is useful when there are powercuts, etc.

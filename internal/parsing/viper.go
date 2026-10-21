@@ -19,6 +19,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+// configGetter reads config values, from Viper or a per-URL settings map.
+type configGetter interface {
+	IsSet(string) bool
+	Get(string) any
+}
+
 // LoadChannelInputFile reads a channel config file into channel input, with its per-URL settings.
 func LoadChannelInputFile(path string) (models.ChannelInput, error) {
 	var input models.ChannelInput
@@ -387,65 +393,34 @@ func convertConfigValue[T any](v any) (T, bool) {
 
 	switch any(zero).(type) {
 	case string:
-		if s, ok := v.(string); ok {
-			val := any(s).(T)
-			return val, true
-		}
 		if !isScalar(v) {
 			return zero, false
 		}
-		str := fmt.Sprintf("%v", v)
-		val := any(str).(T)
-		return val, true
+		return any(fmt.Sprint(v)).(T), true
 
 	case int:
-		if i, ok := v.(int); ok {
-			val := any(i).(T)
-			return val, true
-		}
-		if i64, ok := v.(int64); ok {
-			i := int(i64)
-			val := any(i).(T)
-			return val, true
-		}
-		if f, ok := v.(float64); ok {
-			i := int(f)
-			val := any(i).(T)
-			return val, true
+		switch n := v.(type) {
+		case int64:
+			return any(int(n)).(T), true
+		case float64:
+			return any(int(n)).(T), true
 		}
 
 	case float64:
-		if f, ok := v.(float64); ok {
-			val := any(f).(T)
-			return val, true
-		}
 		if i, ok := v.(int); ok {
-			f := float64(i)
-			val := any(f).(T)
-			return val, true
-		}
-
-	case bool:
-		if b, ok := v.(bool); ok {
-			val := any(b).(T)
-			return val, true
+			return any(float64(i)).(T), true
 		}
 
 	case []string:
-		if slice, ok := v.([]string); ok {
-			val := any(slice).(T)
-			return val, true
-		}
 		if slice, ok := v.([]any); ok {
 			strSlice := make([]string, len(slice))
 			for i, item := range slice {
 				if !isScalar(item) {
 					return zero, false
 				}
-				strSlice[i] = fmt.Sprintf("%v", item)
+				strSlice[i] = fmt.Sprint(item)
 			}
-			val := any(strSlice).(T)
-			return val, true
+			return any(strSlice).(T), true
 		}
 	}
 
@@ -466,13 +441,10 @@ func isScalar(v any) bool {
 }
 
 // LoadViperIntoStruct loads values from a local Viper instance into a struct of variables.
-func LoadViperIntoStruct(v interface {
-	IsSet(string) bool
-	Get(string) any
-}, ptr any) error {
+func LoadViperIntoStruct(v configGetter, ptr any) error {
 	val := reflect.ValueOf(ptr)
 	if val.Kind() != reflect.Pointer || val.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("expected pointer to struct")
+		return errors.New("expected pointer to struct")
 	}
 
 	val = val.Elem()
@@ -487,46 +459,30 @@ func LoadViperIntoStruct(v interface {
 			continue
 		}
 		tag := field.Tag.Get("viper")
-		if tag == "" {
+		if tag == "" || field.Type.Kind() != reflect.Pointer {
 			continue
 		}
 
-		ft := field.Type
-		switch ft.Kind() {
-
-		case reflect.Pointer:
-			elem := ft.Elem()
-
-			switch elem.Kind() {
-			case reflect.String:
-				v, ok := viperPtr[string](v, tag)
-				if ok {
-					val.Field(i).Set(reflect.ValueOf(v))
-				}
-			case reflect.Int:
-				v, ok := viperPtr[int](v, tag)
-				if ok {
-					val.Field(i).Set(reflect.ValueOf(v))
-				}
-			case reflect.Float64:
-				v, ok := viperPtr[float64](v, tag)
-				if ok {
-					val.Field(i).Set(reflect.ValueOf(v))
-				}
-			case reflect.Bool:
-				v, ok := viperPtr[bool](v, tag)
-				if ok {
-					val.Field(i).Set(reflect.ValueOf(v))
-				}
-			case reflect.Slice:
-				sliceType := reflect.SliceOf(elem.Elem())
-				if sliceType == reflect.TypeFor[[]string]() {
-					v, ok := viperPtr[[]string](v, tag)
-					if ok {
-						val.Field(i).Set(reflect.ValueOf(v))
-					}
-				}
+		var (
+			p  any
+			ok bool
+		)
+		switch elem := field.Type.Elem(); elem.Kind() {
+		case reflect.String:
+			p, ok = viperPtr[string](v, tag)
+		case reflect.Int:
+			p, ok = viperPtr[int](v, tag)
+		case reflect.Float64:
+			p, ok = viperPtr[float64](v, tag)
+		case reflect.Bool:
+			p, ok = viperPtr[bool](v, tag)
+		case reflect.Slice:
+			if elem == reflect.TypeFor[[]string]() {
+				p, ok = viperPtr[[]string](v, tag)
 			}
+		}
+		if ok {
+			val.Field(i).Set(reflect.ValueOf(p))
 		}
 	}
 
@@ -553,10 +509,7 @@ func GivenKeys(in any) []string {
 // viperPtr returns a pointer to the value for a viper tag from a local viper instance if successful, or nil.
 //
 // Supports both kebab-case and snake_case keys.
-func viperPtr[T any](v interface {
-	IsSet(string) bool
-	Get(string) any
-}, tag string) (*T, bool) {
+func viperPtr[T any](v configGetter, tag string) (*T, bool) {
 	val, ok := GetConfigValue[T](v, tag)
 	if !ok {
 		return nil, false
@@ -567,37 +520,20 @@ func viperPtr[T any](v interface {
 // GetConfigValue retrieves values from a local viper instance.
 //
 // Supports both kebab-case and snake_case keys.
-func GetConfigValue[T any](v interface {
-	IsSet(string) bool
-	Get(string) any
-}, key string) (T, bool) {
+func GetConfigValue[T any](v configGetter, key string) (T, bool) {
 	var zero T
 
-	// Try original key first.
-	if v.IsSet(key) {
-		if val, ok := convertConfigValue[T](v.Get(key)); ok {
-			return val, true
-		}
-	}
-
-	// Try snake_case version.
-	snakeKey := strings.ReplaceAll(key, "-", "_")
-	if snakeKey != key && v.IsSet(snakeKey) {
-		if val, ok := convertConfigValue[T](v.Get(snakeKey)); ok {
-			return val, true
-		}
-	}
-
-	// Try kebab-case version.
-	kebabKey := strings.ReplaceAll(key, "_", "-")
-	if kebabKey != key && v.IsSet(kebabKey) {
-		if val, ok := convertConfigValue[T](v.Get(kebabKey)); ok {
-			return val, true
+	variants := keyVariants(key)
+	for _, k := range variants {
+		if v.IsSet(k) {
+			if val, ok := convertConfigValue[T](v.Get(k)); ok {
+				return val, true
+			}
 		}
 	}
 
 	// Set, but not as a usable value.
-	for _, k := range []string{key, snakeKey, kebabKey} {
+	for _, k := range variants {
 		if v.IsSet(k) {
 			logger.Pl.W("Ignoring config key %q: expected a %T value, got %T", k, zero, v.Get(k))
 			break
@@ -606,13 +542,15 @@ func GetConfigValue[T any](v interface {
 	return zero, false
 }
 
+// keyVariants returns key as given, in snake_case, and in kebab-case.
+func keyVariants(key string) []string {
+	return []string{key, strings.ReplaceAll(key, "-", "_"), strings.ReplaceAll(key, "_", "-")}
+}
+
 // ParseURLSettingsFromViper extracts per-URL settings from the config file.
 //
 // Creates local Viper instances for each URL's settings to reuse validation logic.
-func ParseURLSettingsFromViper(v interface {
-	IsSet(string) bool
-	Get(string) any
-}) (map[string]*models.URLSettingsOverride, error) {
+func ParseURLSettingsFromViper(v configGetter) (map[string]*models.URLSettingsOverride, error) {
 	urlSettings := make(map[string]*models.URLSettingsOverride)
 
 	// Check if url-settings exists.
@@ -632,60 +570,43 @@ func ParseURLSettingsFromViper(v interface {
 	// Cast to map.
 	urlSettingsMap, ok := urlSettingsRaw.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("url-settings must be a map[string]any")
+		return nil, errors.New("url-settings must be a map[string]any")
 	}
 
 	// Process each URL's settings.
 	for channelURL, settingsData := range urlSettingsMap {
-
-		// Normalize URL to lowercase for case-insensitive matching.
-		normalizedURL := strings.ToLower(channelURL)
-
-		override := &models.URLSettingsOverride{}
 		dataMap, ok := settingsData.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("settings for URL %q must be a map", channelURL)
 		}
+		override := &models.URLSettingsOverride{}
 
 		// Handle "settings" section.
-		var settingsMap map[string]any
 		if settingsRaw, hasSettings := dataMap["settings"]; hasSettings {
-			if settingsMap, ok = settingsRaw.(map[string]any); !ok {
+			settingsMap, ok := settingsRaw.(map[string]any)
+			if !ok {
 				return nil, fmt.Errorf("settings section for URL %q must be a map", channelURL)
 			}
-
-			// Create new Viper instance and load the settings map.
-			settingsViper := &urlConfigSettingsParser{data: settingsMap}
-			settingsInput := &models.SettingsInput{}
-			if err := LoadViperIntoStruct(settingsViper, settingsInput); err != nil {
+			override.Settings = &models.SettingsInput{}
+			if err := LoadViperIntoStruct(&urlConfigSettingsParser{data: settingsMap}, override.Settings); err != nil {
 				return nil, fmt.Errorf("failed to parse settings for URL %q: %w", channelURL, err)
 			}
-
-			override.Settings = settingsInput
-		} else {
-			logger.Pl.D(1, "No settings section found in %+v", settingsMap)
 		}
 
 		// Handle "metarr" section.
-		var metarrMap map[string]any
 		if metarrRaw, hasMetarr := dataMap["metarr"]; hasMetarr {
-			if metarrMap, ok = metarrRaw.(map[string]any); !ok {
+			metarrMap, ok := metarrRaw.(map[string]any)
+			if !ok {
 				return nil, fmt.Errorf("metarr section for URL %q must be a map", channelURL)
 			}
-
-			// Create new Viper instance and load the metarr map.
-			metarrViper := &urlConfigSettingsParser{data: metarrMap}
-			metarrInput := &models.MetarrArgsInput{}
-			if err := LoadViperIntoStruct(metarrViper, metarrInput); err != nil {
+			override.Metarr = &models.MetarrArgsInput{}
+			if err := LoadViperIntoStruct(&urlConfigSettingsParser{data: metarrMap}, override.Metarr); err != nil {
 				return nil, fmt.Errorf("failed to parse metarr for URL %q: %w", channelURL, err)
 			}
-
-			override.Metarr = metarrInput
-		} else {
-			logger.Pl.D(1, "No Metarr section found in %+v", metarrMap)
 		}
 
-		urlSettings[normalizedURL] = override
+		// Lowercase for case-insensitive matching.
+		urlSettings[strings.ToLower(channelURL)] = override
 	}
 
 	return urlSettings, nil
@@ -698,44 +619,22 @@ type urlConfigSettingsParser struct {
 
 // IsSet checks if the key exists in the data.
 func (u *urlConfigSettingsParser) IsSet(key string) bool {
-	if _, ok := u.data[key]; ok {
-		return true
-	}
-	// Try with underscore/hyphen variations.
-	snakeKey := strings.ReplaceAll(key, "-", "_")
-	if snakeKey != key {
-		if _, ok := u.data[snakeKey]; ok {
-			return true
-		}
-	}
-	kebabKey := strings.ReplaceAll(key, "_", "-")
-	if kebabKey != key {
-		if _, ok := u.data[kebabKey]; ok {
-			return true
-		}
-	}
-	return false
+	_, ok := u.lookup(key)
+	return ok
 }
 
 // Get returns the key from the data.
 func (u *urlConfigSettingsParser) Get(key string) any {
-	// Try original key.
-	if val, ok := u.data[key]; ok {
-		return val
-	}
-	// Try snake_case.
-	snakeKey := strings.ReplaceAll(key, "-", "_")
-	if snakeKey != key {
-		if val, ok := u.data[snakeKey]; ok {
-			return val
+	val, _ := u.lookup(key)
+	return val
+}
+
+// lookup returns the value for key as given, in snake_case, or in kebab-case.
+func (u *urlConfigSettingsParser) lookup(key string) (any, bool) {
+	for _, k := range keyVariants(key) {
+		if val, ok := u.data[k]; ok {
+			return val, true
 		}
 	}
-	// Try kebab-case.
-	kebabKey := strings.ReplaceAll(key, "_", "-")
-	if kebabKey != key {
-		if val, ok := u.data[kebabKey]; ok {
-			return val
-		}
-	}
-	return nil
+	return nil, false
 }

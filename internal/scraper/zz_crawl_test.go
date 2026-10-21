@@ -183,8 +183,8 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 		Selector: "a[href]", Attr: "href", Include: regexp.MustCompile("/episodes/"), Item: ".episode",
 		PreviewFields: []models.MetadataRule{
 			{Name: sharedtags.JTitle, Selector: "h5"},
-			{Name: sharedtags.JThumbnailURL, Selector: "img[data-src]", Attr: "data-src"},
-			{Name: sharedtags.JThumbnailURL, Selector: "img[src]", Attr: "src"},
+			{Name: sharedtags.JThumbnail, Selector: "img[data-src]", Attr: "data-src"},
+			{Name: sharedtags.JThumbnail, Selector: "img[src]", Attr: "src"},
 			{Name: consts.CrawlFieldDuration, Selector: ".duration"},
 			{Name: sharedtags.JUploadDate, Selector: "time"},
 		},
@@ -211,7 +211,7 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 		Selector: `rum-videos-grid script[type="application/json"]`, ItemPath: `items.#(object_type=="video")#`, JSONPath: "url",
 		PreviewFields: []models.MetadataRule{
 			{Name: sharedtags.JTitle, JSONPath: "title"},
-			{Name: sharedtags.JThumbnailURL, JSONPath: "thumb"},
+			{Name: sharedtags.JThumbnail, JSONPath: "thumb"},
 			{Name: consts.CrawlFieldDuration, JSONPath: "duration"},
 			{Name: sharedtags.JUploadDate, JSONPath: "upload_date"},
 		},

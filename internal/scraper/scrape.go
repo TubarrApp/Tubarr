@@ -553,17 +553,17 @@ func setupFieldScraping(c *colly.Collector, fieldName string, rules []models.Met
 			} else {
 				// For description fields without Attr, get HTML content and process it
 				if fieldName == sharedtags.JDescription {
-					html, err := h.DOM.Html()
+					htmlStr, err := h.DOM.Html()
 					if err == nil {
 						// Clean HTML tags and format
-						html = strings.ReplaceAll(html, "<br>", "\n")
-						html = strings.ReplaceAll(html, "<br/>", "\n")
-						html = strings.ReplaceAll(html, "<br />", "\n")
-						html = strings.ReplaceAll(html, "&nbsp;", "\n")
-						html = strings.ReplaceAll(html, " \n", "\n")
-						html = strings.ReplaceAll(html, "\n ", "\n")
-						html = strings.TrimSpace(html)
-						value = html
+						htmlStr = strings.ReplaceAll(htmlStr, "<br>", "\n")
+						htmlStr = strings.ReplaceAll(htmlStr, "<br/>", "\n")
+						htmlStr = strings.ReplaceAll(htmlStr, "<br />", "\n")
+						htmlStr = strings.ReplaceAll(htmlStr, "&nbsp;", "\n")
+						htmlStr = strings.ReplaceAll(htmlStr, " \n", "\n")
+						htmlStr = strings.ReplaceAll(htmlStr, "\n ", "\n")
+						htmlStr = strings.TrimSpace(htmlStr)
+						value = htmlStr
 					} else {
 						value = h.Text
 					}
@@ -593,38 +593,19 @@ func setupFieldScraping(c *colly.Collector, fieldName string, rules []models.Met
 func parseScrapedDate(raw string) (string, time.Time) {
 	raw = strings.TrimSpace(raw)
 
-	var t time.Time
-	var err error
-
-	// Plain digit date, e.g. yt-dlp's YYYYMMDD upload_date format.
-	if _, parseErr := strconv.ParseInt(raw, 10, 64); parseErr == nil {
-		if len(raw) == 8 {
-			t, err = time.Parse("20060102", raw)
-		} else {
-			err = fmt.Errorf("unrecognized plain numeric date length: %q", raw)
+	// yt-dlp's YYYYMMDD upload_date, "2020-12-07", or an RFC3339 timestamp.
+	for _, layout := range []string{"20060102", "2006-01-02", time.RFC3339} {
+		if t, err := time.Parse(layout, raw); err == nil && !t.IsZero() {
+			return t.Format("2006-01-02"), t
 		}
-	}
-
-	// Hyphenated date, e.g. "2020-12-07".
-	if (err != nil || t.IsZero()) && strings.Contains(raw, "-") {
-		num := strings.ReplaceAll(raw, "-", "")
-		if _, parseErr := strconv.ParseInt(num, 10, 64); parseErr == nil {
-			t, err = time.Parse("2006-01-02", raw)
-		}
-	}
-
-	// RFC3339 timestamp.
-	if (err != nil || t.IsZero()) && strings.Contains(raw, "T") {
-		t, err = time.Parse(time.RFC3339, raw)
 	}
 
 	// Word date, e.g. "December 7, 2020".
-	if err != nil || t.IsZero() {
-		if parsedDate, parseErr := parsing.ParseWordDate(raw); parseErr == nil {
-			t, err = time.Parse("2006-01-02", parsedDate)
-		}
+	parsedDate, err := parsing.ParseWordDate(raw)
+	if err != nil {
+		return raw, time.Time{}
 	}
-
+	t, err := time.Parse("2006-01-02", parsedDate)
 	if err != nil || t.IsZero() {
 		return raw, time.Time{}
 	}
@@ -669,7 +650,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		sharedtags.JTitle:          true,
 		sharedtags.JDescription:    true,
 		sharedtags.JDirectVideoURL: true,
-		sharedtags.JThumbnailURL:   true,
+		sharedtags.JThumbnail:      true,
 	}
 
 	// Recognized date fields, each validated as a full date string. Includes an order of preference for v.UploadDate.
@@ -696,8 +677,8 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 	if rules, ok := rulesByField[sharedtags.JDirectVideoURL]; ok {
 		setupFieldScraping(collector, sharedtags.JDirectVideoURL, rules, &directVideoURL)
 	}
-	if rules, ok := rulesByField[sharedtags.JThumbnailURL]; ok {
-		setupFieldScraping(collector, sharedtags.JThumbnailURL, rules, &thumbnailURL)
+	if rules, ok := rulesByField[sharedtags.JThumbnail]; ok {
+		setupFieldScraping(collector, sharedtags.JThumbnail, rules, &thumbnailURL)
 	}
 
 	// Setup scraping for recognized date fields. Each is written into the metadata JSON
@@ -755,7 +736,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 
 		if thumbnailURL != "" {
 			v.ThumbnailURL = thumbnailURL
-			metadata[sharedtags.JThumbnailURL] = thumbnailURL
+			metadata[sharedtags.JThumbnail] = thumbnailURL
 		}
 
 		parsedDates := make(map[string]time.Time, len(dateValues))

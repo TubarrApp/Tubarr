@@ -115,7 +115,7 @@ func buildFuzzedChannelForm(f channelFormFields, samples map[string][2]string, c
 func editPageForm(f channelFormFields, got channelDetails) url.Values {
 	form := url.Values{}
 	for _, k := range f.settings {
-		var v any = got.Settings[k]
+		v := got.Settings[k]
 		if k == "channel_config_file" {
 			v = got.ChannelConfigFile
 		}

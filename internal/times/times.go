@@ -5,10 +5,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/models"
+	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -112,4 +115,29 @@ func RandomMinsDuration(s int) time.Duration {
 		return 0
 	}
 	return time.Duration(rand.IntN(s+1)) * time.Minute
+}
+
+// CalculateJitter calculates a number to use as jitter.
+func CalculateJitter(c *models.Channel) (jitter time.Duration) {
+	jitterInt := state.GetOrComputeJitter(c.ID, len(c.URLModels), func() int {
+		j := 5
+		for _, u := range c.URLModels {
+			url := strings.ToLower(u.URL)
+			switch {
+			case strings.Contains(url, "tube"), strings.Contains(url, "tok"),
+				strings.Contains(url, "gram"), strings.Contains(url, "book"), strings.Contains(url, "x."):
+				j = max(10, j)
+			case strings.Contains(url, "motion"), strings.Contains(url, "vime"),
+				strings.Contains(url, "bili"), strings.Contains(url, "ddit"):
+				j = max(8, j)
+			}
+		}
+		return j
+	})
+
+	if jitterInt > 0 {
+		jitter = RandomMinsDuration(jitterInt) // Probability, with re-rolls, expect ~half the time added
+	}
+
+	return jitter
 }

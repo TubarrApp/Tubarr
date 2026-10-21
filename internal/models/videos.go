@@ -75,8 +75,11 @@ type SkipMetarr struct {
 	Skip   bool
 	Reason SkipMetarrReasons
 }
+
+// SkipMetarrReasons are reasons the Metarr step was skipped.
 type SkipMetarrReasons string
 
+// SkipMetarrReasons strings.
 const (
 	SkipMetarrNoPath                         SkipMetarrReasons = "metarr isn't on $PATH or won't run"
 	SkipMetarrMissingFilenameOpsFile         SkipMetarrReasons = "filename ops path is set, but the file can't be read or parsed"
@@ -90,8 +93,11 @@ type SkipDownloads struct {
 	Skip   bool
 	Reason SkipDownloadReasons
 }
+
+// SkipDownloadReasons are reasons a download was skipped.
 type SkipDownloadReasons string
 
+// SkipDownloadReasons strings.
 const (
 	SkipDLMissingFilterFile SkipDownloadReasons = "filter file path is set, but file appears to be unreachable"
 )

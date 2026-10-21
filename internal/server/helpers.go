@@ -492,6 +492,108 @@ func parseURLSettings(raw string) (map[string]urlSettings, error) {
 	return parsed, nil
 }
 
+// syncChannelURLs makes the channel's URLs match the edit form, keeping the manual downloads URL.
+func syncChannelURLs(cs contracts.ChannelStore, channelID int64, existing []*models.ChannelURL, f *channelForm, now time.Time) error {
+	existingURLMap := make(map[string]*models.ChannelURL, len(existing))
+	for _, urlModel := range existing {
+		existingURLMap[urlModel.URL] = urlModel
+	}
+
+	// URLs edited in place keep their row, so their settings and videos stay with them.
+	for from, to := range f.renames {
+		urlModel, exists := existingURLMap[from]
+		if _, taken := existingURLMap[to]; !exists || urlModel.IsManual || taken {
+			continue
+		}
+		if err := cs.RenameChannelURL(urlModel.ID, to); err != nil {
+			return err
+		}
+		delete(existingURLMap, from)
+		urlModel.URL = to
+		existingURLMap[to] = urlModel
+	}
+
+	// Delete URLs no longer listed. The manual downloads URL is never listed in the edit form, so it's kept.
+	for existingURL, urlModel := range existingURLMap {
+		if !urlModel.IsManual && !slices.Contains(f.urls, existingURL) {
+			if err := cs.DeleteChannelURL(urlModel.ID); err != nil {
+				return fmt.Errorf("failed to delete URL %q: %w", existingURL, err)
+			}
+		}
+	}
+
+	// Add or update listed URLs.
+	for _, u := range f.urls {
+		var parsedUsername, parsedPassword, parsedLoginURL string
+		if a, exists := f.authMap[u]; exists {
+			parsedUsername, parsedPassword, parsedLoginURL = a.Username, a.Password, a.LoginURL
+		}
+		urlSettings := f.urlSettings[u]
+
+		if existingURLModel, exists := existingURLMap[u]; exists {
+			// A blank password keeps the saved one, as passwords aren't sent to the edit page. Clearing the ciphertext
+			// makes a new password get encrypted, and a cleared login get stored blank.
+			if parsedPassword != "" || parsedUsername == "" {
+				existingURLModel.Password = parsedPassword
+				existingURLModel.EncryptedPassword = ""
+			}
+			existingURLModel.Username = parsedUsername
+			existingURLModel.LoginURL = parsedLoginURL
+			existingURLModel.UpdatedAt = now
+			existingURLModel.ChanURLSettings = urlSettings.Settings
+			existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
+
+			if err := cs.UpdateChannelURLSettings(existingURLModel); err != nil {
+				return fmt.Errorf("failed to update URL %q: %w", u, err)
+			}
+			continue
+		}
+
+		chanURL := &models.ChannelURL{
+			URL:               u,
+			Username:          parsedUsername,
+			Password:          parsedPassword,
+			LoginURL:          parsedLoginURL,
+			ChanURLSettings:   urlSettings.Settings,
+			ChanURLMetarrArgs: urlSettings.Metarr,
+			LastScan:          now,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+		}
+		if _, err := cs.AddChannelURL(channelID, chanURL, false); err != nil {
+			return fmt.Errorf("failed to add URL %q: %w", u, err)
+		}
+	}
+	return nil
+}
+
+// replaceNotifications deletes and re-sets notifications fresh.
+func replaceNotifications(cs contracts.ChannelStore, channelID int64, f *channelForm) error {
+	// Replace notifications.
+	existingNotifications, err := cs.GetNotifyURLs(channelID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch existing notifications: %w", err)
+	}
+	existingNotificationURLs := make([]string, 0, len(existingNotifications))
+	for _, n := range existingNotifications {
+		if n.NotifyURL != "" {
+			existingNotificationURLs = append(existingNotificationURLs, n.NotifyURL)
+		}
+	}
+	if len(existingNotificationURLs) > 0 {
+		if err := cs.DeleteNotifyURLs(channelID, existingNotificationURLs); err != nil {
+			return fmt.Errorf("failed to delete existing notifications: %w", err)
+		}
+	}
+	if len(f.notifications) > 0 {
+		if err := cs.AddNotifyURLs(channelID, f.notifications); err != nil {
+			return fmt.Errorf("failed to add notification URLs: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // urlSettings are a channel URL's parsed custom settings.
 type urlSettings struct {
 	Settings *models.Settings

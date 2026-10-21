@@ -26,7 +26,7 @@ const (
 	TimeRemainingMsg = sharedconsts.ColorCyan + "Time remaining:" + sharedconsts.ColorReset
 )
 
-// YtdlpCodecToRegex contains translations for codecs into YT-DLP regex strings.
+// YtdlpCodecRegex contains translations for codecs into YT-DLP regex strings.
 var YtdlpCodecRegex = map[string]string{
 	// Video.
 	sharedconsts.VCodecAV1:   "^av0?1",

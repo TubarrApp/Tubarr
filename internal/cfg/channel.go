@@ -207,7 +207,7 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 			}
 
 			// Combine with video URLs if any.
-			videoURLs := append(urls, urlLines...)
+			videoURLs := slices.Concat(urls, urlLines)
 
 			c, _, _, err := lookupChannel(cs, channelID, channelName)
 			if err != nil {

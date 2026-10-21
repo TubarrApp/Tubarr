@@ -20,6 +20,7 @@ func (nilDBStore) GetDB() *sql.DB                                               
 func (nilDBStore) SetDownloadStatus(*models.Video) error                           { return nil }
 func (nilDBStore) UpdateDownloadStatus(context.Context, models.StatusUpdate) error { return nil }
 func (nilDBStore) CancelDownload(int64, string) bool                               { return false }
+func (nilDBStore) MarkDownloadCanceled(context.Context, int64) (bool, error)       { return false, nil }
 
 // fakeYTDLP puts a yt-dlp script running body first on PATH, returning the file it adds a line to on each run.
 func fakeYTDLP(t *testing.T, body string) (runs string) {

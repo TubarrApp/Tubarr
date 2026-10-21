@@ -124,49 +124,55 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 		v.Description = sharedtags.FirstString(m, sharedtags.DescriptionKeys)
 	}
 
-	// Thumbnails.
-	if v.ThumbnailURL == "" {
-		// Check directly.
-		if thumbnailVal, exists := m[sharedtags.JThumbnailURL]; exists {
-			if thumbnail, ok := thumbnailVal.(string); ok {
-				v.ThumbnailURL = thumbnail
-			}
-		}
-		// Still empty, check arrays.
-		if v.ThumbnailURL == "" {
-			if thumbsVal, exists := m["thumbnails"]; exists {
-				if thumbs, ok := thumbsVal.([]any); ok {
-					var best string
-					maxPref := math.MinInt
-					for _, t := range thumbs {
-						if thumbMap, ok := t.(map[string]any); ok {
-							urlStr, _ := thumbMap["url"].(string)
-							if urlStr == "" {
-								continue
-							}
-							// Highest-resolution or best preference.
-							if pref, ok := thumbMap["preference"].(float64); ok {
-								if int(pref) > maxPref {
-									maxPref = int(pref)
-									best = urlStr
-								}
-							} else if best == "" {
-								// fallback if preference missing.
-								best = urlStr
-							}
-						}
-					}
-					if best != "" {
-						v.ThumbnailURL = best
-						logger.Pl.D(2, "Selected thumbnail from array: %s", best)
-					}
-				}
-			}
-		}
-	}
+	// Select thumbnail
+	bestThumbnail(v, m)
 
 	logger.Pl.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Title)
 	return true, nil
+}
+
+// bestThumbnail sets the video's thumbnail URL from its metadata, if it has no thumbnail URL already set.
+func bestThumbnail(v *models.Video, m map[string]any) {
+	// Already got thumbnail URL.
+	if v.ThumbnailURL != "" {
+		return
+	}
+
+	// Check the single thumbnail field.
+	if thumbnail, _ := m[sharedtags.JThumbnail].(string); thumbnail != "" {
+		v.ThumbnailURL = thumbnail
+		return
+	}
+
+	// Otherwise pick from the thumbnails list.
+	thumbs, _ := m[sharedtags.JThumbnails].([]any)
+	var best string
+	maxPref := math.MinInt
+	for _, t := range thumbs {
+		thumbMap, ok := t.(map[string]any)
+		if !ok {
+			continue
+		}
+		// Skip empty URL values.
+		urlStr, _ := thumbMap[sharedtags.JURL].(string)
+		if urlStr == "" {
+			continue
+		}
+		// Highest preference wins.
+		if pref, ok := thumbMap[sharedtags.JPreference].(float64); ok {
+			if int(pref) > maxPref {
+				maxPref = int(pref)
+				best = urlStr
+			}
+		} else if best == "" {
+			// Entries without a preference are only used if none have one.
+			best = urlStr
+		}
+	}
+	if best != "" {
+		v.ThumbnailURL = best
+		logger.Pl.D(2, "Selected thumbnail from array: %s", best)
+	}
 }
 
 // handleFilters uses user input filters to check if the video should be downloaded.
@@ -249,24 +255,12 @@ func getRelevantFilters(filters []models.Filters, currentURL string) []models.Fi
 	return relevant
 }
 
-// getRelevantFilters returns filters applicable to the given URL.
+// getRelevantFilteredMetaOps returns filtered meta ops applicable to the given URL.
 func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, currentURL string) []models.FilteredMetaOps {
 	relevantFilteredMetaOps := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
 
 	for _, fmo := range filteredMetaOps {
-		relevantFilters := make([]models.Filters, 0, len(fmo.Filters))
-
-		for _, filter := range fmo.Filters {
-			// Include if no specific URL specified, or if it matches current URL.
-			if sharedparsing.AppliesToChannel(filter.ChannelURL, currentURL) {
-				relevantFilters = append(relevantFilters, filter)
-			} else {
-				logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
-					filter, filter.ChannelURL, currentURL)
-			}
-		}
-
-		fmo.Filters = relevantFilters
+		fmo.Filters = getRelevantFilters(fmo.Filters, currentURL)
 		relevantFilteredMetaOps = append(relevantFilteredMetaOps, fmo)
 	}
 	return relevantFilteredMetaOps
@@ -277,17 +271,7 @@ func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenam
 	relevantFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
 
 	for _, ffo := range filteredFilenameOps {
-		relevantFilters := make([]models.Filters, 0, len(ffo.Filters))
-		for _, filter := range ffo.Filters {
-			// Include if no specific URL specified, or if it matches current URL.
-			if sharedparsing.AppliesToChannel(filter.ChannelURL, currentURL) {
-				relevantFilters = append(relevantFilters, filter)
-			} else {
-				logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
-					filter, filter.ChannelURL, currentURL)
-			}
-		}
-		ffo.Filters = relevantFilters
+		ffo.Filters = getRelevantFilters(ffo.Filters, currentURL)
 		relevantFilteredFilenameOps = append(relevantFilteredFilenameOps, ffo)
 	}
 	return relevantFilteredFilenameOps

@@ -305,9 +305,9 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		}
 
 		// Fill credentials.
-		cu.Username = nullString(username)
-		cu.EncryptedPassword = nullString(password)
-		cu.LoginURL = nullString(loginURL)
+		cu.Username = username.String
+		cu.EncryptedPassword = password.String
+		cu.LoginURL = loginURL.String
 
 		if cu.Password == "" && cu.EncryptedPassword != "" {
 			if cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword); err != nil {

@@ -172,7 +172,7 @@ func setListedField(lv *listedVideo, name, value string, absURL func(string) str
 		if lv.Title == "" {
 			lv.Title = value
 		}
-	case sharedtags.JThumbnailURL:
+	case sharedtags.JThumbnail:
 		if lv.ThumbnailURL == "" {
 			lv.ThumbnailURL = absURL(value)
 		}

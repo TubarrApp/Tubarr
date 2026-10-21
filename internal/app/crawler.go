@@ -107,21 +107,19 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 		ch.URLModels = due
 
 		// Run concurrent jobs.
-		wg.Add(1)
-		go func(c *models.Channel) {
-			defer wg.Done()
+		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() {
 				<-sem
 			}()
 
 			// Initiate crawl.
-			if performedCrawls, err := CrawlChannel(ctx, s, c); err != nil {
+			if performedCrawls, err := CrawlChannel(ctx, s, &ch); err != nil {
 				errChan <- err
 			} else if performedCrawls {
-				logger.Pl.S("Completed crawl for channel %q", c.Name)
+				logger.Pl.S("Completed crawl for channel %q", ch.Name)
 			}
-		}(&ch)
+		})
 	}
 
 	wg.Wait()
@@ -135,7 +133,7 @@ func CheckChannels(ctx context.Context, s contracts.Store) error {
 }
 
 // ManualDownloadToChannel downloads custom video URLs sent in to the channel.
-func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, manualVideos []models.ManualVideo) (err error) {
+func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contracts.ChannelStore, c *models.Channel, manualVideos []models.ManualVideo) error {
 	if c == nil || c.ChanSettings == nil {
 		return fmt.Errorf("invalid nil parameters (channel: %v, channel settings: %v)", c == nil, c.ChanSettings == nil)
 	}
@@ -177,6 +175,12 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 
 	for _, mv := range manualVideos {
 		actualVideoURL := mv.URL
+		if _, dup := queuedURLs[actualVideoURL]; dup {
+			logger.Pl.W("Video %q was entered more than once for channel %q, skipping duplicate", actualVideoURL, c.Name)
+			continue
+		}
+		queuedURLs[actualVideoURL] = struct{}{}
+
 		targetChannelURLModel, err := ManualChannelURL(cs, c, mv.ChannelURLID)
 		if err != nil {
 			return err
@@ -193,25 +197,10 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 			targetChannelURLModel = &withAuth
 		}
 
-		if _, dup := queuedURLs[actualVideoURL]; dup {
-			logger.Pl.W("Video %q was entered more than once for channel %q, skipping duplicate", actualVideoURL, c.Name)
-			continue
-		}
-		queuedURLs[actualVideoURL] = struct{}{}
-
 		// Check if this URL's domain is blocked globally for its authentication context.
-		parsed, err := url.Parse(targetChannelURLModel.URL)
-		if err != nil {
-			logger.Pl.W("Unable to parse %q, skipping...", targetChannelURLModel.URL)
-			continue
-		}
-		hostname := parsed.Hostname()
-		blockCtx := blocking.GetBlockContext(targetChannelURLModel)
-		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, blockCtx)
-		if isBlocked {
-			logger.Pl.W("Skipping video %q for channel %q. Domain is blocked for context %q (Blocked at: %v, Time remaining: %v)",
-				actualVideoURL, c.Name, blockCtx, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
-			recordSkip(s.VideoStore(), c, actualVideoURL, fmt.Errorf("%s is blocked for %s requests until %s", hostname, blockCtx, time.Now().Add(remaining).Format("2006-01-02 15:04 MST")))
+		if err := domainBlocked(targetChannelURLModel); err != nil {
+			logger.Pl.W("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, err)
+			recordSkip(s.VideoStore(), c, actualVideoURL, err)
 			continue
 		}
 
@@ -237,20 +226,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 			logger.Pl.E("Skipping video %q for channel %q: %v", actualVideoURL, c.Name, err)
 			// A video not yet in the channel is kept as failed, so the URL the user entered isn't lost.
 			if v.ID == 0 {
-
-				failed := &models.Video{ChannelID: c.ID,
-					ChannelURLID: targetChannelURLModel.ID,
-					ChannelURL:   targetChannelURLModel.URL,
-					URL:          actualVideoURL,
-					DownloadStatus: models.DLStatus{
-						Status: consts.DLStatusFailed,
-					}}
-
-				if id, addErr := s.VideoStore().AddVideo(failed, c.ID, targetChannelURLModel.ID); addErr != nil {
-					logger.Pl.E("Failed to store skipped video %q: %v", actualVideoURL, addErr)
-				} else if setErr := s.VideoStore().SetMissingVideoErrors([]int64{id}, err.Error()); setErr != nil {
-					logger.Pl.E("Failed to store why video %q was skipped: %v", actualVideoURL, setErr)
-				}
+				storeSkippedManualVideo(s.VideoStore(), c, targetChannelURLModel, actualVideoURL, err)
 			}
 			recordSkip(s.VideoStore(), c, actualVideoURL, err)
 			continue
@@ -285,6 +261,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		cu := b.cu
 
 		// Get access details only for channel URLs with videos to download (e.g. avoids needless FlareSolverr solves).
+		var err error
 		if cu.Cookies, cu.CookiePath, err = scrape.ScraperURLCookies(queueCtx, cs, c, cu); err != nil {
 			procError = errors.Join(procError, err)
 			for _, v := range b.videos {
@@ -341,6 +318,25 @@ func UnavailableDestinations(c *models.Channel, manualVideos []models.ManualVide
 // recordSkip stores why a claimed video wasn't downloaded, shown once it's back in the Available list.
 func recordSkip(vs contracts.VideoStore, c *models.Channel, videoURL string, reason error) {
 	if err := vs.SetQueuedVideoError(c.ID, videoURL, reason.Error()); err != nil {
+		logger.Pl.E("Failed to store why video %q was skipped: %v", videoURL, err)
+	}
+}
+
+// storeSkippedManualVideo adds a manual video not yet in the channel as failed, with why it was skipped.
+func storeSkippedManualVideo(vs contracts.VideoStore, c *models.Channel, cu *models.ChannelURL, videoURL string, reason error) {
+	failed := &models.Video{
+		ChannelID:      c.ID,
+		ChannelURLID:   cu.ID,
+		ChannelURL:     cu.URL,
+		URL:            videoURL,
+		DownloadStatus: models.DLStatus{Status: consts.DLStatusFailed},
+	}
+	id, err := vs.AddVideo(failed, c.ID, cu.ID)
+	if err != nil {
+		logger.Pl.E("Failed to store skipped video %q: %v", videoURL, err)
+		return
+	}
+	if err := vs.SetMissingVideoErrors([]int64{id}, reason.Error()); err != nil {
 		logger.Pl.E("Failed to store why video %q was skipped: %v", videoURL, err)
 	}
 }
@@ -416,7 +412,7 @@ func downloadClaimed(ctx context.Context, s contracts.Store, c *models.Channel, 
 // CrawlChannel crawls a channel for new URLs.
 func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (performedCrawls bool, err error) {
 	if c == nil {
-		return false, fmt.Errorf("channel cannot be nil")
+		return false, errors.New("channel cannot be nil")
 	}
 	if c.LoadErr != nil {
 		return false, c.LoadErr
@@ -508,6 +504,12 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 		channelURLsGotNew                   []string
 	)
 
+	// Group videos by channel URL.
+	videosByURL := make(map[int64][]*models.Video, len(c.URLModels))
+	for _, v := range videos {
+		videosByURL[v.ChannelURLID] = append(videosByURL[v.ChannelURLID], v)
+	}
+
 	// Process channel URLs.
 	for _, cu := range c.URLModels {
 		// Skip manual or paused channel entry.
@@ -515,13 +517,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 			continue
 		}
 
-		// Get requests for this channel.
-		var vRequests []*models.Video
-		for _, v := range videos {
-			if v.ChannelURLID == cu.ID {
-				vRequests = append(vRequests, v)
-			}
-		}
+		vRequests := videosByURL[cu.ID]
 		if len(vRequests) == 0 {
 			continue
 		}
@@ -590,7 +586,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, c *models.Channel) (pe
 // CrawlChannelIgnore gets the channel's currently displayed videos and marks them as complete without downloading.
 func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channel) error {
 	if c == nil {
-		return fmt.Errorf("channel cannot be nil")
+		return errors.New("channel cannot be nil")
 	}
 	if c.LoadErr != nil {
 		return c.LoadErr
@@ -644,19 +640,9 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 			continue
 		}
 
-		parsed, err := url.Parse(cu.URL)
-		if err != nil {
-			logger.Pl.W("Unable to parse %q, skipping...", cu.URL)
-			continue
-		}
-
-		hostname := parsed.Hostname()
-
 		// Check if this URL is blocked globally for its authentication context.
-		blockCtx := blocking.GetBlockContext(cu)
-		isBlocked, blockedTime, remaining := blocking.IsBlocked(hostname, blockCtx)
-		if isBlocked {
-			logger.Pl.D(2, "Skipping URL %q for channel %q. Domain %q is blocked for context %q (Blocked at: %v, Time remaining: %v)", cu.URL, c.Name, hostname, blockCtx, blockedTime.Format("2006-01-02 15:04:05"), remaining.Round(time.Second))
+		if err := domainBlocked(cu); err != nil {
+			logger.Pl.D(2, "Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
 			continue
 		}
 
@@ -670,6 +656,20 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 		allowedURLModels = append(allowedURLModels, cu)
 	}
 	return allowedURLModels, len(allowedURLModels) > 0
+}
+
+// domainBlocked returns why the channel URL's domain is blocked for its authentication context, or nil if it isn't.
+func domainBlocked(cu *models.ChannelURL) error {
+	parsed, err := url.Parse(cu.URL)
+	if err != nil {
+		return fmt.Errorf("unable to parse %q: %w", cu.URL, err)
+	}
+	hostname := parsed.Hostname()
+	blockCtx := blocking.GetBlockContext(cu)
+	if isBlocked, _, remaining := blocking.IsBlocked(hostname, blockCtx); isBlocked {
+		return fmt.Errorf("%s is blocked for %s requests until %s", hostname, blockCtx, time.Now().Add(remaining).Format("2006-01-02 15:04 MST"))
+	}
+	return nil
 }
 
 // checkDestinations returns an error if any of a channel URL's download destinations (or a video's overrides) isn't available.
@@ -742,7 +742,7 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 		return nil, fmt.Errorf("failed to fetch newly created manual downloads URL: %w", err)
 	}
 	if !hasRows || fetchedCU == nil {
-		return nil, fmt.Errorf("newly created manual downloads URL not found in database")
+		return nil, errors.New("newly created manual downloads URL not found in database")
 	}
 
 	// Add to in-memory models.

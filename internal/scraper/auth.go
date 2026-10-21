@@ -2,7 +2,7 @@ package scraper
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -27,7 +27,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	logger.Pl.I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, auth.StarPassword(a.Password))
 
 	// 'GET' the login page to get a fresh token
-	req, err := http.NewRequestWithContext(ctx, "GET", a.LoginURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.LoginURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 		return nil, err
 	}
 	if getResp == nil {
-		return nil, fmt.Errorf("'GET' request returned a nil response")
+		return nil, errors.New("'GET' request returned a nil response")
 	}
 	defer func() {
 		if getResp != nil && getResp.Body != nil {
@@ -66,7 +66,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 	logger.Pl.D(1, "Sending token %q", data.Get("_token"))
 
 	// 'POST' auth details to the login form
-	req, err = http.NewRequestWithContext(ctx, "POST", a.LoginURL, strings.NewReader(data.Encode()))
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, a.LoginURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie,
 		return nil, err
 	}
 	if postResp == nil {
-		return nil, fmt.Errorf("'POST' request returned a nil response")
+		return nil, errors.New("'POST' request returned a nil response")
 	}
 	defer func() {
 		if postResp != nil && postResp.Body != nil {

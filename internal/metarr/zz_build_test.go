@@ -175,6 +175,96 @@ func TestMakeMetarrCommandThumbnail(t *testing.T) {
 	}
 }
 
+// TestMakeMetarrCommandArgs tests the whole Metarr command for channel URL, global and Download As values.
+func TestMakeMetarrCommandArgs(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	metaOps, err := parsing.ParseMetaOps([]string{"artist:set:Cat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	channelArgs := &models.MetarrArgs{
+		OutputExt: "mp4", RenameStyle: "spaces", MinFreeMem: "1G", ExtraFFmpegArgs: "-x", OutputDir: "/out", MaxCPU: 50,
+		MetaOps: metaOps, TranscodeGPU: "vaapi", TranscodeGPUNode: "/dev/dri/renderD128", TranscodeQuality: "23",
+		TranscodeVideoFilter: "scale=1280:-2", TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"},
+	}
+	globals := map[string]any{
+		keys.MMinFreeMem: "2G", keys.OutputFiletype: "mkv", keys.MRenameStyle: "underscores", keys.MExtraFFmpegArgs: "-y",
+		keys.DebugLevel: 2, keys.MMetaOps: []string{"title:set:Global"}, keys.MFilenameOps: []string{"prefix:[G] "},
+		keys.MoveOnComplete: "/moved",
+	}
+	files := []string{metkeys.VideoFile, "/videos/v.mp4", metkeys.MetaFile, "/videos/v.json"}
+
+	for _, tc := range []struct {
+		name      string
+		globals   map[string]any
+		args      *models.MetarrArgs
+		overrides *models.VideoOverrides
+		want      []string
+	}{
+		{"channel URL", nil, channelArgs, nil, slices.Concat(files, []string{
+			metkeys.FilenameOps, defaultFilenameSet,
+			metkeys.MetaOps, "artist:set:Cat", metkeys.MetaOW,
+			metkeys.MaxCPU, "50.00",
+			metkeys.MinFreeMem, "1G",
+			metkeys.OutputDir, "/out",
+			metkeys.Ext, "mp4",
+			metkeys.RenameStyle, "spaces",
+			metkeys.ExtraFFmpegArgs, "-x",
+			metkeys.TranscodeGPU, "vaapi",
+			metkeys.TranscodeGPUNode, "/dev/dri/renderD128",
+			metkeys.TranscodeVideoCodecs, "h264:hevc",
+			metkeys.TranscodeQuality, "23",
+			metkeys.TranscodeAudioCodecs, "aac",
+			metkeys.TranscodeVideoFilter, "scale=1280:-2",
+		})},
+		{"global", globals, &models.MetarrArgs{}, nil, slices.Concat(files, []string{
+			metkeys.FilenameOps, "prefix:[G] ",
+			metkeys.FilenameOps, defaultFilenameSet,
+			metkeys.MetaOps, "title:set:Global", metkeys.MetaOW,
+			metkeys.MinFreeMem, "2G",
+			metkeys.OutputDir, "/moved",
+			metkeys.Ext, "mkv",
+			metkeys.RenameStyle, "underscores",
+			metkeys.ExtraFFmpegArgs, "-y",
+			metkeys.Debug, "2",
+		})},
+		{"Download As", globals, channelArgs, &models.VideoOverrides{
+			MetarrArgs: models.MetarrArgs{OutputExt: "webm", TranscodeGPU: validation.GPUNone, MaxCPU: 80},
+			Thumbnail:  "/thumb.png",
+		}, slices.Concat(files, []string{
+			metkeys.FilenameOps, defaultFilenameSet,
+			metkeys.MaxCPU, "80.00",
+			metkeys.MinFreeMem, "1G",
+			metkeys.OutputDir, "/moved",
+			metkeys.Ext, "webm",
+			metkeys.RenameStyle, "spaces",
+			metkeys.ExtraFFmpegArgs, "-x",
+			metkeys.Thumbnail, "/thumb.png",
+			metkeys.TranscodeVideoCodecs, "h264:hevc",
+			metkeys.TranscodeQuality, "23",
+			metkeys.TranscodeAudioCodecs, "aac",
+			metkeys.TranscodeVideoFilter, "scale=1280:-2",
+			metkeys.Debug, "2",
+		})},
+		{"strip thumbnail", nil, &models.MetarrArgs{}, &models.VideoOverrides{StripThumbnail: true}, slices.Concat(files, []string{
+			metkeys.FilenameOps, defaultFilenameSet,
+			metkeys.StripThumbnail,
+		})},
+	} {
+		viper.Reset()
+		for k, val := range tc.globals {
+			viper.Set(k, val)
+		}
+		c := &models.Channel{ID: 1, Name: "Cats"}
+		cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: tc.args}
+		v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json", Overrides: tc.overrides}
+		if got := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); !slices.Equal(got, tc.want) {
+			t.Errorf("%s:\ngot  %q\nwant %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestWithDefaultFilenameSet tests finished videos are renamed to their full title unless an op that applies sets the
 // name, and that channels without ops of their own still get the global ones.
 func TestWithDefaultFilenameSet(t *testing.T) {

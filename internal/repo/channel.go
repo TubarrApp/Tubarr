@@ -439,7 +439,7 @@ func (cs *ChannelStore) videoFilePaths(channelID int64, urls []string) ([]string
 // UpdateChannelFromConfig updates the channel settings from a config file if it exists.
 func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	if c == nil {
-		return fmt.Errorf("dev error: channel sent in nil")
+		return errors.New("dev error: channel sent in nil")
 	}
 
 	cfgFile := c.ChannelConfigFile
@@ -1357,7 +1357,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("update failed: no rows affected")
+		return errors.New("update failed: no rows affected")
 	}
 
 	logger.Pl.S("Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
@@ -1400,28 +1400,8 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
-			"FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) "+
-			"ORDER BY %s DESC",
-		consts.QVidID,
-		consts.QVidChanID,
-		consts.QVidChanURLID,
-		consts.QVidChanURL,
-		consts.QVidThumbnailURL,
-		consts.QVidFinished,
-		consts.QVidIgnored,
-		consts.QVidURL,
-		consts.QVidTitle,
-		consts.QVidDescription,
-		consts.QVidUploadDate,
-		consts.QVidMetarrStatus,
-		consts.QVidMetarrError,
-		consts.QVidVideoPath,
-		consts.QVidJSONPath,
-		consts.QVidDuration,
-		consts.QVidFilesize,
-		consts.QVidCreatedAt,
-		consts.QVidUpdatedAt,
+		"SELECT %s FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) ORDER BY %s DESC",
+		videoListColumns,
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidFinished,
@@ -1430,9 +1410,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	)
 
 	rows, err := cs.q.Query(query, c.ID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, false, nil
-	} else if err != nil {
+	if err != nil {
 		return nil, true, fmt.Errorf("failed to query videos: %w", err)
 	}
 	defer func() {
@@ -1441,81 +1419,8 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 		}
 	}()
 
-	for rows.Next() {
-		var (
-			v            models.Video
-			url          sql.NullString
-			title        sql.NullString
-			thumbnailURL sql.NullString
-			description  sql.NullString
-			uploadDate   sql.NullTime
-			channelURLID sql.NullInt64
-			channelURL   sql.NullString
-			metarrStatus sql.NullString
-			metarrError  sql.NullString
-			videoPath    sql.NullString
-			jsonPath     sql.NullString
-			duration     sql.NullInt64
-			filesize     sql.NullInt64
-		)
-
-		if err := rows.Scan(
-			&v.ID,
-			&v.ChannelID,
-			&channelURLID,
-			&channelURL,
-			&thumbnailURL,
-			&v.Finished,
-			&v.Ignored,
-			&url,
-			&title,
-			&description,
-			&uploadDate,
-			&metarrStatus,
-			&metarrError,
-			&videoPath,
-			&jsonPath,
-			&duration,
-			&filesize,
-			&v.CreatedAt,
-			&v.UpdatedAt,
-		); err != nil {
-			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
-		}
-		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
-		v.MetarrError = metarrError.String
-		v.VideoFilePath = videoPath.String
-		v.JSONFilePath = jsonPath.String // Edit & Re-Run needs the metadata file.
-		v.Duration = int(duration.Int64)
-		v.Filesize = filesize.Int64
-
-		// Handle nullable fields.
-		if channelURLID.Valid {
-			v.ChannelURLID = channelURLID.Int64
-		}
-		if channelURL.Valid {
-			v.ChannelURL = channelURL.String
-		}
-		if url.Valid {
-			v.URL = url.String
-		}
-		if title.Valid {
-			v.Title = title.String
-		}
-		if thumbnailURL.Valid {
-			v.ThumbnailURL = thumbnailURL.String
-		}
-		if description.Valid {
-			v.Description = description.String
-		}
-		if uploadDate.Valid {
-			v.UploadDate = uploadDate.Time
-		}
-
-		videos = append(videos, &v)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, true, fmt.Errorf("failed while retrieving videos: %w", err)
+	if videos, err = scanVideoList(rows); err != nil {
+		return nil, true, err
 	}
 
 	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(videos), c.Name)
@@ -1652,7 +1557,6 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	// Auth details.
 	gotAuthModels := false
 	for _, cu := range c.URLModels {
-
 		if cu.Password == "" && cu.EncryptedPassword != "" {
 			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
 			if err != nil {
@@ -1667,9 +1571,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 				auth.StarPassword(cu.Password),
 				cu.LoginURL)
 
-			if !gotAuthModels {
-				gotAuthModels = true
-			}
+			gotAuthModels = true
 		}
 	}
 	if !gotAuthModels {
@@ -1912,12 +1814,4 @@ func (cs *ChannelStore) channelExistsID(id int64) bool {
 	}
 
 	return exists
-}
-
-// nullString converts an sql.NullString into a string, or "".
-func nullString(s sql.NullString) string {
-	if s.Valid {
-		return s.String
-	}
-	return ""
 }

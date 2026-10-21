@@ -33,44 +33,6 @@ var ErrDuplicateDownload = errors.New("already being downloaded")
 var globalDownloadSem chan struct{}
 var globalDownloadSemMu sync.RWMutex
 
-// InitGlobalDownloadLimit sets up the global download concurrency limiter.
-// A limit of 0 means no limit (unlimited concurrent downloads).
-// Note: Changes take effect for new downloads. In-progress downloads retain their slots.
-func InitGlobalDownloadLimit(limit int) {
-	globalDownloadSemMu.Lock()
-	defer globalDownloadSemMu.Unlock()
-
-	if limit > 0 {
-		globalDownloadSem = make(chan struct{}, limit)
-		logger.Pl.I("Global download concurrency limit set to %d", limit)
-	} else {
-		globalDownloadSem = nil
-		logger.Pl.I("Global download concurrency limit disabled (unlimited)")
-	}
-}
-
-// AcquireGlobalDownloadSlot blocks until a download slot is available, or ctx is done.
-// Returns the semaphore channel that was used (for proper release later).
-// Returns immediately if no global limit is configured (limit=0).
-func AcquireGlobalDownloadSlot(ctx context.Context, videoURL string) (chan struct{}, error) {
-	globalDownloadSemMu.RLock()
-	sem := globalDownloadSem
-	globalDownloadSemMu.RUnlock()
-
-	if sem == nil {
-		return nil, nil
-	}
-	if err := limits.AcquireSlot(ctx, sem, "global download", videoURL); err != nil {
-		return nil, err
-	}
-	return sem, nil
-}
-
-// isProcessNotExist checks if an error indicates a process doesn't exist.
-func isProcessNotExist(err error) bool {
-	return errors.Is(err, syscall.ESRCH)
-}
-
 // DownloadType represents the type of download operation.
 type DownloadType string
 
@@ -109,29 +71,6 @@ type VideoDownload struct {
 	destinations []string // Files yt-dlp reported downloading to, across attempts.
 }
 
-// cleanup safely terminates any running command.
-func (d *VideoDownload) cleanup() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	// Kill running command if exists.
-	if d.cmd != nil && d.cmd.Process != nil {
-		// Try graceful termination first.
-		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
-			// Force kill if graceful fails (but only if process still exists).
-			if d.cmd.Process != nil {
-				if err := d.cmd.Process.Kill(); err != nil {
-					// Only log if it's not "process already finished" or "no such process".
-					if !errors.Is(err, os.ErrProcessDone) && !isProcessNotExist(err) {
-						logger.Pl.W("Failed to cleanup video download process %d: %v", d.cmd.Process.Pid, err)
-					}
-				}
-			}
-		}
-		d.cmd = nil
-	}
-}
-
 // JSONDownload encapsulates a JSON download operation.
 type JSONDownload struct {
 	Video      *models.Video
@@ -149,25 +88,75 @@ type JSONDownload struct {
 }
 
 // cleanup safely terminates any running command.
+func (d *VideoDownload) cleanup() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// Kill running command if exists.
+	if d.cmd != nil && d.cmd.Process != nil {
+		stopProcess(d.cmd.Process, "video")
+		d.cmd = nil
+	}
+}
+
+// cleanup safely terminates any running command.
 func (d *JSONDownload) cleanup() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	// Kill running command if exists.
 	if d.cmd != nil && d.cmd.Process != nil {
-		// Try graceful termination first.
-		if err := d.cmd.Process.Signal(os.Interrupt); err != nil {
-			// Force kill if graceful fails (but only if process still exists).
-			if d.cmd.Process != nil {
-				if err := d.cmd.Process.Kill(); err != nil {
-					// Only log if it's not "process already finished" or "no such process".
-					if !errors.Is(err, os.ErrProcessDone) && !isProcessNotExist(err) {
-						logger.Pl.W("Failed to cleanup JSON download process %d: %v", d.cmd.Process.Pid, err)
-					}
-				}
-			}
-		}
+		stopProcess(d.cmd.Process, "JSON")
 		d.cmd = nil
+	}
+}
+
+// InitGlobalDownloadLimit sets up the global download concurrency limiter.
+// A limit of 0 means no limit (unlimited concurrent downloads).
+// Note: Changes take effect for new downloads. In-progress downloads retain their slots.
+func InitGlobalDownloadLimit(limit int) {
+	globalDownloadSemMu.Lock()
+	defer globalDownloadSemMu.Unlock()
+
+	if limit > 0 {
+		globalDownloadSem = make(chan struct{}, limit)
+		logger.Pl.I("Global download concurrency limit set to %d", limit)
+	} else {
+		globalDownloadSem = nil
+		logger.Pl.I("Global download concurrency limit disabled (unlimited)")
+	}
+}
+
+// AcquireGlobalDownloadSlot blocks until a download slot is available, or ctx is done.
+// Returns the semaphore channel that was used (for proper release later).
+// Returns immediately if no global limit is configured (limit=0).
+func AcquireGlobalDownloadSlot(ctx context.Context, videoURL string) (chan struct{}, error) {
+	globalDownloadSemMu.RLock()
+	sem := globalDownloadSem
+	globalDownloadSemMu.RUnlock()
+
+	if sem == nil {
+		return nil, nil
+	}
+	if err := limits.AcquireSlot(ctx, sem, "global download", videoURL); err != nil {
+		return nil, err
+	}
+	return sem, nil
+}
+
+// isProcessNotExist checks if an error indicates a process doesn't exist.
+func isProcessNotExist(err error) bool {
+	return errors.Is(err, syscall.ESRCH)
+}
+
+// stopProcess interrupts a download process, killing it if that fails.
+func stopProcess(p *os.Process, what string) {
+	if err := p.Signal(os.Interrupt); err == nil {
+		return
+	}
+	// Only log if it's not "process already finished" or "no such process".
+	if err := p.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && !isProcessNotExist(err) {
+		logger.Pl.W("Failed to cleanup %s download process %d: %v", what, p.Pid, err)
 	}
 }
 

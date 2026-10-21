@@ -2,6 +2,7 @@ package metarr
 
 import (
 	"fmt"
+	"slices"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -34,7 +35,7 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	nonConflictingDBOps := filterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
 
 	// Combine
-	fileAndDBOps := append(fileMetaOps, nonConflictingDBOps...)
+	fileAndDBOps := slices.Concat(fileMetaOps, nonConflictingDBOps)
 
 	// Merge with filtered meta ops (per-video, stored in Video struct)
 	mergedOps := applyFilteredMetaOps(fileAndDBOps, v.FilteredMetaOps, v.URL, c.Name)

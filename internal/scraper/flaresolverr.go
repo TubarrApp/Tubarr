@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -184,7 +185,7 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 
 	baseURL := abstractions.GetString(keys.FlareSolverrURL)
 	if baseURL == "" {
-		return nil, cm.flareSolverrFailed(host, http.StatusNotFound, fmt.Errorf("no FlareSolverr URL is set in settings"))
+		return nil, cm.flareSolverrFailed(host, http.StatusNotFound, errors.New("no FlareSolverr URL is set in settings"))
 	}
 
 	logger.Pl.I("Solving %q through FlareSolverr at %q...", homeURL, baseURL)

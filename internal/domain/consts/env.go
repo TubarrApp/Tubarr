@@ -15,7 +15,7 @@ const (
 	EnvWebAllowedHosts = "TUBARR_WEB_ALLOWED_HOSTS" // Comma-separated hostnames allowed alongside those saved in Settings.
 )
 
-// Viper supported extensions.
+// ViperValidConfigExts lists Viper supported config extensions.
 var ViperValidConfigExts = map[string]struct{}{
 	".yaml": {},
 	".yml":  {},

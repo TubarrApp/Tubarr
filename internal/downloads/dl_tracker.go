@@ -121,11 +121,7 @@ func (t *DownloadTracker) drain() {
 
 	t.videoIDs.Range(func(id, _ any) bool {
 		videoID, _ := id.(int64)
-		v, ok := state.StatusUpdateCache.LoadAndDelete(videoID)
-		if !ok {
-			return true
-		}
-		if update, ok := v.(models.StatusUpdate); ok {
+		if update, ok := state.TakeStatusUpdate(videoID); ok {
 			if err := t.dlStore.UpdateDownloadStatus(drainCtx, update); err != nil {
 				logger.Pl.E("Failed to store final update for video %q: %v", update.VideoURL, err)
 			}
@@ -178,7 +174,7 @@ func (t *DownloadTracker) flushUpdates(ctx context.Context, update models.Status
 		}
 		// Finished statuses are stored, so they no longer need caching (the cache feeds the active downloads view).
 		if update.Status != consts.DLStatusQueued && update.Status != consts.DLStatusDownloading {
-			state.StatusUpdateCache.Delete(update.VideoID)
+			state.DeleteStatusUpdate(update.VideoID)
 		}
 	}
 }

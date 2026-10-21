@@ -2,6 +2,7 @@ package repo
 
 import (
 	"cmp"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -33,8 +34,12 @@ func (vs *VideoStore) GetDB() *sql.DB {
 
 // AddVideos adds multiple videos to the database, returning them with filled IDs.
 //
-// Videos without URLs or channel IDs are skipped, and errors for each are returned.
+// Videos without URLs are skipped, and errors for each are returned.
 func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoModels []*models.Video, err error) {
+	if channelID == 0 {
+		return nil, errors.New("videos have no channel ID")
+	}
+
 	tx, err := vs.DB.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -50,117 +55,60 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 			errs = append(errs, fmt.Errorf("video #%d must have a URL", i))
 			continue
 		}
-		if channelID == 0 {
-			errs = append(errs, fmt.Errorf("video #%d has no channel ID", i))
-			continue
-		}
 		validVideos = append(validVideos, v)
 	}
 
+	// Update finished and ignored status
+	updateQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ?",
+		consts.DBVideos,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidUpdatedAt,
+		consts.QVidChanID,
+		consts.QVidURL,
+	)
+
+	// Insert or update download status using SQLite UPSERT (INSERT ... ON CONFLICT)
+	statusQuery := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?) "+
+			"ON CONFLICT(%s) DO UPDATE SET "+
+			"%s = excluded.%s, "+
+			"%s = excluded.%s, "+
+			"%s = excluded.%s",
+		consts.DBDownloads,
+		consts.QDLVidID,
+		consts.QDLStatus,
+		consts.QDLPct,
+		consts.QDLCreatedAt,
+		consts.QDLUpdatedAt,
+		consts.QDLVidID,
+		consts.QDLStatus, consts.QDLStatus,
+		consts.QDLPct, consts.QDLPct,
+		consts.QDLUpdatedAt, consts.QDLUpdatedAt,
+	)
+
 	now := time.Now()
-
 	for _, v := range validVideos {
-		videoID, exists := vs.VideoExists(v, channelID)
-		if exists {
-			// Update finished and ignored status
-			updateQuery := fmt.Sprintf(
-				"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ?",
-				consts.DBVideos,
-				consts.QVidFinished,
-				consts.QVidIgnored,
-				consts.QVidUpdatedAt,
-				consts.QVidChanID,
-				consts.QVidURL,
-			)
-
-			_, err := tx.Exec(updateQuery, v.Finished, v.Ignored, now, channelID, v.URL)
-			if err != nil {
+		if videoID, exists := videoExists(tx, v.URL, channelID); exists {
+			if _, err := tx.Exec(updateQuery, v.Finished, v.Ignored, now, channelID, v.URL); err != nil {
 				errs = append(errs, fmt.Errorf("failed to update video %q: %w", v.URL, err))
 				continue
 			}
 			v.ID = videoID
 		} else {
-			// Marshal metadata JSON
-			metadataJSON, err := marshalVideoMetadataJSON(v)
+			id, err := insertVideo(tx, v, channelID, v.ChannelURLID, now)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to marshal metadata for video %q: %w", v.URL, err))
+				errs = append(errs, err)
 				continue
 			}
-
-			// Insert new video with all fields
-			insertQuery := fmt.Sprintf(
-				"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
-					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-				consts.DBVideos,
-				consts.QVidChanID,
-				consts.QVidChanURLID,
-				consts.QVidChanURL,
-				consts.QVidThumbnailURL,
-				consts.QVidURL,
-				consts.QVidTitle,
-				consts.QVidDescription,
-				consts.QVidFinished,
-				consts.QVidIgnored,
-				consts.QVidUploadDate,
-				consts.QVidMetadata,
-				consts.QVidCreatedAt,
-				consts.QVidUpdatedAt,
-			)
-
-			result, err := tx.Exec(
-				insertQuery,
-				channelID,
-				v.ChannelURLID,
-				v.ChannelURL,
-				v.ThumbnailURL,
-				v.URL,
-				v.Title,
-				v.Description,
-				v.Finished,
-				v.Ignored,
-				v.UploadDate,
-				metadataJSON,
-				now,
-				now,
-			)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to insert video %q: %w", v.URL, err))
-				continue
-			}
-
-			id, err := result.LastInsertId()
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err))
-				continue
-			}
-
 			v.ID = id
 		}
 
-		// Insert or update download status using SQLite UPSERT (INSERT ... ON CONFLICT)
-		sqlQuery := fmt.Sprintf(
-			"INSERT INTO %s (%s, %s, %s, %s, %s) "+
-				"VALUES (?, ?, ?, ?, ?) "+
-				"ON CONFLICT(%s) DO UPDATE SET "+
-				"%s = excluded.%s, "+
-				"%s = excluded.%s, "+
-				"%s = excluded.%s",
-			consts.DBDownloads,
-			consts.QDLVidID,
-			consts.QDLStatus,
-			consts.QDLPct,
-			consts.QDLCreatedAt,
-			consts.QDLUpdatedAt,
-			consts.QDLVidID,
-			consts.QDLStatus, consts.QDLStatus,
-			consts.QDLPct, consts.QDLPct,
-			consts.QDLUpdatedAt, consts.QDLUpdatedAt,
-		)
-
-		if _, err := tx.Exec(sqlQuery, v.ID, v.DownloadStatus.Status, v.DownloadStatus.Percent, now, now); err != nil {
+		if _, err := tx.Exec(statusQuery, v.ID, v.DownloadStatus.Status, v.DownloadStatus.Percent, now, now); err != nil {
 			errs = append(errs, fmt.Errorf("failed to insert/update download status for video %d: %w", v.ID, err))
 		}
-
 	}
 
 	// Commit transaction
@@ -188,63 +136,15 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		return id, nil
 	}
 
-	// Marshal JSON fields
-	metadataJSON, err := marshalVideoMetadataJSON(v)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal JSON for video %q: %w", v.URL, err)
-	}
-
 	tx, err := vs.DB.Begin()
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer rollback(tx)
 
-	now := time.Now()
-
 	// Insert into videos table
-	vidQuery := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		consts.DBVideos,
-		consts.QVidChanID,
-		consts.QVidChanURLID,
-		consts.QVidChanURL,
-		consts.QVidThumbnailURL,
-		consts.QVidURL,
-		consts.QVidTitle,
-		consts.QVidDescription,
-		consts.QVidFinished,
-		consts.QVidIgnored,
-		consts.QVidUploadDate,
-		consts.QVidMetadata,
-		consts.QVidCreatedAt,
-		consts.QVidUpdatedAt,
-	)
-
-	result, err := tx.Exec(
-		vidQuery,
-		channelID,
-		channelURLID,
-		v.ChannelURL,
-		v.ThumbnailURL,
-		v.URL,
-		v.Title,
-		v.Description,
-		v.Finished,
-		v.Ignored,
-		v.UploadDate,
-		metadataJSON,
-		now,
-		now,
-	)
-	if err != nil {
-		return 0, fmt.Errorf("failed to insert video %q: %w", v.URL, err)
-	}
-
-	videoID, err = result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get inserted video ID for %q: %w", v.URL, err)
+	if videoID, err = insertVideo(tx, v, channelID, channelURLID, time.Now()); err != nil {
+		return 0, err
 	}
 	v.ID = videoID
 
@@ -510,6 +410,29 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64, includeDone bool)
 	}
 
 	return videos, nil
+}
+
+// GetLatestFinishedVideos returns a channel's n most recently updated finished videos, without their metadata.
+func (vs *VideoStore) GetLatestFinishedVideos(ctx context.Context, channelID int64, n int) ([]*models.Video, error) {
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ? AND %s = 1 ORDER BY %s DESC LIMIT ?",
+		videoListColumns,
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidFinished,
+		consts.QVidUpdatedAt,
+	)
+
+	rows, err := vs.DB.QueryContext(ctx, query, channelID, n)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query videos: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			logger.Pl.E("Failed to close rows: %v", closeErr)
+		}
+	}()
+	return scanVideoList(rows)
 }
 
 // AddAvailableVideos stores newly found videos as Available, skipping any already in the channel.
@@ -906,25 +829,7 @@ func (vs *VideoStore) RecoverInterrupted() (pending, failed int64, err error) {
 
 // VideoExists returns the video's ID and true if the channel already has a video with its URL.
 func (vs *VideoStore) VideoExists(v *models.Video, channelID int64) (int64, bool) {
-	var id int64
-	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ? AND %s = ?",
-		consts.QVidID,
-		consts.DBVideos,
-		consts.QVidURL,
-		consts.QVidChanID,
-	)
-
-	err := vs.DB.QueryRow(query, v.URL, channelID).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, false
-	} else if err != nil {
-		logger.Pl.E("Error checking if video exists: %v", err)
-		return 0, false
-	}
-
-	logger.Pl.D(1, "Video with URL %q already exists in the database with ID %d", v.URL, id)
-	return id, true
+	return videoExists(vs.DB, v.URL, channelID)
 }
 
 // GetVideoOverrides returns a video's Download As overrides, nil if it has none.
@@ -1064,4 +969,160 @@ func unmarshalVideoOverrides(raw sql.NullString) (*models.VideoOverrides, error)
 		return nil, err
 	}
 	return &o, nil
+}
+
+// videoExists returns the ID and true if the channel has a video with videoURL, looked up through q.
+func videoExists(q querier, videoURL string, channelID int64) (int64, bool) {
+	var id int64
+	query := fmt.Sprintf(
+		"SELECT %s FROM %s WHERE %s = ? AND %s = ?",
+		consts.QVidID,
+		consts.DBVideos,
+		consts.QVidURL,
+		consts.QVidChanID,
+	)
+
+	err := q.QueryRow(query, videoURL, channelID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false
+	} else if err != nil {
+		logger.Pl.E("Error checking if video exists: %v", err)
+		return 0, false
+	}
+
+	logger.Pl.D(1, "Video with URL %q already exists in the database with ID %d", videoURL, id)
+	return id, true
+}
+
+// insertVideo adds v as a new row, returning its ID.
+func insertVideo(q querier, v *models.Video, channelID, channelURLID int64, now time.Time) (int64, error) {
+	metadataJSON, err := marshalVideoMetadataJSON(v)
+	if err != nil {
+		return 0, err
+	}
+
+	query := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidChanURLID,
+		consts.QVidChanURL,
+		consts.QVidThumbnailURL,
+		consts.QVidURL,
+		consts.QVidTitle,
+		consts.QVidDescription,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidUploadDate,
+		consts.QVidMetadata,
+		consts.QVidCreatedAt,
+		consts.QVidUpdatedAt,
+	)
+
+	result, err := q.Exec(
+		query,
+		channelID,
+		channelURLID,
+		v.ChannelURL,
+		v.ThumbnailURL,
+		v.URL,
+		v.Title,
+		v.Description,
+		v.Finished,
+		v.Ignored,
+		v.UploadDate,
+		metadataJSON,
+		now,
+		now,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert video %q: %w", v.URL, err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get inserted ID for video %q: %w", v.URL, err)
+	}
+	return id, nil
+}
+
+// videoListColumns are the columns scanVideoList reads, in its order.
+var videoListColumns = strings.Join([]string{
+	consts.QVidID,
+	consts.QVidChanID,
+	consts.QVidChanURLID,
+	consts.QVidChanURL,
+	consts.QVidThumbnailURL,
+	consts.QVidFinished,
+	consts.QVidIgnored,
+	consts.QVidURL,
+	consts.QVidTitle,
+	consts.QVidDescription,
+	consts.QVidUploadDate,
+	consts.QVidMetarrStatus,
+	consts.QVidMetarrError,
+	consts.QVidVideoPath,
+	consts.QVidJSONPath,
+	consts.QVidDuration,
+	consts.QVidFilesize,
+	consts.QVidCreatedAt,
+	consts.QVidUpdatedAt,
+}, ", ")
+
+// scanVideoList reads rows selected with videoListColumns into videos, without their metadata.
+func scanVideoList(rows *sql.Rows) ([]*models.Video, error) {
+	var videos []*models.Video
+	for rows.Next() {
+		var (
+			v                                         models.Video
+			channelURLID, duration, filesize          sql.NullInt64
+			channelURL, thumbnailURL, videoURL, title sql.NullString
+			description, metarrStatus, metarrError    sql.NullString
+			videoPath, jsonPath                       sql.NullString
+			uploadDate                                sql.NullTime
+		)
+		if err := rows.Scan(
+			&v.ID,
+			&v.ChannelID,
+			&channelURLID,
+			&channelURL,
+			&thumbnailURL,
+			&v.Finished,
+			&v.Ignored,
+			&videoURL,
+			&title,
+			&description,
+			&uploadDate,
+			&metarrStatus,
+			&metarrError,
+			&videoPath,
+			&jsonPath,
+			&duration,
+			&filesize,
+			&v.CreatedAt,
+			&v.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan video: %w", err)
+		}
+		v.ChannelURLID = channelURLID.Int64
+		v.ChannelURL = channelURL.String
+		v.ThumbnailURL = thumbnailURL.String
+		v.URL = videoURL.String
+		v.Title = title.String
+		v.Description = description.String
+		v.UploadDate = uploadDate.Time
+		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
+		v.MetarrError = metarrError.String
+		v.VideoFilePath = videoPath.String
+		v.JSONFilePath = jsonPath.String // Edit & Re-Run needs the metadata file.
+		v.Duration = int(duration.Int64)
+		v.Filesize = filesize.Int64
+
+		videos = append(videos, &v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while retrieving videos: %w", err)
+	}
+	return videos, nil
 }

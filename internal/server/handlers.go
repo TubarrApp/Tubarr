@@ -229,7 +229,7 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request
 
 // handleGetChannel returns the data for a specific channel.
 func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, consts.QChanID)
+	id := chi.URLParam(r, consts.WebParamChannelID)
 
 	// As saved, so each URL shows only its own settings in the edit form.
 	c, found, err := ss.cs.GetChannelModel(consts.QChanID, id, false)
@@ -350,7 +350,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 // handleUpdateChannel updates parameters for a given channel.
 func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Request) {
 	// Get channel ID from URL.
-	idStr := chi.URLParam(r, "id")
+	idStr := chi.URLParam(r, consts.WebParamChannelID)
 	channelID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid channel ID %q: %v", idStr, err), http.StatusBadRequest)
@@ -402,97 +402,16 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("failed to update channel metarr args: %w", err)
 		}
 
-		// Delete URLs no longer listed. The manual downloads URL is never listed in the edit form, so it's kept.
-		existingURLMap := make(map[string]*models.ChannelURL, len(existingChannel.URLModels))
-		for _, urlModel := range existingChannel.URLModels {
-			existingURLMap[urlModel.URL] = urlModel
-		}
-
-		// URLs edited in place keep their row, so their settings and videos stay with them.
-		for from, to := range f.renames {
-			urlModel, exists := existingURLMap[from]
-			if _, taken := existingURLMap[to]; !exists || urlModel.IsManual || taken {
-				continue
-			}
-			if err := cs.RenameChannelURL(urlModel.ID, to); err != nil {
-				return err
-			}
-			delete(existingURLMap, from)
-			urlModel.URL = to
-			existingURLMap[to] = urlModel
-		}
-		for existingURL, urlModel := range existingURLMap {
-			if !urlModel.IsManual && !slices.Contains(f.urls, existingURL) {
-				if err := cs.DeleteChannelURL(urlModel.ID); err != nil {
-					return fmt.Errorf("failed to delete URL %q: %w", existingURL, err)
-				}
-			}
-		}
-
-		// Add or update listed URLs.
-		for _, u := range f.urls {
-			var parsedUsername, parsedPassword, parsedLoginURL string
-			if a, exists := f.authMap[u]; exists {
-				parsedUsername, parsedPassword, parsedLoginURL = a.Username, a.Password, a.LoginURL
-			}
-			urlSettings := f.urlSettings[u]
-
-			if existingURLModel, exists := existingURLMap[u]; exists {
-				// A blank password keeps the saved one, as passwords aren't sent to the edit page. Clearing the ciphertext
-				// makes a new password get encrypted, and a cleared login get stored blank.
-				if parsedPassword != "" || parsedUsername == "" {
-					existingURLModel.Password = parsedPassword
-					existingURLModel.EncryptedPassword = ""
-				}
-				existingURLModel.Username = parsedUsername
-				existingURLModel.LoginURL = parsedLoginURL
-				existingURLModel.UpdatedAt = now
-				existingURLModel.ChanURLSettings = urlSettings.Settings
-				existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
-
-				if err := cs.UpdateChannelURLSettings(existingURLModel); err != nil {
-					return fmt.Errorf("failed to update URL %q: %w", u, err)
-				}
-				continue
-			}
-
-			chanURL := &models.ChannelURL{
-				URL:               u,
-				Username:          parsedUsername,
-				Password:          parsedPassword,
-				LoginURL:          parsedLoginURL,
-				ChanURLSettings:   urlSettings.Settings,
-				ChanURLMetarrArgs: urlSettings.Metarr,
-				LastScan:          now,
-				CreatedAt:         now,
-				UpdatedAt:         now,
-			}
-			if _, err := cs.AddChannelURL(channelID, chanURL, false); err != nil {
-				return fmt.Errorf("failed to add URL %q: %w", u, err)
-			}
+		// Rename, delete, add and update URLs.
+		if err := syncChannelURLs(cs, channelID, existingChannel.URLModels, f, now); err != nil {
+			return err
 		}
 
 		// Replace notifications.
-		existingNotifications, err := cs.GetNotifyURLs(channelID)
-		if err != nil {
-			return fmt.Errorf("failed to fetch existing notifications: %w", err)
+		if err = replaceNotifications(cs, channelID, f); err != nil {
+			return err
 		}
-		existingURLs := make([]string, 0, len(existingNotifications))
-		for _, n := range existingNotifications {
-			if n.NotifyURL != "" {
-				existingURLs = append(existingURLs, n.NotifyURL)
-			}
-		}
-		if len(existingURLs) > 0 {
-			if err := cs.DeleteNotifyURLs(channelID, existingURLs); err != nil {
-				return fmt.Errorf("failed to delete existing notifications: %w", err)
-			}
-		}
-		if len(f.notifications) > 0 {
-			if err := cs.AddNotifyURLs(channelID, f.notifications); err != nil {
-				return fmt.Errorf("failed to add notification URLs: %w", err)
-			}
-		}
+
 		return nil
 	}); err != nil {
 		logger.Pl.E("Failed to update channel %d: %v", channelID, err)
@@ -504,7 +423,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 
 // handleDeleteChannel deletes a channel from Tubarr.
 func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	id := chi.URLParam(r, consts.WebParamChannelID)
 	c, ok := ss.channelFromRequest(w, r)
 	if !ok {
 		return
@@ -552,7 +471,7 @@ func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request
 // handleDeleteChannelVideos deletes given video entries from a channel.
 func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.Request) {
 	// Get channel ID from URL path
-	idStr := chi.URLParam(r, "id")
+	idStr := chi.URLParam(r, consts.WebParamChannelID)
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not parse channel ID %q: %v", idStr, err), http.StatusBadRequest)
@@ -634,14 +553,14 @@ func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request
 
 // handleCancelDownload cancels an active download by video ID.
 func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Request) {
-	videoIDStr := chi.URLParam(r, "videoID")
+	videoIDStr := chi.URLParam(r, consts.WebParamVideoID)
 	videoID, err := strconv.ParseInt(videoIDStr, 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid video ID %q: %v", videoIDStr, err), http.StatusBadRequest)
 		return
 	}
 
-	if err := ss.cancelDownload(videoID); err != nil {
+	if err := ss.cancelDownload(r.Context(), videoID); err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, errNoActiveDownload) {
 			status = http.StatusNotFound
@@ -668,7 +587,7 @@ func (ss *serverStore) handleCancelDownloads(w http.ResponseWriter, r *http.Requ
 
 	canceled := 0
 	for _, id := range body.VideoIDs {
-		if err := ss.cancelDownload(id); err != nil {
+		if err := ss.cancelDownload(r.Context(), id); err != nil {
 			if !errors.Is(err, errNoActiveDownload) {
 				logger.Pl.E("Failed to cancel download for video ID %d: %v", id, err)
 			}
@@ -823,7 +742,7 @@ func (ss *serverStore) handleGetPostProcessing(w http.ResponseWriter, r *http.Re
 // channelFromRequest loads the channel the request's {id} names, its URLs' unset settings filled in from the channel's
 // as jobs use them, writing an error response if it can't.
 func (ss *serverStore) channelFromRequest(w http.ResponseWriter, r *http.Request) (*models.Channel, bool) {
-	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, "id"), true)
+	c, found, err := ss.cs.GetChannelModel(consts.QChanID, chi.URLParam(r, consts.WebParamChannelID), true)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return nil, false
@@ -838,7 +757,7 @@ func (ss *serverStore) channelFromRequest(w http.ResponseWriter, r *http.Request
 // channelURLFromRequest returns the channel URL named in the request path, where ID 0 is the channel's manual
 // downloads URL (the ID of a video whose channel URL was removed).
 func (ss *serverStore) channelURLFromRequest(w http.ResponseWriter, r *http.Request, c *models.Channel) (*models.ChannelURL, bool) {
-	urlID, err := strconv.ParseInt(chi.URLParam(r, "urlID"), 10, 64)
+	urlID, err := strconv.ParseInt(chi.URLParam(r, consts.WebParamURLID), 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
 		return nil, false
@@ -1160,7 +1079,7 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 
 // handleGetThumbnail shows a video's Download As thumbnail: an image file is served, a URL redirected to.
 func (ss *serverStore) handleGetThumbnail(w http.ResponseWriter, r *http.Request) {
-	videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	videoID, err := strconv.ParseInt(chi.URLParam(r, consts.WebParamChannelID), 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid video ID: %v", err), http.StatusBadRequest)
 		return
@@ -1221,7 +1140,7 @@ func (ss *serverStore) applyThumbnailOverrides(videos []*models.Video) {
 
 // handleUploadThumbnail saves an image as a video's Download As thumbnail, returning its path.
 func (ss *serverStore) handleUploadThumbnail(w http.ResponseWriter, r *http.Request) {
-	videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	videoID, err := strconv.ParseInt(chi.URLParam(r, consts.WebParamChannelID), 10, 64)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("invalid video ID: %v", err), http.StatusBadRequest)
 		return
@@ -1375,33 +1294,28 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get video downloads with full metadata.
-	videos, err := ss.getHomepageCarouselVideos(c, 10)
+	videos, err := ss.vs.GetLatestFinishedVideos(r.Context(), c.ID, 10)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
 	}
 
 	// Blank paths for files moved or deleted outside Tubarr, so the page shows them as missing.
-	for i := range videos {
-		if videos[i].VideoFilePath == "" {
+	for _, v := range videos {
+		if v.VideoFilePath == "" {
 			continue
 		}
-		if _, err := os.Stat(videos[i].VideoFilePath); err != nil {
-			videos[i].VideoFilePath = ""
+		if _, err := os.Stat(v.VideoFilePath); err != nil {
+			v.VideoFilePath = ""
 		}
 	}
-	shown := make([]*models.Video, 0, len(videos))
-	for i := range videos {
-		shown = append(shown, &videos[i])
-	}
-	ss.applyThumbnailOverrides(shown)
+	ss.applyThumbnailOverrides(videos)
 	writeJSON(w, r, http.StatusOK, videos)
 }
 
 // handleSetLogLevel sets the logging level in the database.
 func (ss *serverStore) handleSetLogLevel(w http.ResponseWriter, r *http.Request) {
-	levelStr := chi.URLParam(r, "level")
+	levelStr := chi.URLParam(r, consts.WebParamLogLevel)
 	level, err := strconv.Atoi(levelStr)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not set logging level using input %q: %v", levelStr, err), http.StatusBadRequest)
@@ -1571,8 +1485,8 @@ func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, r *http.Re
 //
 // Context can be specified via query parameter: ?context=unauth|cookie|auth
 func (ss *serverStore) handleUnblockDomain(w http.ResponseWriter, r *http.Request) {
-	domain := chi.URLParam(r, "domain")
-	contextParam := r.URL.Query().Get("context")
+	domain := chi.URLParam(r, consts.WebParamDomain)
+	contextParam := r.URL.Query().Get(consts.WebParamContext)
 
 	if domain == "" {
 		http.Error(w, "domain parameter is required", http.StatusBadRequest)
@@ -1596,7 +1510,7 @@ func (ss *serverStore) handleUnblockDomain(w http.ResponseWriter, r *http.Reques
 
 // handleNewVideoNotificationSeen marks a new video notification as seen.
 func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	id := chi.URLParam(r, consts.WebParamChannelID)
 	c, ok := ss.channelFromRequest(w, r)
 	if !ok {
 		return
@@ -1621,7 +1535,7 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 
 // handleTogglePauseChannel toggles the pause state of a channel.
 func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "id")
+	idStr := chi.URLParam(r, consts.WebParamChannelID)
 	if _, ok := ss.channelFromRequest(w, r); !ok {
 		return
 	}
@@ -1758,7 +1672,7 @@ func (ss *serverStore) handleSetDomainLimit(w http.ResponseWriter, r *http.Reque
 
 // handleDeleteDomainLimit removes the download and crawl concurrency limits for a specific domain.
 func (ss *serverStore) handleDeleteDomainLimit(w http.ResponseWriter, r *http.Request) {
-	hostname := limits.NormalizeDomain(chi.URLParam(r, "hostname"))
+	hostname := limits.NormalizeDomain(chi.URLParam(r, consts.WebParamHostname))
 	if hostname == "" {
 		http.Error(w, "hostname is required", http.StatusBadRequest)
 		return
