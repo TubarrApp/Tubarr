@@ -637,10 +637,10 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	switch pickIndex(3) {
 	case 1:
 		sc.moves = []liveMove{{value: "cats", dir: filepath.Join(dir, "cats")}}
-		form.Set("move_ops", "title:cats:"+sc.moves[0].dir)
+		form.Set("move_ops", "title:contains:cats|"+sc.moves[0].dir)
 	case 2:
 		sc.moves = []liveMove{{feed: "b", value: "dogs", dir: filepath.Join(dir, "dogs")}}
-		form.Set("move_ops", site.feedURL("b")+"|title:dogs:"+sc.moves[0].dir)
+		form.Set("move_ops", site.feedURL("b")+"|title:contains:dogs|"+sc.moves[0].dir)
 	}
 	outputDir := pick("", filepath.Join(dir, "metarr"), filepath.Join(dir, "metarr", "{{year}}"))
 	set("metarr_output_directory", outputDir)

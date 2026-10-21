@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 
+	"github.com/TubarrApp/gocommon/sharedfilters"
 	"github.com/TubarrApp/gocommon/sharedtags"
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
@@ -302,15 +303,15 @@ func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 
 	// Check each move operation against video metadata.
 	for _, op := range relevantMoveOps {
-		if raw, exists := v.MetadataMap[op.Field]; exists {
-			// Convert any type to string.
-			val := fmt.Sprint(raw)
-
-			if strings.Contains(strings.ToLower(val), strings.ToLower(op.ContainsValue)) {
-				logger.Pl.I("Move op matched: Field %q contains the value %q. Output directory retrieved as %q",
-					op.Field, op.ContainsValue, op.OutputDir)
-				return op.OutputDir
-			}
+		f := op.Filter()
+		matched, skipped, err := sharedfilters.Match(v.MetadataMap, f)
+		if err != nil {
+			logger.Pl.E("Skipping move op for field %q: %v", f.Field, err)
+			continue
+		}
+		if matched && !skipped {
+			logger.Pl.I("Move op matched: Field %q %s %q. Output directory retrieved as %q", f.Field, f.FilterType, f.Value, op.OutputDir)
+			return op.OutputDir
 		}
 	}
 

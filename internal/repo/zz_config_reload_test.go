@@ -129,7 +129,7 @@ func TestConfigReloadReadsAllFields(t *testing.T) {
 		"filter-ops:",
 		"  - 'title:contains:cat:must'",
 		"move-ops:",
-		"  - 'title:cat:" + moveDir + "'",
+		"  - 'title:contains:cat|" + moveDir + "'",
 		"ytdlp-preferred-video-codecs: [av1]",
 		"ytdlp-preferred-audio-codecs: [opus]",
 		"metarr-filtered-filename-ops:",

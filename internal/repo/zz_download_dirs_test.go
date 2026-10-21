@@ -27,7 +27,7 @@ func TestCheckDownloadDirs(t *testing.T) {
 	for name, added := range map[string]*models.Settings{
 		"video":     {VideoDir: missing},
 		"templated": {JSONDir: filepath.Join(missing, "{{channel_name}}")},
-		"move op":   {MetaFilterMoveOps: []models.MetaFilterMoveOps{{Field: "title", ContainsValue: "cats", OutputDir: missing}}},
+		"move op":   {MetaFilterMoveOps: []models.MetaFilterMoveOps{{Field: "title", Value: "cats", OutputDir: missing}}},
 	} {
 		if err := checkDownloadDirs(nil, added); err == nil {
 			t.Errorf("%s: missing folder accepted", name)

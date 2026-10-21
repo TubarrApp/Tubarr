@@ -76,8 +76,8 @@ func TestChildSettingsMatchParentLists(t *testing.T) {
 		{Field: "title", FilterType: "omits", Value: "dog", MustAny: "any"},
 	}
 	moveOps := []MetaFilterMoveOps{
-		{Field: "title", ContainsValue: "cat", OutputDir: "/cats"},
-		{Field: "title", ContainsValue: "dog", OutputDir: "/dogs"},
+		{Field: "title", Value: "cat", OutputDir: "/cats"},
+		{Field: "title", Value: "dog", OutputDir: "/dogs"},
 	}
 	parent := &Settings{Filters: filters, MetaFilterMoveOps: moveOps}
 	child := &Settings{Filters: append([]Filters(nil), filters...), MetaFilterMoveOps: append([]MetaFilterMoveOps(nil), moveOps...)}

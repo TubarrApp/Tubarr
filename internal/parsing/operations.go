@@ -103,7 +103,7 @@ func ParseNotifications(notifications []string) ([]*models.Notification, error) 
 
 // ParseMetaFilterMoveOps parses meta filter move operation strings into models.
 //
-// Format: "title:frogs:/home/frogs"
+// Format: "title:contains:frogs|/home/frogs", a filter and a directory.
 func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	if len(ops) == 0 {
 		return nil, nil
@@ -111,27 +111,30 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	// Deduplicate.
 	ops = validation.DeduplicateSliceEntries(ops)
 
-	const moveOpFormatError string = "please enter move operations in the format 'field:value:output directory'.\n\n" +
-		"'title:frogs:/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
+	const moveOpFormatError string = "please enter move operations in the format 'field:filter_type:value|output directory'.\n\n" +
+		"'title:contains:frogs|/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
 
 	m := make([]models.MetaFilterMoveOps, 0, len(ops))
 	for _, op := range ops {
 		chanURL, op := validation.CheckForOpURL(op)
-		split := sharedparsing.EscapedSplit(op, ':')
 
-		if len(split) != 3 {
+		parts := sharedparsing.SplitUnescaped(op, '|')
+		if len(parts) < 2 {
 			return nil, errors.New(moveOpFormatError)
 		}
-
-		field := strings.ToLower(strings.TrimSpace(split[0]))
-		value := strings.ToLower(split[1])
-		outputDir := strings.TrimSpace(strings.TrimSpace(split[2]))
+		filters, err := ParseFilterOps(parts[:1], false)
+		if err != nil {
+			return nil, fmt.Errorf("move operation %q: %w", op, err)
+		}
+		// The directory is the rest of the op, so any further '|' belongs to it.
+		outputDir := strings.Join(sharedparsing.EscapedSplit(strings.Join(parts[1:], "|"), '|'), "|")
 
 		m = append(m, models.MetaFilterMoveOps{
-			Field:         field,
-			ContainsValue: value,
-			OutputDir:     outputDir,
-			ChannelURL:    chanURL,
+			ChannelURL: chanURL,
+			Field:      filters[0].Field,
+			FilterType: filters[0].FilterType,
+			Value:      filters[0].Value,
+			OutputDir:  strings.TrimSpace(outputDir),
 		})
 	}
 	return m, nil

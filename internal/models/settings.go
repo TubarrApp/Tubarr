@@ -1,8 +1,10 @@
 package models
 
 import (
+	"cmp"
 	"slices"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedmodels"
 )
 
@@ -107,10 +109,22 @@ type Filters = sharedmodels.Filters
 
 // MetaFilterMoveOps are used to set an output directory in Metarr based on matching metadata fields.
 type MetaFilterMoveOps struct {
-	ChannelURL    string `json:"move_url_specific"`
-	Field         string `json:"move_op_field"`
-	ContainsValue string `json:"move_op_value"`
-	OutputDir     string `json:"move_op_output_dir"`
+	ChannelURL string `json:"move_url_specific"`
+	Field      string `json:"move_op_field"`
+	FilterType string `json:"move_op_filter_type"`
+	Value      string `json:"move_op_value"`
+	OutputDir  string `json:"move_op_output_dir"`
+}
+
+// Filter returns the move op's filter. Move ops saved before filter types have none, and were always contains.
+func (m MetaFilterMoveOps) Filter() Filters {
+	return Filters{
+		ChannelURL: m.ChannelURL,
+		Field:      m.Field,
+		FilterType: cmp.Or(m.FilterType, sharedconsts.OpContains),
+		Value:      m.Value,
+		MustAny:    sharedconsts.OpMust,
+	}
 }
 
 // FilenameOps are applied to fields by Metarr.

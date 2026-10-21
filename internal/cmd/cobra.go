@@ -214,11 +214,11 @@ func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, dow
 	}
 
 	if moveOpsFile != nil {
-		cmd.Flags().StringVar(moveOpsFile, keys.MoveOpsFile, "", "File containing move filter operations, one per line (format is 'metafield:value:output directory')")
+		cmd.Flags().StringVar(moveOpsFile, keys.MoveOpsFile, "", "File containing move filter operations, one per line (format is 'metafield:filter_type:value|output directory', e.g. 'title:contains:dogs|/home/dogs')")
 	}
 
 	if moveOps != nil {
-		cmd.Flags().StringSliceVar(moveOps, keys.MoveOps, nil, "Move to an output directory in Metarr based on metadata (format is 'metafield:value:output directory')")
+		cmd.Flags().StringSliceVar(moveOps, keys.MoveOps, nil, "Move to an output directory in Metarr based on metadata (format is 'metafield:filter_type:value|output directory', e.g. 'title:contains:dogs|/home/dogs')")
 	}
 
 	if pause != nil {

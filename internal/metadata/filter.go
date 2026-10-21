@@ -504,7 +504,7 @@ func loadMoveOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []m
 	}
 
 	if len(moves) == 0 {
-		logger.Pl.I("No valid filter move operations found in file. Format is one per line 'title:dogs:/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs)")
+		logger.Pl.I("No valid filter move operations found in file. Format is one per line 'title:contains:dogs|/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs')")
 		return nil
 	}
 

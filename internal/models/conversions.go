@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"tubarr/internal/domain/logger"
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
@@ -50,12 +51,17 @@ func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 	return out
 }
 
-// MetaFilterMoveOpsToString converts meta filter move ops back to slice.
+// MetaFilterMoveOpsToString converts a meta filter move op back to its string form.
 //
-// url|title:dog:/dogs
+// url|title:contains:dog|/dogs
 func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
-	// OutputDir is a path, so it is the field most likely to hold a separator.
-	op := sharedparsing.JoinEscaped([]string{m.Field, m.ContainsValue, m.OutputDir}, ':')
+	f := m.Filter()
+	parts := []string{f.Field, f.FilterType}
+	if f.Value != "" {
+		parts = append(parts, f.Value)
+	}
+	// The directory is the rest of the op, so only '\' needs escaping in it.
+	op := sharedparsing.JoinEscaped(parts, ':') + "|" + strings.ReplaceAll(m.OutputDir, `\`, `\\`)
 	// Add channel URL if present.
 	if m.ChannelURL != "" {
 		op = m.ChannelURL + "|" + op

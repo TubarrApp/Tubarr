@@ -26,7 +26,7 @@ func fullSettings() *models.Settings {
 		ExtraYTDLPCrawlArgs:       "--c",
 		Filters:                   []models.Filters{{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}},
 		FilterFile:                "/filters",
-		MetaFilterMoveOps:         []models.MetaFilterMoveOps{{Field: "title", ContainsValue: "cat", OutputDir: "/cats"}},
+		MetaFilterMoveOps:         []models.MetaFilterMoveOps{{Field: "title", Value: "cat", OutputDir: "/cats"}},
 		MetaFilterMoveOpFile:      "/moves",
 		FromDate:                  "20240101",
 		ToDate:                    "20250101",

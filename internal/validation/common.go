@@ -199,9 +199,8 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps, checkPaths bo
 	logger.Pl.D(5, "Validating %d meta filter move operations...", len(moveOps))
 
 	for i, op := range moveOps {
-		// Validate field is not empty
-		if op.Field == "" {
-			return fmt.Errorf("move operation at position %d has empty field", i)
+		if err := ValidateFilterOps([]models.Filters{op.Filter()}); err != nil {
+			return fmt.Errorf("move operation at position %d: %w", i, err)
 		}
 
 		// Validate output directory
