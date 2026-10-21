@@ -47,6 +47,36 @@ download-as-cancel if Download As closes without starting. -->
           />
         </div>
       </template>
+      <div>
+        <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Thumbnail</label>
+        <div class="flex flex-wrap gap-2">
+          <select
+            x-model="thumbChoice"
+            class="h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
+          >
+            <option value="usual">Usual (the metadata's)</option>
+            <option value="custom">Custom image</option>
+            <option value="none">None (remove it)</option>
+          </select>
+          <input
+            x-show="thumbChoice === 'custom'"
+            type="text"
+            x-model="form.thumbnail"
+            placeholder="Image path on the server, or URL"
+            class="min-w-0 flex-1 h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
+          />
+          <button
+            x-show="thumbChoice === 'custom'"
+            type="button"
+            @click="$refs.thumbFile.click()"
+            :disabled="working || uploading"
+            class="w-16 shrink-0 rounded border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+            x-text="uploading ? '…' : 'Upload'"
+          ></button>
+          <input x-ref="thumbFile" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="uploadThumbnail($event)" />
+        </div>
+        <p x-show="thumbChoice === 'custom'" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload a JPEG, PNG or WebP image (up to 10 MB), or give a path on the server or a URL.</p>
+      </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         The ops below are this video's channel URL's (or its last edits), one per line. Edits apply to this video only, and are kept for later post-processing runs. Filtered ops still apply only if their filter matches the video's metadata. Load adds an ops file's ops to its box.
       </p>
@@ -227,6 +257,8 @@ download-as-cancel if Download As closes without starting. -->
       defaults: {}, // The channel URL's directories and ops.
       metarrDefaults: {}, // The channel URL's other Metarr args.
       opsFiles: {}, // Ops file paths typed in, by box.
+      thumbChoice: 'usual', // 'usual', 'custom' (form.thumbnail) or 'none' (stripped).
+      uploading: false,
       setField: 'all-titles', // The meta op builder's field, '' for another typed into setOther.
       setOther: '',
       setValue: '',
@@ -277,6 +309,7 @@ download-as-cancel if Download As closes without starting. -->
           this.defaults = defaults;
           this.metarrDefaults = defaults_metarr || {};
           this.form = saved ? { ...saved, metarr: this.metarrForm(saved_metarr) } : this.defaultForm();
+          this.thumbChoice = this.form.strip_thumbnail ? 'none' : (this.form.thumbnail ? 'custom' : 'usual');
           this.loaded = true;
         } catch (err) {
           this.error = `Couldn't load the channel URL's ops: ${err.message}`;
@@ -297,7 +330,7 @@ download-as-cancel if Download As closes without starting. -->
       },
 
       defaultForm() {
-        return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '', metarr: {} };
+        return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '', thumbnail: '', strip_thumbnail: false, metarr: {} };
       },
 
       // The dialog's set Metarr args from saved ones, with codec lists one per line.
@@ -319,6 +352,29 @@ download-as-cancel if Download As closes without starting. -->
 
       revert() {
         this.form = this.defaultForm();
+        this.thumbChoice = 'usual';
+      },
+
+      // Uploads the chosen image as the video's thumbnail, putting its saved path in the thumbnail box.
+      async uploadThumbnail(event) {
+        const image = event.target.files[0];
+        event.target.value = '';
+        if (!image) return;
+        this.uploading = true;
+        this.error = null;
+        try {
+          const body = new FormData();
+          body.append('thumbnail', image);
+          const response = await fetch(`/api/v1/videos/${this.video.id}/thumbnail`, { method: 'POST', body });
+          if (!response.ok) {
+            throw new Error(await response.text() || response.statusText);
+          }
+          this.form.thumbnail = (await response.json()).path;
+        } catch (err) {
+          this.error = `Couldn't upload the thumbnail: ${err.message}`;
+        } finally {
+          this.uploading = false;
+        }
       },
 
       // Adds the ops in a file which apply to the video's channel URL to a box, leaving out lines it already has.
@@ -353,6 +409,8 @@ download-as-cancel if Download As closes without starting. -->
         const video = this.video;
         const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
         const { metarr: metarrForm, ...overrides } = this.form;
+        overrides.strip_thumbnail = this.thumbChoice === 'none';
+        if (this.thumbChoice !== 'custom') overrides.thumbnail = '';
         // Blank args are left out, so they use the channel URL's.
         const metarr = Object.fromEntries(Object.entries(metarrForm).filter(([, v]) => v !== '' && v != null));
         this.working = true;

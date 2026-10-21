@@ -81,6 +81,26 @@ func IsHTTPURL(s string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
+// ValidateThumbnail checks a Download As thumbnail is an http(s) URL or an existing file, and isn't also stripped.
+func ValidateThumbnail(t string, strip bool) error {
+	switch {
+	case t == "":
+		return nil
+	case strip:
+		return errors.New("a thumbnail can't be both set and stripped")
+	case IsHTTPURL(t):
+		return nil
+	}
+	info, err := os.Stat(t)
+	if err != nil {
+		return fmt.Errorf("thumbnail %q is neither an http(s) URL nor a readable file: %w", t, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("thumbnail %q is not a file", t)
+	}
+	return nil
+}
+
 // ValidateChannelURL checks a channel URL is an absolute http(s) URL, so it can't be read as a yt-dlp option or local file.
 func ValidateChannelURL(u string) error {
 	if !IsHTTPURL(u) {

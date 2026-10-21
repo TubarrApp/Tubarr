@@ -341,6 +341,7 @@ func formConfigFile(r *http.Request) (string, error) {
 type channelForm struct {
 	name          string
 	urls          []string
+	renames       map[string]string // Saved URL to its new address, for URLs edited in place.
 	authMap       map[string]*models.ChannelAccessDetails
 	urlSettings   map[string]urlSettings
 	notifications []*models.Notification
@@ -384,6 +385,16 @@ func parseChannelForm(r *http.Request) (*channelForm, error) {
 	}
 	if f.configFile, err = formConfigFile(r); err != nil {
 		return nil, err
+	}
+	if v := r.FormValue("url_renames"); v != "" {
+		if err := json.Unmarshal([]byte(v), &f.renames); err != nil {
+			return nil, fmt.Errorf("invalid URL renames: %w", err)
+		}
+		for from, to := range f.renames {
+			if !slices.Contains(f.urls, to) {
+				return nil, fmt.Errorf("channel URL %q is renamed to %q, which isn't one of the channel's URLs", from, to)
+			}
+		}
 	}
 	return f, nil
 }
@@ -728,9 +739,14 @@ func splitOpLines(s string) []string {
 // parseOverrideLines parses the Download As dialog's ops and other Metarr args into a video's overrides.
 func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.VideoOverrides, err error) {
 	o = &models.VideoOverrides{
-		Filename: strings.TrimSpace(l.Filename),
-		VideoDir: strings.TrimSpace(l.VideoDir),
-		JSONDir:  strings.TrimSpace(l.JSONDir),
+		Filename:       strings.TrimSpace(l.Filename),
+		VideoDir:       strings.TrimSpace(l.VideoDir),
+		JSONDir:        strings.TrimSpace(l.JSONDir),
+		Thumbnail:      strings.TrimSpace(l.Thumbnail),
+		StripThumbnail: l.StripThumbnail,
+	}
+	if err := validation.ValidateThumbnail(o.Thumbnail, o.StripThumbnail); err != nil {
+		return nil, err
 	}
 	if m != nil {
 		args, err := parseMetarrArgsInput(m)

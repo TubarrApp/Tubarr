@@ -15,6 +15,7 @@ type Video struct {
 	ChannelURLID        int64                 `json:"channel_url_id" db:"channel_url_id"`
 	ChannelURL          string                `json:"channel_url" db:"channel_url"`
 	ThumbnailURL        string                `json:"thumbnail_url" db:"thumbnail_url"`
+	CustomThumbnail     bool                  `json:"custom_thumbnail,omitempty" db:"-"` // Download As set one, shown from /api/v1/videos/{id}/thumbnail.
 	VideoFilePath       string                `json:"video_path" db:"video_path"`
 	VideoDir            string                `json:"-" db:"-"`
 	JSONFilePath        string                `json:"json_path" db:"json_path"`
@@ -47,10 +48,12 @@ type Video struct {
 // VideoOverrides holds a video's directories and Metarr args chosen with Download As, used instead of its channel URL's
 // (and global) ones.
 type VideoOverrides struct {
-	Filename   string `json:"filename,omitempty"`
-	VideoDir   string `json:"video_dir,omitempty"` // Blank uses the channel URL's.
-	JSONDir    string `json:"json_dir,omitempty"`  // Blank uses the channel URL's.
-	MetarrArgs        // Ops replace the channel URL's. Other blank fields use the channel URL's.
+	Filename       string `json:"filename,omitempty"`
+	VideoDir       string `json:"video_dir,omitempty"` // Blank uses the channel URL's.
+	JSONDir        string `json:"json_dir,omitempty"`  // Blank uses the channel URL's.
+	Thumbnail      string `json:"thumbnail,omitempty"` // An image file or URL embedded in place of the metadata's.
+	StripThumbnail bool   `json:"strip_thumbnail,omitempty"`
+	MetarrArgs            // Ops replace the channel URL's. Other blank fields use the channel URL's.
 }
 
 // OverrideLines holds a video's overrides as edited in the Download As dialog, with ops newline-separated.
@@ -63,6 +66,8 @@ type OverrideLines struct {
 	FilteredMetaOps     string `json:"filtered_meta_ops"`
 	FilenameOps         string `json:"filename_ops"`
 	FilteredFilenameOps string `json:"filtered_filename_ops"`
+	Thumbnail           string `json:"thumbnail"`
+	StripThumbnail      bool   `json:"strip_thumbnail"`
 }
 
 // SkipMetarr skips Metarr processing with a given reason.

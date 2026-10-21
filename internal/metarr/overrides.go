@@ -99,6 +99,8 @@ func VideoOverrideLines(o *models.VideoOverrides, chanURL string) models.Overrid
 		FilteredMetaOps:     strings.Join(filteredMetaOpLines(o.FilteredMetaOps, chanURL), "\n"),
 		FilenameOps:         strings.Join(getDedupedFilenameOpStrings(o.FilenameOps), "\n"),
 		FilteredFilenameOps: strings.Join(filteredFilenameOpLines(o.FilteredFilenameOps, chanURL), "\n"),
+		Thumbnail:           o.Thumbnail,
+		StripThumbnail:      o.StripThumbnail,
 	}
 }
 

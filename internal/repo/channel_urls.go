@@ -115,6 +115,25 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 	return id, nil
 }
 
+// RenameChannelURL changes a channel URL's address in place, keeping its videos linked.
+func (cs *ChannelStore) RenameChannelURL(channelURLID int64, newURL string) error {
+	return cs.inTx(func(tcs *ChannelStore) error {
+		if _, err := tcs.q.Exec(
+			fmt.Sprintf("UPDATE %s SET %s = ?, %s = ? WHERE %s = ?", consts.DBChannelURLs, consts.QChanURLURL, consts.QChanURLUpdatedAt, consts.QChanURLID),
+			newURL, time.Now(), channelURLID,
+		); err != nil {
+			return fmt.Errorf("failed to rename channel URL %d to %q: %w", channelURLID, newURL, err)
+		}
+		if _, err := tcs.q.Exec(
+			fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?", consts.DBVideos, consts.QVidChanURL, consts.QVidChanURLID),
+			newURL, channelURLID,
+		); err != nil {
+			return fmt.Errorf("failed to update videos of renamed channel URL %q: %w", newURL, err)
+		}
+		return nil
+	})
+}
+
 // UpdateChannelURLSettings updates the settings of a single ChannelURL model.
 func (cs *ChannelStore) UpdateChannelURLSettings(cu *models.ChannelURL) error {
 	return cs.inTx(func(tcs *ChannelStore) error { return tcs.updateChannelURLSettings(cu) })

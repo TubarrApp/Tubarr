@@ -483,8 +483,8 @@
                                     </svg>
                                   </div>
                                   <img
-                                    x-show="safeURL(video.thumbnail_url)"
-                                    :src="safeURL(video.thumbnail_url)"
+                                    x-show="videoThumb(video)"
+                                    :src="videoThumb(video)"
                                     :alt="video.title"
                                     loading="lazy"
                                     referrerpolicy="no-referrer"
@@ -643,8 +643,8 @@
                                   </svg>
                                 </div>
                                 <img
-                                  x-show="safeURL(video.thumbnail_url)"
-                                  :src="safeURL(video.thumbnail_url)"
+                                  x-show="videoThumb(video)"
+                                  :src="videoThumb(video)"
                                   :alt="video.title"
                                   loading="lazy"
                                   referrerpolicy="no-referrer"

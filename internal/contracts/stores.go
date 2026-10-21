@@ -48,6 +48,7 @@ type ChannelStore interface {
 	UpdateChannelFromConfig(c *models.Channel) (err error)
 	UpdateChannelValue(key, val, col string, newVal any) error
 	UpdateChannelURLSettings(cu *models.ChannelURL) error
+	RenameChannelURL(channelURLID int64, newURL string) error
 	UpdateChannelMetarrArgsJSON(key, val string, updateFn func(*models.MetarrArgs) error) (int64, error)
 	UpdateChannelSettingsJSON(key, val string, updateFn func(*models.Settings) error) (int64, error)
 	UpdateLastScan(channelID int64) error
@@ -103,6 +104,7 @@ type VideoStore interface {
 	GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error)
 	GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error)
 	GetVideoOverrides(videoID int64) (*models.VideoOverrides, error)
+	ThumbnailOverrides() (map[int64]models.VideoOverrides, error)
 
 	// Add operations.
 	AddVideo(v *models.Video, channelID, channelURLID int64) (videoID int64, err error)
@@ -117,4 +119,5 @@ type VideoStore interface {
 	SetQueuedVideoError(channelID int64, videoURL, errMsg string) error
 	SetMissingVideoErrors(videoIDs []int64, errMsg string) error
 	RecoverInterrupted() (pending, failed int64, err error)
+	ReconnectOrphanedVideos() (reconnected int64, err error)
 }

@@ -18,6 +18,7 @@ const (
 	tubarrLogFile = "tubarr.log"
 	metarrLogFile = "metarr.log"
 	benchmarkDir  = "benchmark"
+	thumbnailDir  = "thumbnails"
 )
 
 // File and directory path strings.
@@ -28,6 +29,7 @@ var (
 	TubarrLogFilePath string
 	MetarrLogFilePath string
 	BenchmarkDir      string
+	ThumbnailDir      string // Thumbnails uploaded with Download As, made on the first upload.
 )
 
 // InitProgFilesDirs initializes necessary program directories and filepaths.
@@ -60,6 +62,7 @@ func InitProgFilesDirs() error {
 
 	// Benchmark directory, made once flags are parsed if benchmarking.
 	BenchmarkDir = filepath.Join(HomeTubarrDir, benchmarkDir)
+	ThumbnailDir = filepath.Join(HomeTubarrDir, thumbnailDir)
 
 	return nil
 }

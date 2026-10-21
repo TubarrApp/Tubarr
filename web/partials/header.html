@@ -2,6 +2,9 @@
   // safeURL returns u if it is an http(s) URL, for binding to href or src, else null (Alpine then drops the attribute).
   window.safeURL = (u) => (typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null);
 
+  // videoThumb returns the image to show for a video: its Download As thumbnail if it has one, else the crawled one.
+  window.videoThumb = (v) => (v.custom_thumbnail ? `${window.location.origin}/api/v1/videos/${v.id}/thumbnail` : safeURL(v.thumbnail_url));
+
   // Send the page to the login screen when an API call finds the session has ended.
   (() => {
     const originalFetch = window.fetch;

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
@@ -789,6 +790,94 @@ func (vs *VideoStore) SetMissingVideoErrors(videoIDs []int64, errMsg string) err
 	return nil
 }
 
+// ReconnectOrphanedVideos links videos whose channel URL was deleted to the one matching their recorded address.
+func (vs *VideoStore) ReconnectOrphanedVideos() (reconnected int64, err error) {
+	type channelURLKey struct {
+		channelID int64
+		addr      string
+	}
+	type target struct {
+		id  int64
+		url string
+	}
+	matchKey := func(u string) string {
+		u = strings.ToLower(strings.TrimSpace(u))
+		if _, rest, ok := strings.Cut(u, "://"); ok {
+			u = rest
+		}
+		u = strings.TrimPrefix(strings.TrimPrefix(u, "www."), "m.")
+		return strings.TrimRight(u, "/")
+	}
+
+	tx, err := vs.DB.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer rollback(tx)
+
+	targets := map[channelURLKey]*target{} // nil where two of a channel's URLs match the same address.
+	rows, err := tx.Query(fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s = 0",
+		consts.QChanURLID, consts.QChanURLChannelID, consts.QChanURLURL, consts.DBChannelURLs, consts.QChanURLIsManual))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read channel URLs: %w", err)
+	}
+	for rows.Next() {
+		var t target
+		var channelID int64
+		if err := rows.Scan(&t.id, &channelID, &t.url); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("failed to read channel URL: %w", err)
+		}
+		key := channelURLKey{channelID, matchKey(t.url)}
+		if _, dup := targets[key]; dup {
+			targets[key] = nil
+			continue
+		}
+		targets[key] = &t
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return 0, fmt.Errorf("failed to read channel URLs: %w", err)
+	}
+
+	type orphan struct {
+		id, channelID int64
+		addr          string
+	}
+	var orphans []orphan
+	rows, err = tx.Query(fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s IS NULL AND COALESCE(%s, '') != ''",
+		consts.QVidID, consts.QVidChanID, consts.QVidChanURL, consts.DBVideos, consts.QVidChanURLID, consts.QVidChanURL))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read videos without a channel URL: %w", err)
+	}
+	for rows.Next() {
+		var o orphan
+		if err := rows.Scan(&o.id, &o.channelID, &o.addr); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("failed to read video without a channel URL: %w", err)
+		}
+		orphans = append(orphans, o)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return 0, fmt.Errorf("failed to read videos without a channel URL: %w", err)
+	}
+
+	update := fmt.Sprintf("UPDATE %s SET %s = ?, %s = ? WHERE %s = ?", consts.DBVideos, consts.QVidChanURLID, consts.QVidChanURL, consts.QVidID)
+	for _, o := range orphans {
+		t := targets[channelURLKey{o.channelID, matchKey(o.addr)}]
+		if t == nil {
+			continue
+		}
+		if _, err := tx.Exec(update, t.id, t.url, o.id); err != nil {
+			return 0, fmt.Errorf("failed to reconnect video %d to channel URL %q: %w", o.id, t.url, err)
+		}
+		reconnected++
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return reconnected, nil
+}
+
 // RecoverInterrupted repairs videos a stopped Tubarr left mid-download or mid-Metarr, for startup.
 //
 // Downloaded videos with a stored file become finished with Metarr pending, the rest Failed so they return to Available.
@@ -850,6 +939,35 @@ func (vs *VideoStore) GetVideoOverrides(videoID int64) (*models.VideoOverrides, 
 		return nil, fmt.Errorf("failed to read overrides for video %d: %w", videoID, err)
 	}
 	return unmarshalVideoOverrides(overrides)
+}
+
+// ThumbnailOverrides returns the thumbnail choices of videos whose Download As overrides set or strip one, by video ID.
+func (vs *VideoStore) ThumbnailOverrides() (map[int64]models.VideoOverrides, error) {
+	query := fmt.Sprintf(
+		"SELECT %s, COALESCE(json_extract(%s, '$.thumbnail'), ''), COALESCE(json_extract(%s, '$.strip_thumbnail'), 0) FROM %s "+
+			"WHERE json_extract(%s, '$.thumbnail') IS NOT NULL OR json_extract(%s, '$.strip_thumbnail')",
+		consts.QVidID, consts.QVidOverrides, consts.QVidOverrides, consts.DBVideos, consts.QVidOverrides, consts.QVidOverrides,
+	)
+	rows, err := vs.DB.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read thumbnail overrides: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Pl.E("Failed to close rows for thumbnail overrides: %v", err)
+		}
+	}()
+
+	overrides := map[int64]models.VideoOverrides{}
+	for rows.Next() {
+		var id int64
+		var o models.VideoOverrides
+		if err := rows.Scan(&id, &o.Thumbnail, &o.StripThumbnail); err != nil {
+			return nil, fmt.Errorf("failed to read thumbnail override: %w", err)
+		}
+		overrides[id] = o
+	}
+	return overrides, rows.Err()
 }
 
 // SetVideoOverrides stores the given videos' Download As overrides, clearing them if o is nil.

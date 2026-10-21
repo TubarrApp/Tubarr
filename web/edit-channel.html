@@ -1430,6 +1430,7 @@
               this.formData.urls = data.urls.map(url => {
                 const urlEntry = {
                   url: url,
+                  original: url, // As saved, so an edited address renames the URL rather than replacing it.
                   hasAuth: false,
                   username: '',
                   password: '',
@@ -1638,6 +1639,13 @@
                 urls: this.formData.urls.filter(u => u.url).map(u => u.url).join(' '),
                 auth_details: this.buildAuthDetails()
               };
+
+              // Edited addresses rename their URL, keeping its videos, and notifications for it follow.
+              const renames = Object.fromEntries(this.formData.urls.filter(u => u.original && u.url && u.url !== u.original).map(u => [u.original, u.url]));
+              if (Object.keys(renames).length > 0) {
+                payload.url_renames = JSON.stringify(renames);
+                this.formData.notifications.forEach(n => { if (renames[n.channel_url]) n.channel_url = renames[n.channel_url]; });
+              }
 
               // Add global settings (filter out null/empty values to allow clearing)
               Object.keys(this.formData.settings).forEach(key => {

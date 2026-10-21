@@ -104,6 +104,11 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	if gpu == validation.GPUNone {
 		gpu, gpuNode = "", ""
 	}
+	var thumbnail string
+	var stripThumbnail bool
+	if v.Overrides != nil {
+		thumbnail, stripThumbnail = v.Overrides.Thumbnail, v.Overrides.StripThumbnail
+	}
 
 	mOutDirParser := parsing.NewDirectoryParser(c, cu, parsing.AllTags)
 	// Define fields to process.
@@ -169,6 +174,16 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeGPUNode,
+		},
+		{
+			metarrValue: metVals{str: thumbnail},
+			valType:     str,
+			cmdKey:      metkeys.Thumbnail,
+		},
+		{
+			metarrValue: metVals{b: stripThumbnail},
+			valType:     b,
+			cmdKey:      metkeys.StripThumbnail,
 		},
 		{
 			metarrValue: metVals{strSlice: videoCodecs},

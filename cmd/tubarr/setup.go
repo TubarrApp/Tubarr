@@ -6,6 +6,7 @@ import (
 	"strings"
 	"tubarr/internal/database"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/file"
 	"tubarr/internal/repo"
 )
 
@@ -38,6 +39,19 @@ func initializeApplication(lock bool) (store *repo.Store, db *sql.DB, progContro
 		logger.Pl.E("Failed to recover videos the last run stopped partway: %v", recoverErr)
 	} else if pending+failed > 0 {
 		logger.Pl.I("Recovered videos the last run stopped partway: %d finished with Metarr pending, %d back in Available as failed", pending, failed)
+	}
+
+	if n, err := store.VideoStore().ReconnectOrphanedVideos(); err != nil {
+		logger.Pl.E("Failed to reconnect videos to their channel URLs: %v", err)
+	} else if n > 0 {
+		logger.Pl.I("Reconnected %d video(s) whose channel URL had been replaced to the channel URL they match", n)
+	}
+
+	// Uploaded thumbnails are kept while a video's Download As options use them, as later Metarr runs need them.
+	if overrides, err := store.VideoStore().ThumbnailOverrides(); err != nil {
+		logger.Pl.E("Failed to check for unused uploaded thumbnails: %v", err)
+	} else {
+		file.RemoveUnusedThumbnails(overrides)
 	}
 
 	return store, db, progControl, err

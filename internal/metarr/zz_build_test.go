@@ -120,8 +120,7 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 	}
 }
 
-// TestMakeMetarrCommandGPUNone tests "none" from Download As or the channel URL turns off a GPU set above it, passing
-// Metarr no GPU or device node so it encodes in software.
+// TestMakeMetarrCommandGPUNone tests "none" turns off an inherited GPU, passing Metarr no GPU or device node.
 func TestMakeMetarrCommandGPUNone(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
@@ -149,6 +148,30 @@ func TestMakeMetarrCommandGPUNone(t *testing.T) {
 	}
 	if got, err := validation.ValidateGPUAcceleration("None"); err != nil || got != validation.GPUNone {
 		t.Errorf("ValidateGPUAcceleration(None) = %q, %v; want it kept as %q", got, err, validation.GPUNone)
+	}
+}
+
+// TestMakeMetarrCommandThumbnail tests a Download As thumbnail, or stripping it, is passed to Metarr.
+func TestMakeMetarrCommandThumbnail(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{}}
+	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	args := func() []string {
+		return makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags))
+	}
+
+	if a := args(); slices.Contains(a, metkeys.Thumbnail) || slices.Contains(a, metkeys.StripThumbnail) {
+		t.Errorf("no Download As thumbnail, but got %q", a)
+	}
+	v.Overrides = &models.VideoOverrides{Thumbnail: "/home/tubarr/.tubarr/thumbnails/1.png"}
+	if a := args(); !slices.Contains(a, "/home/tubarr/.tubarr/thumbnails/1.png") || slices.Index(a, metkeys.Thumbnail) != slices.Index(a, "/home/tubarr/.tubarr/thumbnails/1.png")-1 {
+		t.Errorf("custom thumbnail not passed: %q", a)
+	}
+	v.Overrides = &models.VideoOverrides{StripThumbnail: true}
+	if a := args(); !slices.Contains(a, metkeys.StripThumbnail) || slices.Contains(a, metkeys.Thumbnail) {
+		t.Errorf("strip not passed alone: %q", a)
 	}
 }
 

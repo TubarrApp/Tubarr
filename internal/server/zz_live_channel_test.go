@@ -1140,6 +1140,10 @@ func (sc *liveScenario) download(us []string, o *liveOverrides) {
 		if r := after[u]; r.status == consts.DLStatusCompleted {
 			downloaded = true
 			b = b || r.channelURL == sc.site.feedURL("b")
+			if r.channelURLID != before[u].channelURLID || r.channelURL != before[u].channelURL {
+				sc.errorf("video %q moved from channel URL %d %q to %d %q when downloaded from Available",
+					u, before[u].channelURLID, before[u].channelURL, r.channelURLID, r.channelURL)
+			}
 		}
 	}
 	sc.expectNotified("all", downloaded, false)

@@ -861,6 +861,7 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/channels/{}/override-ops/{}?video={}", keys: []string{"video"}, replay: func(t *testing.T) {
 			readsJSON(fmt.Sprintf("/api/v1/channels/1/override-ops/%d", fuzzChannelURLID(t)))(t)
 		}},
+		{path: "/api/v1/videos/{}/thumbnail", replay: routed(post, "/api/v1/videos/999999/thumbnail", http.StatusNotFound)}, // Uploads: TestThumbnailUpload.
 		{path: "/api/v1/channels/{}/override-ops/{}/file?{}", keys: []string{"box", "path"}, replay: func(t *testing.T) {
 			path := wiringFile(t, "meta-ops.txt", "album:set:Wiring\n")
 			readsJSON(fmt.Sprintf("/api/v1/channels/1/override-ops/%d/file?box=meta_ops&path=%s", fuzzChannelURLID(t), url.QueryEscape(path)))(t)

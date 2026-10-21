@@ -184,6 +184,8 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 		r.Post("/downloads/cancel", ss.handleCancelDownloads)
 		r.Get("/post-processing", ss.handleGetPostProcessing)
 		r.Get("/videos/available", ss.handleGetAvailableVideos)
+		r.Get("/videos/{id}/thumbnail", ss.handleGetThumbnail)
+		r.Post("/videos/{id}/thumbnail", ss.handleUploadThumbnail)
 
 		// Logs API.
 		r.Get("/logs", ss.handleGetTubarrLogs)

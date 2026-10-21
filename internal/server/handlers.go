@@ -32,6 +32,7 @@ import (
 	"tubarr/internal/scraper"
 	"tubarr/internal/siterules"
 	"tubarr/internal/state"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/logging"
 	"github.com/go-chi/chi/v5"
@@ -406,6 +407,20 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		for _, urlModel := range existingChannel.URLModels {
 			existingURLMap[urlModel.URL] = urlModel
 		}
+
+		// URLs edited in place keep their row, so their settings and videos stay with them.
+		for from, to := range f.renames {
+			urlModel, exists := existingURLMap[from]
+			if _, taken := existingURLMap[to]; !exists || urlModel.IsManual || taken {
+				continue
+			}
+			if err := cs.RenameChannelURL(urlModel.ID, to); err != nil {
+				return err
+			}
+			delete(existingURLMap, from)
+			urlModel.URL = to
+			existingURLMap[to] = urlModel
+		}
 		for existingURL, urlModel := range existingURLMap {
 			if !urlModel.IsManual && !slices.Contains(f.urls, existingURL) {
 				if err := cs.DeleteChannelURL(urlModel.ID); err != nil {
@@ -530,6 +545,7 @@ func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request
 			v.VideoFilePath = ""
 		}
 	}
+	ss.applyThumbnailOverrides(videos)
 	writeJSON(w, r, http.StatusOK, videos)
 }
 
@@ -972,9 +988,12 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.R
 			retried[cu.ID] = !cu.IsManual && c.AutoDownloads(cu)
 		}
 	}
+	shown := make([]*models.Video, 0, len(videos))
 	for _, v := range videos {
 		v.RetriesOnCrawl = v.DownloadStatus.Status != consts.DLStatusAvailable && retried[v.ChannelURLID]
+		shown = append(shown, &v.Video)
 	}
+	ss.applyThumbnailOverrides(shown)
 	writeJSON(w, r, http.StatusOK, videos)
 }
 
@@ -1138,6 +1157,116 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, r, http.StatusOK, response)
 }
 
+// handleGetThumbnail shows a video's Download As thumbnail: an image file is served, a URL redirected to.
+func (ss *serverStore) handleGetThumbnail(w http.ResponseWriter, r *http.Request) {
+	videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid video ID: %v", err), http.StatusBadRequest)
+		return
+	}
+	o, err := ss.vs.GetVideoOverrides(videoID)
+	if err != nil || o == nil || o.Thumbnail == "" || o.StripThumbnail {
+		http.NotFound(w, r)
+		return
+	}
+	if validation.IsHTTPURL(o.Thumbnail) {
+		http.Redirect(w, r, o.Thumbnail, http.StatusFound)
+		return
+	}
+
+	// Only images are served, as the path is whatever was typed into Download As.
+	f, err := os.Open(o.Thumbnail)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Pl.E("Failed to close thumbnail %q: %v", o.Thumbnail, err)
+		}
+	}()
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(f, head)
+	if !strings.HasPrefix(http.DetectContentType(head[:n]), "image/") {
+		http.NotFound(w, r)
+		return
+	}
+	info, err := f.Stat()
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
+}
+
+// applyThumbnailOverrides marks videos with a custom Download As thumbnail, and blanks stripped ones.
+func (ss *serverStore) applyThumbnailOverrides(videos []*models.Video) {
+	overrides, err := ss.vs.ThumbnailOverrides()
+	if err != nil {
+		logger.Pl.E("Failed to read videos' Download As thumbnails: %v", err)
+		return
+	}
+	for _, v := range videos {
+		o, ok := overrides[v.ID]
+		switch {
+		case !ok:
+		case o.StripThumbnail:
+			v.ThumbnailURL = ""
+		case o.Thumbnail != "":
+			v.CustomThumbnail = true
+		}
+	}
+}
+
+// handleUploadThumbnail saves an image as a video's Download As thumbnail, returning its path.
+func (ss *serverStore) handleUploadThumbnail(w http.ResponseWriter, r *http.Request) {
+	videoID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid video ID: %v", err), http.StatusBadRequest)
+		return
+	}
+	if _, err := ss.vs.GetVideoURLByID(videoID); err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, sql.ErrNoRows) {
+			status = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+
+	upload, _, err := r.FormFile("thumbnail")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("no thumbnail image received (the limit is 10 MB): %v", err), http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		if err := upload.Close(); err != nil {
+			logger.Pl.E("Failed to close uploaded thumbnail: %v", err)
+		}
+		if r.MultipartForm != nil {
+			if err := r.MultipartForm.RemoveAll(); err != nil {
+				logger.Pl.E("Failed to remove uploaded thumbnail's temporary files: %v", err)
+			}
+		}
+	}()
+	data, err := io.ReadAll(upload)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to read thumbnail image: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	path, err := file.SaveThumbnail(videoID, data)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, file.ErrThumbnailType) {
+			status = http.StatusUnsupportedMediaType
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+	writeJSON(w, r, http.StatusOK, map[string]string{"path": path})
+}
+
 // handleGetOverrideOpsFile returns the ops in an ops file which apply to a channel URL, for a Download As dialog box.
 func (ss *serverStore) handleGetOverrideOpsFile(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSpace(r.URL.Query().Get("path"))
@@ -1261,6 +1390,11 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 			videos[i].VideoFilePath = ""
 		}
 	}
+	shown := make([]*models.Video, 0, len(videos))
+	for i := range videos {
+		shown = append(shown, &videos[i])
+	}
+	ss.applyThumbnailOverrides(shown)
 	writeJSON(w, r, http.StatusOK, videos)
 }
 
