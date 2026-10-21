@@ -11,6 +11,7 @@ import (
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -99,6 +100,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	if len(o.TranscodeAudioCodecs) > 0 {
 		audioCodecs = o.TranscodeAudioCodecs
 	}
+	gpu, gpuNode := cmp.Or(o.TranscodeGPU, m.TranscodeGPU), cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode)
+	if gpu == validation.GPUNone {
+		gpu, gpuNode = "", ""
+	}
 
 	mOutDirParser := parsing.NewDirectoryParser(c, cu, parsing.AllTags)
 	// Define fields to process.
@@ -154,13 +159,13 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			cmdKey:      metkeys.ExtraFFmpegArgs,
 		},
 		{
-			metarrValue: metVals{str: cmp.Or(o.TranscodeGPU, m.TranscodeGPU)},
+			metarrValue: metVals{str: gpu},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeGPU,
 		},
 		{
-			metarrValue: metVals{str: cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode)},
+			metarrValue: metVals{str: gpuNode},
 			valType:     str,
 			viperKey:    "",
 			cmdKey:      metkeys.TranscodeGPUNode,

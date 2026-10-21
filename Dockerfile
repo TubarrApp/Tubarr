@@ -31,9 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go manually (Ubuntu’s golang-go is too old)
-RUN wget https://go.dev/dl/go1.27.2.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.27.2.linux-amd64.tar.gz && \
-    rm go1.27.2.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.27.3.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.27.3.linux-amd64.tar.gz && \
+    rm go1.27.3.linux-amd64.tar.gz
 
 ENV PATH="/usr/local/go/bin:${PATH}"
 WORKDIR /build

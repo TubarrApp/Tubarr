@@ -339,7 +339,11 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 		}
 	}
 	if v := in.TranscodeVideoCodec; v != nil {
-		if dst.TranscodeVideoCodecs, err = validation.ValidateVideoTranscodeCodecSlice(*v, dst.TranscodeGPU); err != nil {
+		gpu := dst.TranscodeGPU
+		if gpu == validation.GPUNone {
+			gpu = ""
+		}
+		if dst.TranscodeVideoCodecs, err = validation.ValidateVideoTranscodeCodecSlice(*v, gpu); err != nil {
 			return fmt.Errorf("invalid %s: %w", keys.TranscodeCodec, err)
 		}
 	}

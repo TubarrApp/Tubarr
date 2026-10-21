@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/domain/vars"
@@ -126,25 +127,17 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 		return nil, err
 	}
 
-	// Viper supported extensions.
-	validExts := map[string]struct{}{
-		".yaml": {},
-		".yml":  {},
-		".toml": {},
-		".json": {},
-	}
-
 	var configFiles []string
 	for _, entry := range entries {
 		// Skip directories.
 		if entry.IsDir() {
-			logger.Pl.D(5, "Skipping entry %q in config file scan: is directory", entry.Name())
+			logger.Pl.D(5, "Skipping entry %q in directory %q during config file scan: is directory", entry.Name(), dirPath)
 			continue
 		}
 
 		// Check if file has valid extension.
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if _, exists := validExts[ext]; exists {
+		if _, exists := consts.ViperValidConfigExts[ext]; exists {
 			fullPath := filepath.Join(dirPath, entry.Name())
 			configFiles = append(configFiles, fullPath)
 		}

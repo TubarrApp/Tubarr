@@ -48,18 +48,19 @@ func ValidatePurgeMetafiles(purgeType string) (string, error) {
 	return "", fmt.Errorf("invalid metadata purge type %q (all, json or nfo)", purgeType)
 }
 
-// ValidateGPUAcceleration validates the GPU selection.
+// GPUNone turns off a GPU set by the channel (or channel URL), so Metarr encodes in software.
+const GPUNone = "none"
+
+// ValidateGPUAcceleration validates the GPU selection, keeping GPUNone so it overrides an inherited GPU.
 func ValidateGPUAcceleration(g string) (gpuType string, err error) {
 	g = strings.ToLower(strings.TrimSpace(g))
+	if g == "" || g == GPUNone {
+		return g, nil
+	}
 
 	// Verify OS support.
 	if !sharedvalidation.OSSupportsAccelType(g) {
 		logger.Pl.W("OS does not support acceleration of type %q, omitting.", g)
-		g = ""
-	}
-
-	// Return on empty or if explicitly unwanted.
-	if g == "" || g == "none" {
 		return "", nil
 	}
 

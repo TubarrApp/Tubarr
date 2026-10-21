@@ -10,6 +10,7 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
+// File and directory name constants.
 const (
 	mDir          = ".metarr"
 	tDir          = ".tubarr"

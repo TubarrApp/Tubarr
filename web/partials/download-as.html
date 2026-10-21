@@ -123,7 +123,7 @@ download-as-cancel if Download As closes without starting. -->
         <div class="mt-3 grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
-            <select x-model="form.metarr.metarr_purge_metafile" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_purge_metafile" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_purge_metafile')"></option>
               <option value="json">JSON</option>
               <option value="nfo">NFO</option>
@@ -132,7 +132,7 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
-            <select x-model="form.metarr.metarr_output_ext" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_output_ext" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_output_ext')"></option>
               <option value="avi">avi</option>
               <option value="flv">flv</option>
@@ -144,7 +144,7 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Rename Style</label>
-            <select x-model="form.metarr.metarr_rename_style" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_rename_style" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_rename_style')"></option>
               <option value="spaces">Spaces</option>
               <option value="underscores">Underscores</option>
@@ -161,8 +161,9 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
-            <select x-model="form.metarr.metarr_gpu" class="w-full h-8 rounded border pl-2 pr-8text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+            <select x-model="form.metarr.metarr_gpu" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="usual('metarr_gpu')"></option>
+              <option value="none">None (software)</option>
               <option value="auto">Auto</option>
               <option value="cuda">Nvidia (Cuda)</option>
               <option value="qsv">Intel (QSV)</option>

@@ -1,10 +1,12 @@
 package metarr
 
 import (
+	"bufio"
 	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -83,6 +85,32 @@ func metaPurge(v *models.Video, cu *models.ChannelURL) (string, error) {
 	return validation.ValidatePurgeMetafiles(cmp.Or(o, cu.ChanURLMetarrArgs.MetaPurge, abstractions.GetString(keys.MMetaPurge)))
 }
 
+// runWithProgress runs a Metarr command, recording its progress lines for the video and returning the rest of stdout.
+func runWithProgress(cmd *exec.Cmd, videoID int64) (string, error) {
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+	defer progressByVideo.Delete(videoID)
+
+	var out strings.Builder
+	sc := bufio.NewScanner(pipe)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		if p, ok := parseProgress(sc.Text()); ok {
+			progressByVideo.Store(videoID, p)
+			continue
+		}
+		out.WriteString(sc.Text())
+		out.WriteByte('\n')
+	}
+	_, _ = io.Copy(io.Discard, pipe) // Lets Metarr finish if a line was too long to scan.
+	return out.String(), cmd.Wait()
+}
+
 // runMetarr runs a Metarr command with a built argument list.
 func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	logger.Pl.I("Running Metarr command:\n\n%s\n", cmd.String())
@@ -90,21 +118,21 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	cmd.Stderr = os.Stderr
 
 	// Run command and grab stdout.
-	metarrStdout, err := cmd.Output()
+	metarrStdout, err := runWithProgress(cmd, v.ID)
 	if err != nil {
 		// Metarr still reports where the files are after a failed rename or move.
-		if storeErr := v.StoreFilenamesFromMetarr(string(metarrStdout)); storeErr != nil {
+		if storeErr := v.StoreFilenamesFromMetarr(metarrStdout); storeErr != nil {
 			logger.Pl.D(1, "No file paths stored from failed Metarr run for %q: %v", v.URL, storeErr)
 		}
 		// Metarr's own account of why it failed, rather than just its exit status.
-		if msgs := metarrErrors(string(metarrStdout)); len(msgs) > 0 {
+		if msgs := metarrErrors(metarrStdout); len(msgs) > 0 {
 			return errors.New(strings.Join(msgs, "; "))
 		}
 		return err
 	}
 
 	// Retrieve filenames.
-	if err := v.StoreFilenamesFromMetarr(string(metarrStdout)); err != nil {
+	if err := v.StoreFilenamesFromMetarr(metarrStdout); err != nil {
 		return err
 	}
 

@@ -5,10 +5,11 @@
       [x-cloak] { display: none !important; }
       .transcodes-table { width: 100%; }
       .transcodes-table .check-col { width: 2.5rem; }
-      .transcodes-table .video-col { width: 40%; }
-      .transcodes-table .channel-col { width: 20%; }
-      .transcodes-table .status-col { width: 10%; }
-      .transcodes-table .elapsed-col { width: 12%; font-variant-numeric: tabular-nums; }
+      .transcodes-table .video-col { width: 32%; }
+      .transcodes-table .channel-col { width: 16%; }
+      .transcodes-table .status-col { width: 9%; }
+      .transcodes-table .progress-col { width: 20%; font-variant-numeric: tabular-nums; }
+      .transcodes-table .elapsed-col { width: 11%; font-variant-numeric: tabular-nums; }
       .scrollable-text { display: block; max-width: 100%; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
       .scrollable-text::-webkit-scrollbar { height: 4px; }
     </style>
@@ -133,6 +134,7 @@
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 video-col">Video</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 channel-col">Channel</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 status-col">Status</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 progress-col">Progress</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200 elapsed-col">Time</th>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
                       </tr>
@@ -161,6 +163,20 @@
                           <td class="px-4 py-3 status-col">
                             <span x-show="job.started_at" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">Running</span>
                             <span x-show="!job.started_at" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Queued</span>
+                          </td>
+                          <td class="px-4 py-3 progress-col">
+                            <template x-if="job.progress">
+                              <div>
+                                <div x-show="job.progress.percent >= 0" class="flex items-center gap-2">
+                                  <div class="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                                    <div class="bg-brand-500 h-2 rounded-full transition-all duration-300" :style="`width: ${job.progress.percent}%`"></div>
+                                  </div>
+                                  <span class="text-sm text-gray-600 dark:text-gray-400 w-[3.5rem] text-right" x-text="`${job.progress.percent.toFixed(1)}%`"></span>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-text="progressDetail(job.progress)"></p>
+                              </div>
+                            </template>
+                            <span x-show="!job.progress" class="text-sm text-gray-400 dark:text-gray-500">—</span>
                           </td>
                           <td class="px-4 py-3 elapsed-col">
                             <span
@@ -368,6 +384,14 @@
           },
 
           // Formats the time since a timestamp, e.g. "1:02:03" or "4:05".
+          // Describes a transcode's progress besides its percentage, e.g. "frame 1,204 · 29.9 fps · 1.52x".
+          progressDetail(p) {
+            const parts = [`frame ${p.frame.toLocaleString()}`];
+            if (p.fps > 0) parts.push(`${p.fps.toFixed(1)} fps`);
+            if (p.speed) parts.push(p.speed);
+            return parts.join(' · ');
+          },
+
           elapsed(since) {
             const secs = Math.max(0, Math.floor((this.now - new Date(since).getTime()) / 1000));
             const h = Math.floor(secs / 3600);

@@ -54,15 +54,16 @@ func (claim *metarrClaim) enqueue(v *models.Video, cu *models.ChannelURL) {
 
 // MetarrJob is a video queued for or running in Metarr.
 type MetarrJob struct {
-	VideoID      int64      `json:"video_id"`
-	ChannelID    int64      `json:"channel_id"`
-	ChannelName  string     `json:"channel_name"`
-	ChannelURLID int64      `json:"channel_url_id"`
-	ChannelURL   string     `json:"channel_url"`
-	URL          string     `json:"url"`
-	Title        string     `json:"title"`
-	QueuedAt     time.Time  `json:"queued_at"`
-	StartedAt    *time.Time `json:"started_at,omitempty"`
+	VideoID      int64            `json:"video_id"`
+	ChannelID    int64            `json:"channel_id"`
+	ChannelName  string           `json:"channel_name"`
+	ChannelURLID int64            `json:"channel_url_id"`
+	ChannelURL   string           `json:"channel_url"`
+	URL          string           `json:"url"`
+	Title        string           `json:"title"`
+	QueuedAt     time.Time        `json:"queued_at"`
+	StartedAt    *time.Time       `json:"started_at,omitempty"`
+	Progress     *metarr.Progress `json:"progress,omitempty"` // While FFmpeg transcodes.
 }
 
 // globalMetarrSem limits Metarr runs across all channels (0 = unlimited).
@@ -405,6 +406,7 @@ func MetarrJobs() []MetarrJob {
 		if ms := claim.startedAt.Load(); ms != 0 {
 			started := time.UnixMilli(ms)
 			job.StartedAt = &started
+			job.Progress = metarr.VideoProgress(claim.videoID)
 		}
 		jobs = append(jobs, job)
 		return true

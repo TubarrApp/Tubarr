@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/validation"
 
 	"github.com/spf13/viper"
 )
@@ -116,6 +117,38 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 		if got := values(tc.key); !slices.Equal(got, tc.own) {
 			t.Errorf("%s with overrides: got %q, want %q", tc.key, got, tc.own)
 		}
+	}
+}
+
+// TestMakeMetarrCommandGPUNone tests "none" from Download As or the channel URL turns off a GPU set above it, passing
+// Metarr no GPU or device node so it encodes in software.
+func TestMakeMetarrCommandGPUNone(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	newURL := func(gpu string) *models.ChannelURL {
+		return &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{},
+			ChanURLMetarrArgs: &models.MetarrArgs{TranscodeGPU: gpu, TranscodeGPUNode: "/dev/dri/renderD128"}}
+	}
+	hasGPU := func(cu *models.ChannelURL) bool {
+		args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags))
+		return slices.Contains(args, metkeys.TranscodeGPU) || slices.Contains(args, metkeys.TranscodeGPUNode)
+	}
+
+	if !hasGPU(newURL("vaapi")) {
+		t.Error("the channel URL's GPU wasn't passed")
+	}
+	v.Overrides = &models.VideoOverrides{MetarrArgs: models.MetarrArgs{TranscodeGPU: validation.GPUNone}}
+	if hasGPU(newURL("vaapi")) {
+		t.Error("Download As 'none' still passed the channel URL's GPU")
+	}
+	v.Overrides = nil
+	if hasGPU(newURL(validation.GPUNone)) {
+		t.Error("a channel URL's 'none' was passed to Metarr")
+	}
+	if got, err := validation.ValidateGPUAcceleration("None"); err != nil || got != validation.GPUNone {
+		t.Errorf("ValidateGPUAcceleration(None) = %q, %v; want it kept as %q", got, err, validation.GPUNone)
 	}
 }
 
