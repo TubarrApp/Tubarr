@@ -319,18 +319,20 @@
             history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
           },
 
+          // A click toggles one row; shift-click selects just the rows back to the last click, ctrl/cmd+shift adds them.
           toggle(job, index, event) {
-            const select = !this.selected[job.video_id];
             if (event.shiftKey && this.lastClickedIndex !== null) {
+              if (!event.ctrlKey && !event.metaKey) this.selected = {};
               const start = Math.min(this.lastClickedIndex, index);
               const end = Math.max(this.lastClickedIndex, index);
               for (const j of this.filteredJobs.slice(start, end + 1)) {
-                this.setSelected(j, select);
+                this.setSelected(j, true);
               }
+              if (event.target.type === 'checkbox') event.target.checked = true;
             } else {
-              this.setSelected(job, select);
+              this.setSelected(job, !this.selected[job.video_id]);
+              this.lastClickedIndex = index;
             }
-            this.lastClickedIndex = index;
           },
 
           setSelected(job, select) {

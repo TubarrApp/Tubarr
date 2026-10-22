@@ -162,11 +162,12 @@
 
               <!-- Rows -->
               <ul class="divide-y divide-gray-200 dark:divide-gray-800">
-                <template x-for="entry in entries" :key="entry.key">
+                <template x-for="(entry, i) in entries" :key="entry.key">
                   <li class="flex items-start gap-4 px-6 py-4">
                     <input
                       type="checkbox"
-                      x-model="entry.checked"
+                      :checked="entry.checked"
+                      @click="toggle(i, $event)"
                       class="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                     />
                     <div class="min-w-0 flex-1">
@@ -263,6 +264,7 @@
           urlsText: '',
           entries: [], // Videos added to the list, each with its channel and channel URL.
           nextKey: 1,
+          lastClickedIndex: null,
           downloadAsKey: null, // The row Download As is open for.
           working: false,
           error: '',
@@ -372,6 +374,21 @@
           removeEntries(done) {
             const keys = new Set(done.map(e => e.key));
             this.entries = this.entries.filter(e => !keys.has(e.key));
+            this.lastClickedIndex = null;
+          },
+
+          // A click toggles one video; shift-click checks just the videos back to the last click, ctrl/cmd+shift adds them.
+          toggle(index, event) {
+            if (event.shiftKey && this.lastClickedIndex !== null) {
+              if (!event.ctrlKey && !event.metaKey) this.entries.forEach(e => e.checked = false);
+              const start = Math.min(this.lastClickedIndex, index);
+              const end = Math.max(this.lastClickedIndex, index);
+              this.entries.slice(start, end + 1).forEach(e => e.checked = true);
+              event.target.checked = true;
+            } else {
+              this.entries[index].checked = event.target.checked;
+              this.lastClickedIndex = index;
+            }
           },
 
           // Downloads the checked videos, or sends them to Available, with one request per channel.

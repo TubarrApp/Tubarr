@@ -236,9 +236,9 @@
                     <button type="button" @click="crawlSelectedURLs = []" class="text-brand-500 hover:underline">Select None</button>
                   </div>
                   <div class="mt-2 max-h-64 space-y-2 overflow-y-auto">
-                    <template x-for="urlModel in crawlableURLs(crawlDialog)" :key="urlModel.id">
-                      <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
-                        <input type="checkbox" :value="urlModel.id" x-model.number="crawlSelectedURLs" class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300" />
+                    <template x-for="(urlModel, i) in crawlableURLs(crawlDialog)" :key="urlModel.id">
+                      <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 select-none">
+                        <input type="checkbox" :checked="crawlSelectedURLs.includes(urlModel.id)" @click="toggleCrawlURL(i, $event)" class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300" />
                         <span class="break-all" x-text="urlModel.url"></span>
                         <span x-show="urlModel.settings?.paused" class="shrink-0 text-xs text-gray-500 dark:text-gray-400">(paused)</span>
                       </label>
@@ -1222,6 +1222,7 @@
 
           crawlDialog: null, // Channel whose URLs are being picked to crawl.
           crawlSelectedURLs: [],
+          crawlLastClicked: null,
 
           crawlableURLs(channel) {
             return channel?.url_models?.filter(u => u.url !== 'manual-downloads') || [];
@@ -1230,7 +1231,24 @@
           // Opens the crawl dialog with every unpaused URL checked.
           openCrawlDialog(channel) {
             this.crawlSelectedURLs = this.crawlableURLs(channel).filter(u => !u.settings?.paused).map(u => u.id);
+            this.crawlLastClicked = null;
             this.crawlDialog = channel;
+          },
+
+          // A click toggles one URL; shift-click checks just the URLs back to the last click, ctrl/cmd+shift adds them.
+          toggleCrawlURL(index, event) {
+            const urls = this.crawlableURLs(this.crawlDialog);
+            if (event.shiftKey && this.crawlLastClicked !== null) {
+              const start = Math.min(this.crawlLastClicked, index);
+              const end = Math.max(this.crawlLastClicked, index);
+              const ids = urls.slice(start, end + 1).map(u => u.id);
+              const kept = event.ctrlKey || event.metaKey ? this.crawlSelectedURLs.filter(id => !ids.includes(id)) : [];
+              this.crawlSelectedURLs = [...kept, ...ids];
+            } else {
+              const others = this.crawlSelectedURLs.filter(id => id !== urls[index].id);
+              this.crawlSelectedURLs = event.target.checked ? [...others, urls[index].id] : others;
+              this.crawlLastClicked = index;
+            }
           },
 
           async crawlChannel(channelId, urlIDs) {

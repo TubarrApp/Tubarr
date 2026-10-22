@@ -42,7 +42,6 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Video codecs
     libx264-dev \
-    libx265-dev \
     libvpx-dev \
     libsvtav1-dev \
     libdav1d-dev \
@@ -87,6 +86,24 @@ RUN set -e && \
     cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && \
     ninja -j"$(nproc)" && ninja install && ldconfig && \
     rm -rf /tmp/svtav1
+
+############ Build x265 ############
+# Ubuntu's libx265 3.5 segfaults in B-frame rate control, so build the newest release tag (X.Y[.Z]), skipping release candidates.
+# Multilib build: the 10 and 12-bit encoders are linked into the 8-bit shared library, matching Ubuntu's package.
+RUN set -e && \
+    X265_REF="$(git ls-remote --tags --refs https://bitbucket.org/multicoreware/x265_git.git | sed 's#.*/##' | grep -E '^[0-9]+(\.[0-9]+)+$' | sort -V | tail -1)" && \
+    echo "Building x265 $X265_REF" && \
+    git clone --depth 1 --branch "$X265_REF" https://bitbucket.org/multicoreware/x265_git.git /tmp/x265 && \
+    cd /tmp/x265 && mkdir -p build/8bit && \
+    cmake -S source -B build/12bit -DCMAKE_BUILD_TYPE=Release -DHIGH_BIT_DEPTH=ON -DMAIN12=ON -DEXPORT_C_API=OFF -DENABLE_SHARED=OFF -DENABLE_CLI=OFF && \
+    make -C build/12bit -j"$(nproc)" && \
+    cmake -S source -B build/10bit -DCMAKE_BUILD_TYPE=Release -DHIGH_BIT_DEPTH=ON -DEXPORT_C_API=OFF -DENABLE_SHARED=OFF -DENABLE_CLI=OFF && \
+    make -C build/10bit -j"$(nproc)" && \
+    cp build/12bit/libx265.a build/8bit/libx265_main12.a && \
+    cp build/10bit/libx265.a build/8bit/libx265_main10.a && \
+    cmake -S source -B build/8bit -DCMAKE_BUILD_TYPE=Release -DEXTRA_LIB="x265_main10.a;x265_main12.a" -DEXTRA_LINK_FLAGS=-L. -DLINKED_10BIT=ON -DLINKED_12BIT=ON -DENABLE_CLI=OFF && \
+    make -C build/8bit -j"$(nproc)" && make -C build/8bit install && ldconfig && \
+    rm -rf /tmp/x265
 
 ############ Build FFmpeg from source ############
 # Builds the newest release tag (nX.Y[.Z]), skipping -dev snapshots.
@@ -199,7 +216,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     \
     # Video codecs
     libx264-164 \
-    libx265-199 \
     libvpx9 \
     libdav1d7 \
     \

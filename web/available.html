@@ -411,18 +411,20 @@
             history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
           },
 
+          // A click toggles one video; shift-click selects just the videos back to the last click, ctrl/cmd+shift adds them.
           toggle(video, index, event) {
-            const select = !this.selected[video.id];
             if (event.shiftKey && this.lastClickedIndex !== null) {
+              if (!event.ctrlKey && !event.metaKey) this.selected = {};
               const start = Math.min(this.lastClickedIndex, index);
               const end = Math.max(this.lastClickedIndex, index);
               for (const v of this.filteredVideos.slice(start, end + 1)) {
-                this.setSelected(v, select);
+                this.setSelected(v, true);
               }
+              if (event.target.type === 'checkbox') event.target.checked = true;
             } else {
-              this.setSelected(video, select);
+              this.setSelected(video, !this.selected[video.id]);
+              this.lastClickedIndex = index;
             }
-            this.lastClickedIndex = index;
           },
 
           setSelected(video, select) {

@@ -14,11 +14,11 @@
         All Channel URLs
       </label>
       <template x-for="(u, i) in formData.urls.filter(u => u.url)" :key="i">
-        <label class="flex items-center gap-3 py-1 text-sm text-gray-800 dark:text-white/90" :class="selected.includes('') && 'opacity-50'">
+        <label class="flex items-center gap-3 py-1 text-sm text-gray-800 dark:text-white/90 select-none" :class="selected.includes('') && 'opacity-50'">
           <input
             type="checkbox"
-            :value="u.url"
-            x-model="selected"
+            :checked="selected.includes(u.url)"
+            @click="toggleChannelURL(i, $event)"
             :disabled="selected.includes('')"
             class="h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
           />
@@ -68,7 +68,7 @@
       </div>
       <button
         type="button"
-        @click="formData.notifications = formData.notifications.filter(n => !n.checked)"
+        @click="formData.notifications = formData.notifications.filter(n => !n.checked); lastGroupIndex = null"
         :disabled="!formData.notifications.some(n => n.checked)"
         class="text-sm font-medium text-error-600 hover:text-error-700 disabled:opacity-50 disabled:cursor-not-allowed dark:text-error-500"
       >
@@ -78,12 +78,12 @@
 
     <!-- One row per notify URL, listing every channel URL it's set for. -->
     <ul class="divide-y divide-gray-200 dark:divide-gray-800">
-      <template x-for="g in groups()" :key="g.url">
+      <template x-for="(g, i) in groups()" :key="g.url">
         <li class="flex items-start gap-4 px-4 py-3">
           <input
             type="checkbox"
             :checked="g.rows.every(r => r.checked)"
-            @change="g.rows.forEach(r => r.checked = $event.target.checked)"
+            @click="toggleGroup(i, $event)"
             class="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
           />
           <div class="min-w-0 flex-1">
@@ -105,6 +105,36 @@
       selected: [''], // Chosen channel URLs, where '' is all of them.
       notifyText: '',
       error: '',
+      lastURLIndex: null,
+      lastGroupIndex: null,
+
+      // A click toggles one channel URL; shift-click checks just the ones back to the last click, ctrl/cmd+shift adds them.
+      toggleChannelURL(index, event) {
+        const urls = this.formData.urls.filter(u => u.url).map(u => u.url);
+        if (event.shiftKey && this.lastURLIndex !== null) {
+          const picked = urls.slice(Math.min(this.lastURLIndex, index), Math.max(this.lastURLIndex, index) + 1);
+          const kept = event.ctrlKey || event.metaKey ? this.selected.filter(u => !picked.includes(u)) : [];
+          this.selected = [...kept, ...picked];
+        } else {
+          const others = this.selected.filter(u => u !== urls[index]);
+          this.selected = event.target.checked ? [...others, urls[index]] : others;
+          this.lastURLIndex = index;
+        }
+      },
+
+      // A click toggles one notify URL; shift-click checks just the ones back to the last click, ctrl/cmd+shift adds them.
+      toggleGroup(index, event) {
+        const groups = this.groups();
+        if (event.shiftKey && this.lastGroupIndex !== null) {
+          if (!event.ctrlKey && !event.metaKey) this.formData.notifications.forEach(n => n.checked = false);
+          groups.slice(Math.min(this.lastGroupIndex, index), Math.max(this.lastGroupIndex, index) + 1)
+            .forEach(g => g.rows.forEach(r => r.checked = true));
+          event.target.checked = true;
+        } else {
+          groups[index].rows.forEach(r => r.checked = event.target.checked);
+          this.lastGroupIndex = index;
+        }
+      },
 
       // Puts each typed URL on the list for each chosen channel URL, skipping ones already there.
       add() {
@@ -140,6 +170,7 @@
         this.selected = chans.includes('') ? [''] : chans;
         this.notifyText = g.url;
         this.formData.notifications = this.formData.notifications.filter(n => n.notify_url !== g.url);
+        this.lastGroupIndex = null;
       },
 
       // Groups the rows by notify URL, in list order.

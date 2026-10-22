@@ -688,6 +688,7 @@
             }
           },
 
+          // A click toggles one video; shift-click selects just the videos back to the last click, ctrl/cmd+shift adds them.
           handleCheckboxClick(videoUrl, event) {
             const currentIndex = this.filteredVideos.findIndex(v => v.url === videoUrl);
             if (currentIndex === -1) return;
@@ -697,19 +698,10 @@
             if (event.shiftKey && this.lastClickedIndex !== null) {
               const start = Math.min(this.lastClickedIndex, currentIndex);
               const end = Math.max(this.lastClickedIndex, currentIndex);
-              const selectedSet = new Set(this.selectedVideos);
-
-              // Mirror typical multi-select behavior by applying the current click to the whole range
-              const shown = this.filteredVideos;
-              for (let i = start; i <= end; i++) {
-                const url = shown[i].url;
-                if (shouldSelect) {
-                  selectedSet.add(url);
-                } else {
-                  selectedSet.delete(url);
-                }
+              const selectedSet = new Set(event.ctrlKey || event.metaKey ? this.selectedVideos : []);
+              for (const v of this.filteredVideos.slice(start, end + 1)) {
+                selectedSet.add(v.url);
               }
-
               this.selectedVideos = Array.from(selectedSet);
             } else {
               const selectedSet = new Set(this.selectedVideos);
@@ -719,9 +711,8 @@
                 selectedSet.delete(videoUrl);
               }
               this.selectedVideos = Array.from(selectedSet);
+              this.lastClickedIndex = currentIndex;
             }
-
-            this.lastClickedIndex = currentIndex;
           },
 
           toggleSelectAll(checked) {

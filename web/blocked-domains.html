@@ -332,18 +332,20 @@
             return `${d.domain}|${d.context}`;
           },
 
+          // A click toggles one row; shift-click selects just the rows back to the last click, ctrl/cmd+shift adds them.
           toggle(domain, index, event) {
-            const select = !this.selected[this.rowKey(domain)];
             if (event.shiftKey && this.lastClickedIndex !== null) {
+              if (!event.ctrlKey && !event.metaKey) this.selected = {};
               const start = Math.min(this.lastClickedIndex, index);
               const end = Math.max(this.lastClickedIndex, index);
               for (const d of this.filteredDomains.slice(start, end + 1)) {
-                this.setSelected(d, select);
+                this.setSelected(d, true);
               }
+              if (event.target.type === 'checkbox') event.target.checked = true;
             } else {
-              this.setSelected(domain, select);
+              this.setSelected(domain, !this.selected[this.rowKey(domain)]);
+              this.lastClickedIndex = index;
             }
-            this.lastClickedIndex = index;
           },
 
           setSelected(d, select) {
