@@ -134,8 +134,8 @@ func checkBotDetection(uri string, cu *models.ChannelURL, db *sql.DB, inputErr e
 	return fmt.Errorf("url %q %s. Aborting without retries. Error message: %w", uri, consts.BotActivitySentinel, inputErr)
 }
 
-// checkIfAvoidURL checks if the hostname of the URL is blocked for the channel URL's context.
-func checkIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
+// CheckIfAvoidURL checks if the hostname of the URL is blocked for the channel URL's context.
+func CheckIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
 	if cu == nil || db == nil {
 		return nil
 	}

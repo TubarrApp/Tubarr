@@ -39,14 +39,14 @@ func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *
 }
 
 // Execute performs the download with retries.
-func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
+func (d *VideoDownload) Execute() error {
 	if d.Video == nil {
-		return false, errors.New("video model is nil")
+		return errors.New("video model is nil")
 	}
 
 	key := ongoingKey{TypeVideo, d.Video.URL}
 	if _, exists := ongoingDownloads.LoadOrStore(key, struct{}{}); exists {
-		return false, fmt.Errorf("video %q: %w", d.Video.URL, ErrDuplicateDownload)
+		return fmt.Errorf("video %q: %w", d.Video.URL, ErrDuplicateDownload)
 	}
 	defer ongoingDownloads.Delete(key)
 	d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0, "Waiting for download slot", nil)
@@ -54,7 +54,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	// Acquire per-domain slot first (blocks if domain limit reached, no-op if no limit).
 	domainSem, err := limits.DomainDownloads.Acquire(d.Context, d.Video.URL)
 	if err != nil {
-		return false, d.cancelVideoDownload()
+		return d.cancelVideoDownload()
 	}
 	defer limits.Release(domainSem)
 
@@ -62,7 +62,7 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	// Store the semaphore to ensure we release on the same one we acquired.
 	dlSem, err := AcquireGlobalDownloadSlot(d.Context, d.Video.URL)
 	if err != nil {
-		return false, d.cancelVideoDownload()
+		return d.cancelVideoDownload()
 	}
 	defer limits.Release(dlSem)
 
@@ -75,14 +75,14 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 	)
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
 		// Check if URL should be avoided (set by previous videos or persistent blocks).
-		if err := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
-			return false, err
+		if err := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
+			return err
 		}
 
 		logger.Pl.I("Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxRetries, d.Video.URL)
 		if d.Context.Err() != nil {
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
-			return false, d.cancelVideoDownload()
+			return d.cancelVideoDownload()
 		}
 
 		err := d.videoDLAttempt()
@@ -90,20 +90,20 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 			d.Video.UpdatedAt = time.Now()
 			d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
 			logger.Pl.S("Successfully completed video download for URL: %s", d.Video.URL)
-			return false, nil
+			return nil
 		}
 		if d.Context.Err() != nil {
-			return false, d.cancelVideoDownload()
+			return d.cancelVideoDownload()
 		}
 
 		// Check bot detection FIRST - abort immediately if detected.
 		if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
-			return true, botErr // Only 'TRUE' path for bot detected.
+			return botErr
 		}
 
 		// Check if URL should be avoided (in case bot was just detected).
-		if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
-			return false, avoidErr
+		if avoidErr := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
+			return avoidErr
 		}
 
 		// Other errors - retry, unless that was the last attempt.
@@ -124,11 +124,11 @@ func (d *VideoDownload) Execute() (botBlockChannel bool, err error) {
 		select {
 		case <-d.Context.Done():
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
-			return false, d.cancelVideoDownload()
+			return d.cancelVideoDownload()
 		case <-time.After(randWait):
 		}
 	}
-	return false, fmt.Errorf("all %d download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
+	return fmt.Errorf("all %d download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
 // videoDLAttempt performs a single download attempt.

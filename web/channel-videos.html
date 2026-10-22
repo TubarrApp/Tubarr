@@ -47,7 +47,7 @@
             <div
               x-data="videosData()"
               x-init="init()"
-              @edit-metarr-done.window="loadActivity(); setTimeout(() => loadVideos(), 3000)"
+              @edit-metarr-done.window="startedMetarr.push($event.detail.id); loadActivity(); setTimeout(() => loadVideos(), 3000)"
             >
               <!-- Loading State -->
               <div x-show="loading" class="text-center py-12">
@@ -139,6 +139,7 @@
                   >
                     <option value="" x-text="`All statuses (${urlVideos.length})`"></option>
                     <option value="finished" x-text="`Finished (${statusCount('finished')})`"></option>
+                    <option value="processing" x-text="`Post-processing (${statusCount('processing')})`"></option>
                     <option value="pending" x-text="`Not post-processed (${statusCount('pending')})`"></option>
                     <option value="failed" x-text="`Post-processing failed (${statusCount('failed')})`"></option>
                     <option value="ignored" x-text="`Ignored (${statusCount('ignored')})`"></option>
@@ -277,7 +278,12 @@
                             <span class="text-sm text-gray-600 dark:text-gray-400" x-text="formatDate(video.upload_date)"></span>
                           </td>
                           <td class="px-6 py-4">
-                            <template x-if="video.finished && !needsMetarr(video)">
+                            <template x-if="processing(video)">
+                              <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">
+                                Post-processing
+                              </span>
+                            </template>
+                            <template x-if="video.finished && !needsMetarr(video) && !processing(video)">
                               <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
                                 Finished
                               </span>
@@ -287,7 +293,7 @@
                                 Ignored
                               </span>
                             </template>
-                            <template x-if="needsMetarr(video)">
+                            <template x-if="needsMetarr(video) && !processing(video)">
                               <span class="inline-flex flex-col items-start max-w-xs">
                                 <span
                                   class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium"
@@ -301,7 +307,7 @@
                                 ></span>
                               </span>
                             </template>
-                            <template x-if="!video.finished && !video.ignored">
+                            <template x-if="!video.finished && !video.ignored && !processing(video)">
                               <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
                                 Queued
                               </span>
@@ -311,8 +317,8 @@
                             <button
                               x-show="metarrDone(video)"
                               @click="$dispatch('edit-metarr', { ...video, channel_id: channelId, rerun: true })"
-                              :disabled="!video.json_path || !video.video_path || runningMetarr"
-                              :title="!video.video_path ? missingFileHint : video.json_path ? 'Edit the filename, directory and ops, then post-process the finished files again with Metarr, e.g. to fix a date.' : 'Its metadata file was removed when it was post-processed, so it can\'t be processed again.'"
+                              :disabled="!video.json_path || !video.video_path || runningMetarr || processing(video)"
+                              :title="processing(video) ? processingHint : !video.video_path ? missingFileHint : video.json_path ? 'Edit the filename, directory and ops, then post-process the finished files again with Metarr, e.g. to fix a date.' : 'Its metadata file was removed when it was post-processed, so it can\'t be processed again.'"
                               class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
                             >
                               Edit &amp; Re-Process
@@ -320,8 +326,8 @@
                             <button
                               x-show="!metarrDone(video)"
                               @click="runMetarr([video.id])"
-                              :disabled="!needsMetarr(video) || !video.video_path || runningMetarr"
-                              :title="needsMetarr(video) && !video.video_path ? missingFileHint : null"
+                              :disabled="!needsMetarr(video) || !video.video_path || runningMetarr || processing(video)"
+                              :title="processing(video) ? processingHint : needsMetarr(video) && !video.video_path ? missingFileHint : null"
                               class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
                             >
                               Post-Process
@@ -329,8 +335,8 @@
                             <button
                               x-show="!metarrDone(video)"
                               @click="$dispatch('edit-metarr', { ...video, channel_id: channelId })"
-                              :disabled="!needsMetarr(video) || !video.video_path || runningMetarr"
-                              :title="needsMetarr(video) && !video.video_path ? missingFileHint : 'See and edit the filename, directory and ops it\'s post-processed with (by Metarr), then post-process it.'"
+                              :disabled="!needsMetarr(video) || !video.video_path || runningMetarr || processing(video)"
+                              :title="processing(video) ? processingHint : needsMetarr(video) && !video.video_path ? missingFileHint : 'See and edit the filename, directory and ops it\'s post-processed with (by Metarr), then post-process it.'"
                               class="mr-3 text-sm font-medium text-brand-500 hover:text-brand-600 disabled:opacity-50 disabled:cursor-not-allowed dark:text-brand-400 dark:hover:text-brand-400"
                             >
                               Edit &amp; Post-Process
@@ -409,6 +415,8 @@
           deleteFiles: false,
           runningMetarr: false,
           metarrActive: false,
+          metarrVideoIDs: [], // Videos queued for or running in Metarr, in any channel.
+          startedMetarr: [], // Videos just sent to Metarr, shown as post-processing until the videos next load.
           stoppingMetarr: false,
           currentPage: 1,
           itemsPerPage: 25,
@@ -418,6 +426,7 @@
           statusFilter: '',
           sortOrder: 'newest',
           missingFileHint: "The video file isn't at its saved path any more (moved or renamed?), so it can't be processed.",
+          processingHint: 'Already post-processing. Stop it on the Post-processing page to run it again.',
 
           init() {
             // Get channel ID from URL params
@@ -453,6 +462,7 @@
               }
 
               this.videos = await videosResponse.json() || [];
+              this.startedMetarr = [];
               this.loading = false;
 
               this.loadActivity();
@@ -473,9 +483,12 @@
               if (!response.ok) return;
               const activity = await response.json();
               const wasActive = this.metarrActive;
+              const wasProcessing = this.metarrVideoIDs;
               this.metarrActive = activity.metarr.includes(Number(this.channelId)); // IDs, as the page's ID comes from its URL.
-              // Refresh statuses once Metarr finishes.
-              if (wasActive && !this.metarrActive) {
+              this.metarrVideoIDs = activity.metarr_videos || [];
+              // Refresh statuses once Metarr finishes, or finishes one of the page's videos.
+              const finished = wasProcessing.some(id => !this.metarrVideoIDs.includes(id) && this.videos.some(v => v.id === id));
+              if ((wasActive && !this.metarrActive) || finished) {
                 this.loadVideos();
               }
             } catch (err) {
@@ -511,9 +524,14 @@
             return video.finished && !video.ignored && video.metarr_status === 'done';
           },
 
+          processing(video) {
+            return this.metarrVideoIDs.includes(video.id) || this.startedMetarr.includes(video.id);
+          },
+
           // The video's Status column badge, as a status filter value.
           statusOf(video) {
             if (video.ignored) return 'ignored';
+            if (this.processing(video)) return 'processing';
             if (!this.needsMetarr(video)) return 'finished';
             return video.metarr_status === 'failed' ? 'failed' : 'pending';
           },
@@ -586,7 +604,7 @@
           },
 
           get awaitingMetarr() {
-            return this.videos.filter(v => this.needsMetarr(v));
+            return this.videos.filter(v => this.needsMetarr(v) && !this.processing(v));
           },
 
           get selectedAwaitingMetarr() {
@@ -615,6 +633,7 @@
                 const errorText = await response.text();
                 throw new Error(errorText || 'Failed to start post-processing');
               }
+              this.startedMetarr = videoIds.length > 0 ? videoIds : this.awaitingMetarr.map(v => v.id);
               await this.loadActivity();
               setTimeout(() => this.loadVideos(), 3000);
             } catch (err) {

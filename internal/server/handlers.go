@@ -724,13 +724,16 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
-// handleGetActivity returns the IDs of channels with running crawls/downloads, crawls being stopped, and Metarr processes.
+// handleGetActivity returns the IDs of channels with running crawls/downloads, crawls being stopped, and Metarr processes,
+// and of the videos in Metarr.
 func (ss *serverStore) handleGetActivity(w http.ResponseWriter, r *http.Request) {
 	crawling, stopping := state.CrawlActivity()
+	metarrChannels, metarrVideos := app.MetarrActivity()
 	writeJSON(w, r, http.StatusOK, map[string][]int64{
-		"crawling": crawling,
-		"stopping": stopping,
-		"metarr":   app.MetarrActivity(),
+		"crawling":      crawling,
+		"stopping":      stopping,
+		"metarr":        metarrChannels,
+		"metarr_videos": metarrVideos,
 	})
 }
 
@@ -1253,6 +1256,12 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Checked before saving edited options, which would otherwise replace the ones a running video uses.
+	if n := app.MetarrBusy(c.ID, requestBody.VideoIDs); n > 0 {
+		http.Error(w, fmt.Sprintf("%d of the video(s) are already post-processing", n), http.StatusConflict)
+		return
+	}
+
 	// Edited options replace the video's earlier ones, kept for later runs.
 	if overrides != nil {
 		awaiting, err := ss.vs.GetVideosAwaitingMetarr(c.ID, requestBody.Rerun)
@@ -1299,6 +1308,11 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
 	}
+	total, err := ss.vs.CountFinishedVideos(r.Context(), c.ID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("could not count downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
+		return
+	}
 
 	// Blank paths for files moved or deleted outside Tubarr, so the page shows them as missing.
 	for _, v := range videos {
@@ -1310,7 +1324,7 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	ss.applyThumbnailOverrides(videos)
-	writeJSON(w, r, http.StatusOK, videos)
+	writeJSON(w, r, http.StatusOK, map[string]any{"videos": videos, "total": total})
 }
 
 // handleSetLogLevel sets the logging level in the database.

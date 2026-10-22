@@ -39,14 +39,14 @@ func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *m
 }
 
 // Execute performs the download with retries.
-func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
+func (d *JSONDownload) Execute() error {
 	if d.Video == nil {
-		return false, errors.New("video model is nil")
+		return errors.New("video model is nil")
 	}
 
 	key := ongoingKey{TypeJSON, d.Video.URL}
 	if _, exists := ongoingDownloads.LoadOrStore(key, struct{}{}); exists {
-		return false, fmt.Errorf("metadata for %q: %w", d.Video.URL, ErrDuplicateDownload)
+		return fmt.Errorf("metadata for %q: %w", d.Video.URL, ErrDuplicateDownload)
 	}
 	defer ongoingDownloads.Delete(key)
 
@@ -60,10 +60,15 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 
 	// JSON download attempt loop
 	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
+		// Check if URL should be avoided (set by previous videos or persistent blocks).
+		if err := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
+			return err
+		}
+
 		logger.Pl.I("Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxRetries, d.Video.URL)
 		if d.Context.Err() != nil {
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
-			return false, d.cancelJSONDownload()
+			return d.cancelJSONDownload()
 		}
 
 		// Download JSON
@@ -71,19 +76,19 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 		if err == nil { // If err IS nil
 			d.Video.UpdatedAt = time.Now()
 			logger.Pl.S("Successfully completed JSON download for URL: %s", d.Video.URL)
-			return false, nil
+			return nil
 		}
 
 		// ERROR PATH:
 
 		// Check bot detection after each attempt.
 		if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
-			return true, botErr // Abort immediately, no retries
+			return botErr // Abort immediately, no retries
 		}
 
-		// Check if URL should be avoided (set by previous videos or persistent blocks).
-		if avoidErr := checkIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
-			return false, avoidErr
+		// Check if URL should be avoided (in case bot was just detected).
+		if avoidErr := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
+			return avoidErr
 		}
 
 		// Other errors - retry, unless that was the last attempt.
@@ -101,13 +106,13 @@ func (d *JSONDownload) Execute() (botBlockChannel bool, err error) {
 		select {
 		case <-d.Context.Done():
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
-			return false, d.cancelJSONDownload()
+			return d.cancelJSONDownload()
 		case <-time.After(randWait):
 		}
 	}
 
 	// All failed
-	return false, fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
+	return fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
 }
 
 // jsonDLAttempt performs a single download attempt.

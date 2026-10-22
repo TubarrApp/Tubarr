@@ -751,36 +751,6 @@ func ensureManualDownloadsChannelURL(cs contracts.ChannelStore, c *models.Channe
 	return fetchedCU, nil
 }
 
-// blockChannelBotDetected blocks a domain globally due to bot detection on the given URL.
-func blockChannelBotDetected(cs contracts.ChannelStore, cu *models.ChannelURL, videoURL string) error {
-	// Fall back to the channel URL if the video URL can't be parsed.
-	var hostname string
-	parsedURL, err := url.Parse(videoURL)
-	if err == nil {
-		hostname = parsedURL.Hostname()
-	}
-	if hostname == "" {
-		// Fall back to channel URL if video URL is invalid.
-		logger.Pl.E("Could not parse video URL %q, falling back to channel URL", videoURL)
-		parsedURL, err = url.Parse(cu.URL)
-		if err != nil {
-			return fmt.Errorf("failed to parse channel URL %q for blocking: %w", cu.URL, err)
-		}
-		hostname = parsedURL.Hostname()
-	}
-
-	// Determine the block context based on authentication.
-	blockCtx := blocking.GetBlockContext(cu)
-
-	// Block the domain globally for this context.
-	db := cs.GetDB()
-	if err := blocking.BlockDomain(db, hostname, blockCtx); err != nil {
-		return fmt.Errorf("failed to block domain %q (context: %s): %w", hostname, blockCtx, err)
-	}
-
-	return nil
-}
-
 // CheckManualVideos returns the videos that can't be sent in to the channel, with why. Each must be a full http(s) video
 // URL, with no channel URL or one of the channel's.
 func CheckManualVideos(c *models.Channel, manualVideos []models.ManualVideo) (bad []string) {

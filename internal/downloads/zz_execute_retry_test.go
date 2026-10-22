@@ -75,7 +75,7 @@ func TestExecuteRetries(t *testing.T) {
 	runs := fakeYTDLP(t, `echo "ERROR: video unavailable" >&2; exit 1`)
 	vd, jd := newTestDownloads(t.Context(), t, "https://retries.example/v", 3)
 
-	if _, err := vd.Execute(); err == nil || !strings.Contains(err.Error(), "all 3 download attempts failed") {
+	if err := vd.Execute(); err == nil || !strings.Contains(err.Error(), "all 3 download attempts failed") {
 		t.Errorf("video download: got error %v, want all 3 attempts failed", err)
 	}
 	if n := countRuns(t, runs); n != 3 {
@@ -85,7 +85,7 @@ func TestExecuteRetries(t *testing.T) {
 	if err := os.Remove(runs); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := jd.Execute(); err == nil || !strings.Contains(err.Error(), "all 3 JSON download attempts failed") {
+	if err := jd.Execute(); err == nil || !strings.Contains(err.Error(), "all 3 JSON download attempts failed") {
 		t.Errorf("JSON download: got error %v, want all 3 attempts failed", err)
 	}
 	if n := countRuns(t, runs); n != 3 {
@@ -106,8 +106,8 @@ func TestExecuteVideoSucceedsFirstTry(t *testing.T) {
 	runs := fakeYTDLP(t, "echo '"+videoPath+"'")
 	vd, _ := newTestDownloads(t.Context(), t, "https://success.example/v", 3)
 
-	if bot, err := vd.Execute(); err != nil || bot {
-		t.Fatalf("got bot %t, error %v, want a clean success", bot, err)
+	if err := vd.Execute(); err != nil {
+		t.Fatalf("got error %v, want a clean success", err)
 	}
 	if n := countRuns(t, runs); n != 1 {
 		t.Errorf("ran yt-dlp %d times, want 1", n)
@@ -128,10 +128,10 @@ func TestExecuteCanceledBeforeStart(t *testing.T) {
 	cancel()
 	vd, jd := newTestDownloads(ctx, t, "https://canceled.example/v", 3)
 
-	if _, err := vd.Execute(); err == nil || !strings.Contains(err.Error(), "canceled") {
+	if err := vd.Execute(); err == nil || !strings.Contains(err.Error(), "canceled") {
 		t.Errorf("video download: got error %v, want a cancellation", err)
 	}
-	if _, err := jd.Execute(); err == nil || !strings.Contains(err.Error(), "canceled") {
+	if err := jd.Execute(); err == nil || !strings.Contains(err.Error(), "canceled") {
 		t.Errorf("JSON download: got error %v, want a cancellation", err)
 	}
 	if n := countRuns(t, runs); n != 0 {

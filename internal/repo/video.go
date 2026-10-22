@@ -435,6 +435,20 @@ func (vs *VideoStore) GetLatestFinishedVideos(ctx context.Context, channelID int
 	return scanVideoList(rows)
 }
 
+// CountFinishedVideos returns how many finished videos a channel has.
+func (vs *VideoStore) CountFinishedVideos(ctx context.Context, channelID int64) (n int, err error) {
+	query := fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s WHERE %s = ? AND %s = 1",
+		consts.DBVideos,
+		consts.QVidChanID,
+		consts.QVidFinished,
+	)
+	if err := vs.DB.QueryRowContext(ctx, query, channelID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("failed to count finished videos: %w", err)
+	}
+	return n, nil
+}
+
 // AddAvailableVideos stores newly found videos as Available, skipping any already in the channel.
 //
 // Videos are given in the channel's listing order and inserted last first, so GetAvailableVideos' ID tie-breaker keeps

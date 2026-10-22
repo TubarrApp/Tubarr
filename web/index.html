@@ -616,9 +616,9 @@
                       <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
                     </div>
 
-                    <!-- Completed Videos Header -->
+                    <!-- Latest Downloads Header -->
                     <div x-show="!channel.videosLoading" class="px-3 pt-3 border-t border-gray-100 dark:border-gray-800 sm:px-6 sm:pt-6">
-                      <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">Latest Completed Videos</h4>
+                      <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">Latest Downloads</h4>
                     </div>
 
                     <!-- No Videos State -->
@@ -740,13 +740,13 @@
                       </div>
                     </div>
 
-                    <!-- View Completed Videos Link (shown when expanded, regardless of video count) -->
+                    <!-- Downloaded Videos Link (shown when expanded, regardless of video count) -->
                     <div x-show="!channel.videosLoading" class="px-3 pb-3 sm:px-6 sm:pb-6">
                       <a
                         :href="'channel-videos.html?channel=' + channel.id"
                         class="flex items-center gap-2 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300"
                       >
-                        View Completed Videos
+                        <span x-text="`Downloaded Videos (${channel.videosTotal})`"></span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                         </svg>
@@ -859,6 +859,7 @@
               // Initialize channel state without loading videos
               for (let channel of this.channels) {
                 channel.videos = [];
+                channel.videosTotal = 0;
                 channel.videosLoading = false;
                 channel.expanded = false;
                 channel.videosLoaded = false;
@@ -1024,8 +1025,9 @@
                 throw new Error('Failed to fetch videos');
               }
 
-              const videos = await response.json();
+              const { videos, total } = await response.json();
               channel.videos = videos || [];
+              channel.videosTotal = total || 0;
               channel.videosLoading = false;
               channel.videosLoaded = true;
             } catch (err) {

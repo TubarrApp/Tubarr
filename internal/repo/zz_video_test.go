@@ -170,6 +170,9 @@ func TestFinishedVideoLists(t *testing.T) {
 	if v := latest[0]; v.Title != "New" || v.ChannelURLID != cu.ID || v.ChannelURL != cu.URL || !v.Finished {
 		t.Errorf("latest finished: fields not read: %+v", v)
 	}
+	if n, err := vs.CountFinishedVideos(t.Context(), c.ID); err != nil || n != 3 {
+		t.Errorf("finished count: got %d, %v, want 3", n, err)
+	}
 
 	all, _, err := cs.GetDownloadedOrIgnoredVideos(c)
 	if err != nil {

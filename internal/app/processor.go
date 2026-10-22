@@ -312,6 +312,14 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 	}()
 	track("Waiting to start")
 
+	// Fail fast once an earlier video's bot detection has blocked the domain.
+	if err := downloads.CheckIfAvoidURL(v.URL, cu, b.cs.GetDB()); err != nil {
+		if v.ID == 0 {
+			storeFailedVideo(b.vs, b.dlTracker, v, c, cu, err)
+		}
+		return err
+	}
+
 	// Bot detection avoidance wait time.
 	waitCtx, waitCancel := context.WithCancelCause(queueCtx)
 	stopWait := context.AfterFunc(vidCtx, func() { waitCancel(context.Cause(vidCtx)) })
@@ -324,14 +332,13 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 
 	// Process JSON metadata phase.
 	track("Fetching metadata")
-	proceed, botBlockChannel, err := processJSON(vidCtx, b.vs, b.dlTracker, b.dirParser, c, cu, v)
+	proceed, err := processJSON(vidCtx, b.vs, b.dlTracker, b.dirParser, c, cu, v)
 	if errors.Is(err, downloads.ErrDuplicateDownload) {
 		logger.Pl.I("Skipping video %q: %v", v.URL, err)
 		return nil
 	}
 	if err != nil {
-		handleBotBlock(b.cs, cu, v.URL, botBlockChannel)
-		if v.ID == 0 && !botBlockChannel && vidCtx.Err() == nil {
+		if v.ID == 0 && vidCtx.Err() == nil {
 			storeFailedVideo(b.vs, b.dlTracker, v, c, cu, err)
 		}
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
@@ -348,13 +355,12 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, b.dirParser)
 
 	// Process video download phase.
-	botBlockChannel, err = processVideo(vidCtx, v, cu, c, b.dlTracker)
+	err = processVideo(vidCtx, v, cu, c, b.dlTracker)
 	if errors.Is(err, downloads.ErrDuplicateDownload) {
 		logger.Pl.I("Skipping video %q: %v", v.URL, err)
 		return nil
 	}
 	if err != nil {
-		handleBotBlock(b.cs, cu, v.URL, botBlockChannel)
 		return fmt.Errorf("video processing error for video URL %q: %w", v.URL, err)
 	}
 	b.downloaded.Add(1)
@@ -477,9 +483,9 @@ func processJSON(
 	c *models.Channel,
 	cu *models.ChannelURL,
 	v *models.Video,
-) (proceed, botBlockChannel bool, err error) {
+) (proceed bool, err error) {
 	if v == nil || cu == nil || c == nil {
-		return false, false, fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
+		return false, fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
 	}
 
 	// ONLY download JSON if it's NOT a custom file (custom scraper already created it).
@@ -489,11 +495,11 @@ func processJSON(
 			RetryMaxInterval: 5,
 		})
 		if err != nil {
-			return false, false, err
+			return false, err
 		}
 
-		if botBlockChannel, err = dl.Execute(); err != nil {
-			return false, botBlockChannel, err
+		if err = dl.Execute(); err != nil {
+			return false, err
 		}
 	} else {
 		logger.Pl.D(1, "Skipping JSON download - using custom scraped file: %s", v.JSONCustomFile)
@@ -502,7 +508,7 @@ func processJSON(
 	// Validate and filter.
 	passedChecks, useFilteredMetaOps, useFilteredFilenameOps, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
 	// Store filtered operations in the video (per-video, not shared).
 	v.FilteredMetaOps = useFilteredMetaOps
@@ -519,9 +525,9 @@ func processJSON(
 
 		v.MarkVideoAsIgnored()
 		if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
-			return false, false, fmt.Errorf("failed to update ignored video: %w", err)
+			return false, fmt.Errorf("failed to update ignored video: %w", err)
 		}
-		return false, false, nil
+		return false, nil
 	}
 
 	// Will download this video (passed checks).
@@ -531,17 +537,17 @@ func processJSON(
 
 	// Save video to database.
 	if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
-		return false, false, fmt.Errorf("failed to update video DB entry: %w", err)
+		return false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 
 	logger.Pl.S("Processed metadata for: %s", v.URL)
-	return true, false, nil
+	return true, nil
 }
 
 // processVideo processes video downloads.
-func processVideo(vidCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) (botBlockChannel bool, err error) {
+func processVideo(vidCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dlTracker *downloads.DownloadTracker) error {
 	if v == nil || cu == nil || c == nil {
-		return false, fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
+		return fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
 	}
 
 	logger.Pl.I("Processing video download for URL: %s", v.URL)
@@ -551,24 +557,13 @@ func processVideo(vidCtx context.Context, v *models.Video, cu *models.ChannelURL
 		RetryMaxInterval: 20,
 	})
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	if botBlockChannel, err = dl.Execute(); err != nil {
-		return botBlockChannel, err
+	if err = dl.Execute(); err != nil {
+		return err
 	}
 
 	logger.Pl.D(1, "Successfully processed and marked as downloaded: %s", v.URL)
-	return false, nil
-}
-
-// handleBotBlock handles cases where the program has been detected as a bot.
-// videoURL should be the actual video URL that triggered the bot detection (important for manual downloads).
-func handleBotBlock(cs contracts.ChannelStore, cu *models.ChannelURL, videoURL string, botBlock bool) {
-	if !botBlock {
-		return
-	}
-	if err := blockChannelBotDetected(cs, cu, videoURL); err != nil {
-		logger.Pl.E("Failed to block channel: %v", err)
-	}
+	return nil
 }

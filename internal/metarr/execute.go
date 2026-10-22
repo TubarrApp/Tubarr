@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -26,8 +27,29 @@ import (
 	"github.com/TubarrApp/gocommon/abstractions"
 )
 
+// runningFiles holds a map of files already being processed by Metarr.
+var runningFiles sync.Map
+
+// tryJobMap checks if the filepath is currently being ran.
+func tryJobMap(filepath string) (alreadyRunning bool) {
+	_, alreadyRunning = runningFiles.LoadOrStore(filepath, true)
+	return alreadyRunning
+}
+
+// clearJobMapEntry clears the job from the map on completion.
+func clearJobMapEntry(filepath string) {
+	runningFiles.Delete(filepath)
+}
+
 // InitMetarr begins processing with Metarr.
 func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) error {
+	// Metarr may move the file, changing v.VideoFilePath, so clear the path that was taken.
+	path := v.VideoFilePath
+	if tryJobMap(path) {
+		return fmt.Errorf("metarr is already processing video %q", path)
+	}
+	defer clearJobMapEntry(path)
+
 	args := makeMetarrCommand(v, cu, c, dirParser)
 	if len(args) == 0 {
 		logger.Pl.I("No Metarr arguments built, returning...")
