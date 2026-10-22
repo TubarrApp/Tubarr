@@ -78,16 +78,23 @@ RUN git clone --depth 1 --branch n13.0.19.1 https://github.com/FFmpeg/nv-codec-h
     make -C /tmp/nv install && rm -rf /tmp/nv
 
 ############ Build SVT-AV1 ############
-RUN git clone --depth 1 https://gitlab.com/AOMediaCodec/SVT-AV1.git /tmp/svtav1 && \
+# Builds the newest release tag (vX.Y.Z), skipping release candidates.
+RUN set -e && \
+    SVTAV1_REF="$(git ls-remote --tags --refs https://gitlab.com/AOMediaCodec/SVT-AV1.git 'v*' | sed 's#.*/##' | grep -E '^v[0-9]+(\.[0-9]+)+$' | sort -V | tail -1)" && \
+    echo "Building SVT-AV1 $SVTAV1_REF" && \
+    git clone --depth 1 --branch "$SVTAV1_REF" https://gitlab.com/AOMediaCodec/SVT-AV1.git /tmp/svtav1 && \
     cd /tmp/svtav1 && mkdir build && cd build && \
     cmake -G Ninja -DCMAKE_BUILD_TYPE=Release .. && \
     ninja -j"$(nproc)" && ninja install && ldconfig && \
     rm -rf /tmp/svtav1
 
 ############ Build FFmpeg from source ############
+# Builds the newest release tag (nX.Y[.Z]), skipping -dev snapshots.
 RUN set -e && \
     rm -rf /ffmpeg && \
-    git clone --depth 1 https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
+    FFMPEG_REF="$(git ls-remote --tags --refs https://git.ffmpeg.org/ffmpeg.git 'n*' | sed 's#.*/##' | grep -E '^n[0-9]+(\.[0-9]+)+$' | sort -V | tail -1)" && \
+    echo "Building FFmpeg $FFMPEG_REF" && \
+    git clone --depth 1 --branch "$FFMPEG_REF" https://git.ffmpeg.org/ffmpeg.git /ffmpeg && \
     cd /ffmpeg && \
     PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/local/lib/pkgconfig" ./configure \
         --prefix=/usr/local \
