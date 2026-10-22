@@ -311,6 +311,21 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 	return videoURL, nil
 }
 
+// GetVideoThumbnailURL returns a video's crawled thumbnail URL by its ID in the database.
+func (vs *VideoStore) GetVideoThumbnailURL(videoID int64) (thumbURL string, err error) {
+	query := fmt.Sprintf(
+		"SELECT COALESCE(%s, '') FROM %s WHERE %s = ?",
+		consts.QVidThumbnailURL,
+		consts.DBVideos,
+		consts.QVidID,
+	)
+
+	if err = vs.DB.QueryRow(query, videoID).Scan(&thumbURL); err != nil {
+		return "", fmt.Errorf("failed to read thumbnail URL for video %d: %w", videoID, err)
+	}
+	return thumbURL, nil
+}
+
 // GetVideoChannelURLID returns the ID of the channel URL a video belongs to.
 func (vs *VideoStore) GetVideoChannelURLID(videoID int64) (int64, error) {
 	query := fmt.Sprintf(
@@ -860,6 +875,33 @@ func (vs *VideoStore) GetVideoOverrides(videoID int64) (*models.VideoOverrides, 
 		return nil, fmt.Errorf("failed to read overrides for video %d: %w", videoID, err)
 	}
 	return unmarshalVideoOverrides(overrides)
+}
+
+// ThumbnailURLs returns every crawled thumbnail URL videos use.
+func (vs *VideoStore) ThumbnailURLs() ([]string, error) {
+	query := fmt.Sprintf(
+		"SELECT DISTINCT %s FROM %s WHERE %s IS NOT NULL AND %s != ''",
+		consts.QVidThumbnailURL, consts.DBVideos, consts.QVidThumbnailURL, consts.QVidThumbnailURL,
+	)
+	rows, err := vs.DB.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read thumbnail URLs: %w", err)
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Pl.E("Failed to close rows for thumbnail URLs: %v", err)
+		}
+	}()
+
+	var thumbURLs []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			return nil, fmt.Errorf("failed to read thumbnail URL: %w", err)
+		}
+		thumbURLs = append(thumbURLs, u)
+	}
+	return thumbURLs, rows.Err()
 }
 
 // ThumbnailOverrides returns the thumbnail choices of videos whose Download As overrides set or strip one, by video ID.

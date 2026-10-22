@@ -8,20 +8,8 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 
-	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
-
-// nonConflictingMetaOp contains keys which do not conflict with other writes.
-var nonConflictingMetaOp = map[string]struct{}{
-	sharedconsts.OpAppend:       {},
-	sharedconsts.OpCopyTo:       {},
-	sharedconsts.OpPrefix:       {},
-	sharedconsts.OpReplace:      {},
-	sharedconsts.OpRegexReplace: {},
-	sharedconsts.OpKeepAfter:    {},
-	sharedconsts.OpKeepBefore:   {},
-}
 
 // loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering
 func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
@@ -32,7 +20,7 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	}
 
 	// File ops override DB ops with same key
-	nonConflictingDBOps := filterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
+	nonConflictingDBOps := models.FilterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
 
 	// Combine
 	fileAndDBOps := slices.Concat(fileMetaOps, nonConflictingDBOps)
@@ -82,29 +70,6 @@ func LoadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]
 	return parsedOps, nil
 }
 
-// filterConflictingMetaOps removes DB ops that conflict with file ops on the same field
-func filterConflictingMetaOps(fileOps, dbOps []models.MetaOps) []models.MetaOps {
-	fileOpKeys := make(map[string]bool)
-
-	// Build conflicting key map (Field:OpType only, NOT value [otherwise conflicting keys may not match in map])
-	for _, op := range fileOps {
-		if _, ok := nonConflictingMetaOp[op.OpType]; !ok {
-			fileOpKeys[op.Field+":"+op.OpType] = true
-		}
-	}
-
-	result := make([]models.MetaOps, 0, len(dbOps))
-	for _, op := range dbOps {
-		_, nonConflicting := nonConflictingMetaOp[op.OpType]
-		if !fileOpKeys[op.Field+":"+op.OpType] || nonConflicting {
-			result = append(result, op)
-		} else {
-			logger.Pl.D(2, "File meta op overrides DB op: %s", sharedparsing.FormatMetaOp(op, false))
-		}
-	}
-	return result
-}
-
 // applyFilteredMetaOps applies filtering rules to meta ops
 func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMetaOps, videoURL, channelName string) []models.MetaOps {
 	matchedFilteredOps := extractMatchedFilteredMetaOps(filteredOps)
@@ -141,7 +106,7 @@ func extractMatchedFilteredMetaOps(filteredOps []models.FilteredMetaOps) []model
 func buildMetaOpKeySet(ops []models.MetaOps, includeNonConflicting bool) map[string]bool {
 	metaOpsKeys := make(map[string]bool, len(ops))
 	for _, op := range ops {
-		_, nonConflicting := nonConflictingMetaOp[op.OpType]
+		_, nonConflicting := models.NonConflictingMetaOps[op.OpType]
 		if includeNonConflicting || !nonConflicting {
 			metaOpsKeys[sharedparsing.FormatMetaOp(op, false)] = true
 		}

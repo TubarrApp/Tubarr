@@ -40,7 +40,7 @@ func TestAvailableVideosAPI(t *testing.T) {
 		jsonkeys.SettingsCrawlFreq:       {"30"},
 		jsonkeys.SettingsDownloadRetries: {"1"},
 		jsonkeys.SettingsAutoDownload:    {"false"},
-		jsonkeys.MetarrMetaOps:           {"https://example.com/@review|artist:set:Cats"},
+		jsonkeys.MetarrMetaOps:           {"artist:set:Cats"},
 	}
 	if w := serve(http.MethodPost, "/api/v1/channels/add", "application/x-www-form-urlencoded", form.Encode()); w.Code >= 300 {
 		t.Fatalf("adding channel: %d %s", w.Code, w.Body.String())

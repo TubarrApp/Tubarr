@@ -86,11 +86,42 @@
                   </p>
                 </div>
 
+                <div x-show="!loading && blockedDomains.length > 0">
+                <!-- Filter -->
+                <div class="flex flex-wrap items-center gap-4 pb-5">
+                  <input
+                    type="search"
+                    x-model="domainFilter"
+                    @input="lastClickedIndex = null"
+                    placeholder="Filter by domain"
+                    class="w-56 max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+
+                <!-- Selection Bar -->
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-800 dark:bg-gray-800">
+                  <div class="flex flex-wrap items-center gap-4 text-sm">
+                    <span class="font-medium text-gray-900 dark:text-white">
+                      <span x-text="selectedCount"></span> of <span x-text="filteredDomains.length"></span> selected
+                    </span>
+                    <button @click="selectAllFiltered()" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Select all</button>
+                    <button x-show="selectedCount > 0" @click="selected = {}" class="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100">Clear</button>
+                  </div>
+                  <button
+                    @click="unblockSelected()"
+                    :disabled="selectedCount === 0 || working"
+                    class="px-4 py-2 text-sm font-medium text-white rounded-lg bg-error-500 hover:bg-error-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Unblock<span x-show="selectedCount > 0" x-text="` (${selectedCount})`"></span>
+                  </button>
+                </div>
+
                 <!-- Table -->
-                <div x-show="!loading && blockedDomains.length > 0" class="overflow-x-auto">
+                <div class="overflow-x-auto">
                   <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
                       <tr>
+                        <th scope="col" class="w-10 px-4 py-3.5"></th>
                         <th
                           scope="col"
                           class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
@@ -124,8 +155,16 @@
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-                      <template x-for="domain in blockedDomains" :key="domain.domain + domain.context">
-                        <tr>
+                      <template x-for="(domain, i) in filteredDomains" :key="rowKey(domain)">
+                        <tr @click="toggle(domain, i, $event)" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td class="w-10 px-4 py-4">
+                            <input
+                              type="checkbox"
+                              :checked="!!selected[rowKey(domain)]"
+                              @click.stop="toggle(domain, i, $event)"
+                              class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                            />
+                          </td>
                           <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                             <span x-text="domain.domain"></span>
                           </td>
@@ -157,7 +196,7 @@
                           </td>
                           <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <button
-                              @click="unblockDomain(domain.domain, domain.context)"
+                              @click.stop="unblockDomain(domain.domain, domain.context)"
                               x-bind:style="'color: #ef4444;'"
                               @mouseover="$event.target.style.color = '#f87171'"
                               @mouseout="$event.target.style.color = '#ef4444'"
@@ -167,8 +206,12 @@
                           </td>
                         </tr>
                       </template>
+                      <tr x-show="filteredDomains.length === 0">
+                        <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">No domains match the filter.</td>
+                      </tr>
                     </tbody>
                   </table>
+                </div>
                 </div>
               </div>
             </div>
@@ -191,7 +234,11 @@
           sidebarToggle: false,
           scrollTop: false,
           loading: true,
+          working: false,
           blockedDomains: [],
+          domainFilter: '',
+          selected: {},
+          lastClickedIndex: null,
 
           init() {
             this.fetchBlockedDomains();
@@ -236,6 +283,13 @@
                 // If domains are also the same, sort by context
                 return a.context.localeCompare(b.context);
               });
+
+              // Drop selections for blocks that expired or were removed.
+              const current = {};
+              for (const d of this.blockedDomains) {
+                if (this.selected[this.rowKey(d)]) current[this.rowKey(d)] = d;
+              }
+              this.selected = current;
             } catch (error) {
               console.error('Error fetching blocked domains:', error);
             } finally {
@@ -261,6 +315,74 @@
             } catch (error) {
               console.error('Error unblocking domain:', error);
               alert('Failed to unblock domain. Please try again.');
+            }
+          },
+
+          get filteredDomains() {
+            const filter = this.domainFilter.trim().toLowerCase();
+            if (!filter) return this.blockedDomains;
+            return this.blockedDomains.filter(d => d.domain.toLowerCase().includes(filter));
+          },
+
+          get selectedCount() {
+            return Object.keys(this.selected).length;
+          },
+
+          rowKey(d) {
+            return `${d.domain}|${d.context}`;
+          },
+
+          toggle(domain, index, event) {
+            const select = !this.selected[this.rowKey(domain)];
+            if (event.shiftKey && this.lastClickedIndex !== null) {
+              const start = Math.min(this.lastClickedIndex, index);
+              const end = Math.max(this.lastClickedIndex, index);
+              for (const d of this.filteredDomains.slice(start, end + 1)) {
+                this.setSelected(d, select);
+              }
+            } else {
+              this.setSelected(domain, select);
+            }
+            this.lastClickedIndex = index;
+          },
+
+          setSelected(d, select) {
+            if (select) {
+              this.selected[this.rowKey(d)] = d;
+            } else {
+              delete this.selected[this.rowKey(d)];
+            }
+          },
+
+          selectAllFiltered() {
+            this.filteredDomains.forEach(d => this.setSelected(d, true));
+          },
+
+          async unblockSelected() {
+            const chosen = Object.values(this.selected);
+            if (chosen.length === 0) return;
+            const what = chosen.length === 1 ? `"${chosen[0].domain}" for ${chosen[0].contextLabel}` : `${chosen.length} blocked domain contexts`;
+            if (!confirm(`Unblock ${what}?`)) return;
+
+            this.working = true;
+            const failed = [];
+            for (const d of chosen) {
+              try {
+                const url = `/api/v1/blocked-domains/${encodeURIComponent(d.domain)}?context=${d.context}`;
+                const response = await fetch(url, { method: 'DELETE' });
+                if (!response.ok) {
+                  failed.push(`${d.domain} (${d.contextLabel})`);
+                }
+              } catch (error) {
+                failed.push(`${d.domain} (${d.contextLabel})`);
+              }
+            }
+            this.working = false;
+            this.selected = {};
+            this.lastClickedIndex = null;
+            await this.fetchBlockedDomains();
+            if (failed.length > 0) {
+              alert(`Failed to unblock: ${failed.join(', ')}`);
             }
           },
 

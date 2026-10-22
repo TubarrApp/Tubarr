@@ -28,7 +28,7 @@ func withDefaultFilenameSet(v *models.Video, cu *models.ChannelURL, ops []string
 	if len(ops) == 0 && v.Overrides == nil && abstractions.IsSet(keys.MFilenameOps) {
 		ops = abstractions.GetStringSlice(keys.MFilenameOps)
 	}
-	parsed, err := parsing.ParseFilenameOps(ops)
+	parsed, _, err := sharedparsing.ParseFilenameOps(ops) // Global ops go to Metarr as written, channel URLs and all.
 	if err != nil {
 		return ops // Metarr reports the invalid op.
 	}

@@ -23,9 +23,9 @@ import (
 // TestThumbnailUpload tests uploading, serving and cleaning up Download As thumbnails.
 func TestThumbnailUpload(t *testing.T) {
 	setupFuzzServer(t)
-	oldDir := paths.ThumbnailDir
-	paths.ThumbnailDir = filepath.Join(t.TempDir(), "thumbnails")
-	t.Cleanup(func() { paths.ThumbnailDir = oldDir })
+	oldDir := paths.UploadedThumbnailDir
+	paths.UploadedThumbnailDir = filepath.Join(t.TempDir(), "thumbnails")
+	t.Cleanup(func() { paths.UploadedThumbnailDir = oldDir })
 
 	form := url.Values{
 		"name":                           {"Thumbnail Channel"},
@@ -88,7 +88,7 @@ func TestThumbnailUpload(t *testing.T) {
 	}
 
 	png := savedPath(upload(videoID, []byte("\x89PNG\r\n\x1a\n rest of image")))
-	if png != filepath.Join(paths.ThumbnailDir, fmt.Sprintf("%d.png", videoID)) {
+	if png != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.png", videoID)) {
 		t.Errorf("PNG saved to %q", png)
 	}
 	jpg := savedPath(upload(videoID, []byte("\xFF\xD8\xFF\xE0 rest of image")))
@@ -104,7 +104,7 @@ func TestThumbnailUpload(t *testing.T) {
 
 	// A thumbnail must exist, and can't be stripped at the same time.
 	for name, lines := range map[string]models.OverrideLines{
-		"missing file":     {Thumbnail: filepath.Join(paths.ThumbnailDir, "nope.png")},
+		"missing file":     {Thumbnail: filepath.Join(paths.UploadedThumbnailDir, "nope.png")},
 		"set and stripped": {Thumbnail: jpg, StripThumbnail: true},
 	} {
 		if _, err := parseOverrideLines(&lines, nil); err == nil {
@@ -120,7 +120,7 @@ func TestThumbnailUpload(t *testing.T) {
 	if err := s.VideoStore().SetVideoOverrides([]int64{videoID}, o); err != nil {
 		t.Fatal(err)
 	}
-	orphan := filepath.Join(paths.ThumbnailDir, "424242.png")
+	orphan := filepath.Join(paths.UploadedThumbnailDir, "424242.png")
 	if err := os.WriteFile(orphan, []byte("png"), 0o600); err != nil {
 		t.Fatal(err)
 	}

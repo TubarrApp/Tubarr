@@ -196,6 +196,7 @@
                     </p>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                       Blocking <span class="font-semibold text-brand-500 dark:text-brand-400" x-text="blockedDomainContextsCount"></span> domain context<span x-show="blockedDomainContextsCount !== 1">s</span>
+                      <button x-show="blockedDomainContextsCount > 0" @click="unblockAllDomains()" class="ml-2 text-error-600 hover:text-error-500 dark:text-error-500">(unblock all)</button>
                     </p>
                   </div>
                   <div class="flex items-center gap-2">
@@ -779,6 +780,7 @@
           togglingPause: null,
           actionsMenuOpen: null,
           blockedDomainContextsCount: 0,
+          blockedDomainNames: [],
           crawlConcurrency: 0,
           savingCrawl: false,
           crawlSaved: false,
@@ -893,6 +895,7 @@
               }
 
               const blockedDomains = await response.json();
+              this.blockedDomainNames = blockedDomains.map(d => d.domain);
 
               // Count total contexts across all domains
               let totalContexts = 0;
@@ -906,6 +909,31 @@
             } catch (err) {
               console.error('Error loading blocked domains count:', err);
               this.blockedDomainContextsCount = 0;
+            }
+          },
+
+          async unblockAllDomains() {
+            const n = this.blockedDomainContextsCount;
+            if (!confirm(`Unblock all ${n} blocked domain context${n !== 1 ? 's' : ''}?`)) {
+              return;
+            }
+
+            // No context parameter unblocks every context for the domain.
+            const failed = [];
+            for (const domain of this.blockedDomainNames) {
+              try {
+                const response = await fetch(`/api/v1/blocked-domains/${encodeURIComponent(domain)}`, { method: 'DELETE' });
+                if (!response.ok) {
+                  failed.push(domain);
+                }
+              } catch (err) {
+                failed.push(domain);
+              }
+            }
+
+            await this.loadBlockedDomainsCount();
+            if (failed.length > 0) {
+              alert(`Failed to unblock: ${failed.join(', ')}`);
             }
           },
 

@@ -3,9 +3,11 @@ package models
 import (
 	"cmp"
 	"slices"
+	"tubarr/internal/domain/logger"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedmodels"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // DomainLimit holds a domain's concurrent download and crawl limits (0 = unlimited).
@@ -134,6 +136,71 @@ type FilenameOps = sharedmodels.FilenameOps
 
 // MetaOps are applied to fields by Metarr.
 type MetaOps = sharedmodels.MetaOps
+
+// NonConflictingMetaOps contains meta op types which do not conflict with other writes.
+var NonConflictingMetaOps = map[string]struct{}{
+	sharedconsts.OpAppend:       {},
+	sharedconsts.OpCopyTo:       {},
+	sharedconsts.OpPrefix:       {},
+	sharedconsts.OpReplace:      {},
+	sharedconsts.OpRegexReplace: {},
+	sharedconsts.OpKeepAfter:    {},
+	sharedconsts.OpKeepBefore:   {},
+}
+
+// ConflictingFilenameOps contains filename op types Metarr runs only once.
+var ConflictingFilenameOps = map[string]struct{}{
+	sharedconsts.OpSet:           {},
+	sharedconsts.OpDateTag:       {},
+	sharedconsts.OpDeleteDateTag: {},
+}
+
+// FilterConflictingMetaOps removes base ops that conflict with override ops on the same field.
+func FilterConflictingMetaOps(overrides, base []MetaOps) []MetaOps {
+	overrideKeys := make(map[string]bool)
+
+	// Build conflicting key map (Field:OpType only, NOT value [otherwise conflicting keys may not match in map])
+	for _, op := range overrides {
+		if _, ok := NonConflictingMetaOps[op.OpType]; !ok {
+			overrideKeys[op.Field+":"+op.OpType] = true
+		}
+	}
+
+	result := make([]MetaOps, 0, len(base))
+	for _, op := range base {
+		_, nonConflicting := NonConflictingMetaOps[op.OpType]
+		if !overrideKeys[op.Field+":"+op.OpType] || nonConflicting {
+			result = append(result, op)
+		} else {
+			logger.Pl.D(2, "Meta op overridden: %s", sharedparsing.FormatMetaOp(op, false))
+		}
+	}
+	return result
+}
+
+// FilterConflictingFilenameOps removes base ops of a type Metarr runs once, when override ops have that type.
+func FilterConflictingFilenameOps(overrides, base []FilenameOps) []FilenameOps {
+	overrideKeys := make(map[string]bool)
+
+	// Build conflict keys
+	for _, op := range overrides {
+		if _, conflicts := ConflictingFilenameOps[op.OpType]; conflicts {
+			overrideKeys[op.OpType] = true
+		}
+	}
+
+	// Add new operations
+	result := make([]FilenameOps, 0, len(base))
+	for _, op := range base {
+		_, conflicts := ConflictingFilenameOps[op.OpType]
+		if !overrideKeys[op.OpType] || !conflicts {
+			result = append(result, op)
+		} else {
+			logger.Pl.D(2, "Filename op overridden: %s", sharedparsing.FormatFilenameOp(op, false))
+		}
+	}
+	return result
+}
 
 // ChildSettingsMatchParent checks if the child Settings are empty/mismatch the parent on each entry.
 func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {

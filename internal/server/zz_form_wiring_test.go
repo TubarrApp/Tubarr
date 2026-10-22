@@ -836,6 +836,19 @@ func pageRequests() []pageRequest {
 				t.Error("domain is still blocked")
 			}
 		}},
+		{path: "/api/v1/blocked-domains/{}", replay: func(t *testing.T) {
+			for _, blockCtx := range []vars.BlockContext{vars.BlockContextCookie, vars.BlockContextAuth} {
+				if err := blocking.BlockDomain(fuzzServer.db, "wiring.example", blockCtx); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if w := sendRequest(t, del, "/api/v1/blocked-domains/wiring.example", "", ""); w.Code != http.StatusOK {
+				t.Fatalf("unblocking all contexts = %d %s", w.Code, w.Body.String())
+			}
+			if _, ok := blocking.GetAllBlockedDomains()["wiring.example"]; ok {
+				t.Error("domain is still blocked")
+			}
+		}},
 		{path: "/api/v1/channels/{}/{}", keys: []string{"stop-queue", "abort"}, replay: func(t *testing.T) {
 			routed(post, "/api/v1/channels/1/stop-queue", http.StatusConflict)(t) // Routed, with nothing running.
 			routed(post, "/api/v1/channels/1/abort", http.StatusConflict)(t)

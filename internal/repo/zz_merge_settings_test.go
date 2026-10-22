@@ -91,15 +91,20 @@ func TestMergeSettingsInheritsAll(t *testing.T) {
 	}
 }
 
-// TestMergeSettingsKeepsOwn tests a channel URL keeps the settings it sets itself.
+// TestMergeSettingsKeepsOwn tests a channel URL keeps the settings it sets itself, its lists added to the channel's.
 func TestMergeSettingsKeepsOwn(t *testing.T) {
 	no := false
-	ownFilters := []models.Filters{{Field: "title", FilterType: "omits", Value: "dog", MustAny: "any"}}
-	child := &models.Settings{VideoDir: "/own", Retries: 5, Filters: ownFilters, UseGlobalCookies: &no, Paused: true}
+	ownFilter := models.Filters{Field: "title", FilterType: "omits", Value: "dog", MustAny: "any"}
+	ownMove := models.MetaFilterMoveOps{Field: "title", Value: "dog", OutputDir: "/dogs"}
+	ownCodecs := []string{"vp9"}
+	child := &models.Settings{VideoDir: "/own", Retries: 5, Filters: []models.Filters{ownFilter}, MetaFilterMoveOps: []models.MetaFilterMoveOps{ownMove},
+		YTDLPPreferredVideoCodecs: ownCodecs, UseGlobalCookies: &no, Paused: true}
 	mergeSettings(child, fullSettings())
 
 	want := *fullSettings()
-	want.VideoDir, want.Retries, want.Filters, want.UseGlobalCookies = "/own", 5, ownFilters, &no
+	want.VideoDir, want.Retries, want.UseGlobalCookies, want.YTDLPPreferredVideoCodecs = "/own", 5, &no, ownCodecs
+	want.Filters = append(want.Filters, ownFilter)
+	want.MetaFilterMoveOps = append([]models.MetaFilterMoveOps{ownMove}, want.MetaFilterMoveOps...)
 	if !reflect.DeepEqual(*child, want) {
 		t.Errorf("merged settings differ:\ngot  %+v\nwant %+v", *child, want)
 	}
@@ -117,16 +122,56 @@ func TestMergeMetarrArgsInheritsAll(t *testing.T) {
 	}
 }
 
-// TestMergeMetarrArgsKeepsOwn tests a channel URL keeps the Metarr args it sets itself.
+// TestMergeMetarrArgsKeepsOwn tests a channel URL keeps the Metarr args it sets itself, its ops added to the channel's.
 func TestMergeMetarrArgsKeepsOwn(t *testing.T) {
-	ownOps := []models.MetaOps{{Field: "title", OpType: "prefix", OpValue: "[B] "}}
-	child := &models.MetarrArgs{OutputDir: "/own", MaxCPU: 25, MetaOps: ownOps}
+	ownOp := models.MetaOps{Field: "title", OpType: "prefix", OpValue: "[B] "}
+	ownFilenameOp := models.FilenameOps{OpType: "append", OpValue: " [B]"}
+	ownFiltered := models.FilteredMetaOps{Filters: []models.Filters{{Field: "title", FilterType: "contains", Value: "dog"}},
+		MetaOps: []models.MetaOps{{Field: "genre", OpType: "set", OpValue: "Dogs"}}}
+	ownCodecs := []string{"hevc"}
+	child := &models.MetarrArgs{OutputDir: "/own", MaxCPU: 25, MetaOps: []models.MetaOps{ownOp}, FilenameOps: []models.FilenameOps{ownFilenameOp},
+		FilteredMetaOps: []models.FilteredMetaOps{ownFiltered}, TranscodeVideoCodecs: ownCodecs}
 	mergeMetarrArgs(child, fullMetarrArgs())
 
 	want := *fullMetarrArgs()
-	want.OutputDir, want.MaxCPU, want.MetaOps = "/own", 25, ownOps
+	want.OutputDir, want.MaxCPU, want.TranscodeVideoCodecs = "/own", 25, ownCodecs
+	want.MetaOps = append(want.MetaOps, ownOp)
+	want.FilenameOps = append(want.FilenameOps, ownFilenameOp)
+	want.FilteredMetaOps = append(want.FilteredMetaOps, ownFiltered)
 	if !reflect.DeepEqual(*child, want) {
 		t.Errorf("merged Metarr args differ:\ngot  %+v\nwant %+v", *child, want)
+	}
+}
+
+// TestMergeOpsReplaceConflicting tests a channel URL's ops replace the channel's that Metarr can't run alongside them.
+func TestMergeOpsReplaceConflicting(t *testing.T) {
+	parent := &models.MetarrArgs{
+		MetaOps: []models.MetaOps{
+			{Field: "artist", OpType: "set", OpValue: "Channel"},
+			{Field: "title", OpType: "append", OpValue: " [C]"},
+		},
+		FilenameOps: []models.FilenameOps{
+			{OpType: "set", OpValue: "{{title}}"},
+			{OpType: "prefix", OpValue: "[C] "},
+		},
+	}
+	child := &models.MetarrArgs{
+		MetaOps:     []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "URL"}, {Field: "title", OpType: "append", OpValue: " [U]"}},
+		FilenameOps: []models.FilenameOps{{OpType: "set", OpValue: "{{fulltitle}}"}},
+	}
+	mergeMetarrArgs(child, parent)
+
+	wantMeta := []models.MetaOps{
+		{Field: "title", OpType: "append", OpValue: " [C]"},
+		{Field: "artist", OpType: "set", OpValue: "URL"},
+		{Field: "title", OpType: "append", OpValue: " [U]"},
+	}
+	wantFilename := []models.FilenameOps{{OpType: "prefix", OpValue: "[C] "}, {OpType: "set", OpValue: "{{fulltitle}}"}}
+	if !reflect.DeepEqual(child.MetaOps, wantMeta) {
+		t.Errorf("meta ops = %+v, want %+v", child.MetaOps, wantMeta)
+	}
+	if !reflect.DeepEqual(child.FilenameOps, wantFilename) {
+		t.Errorf("filename ops = %+v, want %+v", child.FilenameOps, wantFilename)
 	}
 }
 

@@ -208,7 +208,7 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 
 ## Configuration Highlights
 
-- **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's.
+- **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's. Its filters, move ops and filename/meta ops (filtered or not) are added to the channel's instead, with the URL's op used where both set the same thing.
 - **Metarr args**: filename/meta operations, filtered operations, metadata-based move rules, FFmpeg transcode settings, metadata file deletion, per-URL output directories.
 - **Notifications**: URLs called when new videos are downloaded, for every channel URL or just one. On the CLI and in config files, entries are `NotifyURL` or `ChannelURL|NotifyURL`. The web UI picks the channel URL from a list.
 - **Global settings**: crawl concurrency, global and per-domain download limits, FlareSolverr URL, and custom site scraping rules (`--scrape-config-file`), also editable on the web UI's Settings page.

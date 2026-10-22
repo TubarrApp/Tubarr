@@ -461,7 +461,7 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 	return count > 0
 }
 
-// mergeSettings fills a channel URL's unset settings from the channel's. Pausing is per URL, so never inherited.
+// mergeSettings fills a channel URL's unset settings from the channel's, adding to its filters and move ops. Pausing isn't inherited.
 func mergeSettings(u, ch *models.Settings) {
 	if ch == nil {
 		return
@@ -480,9 +480,9 @@ func mergeSettings(u, ch *models.Settings) {
 	u.ExtraYTDLPVideoArgs = cmp.Or(u.ExtraYTDLPVideoArgs, ch.ExtraYTDLPVideoArgs)
 	u.ExtraYTDLPMetaArgs = cmp.Or(u.ExtraYTDLPMetaArgs, ch.ExtraYTDLPMetaArgs)
 	u.ExtraYTDLPCrawlArgs = cmp.Or(u.ExtraYTDLPCrawlArgs, ch.ExtraYTDLPCrawlArgs)
-	u.Filters = inheritSlice(u.Filters, ch.Filters)
+	u.Filters = slices.Concat(ch.Filters, u.Filters)
 	u.FilterFile = cmp.Or(u.FilterFile, ch.FilterFile)
-	u.MetaFilterMoveOps = inheritSlice(u.MetaFilterMoveOps, ch.MetaFilterMoveOps)
+	u.MetaFilterMoveOps = slices.Concat(u.MetaFilterMoveOps, ch.MetaFilterMoveOps) // URL's first, as the first match wins.
 	u.MetaFilterMoveOpFile = cmp.Or(u.MetaFilterMoveOpFile, ch.MetaFilterMoveOpFile)
 	u.FromDate = cmp.Or(u.FromDate, ch.FromDate)
 	u.ToDate = cmp.Or(u.ToDate, ch.ToDate)
@@ -491,20 +491,20 @@ func mergeSettings(u, ch *models.Settings) {
 	u.AutoDownload = inheritBool(u.AutoDownload, ch.AutoDownload)
 }
 
-// mergeMetarrArgs fills a channel URL's unset Metarr args from the channel's.
+// mergeMetarrArgs fills a channel URL's unset Metarr args from the channel's, adding to its op lists.
 func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	if ch == nil {
 		return
 	}
 	u.OutputExt = cmp.Or(u.OutputExt, ch.OutputExt)
-	u.FilenameOps = inheritSlice(u.FilenameOps, ch.FilenameOps)
+	u.FilenameOps = slices.Concat(models.FilterConflictingFilenameOps(u.FilenameOps, ch.FilenameOps), u.FilenameOps)
 	u.FilenameOpsFile = cmp.Or(u.FilenameOpsFile, ch.FilenameOpsFile)
-	u.FilteredFilenameOps = inheritSlice(u.FilteredFilenameOps, ch.FilteredFilenameOps)
+	u.FilteredFilenameOps = slices.Concat(ch.FilteredFilenameOps, u.FilteredFilenameOps)
 	u.FilteredFilenameOpsFile = cmp.Or(u.FilteredFilenameOpsFile, ch.FilteredFilenameOpsFile)
 	u.RenameStyle = cmp.Or(u.RenameStyle, ch.RenameStyle)
-	u.MetaOps = inheritSlice(u.MetaOps, ch.MetaOps)
+	u.MetaOps = slices.Concat(models.FilterConflictingMetaOps(u.MetaOps, ch.MetaOps), u.MetaOps)
 	u.MetaOpsFile = cmp.Or(u.MetaOpsFile, ch.MetaOpsFile)
-	u.FilteredMetaOps = inheritSlice(u.FilteredMetaOps, ch.FilteredMetaOps)
+	u.FilteredMetaOps = slices.Concat(ch.FilteredMetaOps, u.FilteredMetaOps)
 	u.FilteredMetaOpsFile = cmp.Or(u.FilteredMetaOpsFile, ch.FilteredMetaOpsFile)
 	u.OutputDir = cmp.Or(u.OutputDir, ch.OutputDir)
 	u.MetaPurge = cmp.Or(u.MetaPurge, ch.MetaPurge)

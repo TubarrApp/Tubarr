@@ -10,26 +10,37 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-// File and directory name constants.
+// File and directory name constants
 const (
-	mDir          = ".metarr"
-	tDir          = ".tubarr"
-	tDBFile       = "tubarr.db"
+	tubarrDir     = ".tubarr"
+	tubarrDBFile  = "tubarr.db"
 	tubarrLogFile = "tubarr.log"
+
+	metarrDir     = ".metarr"
 	metarrLogFile = "metarr.log"
-	benchmarkDir  = "benchmark"
-	thumbnailDir  = "thumbnails"
+
+	benchmarkDir = "benchmark"
+	uploadDir    = "uploads"
+	cacheDir     = "cache"
+	thumbnailDir = "thumbnails"
 )
 
-// File and directory path strings.
+// File and directory path strings
 var (
-	HomeMetarrDir     string
-	HomeTubarrDir     string
-	DBFilePath        string
+	HomeMetarrDir string
+	HomeTubarrDir string
+	DBFilePath    string
+	BenchmarkDir  string
+
+	// Log file paths
 	TubarrLogFilePath string
 	MetarrLogFilePath string
-	BenchmarkDir      string
-	ThumbnailDir      string // Thumbnails uploaded with Download As, made on the first upload.
+
+	// Uploads
+	UploadedThumbnailDir string
+
+	// Tubarr cache elements
+	CacheThumbnailDir string
 )
 
 // InitProgFilesDirs initializes necessary program directories and filepaths.
@@ -40,7 +51,7 @@ func InitProgFilesDirs() error {
 	}
 
 	// Home Tubarr dir ~/.tubarr
-	HomeTubarrDir = filepath.Join(UserHomeDir, tDir)
+	HomeTubarrDir = filepath.Join(UserHomeDir, tubarrDir)
 	if _, err := os.Stat(HomeTubarrDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(HomeTubarrDir, sharedconsts.PermsHomeProgDir); err != nil {
 			return fmt.Errorf("failed to make directories: %w", err)
@@ -48,7 +59,7 @@ func InitProgFilesDirs() error {
 	}
 
 	// Home Metarr dir ~/.metarr
-	HomeMetarrDir = filepath.Join(UserHomeDir, mDir)
+	HomeMetarrDir = filepath.Join(UserHomeDir, metarrDir)
 	if _, err := os.Stat(HomeMetarrDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(HomeMetarrDir, sharedconsts.PermsHomeProgDir); err != nil {
 			return fmt.Errorf("failed to make directories: %w", err)
@@ -56,13 +67,18 @@ func InitProgFilesDirs() error {
 	}
 
 	// Main files
-	DBFilePath = filepath.Join(HomeTubarrDir, tDBFile)
+	DBFilePath = filepath.Join(HomeTubarrDir, tubarrDBFile)
 	TubarrLogFilePath = filepath.Join(HomeTubarrDir, tubarrLogFile)
 	MetarrLogFilePath = filepath.Join(HomeMetarrDir, metarrLogFile)
 
-	// Benchmark directory, made once flags are parsed if benchmarking.
+	// Benchmark directory, made once flags are parsed if benchmarking
 	BenchmarkDir = filepath.Join(HomeTubarrDir, benchmarkDir)
-	ThumbnailDir = filepath.Join(HomeTubarrDir, thumbnailDir)
+
+	// Uploads directory for holding files uploaded by the user
+	UploadedThumbnailDir = filepath.Join(HomeTubarrDir, uploadDir, thumbnailDir)
+
+	// Cache directory holding items cached by Tubarr
+	CacheThumbnailDir = filepath.Join(HomeTubarrDir, cacheDir, thumbnailDir)
 
 	return nil
 }

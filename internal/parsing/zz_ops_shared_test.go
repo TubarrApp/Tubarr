@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 
@@ -29,7 +28,7 @@ func TestMetaOpsRoundTripThroughTubarr(t *testing.T) {
 		`title:date-tag:prefix:md`,
 		`title:set:cats\: the sequel`,
 		`description:append:back\\slash`,
-		`https://example.com|title:prefix:[CATS] `,
+		`title:prefix:[CATS] `,
 	}
 
 	parsed, err := parsing.ParseMetaOps(in)
@@ -126,37 +125,44 @@ func TestUnescapedPipeInValue(t *testing.T) {
 	}
 }
 
-// TestFilteredOpsRoundTripWithChannelURL covers a filtered entry scoped to a channel.
-// Tubarr's own serializer emits the "channelURL|filter||ops" form, so failing to parse
-// it back meant a channel-scoped filtered operation could be saved but never read.
-func TestFilteredOpsRoundTripWithChannelURL(t *testing.T) {
-	const chanURL = "https://example.com"
-
-	meta := models.FilteredMetaOps{
-		Filters: []models.Filters{{ChannelURL: chanURL, Field: "title", FilterType: "contains", Value: "cat"}},
-		MetaOps: []models.MetaOps{{Field: "director", OpType: "set", OpValue: "Mr Cat"}},
+// TestChannelURLRejected tests that every op and filter parser rejects an entry scoped to a channel URL.
+func TestChannelURLRejected(t *testing.T) {
+	const u = "https://example.com/@cats"
+	parsers := map[string]func(string) error{
+		"meta": func(s string) error {
+			_, err := parsing.ParseMetaOps([]string{s})
+			return err
+		},
+		"filename": func(s string) error {
+			_, err := parsing.ParseFilenameOps([]string{s})
+			return err
+		},
+		"filter": func(s string) error {
+			_, err := parsing.ParseFilterOps([]string{s}, true)
+			return err
+		},
+		"filtered meta": func(s string) error {
+			_, err := parsing.ParseFilteredMetaOps([]string{s})
+			return err
+		},
+		"filtered filename": func(s string) error {
+			_, err := parsing.ParseFilteredFilenameOps([]string{s})
+			return err
+		},
 	}
-
-	serialized := models.FilteredMetaOpsToSlice(meta)
-	if len(serialized) != 1 {
-		t.Fatalf("serialized to %q, want one entry", serialized)
+	entries := map[string][]string{
+		"meta":              {u + "|title:set:Cats", u + "||title:set:Cats"},
+		"filename":          {u + "|prefix:[CATS] ", u + "||prefix:[CATS] "},
+		"filter":            {u + "|title:contains:cat:must", u + "||title:contains:cat:must"},
+		"filtered meta":     {u + "|title:contains:cat||genre:set:Cats", "title:contains:cat||" + u + "|genre:set:Cats", u + "||title:contains:cat||genre:set:Cats"},
+		"filtered filename": {u + "|title:contains:cat||prefix:[CATS] ", "title:contains:cat||" + u + "|prefix:[CATS] "},
 	}
-
-	got, err := parsing.ParseFilteredMetaOps(serialized)
-	if err != nil {
-		t.Fatalf("ParseFilteredMetaOps(%q): %v", serialized, err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("parsed %d entries, want 1", len(got))
-	}
-	if len(got[0].Filters) != 1 || got[0].Filters[0].Field != "title" || got[0].Filters[0].Value != "cat" {
-		t.Errorf("filters = %+v", got[0].Filters)
-	}
-	if len(got[0].MetaOps) != 1 || got[0].MetaOps[0].Field != "director" || got[0].MetaOps[0].OpValue != "Mr Cat" {
-		t.Errorf("meta ops = %+v", got[0].MetaOps)
-	}
-	if got[0].Filters[0].ChannelURL != chanURL || got[0].MetaOps[0].ChannelURL != chanURL {
-		t.Errorf("channel URL not applied: filter=%q op=%q", got[0].Filters[0].ChannelURL, got[0].MetaOps[0].ChannelURL)
+	for name, parse := range parsers {
+		for _, entry := range entries[name] {
+			if err := parse(entry); err == nil {
+				t.Errorf("%s parser accepted %q", name, entry)
+			}
+		}
 	}
 }
 
@@ -172,30 +178,5 @@ func TestFilteredOpsWithoutChannelURL(t *testing.T) {
 	}
 	if got[0].Filters[0].ChannelURL != "" || got[0].MetaOps[0].ChannelURL != "" {
 		t.Errorf("no channel URL expected, got filter=%q op=%q", got[0].Filters[0].ChannelURL, got[0].MetaOps[0].ChannelURL)
-	}
-}
-
-// TestFilteredFilenameOpsRoundTripWithChannelURL mirrors the meta case for filenames.
-func TestFilteredFilenameOpsRoundTripWithChannelURL(t *testing.T) {
-	const chanURL = "https://example.com"
-
-	f := models.FilteredFilenameOps{
-		Filters:     []models.Filters{{ChannelURL: chanURL, Field: "title", FilterType: "contains", Value: "cat"}},
-		FilenameOps: []models.FilenameOps{{OpType: "prefix", OpValue: "[CATS] "}},
-	}
-
-	serialized := models.FilteredFilenameOpsToSlice(f)
-	got, err := parsing.ParseFilteredFilenameOps(serialized)
-	if err != nil {
-		t.Fatalf("ParseFilteredFilenameOps(%q): %v", serialized, err)
-	}
-	if len(got) != 1 || len(got[0].FilenameOps) != 1 {
-		t.Fatalf("got %+v", got)
-	}
-	if got[0].FilenameOps[0].OpValue != "[CATS] " {
-		t.Errorf("filename op = %+v", got[0].FilenameOps[0])
-	}
-	if got[0].FilenameOps[0].ChannelURL != chanURL {
-		t.Errorf("channel URL not applied, got %q", got[0].FilenameOps[0].ChannelURL)
 	}
 }

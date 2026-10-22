@@ -47,11 +47,17 @@ func initializeApplication(lock bool) (store *repo.Store, db *sql.DB, progContro
 		logger.Pl.I("Reconnected %d video(s) whose channel URL had been replaced to the channel URL they match", n)
 	}
 
-	// Uploaded thumbnails are kept while a video's Download As options use them, as later Metarr runs need them.
+	// Uploaded thumbnails are kept while a video's Download As options use them, as later Metarr runs need them, and
+	// cached ones while a video's crawled or Download As thumbnail URL is theirs.
 	if overrides, err := store.VideoStore().ThumbnailOverrides(); err != nil {
-		logger.Pl.E("Failed to check for unused uploaded thumbnails: %v", err)
+		logger.Pl.E("Failed to check for unused uploaded and cached thumbnails: %v", err)
 	} else {
 		file.RemoveUnusedThumbnails(overrides)
+		if thumbURLs, err := store.VideoStore().ThumbnailURLs(); err != nil {
+			logger.Pl.E("Failed to check for unused cached thumbnails: %v", err)
+		} else {
+			file.RemoveUnusedCachedThumbnails(thumbURLs, overrides)
+		}
 	}
 
 	return store, db, progControl, err

@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/parsing"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/spf13/viper"
 )
 
@@ -28,15 +29,16 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
 
-	metaOps, err := parsing.ParseMetaOps([]string{ownURL + "|title:prefix:[A] ", otherURL + "|title:prefix:[B] ", "artist:set:Cats"})
+	// Scoped ops as saved before channel URLs were taken from the URL's own settings.
+	metaOps, _, err := sharedparsing.ParseMetaOps([]string{ownURL + "|title:prefix:[A] ", otherURL + "|title:prefix:[B] ", "artist:set:Cats"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	filenameOps, err := parsing.ParseFilenameOps([]string{otherURL + "|date-tag:prefix:ymd"})
+	filenameOps, _, err := sharedparsing.ParseFilenameOps([]string{otherURL + "|date-tag:prefix:ymd"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	filteredMetaOps, err := parsing.ParseFilteredMetaOps([]string{ownURL + "|title:contains:cat||genre:set:Cats", otherURL + "|title:contains:dog||genre:set:Dogs"})
+	filteredMetaOps, _, err := sharedparsing.ParseFilteredMetaOps([]string{ownURL + "|title:contains:cat||genre:set:Cats", otherURL + "|title:contains:dog||genre:set:Dogs"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,8 +86,7 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	}
 }
 
-// TestFileOverrideLines tests a Download As box gets an ops file's ops for its channel URL, without their channel URL
-// prefix, with template tags filled in the path.
+// TestFileOverrideLines tests a Download As box gets an ops file's ops, with template tags filled in the path.
 func TestFileOverrideLines(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	dir := filepath.Join(t.TempDir(), "Test")
@@ -107,8 +108,8 @@ func TestFileOverrideLines(t *testing.T) {
 		box, content string
 		want         []string
 	}{
-		{"meta_ops", ownURL + "|title:prefix:[A] \n" + otherURL + "|title:prefix:[B] \nartist:set:Cats\n", []string{"title:prefix:[A] ", "artist:set:Cats"}},
-		{"filtered_meta_ops", "title:contains:cat||genre:set:Cats\n" + otherURL + "|title:contains:dog||genre:set:Dogs\n", []string{"title:contains:cat||genre:set:Cats"}},
+		{"meta_ops", "title:prefix:[A] \nartist:set:Cats\n", []string{"title:prefix:[A] ", "artist:set:Cats"}},
+		{"filtered_meta_ops", "title:contains:cat||genre:set:Cats\n", []string{"title:contains:cat||genre:set:Cats"}},
 		{"filename_ops", "date-tag:prefix:ymd\n", []string{"date-tag:prefix:ymd"}},
 		{"filtered_filename_ops", "title:contains:cat||prefix:[Cats] \n", []string{"title:contains:cat||prefix:[Cats] "}},
 	} {
@@ -120,6 +121,9 @@ func TestFileOverrideLines(t *testing.T) {
 
 	if _, err := FileOverrideLines("meta_ops", write("bad.txt", "artist:bogus:x\n"), cu, dp); err == nil {
 		t.Error("expected an error for an invalid op")
+	}
+	if _, err := FileOverrideLines("meta_ops", write("scoped.txt", ownURL+"|title:prefix:[A] \n"), cu, dp); err == nil {
+		t.Error("expected an error for an op with a channel URL")
 	}
 	if _, err := FileOverrideLines("meta_ops", filepath.Join(dir, "missing.txt"), cu, dp); err == nil {
 		t.Error("expected an error for a missing file")

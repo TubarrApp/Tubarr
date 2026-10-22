@@ -35,12 +35,12 @@ func ChannelURLOverrideLines(cu *models.ChannelURL, dirParser *parsing.Directory
 	}
 
 	// Channel URL ops, else the global ones, as Metarr is given them.
-	metaOps := slices.Concat(fileMetaOps, filterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps))
+	metaOps := slices.Concat(fileMetaOps, models.FilterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps))
 	metaOpLines := getDedupedMetaOpStrings(filterMetaOpsByChannel(metaOps, cu.URL))
 	if len(metaOpLines) == 0 {
 		metaOpLines = globalOpLines(keys.MMetaOps, cu.URL)
 	}
-	filenameOps := slices.Concat(fileFilenameOps, filterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps))
+	filenameOps := slices.Concat(fileFilenameOps, models.FilterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps))
 	filenameOpLines := getDedupedFilenameOpStrings(filterFilenameOpsByChannel(filenameOps, cu.URL))
 	if len(filenameOpLines) == 0 {
 		filenameOpLines = globalOpLines(keys.MFilenameOps, cu.URL)

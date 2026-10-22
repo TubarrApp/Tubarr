@@ -224,7 +224,7 @@
                       <!-- Auto Download Override -->
                       <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">New videos:</span>
-                        <select x-model="urlEntry.custom.auto_download" class="max-w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                        <select x-model="urlEntry.custom.auto_download" class="max-w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                           <option value="">Use channel setting</option>
                           <option value="true">Download automatically</option>
                           <option value="false">List as available to choose from</option>
@@ -241,15 +241,15 @@
                         <!-- Per-URL Tabs -->
                         <div class="border-b border-gray-300 dark:border-gray-600">
                           <nav class="flex flex-wrap gap-1">
-                            <button type="button" @click="urlTab = 'overview'" :class="urlTab === 'overview' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs font-medium rounded-t">Overview</button>
-                            <button type="button" @click="urlTab = 'basic'" :class="urlTab === 'basic' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Basic</button>
-                            <button type="button" @click="urlTab = 'advanced'" :class="urlTab === 'advanced' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Advanced</button>
-                            <button type="button" @click="urlTab = 'metarr'" :class="urlTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-1 px-2 border-b-2 text-xs">Post-processing</button>
+                            <button type="button" @click="urlTab = 'overview'" :class="urlTab === 'overview' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm font-medium rounded-t">Overview</button>
+                            <button type="button" @click="urlTab = 'basic'" :class="urlTab === 'basic' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm">Basic</button>
+                            <button type="button" @click="urlTab = 'advanced'" :class="urlTab === 'advanced' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm">Advanced</button>
+                            <button type="button" @click="urlTab = 'metarr'" :class="urlTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm">Post-processing</button>
                           </nav>
                         </div>
 
                         <!-- Overview Tab -->
-                        <div x-show="urlTab === 'overview'" class="text-xs text-gray-700 dark:text-gray-300 space-y-2">
+                        <div x-show="urlTab === 'overview'" class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
                           <p class="font-medium">This URL can override ANY channel setting.</p>
                           <ul class="list-disc list-inside space-y-1 ml-2">
                             <li><strong>Basic:</strong> Directories, concurrency, retries, filesize, filters</li>
@@ -257,60 +257,61 @@
                             <li><strong>Post-processing:</strong> Metarr output directory, transcoding, meta/filename operations</li>
                           </ul>
                           <p class="mt-2 text-brand-600 dark:text-brand-400">💡 Any field left empty will use the channel setting.</p>
+                          <p class="text-brand-600 dark:text-brand-400">💡 Filters and operations are added to the channel's. Where both set the same thing, such as a field's value or the filename, this URL's is used.</p>
                         </div>
 
                         <!-- Basic Tab for This URL -->
-                        <div x-show="urlTab === 'basic'" class="space-y-2">
-                          <div class="grid grid-cols-2 gap-2">
+                        <div x-show="urlTab === 'basic'" class="space-y-4">
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Directory</label>
-                              <input type="text" x-model="urlEntry.custom.video_directory" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Video Directory</label>
+                              <input type="text" x-model="urlEntry.custom.video_directory" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">JSON Directory</label>
-                              <input type="text" x-model="urlEntry.custom.json_directory" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">JSON Directory</label>
+                              <input type="text" x-model="urlEntry.custom.json_directory" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Concurrency</label>
-                              <input type="number" x-model.number="urlEntry.custom.max_concurrency" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max Concurrency</label>
+                              <input type="number" x-model.number="urlEntry.custom.max_concurrency" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Crawl Frequency (min)</label>
-                              <input type="number" x-model.number="urlEntry.custom.crawl_freq" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Crawl Frequency (min)</label>
+                              <input type="number" x-model.number="urlEntry.custom.crawl_freq" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Download Retries</label>
-                              <input type="number" x-model.number="urlEntry.custom.download_retries" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Download Retries</label>
+                              <input type="number" x-model.number="urlEntry.custom.download_retries" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Filesize</label>
-                              <input type="text" x-model="urlEntry.custom.max_filesize" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max Filesize</label>
+                              <input type="text" x-model="urlEntry.custom.max_filesize" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">From Date</label>
-                              <input type="text" x-model="urlEntry.custom.from_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">From Date</label>
+                              <input type="text" x-model="urlEntry.custom.from_date" placeholder="YYYYMMDD" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">To Date</label>
-                              <input type="text" x-model="urlEntry.custom.to_date" placeholder="YYYYMMDD" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">To Date</label>
+                              <input type="text" x-model="urlEntry.custom.to_date" placeholder="YYYYMMDD" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filter File</label>
-                              <input type="text" x-model="urlEntry.custom.filter_file" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filter File</label>
+                              <input type="text" x-model="urlEntry.custom.filter_file" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filters (one per line)</label>
-                            <textarea x-model="urlEntry.custom.filters" rows="3" placeholder="title:contains:keyword:must" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filters (one per line, added to the channel's)</label>
+                            <textarea x-model="urlEntry.custom.filters" rows="3" placeholder="title:contains:keyword:must" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                         </div>
 
                         <!-- Advanced Tab for This URL -->
-                        <div x-show="urlTab === 'advanced'" class="space-y-2">
-                          <div class="grid grid-cols-2 gap-2">
+                        <div x-show="urlTab === 'advanced'" class="space-y-4">
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">YT-DLP Output Ext</label>
-                              <select x-model="urlEntry.custom.ytdlp_output_ext" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Output Ext</label>
+                              <select x-model="urlEntry.custom.ytdlp_output_ext" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use channel setting</option>
                                 <option value="mp4">mp4</option>
                                 <option value="mkv">mkv</option>
@@ -321,20 +322,20 @@
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Cookies From Browser</label>
-                              <input type="text" x-model="urlEntry.custom.cookies_from_browser" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Cookies From Browser</label>
+                              <input type="text" x-model="urlEntry.custom.cookies_from_browser" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Use Global Cookies</label>
-                              <select x-model="urlEntry.custom.use_global_cookies" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Use Global Cookies</label>
+                              <select x-model="urlEntry.custom.use_global_cookies" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use channel setting</option>
                                 <option value="false">No</option>
                                 <option value="true">Yes</option>
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader</label>
-                              <select x-model="urlEntry.custom.external_downloader" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">External Downloader</label>
+                              <select x-model="urlEntry.custom.external_downloader" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use channel setting</option>
                                 <option value="native">yt-dlp built-in</option>
                                 <option value="aria2c">aria2c</option>
@@ -349,50 +350,50 @@
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">External Downloader Args</label>
-                              <input type="text" x-model="urlEntry.custom.external_downloader_args" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">External Downloader Args</label>
+                              <input type="text" x-model="urlEntry.custom.external_downloader_args" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Meta Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Meta Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Crawl Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_crawl_args" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Crawl Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_crawl_args" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">YT-DLP Preferred Video Codecs (one per line, in order of priority)</label>
-                            <textarea x-model="urlEntry.custom.ytdlp_preferred_video_codecs" rows="2" placeholder="vp9&#10;av1&#10;h264" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Preferred Video Codecs (one per line, in order of priority)</label>
+                            <textarea x-model="urlEntry.custom.ytdlp_preferred_video_codecs" rows="2" placeholder="vp9&#10;av1&#10;h264" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">YT-DLP Preferred Audio Codecs (one per line, in order of priority)</label>
-                            <textarea x-model="urlEntry.custom.ytdlp_preferred_audio_codecs" rows="2" placeholder="opus&#10;aac&#10;vorbis" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Preferred Audio Codecs (one per line, in order of priority)</label>
+                            <textarea x-model="urlEntry.custom.ytdlp_preferred_audio_codecs" rows="2" placeholder="opus&#10;aac&#10;vorbis" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                         </div>
 
                         <!-- Metarr Tab for This URL -->
-                        <div x-show="urlTab === 'metarr'" class="space-y-2">
-                          <div class="grid grid-cols-2 gap-2">
+                        <div x-show="urlTab === 'metarr'" class="space-y-4">
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="col-span-2">
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Directory</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_output_directory" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Output Directory</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_output_directory" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Move Operations File</label>
-                              <input type="text" x-model="urlEntry.custom.move_ops_file" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Move Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.move_ops_file" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Move Operations (one per line)</label>
-                              <textarea x-model="urlEntry.custom.move_ops" rows="2" placeholder="title:contains:keyword||/path" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Move Operations (one per line, checked before the channel's)</label>
+                              <textarea x-model="urlEntry.custom.move_ops" rows="2" placeholder="title:contains:keyword||/path" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
-                              <select x-model="urlEntry.custom.metarr_purge_metafile" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
+                              <select x-model="urlEntry.custom.metarr_purge_metafile" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use channel setting</option>
                                 <option value="json">JSON</option>
                                 <option value="nfo">NFO</option>
@@ -400,8 +401,8 @@
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
-                              <select x-model="urlEntry.custom.metarr_output_ext" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Output Extension</label>
+                              <select x-model="urlEntry.custom.metarr_output_ext" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use channel setting</option>
                                 <option value="avi">avi</option>
                                 <option value="flv">flv</option>
@@ -412,8 +413,8 @@
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Rename Style</label>
-                              <select x-model="urlEntry.custom.metarr_rename_style" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Rename Style</label>
+                              <select x-model="urlEntry.custom.metarr_rename_style" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use channel setting</option>
                                 <option value="spaces">Spaces</option>
                                 <option value="underscores">Underscores</option>
@@ -421,21 +422,21 @@
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Concurrency</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" min="0" :placeholder="urlPostProcessHint()" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Concurrency</label>
+                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" min="0" :placeholder="urlPostProcessHint()" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                               <p x-show="capNote(urlEntry.custom.metarr_concurrency, globalPostProcessLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(urlEntry.custom.metarr_concurrency, globalPostProcessLimit)"></p>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_max_cpu_usage" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
+                              <input type="number" x-model.number="urlEntry.custom.metarr_max_cpu_usage" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Min Free Memory</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_min_free_mem" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Min Free Memory</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_min_free_mem" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
-                              <select x-model="urlEntry.custom.metarr_gpu" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
+                              <select x-model="urlEntry.custom.metarr_gpu" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="">Use channel setting</option>
                                 <option value="none">None (software)</option>
                                 <option value="auto">Auto</option>
@@ -445,73 +446,73 @@
                               </select>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Node Path</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_transcode_gpu_node" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">GPU Node Path</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_transcode_gpu_node" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
                               <textarea
                                 x-model="urlEntry.custom.metarr_transcode_video_transcode_codecs"
                                 placeholder="Use channel setting (one per line, e.g. h264:hevc or av1)"
                                 rows="2"
-                                class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
+                                class="w-full rounded-lg border px-4 py-2.5 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
                               ></textarea>
                               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., h264:hevc)</p>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Audio Transcode Codecs</label>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Audio Transcode Codecs</label>
                               <textarea
                                 x-model="urlEntry.custom.metarr_transcode_audio_codecs"
                                 placeholder="Use channel setting (one per line, e.g. aac or dts:ac3)"
                                 rows="2"
-                                class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
+                                class="w-full rounded-lg border px-4 py-2.5 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
                               ></textarea>
                               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., dts:ac3)</p>
                             </div>
                             <div>
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
-                              <input type="number" min="0" max="51" x-model="urlEntry.custom.metarr_transcode_quality" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
+                              <input type="number" min="0" max="51" x-model="urlEntry.custom.metarr_transcode_quality" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Video Filter</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_transcode_video_filter" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Transcode Video Filter</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_transcode_video_filter" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="col-span-2">
-                              <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_extra_ffmpeg_args" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_extra_ffmpeg_args" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Meta Operations File</label>
-                            <input type="text" x-model="urlEntry.custom.metarr_meta_ops_file" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Meta Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_meta_ops_file" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Meta Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" placeholder="artist:set:Value" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Meta Operations (one per line, added to the channel's)</label>
+                            <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" placeholder="artist:set:Value" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations File</label>
-                            <input type="text" x-model="urlEntry.custom.metarr_filtered_meta_ops_file" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Meta Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_filtered_meta_ops_file" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" placeholder="filter_rule||meta_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line, added to the channel's)</label>
+                            <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" placeholder="filter_rule||meta_op" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filename Operations File</label>
-                            <input type="text" x-model="urlEntry.custom.metarr_filename_ops_file" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filename Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_filename_ops_file" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filename Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" placeholder="prefix:[PREFIX] " class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filename Operations (one per line, added to the channel's)</label>
+                            <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" placeholder="prefix:[PREFIX] " class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Filename Operations File</label>
-                            <input type="text" x-model="urlEntry.custom.metarr_filtered_filename_ops_file" placeholder="Use channel setting" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Filename Operations File</label>
+                            <input type="text" x-model="urlEntry.custom.metarr_filtered_filename_ops_file" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                           <div>
-                            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line)</label>
-                            <textarea x-model="urlEntry.custom.metarr_filtered_filename_ops" rows="2" placeholder="filter_rule||filename_op" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line, added to the channel's)</label>
+                            <textarea x-model="urlEntry.custom.metarr_filtered_filename_ops" rows="2" placeholder="filter_rule||filename_op" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                         </div>
 

@@ -1080,7 +1080,8 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, r, http.StatusOK, response)
 }
 
-// handleGetThumbnail shows a video's Download As thumbnail: an image file is served, a URL redirected to.
+// handleGetThumbnail shows a video's thumbnail: its Download As image file, else its Download As or crawled URL's
+// image, from the cache.
 func (ss *serverStore) handleGetThumbnail(w http.ResponseWriter, r *http.Request) {
 	videoID, err := strconv.ParseInt(chi.URLParam(r, consts.WebParamChannelID), 10, 64)
 	if err != nil {
@@ -1088,24 +1089,44 @@ func (ss *serverStore) handleGetThumbnail(w http.ResponseWriter, r *http.Request
 		return
 	}
 	o, err := ss.vs.GetVideoOverrides(videoID)
-	if err != nil || o == nil || o.Thumbnail == "" || o.StripThumbnail {
+	if err != nil || (o != nil && o.StripThumbnail) {
 		http.NotFound(w, r)
 		return
 	}
-	if validation.IsHTTPURL(o.Thumbnail) {
-		http.Redirect(w, r, o.Thumbnail, http.StatusFound)
+
+	var thumbURL string
+	switch {
+	case o != nil && o.Thumbnail != "" && !validation.IsHTTPURL(o.Thumbnail):
+		serveThumbnailFile(w, r, o.Thumbnail)
 		return
+	case o != nil && o.Thumbnail != "":
+		thumbURL = o.Thumbnail
+	default:
+		if thumbURL, err = ss.vs.GetVideoThumbnailURL(videoID); err != nil || !validation.IsHTTPURL(thumbURL) {
+			http.NotFound(w, r)
+			return
+		}
 	}
 
-	// Only images are served, as the path is whatever was typed into Download As.
-	f, err := os.Open(o.Thumbnail)
+	path, err := file.CacheThumbnail(r.Context(), thumbURL)
+	if err != nil {
+		logger.Pl.W("Failed to cache thumbnail %q for video %d, sending the browser to it instead: %v", thumbURL, videoID, err)
+		http.Redirect(w, r, thumbURL, http.StatusFound)
+		return
+	}
+	serveThumbnailFile(w, r, path)
+}
+
+// serveThumbnailFile serves an image file, and nothing else, as the path may be whatever was typed into Download As.
+func serveThumbnailFile(w http.ResponseWriter, r *http.Request, path string) {
+	f, err := os.Open(path)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
-			logger.Pl.E("Failed to close thumbnail %q: %v", o.Thumbnail, err)
+			logger.Pl.E("Failed to close thumbnail %q: %v", path, err)
 		}
 	}()
 	head := make([]byte, 512)
@@ -1119,6 +1140,7 @@ func (ss *serverStore) handleGetThumbnail(w http.ResponseWriter, r *http.Request
 		http.NotFound(w, r)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 }
 

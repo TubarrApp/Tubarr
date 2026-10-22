@@ -21,6 +21,11 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, op := range parsed {
+		if op.ChannelURL != "" {
+			return nil, channelURLError(sharedparsing.FormatFilenameOp(op, true))
+		}
+	}
 	logger.Pl.D(1, "Parsed %d filename operations from %v", len(parsed), filenameOps)
 	return parsed, nil
 }
@@ -34,6 +39,11 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, op := range parsed {
+		if op.ChannelURL != "" {
+			return nil, channelURLError(sharedparsing.FormatMetaOp(op, true))
+		}
+	}
 	logger.Pl.D(1, "Parsed %d meta operations from %v", len(parsed), metaOps)
 	return parsed, nil
 }
@@ -46,13 +56,27 @@ func logWarnings(warnings []sharedparsing.Warning) {
 	}
 }
 
+// channelURLError rejects an entry scoped to a channel URL, which Tubarr scopes with that URL's custom settings.
+func channelURLError(entry string) error {
+	return fmt.Errorf("%q starts with a channel URL, add it to that URL's custom settings instead", entry)
+}
+
 // ParseFilterOps parses filter operation strings into models.
 //
 // Format: "title:omits:frogs:must" or "title:contains:cat"
 //
 // When requireMustAny is false, must is added automatically to each filter.
 func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error) {
-	return sharedparsing.ParseFilterOps(ops, requireMustAny)
+	filters, err := sharedparsing.ParseFilterOps(ops, requireMustAny)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range filters {
+		if f.ChannelURL != "" {
+			return nil, channelURLError(sharedparsing.FormatFilter(f, requireMustAny))
+		}
+	}
+	return filters, nil
 }
 
 // ParseNotifications parses notification strings into models.
@@ -117,7 +141,9 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 
 	m := make([]models.MetaFilterMoveOps, 0, len(ops))
 	for _, op := range ops {
-		chanURL, op := validation.CheckForOpURL(op)
+		if u, _, err := sharedparsing.SplitOpURL(op); u != "" || errors.Is(err, sharedparsing.ErrDoubledURLSeparator) {
+			return nil, channelURLError(op)
+		}
 
 		// An unescaped "||" leaves an empty part between its two '|'.
 		parts := sharedparsing.SplitUnescaped(op, '|')
@@ -135,7 +161,6 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 		}
 
 		m = append(m, models.MetaFilterMoveOps{
-			ChannelURL: chanURL,
 			Field:      filters[0].Field,
 			FilterType: filters[0].FilterType,
 			Value:      filters[0].Value,
@@ -154,6 +179,18 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 	if err != nil {
 		return nil, err
 	}
+	for _, fmo := range parsed {
+		for _, f := range fmo.Filters {
+			if f.ChannelURL != "" {
+				return nil, channelURLError(sharedparsing.FormatFilter(f, false))
+			}
+		}
+		for _, op := range fmo.MetaOps {
+			if op.ChannelURL != "" {
+				return nil, channelURLError(sharedparsing.FormatMetaOp(op, true))
+			}
+		}
+	}
 	return parsed, nil
 }
 
@@ -165,6 +202,18 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 	logWarnings(warnings)
 	if err != nil {
 		return nil, err
+	}
+	for _, ffo := range parsed {
+		for _, f := range ffo.Filters {
+			if f.ChannelURL != "" {
+				return nil, channelURLError(sharedparsing.FormatFilter(f, false))
+			}
+		}
+		for _, op := range ffo.FilenameOps {
+			if op.ChannelURL != "" {
+				return nil, channelURLError(sharedparsing.FormatFilenameOp(op, true))
+			}
+		}
 	}
 	return parsed, nil
 }

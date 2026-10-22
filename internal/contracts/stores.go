@@ -100,6 +100,7 @@ type VideoStore interface {
 
 	// Get operations.
 	GetVideoURLByID(videoID int64) (videoURL string, err error)
+	GetVideoThumbnailURL(videoID int64) (thumbURL string, err error)
 	GetVideoChannelURLID(videoID int64) (channelURLID int64, err error)
 	VideoExists(v *models.Video, channelID int64) (videoID int64, exists bool)
 	GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error)
@@ -107,6 +108,7 @@ type VideoStore interface {
 	CountFinishedVideos(ctx context.Context, channelID int64) (n int, err error)
 	GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error)
 	GetVideoOverrides(videoID int64) (*models.VideoOverrides, error)
+	ThumbnailURLs() (thumbURLs []string, err error)
 	ThumbnailOverrides() (map[int64]models.VideoOverrides, error)
 
 	// Add operations.

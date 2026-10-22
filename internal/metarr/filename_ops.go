@@ -12,12 +12,6 @@ import (
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
-// conflictingFilenameOp contains conflicting filename operations.
-var conflictingFilenameOp = map[string]struct{}{
-	sharedconsts.OpDateTag:       {},
-	sharedconsts.OpDeleteDateTag: {},
-}
-
 // loadAndMergeFilenameOps loads and merges filename ops: file ops override DB ops, then apply filtering
 func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 	// Load file ops (highest priority). An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
@@ -27,7 +21,7 @@ func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.C
 	}
 
 	// Ops from file override DB ops with same key
-	nonConflictingDBOps := filterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps)
+	nonConflictingDBOps := models.FilterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps)
 
 	// Combine
 	fileAndDBOps := slices.Concat(fileFilenameOps, nonConflictingDBOps)
@@ -83,30 +77,6 @@ func LoadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser)
 	return parsedOps, nil
 }
 
-// filterConflictingFilenameOps removes DB ops that are fully identical to file ops
-func filterConflictingFilenameOps(fileOps, dbOps []models.FilenameOps) []models.FilenameOps {
-	fileOpKeys := make(map[string]bool)
-
-	// Build conflict keys
-	for _, op := range fileOps {
-		if _, conflicts := conflictingFilenameOp[op.OpType]; conflicts {
-			fileOpKeys[op.OpType] = true
-		}
-	}
-
-	// Add new operations
-	result := make([]models.FilenameOps, 0, len(dbOps))
-	for _, op := range dbOps {
-		_, conflicts := conflictingFilenameOp[op.OpType]
-		if !fileOpKeys[op.OpType] || !conflicts {
-			result = append(result, op)
-		} else {
-			logger.Pl.D(2, "File filename op overrides DB op: %s", sharedparsing.FormatFilenameOp(op, false))
-		}
-	}
-	return result
-}
-
 // applyFilteredFilenameOps applies filtering rules to filename ops
 func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.FilteredFilenameOps, videoURL, channelName string) []models.FilenameOps {
 	matchedFilteredOps := extractMatchedFilteredFilenameOps(filteredOps)
@@ -143,7 +113,7 @@ func extractMatchedFilteredFilenameOps(filteredOps []models.FilteredFilenameOps)
 func buildFilenameOpKeySet(ops []models.FilenameOps, includeNonConflicting bool) map[string]bool {
 	filenameOpsKeys := make(map[string]bool, len(ops))
 	for _, op := range ops {
-		_, conflicts := conflictingFilenameOp[op.OpType]
+		_, conflicts := models.ConflictingFilenameOps[op.OpType]
 		if includeNonConflicting || !conflicts {
 			filenameOpsKeys[sharedparsing.FormatFilenameOp(op, false)] = true
 		}

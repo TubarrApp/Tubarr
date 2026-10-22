@@ -21,7 +21,6 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 		{`title:contains:cats||C:\Videos\Cats`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: `C:\Videos\Cats`}},
 		{"title:contains:cats||/home/a|b||c", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/a|b||c"}},
 		{`title:contains:ends in a pipe\|||/home/pipe`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "ends in a pipe|", OutputDir: "/home/pipe"}},
-		{"https://tubesite.com/@cats|title:contains:cats||/home/cats", models.MetaFilterMoveOps{ChannelURL: "https://tubesite.com/@cats", Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/cats"}},
 	}
 	for _, tt := range tests {
 		got, err := ParseMetaFilterMoveOps([]string{tt.in})
@@ -41,6 +40,8 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 		"title:contains:cats||",     // Empty directory.
 		"title:contains:cats|/home", // A single '|'.
 		"title:morethan||/home",     // A comparison with no value.
+		"https://tubesite.com/@cats|title:contains:cats||/home/cats",  // A channel URL.
+		"https://tubesite.com/@cats||title:contains:cats||/home/cats", // A channel URL with "||".
 	} {
 		if _, err := ParseMetaFilterMoveOps([]string{bad}); err == nil {
 			t.Errorf("ParseMetaFilterMoveOps(%q) was accepted", bad)
