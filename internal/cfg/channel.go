@@ -250,16 +250,16 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 				return nil
 			}
 
-			// Lock crawl state.
-			crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID)
+			// Lock the channel.
+			jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID)
 			if !ok {
-				logger.Pl.I("Crawl job is active for channel %q, please try again when it's complete.", c.Name)
+				logger.Pl.I("Channel %q has a running job, please try again when it's complete.", c.Name)
 				return nil
 			}
 			defer unlock()
 
 			// Download URLs.
-			if err := app.ManualDownloadToChannel(crawlCtx, s, cs, c, manualVideos); err != nil {
+			if err := app.ManualDownloadToChannel(jobCtx, s, cs, c, manualVideos); err != nil {
 				return err
 			}
 
@@ -774,7 +774,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			logger.Pl.D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Run ignore crawl.
-			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
+			if jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID); ok {
 				defer unlock()
 
 				// Clean expired blocks first.
@@ -782,11 +782,11 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 					logger.Pl.W("Failed to clean expired blocks: %v", err)
 				}
 
-				if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
+				if err := app.CrawlChannelIgnore(jobCtx, s, c); err != nil {
 					return err
 				}
 			} else {
-				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
+				logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
 			}
 
 			// Success.
@@ -1221,20 +1221,20 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 			}
 
 			// Crawl channel.
-			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
+			if jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID); ok {
 				defer unlock()
 
 				// Clean expired blocks first.
 				if err := blocking.CleanExpiredBlocks(cs.GetDB()); err != nil {
 					logger.Pl.W("Failed to clean expired blocks: %v", err)
 				}
-				if performedCrawls, err := app.CrawlChannel(crawlCtx, s, c); err != nil {
+				if performedCrawls, err := app.CrawlChannel(jobCtx, s, c); err != nil {
 					return err
 				} else if performedCrawls {
 					logger.Pl.S("Completed crawl for channel with %s %q", key, val)
 				}
 			} else {
-				logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
+				logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
 			}
 
 			// Success.
@@ -1437,14 +1437,14 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 
 // runIgnoreCrawl runs an ignore crawl of a newly added channel, so only videos uploaded from now on download.
 func runIgnoreCrawl(ctx context.Context, s contracts.Store, c *models.Channel) {
-	crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID)
+	jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID)
 	if !ok {
-		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
+		logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
 		return
 	}
 	defer unlock()
 	logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
-	if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
+	if err := app.CrawlChannelIgnore(jobCtx, s, c); err != nil {
 		logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
 	}
 }

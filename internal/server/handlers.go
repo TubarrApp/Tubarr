@@ -70,9 +70,9 @@ func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 //
 //nolint:contextcheck
 func (ss *serverStore) startIgnoreCrawl(c *models.Channel) bool {
-	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID)
+	jobCtx, unlock, ok := state.TryLockChannel(ss.ctx, c.ID)
 	if !ok {
-		logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
+		logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
 		return false
 	}
 	logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
@@ -83,7 +83,7 @@ func (ss *serverStore) startIgnoreCrawl(c *models.Channel) bool {
 		} else {
 			logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 		}
-	}(crawlCtx)
+	}(jobCtx)
 	return true
 }
 
@@ -650,7 +650,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 
 	// Start crawl in background.
-	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID); ok {
+	if jobCtx, unlock, ok := state.TryLockChannel(ss.ctx, c.ID); ok {
 		// Clean expired blocks first.
 		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
 			logger.Pl.W("Failed to clean expired blocks: %v", err)
@@ -666,13 +666,13 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			} else if performedCrawls {
 				logger.Pl.S("Completed crawl for channel %q", c.Name)
 			}
-		}(crawlCtx)
+		}(jobCtx)
 
 		writeJSON(w, r, http.StatusAccepted, map[string]string{"message": "Channel crawl started"})
 		return
 	}
-	logger.Pl.I("Crawl for channel %q is already active, skipping...", c.Name)
-	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "Channel crawl already running for channel"})
+	logger.Pl.I("Channel %q already has a running job, skipping crawl...", c.Name)
+	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "The channel already has a crawl or download running. Try again once it finishes."})
 }
 
 // handleStopQueue stops a channel's job from starting queued work, letting in-progress downloads and Metarr processes finish.
@@ -730,13 +730,13 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
-// handleGetActivity returns the IDs of channels with running crawls/downloads, crawls being stopped, and Metarr processes,
-// and of the videos in Metarr.
+// handleGetActivity returns the IDs of channels with a running crawl or download job, jobs being stopped, and Metarr
+// processes, and of the videos in Metarr.
 func (ss *serverStore) handleGetActivity(w http.ResponseWriter, r *http.Request) {
-	crawling, stopping := state.CrawlActivity()
+	jobs, stopping := state.LockedChannels()
 	metarrChannels, metarrVideos := app.MetarrActivity()
 	writeJSON(w, r, http.StatusOK, map[string][]int64{
-		"crawling":      crawling,
+		"jobs":          jobs,
 		"stopping":      stopping,
 		"metarr":        metarrChannels,
 		"metarr_videos": metarrVideos,
@@ -840,18 +840,11 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	}
 
 	// Start download in background, once any running crawl or download of the channel finishes.
-	queued := state.CrawlStateActive(c.ID)
+	queued := state.ChannelLocked(c.ID)
 	//nolint:contextcheck
 	go func() {
-		ctx, unlock, err := state.LockCrawl(ss.ctx, c.ID)
-		if err != nil {
-			logger.Pl.W("Manual download of %d URL(s) for channel %q did not start: %v", len(requestBody.ManualVideos), c.Name, err)
-			return
-		}
-		defer unlock()
 		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
-
-		if err := app.ManualDownloadToChannel(ctx, ss.s, ss.cs, c, requestBody.ManualVideos); err != nil {
+		if err := app.DownloadManual(ss.ctx, ss.s, c, requestBody.ManualVideos); err != nil {
 			logger.Pl.E("Encountered errors downloading URLs for channel %q: %v", c.Name, err)
 		} else {
 			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)

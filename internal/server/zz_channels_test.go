@@ -41,7 +41,7 @@ func TestDeleteChannelStopsItsJob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, unlock, ok := state.TryLockCrawl(context.Background(), id) // Stands in for a running crawl.
+	ctx, unlock, ok := state.TryLockChannel(context.Background(), id) // Stands in for a running job.
 	if !ok {
 		t.Fatal("couldn't lock the new channel's job")
 	}

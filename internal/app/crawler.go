@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/limits"
 	"tubarr/internal/models"
@@ -239,6 +240,7 @@ func ManualDownloadToChannel(ctx context.Context, s contracts.Store, cs contract
 		}
 		b.videos = append(b.videos, v)
 		customVideoRequests = append(customVideoRequests, v)
+		downloads.Enqueue(v, "Waiting to start") // Their wait for the channel's running job is over.
 	}
 
 	if len(customVideoRequests) == 0 {
@@ -359,41 +361,103 @@ func RemoveDismissedFromNew(cs contracts.ChannelStore, c *models.Channel, dismis
 //
 // Claimed videos the download didn't reach are marked canceled if the channel was stopped, or failed otherwise (e.g. their
 // domain is blocked), so they can be chosen again. Login details given (or nil) are used for this download only.
-func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Channel, claimed []*models.Video, auth *models.ManualAuth) (err error) {
-	ids := make([]int64, 0, len(claimed))
-	for _, v := range claimed {
-		ids = append(ids, v.ID)
+func DownloadAvailable(parent context.Context, s contracts.Store, c *models.Channel, claimed []*models.Video, auth *models.ManualAuth) error {
+	return downloadQueued(parent, s, c, claimed, func(ctx context.Context) error {
+		return downloadClaimed(ctx, s, c, claimed, auth)
+	})
+}
+
+// DownloadManual downloads video URLs sent in for a channel, once any running crawl or download of the channel finishes.
+//
+// URLs not yet in the channel are stored as queued first, so all show on the Downloads page while they wait. Those the
+// download didn't reach are left in the Available list, as DownloadAvailable leaves its videos.
+func DownloadManual(parent context.Context, s contracts.Store, c *models.Channel, manualVideos []models.ManualVideo) error {
+	return downloadQueued(parent, s, c, storeManualVideos(s, c, manualVideos), func(ctx context.Context) error {
+		return ManualDownloadToChannel(ctx, s, s.ChannelStore(), c, manualVideos)
+	})
+}
+
+// downloadQueued queues a channel's videos on the Downloads page, then runs their download once any running crawl or
+// download of the channel finishes.
+//
+// Videos the download didn't reach are marked canceled if the channel was stopped, or failed with the download's error
+// otherwise (e.g. their domain is blocked), so they can be chosen again.
+func downloadQueued(parent context.Context, s contracts.Store, c *models.Channel, queued []*models.Video, download func(ctx context.Context) error) error {
+	stage := "Waiting to start"
+	if state.ChannelLocked(c.ID) {
+		stage = "Waiting for the channel's running job"
+		logger.Pl.I("Waiting for channel %q's running job before downloading %d video(s)", c.Name, len(queued))
 	}
-	ctx, unlock, err := state.LockCrawl(parent, c.ID)
+	for _, v := range queued {
+		downloads.Enqueue(v, stage)
+	}
+
+	ctx, unlock, err := state.LockChannel(parent, c.ID)
 	if err == nil {
 		defer unlock()
-		err = downloadClaimed(ctx, s, c, claimed, auth)
+		err = download(ctx)
 	}
 
 	unreached := consts.DLStatusFailed
 	if errors.Is(err, state.ErrStoppedWaiting) || (ctx != nil && state.QueueCtx(ctx).Err() != nil) {
 		unreached = consts.DLStatusCanceled
 	}
-	reset, resetErr := s.VideoStore().ClaimVideos(c.ID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, unreached)
-	if resetErr != nil {
-		err = errors.Join(err, resetErr)
+	reason := "skipped before downloading, see the Tubarr log for why"
+	if err != nil {
+		reason = err.Error()
 	}
+	return errors.Join(err, finishQueued(s.VideoStore(), c, queued, unreached, reason))
+}
 
-	// Failed videos without a reason of their own get the batch's.
-	if unreached == consts.DLStatusFailed && len(reset) > 0 {
-		reason := "skipped before downloading, see the Tubarr log for why"
-		if err != nil {
-			reason = err.Error()
-		}
-		resetIDs := make([]int64, 0, len(reset))
-		for _, v := range reset {
-			resetIDs = append(resetIDs, v.ID)
-		}
-		if reasonErr := s.VideoStore().SetMissingVideoErrors(resetIDs, reason); reasonErr != nil {
-			err = errors.Join(err, reasonErr)
+// finishQueued takes a job's videos off the download queue, returning those still queued (never reached) to the
+// Available list with the given status. Failed ones without a reason of their own are given reason.
+func finishQueued(vs contracts.VideoStore, c *models.Channel, videos []*models.Video, unreached consts.DownloadStatus, reason string) error {
+	ids := make([]int64, 0, len(videos))
+	for _, v := range videos {
+		downloads.Dequeue(v)
+		if v.ID != 0 {
+			ids = append(ids, v.ID)
 		}
 	}
-	return err
+	reset, err := vs.ClaimVideos(c.ID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, unreached)
+	if err != nil || unreached != consts.DLStatusFailed || len(reset) == 0 {
+		return err
+	}
+	resetIDs := make([]int64, 0, len(reset))
+	for _, v := range reset {
+		resetIDs = append(resetIDs, v.ID)
+	}
+	return vs.SetMissingVideoErrors(resetIDs, reason)
+}
+
+// storeManualVideos returns the channel's videos for URLs sent in, storing those not yet in the channel as queued.
+//
+// URLs whose channel URL can't be found are left out, for ManualDownloadToChannel to report.
+func storeManualVideos(s contracts.Store, c *models.Channel, manualVideos []models.ManualVideo) []*models.Video {
+	vs := s.VideoStore()
+	videos := make([]*models.Video, 0, len(manualVideos))
+	for _, mv := range manualVideos {
+		cu, err := ManualChannelURL(s.ChannelStore(), c, mv.ChannelURLID)
+		if err != nil {
+			continue
+		}
+		v := &models.Video{
+			ChannelID:      c.ID,
+			ChannelURLID:   cu.ID,
+			ChannelURL:     cu.URL,
+			URL:            mv.URL,
+			Title:          mv.Title,
+			DownloadStatus: models.DLStatus{Status: consts.DLStatusQueued},
+		}
+		if id, exists := vs.VideoExists(v, c.ID); exists {
+			v.ID = id
+		} else if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
+			logger.Pl.E("Failed to store video %q to queue it: %v", mv.URL, err)
+			continue
+		}
+		videos = append(videos, v)
+	}
+	return videos
 }
 
 // downloadClaimed downloads claimed videos through their channel URLs.

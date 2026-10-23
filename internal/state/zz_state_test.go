@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-func TestCrawlLock(t *testing.T) {
-	ctx, unlock, ok := TryLockCrawl(context.Background(), 1)
+func TestChannelLock(t *testing.T) {
+	ctx, unlock, ok := TryLockChannel(context.Background(), 1)
 	if !ok {
 		t.Fatal("first lock failed")
 	}
-	if _, _, ok := TryLockCrawl(context.Background(), 1); ok {
+	if _, _, ok := TryLockChannel(context.Background(), 1); ok {
 		t.Fatal("second lock succeeded while held")
 	}
-	if active, _ := CrawlActivity(); len(active) != 1 || active[0] != 1 {
+	if active, _ := LockedChannels(); len(active) != 1 || active[0] != 1 {
 		t.Fatalf("lock not reported active by channel ID, got %v", active)
 	}
 
@@ -30,7 +30,7 @@ func TestCrawlLock(t *testing.T) {
 	default:
 		t.Fatal("stop queue did not signal stop requested")
 	}
-	if active, stopping := CrawlActivity(); len(active) != 0 || len(stopping) != 1 {
+	if active, stopping := LockedChannels(); len(active) != 0 || len(stopping) != 1 {
 		t.Fatal("stopped job should be reported as stopping until it unlocks")
 	}
 
@@ -42,17 +42,17 @@ func TestCrawlLock(t *testing.T) {
 	}
 
 	unlock()
-	if CrawlStateActive(1) || AbortAll(1) {
+	if ChannelLocked(1) || AbortAll(1) {
 		t.Fatal("lock not released")
 	}
 
 	// Stale unlock must not release a newer lock.
-	_, unlock2, ok := TryLockCrawl(context.Background(), 1)
+	_, unlock2, ok := TryLockChannel(context.Background(), 1)
 	if !ok {
 		t.Fatal("relock failed")
 	}
 	unlock()
-	if !CrawlStateActive(1) {
+	if !ChannelLocked(1) {
 		t.Fatal("stale unlock released newer lock")
 	}
 	unlock2()
@@ -60,9 +60,9 @@ func TestCrawlLock(t *testing.T) {
 
 // TestUnlockLeavesStopOpen tests that unlocking cancels the job's contexts without signalling a stop.
 func TestUnlockLeavesStopOpen(t *testing.T) {
-	ctx, unlock, ok := TryLockCrawl(context.Background(), 2)
+	ctx, unlock, ok := TryLockChannel(context.Background(), 2)
 	if !ok {
-		t.Fatal("TryLockCrawl failed on an unlocked channel")
+		t.Fatal("TryLockChannel failed on an unlocked channel")
 	}
 	unlock()
 	if ctx.Err() == nil || QueueCtx(ctx).Err() == nil {
@@ -75,12 +75,13 @@ func TestUnlockLeavesStopOpen(t *testing.T) {
 	}
 }
 
-// TestLockCrawlWaits tests that LockCrawl gets the lock once the running job ends, and gives up if the channel is stopped.
-func TestLockCrawlWaits(t *testing.T) {
-	_, unlock, _ := TryLockCrawl(context.Background(), 3)
+// TestLockChannelWaits tests that LockChannel gets the lock once the running job ends, and gives up if the channel is
+// stopped.
+func TestLockChannelWaits(t *testing.T) {
+	_, unlock, _ := TryLockChannel(context.Background(), 3)
 	got := make(chan error, 1)
 	go func() {
-		_, unlockWaiter, err := LockCrawl(context.Background(), 3)
+		_, unlockWaiter, err := LockChannel(context.Background(), 3)
 		if err == nil {
 			unlockWaiter()
 		}
@@ -92,10 +93,10 @@ func TestLockCrawlWaits(t *testing.T) {
 		t.Fatalf("expected the lock once the job ended, got %v", err)
 	}
 
-	_, unlock, _ = TryLockCrawl(context.Background(), 3)
+	_, unlock, _ = TryLockChannel(context.Background(), 3)
 	defer unlock()
 	go func() {
-		_, _, err := LockCrawl(context.Background(), 3)
+		_, _, err := LockChannel(context.Background(), 3)
 		got <- err
 	}()
 	time.Sleep(50 * time.Millisecond)

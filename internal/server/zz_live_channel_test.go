@@ -481,7 +481,7 @@ func waitLive(t *testing.T, channelID int64) {
 			t.Fatal(err)
 		}
 		idle := sendRequest(t, http.MethodGet, "/api/v1/status/idle", "", "").Code == http.StatusOK
-		if idle && busy == 0 && !slices.Contains(activity["crawling"], channelID) && !slices.Contains(activity["metarr"], channelID) {
+		if idle && busy == 0 && !slices.Contains(activity["jobs"], channelID) && !slices.Contains(activity["metarr"], channelID) {
 			return
 		}
 		if time.Now().After(deadline) {

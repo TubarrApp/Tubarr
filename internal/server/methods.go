@@ -96,13 +96,13 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 
 			// Crawl goroutine
 			go func(ch *models.Channel) {
-				crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.ID)
+				jobCtx, unlock, ok := state.TryLockChannel(ctx, ch.ID)
 				if !ok {
 					return
 				}
 				defer unlock()
 
-				release, err := app.AcquireCrawlSlot(state.QueueCtx(crawlCtx), ch.Name)
+				release, err := app.AcquireCrawlSlot(state.QueueCtx(jobCtx), ch.Name)
 				if err != nil {
 					logger.Pl.D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
 					return
@@ -110,7 +110,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 				defer release()
 
 				logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
-				if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ch); err != nil {
+				if performedCrawls, err := app.CrawlChannel(jobCtx, ss.s, ch); err != nil {
 					logger.Pl.E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
 				} else if performedCrawls {
 					logger.Pl.S("Crawl watchdog: Completed crawl for channel %q", ch.Name)

@@ -150,6 +150,7 @@ func InitProcess(
 	}
 
 	// Send jobs.
+	sent := make([]*models.Video, 0, len(videos))
 	for _, video := range videos {
 		if video == nil {
 			logger.Pl.E("Video in queue for channel %q is nil", c.Name)
@@ -197,6 +198,18 @@ func InitProcess(
 			logger.Pl.D(1, "Video in channel %q with URL %q is already marked as downloaded", c.Name, video.URL)
 			continue
 		}
+
+		// New videos are stored now, so they show on the Downloads page while waiting for a worker.
+		if video.ID == 0 {
+			video.DownloadStatus = models.DLStatus{Status: consts.DLStatusQueued}
+			if video.ID, err = s.VideoStore().AddVideo(video, c.ID, cu.ID); err != nil {
+				logger.Pl.E("Skipping download of %q: failed to store it: %v", video.URL, err)
+				errs = append(errs, err)
+				continue
+			}
+		}
+		downloads.Enqueue(video, "Waiting to start")
+		sent = append(sent, video)
 		jobs <- video
 	}
 	close(jobs)
@@ -218,6 +231,22 @@ func InitProcess(
 	}
 
 	nDownloaded = int(downloaded.Load())
+
+	// Videos the workers never started (the job was stopped) go to the Available list, canceled if the user chose them.
+	chosen, crawled := make([]*models.Video, 0, len(sent)), make([]*models.Video, 0, len(sent))
+	for _, v := range sent {
+		if v.SkipFilters || cu.IsManual {
+			chosen = append(chosen, v)
+		} else {
+			crawled = append(crawled, v)
+		}
+	}
+	if err := finishQueued(s.VideoStore(), c, chosen, consts.DLStatusCanceled, ""); err != nil {
+		errs = append(errs, err)
+	}
+	if err := finishQueued(s.VideoStore(), c, crawled, consts.DLStatusFailed, "the queue was stopped before this video started"); err != nil {
+		errs = append(errs, err)
+	}
 
 	// Return errors, and succeeded/downloaded counts.
 	if len(errs) > 0 {
@@ -258,6 +287,14 @@ func executeCustomScraper(ctx context.Context, s *scraper.Scraper, v *models.Vid
 func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *models.Video) (err error) {
 	c, cu := b.c, b.cu
 
+	// Canceled from the Downloads page while it waited in the queue.
+	queuedCtx, canceled := downloads.Start(v)
+	defer downloads.Dequeue(v)
+	if canceled {
+		logger.Pl.I("Skipping video %q: canceled before it started", v.URL)
+		return nil
+	}
+
 	// Take hold of video before touching its files, canceling any separate Metarr run on it.
 	// The hold stops a Run Metarr re-run and this download using the video's files at the same time.
 	key := metarrKey{c.ID, v.URL}
@@ -289,16 +326,18 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 		}
 	}()
 
-	// Per-video context, canceled from the Downloads page once the video is tracked there.
+	// Per-video context, canceled from the Downloads page.
 	vidCtx, vidCancel := context.WithCancelCause(procCtx)
 	defer vidCancel(nil)
+	stopCancelLink := context.AfterFunc(queuedCtx, func() { vidCancel(context.Cause(queuedCtx)) })
+	defer stopCancelLink()
 	tracked := false
 	track := func(stage string) {
 		if v.ID == 0 {
 			return
 		}
 		if !tracked {
-			downloads.RegisterDownloadContext(v.ID, v.URL, vidCancel)
+			downloads.Tracked(v)
 			tracked = true
 		}
 		b.dlTracker.SetStatus(v, consts.DLStatusQueued, 0, stage, nil)
@@ -307,17 +346,8 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 		if !tracked {
 			return
 		}
-		downloads.UnregisterDownloadContext(v.ID, v.URL)
 		finishTracking(vidCtx, b.dlTracker, v, err)
 	}()
-
-	// New videos are stored first, so they show on the Downloads page while waiting and fetching metadata.
-	if v.ID == 0 {
-		v.DownloadStatus = models.DLStatus{Status: consts.DLStatusQueued}
-		if v.ID, err = b.vs.AddVideo(v, c.ID, cu.ID); err != nil {
-			return fmt.Errorf("failed to store video %q: %w", v.URL, err)
-		}
-	}
 	track("Waiting to start")
 
 	// Fail fast once an earlier video's bot detection has blocked the domain.

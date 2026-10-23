@@ -12,13 +12,14 @@ import (
 	"tubarr/internal/models"
 )
 
-// --- Crawl State --------------------------------------------------------------------------
+// --- Channel Locks --------------------------------------------------------------------------
 
-// crawlState holds each channel's active crawl or download job, keyed by channel ID (names can change mid-job).
-var crawlState sync.Map
+// channelLocks holds each channel's lock, held by its running crawl or download job so no other job runs on it, keyed
+// by channel ID (names can change mid-job).
+var channelLocks sync.Map
 
-// crawlLock is an active crawl or download job.
-type crawlLock struct {
+// channelLock is a channel's lock, with the stop controls of the job holding it.
+type channelLock struct {
 	cancelActive context.CancelFunc // Cancels in-progress work.
 	cancelQueue  context.CancelFunc // Stops queued work from starting.
 	stopped      atomic.Bool
@@ -32,28 +33,28 @@ type (
 	stopChKey    struct{}
 )
 
-// TryLockCrawl locks a channel's crawl state if it isn't already locked.
+// TryLockChannel locks a channel for a job if it isn't already locked.
 //
 // Returns the job's active context, canceled by AbortAll, and an unlock function which must be called when the job ends.
-func TryLockCrawl(parent context.Context, channelID int64) (ctx context.Context, unlock func(), ok bool) {
+func TryLockChannel(parent context.Context, channelID int64) (ctx context.Context, unlock func(), ok bool) {
 	activeCtx, cancelActive := context.WithCancel(parent)
 	activeCtx = context.WithValue(activeCtx, jobParentKey{}, parent)
 	queueCtx, cancelQueue := context.WithCancel(activeCtx)
-	l := &crawlLock{cancelActive: cancelActive, cancelQueue: cancelQueue, stopCh: make(chan struct{})}
-	if _, loaded := crawlState.LoadOrStore(channelID, l); loaded {
+	l := &channelLock{cancelActive: cancelActive, cancelQueue: cancelQueue, stopCh: make(chan struct{})}
+	if _, loaded := channelLocks.LoadOrStore(channelID, l); loaded {
 		cancelQueue()
 		cancelActive()
 		return nil, nil, false
 	}
 	ctx = context.WithValue(activeCtx, queueCtxKey{}, queueCtx)
 	return context.WithValue(ctx, stopChKey{}, l.stopCh), func() {
-		crawlState.CompareAndDelete(channelID, l)
+		channelLocks.CompareAndDelete(channelID, l)
 		cancelQueue()
 		cancelActive()
 	}, true
 }
 
-// ErrStoppedWaiting is returned by LockCrawl when the channel is stopped while waiting to lock it.
+// ErrStoppedWaiting is returned by LockChannel when the channel is stopped while waiting to lock it.
 var ErrStoppedWaiting = errors.New("stopped while waiting for the channel's running job to finish")
 
 // stopCounts counts each channel's stops, so jobs waiting to lock a channel can tell they were stopped.
@@ -66,10 +67,10 @@ func stopCount(channelID int64) *atomic.Int64 {
 	return n
 }
 
-// LockCrawl waits for a channel's running job to finish, then locks its crawl state as TryLockCrawl does.
+// LockChannel waits for a channel's running job to finish, then locks the channel as TryLockChannel does.
 //
 // Returns ErrStoppedWaiting if the channel is stopped while waiting, so a stop also cancels waiting jobs.
-func LockCrawl(parent context.Context, channelID int64) (ctx context.Context, unlock func(), err error) {
+func LockChannel(parent context.Context, channelID int64) (ctx context.Context, unlock func(), err error) {
 	stops := stopCount(channelID)
 	start := stops.Load()
 	ticker := time.NewTicker(time.Second)
@@ -78,7 +79,7 @@ func LockCrawl(parent context.Context, channelID int64) (ctx context.Context, un
 		if stops.Load() != start {
 			return nil, nil, ErrStoppedWaiting
 		}
-		if ctx, unlock, ok := TryLockCrawl(parent, channelID); ok {
+		if ctx, unlock, ok := TryLockChannel(parent, channelID); ok {
 			return ctx, unlock, nil
 		}
 		select {
@@ -117,7 +118,7 @@ func StopRequested(ctx context.Context) <-chan struct{} {
 	return ch
 }
 
-// StopQueue stops a channel's job from starting queued work, and cancels jobs waiting in LockCrawl, letting in-progress
+// StopQueue stops a channel's job from starting queued work, and cancels jobs waiting in LockChannel, letting in-progress
 // downloads finish.
 //
 // Returns false if no job is running.
@@ -125,22 +126,22 @@ func StopQueue(channelID int64) bool {
 	return stopJob(channelID, false)
 }
 
-// AbortAll stops a channel's job, killing in-progress downloads, and cancels jobs waiting in LockCrawl.
+// AbortAll stops a channel's job, killing in-progress downloads, and cancels jobs waiting in LockChannel.
 //
 // Returns false if no job is running.
 func AbortAll(channelID int64) bool {
 	return stopJob(channelID, true)
 }
 
-// stopJob stops a channel's job and any jobs waiting in LockCrawl, also cancelling in-progress work if abort is set.
+// stopJob stops a channel's job and any jobs waiting in LockChannel, also cancelling in-progress work if abort is set.
 func stopJob(channelID int64, abort bool) bool {
-	v, ok := crawlState.Load(channelID)
+	v, ok := channelLocks.Load(channelID)
 	if !ok {
 		return false
 	}
-	l, ok := v.(*crawlLock)
+	l, ok := v.(*channelLock)
 	if !ok {
-		logger.Pl.E("Dev Error: Wrong type %T stored in CrawlState for channel ID %d", v, channelID)
+		logger.Pl.E("Dev Error: Wrong type %T stored in channelLocks for channel ID %d", v, channelID)
 		return false
 	}
 	stopCount(channelID).Add(1)
@@ -154,18 +155,18 @@ func stopJob(channelID int64, abort bool) bool {
 	return true
 }
 
-// CrawlStateActive reports whether a channel has an active crawl or download job.
-func CrawlStateActive(channelID int64) bool {
-	_, ok := crawlState.Load(channelID)
+// ChannelLocked reports whether a channel is locked by a running crawl or download job.
+func ChannelLocked(channelID int64) bool {
+	_, ok := channelLocks.Load(channelID)
 	return ok
 }
 
-// CrawlActivity returns the IDs of channels with an active crawl or download job, and those being stopped.
-func CrawlActivity() (active, stopping []int64) {
+// LockedChannels returns the IDs of channels locked by a running crawl or download job, and those being stopped.
+func LockedChannels() (active, stopping []int64) {
 	active, stopping = []int64{}, []int64{}
-	crawlState.Range(func(k, v any) bool {
+	channelLocks.Range(func(k, v any) bool {
 		id, _ := k.(int64)
-		if l, ok := v.(*crawlLock); ok && l.stopped.Load() {
+		if l, ok := v.(*channelLock); ok && l.stopped.Load() {
 			stopping = append(stopping, id)
 		} else {
 			active = append(active, id)
