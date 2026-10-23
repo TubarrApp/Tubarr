@@ -1317,19 +1317,19 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 }
 
 // UpdateChannelValue updates a single element in the database.
-func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) error {
-	if err := validKey(key, consts.ValidChannelKeys); err != nil {
+func (cs *ChannelStore) UpdateChannelValue(key, val, col string, updateWithVal any) error {
+	if err := validKey(key, consts.ValidChannelKeys); err != nil { // Key name check.
 		return err
 	}
-	if err := validKey(col, consts.ValidChannelKeys); err != nil { // Column names can't be SQL parameters, so only known ones are allowed.
+	if err := validKey(col, consts.ValidChannelKeys); err != nil { // Column name check. Column names can't be SQL parameters, so only known ones are allowed.
 		return err
 	}
 
 	if !cs.channelExists(key, val) {
-		return fmt.Errorf("channel with key %q and value %q does not exist", key, val)
+		return fmt.Errorf("channel [%s=%s] does not exist", key, val)
 	}
-	if col == consts.QChanName && cs.channelExists(consts.QChanName, fmt.Sprint(newVal)) {
-		return fmt.Errorf("%w: channel with name %q already exists", contracts.ErrInvalidChannel, newVal)
+	if col == consts.QChanName && cs.channelExists(consts.QChanName, fmt.Sprint(updateWithVal)) {
+		return fmt.Errorf("%w: channel with name %q already exists", contracts.ErrInvalidChannel, updateWithVal)
 	}
 
 	query := fmt.Sprintf(
@@ -1341,11 +1341,11 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 
 	// Print SQL query.
 	if logging.Level() > 1 {
-		logger.Pl.P("Executing SQL: %s with args: %v\n", query, []any{newVal, val})
+		logger.Pl.P("Executing SQL: %s with args: %v\n", query, []any{updateWithVal, val})
 	}
 
 	// Execute query.
-	res, err := cs.q.Exec(query, newVal, val)
+	res, err := cs.q.Exec(query, updateWithVal, val)
 	if err != nil {
 		return err
 	}
@@ -1357,10 +1357,14 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, newVal any) err
 	}
 
 	if rowsAffected == 0 {
-		return errors.New("update failed: no rows affected")
+		return fmt.Errorf("update failed for channel [%s=%s]: no rows affected", key, val)
 	}
 
-	logger.Pl.S("Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, newVal)
+	if col != consts.QChanNewVideoNotification {
+		logger.Pl.S("Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, updateWithVal)
+	} else {
+		logger.Pl.D(3, "Channel [%s=%s]: Set %q to %+v", key, val, consts.QChanNewVideoNotification, updateWithVal)
+	}
 	return nil
 }
 
@@ -1393,19 +1397,18 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	return nil
 }
 
-// GetDownloadedOrIgnoredVideos loads already downloaded or ignored videos from the database, without metadata.
-func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos []*models.Video, hasRows bool, err error) {
+// GetDownloadedVideos loads already downloaded videos from the database, without metadata.
+func (cs *ChannelStore) GetDownloadedVideos(c *models.Channel) (videos []*models.Video, hasRows bool, err error) {
 	if c.ID == 0 {
 		return nil, false, errors.New("model entered has no ID")
 	}
 
 	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ? AND (%s = 1 OR %s = 1) ORDER BY %s DESC",
+		"SELECT %s FROM %s WHERE %s = ? AND %s = 1 ORDER BY %s DESC",
 		videoListColumns,
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidFinished,
-		consts.QVidIgnored,
 		consts.QVidUpdatedAt,
 	)
 
@@ -1427,20 +1430,20 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideos(c *models.Channel) (videos 
 	return videos, true, nil
 }
 
-// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, or Available URLs from the database, and failed or canceled ones separately.
+// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, canceled, or Available URLs from the database, and failed ones separately.
 func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls, failedURLs []string, err error) {
 	if c.ID == 0 {
 		return nil, nil, errors.New("model entered has no ID")
 	}
 
 	seen := fmt.Sprintf(
-		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s = ?)",
+		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?))",
 		consts.QVidFinished,
 		consts.QVidIgnored,
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
 	)
 	query := fmt.Sprintf(
-		"SELECT %s, %s FROM %s WHERE %s = ? AND (%s OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?)))",
+		"SELECT %s, %s FROM %s WHERE %s = ? AND (%s OR %s IN (SELECT %s FROM %s WHERE %s = ?))",
 		consts.QVidURL, seen,
 		consts.DBVideos,
 		consts.QVidChanID,
@@ -1448,7 +1451,9 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
 	)
 
-	rows, err := cs.q.Query(query, consts.DLStatusAvailable, c.ID, consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCanceled)
+	// Canceled videos count as seen, as the user chose not to download them.
+	rows, err := cs.q.Query(query, consts.DLStatusAvailable, consts.DLStatusCanceled, c.ID,
+		consts.DLStatusAvailable, consts.DLStatusCanceled, consts.DLStatusFailed)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute query: %w", err)
 	}

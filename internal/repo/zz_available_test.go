@@ -115,6 +115,38 @@ func TestAvailableVideos(t *testing.T) {
 		t.Errorf("expected the dismissed video to be seen and the other failed, got %v and %v", seen, failed)
 	}
 
+	// Ignored videos are listed only when asked for, and restoring returns them to Available.
+	if available, _ := vs.GetAvailableVideos(app.AvailableStatuses...); len(available) != 1 {
+		t.Errorf("expected only the failed video listed, got %d", len(available))
+	}
+	withIgnored, _ := vs.GetAvailableVideos(consts.DLStatusIgnored)
+	if len(withIgnored) != 1 || withIgnored[0].URL != "https://example.com/v/1" {
+		t.Fatalf("expected the dismissed video listed as ignored, got %+v", withIgnored)
+	}
+	if restored, err := vs.ClaimVideos(chanID, ids, []consts.DownloadStatus{consts.DLStatusIgnored}, consts.DLStatusAvailable); err != nil || len(restored) != 1 || restored[0].Ignored {
+		t.Fatalf("restore: got %+v, %v, want the one ignored video, no longer ignored", restored, err)
+	}
+	if available, _ := vs.GetAvailableVideos(consts.DLStatusAvailable); len(available) != 1 || available[0].URL != "https://example.com/v/1" {
+		t.Errorf("expected the restored video listed as Available, got %+v", available)
+	}
+	if again, err := vs.ClaimVideos(chanID, ids[:1], []consts.DownloadStatus{consts.DLStatusIgnored}, consts.DLStatusAvailable); err != nil || len(again) != 0 {
+		t.Errorf("second restore: got %d, %v, want 0", len(again), err)
+	}
+	if seen, _, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 1 {
+		t.Errorf("expected the restored video still seen by crawls, got %v", seen)
+	}
+	if dismissed, err := vs.ClaimVideos(chanID, ids[:1], app.AvailableStatuses, consts.DLStatusIgnored); err != nil || len(dismissed) != 1 {
+		t.Fatalf("dismiss again: got %d, %v, want 1", len(dismissed), err)
+	}
+
+	// Canceled videos count as seen, so crawls never retry them.
+	if canceled, err := vs.ClaimVideos(chanID, ids[1:], app.AvailableStatuses, consts.DLStatusCanceled); err != nil || len(canceled) != 1 {
+		t.Fatalf("cancel: got %d, %v, want 1", len(canceled), err)
+	}
+	if seen, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 2 || len(failed) != 0 {
+		t.Errorf("expected both videos seen and none failed, got %v and %v", seen, failed)
+	}
+
 	// Videos can't be claimed through another channel.
 	if claimed, err := vs.ClaimVideos(chanID+1, ids[1:], app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(claimed) != 0 {
 		t.Errorf("other channel claim: got %d, %v, want 0", len(claimed), err)

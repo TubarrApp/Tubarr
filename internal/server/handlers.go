@@ -196,6 +196,11 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request
 		writeJSON(w, r, http.StatusOK, []any{})
 		return
 	}
+	failedMetarr, err := ss.vs.CountFailedMetarrVideos(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	response := make([]channelResponse, 0, len(channels))
 	for _, c := range channels {
@@ -209,6 +214,7 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request
 			ChannelConfigFile:    c.ChannelConfigFile,
 			NewVideoNotification: c.NewVideoNotification,
 			LoadError:            loadError(c),
+			FailedPostProcessing: failedMetarr[c.ID],
 			Settings:             newSettingsResponse(c.ChanSettings),
 			Metarr:               newMetarrArgsResponse(c.ChanMetarrArgs),
 		}
@@ -442,14 +448,14 @@ func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleGetAllVideos retrieves all videos, ignored or finished, for a given channel.
+// handleGetAllVideos retrieves all downloaded videos for a given channel (ignored ones are on the Available page).
 func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request) {
 	c, ok := ss.channelFromRequest(w, r)
 	if !ok {
 		return
 	}
 
-	videos, _, err := ss.cs.GetDownloadedOrIgnoredVideos(c)
+	videos, _, err := ss.cs.GetDownloadedVideos(c)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve downloaded videos for channel %q: %v", c.Name, err), http.StatusInternalServerError)
 		return
@@ -890,11 +896,16 @@ func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Req
 	writeJSON(w, r, http.StatusOK, map[string]any{"videos": added, "existing": existing})
 }
 
-// handleGetAvailableVideos returns videos awaiting the user's choice to download or dismiss them, across all channels.
+// handleGetAvailableVideos returns videos awaiting the user's choice to download or dismiss them across all channels,
+// with the ignored ones which can be restored if asked for.
 //
-// Failed and canceled videos from channel URLs which auto download are marked as retried by their next crawl.
+// Failed videos from channel URLs which auto download are marked as retried by their next crawl.
 func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.Request) {
-	videos, err := ss.vs.GetAvailableVideos(app.AvailableStatuses...)
+	statuses := app.AvailableStatuses
+	if r.URL.Query().Get("ignored") == "1" {
+		statuses = slices.Concat(statuses, []consts.DownloadStatus{consts.DLStatusIgnored})
+	}
+	videos, err := ss.vs.GetAvailableVideos(statuses...)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not retrieve available videos: %v", err), http.StatusInternalServerError)
 		return
@@ -913,14 +924,14 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.R
 	}
 	shown := make([]*models.Video, 0, len(videos))
 	for _, v := range videos {
-		v.RetriesOnCrawl = v.DownloadStatus.Status != consts.DLStatusAvailable && retried[v.ChannelURLID]
+		v.RetriesOnCrawl = v.DownloadStatus.Status == consts.DLStatusFailed && retried[v.ChannelURLID]
 		shown = append(shown, &v.Video)
 	}
 	ss.applyThumbnailOverrides(shown)
 	writeJSON(w, r, http.StatusOK, videos)
 }
 
-// handleAvailableAction downloads or dismisses a channel's chosen Available videos.
+// handleAvailableAction downloads or dismisses a channel's chosen Available videos, or restores ignored ones to Available.
 //
 // Downloads start once any running crawl or download of the channel finishes, so the channel's Stop Queue and Abort All buttons cover them.
 func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Request) {
@@ -941,13 +952,17 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	}
 
 	var status consts.DownloadStatus
+	from := app.AvailableStatuses
 	switch requestBody.Action {
 	case "download":
 		status = consts.DLStatusQueued
 	case "dismiss":
 		status = consts.DLStatusIgnored
+	case "restore":
+		status = consts.DLStatusAvailable
+		from = []consts.DownloadStatus{consts.DLStatusIgnored}
 	default:
-		http.Error(w, fmt.Sprintf("unknown action %q (expected 'download' or 'dismiss')", requestBody.Action), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("unknown action %q (expected 'download', 'dismiss' or 'restore')", requestBody.Action), http.StatusBadRequest)
 		return
 	}
 	if requestBody.Auth != nil && (status != consts.DLStatusQueued || !app.ValidManualAuth(requestBody.Auth)) {
@@ -988,7 +1003,7 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	claimed, err := ss.vs.ClaimVideos(c.ID, requestBody.VideoIDs, app.AvailableStatuses, status)
+	claimed, err := ss.vs.ClaimVideos(c.ID, requestBody.VideoIDs, from, status)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to update videos: %v", err), http.StatusInternalServerError)
 		return
@@ -1242,9 +1257,10 @@ func (ss *serverStore) handleGetOverrideOpsFile(w http.ResponseWriter, r *http.R
 func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
 		VideoIDs  []int64               `json:"video_ids"`
-		Overrides *models.OverrideLines `json:"overrides"` // Edit & Run, for one video.
-		Metarr    *metarrArgsInput      `json:"metarr"`    // Edit & Run's other Metarr args, with the overrides.
-		Rerun     bool                  `json:"rerun"`     // Also runs on given videos Metarr already processed.
+		Overrides *models.OverrideLines `json:"overrides"`   // Edit & Run, for one video.
+		Metarr    *metarrArgsInput      `json:"metarr"`      // Edit & Run's other Metarr args, with the overrides.
+		Rerun     bool                  `json:"rerun"`       // Also runs on given videos Metarr already processed.
+		Failed    bool                  `json:"failed_only"` // Runs on all the channel's videos Metarr failed on.
 	}
 	if err := decodeJSON(r, &requestBody); err != nil && !errors.Is(err, io.EOF) {
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
@@ -1253,6 +1269,10 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 
 	if requestBody.Rerun && len(requestBody.VideoIDs) == 0 {
 		http.Error(w, "a re-run needs the videos to run on", http.StatusBadRequest)
+		return
+	}
+	if requestBody.Failed && (len(requestBody.VideoIDs) > 0 || requestBody.Rerun || requestBody.Overrides != nil) {
+		http.Error(w, "a run on failed videos takes no videos, re-run or overrides", http.StatusBadRequest)
 		return
 	}
 
@@ -1276,6 +1296,23 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	if c.LoadErr != nil {
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
+	}
+
+	if requestBody.Failed {
+		awaiting, err := ss.vs.GetVideosAwaitingMetarr(c.ID, false)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, v := range awaiting {
+			if v.MetarrStatus == consts.MetarrStatusFailed {
+				requestBody.VideoIDs = append(requestBody.VideoIDs, v.ID)
+			}
+		}
+		if len(requestBody.VideoIDs) == 0 {
+			http.Error(w, "no videos in this channel failed post-processing", http.StatusConflict)
+			return
+		}
 	}
 
 	// Checked before saving edited options, which would otherwise replace the ones a running video uses.

@@ -142,7 +142,6 @@
                     <option value="processing" x-text="`Post-processing (${statusCount('processing')})`"></option>
                     <option value="pending" x-text="`Not post-processed (${statusCount('pending')})`"></option>
                     <option value="failed" x-text="`Post-processing failed (${statusCount('failed')})`"></option>
-                    <option value="ignored" x-text="`Ignored (${statusCount('ignored')})`"></option>
                   </select>
 
                   <select
@@ -286,11 +285,6 @@
                             <template x-if="video.finished && !needsMetarr(video) && !processing(video)">
                               <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
                                 Finished
-                              </span>
-                            </template>
-                            <template x-if="video.ignored">
-                              <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">
-                                Ignored
                               </span>
                             </template>
                             <template x-if="needsMetarr(video) && !processing(video)">
@@ -530,7 +524,6 @@
 
           // The video's Status column badge, as a status filter value.
           statusOf(video) {
-            if (video.ignored) return 'ignored';
             if (this.processing(video)) return 'processing';
             if (!this.needsMetarr(video)) return 'finished';
             return video.metarr_status === 'failed' ? 'failed' : 'pending';

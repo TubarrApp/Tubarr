@@ -167,12 +167,13 @@
                           </td>
                           <td class="px-4 py-3 status-col">
                             <span x-show="isDownloading(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">Downloading</span>
-                            <span x-show="!isDownloading(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Queued</span>
+                            <span x-show="isQueued(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Queued</span>
+                            <span x-show="isFiltered(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">Filtered out</span>
                             <p x-show="download.download_status.stage" class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-text="download.download_status.stage"></p>
                             <p x-show="download.download_status.error" class="mt-1 text-xs text-error-600 dark:text-error-500 break-words" x-text="download.download_status.error"></p>
                           </td>
                           <td class="px-4 py-3 progress-col">
-                            <div class="flex items-center gap-2">
+                            <div x-show="!isFiltered(download)" class="flex items-center gap-2">
                               <div class="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
                                 <div
                                   class="bg-brand-500 h-2 rounded-full transition-all duration-300"
@@ -183,10 +184,11 @@
                             </div>
                           </td>
                           <td class="px-4 py-3 eta-col">
-                            <span class="text-sm text-gray-600 dark:text-gray-400" x-text="formatETA(download.download_status.eta)"></span>
+                            <span x-show="!isFiltered(download)" class="text-sm text-gray-600 dark:text-gray-400" x-text="formatETA(download.download_status.eta)"></span>
                           </td>
                           <td class="px-4 py-3">
                             <button
+                              x-show="!isFiltered(download)"
                               @click.stop="cancel([download])"
                               :disabled="working"
                               class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
@@ -261,6 +263,20 @@
             return download.download_status.status === 'Downloading';
           },
 
+          isQueued(download) {
+            return download.download_status.status === 'Queued';
+          },
+
+          // Briefly shown after failing the download filters, before leaving the page.
+          isFiltered(download) {
+            return download.download_status.status === 'Ignored';
+          },
+
+          // Downloading, then queued, then filtered out.
+          rank(download) {
+            return this.isDownloading(download) ? 0 : this.isQueued(download) ? 1 : 2;
+          },
+
           // Channels with downloads, and their counts.
           get channelOptions() {
             const byID = new Map();
@@ -288,7 +304,7 @@
             return [...byID.values()];
           },
 
-          // Downloading first, then queued, each in a stable order as the server's isn't.
+          // Downloading first, then queued, then filtered out, each in a stable order as the server's isn't.
           get filteredDownloads() {
             let list = this.channelDownloads;
             if (this.urlFilter !== '') {
@@ -298,7 +314,7 @@
             if (title) { // URL too, as a download may not have a title yet.
               list = list.filter(d => (d.title || d.url || '').toLowerCase().includes(title));
             }
-            return [...list].sort((a, b) => (this.isDownloading(b) - this.isDownloading(a)) || (a.id - b.id));
+            return [...list].sort((a, b) => (this.rank(a) - this.rank(b)) || (a.id - b.id));
           },
 
           get selectedCount() {
@@ -344,7 +360,7 @@
           },
 
           selectQueued() {
-            this.filteredDownloads.filter(d => !this.isDownloading(d)).forEach(d => this.setSelected(d, true));
+            this.filteredDownloads.filter(d => this.isQueued(d)).forEach(d => this.setSelected(d, true));
           },
 
           async cancel(chosen) {

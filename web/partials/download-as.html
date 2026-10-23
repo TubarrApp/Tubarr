@@ -23,7 +23,16 @@ download-as-cancel if Download As closes without starting. -->
       <div>
         <div class="mb-1 flex items-center justify-between">
           <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Filename</label>
-          <button type="button" @click="form.filename = video.title" class="text-xs text-brand-500 hover:underline">Use title</button>
+          <div class="flex gap-3">
+            <button type="button" @click="form.filename = video.title" class="text-xs text-brand-500 hover:underline">Use title</button>
+            <button
+              type="button"
+              @click="addSetOp('all-titles', form.filename)"
+              :disabled="!form.filename?.trim()"
+              title="Add all-titles:set: with this filename to the meta ops, so the video's titles match it."
+              class="text-xs text-brand-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+            >Apply to metadata</button>
+          </div>
         </div>
         <input
           type="text"
@@ -42,7 +51,7 @@ download-as-cancel if Download As closes without starting. -->
           <input
             type="text"
             x-model="form[dir.key]"
-            :placeholder="defaults[dir.key] || dir.none"
+            :placeholder="(defaults[dir.key] || dir.none) + (dir.note || '')"
             class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
         </div>
@@ -274,7 +283,7 @@ download-as-cancel if Download As closes without starting. -->
       dirs: [
         { key: 'video_dir', label: 'Video Directory', none: "The channel URL's" },
         { key: 'json_dir', label: 'JSON Directory', none: "The channel URL's" },
-        { key: 'output_dir', label: 'Post-Process Directory', none: 'None, or a move op\'s' }
+        { key: 'output_dir', label: 'Post-Process Directory', none: 'Default', note: ' / Set by move ops' }
       ],
       boxes: [
         { key: 'meta_ops', label: 'Meta Ops', placeholder: 'title:prefix:[Cats] ' },
@@ -320,13 +329,14 @@ download-as-cancel if Download As closes without starting. -->
 
       // The channel URL's ops, with no filename and the usual directories and other args (blank, so move ops still apply).
       // Adds a field:set:value line to the top of the meta ops, replacing any other set of that field.
-      addSetOp() {
-        const field = (this.setField || this.setOther).trim().replace(/[\\:|]/g, c => `\\${c}`);
-        if (!field || this.setValue === '') return;
+      // Without arguments, uses the builder's field and value.
+      addSetOp(setField = this.setField || this.setOther, value = this.setValue) {
+        const field = setField.trim().replace(/[\\:|]/g, c => `\\${c}`);
+        if (!field || value === '') return;
         const prefix = `${field}:set:`.toLowerCase();
         const kept = (this.form.meta_ops || '').split('\n').filter(l => l.trim() && !l.toLowerCase().startsWith(prefix));
-        this.form.meta_ops = [`${field}:set:${this.setValue.replace(/\\/g, '\\\\')}`, ...kept].join('\n');
-        this.setValue = '';
+        this.form.meta_ops = [`${field}:set:${value.replace(/\\/g, '\\\\')}`, ...kept].join('\n');
+        if (arguments.length === 0) this.setValue = '';
       },
 
       defaultForm() {

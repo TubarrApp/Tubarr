@@ -111,10 +111,11 @@
                     @change="filterChanged()"
                     class="rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-8 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                   >
-                    <option value="" x-text="`All statuses (${urlVideos.length})`"></option>
+                    <option value="" x-text="`All statuses (${notIgnoredCount})`"></option>
                     <option value="Available" x-text="`Untried (${statusCount('Available')})`"></option>
                     <option value="Failed" x-text="`Failed (${statusCount('Failed')})`"></option>
                     <option value="Canceled" x-text="`Canceled (${statusCount('Canceled')})`"></option>
+                    <option value="Ignored" x-text="`Ignored (${statusCount('Ignored')})`"></option>
                   </select>
 
                   <select
@@ -141,6 +142,16 @@
                   </div>
                   <div class="flex gap-3">
                     <button
+                      x-show="ignoredView"
+                      @click="act('restore')"
+                      :disabled="selectedCount === 0 || working"
+                      title="Move the selected videos back to Available, to download them past the download filters."
+                      class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Restore<span x-show="selectedCount > 0" x-text="` (${selectedCount})`"></span>
+                    </button>
+                    <button
+                      x-show="!ignoredView"
                       @click="act('dismiss')"
                       :disabled="selectedCount === 0 || working"
                       title="Hide the selected videos. Crawls won't show them again."
@@ -149,6 +160,7 @@
                       Dismiss
                     </button>
                     <button
+                      x-show="!ignoredView"
                       @click="act('download')"
                       :disabled="selectedCount === 0 || working"
                       class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -191,7 +203,8 @@
                         <span
                           x-show="video.download_status.status !== 'Available'"
                           class="available-overlay"
-                          style="top: 0.5rem; right: 0.5rem; background: #b91c1c;"
+                          style="top: 0.5rem; right: 0.5rem;"
+                          :style="{ background: video.download_status.status === 'Ignored' ? '#4b5563' : '#b91c1c' }"
                           :title="video.download_status.error || ''"
                           x-text="video.retries_on_crawl ? `${video.download_status.status}: retries on next crawl` : video.download_status.status"
                         ></span>
@@ -225,6 +238,7 @@
                           x-text="video.download_status.error"
                         ></p>
                         <button
+                          x-show="!ignoredView"
                           type="button"
                           @click.stop="$dispatch('download-as', video)"
                           title="Download this video with its own filename and Metarr ops."
@@ -321,7 +335,7 @@
 
           async loadVideos() {
             try {
-              const response = await fetch('/api/v1/videos/available');
+              const response = await fetch('/api/v1/videos/available?ignored=1');
               if (!response.ok) {
                 throw new Error(await response.text() || 'Failed to fetch available videos');
               }
@@ -334,10 +348,29 @@
             }
           },
 
+          // Ignored videos are shown only by the Ignored status filter, as they can only be restored.
+          get ignoredView() {
+            return this.statusFilter === 'Ignored';
+          },
+
+          isIgnored(video) {
+            return video.download_status.status === 'Ignored';
+          },
+
+          get viewVideos() {
+            return this.videos.filter(v => this.isIgnored(v) === this.ignoredView);
+          },
+
+          // Whether the video is in the selected channel and channel URL, whatever its status.
+          inScope(video) {
+            return (this.channelFilter === '' || String(video.channel_id) === this.channelFilter) &&
+              (this.urlFilter === '' || String(video.channel_url_id) === this.urlFilter);
+          },
+
           // Channels with available videos, and their counts.
           get channelOptions() {
             const byID = new Map();
-            for (const v of this.videos) {
+            for (const v of this.viewVideos) {
               const ch = byID.get(v.channel_id) || { id: String(v.channel_id), name: v.channel_name, count: 0 };
               ch.count++;
               byID.set(v.channel_id, ch);
@@ -346,8 +379,8 @@
           },
 
           get channelVideos() {
-            if (this.channelFilter === '') return this.videos;
-            return this.videos.filter(v => String(v.channel_id) === this.channelFilter);
+            if (this.channelFilter === '') return this.viewVideos;
+            return this.viewVideos.filter(v => String(v.channel_id) === this.channelFilter);
           },
 
           // The selected channel's URLs with available videos, and their counts.
@@ -369,7 +402,11 @@
 
           // How many of the selected channel URL's videos have the download status.
           statusCount(status) {
-            return this.urlVideos.filter(v => v.download_status.status === status).length;
+            return this.videos.filter(v => this.inScope(v) && v.download_status.status === status).length;
+          },
+
+          get notIgnoredCount() {
+            return this.videos.filter(v => this.inScope(v) && !this.isIgnored(v)).length;
           },
 
           get filteredVideos() {
@@ -402,6 +439,10 @@
           filterChanged() {
             this.currentPage = 1;
             this.lastClickedIndex = null;
+            // Ignored videos can only be restored, and others never, so selections don't carry between the two.
+            for (const [id, v] of Object.entries(this.selected)) {
+              if (this.isIgnored(v) !== this.ignoredView) delete this.selected[id];
+            }
             const params = new URLSearchParams();
             if (this.channelFilter) params.set('channel', this.channelFilter);
             if (this.urlFilter) params.set('url', this.urlFilter);
@@ -443,7 +484,7 @@
             this.filteredVideos.forEach(v => this.setSelected(v, true));
           },
 
-          // Downloads or dismisses the selected videos, sent per channel.
+          // Downloads, dismisses or restores the selected videos, sent per channel.
           async act(action) {
             const chosen = Object.values(this.selected);
             if (chosen.length === 0) return;

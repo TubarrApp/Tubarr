@@ -66,7 +66,7 @@ type ChannelStore interface {
 
 	// 'Get' operations.
 	GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error)
-	GetDownloadedOrIgnoredVideos(c *models.Channel) (videos []*models.Video, hasRows bool, err error)
+	GetDownloadedVideos(c *models.Channel) (videos []*models.Video, hasRows bool, err error)
 	GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls, failedURLs []string, err error)
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetChannelID(key, val string) (int64, error)
@@ -106,6 +106,7 @@ type VideoStore interface {
 	GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error)
 	GetLatestFinishedVideos(ctx context.Context, channelID int64, n int) (videos []*models.Video, err error)
 	CountFinishedVideos(ctx context.Context, channelID int64) (n int, err error)
+	CountFailedMetarrVideos(ctx context.Context) (counts map[int64]int, err error)
 	GetAvailableVideos(statuses ...consts.DownloadStatus) (videos []*models.AvailableVideo, err error)
 	GetVideoOverrides(videoID int64) (*models.VideoOverrides, error)
 	ThumbnailURLs() (thumbURLs []string, err error)

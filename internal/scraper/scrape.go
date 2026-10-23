@@ -101,7 +101,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			continue
 		}
 
-		// Failed or canceled videos wait in the Available list, so only auto-downloading URLs retry them.
+		// Failed videos wait in the Available list, so only auto-downloading URLs retry them (canceled ones are never retried).
 		seenURLs := existingURLs
 		if !c.AutoDownloads(cu) {
 			seenURLs = slices.Concat(existingURLs, failedURLs)

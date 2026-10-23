@@ -13,6 +13,9 @@ import (
 	"tubarr/internal/state"
 )
 
+// filteredDisplayTime is how long a filtered out video stays on the Downloads page.
+const filteredDisplayTime = 5 * time.Second
+
 // DownloadTracker is the model holding data related to download tracking.
 type DownloadTracker struct {
 	updates  chan models.StatusUpdate
@@ -121,6 +124,10 @@ func (t *DownloadTracker) drain() {
 
 	t.videoIDs.Range(func(id, _ any) bool {
 		videoID, _ := id.(int64)
+		// Filtered out videos are already stored, and left for their timer to remove from the Downloads page.
+		if state.GetStatusUpdate(videoID).Status == consts.DLStatusIgnored {
+			return true
+		}
 		if update, ok := state.TakeStatusUpdate(videoID); ok {
 			if err := t.dlStore.UpdateDownloadStatus(drainCtx, update); err != nil {
 				logger.Pl.E("Failed to store final update for video %q: %v", update.VideoURL, err)
@@ -173,7 +180,10 @@ func (t *DownloadTracker) flushUpdates(ctx context.Context, update models.Status
 			return
 		}
 		// Finished statuses are stored, so they no longer need caching (the cache feeds the active downloads view).
-		if update.Status != consts.DLStatusQueued && update.Status != consts.DLStatusDownloading {
+		if update.Status == consts.DLStatusIgnored {
+			// Kept briefly so the Downloads page shows the video was filtered out.
+			time.AfterFunc(filteredDisplayTime, func() { state.DeleteStatusUpdateIf(update.VideoID, consts.DLStatusIgnored) })
+		} else if update.Status != consts.DLStatusQueued && update.Status != consts.DLStatusDownloading {
 			state.DeleteStatusUpdate(update.VideoID)
 		}
 	}

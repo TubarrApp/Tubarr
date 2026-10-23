@@ -126,7 +126,7 @@ func TestAddVideosDuplicateURL(t *testing.T) {
 	}
 }
 
-// TestFinishedVideoLists tests the latest finished and the downloaded or ignored video lists, newest first.
+// TestFinishedVideoLists tests the latest finished and the downloaded video lists, newest first, and the failed Metarr count.
 func TestFinishedVideoLists(t *testing.T) {
 	cs := newTestChannelStore(t)
 	c := testChannel(t, "chan", "https://example.com/@a")
@@ -174,15 +174,32 @@ func TestFinishedVideoLists(t *testing.T) {
 		t.Errorf("finished count: got %d, %v, want 3", n, err)
 	}
 
-	all, _, err := cs.GetDownloadedOrIgnoredVideos(c)
+	// Ignored videos are listed on the Available page instead.
+	all, _, err := cs.GetDownloadedVideos(c)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"https://example.com/v/new", "https://example.com/v/ignored", "https://example.com/v/mid", "https://example.com/v/old"}
+	want := []string{"https://example.com/v/new", "https://example.com/v/mid", "https://example.com/v/old"}
 	if !slices.Equal(urls(all), want) {
-		t.Fatalf("downloaded or ignored: got %q, want %q", urls(all), want)
+		t.Fatalf("downloaded: got %q, want %q", urls(all), want)
 	}
-	if !all[1].Ignored {
-		t.Errorf("downloaded or ignored: ignored video read as not ignored")
+
+	// Only downloaded, not ignored, videos Metarr failed on are counted.
+	for u, status := range map[string]consts.MetarrStatus{
+		"https://example.com/v/old":     consts.MetarrStatusFailed,
+		"https://example.com/v/mid":     consts.MetarrStatusFailed,
+		"https://example.com/v/new":     consts.MetarrStatusDone,
+		"https://example.com/v/ignored": consts.MetarrStatusFailed,
+	} {
+		if _, err := cs.db.Exec("UPDATE "+consts.DBVideos+" SET "+consts.QVidMetarrStatus+" = ? WHERE "+consts.QVidURL+" = ?", status, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	counts, err := vs.CountFailedMetarrVideos(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(counts) != 1 || counts[c.ID] != 2 {
+		t.Errorf("failed Metarr counts: got %v, want 2 for channel %d", counts, c.ID)
 	}
 }

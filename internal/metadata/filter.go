@@ -254,7 +254,7 @@ func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, f
 		return true, false
 	}
 	if filter.MustAny == sharedconsts.OpMust {
-		logger.Pl.I("%s mismatch: Video %q %s", filterType, videoURL, mismatch)
+		logger.Pl.D(3, "%s mismatch: Video %q %s", filterType, videoURL, mismatch)
 		return false, true
 	}
 	return false, false

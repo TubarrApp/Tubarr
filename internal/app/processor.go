@@ -310,13 +310,18 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 		downloads.UnregisterDownloadContext(v.ID, v.URL)
 		finishTracking(vidCtx, b.dlTracker, v, err)
 	}()
+
+	// New videos are stored first, so they show on the Downloads page while waiting and fetching metadata.
+	if v.ID == 0 {
+		v.DownloadStatus = models.DLStatus{Status: consts.DLStatusQueued}
+		if v.ID, err = b.vs.AddVideo(v, c.ID, cu.ID); err != nil {
+			return fmt.Errorf("failed to store video %q: %w", v.URL, err)
+		}
+	}
 	track("Waiting to start")
 
 	// Fail fast once an earlier video's bot detection has blocked the domain.
 	if err := downloads.CheckIfAvoidURL(v.URL, cu, b.cs.GetDB()); err != nil {
-		if v.ID == 0 {
-			storeFailedVideo(b.vs, b.dlTracker, v, c, cu, err)
-		}
 		return err
 	}
 
@@ -338,9 +343,6 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 		return nil
 	}
 	if err != nil {
-		if v.ID == 0 && vidCtx.Err() == nil {
-			storeFailedVideo(b.vs, b.dlTracker, v, c, cu, err)
-		}
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
 	}
 	if !proceed {
@@ -348,7 +350,6 @@ func (b *videoBatch) videoJob(queueCtx, procCtx, metarrCtx context.Context, v *m
 		return nil
 	}
 
-	// New videos have an ID once their metadata is stored.
 	track("Waiting for download slot")
 
 	// Check move operations.
@@ -445,16 +446,6 @@ func isClosed(ch <-chan struct{}) bool {
 	default:
 		return false
 	}
-}
-
-// storeFailedVideo stores a new video whose metadata download failed as Failed with its error, listing it in Available.
-func storeFailedVideo(vs contracts.VideoStore, dlTracker *downloads.DownloadTracker, v *models.Video, c *models.Channel, cu *models.ChannelURL, failure error) {
-	v.DownloadStatus = models.DLStatus{Status: consts.DLStatusFailed}
-	if _, err := vs.AddVideo(v, c.ID, cu.ID); err != nil {
-		logger.Pl.E("Failed to store failed video %q: %v", v.URL, err)
-		return
-	}
-	dlTracker.SetStatus(v, consts.DLStatusFailed, 0, "", failure)
 }
 
 // completeAndStoreVideo marks a video as complete.

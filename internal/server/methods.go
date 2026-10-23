@@ -126,8 +126,12 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Video {
 	var videos []models.Video
 	for _, statusUpdate := range state.ChannelStatusUpdates(channel.ID) {
-		// Only include Queued or Downloading statuses
-		if statusUpdate.Status != consts.DLStatusQueued && statusUpdate.Status != consts.DLStatusDownloading {
+		// Only include Queued or Downloading statuses, and Ignored ones briefly kept to show they were filtered out.
+		switch statusUpdate.Status {
+		case consts.DLStatusQueued, consts.DLStatusDownloading, consts.DLStatusIgnored:
+			// Proceed with loop logic
+		default:
+			// Go to next iteration
 			continue
 		}
 

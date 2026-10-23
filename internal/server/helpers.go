@@ -38,6 +38,7 @@ type channelResponse struct {
 	ChannelConfigFile    string               `json:"channel_config_file"`
 	NewVideoNotification bool                 `json:"new_video_notification"`
 	LoadError            string               `json:"load_error,omitempty"` // Why it won't run until its settings are fixed.
+	FailedPostProcessing int                  `json:"failed_post_processing"`
 	Settings             *settingsResponse    `json:"settings,omitempty"`
 	Metarr               *metarrArgsResponse  `json:"metarr,omitempty"`
 	URLModels            []channelURLResponse `json:"url_models,omitempty"`

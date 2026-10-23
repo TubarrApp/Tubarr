@@ -421,6 +421,30 @@
                             </svg>
                             <span x-text="ignoring === channel.id ? 'Ignoring...' : 'Ignore to Date'"></span>
                           </button>
+                          <button
+                            x-show="failedDownloads(channel).length > 0"
+                            @click="retryFailedDownloads(channel); actionsMenuOpen = null"
+                            :disabled="retrying === channel.id"
+                            title="Download this channel's failed videos again (canceled ones aren't included)"
+                            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span x-text="`Retry Failed Downloads (${failedDownloads(channel).length})`"></span>
+                          </button>
+                          <button
+                            x-show="channel.failed_post_processing > 0"
+                            @click="retryFailedPostProcessing(channel); actionsMenuOpen = null"
+                            :disabled="retrying === channel.id || isMetarrActive(channel)"
+                            title="Post-process this channel's videos which failed post-processing again"
+                            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span x-text="`Retry Failed Post-processing (${channel.failed_post_processing})`"></span>
+                          </button>
                           <!-- Removed per-channel Active Downloads link -->
                           <div class="border-t border-gray-200 dark:border-gray-700"></div>
                           <button
@@ -822,6 +846,55 @@
               alert(`Failed to download "${video.title}": ${err.message}`);
             } finally {
               this.downloadingAvailable = this.downloadingAvailable.filter(id => id !== video.id);
+            }
+          },
+
+          retrying: null, // Channel ID whose retry request is in flight.
+
+          // Failed videos in the channel's Available list, which crawls only retry on auto-download URLs.
+          failedDownloads(channel) {
+            return (this.availableVideos[channel.id] || []).filter(v => v.download_status.status === 'Failed');
+          },
+
+          async retryFailedDownloads(channel) {
+            const ids = this.failedDownloads(channel).map(v => v.id);
+            if (ids.length === 0 || !confirm(`Download ${ids.length} failed video(s) for "${channel.name}" again?`)) return;
+            this.retrying = channel.id;
+            try {
+              const response = await fetch(`/api/v1/channels/${channel.id}/available`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'download', video_ids: ids })
+              });
+              if (!response.ok) {
+                throw new Error(await response.text() || response.statusText);
+              }
+              await this.loadAvailableVideos();
+            } catch (err) {
+              alert(`Failed to retry downloads: ${err.message}`);
+            } finally {
+              this.retrying = null;
+            }
+          },
+
+          async retryFailedPostProcessing(channel) {
+            if (!confirm(`Post-process ${channel.failed_post_processing} video(s) for "${channel.name}" again? This may start transcodes.`)) return;
+            this.retrying = channel.id;
+            try {
+              const response = await fetch(`/api/v1/channels/${channel.id}/run-metarr`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ failed_only: true })
+              });
+              if (!response.ok) {
+                throw new Error(await response.text() || response.statusText);
+              }
+              channel.failed_post_processing = 0; // Recounted on the next channel load, if any fail again.
+              await this.loadActivity();
+            } catch (err) {
+              alert(`Failed to retry post-processing: ${err.message}`);
+            } finally {
+              this.retrying = null;
             }
           },
 

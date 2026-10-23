@@ -1133,6 +1133,7 @@ func pageRequests() []pageRequest {
 			}
 		}},
 		{path: "/api/v1/videos/available", replay: readsJSON("/api/v1/videos/available")},
+		{path: "/api/v1/videos/available?ignored=1", replay: readsJSON("/api/v1/videos/available?ignored=1")},
 	}
 }
 

@@ -464,6 +464,39 @@ func (vs *VideoStore) CountFinishedVideos(ctx context.Context, channelID int64) 
 	return n, nil
 }
 
+// CountFailedMetarrVideos returns how many downloaded videos Metarr failed on, by channel ID.
+func (vs *VideoStore) CountFailedMetarrVideos(ctx context.Context) (counts map[int64]int, err error) {
+	query := fmt.Sprintf(
+		"SELECT %s, COUNT(*) FROM %s WHERE %s = 1 AND %s = 0 AND %s = ? GROUP BY %s",
+		consts.QVidChanID,
+		consts.DBVideos,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidMetarrStatus,
+		consts.QVidChanID,
+	)
+	rows, err := vs.DB.QueryContext(ctx, query, consts.MetarrStatusFailed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count videos Metarr failed on: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			logger.Pl.E("Failed to close rows: %v", closeErr)
+		}
+	}()
+
+	counts = make(map[int64]int)
+	for rows.Next() {
+		var channelID int64
+		var n int
+		if err := rows.Scan(&channelID, &n); err != nil {
+			return nil, fmt.Errorf("failed to scan failed Metarr count: %w", err)
+		}
+		counts[channelID] = n
+	}
+	return counts, rows.Err()
+}
+
 // AddAvailableVideos stores newly found videos as Available, skipping any already in the channel.
 //
 // Videos are given in the channel's listing order and inserted last first, so GetAvailableVideos' ID tie-breaker keeps
@@ -539,7 +572,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 	query := fmt.Sprintf(
 		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, d.%s, c.%s "+
 			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
-			"WHERE v.%s = 0 AND v.%s = 0 AND d.%s IN (%s) "+
+			"WHERE v.%s = 0 AND (v.%s = 0 OR d.%s = ?) AND d.%s IN (%s) "+
 			"ORDER BY v.%s DESC, v.%s DESC, v.%s DESC",
 		consts.QVidID,
 		consts.QVidChanID,
@@ -558,15 +591,16 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		consts.DBDownloads, consts.QDLVidID, consts.QVidID,
 		consts.DBChannels, consts.QChanID, consts.QVidChanID,
 		consts.QVidFinished,
-		consts.QVidIgnored,
+		consts.QVidIgnored, consts.QDLStatus, // Ignored videos are listed only when asked for by their status.
 		consts.QDLStatus, placeholders(len(statuses)),
 		consts.QVidUploadDate,
 		consts.QVidCreatedAt,
 		consts.QVidID,
 	)
-	args := make([]any, len(statuses))
-	for i, s := range statuses {
-		args[i] = s
+	args := make([]any, 0, len(statuses)+1)
+	args = append(args, consts.DLStatusIgnored)
+	for _, s := range statuses {
+		args = append(args, s)
 	}
 
 	rows, err := vs.DB.Query(query, args...)
@@ -622,11 +656,13 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 // ClaimVideos moves a channel's given unfinished videos with a status in from to status, returning those moved.
 //
 // Each video is claimed by a conditional update, so concurrent requests can't both claim it.
-// Claiming as Ignored also marks the video ignored, so crawls skip it.
+// Claiming as Ignored also marks the video ignored, so crawls skip it. Claiming from only Ignored restores ignored videos.
 func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []consts.DownloadStatus, status consts.DownloadStatus) (claimed []*models.Video, err error) {
 	if len(videoIDs) == 0 || len(from) == 0 {
 		return nil, nil
 	}
+	restoring := slices.Equal(from, []consts.DownloadStatus{consts.DLStatusIgnored})
+
 	tx, err := vs.DB.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -635,7 +671,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 
 	claimQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = 0, %s = CASE WHEN ? THEN '' ELSE %s END, %s = ? WHERE %s = ? AND %s IN (%s) "+
-			"AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = 0)",
+			"AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = ?)",
 		consts.DBDownloads,
 		consts.QDLStatus,
 		consts.QDLPct,
@@ -655,7 +691,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		consts.QVidID,
 	)
 	ignoreQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = 1, %s = ? WHERE %s = ?",
+		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
 		consts.DBVideos,
 		consts.QVidIgnored,
 		consts.QVidUpdatedAt,
@@ -668,7 +704,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		for _, s := range from {
 			args = append(args, s)
 		}
-		result, err := tx.Exec(claimQuery, append(args, channelID)...)
+		result, err := tx.Exec(claimQuery, append(args, channelID, restoring)...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to claim video %d: %w", id, err)
 		}
@@ -687,11 +723,11 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		v.Title = title.String
 		v.DownloadStatus.Status = status
 
-		if status == consts.DLStatusIgnored {
-			if _, err := tx.Exec(ignoreQuery, now, id); err != nil {
-				return nil, fmt.Errorf("failed to ignore video %d: %w", id, err)
+		if status == consts.DLStatusIgnored || restoring {
+			v.Ignored = status == consts.DLStatusIgnored
+			if _, err := tx.Exec(ignoreQuery, v.Ignored, now, id); err != nil {
+				return nil, fmt.Errorf("failed to set ignored for video %d: %w", id, err)
 			}
-			v.Ignored = true
 		}
 		claimed = append(claimed, v)
 	}

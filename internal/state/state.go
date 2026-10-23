@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 )
@@ -222,6 +223,13 @@ func TakeStatusUpdate(videoID int64) (models.StatusUpdate, bool) {
 // DeleteStatusUpdate removes a video's status update.
 func DeleteStatusUpdate(videoID int64) {
 	statusUpdates.Delete(videoID)
+}
+
+// DeleteStatusUpdateIf removes a video's status update if it still has the given status.
+func DeleteStatusUpdateIf(videoID int64, status consts.DownloadStatus) {
+	if GetStatusUpdate(videoID).Status == status {
+		statusUpdates.Delete(videoID)
+	}
 }
 
 // ChannelStatusUpdates returns the status updates held for a channel's videos.
