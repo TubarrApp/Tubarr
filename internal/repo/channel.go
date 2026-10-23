@@ -1169,18 +1169,20 @@ func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn fu
 	}
 
 	var (
-		channelID  int64
-		metarrArgs json.RawMessage
+		channelID   int64
+		channelName string
+		metarrArgs  json.RawMessage
 	)
 	query := fmt.Sprintf(
-		"SELECT %s, %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QChanID,
+		consts.QChanName,
 		consts.QChanMetarr,
 		consts.DBChannels,
 		key,
 	)
 
-	err := cs.q.QueryRow(query, val).Scan(&channelID, &metarrArgs)
+	err := cs.q.QueryRow(query, val).Scan(&channelID, &channelName, &metarrArgs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
@@ -1219,7 +1221,7 @@ func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn fu
 	}
 
 	// Print the updated settings.
-	logger.Pl.S("Updated MetarrArgs: %s", string(updatedArgs))
+	logger.Pl.S("Updated MetarrArgs for channel %q (ID %d): %s", channelName, channelID, string(updatedArgs))
 
 	// Update the database with the new settings.
 	updateQuery := fmt.Sprintf(
@@ -1252,15 +1254,21 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 		return 0, err
 	}
 
-	var settingsJSON json.RawMessage
+	var (
+		channelID    int64
+		channelName  string
+		settingsJSON json.RawMessage
+	)
 	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
+		consts.QChanID,
+		consts.QChanName,
 		consts.QChanSettings,
 		consts.DBChannels,
 		key,
 	)
 
-	err := cs.q.QueryRow(query, val).Scan(&settingsJSON)
+	err := cs.q.QueryRow(query, val).Scan(&channelID, &channelName, &settingsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("no channel found with key %q and value '%v'", key, val)
 	} else if err != nil {
@@ -1298,7 +1306,7 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 	}
 
 	// Print the updated settings.
-	logger.Pl.S("Updated ChannelSettings: %s", string(updatedSettings))
+	logger.Pl.S("Updated ChannelSettings for channel %q (ID %d): %s", channelName, channelID, string(updatedSettings))
 
 	// Update the database with the new settings.
 	updateQuery := fmt.Sprintf(

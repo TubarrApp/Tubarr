@@ -170,8 +170,20 @@
                   </div>
                 </div>
 
+                <!-- No Matches (e.g. only ignored videos, which the default view hides) -->
+                <div x-show="filteredVideos.length === 0" class="px-6 text-center" style="padding-top: 3rem; padding-bottom: 3rem;">
+                  <p class="text-gray-900 dark:text-white font-medium" x-text="!ignoredView && notIgnoredCount === 0 ? 'Nothing waiting' : 'No videos match these filters'"></p>
+                  <button
+                    x-show="!ignoredView && statusCount('Ignored') > 0"
+                    type="button"
+                    @click="statusFilter = 'Ignored'; filterChanged()"
+                    class="mt-2 text-sm text-brand-500 hover:underline dark:text-brand-400"
+                    x-text="`${statusCount('Ignored')} ignored video(s) can be restored from the Ignored filter.`"
+                  ></button>
+                </div>
+
                 <!-- Video Grid -->
-                <div x-ref="grid" class="available-grid p-6">
+                <div x-ref="grid" x-show="filteredVideos.length > 0" class="available-grid p-6">
                   <template x-for="(video, i) in paginatedVideos" :key="video.id">
                     <div
                       @click="toggle(video, startIndex + i, $event)"
