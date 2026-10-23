@@ -139,6 +139,32 @@ func TestAvailableVideos(t *testing.T) {
 		t.Fatalf("dismiss again: got %d, %v, want 1", len(dismissed), err)
 	}
 
+	// Failed videos are retried by crawls until they run out of crawl retries, and downloading one gives them back.
+	failedURL := []string{"https://example.com/v/2"}
+	for range consts.MaxCrawlDLRetries {
+		if _, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); !slices.Equal(failed, failedURL) {
+			t.Fatalf("expected the failed video retried, got %v", failed)
+		}
+		if err := cs.AddCrawlDLRetries(chanID, failedURL); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if seen, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 2 || len(failed) != 0 {
+		t.Errorf("expected the failed video seen once out of crawl retries, got %v and %v", seen, failed)
+	}
+	if available, _ := vs.GetAvailableVideos(consts.DLStatusFailed); len(available) != 1 || available[0].CrawlDLRetries != consts.MaxCrawlDLRetries {
+		t.Errorf("expected the failed video listed with %d crawl download retries, got %+v", consts.MaxCrawlDLRetries, available)
+	}
+	if queued, err := vs.ClaimVideos(chanID, ids[1:], app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(queued) != 1 {
+		t.Fatalf("download: got %d, %v, want 1", len(queued), err)
+	}
+	if reset, err := vs.ClaimVideos(chanID, ids[1:], []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil || len(reset) != 1 {
+		t.Fatalf("fail again: got %d, %v, want 1", len(reset), err)
+	}
+	if _, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); !slices.Equal(failed, failedURL) {
+		t.Errorf("expected the downloaded video's crawl retries reset, got failed %v", failed)
+	}
+
 	// Canceled videos count as seen, so crawls never retry them.
 	if canceled, err := vs.ClaimVideos(chanID, ids[1:], app.AvailableStatuses, consts.DLStatusCanceled); err != nil || len(canceled) != 1 {
 		t.Fatalf("cancel: got %d, %v, want 1", len(canceled), err)

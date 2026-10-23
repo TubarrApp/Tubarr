@@ -1438,17 +1438,19 @@ func (cs *ChannelStore) GetDownloadedVideos(c *models.Channel) (videos []*models
 	return videos, true, nil
 }
 
-// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, canceled, or Available URLs from the database, and failed ones separately.
+// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, canceled, or Available URLs from the database, and
+// failed ones crawls can still retry separately.
 func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls, failedURLs []string, err error) {
 	if c.ID == 0 {
 		return nil, nil, errors.New("model entered has no ID")
 	}
 
 	seen := fmt.Sprintf(
-		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?))",
+		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?) OR (%s = ? AND %s >= ?))",
 		consts.QVidFinished,
 		consts.QVidIgnored,
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
+		consts.QDLStatus, consts.QCrawlDLRetries,
 	)
 	query := fmt.Sprintf(
 		"SELECT %s, %s FROM %s WHERE %s = ? AND (%s OR %s IN (SELECT %s FROM %s WHERE %s = ?))",
@@ -1459,9 +1461,10 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
 	)
 
-	// Canceled videos count as seen, as the user chose not to download them.
-	rows, err := cs.q.Query(query, consts.DLStatusAvailable, consts.DLStatusCanceled, c.ID,
-		consts.DLStatusAvailable, consts.DLStatusCanceled, consts.DLStatusFailed)
+	// Canceled videos count as seen, as the user chose not to download them, and so do failed ones out of crawl retries.
+	seenArgs := []any{consts.DLStatusAvailable, consts.DLStatusCanceled, consts.DLStatusFailed, consts.MaxCrawlDLRetries}
+	args := slices.Concat(seenArgs, []any{c.ID}, seenArgs, []any{consts.DLStatusFailed})
+	rows, err := cs.q.Query(query, args...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -1493,6 +1496,23 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 
 	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
 	return urls, failedURLs, nil
+}
+
+// AddCrawlDLRetries counts a crawl's download retry for each of the channel's failed videos with the given URLs.
+func (cs *ChannelStore) AddCrawlDLRetries(channelID int64, videoURLs []string) error {
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = %s + 1 WHERE %s = ? AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = ?)",
+		consts.DBDownloads,
+		consts.QCrawlDLRetries, consts.QCrawlDLRetries,
+		consts.QDLStatus,
+		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID, consts.QVidURL,
+	)
+	for _, u := range videoURLs {
+		if _, err := cs.q.Exec(query, consts.DLStatusFailed, channelID, u); err != nil {
+			return fmt.Errorf("failed to count crawl retry for video %q: %w", u, err)
+		}
+	}
+	return nil
 }
 
 // DisplaySettings displays fields relevant to a channel.

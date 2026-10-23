@@ -899,7 +899,8 @@ func (ss *serverStore) handleAddAvailableURLs(w http.ResponseWriter, r *http.Req
 // handleGetAvailableVideos returns videos awaiting the user's choice to download or dismiss them across all channels,
 // with the ignored ones which can be restored if asked for.
 //
-// Failed videos from channel URLs which auto download are marked as retried by their next crawl.
+// Failed videos from channel URLs which auto download are marked as retried by their next crawl, while they have crawl
+// retries left.
 func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.Request) {
 	statuses := app.AvailableStatuses
 	if r.URL.Query().Get("ignored") == "1" {
@@ -924,7 +925,10 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.R
 	}
 	shown := make([]*models.Video, 0, len(videos))
 	for _, v := range videos {
-		v.RetriesOnCrawl = v.DownloadStatus.Status == consts.DLStatusFailed && retried[v.ChannelURLID]
+		if v.DownloadStatus.Status == consts.DLStatusFailed && retried[v.ChannelURLID] {
+			v.CrawlDLRetriesLeft = max(consts.MaxCrawlDLRetries-v.CrawlDLRetries, 0)
+			v.RetriesOnCrawl = v.CrawlDLRetriesLeft > 0
+		}
 		shown = append(shown, &v.Video)
 	}
 	ss.applyThumbnailOverrides(shown)

@@ -142,6 +142,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := addColumnIfMissing(tx, "downloads", consts.QCrawlDLRetries, "INTEGER DEFAULT 0"); err != nil {
+		return err
+	}
+
 	if err := initNotifyTable(tx); err != nil {
 		return err
 	}

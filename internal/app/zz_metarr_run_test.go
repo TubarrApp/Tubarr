@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 	"tubarr/internal/database"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/paths"
@@ -15,6 +16,50 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/repo"
 )
+
+// TestMetarrBusy tests that only the channel's given videos queued for or running in Metarr are counted.
+func TestMetarrBusy(t *testing.T) {
+	inMetarr := func(videoID int64) *metarrClaim {
+		claim := &metarrClaim{videoID: videoID, done: make(chan struct{})}
+		claim.inMetarr.Store(true)
+		return claim
+	}
+	claims := map[metarrKey]*metarrClaim{
+		{1, "https://a.example/1"}: inMetarr(10),
+		{1, "https://a.example/2"}: inMetarr(11),
+		{1, "https://a.example/3"}: {videoID: 12, pipeline: true, done: make(chan struct{})}, // Still downloading.
+		{2, "https://b.example/1"}: inMetarr(20),
+	}
+	for k, c := range claims {
+		metarrClaims.Store(k, c)
+	}
+	t.Cleanup(func() {
+		for k := range claims {
+			metarrClaims.Delete(k)
+		}
+	})
+
+	tests := []struct {
+		name     string
+		channel  int64
+		videoIDs []int64
+		want     int
+	}{
+		{"one running", 1, []int64{10}, 1},
+		{"two running", 1, []int64{10, 11}, 2},
+		{"not in Metarr yet", 1, []int64{12}, 0},
+		{"other channel's video", 1, []int64{20}, 0},
+		{"not held", 1, []int64{99}, 0},
+		{"no videos given", 1, nil, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MetarrBusy(tt.channel, tt.videoIDs); got != tt.want {
+				t.Errorf("MetarrBusy(%d, %v) = %d, want %d", tt.channel, tt.videoIDs, got, tt.want)
+			}
+		})
+	}
+}
 
 // TestMetarrSkip tests each reason Metarr is held back for a channel URL, and that it isn't otherwise.
 func TestMetarrSkip(t *testing.T) {
@@ -119,4 +164,53 @@ func TestRunMetarrLeavesPendingForMissingOpsFile(t *testing.T) {
 	if _, err := os.Stat(ran); err != nil {
 		t.Error("Metarr didn't run for a Download As video, which doesn't use the ops file")
 	}
+}
+
+// TestWaitMetarr tests shutdown waits for videos in Metarr to be released, up to the timeout, and not for ones still downloading.
+func TestWaitMetarr(t *testing.T) {
+	hold := func(t *testing.T, url string, inMetarr bool) (metarrKey, *metarrClaim) {
+		t.Helper()
+		key := metarrKey{channelID: 1, url: url}
+		claim := &metarrClaim{done: make(chan struct{})}
+		claim.inMetarr.Store(inMetarr)
+		metarrClaims.Store(key, claim)
+		t.Cleanup(func() { metarrClaims.Delete(key) })
+		return key, claim
+	}
+
+	t.Run("waits for release", func(t *testing.T) {
+		key, claim := hold(t, "https://example.com/v/1", true)
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			releaseMetarr(key, claim)
+		}()
+		start := time.Now()
+		WaitMetarr(5 * time.Second)
+		select {
+		case <-claim.done:
+		default:
+			t.Fatal("returned before the run was released")
+		}
+		if d := time.Since(start); d > 2*time.Second {
+			t.Fatalf("waited %v after the run was released at 50ms", d)
+		}
+	})
+
+	t.Run("gives up at timeout", func(t *testing.T) {
+		hold(t, "https://example.com/v/2", true)
+		start := time.Now()
+		WaitMetarr(100 * time.Millisecond)
+		if d := time.Since(start); d < 100*time.Millisecond || d > 2*time.Second {
+			t.Fatalf("waited %v, want the 100ms timeout", d)
+		}
+	})
+
+	t.Run("skips downloads", func(t *testing.T) {
+		hold(t, "https://example.com/v/3", false)
+		start := time.Now()
+		WaitMetarr(5 * time.Second)
+		if d := time.Since(start); d > time.Second {
+			t.Fatalf("waited %v on a video not yet in Metarr", d)
+		}
+	})
 }

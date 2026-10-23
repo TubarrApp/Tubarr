@@ -119,6 +119,19 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			continue
 		}
 
+		// Failed videos found again use up one of their crawl retries (Ignore to Date ignores them instead).
+		if !ignoreCrawl && c.AutoDownloads(cu) {
+			var retried []string
+			for _, u := range failedURLs {
+				if _, found := newEpisodes[u]; found {
+					retried = append(retried, u)
+				}
+			}
+			if err := cs.AddCrawlDLRetries(c.ID, retried); err != nil {
+				logger.Pl.E("Failed to count crawl retries for channel URL %q: %v", cu.URL, err)
+			}
+		}
+
 		// Filter and create video requests, in the order the channel lists them.
 		for _, newURL := range listedInOrder(newEpisodes) {
 			lv := newEpisodes[newURL]

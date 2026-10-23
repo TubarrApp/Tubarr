@@ -105,8 +105,10 @@ const (
 // AvailableVideo is a video awaiting the user's choice to download it, with its channel's name.
 type AvailableVideo struct {
 	Video
-	ChannelName    string `json:"channel_name"`
-	RetriesOnCrawl bool   `json:"retries_on_crawl,omitempty"` // A failed or canceled video the channel URL's next crawl downloads again.
+	ChannelName        string `json:"channel_name"`
+	RetriesOnCrawl     bool   `json:"retries_on_crawl,omitempty"` // A failed video the channel URL's next crawl downloads again.
+	CrawlDLRetries     int    `json:"-"`                          // Crawls which have retried it since the user last downloaded it.
+	CrawlDLRetriesLeft int    `json:"crawl_dl_retries_left,omitempty"`
 }
 
 // ManualVideo is a video URL sent in for a channel, through the channel URL with the given ID (0 for its manual downloads).

@@ -119,3 +119,95 @@ func TestConfigReloadChecksChangedPaths(t *testing.T) {
 		t.Error("reloaded a filter file that's missing")
 	}
 }
+
+// TestMissingFilterFileDoesNotBlockChannels tests a channel whose filter file disappears still loads and can be paused,
+// and doesn't stop other channels loading, while setting a missing file is still rejected.
+func TestMissingFilterFileDoesNotBlockChannels(t *testing.T) {
+	cs := newTestChannelStore(t)
+	if _, err := cs.AddChannel(testChannel(t, "Healthy", "https://example.com/@a")); err != nil {
+		t.Fatal(err)
+	}
+	filterFile := filepath.Join(t.TempDir(), "filters.txt")
+	if err := os.WriteFile(filterFile, []byte("title:contains:cat\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c := testChannel(t, "Uses filter file", "https://example.com/@b")
+	c.ChanSettings.FilterFile = filterFile
+	id, err := cs.AddChannel(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idStr := strconv.FormatInt(id, 10)
+
+	if err := os.Remove(filterFile); err != nil {
+		t.Fatal(err)
+	}
+	if chans, _, err := cs.GetAllChannels(true); err != nil || len(chans) != 2 {
+		t.Fatalf("GetAllChannels = %d channels, %v; want both", len(chans), err)
+	}
+	if _, found, err := cs.GetChannelModel(consts.QChanID, idStr, true); !found || err != nil {
+		t.Fatalf("GetChannelModel = found %v, %v; want it loaded so it can be fixed", found, err)
+	}
+
+	// Unrelated updates (e.g. pausing) work, but setting a missing path doesn't.
+	if _, err := cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+		s.Paused = true
+		return nil
+	}); err != nil {
+		t.Errorf("pausing the channel = %v, want it to work", err)
+	}
+	if _, err := cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {
+		s.FilterFile = filepath.Join(t.TempDir(), "also-missing.txt")
+		return nil
+	}); err == nil {
+		t.Error("setting a missing filter file succeeded, want it rejected")
+	}
+}
+
+// TestCheckDownloadDirs tests that saving refuses a missing folder it adds without creating it, but accepts unchanged
+// ones, so e.g. a channel can be saved while an unchanged folder's drive is unmounted.
+func TestCheckDownloadDirs(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "missing")
+	exists := func(path string) bool {
+		_, err := os.Stat(path)
+		return err == nil
+	}
+
+	// Existing and templated (with an existing fixed part) folders are accepted.
+	s := &models.Settings{VideoDir: dir, JSONDir: filepath.Join(dir, "{{channel_name}}")}
+	if err := checkDownloadDirs(nil, s); err != nil {
+		t.Fatalf("existing folders: %v", err)
+	}
+
+	// New missing folders are refused and not created, whether plain, templated or a move op's.
+	for name, added := range map[string]*models.Settings{
+		"video":     {VideoDir: missing},
+		"templated": {JSONDir: filepath.Join(missing, "{{channel_name}}")},
+		"move op":   {MetaFilterMoveOps: []models.MetaFilterMoveOps{{Field: "title", Value: "cats", OutputDir: missing}}},
+	} {
+		if err := checkDownloadDirs(nil, added); err == nil {
+			t.Errorf("%s: missing folder accepted", name)
+		}
+	}
+	if exists(missing) {
+		t.Fatal("checking created the missing folder")
+	}
+
+	// Saved again unchanged while a folder is missing: accepted, and still not created.
+	unchanged := &models.Settings{VideoDir: missing}
+	if err := checkDownloadDirs(unchanged, unchanged); err != nil {
+		t.Errorf("unchanged missing folder: %v", err)
+	}
+
+	// Metarr output folder: a new missing one is refused, an unchanged one accepted.
+	if err := checkOutputDir(nil, &models.MetarrArgs{OutputDir: missing}); err == nil {
+		t.Error("output folder: missing folder accepted")
+	}
+	if err := checkOutputDir(&models.MetarrArgs{OutputDir: missing}, &models.MetarrArgs{OutputDir: missing}); err != nil {
+		t.Errorf("output folder: unchanged missing folder: %v", err)
+	}
+	if exists(missing) {
+		t.Error("checking created the missing folder")
+	}
+}

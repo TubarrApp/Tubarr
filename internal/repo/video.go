@@ -570,7 +570,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		return nil, nil
 	}
 	query := fmt.Sprintf(
-		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, d.%s, c.%s "+
+		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, d.%s, d.%s, c.%s "+
 			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
 			"WHERE v.%s = 0 AND (v.%s = 0 OR d.%s = ?) AND d.%s IN (%s) "+
 			"ORDER BY v.%s DESC, v.%s DESC, v.%s DESC",
@@ -586,6 +586,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		consts.QVidCreatedAt,
 		consts.QDLStatus,
 		consts.QDLError,
+		consts.QCrawlDLRetries,
 		consts.QChanName,
 		consts.DBVideos,
 		consts.DBDownloads, consts.QDLVidID, consts.QVidID,
@@ -634,6 +635,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 			&v.CreatedAt,
 			&v.DownloadStatus.Status,
 			&errorMsg,
+			&v.CrawlDLRetries,
 			&v.ChannelName,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan available video: %w", err)
@@ -670,12 +672,13 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	defer rollback(tx)
 
 	claimQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = 0, %s = CASE WHEN ? THEN '' ELSE %s END, %s = ? WHERE %s = ? AND %s IN (%s) "+
-			"AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = ?)",
+		"UPDATE %s SET %s = ?, %s = 0, %s = CASE WHEN ? THEN '' ELSE %s END, %s = CASE WHEN ? THEN 0 ELSE %s END, "+
+			"%s = ? WHERE %s = ? AND %s IN (%s) AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = ?)",
 		consts.DBDownloads,
 		consts.QDLStatus,
 		consts.QDLPct,
 		consts.QDLError, consts.QDLError, // A new download attempt clears the last one's error.
+		consts.QCrawlDLRetries, consts.QCrawlDLRetries, // And, being the user's, gives crawls their retries back.
 		consts.QDLUpdatedAt,
 		consts.QDLVidID,
 		consts.QDLStatus, placeholders(len(from)),
@@ -700,7 +703,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 
 	now := time.Now()
 	for _, id := range videoIDs {
-		args := []any{status, status == consts.DLStatusQueued, now, id}
+		args := []any{status, status == consts.DLStatusQueued, status == consts.DLStatusQueued, now, id}
 		for _, s := range from {
 			args = append(args, s)
 		}

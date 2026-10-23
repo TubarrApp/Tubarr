@@ -218,7 +218,7 @@
                           style="top: 0.5rem; right: 0.5rem;"
                           :style="{ background: video.download_status.status === 'Ignored' ? '#4b5563' : '#b91c1c' }"
                           :title="video.download_status.error || ''"
-                          x-text="video.retries_on_crawl ? `${video.download_status.status}: retries on next crawl` : video.download_status.status"
+                          x-text="video.retries_on_crawl ? `${video.download_status.status}: retries on next crawl (${video.crawl_dl_retries_left} left)` : video.download_status.status"
                         ></span>
                         <span
                           x-show="video.duration > 0"

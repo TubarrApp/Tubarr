@@ -168,6 +168,8 @@ const (
 	QDLError     = "error"
 	QDLCreatedAt = "created_at"
 	QDLUpdatedAt = "updated_at"
+
+	QCrawlDLRetries = "crawl_download_retries" // Crawls which retried a failed download, not a download's own retries.
 )
 
 // ValidDownloadKeys holds valid keys for the download database.
@@ -178,6 +180,8 @@ var ValidDownloadKeys = map[string]struct{}{
 	QDLError:     {},
 	QDLCreatedAt: {},
 	QDLUpdatedAt: {},
+
+	QCrawlDLRetries: {},
 }
 
 // Notification database entry keys.

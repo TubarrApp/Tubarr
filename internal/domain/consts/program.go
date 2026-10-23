@@ -16,6 +16,9 @@ const (
 	DefaultBotAvoidanceSeconds   = 10
 )
 
+// MaxCrawlDLRetries is how many crawls retry a failed video on auto-download URLs before it's left for the user to retry.
+const MaxCrawlDLRetries = 3
+
 // Intervals.
 const (
 	Interval100ms = 100 * time.Millisecond

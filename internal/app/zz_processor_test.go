@@ -4,11 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io"
+	"path/filepath"
 	"sync"
 	"testing"
+	"tubarr/internal/database"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/downloads"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
+	"tubarr/internal/repo"
+	"tubarr/internal/scraper"
 )
 
 // recordingDownloadStore records the download statuses stored for each video.
@@ -73,5 +81,59 @@ func TestFinishTracking(t *testing.T) {
 				t.Errorf("stored status %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestUnusableFilterFileHoldsBackCrawledVideos tests crawled videos aren't processed at all while the filter file can't be
+// used, so nothing downloads unfiltered and no requests are made for them.
+func TestUnusableFilterFileHoldsBackCrawledVideos(t *testing.T) {
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	store, err := repo.InitStores(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dir := t.TempDir()
+	settings := func() *models.Settings {
+		return &models.Settings{VideoDir: dir, JSONDir: dir, FilterFile: filepath.Join(dir, "missing-filters.txt")}
+	}
+	c := &models.Channel{ID: 1, Name: "Cats", ChanSettings: settings(), ChanMetarrArgs: &models.MetarrArgs{}}
+	cu := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats", ChanURLSettings: settings(), ChanURLMetarrArgs: &models.MetarrArgs{}}
+	videos := []*models.Video{{URL: "https://example.com/watch/1"}, {URL: "https://example.com/watch/2"}}
+
+	succeeded, downloaded, err := InitProcess(context.Background(), store, c, cu, videos, scraper.New())
+	if err == nil || succeeded != 0 || downloaded != 0 {
+		t.Fatalf("InitProcess = %d succeeded, %d downloaded, %v; want none processed and an error", succeeded, downloaded, err)
+	}
+	for _, v := range videos {
+		if !v.SkipDownloads.Skip || v.SkipDownloads.Reason != models.SkipDLMissingFilterFile {
+			t.Errorf("video %q SkipDownloads = %+v, want skipped for the missing filter file", v.URL, v.SkipDownloads)
+		}
+	}
+}
+
+// TestOverrideDir tests a Download As directory is filled in, a blank one keeps the channel URL's, and one whose
+// fixed part doesn't exist (e.g. an unmounted drive) is refused.
+func TestOverrideDir(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	dir := t.TempDir()
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := &models.ChannelURL{URL: "https://example.com/@cats"}
+	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
+
+	if got, err := overrideDir(dp, "", "/channel", "test"); err != nil || got != "/channel" {
+		t.Errorf("blank: got %q, %v, want /channel", got, err)
+	}
+	if got, err := overrideDir(dp, filepath.Join(dir, "{{channel_name}}"), "/channel", "test"); err != nil || got != filepath.Join(dir, "Cats") {
+		t.Errorf("templated: got %q, %v, want %q", got, err, filepath.Join(dir, "Cats"))
+	}
+	if _, err := overrideDir(dp, filepath.Join(dir, "unmounted", "videos"), "/channel", "test"); err == nil {
+		t.Error("missing destination: got no error")
 	}
 }
