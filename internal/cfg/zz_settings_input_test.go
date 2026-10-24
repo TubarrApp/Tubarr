@@ -270,7 +270,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 	gpuNode := mkfile("renderD128", "")
 
 	in := []settingsKey{
-		{keys.DownloadConcurrency, "Concurrency", false, 3, 0},
+		{keys.DownloadConcurrency, "DownloadConcurrency", false, 3, 0},
 		{keys.CookiesFromBrowser, "CookiesFromBrowser", false, "firefox", ""},
 		{keys.CrawlFreq, "CrawlFreq", false, 45, 0},
 		{keys.ExternalDownloader, "ExternalDownloader", false, "aria2c", ""},
@@ -308,7 +308,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		{keys.MExtraFFmpegArgs, "ExtraFFmpegArgs", true, "-map 0", ""},
 		{keys.MOutputDir, "OutputDir", true, outDir, ""},
 		{keys.MMetaPurge, "MetaPurge", true, "JSON", ""},
-		{keys.MConcurrency, "Concurrency", true, 2, 0},
+		{keys.MConcurrency, "MetarrConcurrency", true, 2, 0},
 		{keys.MMaxCPU, "MaxCPU", true, 50.0, 0.0},
 		{keys.MMinFreeMem, "MinFreeMem", true, "2G", ""},
 		{keys.TranscodeGPU, "TranscodeGPU", true, "VAAPI", ""},

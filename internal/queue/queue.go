@@ -1,4 +1,3 @@
-// Package queue holds the videos waiting to be processed, and those being processed.
 package queue
 
 import (
