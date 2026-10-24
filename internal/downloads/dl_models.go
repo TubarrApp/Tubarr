@@ -8,39 +8,27 @@ import (
 	"sync"
 	"syscall"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/limits"
 	"tubarr/internal/models"
 )
 
-var ongoingDownloads sync.Map       // map[ongoingKey]struct{}.
-var activeDownloadContexts sync.Map // map[int64]context.CancelCauseFunc.
-
 // ErrCanceledByUser is the cause of a download context canceled from the web UI or API, as opposed to by shutdown.
 var ErrCanceledByUser = errors.New("download canceled by user")
-
-// ongoingKey identifies a running download of one type of file for a URL.
-type ongoingKey struct {
-	kind DownloadType
-	url  string
-}
-
-// ErrDuplicateDownload is returned when the same file is already being downloaded for a URL.
-var ErrDuplicateDownload = errors.New("already being downloaded")
 
 // globalDownloadSem limits concurrent video downloads across all channels.
 // nil means no global limit (unlimited concurrent downloads).
 var globalDownloadSem chan struct{}
 var globalDownloadSemMu sync.RWMutex
 
-// DownloadType represents the type of download operation.
-type DownloadType string
-
-// Denotes the type of file being downloaded.
-const (
-	TypeJSON  DownloadType = "JSON"
-	TypeVideo DownloadType = "video"
-)
+// Tracker is told a download's status whenever it changes.
+type Tracker interface {
+	// SetStatus sets the video's download status, then reports it.
+	SetStatus(v *models.Video, status consts.DownloadStatus, pct float64, stage string, err error)
+	// SendUpdate reports the video's download status as it now is.
+	SendUpdate(v *models.Video)
+}
 
 // Options holds configuration for download operations.
 type Options struct {
@@ -60,7 +48,7 @@ type VideoDownload struct {
 	ChannelURL *models.ChannelURL
 	Channel    *models.Channel
 	DLStore    contracts.DownloadStore
-	DLTracker  *DownloadTracker
+	DLTracker  Tracker
 	Options    Options
 	Context    context.Context
 
@@ -77,7 +65,7 @@ type JSONDownload struct {
 	Channel    *models.Channel
 	ChannelURL *models.ChannelURL
 	DLStore    contracts.DownloadStore
-	DLTracker  *DownloadTracker
+	DLTracker  Tracker
 	Options    Options
 	Context    context.Context
 
@@ -158,28 +146,4 @@ func stopProcess(p *os.Process, what string) {
 	if err := p.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) && !isProcessNotExist(err) {
 		logger.Pl.W("Failed to cleanup %s download process %d: %v", what, p.Pid, err)
 	}
-}
-
-// RegisterDownloadContext registers a cancellation function for a video download.
-func RegisterDownloadContext(videoID int64, videoURL string, cancel context.CancelCauseFunc) {
-	activeDownloadContexts.Store(videoID, cancel)
-	logger.Pl.D(2, "Registered cancellation context for video ID %d with URL %q", videoID, videoURL)
-}
-
-// UnregisterDownloadContext removes a video's cancellation function.
-func UnregisterDownloadContext(videoID int64, videoURL string) {
-	activeDownloadContexts.Delete(videoID)
-	logger.Pl.D(2, "Unregistered cancellation context for video ID %d with URL %q", videoID, videoURL)
-}
-
-// CancelDownloadByVideoID cancels an active download by video ID.
-func CancelDownloadByVideoID(videoID int64, videoURL string) bool {
-	if cancel, ok := activeDownloadContexts.Load(videoID); ok {
-		if cancelFunc, ok := cancel.(context.CancelCauseFunc); ok {
-			logger.Pl.I("Cancelling download for video ID %d with URL %q", videoID, videoURL)
-			cancelFunc(ErrCanceledByUser)
-			return true
-		}
-	}
-	return false
 }

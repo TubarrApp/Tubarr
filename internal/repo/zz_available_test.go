@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"errors"
 	"io"
 	"path/filepath"
 	"slices"
@@ -80,23 +81,23 @@ func TestAvailableVideos(t *testing.T) {
 		t.Fatalf("video 1: got %+v", one)
 	}
 
-	// Claiming twice only succeeds once.
+	// Queuing twice only succeeds once.
 	ids := []int64{available[0].ID, available[1].ID}
-	claimed, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued)
-	if err != nil || len(claimed) != 2 {
-		t.Fatalf("first claim: got %d, %v, want 2", len(claimed), err)
-	}
-	// Claimed videos keep their title, so the Downloads page can show it before the metadata arrives.
-	for _, v := range claimed {
+	for _, id := range ids {
+		v := &models.Video{ID: id}
+		if claimed, err := vs.QueueVideo(chanID, v, true); err != nil || !claimed {
+			t.Fatalf("first queue of video %d: got %t, %v, want claimed", id, claimed, err)
+		}
+		// Queued videos keep their title, so the Downloads page can show it before the metadata arrives.
 		if v.URL == "https://example.com/v/1" && v.Title != "One" {
-			t.Errorf("claimed video 1's title = %q, want \"One\"", v.Title)
+			t.Errorf("queued video 1's title = %q, want \"One\"", v.Title)
+		}
+		if claimed, err := vs.QueueVideo(chanID, &models.Video{ID: id}, true); err != nil || claimed {
+			t.Fatalf("second queue of video %d: got %t, %v, want refused", id, claimed, err)
 		}
 	}
-	if again, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(again) != 0 {
-		t.Fatalf("second claim: got %d, %v, want 0", len(again), err)
-	}
 
-	// Claimed videos no longer count as seen, and a crawl re-finding them leaves them alone.
+	// Queued videos count as seen, and a crawl re-finding them leaves them alone.
 	if added, err := vs.AddAvailableVideos(newVideos(), chanID); err != nil || len(added) != 0 {
 		t.Fatalf("add while downloading: got %d, %v, want 0 added", len(added), err)
 	}
@@ -155,8 +156,8 @@ func TestAvailableVideos(t *testing.T) {
 	if available, _ := vs.GetAvailableVideos(consts.DLStatusFailed); len(available) != 1 || available[0].CrawlDLRetries != consts.MaxCrawlDLRetries {
 		t.Errorf("expected the failed video listed with %d crawl download retries, got %+v", consts.MaxCrawlDLRetries, available)
 	}
-	if queued, err := vs.ClaimVideos(chanID, ids[1:], app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(queued) != 1 {
-		t.Fatalf("download: got %d, %v, want 1", len(queued), err)
+	if claimed, err := vs.QueueVideo(chanID, &models.Video{ID: ids[1]}, true); err != nil || !claimed {
+		t.Fatalf("download: got %t, %v, want claimed", claimed, err)
 	}
 	if reset, err := vs.ClaimVideos(chanID, ids[1:], []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil || len(reset) != 1 {
 		t.Fatalf("fail again: got %d, %v, want 1", len(reset), err)
@@ -174,7 +175,7 @@ func TestAvailableVideos(t *testing.T) {
 	}
 
 	// Videos can't be claimed through another channel.
-	if claimed, err := vs.ClaimVideos(chanID+1, ids[1:], app.AvailableStatuses, consts.DLStatusQueued); err != nil || len(claimed) != 0 {
+	if claimed, err := vs.ClaimVideos(chanID+1, ids[1:], app.AvailableStatuses, consts.DLStatusIgnored); err != nil || len(claimed) != 0 {
 		t.Errorf("other channel claim: got %d, %v, want 0", len(claimed), err)
 	}
 }
@@ -252,9 +253,8 @@ func TestVideoOverrides(t *testing.T) {
 	}
 }
 
-// TestQueuedVideoErrors checks why a claimed video wasn't downloaded is kept when it returns to the Available list,
-// videos without a reason get the fallback, and a new download attempt clears the last one's error.
-func TestQueuedVideoErrors(t *testing.T) {
+// TestQueueClearsLastError checks a failed video keeps why it failed in the Available list, and queuing it again clears it.
+func TestQueueClearsLastError(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	paths.HomeTubarrDir = t.TempDir()
 	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
@@ -296,34 +296,24 @@ func TestQueuedVideoErrors(t *testing.T) {
 		return got
 	}
 
-	// Video 1 is skipped with a reason, and video 2 returns without one, getting the fallback.
-	if _, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued); err != nil {
+	// Video 1 fails with a reason, shown in the Available list.
+	ds := GetDownloadStore(db)
+	failed := models.StatusUpdate{VideoID: ids[0], VideoURL: videos[0].URL, Status: consts.DLStatusFailed, Error: errors.New("domain blocked")}
+	if err := ds.UpdateDownloadStatus(t.Context(), failed); err != nil {
 		t.Fatal(err)
 	}
-	if err := vs.SetQueuedVideoError(chanID, videos[0].URL, "domain blocked"); err != nil {
-		t.Fatal(err)
-	}
-	if err := vs.SetQueuedVideoError(chanID+1, videos[1].URL, "another channel's"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := vs.ClaimVideos(chanID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil {
-		t.Fatal(err)
-	}
-	if err := vs.SetMissingVideoErrors(ids, "fallback"); err != nil {
-		t.Fatal(err)
-	}
-	if got := errorsByURL(); got[videos[0].URL] != "domain blocked" || got[videos[1].URL] != "fallback" {
+	if got := errorsByURL(); got[videos[0].URL] != "domain blocked" || got[videos[1].URL] != "" {
 		t.Errorf("after failing: got errors %v", got)
 	}
 
-	// Trying again clears the last attempt's errors.
-	if _, err := vs.ClaimVideos(chanID, ids, app.AvailableStatuses, consts.DLStatusQueued); err != nil {
+	// Trying again clears the last attempt's error.
+	if claimed, err := vs.QueueVideo(chanID, &models.Video{ID: ids[0]}, true); err != nil || !claimed {
+		t.Fatalf("queue: got %t, %v, want claimed", claimed, err)
+	}
+	if _, err := vs.ClaimVideos(chanID, ids[:1], []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusCanceled); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vs.ClaimVideos(chanID, ids, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusCanceled); err != nil {
-		t.Fatal(err)
-	}
-	if got := errorsByURL(); got[videos[0].URL] != "" || got[videos[1].URL] != "" {
+	if got := errorsByURL(); got[videos[0].URL] != "" {
 		t.Errorf("after trying again: got errors %v, want none", got)
 	}
 }

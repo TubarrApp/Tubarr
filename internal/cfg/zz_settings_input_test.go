@@ -327,7 +327,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 	}
 	yes := true
 	wantS := &models.Settings{
-		Concurrency:               3,
+		DownloadConcurrency:       3,
 		CookiesFromBrowser:        "firefox",
 		CrawlFreq:                 45,
 		ExternalDownloader:        "aria2c",
@@ -365,7 +365,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		FilteredMetaOpsFile:     filteredMetaOpsFile,
 		OutputDir:               outDir,
 		MetaPurge:               "json",
-		Concurrency:             2,
+		MetarrConcurrency:       2,
 		MaxCPU:                  50,
 		MinFreeMem:              "2G",
 		TranscodeGPU:            "vaapi",

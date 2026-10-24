@@ -17,7 +17,7 @@ import (
 func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	var err error
 
-	s.Concurrency = max(s.Concurrency, 0)
+	s.DownloadConcurrency = max(s.DownloadConcurrency, 0)
 	s.CrawlFreq = max(s.CrawlFreq, 0)
 
 	if checkPaths && s.FilterFile != "" {
@@ -112,7 +112,7 @@ func ValidateMetarrArgsCombination(m *models.MetarrArgs) error {
 //
 // Ensures all metarr settings are valid before storage/after retrieval. checkPaths is as for ValidateSettingsModel.
 func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
-	m.Concurrency = max(m.Concurrency, 0) // 0 inherits the channel's limit, or the global one.
+	m.MetarrConcurrency = max(m.MetarrConcurrency, 0) // 0 inherits the channel's limit, or the global one.
 
 	// Meta ops
 	// Filtered:

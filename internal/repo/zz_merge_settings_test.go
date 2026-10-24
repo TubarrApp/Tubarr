@@ -10,7 +10,7 @@ import (
 func fullSettings() *models.Settings {
 	yes := true
 	return &models.Settings{
-		Concurrency:               2,
+		DownloadConcurrency:       2,
 		CookiesFromBrowser:        "firefox",
 		CrawlFreq:                 30,
 		ExternalDownloader:        "aria2c",
@@ -53,7 +53,7 @@ func fullMetarrArgs() *models.MetarrArgs {
 		FilteredMetaOpsFile:     "/filtered-meta-ops",
 		OutputDir:               "/out",
 		MetaPurge:               "all",
-		Concurrency:             2,
+		MetarrConcurrency:       2,
 		MaxCPU:                  50,
 		MinFreeMem:              "1G",
 		TranscodeGPU:            "vaapi",

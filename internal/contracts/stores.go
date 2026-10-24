@@ -89,10 +89,6 @@ type DownloadStore interface {
 	// Update operations.
 	SetDownloadStatus(v *models.Video) error
 	UpdateDownloadStatus(ctx context.Context, update models.StatusUpdate) error
-
-	// Cancel operations.
-	CancelDownload(videoID int64, videoURL string) bool
-	MarkDownloadCanceled(ctx context.Context, videoID int64) (canceled bool, err error)
 }
 
 // VideoStore allows access to video repo methods.
@@ -122,9 +118,8 @@ type VideoStore interface {
 	UpdateVideo(v *models.Video, channelID int64) error
 	UpdateVideoPaths(videoID int64, oldVideo, oldJSON, newVideo, newJSON string) (updated bool, err error)
 	ClaimVideos(channelID int64, videoIDs []int64, from []consts.DownloadStatus, status consts.DownloadStatus) (claimed []*models.Video, err error)
+	QueueVideo(channelID int64, v *models.Video, byUser bool) (claimed bool, err error)
 	SetVideoOverrides(videoIDs []int64, o *models.VideoOverrides) error
-	SetQueuedVideoError(channelID int64, videoURL, errMsg string) error
-	SetMissingVideoErrors(videoIDs []int64, errMsg string) error
 	RecoverInterrupted() (pending, failed int64, err error)
 	ReconnectOrphanedVideos() (reconnected int64, err error)
 }

@@ -22,7 +22,6 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
-	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -199,12 +198,6 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	if err != nil {
 		return fmt.Errorf("stderr pipe error: %w", err)
 	}
-
-	// Hold the video so it can't be downloaded twice at once (locks from other downloads until deletion from map).
-	if !state.ClaimActiveVideoDownload(d.Video.ID, d.Video.DownloadStatus) {
-		return fmt.Errorf("video with ID %d is already downloading (URL: %q)", d.Video.ID, d.Video.URL)
-	}
-	defer state.DeleteActiveVideoDownloadStatus(d.Video.ID)
 
 	lineChan := make(chan string, 100)
 

@@ -1,4 +1,5 @@
-package app
+// Package notify tells the services a user set for a channel (e.g. media servers) that it has new videos.
+package notify
 
 import (
 	"crypto/tls"
@@ -30,8 +31,8 @@ func newNotifyHTTPClients(noLANtimeout, lanTimeout time.Duration) (nolan *http.C
 	return nolan, lan
 }
 
-// NotifyServices notifies URLs set for the channel by the user.
-func NotifyServices(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew []string) error {
+// Services notifies URLs set for the channel by the user.
+func Services(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew []string) error {
 	// Retrieve notifications for this channel.
 	notifications, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {

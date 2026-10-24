@@ -655,10 +655,12 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 	return videos, nil
 }
 
-// ClaimVideos moves a channel's given unfinished videos with a status in from to status, returning those moved.
+// ClaimVideos changes the download status of the given videos. A video is only changed if it belongs to the channel,
+// isn't finished, and its current status is one of the from statuses. Returns the videos it changed.
 //
 // Each video is claimed by a conditional update, so concurrent requests can't both claim it.
 // Claiming as Ignored also marks the video ignored, so crawls skip it. Claiming from only Ignored restores ignored videos.
+// Videos are queued for download with QueueVideo instead.
 func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []consts.DownloadStatus, status consts.DownloadStatus) (claimed []*models.Video, err error) {
 	if len(videoIDs) == 0 || len(from) == 0 {
 		return nil, nil
@@ -672,13 +674,10 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	defer rollback(tx)
 
 	claimQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = 0, %s = CASE WHEN ? THEN '' ELSE %s END, %s = CASE WHEN ? THEN 0 ELSE %s END, "+
-			"%s = ? WHERE %s = ? AND %s IN (%s) AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = ?)",
+		"UPDATE %s SET %s = ?, %s = 0, %s = ? WHERE %s = ? AND %s IN (%s) AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = ?)",
 		consts.DBDownloads,
 		consts.QDLStatus,
 		consts.QDLPct,
-		consts.QDLError, consts.QDLError, // A new download attempt clears the last one's error.
-		consts.QCrawlDLRetries, consts.QCrawlDLRetries, // And, being the user's, gives crawls their retries back.
 		consts.QDLUpdatedAt,
 		consts.QDLVidID,
 		consts.QDLStatus, placeholders(len(from)),
@@ -703,7 +702,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 
 	now := time.Now()
 	for _, id := range videoIDs {
-		args := []any{status, status == consts.DLStatusQueued, status == consts.DLStatusQueued, now, id}
+		args := []any{status, now, id}
 		for _, s := range from {
 			args = append(args, s)
 		}
@@ -741,46 +740,93 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	return claimed, nil
 }
 
-// SetQueuedVideoError stores why a channel's queued video wasn't downloaded, shown once it's back in the Available list.
-func (vs *VideoStore) SetQueuedVideoError(channelID int64, videoURL, errMsg string) error {
-	query := fmt.Sprintf(
-		"UPDATE %s SET %s = ? WHERE %s = ? AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = ?)",
-		consts.DBDownloads,
-		consts.QDLError,
-		consts.QDLStatus,
-		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID, consts.QVidURL,
-	)
-	if _, err := vs.DB.Exec(query, errMsg, consts.DLStatusQueued, channelID, videoURL); err != nil {
-		return fmt.Errorf("failed to store error for video %q: %w", videoURL, err)
+// QueueVideo claims one of the channel's videos for download, and reports whether it was claimed. A video the channel
+// doesn't have yet is stored as queued.
+//
+// A video the user chose can be claimed from any status except Queued or Downloading, and its crawls get their retries
+// back. A crawled video can only be claimed from Failed, as a crawl retry. A claimed video gets its stored URL, channel
+// URL and title.
+func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) (bool, error) {
+	from := []consts.DownloadStatus{consts.DLStatusFailed}
+	if byUser {
+		from = []consts.DownloadStatus{consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCanceled, consts.DLStatusCompleted, consts.DLStatusIgnored}
 	}
-	return nil
-}
 
-// SetMissingVideoErrors stores errMsg as the error of the given videos which have none.
-func (vs *VideoStore) SetMissingVideoErrors(videoIDs []int64, errMsg string) error {
 	tx, err := vs.DB.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return false, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer rollback(tx)
 
-	query := fmt.Sprintf(
-		"UPDATE %s SET %s = ? WHERE %s = ? AND COALESCE(%s, '') = ''",
-		consts.DBDownloads,
-		consts.QDLError,
-		consts.QDLVidID,
-		consts.QDLError,
-	)
-	for _, id := range videoIDs {
-		if _, err := tx.Exec(query, errMsg, id); err != nil {
-			return fmt.Errorf("failed to store error for video %d: %w", id, err)
+	now := time.Now()
+	if v.ID == 0 {
+		id, exists := videoExists(tx, v.URL, channelID)
+		if !exists {
+			if v.ID, err = insertVideo(tx, v, channelID, v.ChannelURLID, now); err != nil {
+				return false, err
+			}
+			insertQuery := fmt.Sprintf(
+				"INSERT INTO %s (%s, %s) VALUES (?, ?)",
+				consts.DBDownloads,
+				consts.QDLVidID,
+				consts.QDLStatus,
+			)
+			if _, err := tx.Exec(insertQuery, v.ID, consts.DLStatusQueued); err != nil {
+				return false, fmt.Errorf("failed to queue video %q: %w", v.URL, err)
+			}
+			v.ChannelID = channelID
+			v.DownloadStatus = models.DLStatus{Status: consts.DLStatusQueued}
+			return true, tx.Commit()
 		}
+		v.ID = id
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	claimQuery := fmt.Sprintf(
+		"UPDATE %s SET %s = ?, %s = 0, %s = '', %s = CASE WHEN ? THEN 0 ELSE %s END, %s = ? "+
+			"WHERE %s = ? AND %s IN (%s) AND %s IN (SELECT %s FROM %s WHERE %s = ?)",
+		consts.DBDownloads,
+		consts.QDLStatus,
+		consts.QDLPct,
+		consts.QDLError, // A new download attempt clears the last one's error.
+		consts.QCrawlDLRetries, consts.QCrawlDLRetries,
+		consts.QDLUpdatedAt,
+		consts.QDLVidID,
+		consts.QDLStatus, placeholders(len(from)),
+		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID,
+	)
+	args := []any{consts.DLStatusQueued, byUser, now, v.ID}
+	for _, s := range from {
+		args = append(args, s)
 	}
-	return nil
+	result, err := tx.Exec(claimQuery, append(args, channelID)...)
+	if err != nil {
+		return false, fmt.Errorf("failed to queue video %d: %w", v.ID, err)
+	}
+	if n, err := result.RowsAffected(); err != nil || n == 0 {
+		return false, nil // Already queued or downloading, not a crawl retry, or in another channel.
+	}
+
+	selectQuery := fmt.Sprintf(
+		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
+		consts.QVidURL,
+		consts.QVidChanURLID,
+		consts.QVidChanURL,
+		consts.QVidTitle,
+		consts.DBVideos,
+		consts.QVidID,
+	)
+	var channelURLID sql.NullInt64
+	var videoURL, channelURL, title sql.NullString
+	if err := tx.QueryRow(selectQuery, v.ID).Scan(&videoURL, &channelURLID, &channelURL, &title); err != nil {
+		return false, fmt.Errorf("failed to read queued video %d: %w", v.ID, err)
+	}
+	v.ChannelID = channelID
+	v.URL = videoURL.String
+	v.ChannelURLID = channelURLID.Int64
+	v.ChannelURL = channelURL.String
+	v.Title = cmp.Or(title.String, v.Title)
+	v.DownloadStatus = models.DLStatus{Status: consts.DLStatusQueued}
+	return true, tx.Commit()
 }
 
 // ReconnectOrphanedVideos links videos whose channel URL was deleted to the one matching their recorded address.

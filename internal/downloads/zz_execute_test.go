@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
@@ -25,8 +26,14 @@ type nilDBStore struct{}
 func (nilDBStore) GetDB() *sql.DB                                                  { return nil }
 func (nilDBStore) SetDownloadStatus(*models.Video) error                           { return nil }
 func (nilDBStore) UpdateDownloadStatus(context.Context, models.StatusUpdate) error { return nil }
-func (nilDBStore) CancelDownload(int64, string) bool                               { return false }
-func (nilDBStore) MarkDownloadCanceled(context.Context, int64) (bool, error)       { return false, nil }
+
+// statusTracker keeps a download's status on its video, as the download queue does.
+type statusTracker struct{}
+
+func (statusTracker) SetStatus(v *models.Video, status consts.DownloadStatus, pct float64, stage string, err error) {
+	v.DownloadStatus = models.DLStatus{Status: status, Percent: pct, Stage: stage, Error: err}
+}
+func (statusTracker) SendUpdate(*models.Video) {}
 
 // blockCheckStore is a download store with a database handle, so Execute's domain block checks run.
 type blockCheckStore struct{ nilDBStore }
@@ -83,7 +90,7 @@ func newTestDownloads(ctx context.Context, t *testing.T, url string, maxRetries 
 	opts := &Options{MaxRetries: maxRetries}
 	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{}}
 	c := &models.Channel{ChanSettings: &models.Settings{}, ChanMetarrArgs: &models.MetarrArgs{}}
-	tracker := &DownloadTracker{updates: make(chan models.StatusUpdate, 100), done: make(chan struct{})}
+	tracker := statusTracker{}
 	vd, err := NewVideoDownload(ctx, &models.Video{URL: url, VideoDir: t.TempDir()}, cu, c, nilDBStore{}, tracker, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +197,7 @@ func TestExecuteBlockedDomainSkipsYTDLP(t *testing.T) {
 	opts := &Options{MaxRetries: 3}
 	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{}}
 	c := &models.Channel{ChanSettings: &models.Settings{}, ChanMetarrArgs: &models.MetarrArgs{}}
-	tracker := &DownloadTracker{updates: make(chan models.StatusUpdate, 100), done: make(chan struct{})}
+	tracker := statusTracker{}
 	url := "https://www.blocked.example/v"
 
 	vd, err := NewVideoDownload(t.Context(), &models.Video{URL: url, VideoDir: t.TempDir()}, cu, c, blockCheckStore{}, tracker, opts)
@@ -245,7 +252,7 @@ func TestCancelRemovesPartials(t *testing.T) {
 				Video:      &models.Video{ID: 800001, URL: "https://a.example/v", VideoDir: dir},
 				Channel:    &models.Channel{},
 				ChannelURL: &models.ChannelURL{ChanURLSettings: &models.Settings{}},
-				DLTracker:  &DownloadTracker{updates: make(chan models.StatusUpdate, 100), done: make(chan struct{})},
+				DLTracker:  statusTracker{},
 				Context:    ctx,
 			}
 
@@ -314,7 +321,7 @@ func TestExecuteVideoDownloadTrailingOutput(t *testing.T) {
 					Video:      &models.Video{ID: int64(900000 + trailing + i), URL: "https://a.example/v"},
 					Channel:    &models.Channel{},
 					ChannelURL: &models.ChannelURL{ChanURLSettings: &models.Settings{}},
-					DLTracker:  &DownloadTracker{updates: make(chan models.StatusUpdate, 100), done: make(chan struct{})},
+					DLTracker:  statusTracker{},
 					Context:    ctx,
 				}
 

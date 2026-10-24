@@ -26,9 +26,9 @@ func TestExampleConfigFiles(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if NilOrZeroValue(in.Concurrency) != 3 || NilOrZeroValue(in.CrawlFreq) != 30 || len(NilOrZeroValue(in.MetaOps)) != 3 || len(urlSettings) != 1 {
+		if NilOrZeroValue(in.DownloadConcurrency) != 3 || NilOrZeroValue(in.CrawlFreq) != 30 || len(NilOrZeroValue(in.MetaOps)) != 3 || len(urlSettings) != 1 {
 			t.Errorf("%s: download concurrency %d, crawl frequency %d, %d meta ops, %d URL settings; want 3, 30, 3, 1",
-				name, NilOrZeroValue(in.Concurrency), NilOrZeroValue(in.CrawlFreq), len(NilOrZeroValue(in.MetaOps)), len(urlSettings))
+				name, NilOrZeroValue(in.DownloadConcurrency), NilOrZeroValue(in.CrawlFreq), len(NilOrZeroValue(in.MetaOps)), len(urlSettings))
 		}
 	}
 }
@@ -39,8 +39,8 @@ func TestDownloadConcurrencyKey(t *testing.T) {
 		v := viper.New()
 		v.Set(key, 4)
 		var in models.ChannelInput
-		if err := LoadViperIntoStruct(v, &in); err != nil || NilOrZeroValue(in.Concurrency) != want {
-			t.Errorf("config key %q: download concurrency %d, %v; want %d", key, NilOrZeroValue(in.Concurrency), err, want)
+		if err := LoadViperIntoStruct(v, &in); err != nil || NilOrZeroValue(in.DownloadConcurrency) != want {
+			t.Errorf("config key %q: download concurrency %d, %v; want %d", key, NilOrZeroValue(in.DownloadConcurrency), err, want)
 		}
 	}
 }

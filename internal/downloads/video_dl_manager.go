@@ -9,13 +9,12 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/limits"
 	"tubarr/internal/models"
 	"tubarr/internal/times"
 )
 
 // NewVideoDownload creates a download operation with specified options.
-func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker *DownloadTracker, opts *Options) (*VideoDownload, error) {
+func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker Tracker, opts *Options) (*VideoDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -38,33 +37,11 @@ func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *
 	return dl, nil
 }
 
-// Execute performs the download with retries.
+// Execute performs the download with retries, once the caller holds its download slots.
 func (d *VideoDownload) Execute() error {
 	if d.Video == nil {
 		return errors.New("video model is nil")
 	}
-
-	key := ongoingKey{TypeVideo, d.Video.URL}
-	if _, exists := ongoingDownloads.LoadOrStore(key, struct{}{}); exists {
-		return fmt.Errorf("video %q: %w", d.Video.URL, ErrDuplicateDownload)
-	}
-	defer ongoingDownloads.Delete(key)
-	d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0, "Waiting for download slot", nil)
-
-	// Acquire per-domain slot first (blocks if domain limit reached, no-op if no limit).
-	domainSem, err := limits.DomainDownloads.Acquire(d.Context, d.Video.URL)
-	if err != nil {
-		return d.cancelVideoDownload()
-	}
-	defer limits.Release(domainSem)
-
-	// Acquire global download slot (blocks if limit reached, no-op if limit=0).
-	// Store the semaphore to ensure we release on the same one we acquired.
-	dlSem, err := AcquireGlobalDownloadSlot(d.Context, d.Video.URL)
-	if err != nil {
-		return d.cancelVideoDownload()
-	}
-	defer limits.Release(dlSem)
 
 	// Ensure cleanup on exit.
 	defer d.cleanup()

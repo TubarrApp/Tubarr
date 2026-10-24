@@ -23,6 +23,7 @@ import (
 	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
+	"tubarr/internal/queue"
 	"tubarr/internal/repo"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -169,9 +170,10 @@ func setupFuzzServer(t *testing.T) {
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
+		pp := queue.NewPostProcessingQueue(store)
 		ss := serverStore{
 			s: store, cs: store.ChannelStore(), ds: store.DownloadStore(), vs: store.VideoStore(),
-			tss: store.TubarrSettingsStore(), db: dbase, ctx: ctx, cancel: cancel,
+			tss: store.TubarrSettingsStore(), dq: queue.NewDownloadQueue(ctx, store, pp), pp: pp, db: dbase, ctx: ctx, cancel: cancel,
 		}
 		if fuzzServer.handler, err = NewRouter(ss); err != nil {
 			fuzzServer.initErr = err
@@ -353,7 +355,7 @@ func TestCrossSiteRequestsBlocked(t *testing.T) {
 func FuzzAPI(f *testing.F) {
 	for i := range fuzzRoutes {
 		f.Add(uint8(i), "1", "")
-		f.Add(uint8(i), "1", "name=x&urls=https%3A%2F%2Fa.example&video_directory=videos&crawl_freq=abc&max_concurrency=-5")
+		f.Add(uint8(i), "1", "name=x&urls=https%3A%2F%2Fa.example&video_directory=videos&crawl_freq=abc&download_concurrency=-5")
 		f.Add(uint8(i), "999999", "concurrency=99999999999999999999&url=http%3A%2F%2Flocalhost%3A8191")
 		f.Add(uint8(i), "%2F..%2F", "hostname=a.example&concurrency=0&filters=title%3Acontains%3Ax%3Amust")
 		f.Add(uint8(i), "-1", "url_settings=%7B%22x%22%3A1%7D&metarr_meta_ops=%3A%3A%3A")

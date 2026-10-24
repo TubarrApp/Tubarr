@@ -64,7 +64,7 @@ func resetCobraFlagsAndLoadViper(cmd *cobra.Command, v *viper.Viper) error {
 
 // setChannelSettingsFlags registers the flags for a channel's or URL's settings (bar its directories), read into f.
 func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
-	cmd.SetProgramRelatedFlags(c, &f.Concurrency, &f.CrawlFreq, &f.ExternalDownloaderArgs, &f.ExternalDownloader,
+	cmd.SetProgramRelatedFlags(c, &f.DownloadConcurrency, &f.CrawlFreq, &f.ExternalDownloaderArgs, &f.ExternalDownloader,
 		&f.MoveOpFile, &f.MoveOps, &f.Pause)
 
 	cmd.SetDownloadFlags(c, &f.Retries, &f.UseGlobalCookies, &f.YTDLPOutputExt, &f.FromDate, &f.ToDate,
@@ -233,7 +233,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 		in.CrawlFreq = &f.CrawlFreq
 	}
 	if cmd.Flags().Changed(keys.DownloadConcurrency) {
-		in.Concurrency = &f.Concurrency
+		in.DownloadConcurrency = &f.DownloadConcurrency
 	}
 	if cmd.Flags().Changed(keys.MConcurrency) {
 		in.MetarrConcurrency = &f.MetarrConcurrency

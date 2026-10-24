@@ -1438,15 +1438,15 @@ func (cs *ChannelStore) GetDownloadedVideos(c *models.Channel) (videos []*models
 	return videos, true, nil
 }
 
-// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, canceled, or Available URLs from the database, and
-// failed ones crawls can still retry separately.
+// GetDownloadedOrIgnoredVideoURLs loads already downloaded, ignored, canceled, queued, or Available URLs from the
+// database, and failed ones crawls can still retry separately.
 func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls, failedURLs []string, err error) {
 	if c.ID == 0 {
 		return nil, nil, errors.New("model entered has no ID")
 	}
 
 	seen := fmt.Sprintf(
-		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?) OR (%s = ? AND %s >= ?))",
+		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?, ?, ?) OR (%s = ? AND %s >= ?))",
 		consts.QVidFinished,
 		consts.QVidIgnored,
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
@@ -1462,7 +1462,8 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 	)
 
 	// Canceled videos count as seen, as the user chose not to download them, and so do failed ones out of crawl retries.
-	seenArgs := []any{consts.DLStatusAvailable, consts.DLStatusCanceled, consts.DLStatusFailed, consts.MaxCrawlDLRetries}
+	// Queued and downloading ones are already in the download queue.
+	seenArgs := []any{consts.DLStatusAvailable, consts.DLStatusCanceled, consts.DLStatusQueued, consts.DLStatusDownloading, consts.DLStatusFailed, consts.MaxCrawlDLRetries}
 	args := slices.Concat(seenArgs, []any{c.ID}, seenArgs, []any{consts.DLStatusFailed})
 	rows, err := cs.q.Query(query, args...)
 	if err != nil {
@@ -1651,7 +1652,7 @@ func displaySettingsStruct(s *models.Settings) {
 	fmt.Printf("Video Directory: %s\n", s.VideoDir)
 	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
 	fmt.Printf("Crawl Frequency: %d minutes\n", s.CrawlFreq)
-	fmt.Printf("Concurrency: %d\n", s.Concurrency)
+	fmt.Printf("Download Concurrency: %d\n", s.DownloadConcurrency)
 	fmt.Printf("Cookie Source: %s\n", s.CookiesFromBrowser)
 	fmt.Printf("Retries: %d\n", s.Retries)
 	fmt.Printf("External Downloader: %s\n", s.ExternalDownloader)
@@ -1674,7 +1675,7 @@ func displaySettingsStruct(s *models.Settings) {
 func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
 	fmt.Printf("Output Filetype: %s\n", m.OutputExt)
-	fmt.Printf("Metarr Concurrency: %d\n", m.Concurrency)
+	fmt.Printf("Metarr Concurrency: %d\n", m.MetarrConcurrency)
 	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
 	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)
 	fmt.Printf("HW Acceleration Type: %s\n", m.TranscodeGPU)

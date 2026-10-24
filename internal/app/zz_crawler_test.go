@@ -16,6 +16,25 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// TestCrawlRequestsNeedFilterFile tests a channel URL's crawled videos aren't queued while its filter file can't be used,
+// so nothing downloads unfiltered.
+func TestCrawlRequestsNeedFilterFile(t *testing.T) {
+	dir := t.TempDir()
+	c := &models.Channel{ID: 1, Name: "Cats", ChanSettings: &models.Settings{}}
+	videos := []*models.Video{{URL: "https://example.com/watch/1"}, {URL: "https://example.com/watch/2"}}
+
+	missing := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats", ChanURLSettings: &models.Settings{FilterFile: filepath.Join(dir, "missing.txt")}}
+	if reqs, err := crawlRequests(c, missing, videos); err == nil || len(reqs) != 0 {
+		t.Errorf("crawlRequests with a missing filter file = %d requests, %v; want none and an error", len(reqs), err)
+	}
+
+	usable := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats", ChanURLSettings: &models.Settings{}}
+	reqs, err := crawlRequests(c, usable, videos)
+	if err != nil || len(reqs) != 2 || reqs[0].ByUser {
+		t.Errorf("crawlRequests = %+v, %v; want both videos as crawl requests", reqs, err)
+	}
+}
+
 // TestCheckManualVideos tests manual videos must be full http(s) URLs, with no channel URL or one of the channel's.
 func TestCheckManualVideos(t *testing.T) {
 	c := &models.Channel{Name: "Cats", URLModels: []*models.ChannelURL{{ID: 4, URL: "https://example.com/@cats"}}}
@@ -35,12 +54,6 @@ func TestCheckManualVideos(t *testing.T) {
 		if bad := CheckManualVideos(c, []models.ManualVideo{tc.mv}); (len(bad) == 0) != tc.ok {
 			t.Errorf("CheckManualVideos(%+v) = %v, want accepted: %t", tc.mv, bad, tc.ok)
 		}
-	}
-	if cu, err := ManualChannelURL(nil, c, 4); err != nil || cu != c.URLModels[0] {
-		t.Errorf("ManualChannelURL(4) = %v, %v; want the channel's URL", cu, err)
-	}
-	if _, err := ManualChannelURL(nil, c, 5); err == nil {
-		t.Error("ManualChannelURL(5) found a URL the channel doesn't have")
 	}
 }
 

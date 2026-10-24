@@ -17,7 +17,7 @@ const (
 	SettingsYtdlpOutputExt            = "ytdlp_output_ext"
 	SettingsFromDate                  = "from_date"
 	SettingsToDate                    = "to_date"
-	SettingsMaxConcurrency            = "max_concurrency"
+	SettingsMaxConcurrency            = "download_concurrency"
 	SettingsCrawlFreq                 = "crawl_freq"
 	SettingsDownloadRetries           = "download_retries"
 	SettingsUseGlobalCookies          = "use_global_cookies"

@@ -17,6 +17,7 @@ import (
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
+	"tubarr/internal/queue"
 	"tubarr/internal/server"
 	"tubarr/internal/times"
 
@@ -88,6 +89,10 @@ func main() {
 	// create cancellable context for shutdown.
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 
+	// Videos waiting to be downloaded or post-processed, and those running.
+	postProcessingQueue := queue.NewPostProcessingQueue(store)
+	downloadQueue := queue.NewDownloadQueue(ctx, store, postProcessingQueue)
+
 	// heartbeat shutdown channel.
 	heartbeatDone := make(chan struct{})
 
@@ -100,7 +105,7 @@ func main() {
 	}()
 
 	// ---- INIT COMMANDS (e.g. --web, --debug) ----
-	if err := cfg.InitCommands(ctx, store); err != nil {
+	if err := cfg.InitCommands(ctx, store, downloadQueue, postProcessingQueue); err != nil {
 		logger.Pl.E("Error: %v", err)
 		cancel()
 		<-heartbeatDone
@@ -115,22 +120,35 @@ func main() {
 		}
 
 		if abstractions.GetBool(keys.RunWebInterface) {
-			return server.StartServer(ctx, cancel, store, db)
+			return server.StartServer(ctx, cancel, store, downloadQueue, postProcessingQueue, db)
 		}
 
 		if abstractions.GetBool(keys.TerminalRunDefaultBehavior) {
 			if err := times.StartupWait(ctx); err != nil {
 				return err
 			}
-			return app.CheckChannels(ctx, store)
+			return app.CheckChannels(ctx, store, downloadQueue)
 		}
 		return nil
 	}()
 
+	// Terminal runs let their queued videos finish downloading and post-processing before exiting.
+	if !abstractions.GetBool(keys.RunWebInterface) {
+		if downloadQueue.Len()+postProcessingQueue.Len() > 0 {
+			logger.Pl.I("Waiting for queued videos to finish downloading and post-processing...")
+		}
+		downloadQueue.Wait(ctx)
+		postProcessingQueue.Wait(ctx)
+	}
+
 	// ---- SHUTDOWN ----
 	cancel()        // stop goroutines.
 	<-heartbeatDone // wait for heartbeat to flush DB state.
-	app.WaitMetarr(5 * time.Second)
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if !downloadQueue.Wait(stopCtx) || !postProcessingQueue.Wait(stopCtx) {
+		logger.Pl.W("Downloads or Metarr runs still stopping after 5s, exiting without storing their videos' status")
+	}
+	stopCancel()
 	cleanup(progControl, startTime)
 
 	if runErr != nil {

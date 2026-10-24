@@ -13,7 +13,7 @@ import (
 )
 
 // NewJSONDownload creates a download operation with specified options.
-func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker *DownloadTracker, opts *Options) (*JSONDownload, error) {
+func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker Tracker, opts *Options) (*JSONDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -43,12 +43,6 @@ func (d *JSONDownload) Execute() error {
 	if d.Video == nil {
 		return errors.New("video model is nil")
 	}
-
-	key := ongoingKey{TypeJSON, d.Video.URL}
-	if _, exists := ongoingDownloads.LoadOrStore(key, struct{}{}); exists {
-		return fmt.Errorf("metadata for %q: %w", d.Video.URL, ErrDuplicateDownload)
-	}
-	defer ongoingDownloads.Delete(key)
 
 	// Ensure cleanup on exit.
 	defer d.cleanup()

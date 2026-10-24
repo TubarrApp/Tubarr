@@ -58,9 +58,9 @@ type SettingsInput struct {
 	ExtraYTDLPCrawlArgs *string `viper:"extra-ytdlp-crawl-args"`
 
 	// Concurrency and performance settings.
-	CrawlFreq   *int `viper:"crawl-freq"`
-	Concurrency *int `viper:"download-concurrency"`
-	Retries     *int `viper:"dl-retries"`
+	CrawlFreq           *int `viper:"crawl-freq"`
+	DownloadConcurrency *int `viper:"download-concurrency"`
+	Retries             *int `viper:"dl-retries"`
 
 	// Pause toggle.
 	Pause *bool `viper:"pause-toggle"`

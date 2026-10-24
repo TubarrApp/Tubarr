@@ -29,6 +29,7 @@ import (
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/queue"
 	"tubarr/internal/scraper"
 	"tubarr/internal/siterules"
 	"tubarr/internal/state"
@@ -70,9 +71,9 @@ func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 //
 //nolint:contextcheck
 func (ss *serverStore) startIgnoreCrawl(c *models.Channel) bool {
-	jobCtx, unlock, ok := state.TryLockChannel(ss.ctx, c.ID)
+	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID)
 	if !ok {
-		logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
+		logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
 		return false
 	}
 	logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
@@ -83,7 +84,7 @@ func (ss *serverStore) startIgnoreCrawl(c *models.Channel) bool {
 		} else {
 			logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
 		}
-	}(jobCtx)
+	}(crawlCtx)
 	return true
 }
 
@@ -436,7 +437,7 @@ func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Stop the channel's crawl, downloads and Metarr runs, which would otherwise carry on for a deleted channel.
-	if aborted, n := state.AbortAll(c.ID), app.StopMetarr(c.ID, nil); aborted || n > 0 {
+	if crawling, downloading, n := state.StopCrawl(c.ID), ss.dq.Abort(c.ID), ss.pp.Abort(c.ID); crawling || downloading || n > 0 {
 		logger.Pl.I("Stopped running work for channel %q before deleting it (%d Metarr process(es))", c.Name, n)
 	}
 
@@ -520,39 +521,24 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleGetDownloads retrieves active downloads for all channels.
+// handleGetDownloads returns the videos in the download queue, for the Downloads page.
 func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request) {
-	channels, found, err := ss.cs.GetAllChannels(false)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	if !found {
-		writeJSON(w, r, http.StatusOK, []any{})
-		return
-	}
-
-	// Collect active downloads from all channels
-	allDownloads := make([]map[string]any, 0)
-	for _, c := range channels {
-		videos := ss.getActiveDownloads(c)
-
-		// Convert each video to a map and add channel name
-		for _, video := range videos {
-			videoMap := make(map[string]any)
-			videoMap[consts.QVidID] = video.ID
-			videoMap[consts.QVidTitle] = video.Title
-			videoMap[consts.QVidChanID] = video.ChannelID
-			videoMap[consts.QVidChanURLID] = video.ChannelURLID
-			videoMap[consts.QVidChanURL] = video.ChannelURL
-			videoMap[consts.QVidChanName] = c.Name
-			videoMap[consts.QVidURL] = video.URL
-			videoMap[consts.QVidThumbnailURL] = video.ThumbnailURL
-			video.DownloadStatus.ETA = downloads.ETA(video.ID, video.DownloadStatus.Percent)
-			videoMap[consts.QVidDLStatus] = video.DownloadStatus
-
-			allDownloads = append(allDownloads, videoMap)
-		}
+	entries := ss.dq.Entries()
+	allDownloads := make([]map[string]any, 0, len(entries))
+	for _, e := range entries {
+		status := *e.DownloadStatus
+		status.ETA = downloads.ETA(e.VideoID, status.Percent)
+		allDownloads = append(allDownloads, map[string]any{
+			consts.QVidID:           e.VideoID,
+			consts.QVidTitle:        e.Title,
+			consts.QVidChanID:       e.ChannelID,
+			consts.QVidChanURLID:    e.ChannelURLID,
+			consts.QVidChanURL:      e.ChannelURL,
+			consts.QVidChanName:     e.ChannelName,
+			consts.QVidURL:          e.URL,
+			consts.QVidThumbnailURL: e.ThumbnailURL,
+			consts.QVidDLStatus:     status,
+		})
 	}
 	writeJSON(w, r, http.StatusOK, allDownloads)
 }
@@ -566,7 +552,7 @@ func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := ss.cancelDownload(r.Context(), videoID); err != nil {
+	if err := ss.cancelDownload(videoID); err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, errNoActiveDownload) {
 			status = http.StatusNotFound
@@ -593,7 +579,7 @@ func (ss *serverStore) handleCancelDownloads(w http.ResponseWriter, r *http.Requ
 
 	canceled := 0
 	for _, id := range body.VideoIDs {
-		if err := ss.cancelDownload(r.Context(), id); err != nil {
+		if err := ss.cancelDownload(id); err != nil {
 			if !errors.Is(err, errNoActiveDownload) {
 				logger.Pl.E("Failed to cancel download for video ID %d: %v", id, err)
 			}
@@ -650,7 +636,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 
 	// Start crawl in background.
-	if jobCtx, unlock, ok := state.TryLockChannel(ss.ctx, c.ID); ok {
+	if crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID); ok {
 		// Clean expired blocks first.
 		if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
 			logger.Pl.W("Failed to clean expired blocks: %v", err)
@@ -661,27 +647,30 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 			defer unlock()
 			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, c.ID)
 
-			if performedCrawls, err := app.CrawlChannel(ctx, ss.s, c); err != nil {
+			if performedCrawls, err := app.CrawlChannel(ctx, ss.s, ss.dq, c); err != nil {
 				logger.Pl.E("Encountered errors crawling channel %q: %v", c.Name, err)
 			} else if performedCrawls {
 				logger.Pl.S("Completed crawl for channel %q", c.Name)
 			}
-		}(jobCtx)
+		}(crawlCtx)
 
 		writeJSON(w, r, http.StatusAccepted, map[string]string{"message": "Channel crawl started"})
 		return
 	}
-	logger.Pl.I("Channel %q already has a running job, skipping crawl...", c.Name)
-	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "The channel already has a crawl or download running. Try again once it finishes."})
+	logger.Pl.I("Channel %q is already being crawled, skipping crawl...", c.Name)
+	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "The channel is already being crawled. Try again once it finishes."})
 }
 
-// handleStopQueue stops a channel's job from starting queued work, letting in-progress downloads and Metarr processes finish.
+// handleStopQueue stops a channel's crawl, and its queued downloads and post-processing from starting, letting in-progress
+// downloads and Metarr processes finish.
 func (ss *serverStore) handleStopQueue(w http.ResponseWriter, r *http.Request) {
 	c, ok := ss.channelFromRequest(w, r)
 	if !ok {
 		return
 	}
-	if !state.StopQueue(c.ID) {
+	crawling := state.StopCrawl(c.ID)
+	queued := ss.dq.Stop(c.ID)
+	if n := ss.pp.Stop(c.ID); !crawling && !queued && n == 0 {
 		http.Error(w, "no crawl or download running for channel", http.StatusConflict)
 		return
 	}
@@ -696,9 +685,10 @@ func (ss *serverStore) handleAbortAll(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	aborted := state.AbortAll(c.ID)
-	n := app.StopMetarr(c.ID, nil)
-	if !aborted && n == 0 {
+	crawling := state.StopCrawl(c.ID)
+	downloading := ss.dq.Abort(c.ID)
+	n := ss.pp.Abort(c.ID)
+	if !crawling && !downloading && n == 0 {
 		http.Error(w, "nothing running for channel", http.StatusConflict)
 		return
 	}
@@ -720,7 +710,7 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
-	n := app.StopMetarr(c.ID, body.VideoIDs)
+	n := ss.pp.Cancel(c.ID, body.VideoIDs)
 	if n == 0 {
 		http.Error(w, "no matching Metarr processes running for channel", http.StatusConflict)
 		return
@@ -730,11 +720,33 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
-// handleGetActivity returns the IDs of channels with a running crawl or download job, jobs being stopped, and Metarr
-// processes, and of the videos in Metarr.
+// handleGetActivity returns the IDs of channels crawling or with videos in the download queue, channels being stopped,
+// and channels with Metarr processes, and of the videos in Metarr.
 func (ss *serverStore) handleGetActivity(w http.ResponseWriter, r *http.Request) {
-	jobs, stopping := state.LockedChannels()
-	metarrChannels, metarrVideos := app.MetarrActivity()
+	crawling, stoppingCrawls := state.CrawlingChannels()
+	downloading, stoppingDownloads := ss.dq.Channels()
+
+	// A channel being stopped shows as stopping until its crawl and downloads are both done.
+	stopping := make([]int64, 0, len(stoppingCrawls)+len(stoppingDownloads)) // Never nil, which the page can't read.
+	stopping = append(stopping, stoppingCrawls...)
+	stopping = append(stopping, stoppingDownloads...)
+	slices.Sort(stopping)
+	stopping = slices.Compact(stopping)
+	jobs := []int64{}
+	for _, id := range slices.Concat(crawling, downloading) {
+		if !slices.Contains(stopping, id) && !slices.Contains(jobs, id) {
+			jobs = append(jobs, id)
+		}
+	}
+
+	entries := ss.pp.Entries()
+	metarrChannels, metarrVideos := []int64{}, make([]int64, 0, len(entries))
+	for _, e := range entries {
+		metarrVideos = append(metarrVideos, e.VideoID)
+		if !slices.Contains(metarrChannels, e.ChannelID) {
+			metarrChannels = append(metarrChannels, e.ChannelID)
+		}
+	}
 	writeJSON(w, r, http.StatusOK, map[string][]int64{
 		"jobs":          jobs,
 		"stopping":      stopping,
@@ -745,7 +757,7 @@ func (ss *serverStore) handleGetActivity(w http.ResponseWriter, r *http.Request)
 
 // handleGetPostProcessing returns the videos queued for or running in Metarr.
 func (ss *serverStore) handleGetPostProcessing(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, r, http.StatusOK, app.MetarrJobs())
+	writeJSON(w, r, http.StatusOK, ss.pp.Entries())
 }
 
 // channelFromRequest loads the channel the request's {id} names, its URLs' unset settings filled in from the channel's
@@ -771,7 +783,7 @@ func (ss *serverStore) channelURLFromRequest(w http.ResponseWriter, r *http.Requ
 		http.Error(w, fmt.Sprintf("invalid channel URL ID: %v", err), http.StatusBadRequest)
 		return nil, false
 	}
-	cu, err := app.ManualChannelURL(ss.cs, c, urlID)
+	cu, err := queue.ManualChannelURL(ss.cs, c, urlID)
 	if err != nil {
 		if urlID != 0 {
 			http.Error(w, "channel URL not found", http.StatusNotFound)
@@ -839,18 +851,24 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Start download in background, once any running crawl or download of the channel finishes.
-	queued := state.ChannelLocked(c.ID)
-	//nolint:contextcheck
-	go func() {
-		logger.Pl.I("Starting manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
-		if err := app.DownloadManual(ss.ctx, ss.s, c, requestBody.ManualVideos); err != nil {
-			logger.Pl.E("Encountered errors downloading URLs for channel %q: %v", c.Name, err)
-		} else {
-			logger.Pl.S("Successfully completed manual download for channel %q", c.Name)
+	// The videos wait behind any the channel already has in the download queue.
+	active, _ := ss.dq.Channels()
+	waiting := slices.Contains(active, c.ID)
+
+	logger.Pl.I("Queuing manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
+	queued, err := ss.dq.Add(c, app.ManualRequests(requestBody.ManualVideos)...)
+	if len(queued) == 0 {
+		msg := "no videos were queued, they may already be queued or downloading"
+		if err != nil {
+			msg = err.Error()
 		}
-	}()
-	writeJSON(w, r, http.StatusAccepted, map[string]bool{"queued": queued})
+		http.Error(w, msg, http.StatusConflict)
+		return
+	}
+	if err != nil {
+		logger.Pl.E("Encountered errors queuing URLs for channel %q: %v", c.Name, err)
+	}
+	writeJSON(w, r, http.StatusAccepted, map[string]bool{"queued": waiting})
 }
 
 // handleAddAvailableURLs adds video URLs to a channel's Available list, returning the added videos and the URLs already
@@ -930,7 +948,7 @@ func (ss *serverStore) handleGetAvailableVideos(w http.ResponseWriter, r *http.R
 
 // handleAvailableAction downloads or dismisses a channel's chosen Available videos, or restores ignored ones to Available.
 //
-// Downloads start once any running crawl or download of the channel finishes, so the channel's Stop Queue and Abort All buttons cover them.
+// Downloads join the channel's download queue, so the channel's Stop Queue and Abort All buttons cover them.
 func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
 		Action    string                `json:"action"`
@@ -1000,45 +1018,33 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	// Download As overrides replace any earlier ones, and a plain download clears them.
+	if status == consts.DLStatusQueued {
+		logger.Pl.I("Queuing download of %d available video(s) for channel %q via web request", len(requestBody.VideoIDs), c.Name)
+		queued, err := ss.dq.Add(c, app.AvailableRequests(requestBody.VideoIDs, requestBody.Auth, true, overrides)...)
+		if err != nil {
+			logger.Pl.E("Encountered errors queuing available videos for channel %q: %v", c.Name, err)
+			if len(queued) == 0 {
+				http.Error(w, fmt.Sprintf("failed to queue videos: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+		if overrides != nil && len(queued) == 0 {
+			http.Error(w, "video is no longer available, it may already be downloading", http.StatusConflict)
+			return
+		}
+		writeJSON(w, r, http.StatusAccepted, map[string]int{"count": len(queued)})
+		return
+	}
+
 	claimed, err := ss.vs.ClaimVideos(c.ID, requestBody.VideoIDs, from, status)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to update videos: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if overrides != nil && len(claimed) == 0 {
-		http.Error(w, "video is no longer available, it may already be downloading", http.StatusConflict)
-		return
-	}
-
 	if status == consts.DLStatusIgnored && len(claimed) > 0 {
 		app.RemoveDismissedFromNew(ss.cs, c, claimed)
 	}
-
-	if status == consts.DLStatusQueued && len(claimed) > 0 {
-		// Download As overrides replace any earlier ones, and a plain download clears them.
-		claimedIDs := make([]int64, 0, len(claimed))
-		for _, v := range claimed {
-			claimedIDs = append(claimedIDs, v.ID)
-		}
-		if err := ss.vs.SetVideoOverrides(claimedIDs, overrides); err != nil {
-			if _, resetErr := ss.vs.ClaimVideos(c.ID, claimedIDs, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); resetErr != nil {
-				logger.Pl.E("Failed to return videos to the Available list for channel %q: %v", c.Name, resetErr)
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		//nolint:contextcheck
-		go func() {
-			logger.Pl.I("Starting download of %d available video(s) for channel %q via web request", len(claimed), c.Name)
-			if err := app.DownloadAvailable(ss.ctx, ss.s, c, claimed, requestBody.Auth); err != nil {
-				logger.Pl.E("Encountered errors downloading available videos for channel %q: %v", c.Name, err)
-			} else {
-				logger.Pl.S("Completed download of available videos for channel %q", c.Name)
-			}
-		}()
-	}
-
 	writeJSON(w, r, http.StatusAccepted, map[string]int{"count": len(claimed)})
 }
 
@@ -1313,7 +1319,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Checked before saving edited options, which would otherwise replace the ones a running video uses.
-	if n := app.MetarrBusy(c.ID, requestBody.VideoIDs); n > 0 {
+	if n := ss.pp.Busy(c.ID, requestBody.VideoIDs); n > 0 {
 		http.Error(w, fmt.Sprintf("%d of the video(s) are already post-processing", n), http.StatusConflict)
 		return
 	}
@@ -1343,7 +1349,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	//nolint:contextcheck
 	go func(ctx context.Context) {
 		file.UpdateFromConfigFile(ss.cs, c)
-		if err := app.RunMetarr(ctx, ss.s, c, requestBody.VideoIDs, requestBody.Rerun); err != nil {
+		if err := ss.pp.RunMetarr(ctx, c, requestBody.VideoIDs, requestBody.Rerun); err != nil {
 			logger.Pl.E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
 		} else {
 			logger.Pl.S("Completed Metarr run for channel %q", c.Name)
@@ -1412,9 +1418,9 @@ func (ss *serverStore) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// handleGetIdle reports running jobs, returning 503 if any are running.
+// handleGetIdle reports running crawls and videos being downloaded or post-processed, returning 503 if there are any.
 func (ss *serverStore) handleGetIdle(w http.ResponseWriter, r *http.Request) {
-	running := app.RunningProcesses()
+	running := app.RunningProcesses() + int32(ss.dq.Len()) + int32(ss.pp.Len())
 	status := http.StatusOK
 	if running > 0 {
 		status = http.StatusServiceUnavailable
@@ -1697,7 +1703,7 @@ func (ss *serverStore) handleSetPostProcessConcurrency(w http.ResponseWriter, r 
 		logger.Pl.W("Failed to persist post-processing concurrency to DB: %v", err)
 	}
 	viper.Set(keys.PostProcessConcurrency, limit)
-	app.InitGlobalMetarrLimit(limit)
+	limits.InitGlobalPostProcessLimit(limit)
 	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Post-processing concurrency updated", "limit": limit})
 }
 

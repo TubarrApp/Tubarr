@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -17,8 +18,27 @@ import (
 	"tubarr/internal/state"
 )
 
-// TestDeleteChannelStopsItsJob tests that deleting a channel aborts its running crawl or download job.
-func TestDeleteChannelStopsItsJob(t *testing.T) {
+// TestActivityListsNeverNull tests the activity lists are empty rather than null when nothing is running, as the web UI
+// calls includes on them.
+func TestActivityListsNeverNull(t *testing.T) {
+	setupFuzzServer(t)
+	w := sendRequest(t, http.MethodGet, "/api/v1/channels/activity", "", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("activity = %d %s", w.Code, w.Body.String())
+	}
+	var activity map[string]json.RawMessage
+	if err := json.Unmarshal(w.Body.Bytes(), &activity); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"jobs", "stopping", "metarr", "metarr_videos"} {
+		if list, ok := activity[key]; !ok || string(list) == "null" {
+			t.Errorf("activity %q = %s, want a list", key, list)
+		}
+	}
+}
+
+// TestDeleteChannelStopsItsCrawl tests that deleting a channel stops its running crawl.
+func TestDeleteChannelStopsItsCrawl(t *testing.T) {
 	setupFuzzServer(t)
 	form := url.Values{
 		"name":                           {"Delete Me"},
@@ -41,9 +61,9 @@ func TestDeleteChannelStopsItsJob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, unlock, ok := state.TryLockChannel(context.Background(), id) // Stands in for a running job.
+	ctx, unlock, ok := state.TryLockCrawl(context.Background(), id) // Stands in for a running crawl.
 	if !ok {
-		t.Fatal("couldn't lock the new channel's job")
+		t.Fatal("couldn't lock the new channel's crawl")
 	}
 	defer unlock()
 
@@ -53,7 +73,7 @@ func TestDeleteChannelStopsItsJob(t *testing.T) {
 		t.Fatalf("delete = %d %s", w.Code, w.Body.String())
 	}
 	if ctx.Err() == nil {
-		t.Error("deleting the channel left its running job going")
+		t.Error("deleting the channel left its running crawl going")
 	}
 }
 

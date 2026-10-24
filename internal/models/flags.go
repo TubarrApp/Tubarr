@@ -72,11 +72,11 @@ type ChannelFlagValues struct {
 	ExtraFFmpegArgs     string
 
 	// Concurrency and performance settings
-	CrawlFreq         int
-	Concurrency       int
-	MetarrConcurrency int
-	Retries           int
-	MaxCPU            float64
+	CrawlFreq           int
+	DownloadConcurrency int
+	MetarrConcurrency   int
+	Retries             int
+	MaxCPU              float64
 
 	// Boolean flags
 	Pause     bool

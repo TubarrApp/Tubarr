@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"tubarr/internal/app"
 	"tubarr/internal/auth"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/jsonkeys"
@@ -19,6 +18,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/queue"
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedtemplates"
@@ -156,7 +156,7 @@ type metarrArgsResponse struct {
 	MetaPurge               string   `json:"metarr_purge_metafile,omitempty"`
 	OutputExt               string   `json:"metarr_output_ext,omitempty"`
 	RenameStyle             string   `json:"metarr_rename_style,omitempty"`
-	Concurrency             int      `json:"metarr_concurrency,omitempty"`
+	MetarrConcurrency       int      `json:"metarr_concurrency,omitempty"`
 	MaxCPU                  *float64 `json:"metarr_max_cpu_usage,omitempty"`
 	MinFreeMem              string   `json:"metarr_min_free_mem,omitempty"`
 	GPU                     string   `json:"metarr_gpu,omitempty"`
@@ -186,7 +186,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		MetaPurge:               m.MetaPurge,
 		OutputExt:               m.OutputExt,
 		RenameStyle:             m.RenameStyle,
-		Concurrency:             max(m.Concurrency, 0),
+		MetarrConcurrency:       max(m.MetarrConcurrency, 0),
 		MinFreeMem:              m.MinFreeMem,
 		GPU:                     m.TranscodeGPU,
 		GPUNode:                 m.TranscodeGPUNode,
@@ -222,7 +222,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 type settingsResponse struct {
 	VideoDir               string   `json:"video_directory,omitempty"`
 	JSONDir                string   `json:"json_directory,omitempty"`
-	MaxConcurrency         int      `json:"max_concurrency,omitempty"`
+	DownloadConcurrency    int      `json:"download_concurrency,omitempty"`
 	CrawlFreq              int      `json:"crawl_freq,omitempty"`
 	DownloadRetries        int      `json:"download_retries,omitempty"`
 	MaxFilesize            string   `json:"max_filesize,omitempty"`
@@ -254,7 +254,7 @@ func newSettingsResponse(s *models.Settings) *settingsResponse {
 	return &settingsResponse{
 		VideoDir:               s.VideoDir,
 		JSONDir:                s.JSONDir,
-		MaxConcurrency:         max(s.Concurrency, 0),
+		DownloadConcurrency:    max(s.DownloadConcurrency, 0),
 		CrawlFreq:              max(s.CrawlFreq, 0),
 		DownloadRetries:        max(s.Retries, 0),
 		MaxFilesize:            s.MaxFilesize,
@@ -422,7 +422,7 @@ type settingsInput struct {
 	YtdlpOutputExt            *string  `json:"ytdlp_output_ext"`
 	FromDate                  *string  `json:"from_date"`
 	ToDate                    *string  `json:"to_date"`
-	MaxConcurrency            *int     `json:"max_concurrency"`
+	MaxConcurrency            *int     `json:"download_concurrency"`
 	CrawlFreq                 *int     `json:"crawl_freq"`
 	DownloadRetries           *int     `json:"download_retries"`
 	UseGlobalCookies          *bool    `json:"use_global_cookies"`
@@ -452,7 +452,7 @@ type metarrArgsInput struct {
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
 	TranscodeQuality        *string  `json:"metarr_transcode_quality"`
-	Concurrency             *int     `json:"metarr_concurrency"`
+	MetarrConcurrency       *int     `json:"metarr_concurrency"`
 	MaxCPU                  *float64 `json:"metarr_max_cpu_usage"`
 	FilenameOps             *string  `json:"metarr_filename_ops"`
 	FilteredFilenameOps     *string  `json:"metarr_filtered_filename_ops"`
@@ -625,7 +625,7 @@ func (in *settingsInput) input() *models.SettingsInput {
 		ExtraYTDLPMetaArgs:        in.ExtraYTDLPMetaArgs,
 		ExtraYTDLPCrawlArgs:       in.ExtraYTDLPCrawlArgs,
 		CrawlFreq:                 in.CrawlFreq,
-		Concurrency:               in.MaxConcurrency,
+		DownloadConcurrency:       in.MaxConcurrency,
 		Retries:                   in.DownloadRetries,
 		Pause:                     in.Paused,
 	}
@@ -654,7 +654,7 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 		TranscodeAudioCodec:     linesInput(in.AudioCodecs, splitNonEmptyLines),
 		MinFreeMem:              in.MinFreeMem,
 		MaxCPU:                  in.MaxCPU,
-		MetarrConcurrency:       in.Concurrency,
+		MetarrConcurrency:       in.MetarrConcurrency,
 		ExtraFFmpegArgs:         in.ExtraFFmpegArgs,
 	}
 }
@@ -729,7 +729,7 @@ func formString(r *http.Request, key string) *string {
 
 // settingsFromForm parses and validates the channel form's Settings.
 func settingsFromForm(r *http.Request) (*models.Settings, error) {
-	concurrency, err := formInt(r, jsonkeys.SettingsMaxConcurrency)
+	downloadConcurrency, err := formInt(r, jsonkeys.SettingsMaxConcurrency)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert max concurrency: %w", err)
 	}
@@ -765,7 +765,7 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 		ExtraYTDLPMetaArgs:        formString(r, jsonkeys.SettingsExtraYtdlpMetaArgs),
 		ExtraYTDLPCrawlArgs:       formString(r, jsonkeys.SettingsExtraYtdlpCrawlArgs),
 		CrawlFreq:                 &crawlFreq,
-		Concurrency:               &concurrency,
+		DownloadConcurrency:       &downloadConcurrency,
 		Retries:                   &retries,
 		Pause:                     &paused,
 	}
@@ -902,7 +902,7 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 // gets them, can't work together.
 func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLID int64, o *models.VideoOverrides) error {
 	m := o.MetarrArgs
-	if cu, err := app.ManualChannelURL(cs, c, channelURLID); err == nil && cu.ChanURLMetarrArgs != nil {
+	if cu, err := queue.ManualChannelURL(cs, c, channelURLID); err == nil && cu.ChanURLMetarrArgs != nil {
 		u := cu.ChanURLMetarrArgs
 		m.OutputExt = cmp.Or(m.OutputExt, u.OutputExt)
 		m.TranscodeGPU = cmp.Or(m.TranscodeGPU, u.TranscodeGPU)

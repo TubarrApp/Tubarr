@@ -3,7 +3,6 @@ package metkeys
 
 // Main program elements.
 const (
-	Concurrency = "--concurrency"
 	Debug       = "--debug"
 	MaxCPU      = "--max-cpu"
 	MinFreeMem  = "--min-free-mem"

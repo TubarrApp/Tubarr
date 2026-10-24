@@ -24,6 +24,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+	"tubarr/internal/queue"
 	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
@@ -34,7 +35,7 @@ import (
 )
 
 // InitChannelCmds is the entrypoint for initializing channel commands.
-func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
+func InitChannelCmds(ctx context.Context, s contracts.Store, dq *queue.DownloadQueue, pp *queue.PostProcessingQueue) *cobra.Command {
 	channelCmd := &cobra.Command{
 		Use:   "channel",
 		Short: "Channel commands.",
@@ -50,12 +51,12 @@ func InitChannelCmds(ctx context.Context, s contracts.Store) *cobra.Command {
 	channelCmd.AddCommand(addChannelCmd(ctx, cs, s))
 	channelCmd.AddCommand(addBatchChannelsCmd(ctx, cs, s))
 	channelCmd.AddCommand(unblockChannelCmd(cs))
-	channelCmd.AddCommand(manualDownloadVideoURLs(ctx, cs, s))
-	channelCmd.AddCommand(runMetarrCmd(ctx, cs, s))
+	channelCmd.AddCommand(manualDownloadVideoURLs(cs, s, dq))
+	channelCmd.AddCommand(runMetarrCmd(ctx, cs, s, pp))
 	channelCmd.AddCommand(listAvailableCmd(cs, s))
-	channelCmd.AddCommand(downloadAvailableCmd(ctx, cs, s))
+	channelCmd.AddCommand(downloadAvailableCmd(cs, s, dq))
 	channelCmd.AddCommand(dismissAvailableCmd(cs, s))
-	channelCmd.AddCommand(crawlChannelCmd(ctx, cs, s))
+	channelCmd.AddCommand(crawlChannelCmd(ctx, cs, s, dq))
 	channelCmd.AddCommand(ignoreCrawl(ctx, cs, s))
 	channelCmd.AddCommand(addVideoURLToIgnore(cs))
 	channelCmd.AddCommand(deleteChannelCmd(cs))
@@ -166,7 +167,7 @@ func deleteVideoURLs(cs contracts.ChannelStore) *cobra.Command {
 }
 
 // manualDownloadVideoURLs downloads a list of URLs inputted by the user.
-func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+func manualDownloadVideoURLs(cs contracts.ChannelStore, s contracts.Store, dq *queue.DownloadQueue) *cobra.Command {
 	var (
 		// Channel identifiers.
 		channelID   int
@@ -250,21 +251,18 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 				return nil
 			}
 
-			// Lock the channel.
-			jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID)
-			if !ok {
-				logger.Pl.I("Channel %q has a running job, please try again when it's complete.", c.Name)
-				return nil
+			// Queue the URLs, which Tubarr downloads before exiting.
+			if c.LoadErr != nil {
+				return c.LoadErr
 			}
-			defer unlock()
-
-			// Download URLs.
-			if err := app.ManualDownloadToChannel(jobCtx, s, cs, c, manualVideos); err != nil {
-				return err
+			if bad := app.CheckManualVideos(c, manualVideos); len(bad) > 0 {
+				return fmt.Errorf("can't download:\n%s", strings.Join(bad, "\n"))
 			}
-
-			// Success.
-			return nil
+			queued, err := dq.Add(c, app.ManualRequests(manualVideos)...)
+			if len(queued) == 0 && err == nil {
+				logger.Pl.I("No videos queued for channel %q, they may already be queued or downloading", c.Name)
+			}
+			return err
 		},
 	}
 
@@ -278,7 +276,7 @@ func manualDownloadVideoURLs(ctx context.Context, cs contracts.ChannelStore, s c
 }
 
 // runMetarrCmd runs Metarr on downloaded videos which Metarr has not yet processed.
-func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store, pp *queue.PostProcessingQueue) *cobra.Command {
 	var (
 		channelID   int
 		channelName string
@@ -317,7 +315,7 @@ func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.St
 			}
 
 			file.UpdateFromConfigFile(cs, c)
-			return app.RunMetarr(ctx, s, c, ids, false)
+			return pp.RunMetarr(ctx, c, ids, false)
 		},
 	}
 
@@ -371,7 +369,7 @@ func listAvailableCmd(cs contracts.ChannelStore, s contracts.Store) *cobra.Comma
 }
 
 // downloadAvailableCmd downloads a channel's videos waiting in Available.
-func downloadAvailableCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+func downloadAvailableCmd(cs contracts.ChannelStore, s contracts.Store, dq *queue.DownloadQueue) *cobra.Command {
 	var (
 		channelID   int
 		channelName string
@@ -406,17 +404,14 @@ func downloadAvailableCmd(ctx context.Context, cs contracts.ChannelStore, s cont
 				return nil
 			}
 
-			claimed, err := s.VideoStore().ClaimVideos(c.ID, chosen, app.AvailableStatuses, consts.DLStatusQueued)
-			if err != nil {
-				return err
-			}
-			if len(claimed) == 0 {
+			// Queue the videos, which Tubarr downloads before exiting.
+			queued, err := dq.Add(c, app.AvailableRequests(chosen, nil, false, nil)...)
+			if len(queued) == 0 && err == nil {
 				logger.Pl.I("Videos are no longer available for channel %q, they may already be downloading", c.Name)
 				return nil
 			}
-
-			logger.Pl.I("Starting download of %d available video(s) for channel %q", len(claimed), c.Name)
-			return app.DownloadAvailable(ctx, s, c, claimed, nil)
+			logger.Pl.I("Queued %d available video(s) for channel %q", len(queued), c.Name)
+			return err
 		},
 	}
 
@@ -774,7 +769,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 			logger.Pl.D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Run ignore crawl.
-			if jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID); ok {
+			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
 				defer unlock()
 
 				// Clean expired blocks first.
@@ -782,11 +777,11 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 					logger.Pl.W("Failed to clean expired blocks: %v", err)
 				}
 
-				if err := app.CrawlChannelIgnore(jobCtx, s, c); err != nil {
+				if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
 					return err
 				}
 			} else {
-				logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
+				logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
 			}
 
 			// Success.
@@ -1202,7 +1197,7 @@ func listAllChannelsCmd(cs contracts.ChannelStore) *cobra.Command {
 }
 
 // crawlChannelCmd initiates a crawl of a given channel.
-func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store) *cobra.Command {
+func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.Store, dq *queue.DownloadQueue) *cobra.Command {
 	var (
 		// Channel identifiers.
 		id   int
@@ -1221,20 +1216,20 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 			}
 
 			// Crawl channel.
-			if jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID); ok {
+			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
 				defer unlock()
 
 				// Clean expired blocks first.
 				if err := blocking.CleanExpiredBlocks(cs.GetDB()); err != nil {
 					logger.Pl.W("Failed to clean expired blocks: %v", err)
 				}
-				if performedCrawls, err := app.CrawlChannel(jobCtx, s, c); err != nil {
+				if performedCrawls, err := app.CrawlChannel(crawlCtx, s, dq, c); err != nil {
 					return err
 				} else if performedCrawls {
 					logger.Pl.S("Completed crawl for channel with %s %q", key, val)
 				}
 			} else {
-				logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
+				logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
 			}
 
 			// Success.
@@ -1437,14 +1432,14 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 
 // runIgnoreCrawl runs an ignore crawl of a newly added channel, so only videos uploaded from now on download.
 func runIgnoreCrawl(ctx context.Context, s contracts.Store, c *models.Channel) {
-	jobCtx, unlock, ok := state.TryLockChannel(ctx, c.ID)
+	crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID)
 	if !ok {
-		logger.Pl.I("Channel %q already has a running job, skipping...", c.Name)
+		logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
 		return
 	}
 	defer unlock()
 	logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
-	if err := app.CrawlChannelIgnore(jobCtx, s, c); err != nil {
+	if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
 		logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
 	}
 }

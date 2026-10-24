@@ -8,7 +8,6 @@ import (
 	"time"
 	"tubarr/internal/app"
 	"tubarr/internal/blocking"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -96,13 +95,13 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 
 			// Crawl goroutine
 			go func(ch *models.Channel) {
-				jobCtx, unlock, ok := state.TryLockChannel(ctx, ch.ID)
+				crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.ID)
 				if !ok {
 					return
 				}
 				defer unlock()
 
-				release, err := app.AcquireCrawlSlot(state.QueueCtx(jobCtx), ch.Name)
+				release, err := app.AcquireCrawlSlot(crawlCtx, ch.Name)
 				if err != nil {
 					logger.Pl.D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
 					return
@@ -110,7 +109,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 				defer release()
 
 				logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
-				if performedCrawls, err := app.CrawlChannel(jobCtx, ss.s, ch); err != nil {
+				if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ss.dq, ch); err != nil {
 					logger.Pl.E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
 				} else if performedCrawls {
 					logger.Pl.S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
@@ -120,66 +119,12 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 	}
 }
 
-// getActiveDownloads retrieves all currently downloading videos for a specific channel from the in-memory StatusUpdate map.
-//
-// This provides real-time updates without hitting the database on every poll.
-func (ss *serverStore) getActiveDownloads(channel *models.Channel) []models.Video {
-	var videos []models.Video
-	for _, statusUpdate := range state.ChannelStatusUpdates(channel.ID) {
-		// Only include Queued or Downloading statuses, and Ignored ones briefly kept to show they were filtered out.
-		switch statusUpdate.Status {
-		case consts.DLStatusQueued, consts.DLStatusDownloading, consts.DLStatusIgnored:
-			// Proceed with loop logic
-		default:
-			// Go to next iteration
-			continue
-		}
-
-		// Build a Video model from the StatusUpdate
-		var errMsg string
-		if statusUpdate.Error != nil {
-			errMsg = statusUpdate.Error.Error()
-		}
-		videos = append(videos, models.Video{
-			ID:           statusUpdate.VideoID,
-			Title:        statusUpdate.VideoTitle,
-			ChannelID:    statusUpdate.ChannelID,
-			ChannelURLID: statusUpdate.ChannelURLID,
-			ChannelURL:   statusUpdate.ChannelURL,
-			URL:          statusUpdate.VideoURL,
-			DownloadStatus: models.DLStatus{
-				Status:   statusUpdate.Status,
-				Percent:  statusUpdate.Percent,
-				Stage:    statusUpdate.Stage,
-				Error:    statusUpdate.Error,
-				ErrorMsg: errMsg,
-			},
-		})
-	}
-
-	logger.Pl.D(1, "Found %d active downloads in memory for channel %d", len(videos), channel.ID)
-	return videos
-}
-
 // errNoActiveDownload is returned when there is no download to cancel.
 var errNoActiveDownload = errors.New("no active download found")
 
-// cancelDownload stops a video's running download and marks it canceled in the database.
-//
-// The running process is canceled first, as a video waiting to retry isn't Queued or Downloading in the database.
-func (ss *serverStore) cancelDownload(ctx context.Context, videoID int64) error {
-	videoURL, err := ss.vs.GetVideoURLByID(videoID)
-	if err != nil {
-		logger.Pl.E("Could not get video URL for ID %d: %v", videoID, err)
-	}
-	canceled := ss.ds.CancelDownload(videoID, videoURL)
-
-	// Saved even if the client disconnects.
-	marked, err := ss.ds.MarkDownloadCanceled(context.WithoutCancel(ctx), videoID)
-	if err != nil {
-		return err
-	}
-	if !marked && !canceled {
+// cancelDownload cancels a video's download, waiting or running.
+func (ss *serverStore) cancelDownload(videoID int64) error {
+	if !ss.dq.Cancel(videoID) {
 		return fmt.Errorf("%w for video ID %d", errNoActiveDownload, videoID)
 	}
 	return nil

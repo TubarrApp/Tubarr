@@ -7,7 +7,6 @@ import (
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/downloads"
 	"tubarr/internal/models"
 )
 
@@ -79,33 +78,6 @@ func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models
 		return fmt.Errorf("failed to update download status for video %q: %w", update.VideoURL, err)
 	}
 	return nil
-}
-
-// CancelDownload cancels an active download by calling the downloads package.
-func (ds *DownloadStore) CancelDownload(videoID int64, videoURL string) bool {
-	return downloads.CancelDownloadByVideoID(videoID, videoURL)
-}
-
-// MarkDownloadCanceled marks a video's queued or downloading download canceled, reporting whether it had one.
-func (ds *DownloadStore) MarkDownloadCanceled(ctx context.Context, videoID int64) (bool, error) {
-	query := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = CURRENT_TIMESTAMP WHERE %s = ? AND %s IN (?, ?)",
-		consts.DBDownloads,
-		consts.QDLStatus,
-		consts.QDLUpdatedAt,
-		consts.QDLVidID,
-		consts.QDLStatus,
-	)
-
-	result, err := ds.DB.ExecContext(ctx, query, consts.DLStatusCanceled, videoID, consts.DLStatusQueued, consts.DLStatusDownloading)
-	if err != nil {
-		return false, fmt.Errorf("failed to cancel download: %w", err)
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("failed to get rows affected: %w", err)
-	}
-	return rowsAffected > 0, nil
 }
 
 // ******************************** Private ***************************************************************************************

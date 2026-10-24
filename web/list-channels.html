@@ -195,8 +195,8 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Max Concurrency:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.max_concurrency || 1"></span>
-                              <span x-show="capNote(channel.settings?.max_concurrency, globalDownloadLimit)" class="ml-2 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(channel.settings?.max_concurrency, globalDownloadLimit)"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.download_concurrency || 1"></span>
+                              <span x-show="capNote(channel.settings?.download_concurrency, globalDownloadLimit)" class="ml-2 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(channel.settings?.download_concurrency, globalDownloadLimit)"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Download Retries:</span>

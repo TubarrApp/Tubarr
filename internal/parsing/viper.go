@@ -139,8 +139,8 @@ func ApplyChannelSettingsInput(dst *models.Settings, in *models.SettingsInput) e
 //
 // Files and folders needn't exist: saving checks those it adds or changes.
 func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err error) {
-	if v := in.Concurrency; v != nil {
-		dst.Concurrency = max(*v, 0)
+	if v := in.DownloadConcurrency; v != nil {
+		dst.DownloadConcurrency = max(*v, 0)
 	}
 	if v := in.CookiesFromBrowser; v != nil {
 		dst.CookiesFromBrowser = *v
@@ -323,7 +323,7 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 		}
 	}
 	if v := in.MetarrConcurrency; v != nil {
-		dst.Concurrency = max(*v, 0)
+		dst.MetarrConcurrency = max(*v, 0)
 	}
 	if v := in.MaxCPU; v != nil {
 		dst.MaxCPU = sharedvalidation.ValidateMaxCPU(*v, true)

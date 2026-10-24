@@ -1,4 +1,4 @@
-// Package limits provides concurrency limiters for downloads and crawls.
+// Package limits provides concurrency limiters for downloads, crawls and post-processing.
 package limits
 
 import (
@@ -16,6 +16,19 @@ var (
 	DomainDownloads = &DomainLimiter{kind: "download", sems: make(map[string]chan struct{})}
 	DomainCrawls    = &DomainLimiter{kind: "crawl", sems: make(map[string]chan struct{})}
 )
+
+// GlobalPostProcessing limits Metarr runs across all channels.
+var GlobalPostProcessing = NewSemaphore(0)
+
+// InitGlobalPostProcessLimit sets the Metarr concurrency limit across all channels (0 = unlimited).
+func InitGlobalPostProcessLimit(limit int) {
+	GlobalPostProcessing.SetLimit(limit)
+	if limit > 0 {
+		logger.Pl.I("Global post-processing concurrency limit set to %d", limit)
+	} else {
+		logger.Pl.I("Global post-processing concurrency limit disabled (unlimited)")
+	}
+}
 
 // DomainLimiter limits concurrent operations per domain. A domain with no entry is unlimited.
 type DomainLimiter struct {

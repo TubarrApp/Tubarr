@@ -99,7 +99,7 @@ func TestWebSettingsNormalized(t *testing.T) {
 		"metarr_output_ext":    "MP4",
 		"crawl_freq":           "-5",
 		"download_retries":     "-1",
-		"max_concurrency":      "-2",
+		"download_concurrency": "-2",
 		"metarr_concurrency":   "-3",
 		"metarr_max_cpu_usage": "150",
 	} {
@@ -125,7 +125,7 @@ func TestWebSettingsNormalized(t *testing.T) {
 		{"metarr_output_ext", got.Metarr["metarr_output_ext"], "mp4"},
 		{"crawl_freq", got.Settings["crawl_freq"], ""},
 		{"download_retries", got.Settings["download_retries"], ""},
-		{"max_concurrency", got.Settings["max_concurrency"], ""},
+		{"download_concurrency", got.Settings["download_concurrency"], ""},
 		{"metarr_concurrency", got.Metarr["metarr_concurrency"], ""},
 		{"metarr_max_cpu_usage", got.Metarr["metarr_max_cpu_usage"], "101"},
 		{"per-URL ytdlp_output_ext", got.URLSettings[u]["settings"]["ytdlp_output_ext"], "webm"},
@@ -242,7 +242,7 @@ func TestWebSettingsMissingFile(t *testing.T) {
 // TestParseURLSettingsNumbers tests that numeric per-URL settings sent as JSON numbers are kept.
 func TestParseURLSettingsNumbers(t *testing.T) {
 	const raw = `{"https://example.com/c":{
-		"settings":{"max_concurrency":3,"crawl_freq":45,"download_retries":2,"paused":true},
+		"settings":{"download_concurrency":3,"crawl_freq":45,"download_retries":2,"paused":true},
 		"metarr":{"metarr_concurrency":4,"metarr_max_cpu_usage":50.5}}}`
 
 	parsed, err := parseURLSettings(raw)
@@ -253,12 +253,12 @@ func TestParseURLSettingsNumbers(t *testing.T) {
 	if !ok || got.Settings == nil || got.Metarr == nil {
 		t.Fatalf("parsed = %+v, want settings and metarr for the URL", parsed)
 	}
-	if s := got.Settings; s.Concurrency != 3 || s.CrawlFreq != 45 || s.Retries != 2 || !s.Paused {
+	if s := got.Settings; s.DownloadConcurrency != 3 || s.CrawlFreq != 45 || s.Retries != 2 || !s.Paused {
 		t.Errorf("settings = concurrency %d, crawl freq %d, retries %d, paused %v; want 3, 45, 2, true",
-			s.Concurrency, s.CrawlFreq, s.Retries, s.Paused)
+			s.DownloadConcurrency, s.CrawlFreq, s.Retries, s.Paused)
 	}
-	if m := got.Metarr; m.Concurrency != 4 || m.MaxCPU != 50.5 {
-		t.Errorf("metarr = concurrency %d, max CPU %v; want 4, 50.5", m.Concurrency, m.MaxCPU)
+	if m := got.Metarr; m.MetarrConcurrency != 4 || m.MaxCPU != 50.5 {
+		t.Errorf("metarr = concurrency %d, max CPU %v; want 4, 50.5", m.MetarrConcurrency, m.MaxCPU)
 	}
 }
 
@@ -275,7 +275,7 @@ func TestSplitAuthDetails(t *testing.T) {
 
 // TestParseURLSettingsRejectsBadType tests that a wrongly typed value is an error rather than silently dropped.
 func TestParseURLSettingsRejectsBadType(t *testing.T) {
-	if _, err := parseURLSettings(`{"https://example.com/c":{"settings":{"max_concurrency":"three"}}}`); err == nil {
+	if _, err := parseURLSettings(`{"https://example.com/c":{"settings":{"download_concurrency":"three"}}}`); err == nil {
 		t.Fatal("parseURLSettings accepted a string concurrency, want an error")
 	}
 }

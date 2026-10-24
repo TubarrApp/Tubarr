@@ -466,7 +466,7 @@ func mergeSettings(u, ch *models.Settings) {
 	if ch == nil {
 		return
 	}
-	u.Concurrency = cmp.Or(u.Concurrency, ch.Concurrency)
+	u.DownloadConcurrency = cmp.Or(u.DownloadConcurrency, ch.DownloadConcurrency)
 	u.CookiesFromBrowser = cmp.Or(u.CookiesFromBrowser, ch.CookiesFromBrowser)
 	u.CrawlFreq = cmp.Or(u.CrawlFreq, ch.CrawlFreq) // A blank field saves as 0.
 	u.ExternalDownloader = cmp.Or(u.ExternalDownloader, ch.ExternalDownloader)
@@ -508,7 +508,7 @@ func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	u.FilteredMetaOpsFile = cmp.Or(u.FilteredMetaOpsFile, ch.FilteredMetaOpsFile)
 	u.OutputDir = cmp.Or(u.OutputDir, ch.OutputDir)
 	u.MetaPurge = cmp.Or(u.MetaPurge, ch.MetaPurge)
-	u.Concurrency = cmp.Or(u.Concurrency, ch.Concurrency)
+	u.MetarrConcurrency = cmp.Or(u.MetarrConcurrency, ch.MetarrConcurrency)
 	u.MaxCPU = cmp.Or(u.MaxCPU, ch.MaxCPU)
 	u.MinFreeMem = cmp.Or(u.MinFreeMem, ch.MinFreeMem)
 	u.TranscodeGPU = cmp.Or(u.TranscodeGPU, ch.TranscodeGPU)

@@ -23,6 +23,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
+	"tubarr/internal/queue"
 	"tubarr/internal/server/serverauth"
 
 	"github.com/go-chi/chi/v5"
@@ -37,6 +38,8 @@ type serverStore struct {
 	ds     contracts.DownloadStore
 	vs     contracts.VideoStore
 	tss    contracts.TubarrSettingsStore
+	dq     *queue.DownloadQueue
+	pp     *queue.PostProcessingQueue
 	db     *sql.DB
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -235,7 +238,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 }
 
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
-func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, d *sql.DB) error {
+func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, dq *queue.DownloadQueue, pp *queue.PostProcessingQueue, d *sql.DB) error {
 	// The --web-auth flag or TUBARR_WEB_AUTH override the login mode saved on the Settings page.
 	access, err := serverauth.New(d, store.TubarrSettingsStore(), cmp.Or(viper.GetString(keys.WebAuth), os.Getenv(consts.EnvWebAuth)))
 	if err != nil {
@@ -249,6 +252,8 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		ds:     store.DownloadStore(),
 		vs:     store.VideoStore(),
 		tss:    store.TubarrSettingsStore(),
+		dq:     dq,
+		pp:     pp,
 		db:     d,
 		ctx:    inputCtx,
 		cancel: inputCtxCancel,

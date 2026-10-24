@@ -196,7 +196,7 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 		case keys.CrawlFreq:
 			s.CrawlFreq = 0
 		case keys.DownloadConcurrency:
-			s.Concurrency = 0
+			s.DownloadConcurrency = 0
 		case keys.DLRetries:
 			s.Retries = 0
 		case keys.Pause:
@@ -244,7 +244,7 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 		case keys.MMaxCPU:
 			m.MaxCPU = 0
 		case keys.MConcurrency:
-			m.Concurrency = 0
+			m.MetarrConcurrency = 0
 		case keys.MExtraFFmpegArgs:
 			m.ExtraFFmpegArgs = ""
 

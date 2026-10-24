@@ -19,7 +19,7 @@ type DomainLimit struct {
 // Settings are the primary settings for a channel, affecting videos belonging to it.
 type Settings struct {
 	// Configurations.
-	Concurrency int `json:"max_concurrency"`
+	DownloadConcurrency int `json:"download_concurrency"`
 
 	// Download-related operations.
 	CookiesFromBrowser        string   `json:"cookies_from_browser"`
@@ -76,9 +76,9 @@ type MetarrArgs struct {
 	MetaPurge string `json:"metarr_purge_metafile"`
 
 	// Program operations.
-	Concurrency int     `json:"metarr_concurrency"`
-	MaxCPU      float64 `json:"metarr_max_cpu_usage"`
-	MinFreeMem  string  `json:"metarr_min_free_mem"`
+	MetarrConcurrency int     `json:"metarr_concurrency"`
+	MaxCPU            float64 `json:"metarr_max_cpu_usage"`
+	MinFreeMem        string  `json:"metarr_min_free_mem"`
 
 	// FFmpeg transcoding operations.
 	TranscodeGPU         string   `json:"metarr_transcode_gpu"`
@@ -209,7 +209,7 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 	}
 
 	// Numeric comparisons
-	if child.Concurrency != 0 && child.Concurrency != parent.Concurrency {
+	if child.DownloadConcurrency != 0 && child.DownloadConcurrency != parent.DownloadConcurrency {
 		return false
 	}
 	if child.CrawlFreq != 0 && child.CrawlFreq != parent.CrawlFreq {
@@ -341,7 +341,7 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 	}
 
 	// Numeric comparisons
-	if child.Concurrency != 0 && child.Concurrency != parent.Concurrency {
+	if child.MetarrConcurrency != 0 && child.MetarrConcurrency != parent.MetarrConcurrency {
 		return false
 	}
 	if child.MaxCPU != 0 && child.MaxCPU != parent.MaxCPU {
@@ -433,7 +433,7 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 	}
 
 	// Program operations.
-	if m.Concurrency != 0 {
+	if m.MetarrConcurrency != 0 {
 		return false
 	}
 	if m.MaxCPU != 0.0 {
@@ -476,7 +476,7 @@ func SettingsAllZero(s *Settings) bool {
 	}
 
 	// Configurations.
-	if s.Concurrency != 0 {
+	if s.DownloadConcurrency != 0 {
 		return false
 	}
 

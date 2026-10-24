@@ -1441,9 +1441,6 @@ var liveActions = [...]struct {
 		if cu := sc.urls[f]; cu != nil {
 			cuID = cu.id
 		}
-		subs := []string{fmt.Sprintf("manual download for channel %q", sc.name), fmt.Sprintf("downloading URLs for channel %q", sc.name),
-			fmt.Sprintf("for channel %q did not start", sc.name)}
-		n := len(liveLogLines(subs...))
 		body := map[string]any{"videos": []map[string]any{{"url": u, "channel_url_id": cuID}}}
 		w := sendJSON(sc.t, http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/download-urls", sc.id), body)
 		if sc.unmounted { // Refused up front while its destination is unavailable.
@@ -1456,8 +1453,7 @@ var liveActions = [...]struct {
 		if w.Code != http.StatusAccepted {
 			sc.fatalf("downloading %s = %d %s", u, w.Code, w.Body.String())
 		}
-		waitLogged(sc.t, n, subs...)
-		waitLive(sc.t, sc.id)
+		waitLive(sc.t, sc.id) // In the download queue before the request returns.
 		after := liveRows(sc.t, sc.id)
 		sc.expect(before, after, map[string][]consts.DownloadStatus{u: {consts.DLStatusCompleted}})
 		sc.expectNotified("all", after[u].status == consts.DLStatusCompleted, false)

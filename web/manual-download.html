@@ -437,7 +437,7 @@
             if (done.length === 0) return;
             if (action === 'download') {
               this.success = queued
-                ? `Queued ${done.length} URL(s): downloads start when their channel's current crawl or download finishes. The channel's Stop Queue or Abort All button cancels them.`
+                ? `Queued ${done.length} URL(s) behind their channel's other downloads. Check Downloads for progress. The channel's Stop Queue or Abort All button cancels them.`
                 : `Started downloading ${done.length} URL(s). Check Downloads for progress.`;
             } else {
               this.success = `Sent ${done.length - existing.length} video(s) to Available.`;

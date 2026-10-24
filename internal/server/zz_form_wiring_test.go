@@ -372,7 +372,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		// Settings.
 		"video_directory":              {sub("videos-a"), sub("videos-b")},
 		"json_directory":               {sub("json-a"), sub("json-b")},
-		"max_concurrency":              {"2", "3"},
+		"download_concurrency":         {"2", "3"},
 		"crawl_freq":                   {"45", "60"},
 		"download_retries":             {"2", "4"},
 		"max_filesize":                 {"100m", "2g"},
@@ -646,10 +646,10 @@ func TestChannelFormRoundTrip(t *testing.T) {
 func TestEditChangesURLPassword(t *testing.T) {
 	setupFuzzServer(t)
 	base := url.Values{
-		"name":            {"Password Change"},
-		"urls":            {"https://example.com/@password"},
-		"video_directory": {filepath.Join(fuzzServer.dir, "videos")},
-		"max_concurrency": {"1"}, "crawl_freq": {"30"}, "download_retries": {"1"},
+		"name":                 {"Password Change"},
+		"urls":                 {"https://example.com/@password"},
+		"video_directory":      {filepath.Join(fuzzServer.dir, "videos")},
+		"download_concurrency": {"1"}, "crawl_freq": {"30"}, "download_retries": {"1"},
 	}
 	authFor := func(pass string) string {
 		return `[{"channel_url":"https://example.com/@password","username":"user","password":"` + pass + `","login_url":"https://example.com/login"}]`

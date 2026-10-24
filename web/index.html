@@ -1336,7 +1336,7 @@
                 body: JSON.stringify({ url_ids: urlIDs })
               });
 
-              if (!response.ok && response.status !== 409) { // 409: the channel already has a running job, the message says so.
+              if (!response.ok && response.status !== 409) { // 409: the channel is already being crawled, the message says so.
                 throw new Error('Failed to start crawl');
               }
 
@@ -1360,7 +1360,7 @@
                 method: 'POST'
               });
 
-              if (!response.ok && response.status !== 409) { // 409: the channel already has a running job, the message says so.
+              if (!response.ok && response.status !== 409) { // 409: the channel is already being crawled, the message says so.
                 throw new Error('Failed to ignore uploads to date');
               }
 

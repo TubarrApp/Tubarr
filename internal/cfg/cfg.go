@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"tubarr/internal/app"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
@@ -18,6 +17,7 @@ import (
 	"tubarr/internal/downloads"
 	"tubarr/internal/limits"
 	"tubarr/internal/parsing"
+	"tubarr/internal/queue"
 	"tubarr/internal/siterules"
 	"tubarr/internal/validation"
 
@@ -94,7 +94,7 @@ var rootCmd = &cobra.Command{
 
 		// Initialize global download concurrency limit (0 = unlimited).
 		downloads.InitGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
-		app.InitGlobalMetarrLimit(viper.GetInt(keys.PostProcessConcurrency))
+		limits.InitGlobalPostProcessLimit(viper.GetInt(keys.PostProcessConcurrency))
 
 		// Setup benchmarking if flag is set. A failure only skips benchmarking.
 		if viper.GetBool(keys.Benchmarking) {
@@ -135,7 +135,7 @@ var rootCmd = &cobra.Command{
 }
 
 // InitCommands initializes all commands and their flags.
-func InitCommands(ctx context.Context, s contracts.Store) error {
+func InitCommands(ctx context.Context, s contracts.Store, dq *queue.DownloadQueue, pp *queue.PostProcessingQueue) error {
 	settingsStore = s.TubarrSettingsStore()
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory".
@@ -170,7 +170,7 @@ func InitCommands(ctx context.Context, s contracts.Store) error {
 	}
 
 	// Add Channel and Video function commands.
-	rootCmd.AddCommand(InitChannelCmds(ctx, s))
+	rootCmd.AddCommand(InitChannelCmds(ctx, s, dq, pp))
 	rootCmd.AddCommand(InitVideoCmds(s))
 	rootCmd.AddCommand(InitAuthCmds(s))
 

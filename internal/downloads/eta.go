@@ -24,9 +24,9 @@ var (
 	etaBaselines = map[int64]*etaBaseline{} // By video ID.
 )
 
-// trackETA records a video's progress for ETA, from its first bytes, restarting when its percentage drops (e.g. yt-dlp
+// TrackETA records a video's progress for ETA, from its first bytes, restarting when its percentage drops (e.g. yt-dlp
 // begins downloading the audio portion).
-func trackETA(videoID int64, status consts.DownloadStatus, pct float64, now time.Time) {
+func TrackETA(videoID int64, status consts.DownloadStatus, pct float64, now time.Time) {
 	if videoID == 0 {
 		return
 	}

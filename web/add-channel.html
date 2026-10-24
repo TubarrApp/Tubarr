@@ -263,7 +263,7 @@
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max Concurrency</label>
-                              <input type="number" x-model.number="urlEntry.custom.max_concurrency" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600" />
+                              <input type="number" x-model.number="urlEntry.custom.download_concurrency" placeholder="Use channel setting" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600" />
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Crawl Frequency (min)</label>
@@ -585,12 +585,12 @@
                         </label>
                         <input
                           type="number"
-                          x-model.number="formData.settings.max_concurrency"
+                          x-model.number="formData.settings.download_concurrency"
                           min="1"
                           placeholder="1"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
-                        <p x-show="capNote(formData.settings.max_concurrency, globalDownloadLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(formData.settings.max_concurrency, globalDownloadLimit)"></p>
+                        <p x-show="capNote(formData.settings.download_concurrency, globalDownloadLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(formData.settings.download_concurrency, globalDownloadLimit)"></p>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">WARNING: Higher concurrency can cause bot detection on some tube sites.</p>
                       </div>
 
@@ -1297,7 +1297,7 @@
                   // Basic settings
                   video_directory: '',
                   json_directory: '',
-                  max_concurrency: null,
+                  download_concurrency: null,
                   crawl_freq: null,
                   download_retries: null,
                   max_filesize: '',
@@ -1346,7 +1346,7 @@
             settings: {
               video_directory: '',
               json_directory: '',
-              max_concurrency: 1,
+              download_concurrency: 1,
               crawl_freq: 30,
               download_retries: 3,
               max_filesize: '',
@@ -1446,7 +1446,7 @@
                 auto_download: '',
                 video_directory: '',
                 json_directory: '',
-                max_concurrency: null,
+                download_concurrency: null,
                 crawl_freq: null,
                 download_retries: null,
                 max_filesize: '',
@@ -1675,7 +1675,7 @@
               if (urlEntry.hasCustomSettings && urlEntry.custom) {
                 // Process basic/advanced settings
                 const settingsFields = [
-                  'video_directory', 'json_directory', 'max_concurrency', 'crawl_freq',
+                  'video_directory', 'json_directory', 'download_concurrency', 'crawl_freq',
                   'download_retries', 'max_filesize', 'from_date', 'to_date',
                   'filter_file', 'filters',
                   'ytdlp_output_ext', 'cookies_from_browser',
