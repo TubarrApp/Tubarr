@@ -8,6 +8,7 @@ type DLStatus struct {
 	Percent  float64               `json:"percentage"`
 	Stage    string                `json:"stage,omitempty"` // What a queued video is waiting on, not stored.
 	ETA      int64                 `json:"eta"`             // Seconds left, -1 when unknown, not stored.
+	Speed    float64               `json:"speed"`           // Bytes per second while downloading, 0 when unknown, not stored.
 	Error    error                 `json:"-"`
 	ErrorMsg string                `json:"error,omitempty"` // Why the last attempt failed, as shown in the web UI.
 }

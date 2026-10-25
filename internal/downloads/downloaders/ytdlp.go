@@ -6,15 +6,16 @@ import (
 	"tubarr/internal/domain/command"
 )
 
-// YTDLPProgressParser parses a yt-dlp progress line (see command.ProgressTemplateFmt) into a percentage.
-func YTDLPProgressParser(line string) (pct float64, ok bool) {
+// YTDLPProgressParser parses a yt-dlp progress line (see command.ProgressTemplateFmt) into a percentage and a speed in
+// bytes per second, 0 when yt-dlp doesn't know it yet.
+func YTDLPProgressParser(line string) (pct, speed float64, ok bool) {
 	rest, found := strings.CutPrefix(strings.TrimSpace(line), command.ProgressMarker)
 	if !found {
-		return 0, false
+		return 0, 0, false
 	}
 	fields := strings.Fields(rest)
-	if len(fields) != 5 {
-		return 0, false
+	if len(fields) != 6 {
+		return 0, 0, false
 	}
 
 	// Unknown values are printed as "NA", which parse to 0.
@@ -26,6 +27,7 @@ func YTDLPProgressParser(line string) (pct float64, ok bool) {
 		return f
 	}
 	downloaded, total, estimate, fragIdx, fragCount := num(fields[0]), num(fields[1]), num(fields[2]), num(fields[3]), num(fields[4])
+	speed = num(fields[5])
 
 	switch {
 	case total > 0:
@@ -35,7 +37,7 @@ func YTDLPProgressParser(line string) (pct float64, ok bool) {
 	case fragCount > 0:
 		pct = fragIdx / fragCount * 100
 	default:
-		return 0, false
+		return 0, 0, false
 	}
-	return min(pct, 100.0), true
+	return min(pct, 100.0), speed, true
 }

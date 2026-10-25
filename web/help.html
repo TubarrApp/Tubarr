@@ -222,9 +222,9 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                 </table>
               </div>
               <p>
-                yt-dlp names downloads <code>title [id]</code>, so two videos with the same title can't clash. If no
-                filename op sets the name, Tubarr adds <code>set:{{fulltitle}}</code>, renaming the finished video to its
-                full title.
+                yt-dlp names downloads <code>title [id]</code>, so two videos with the same title can't clash, and
+                finished videos keep that name unless a filename op sets another. To name them by their full title, add
+                <code>set:{{fulltitle}}</code> (<code>&#123;&#123;title&#125;&#125;</code> is often cut short).
               </p>
               <p>Filename ops run in this order:</p>
               <ol>
@@ -350,13 +350,14 @@ title:contains:cat||prefix:[Cats]           filtered filename op (the filter rea
                 </table>
               </div>
               <p>
-                Lines apply in order, and a plain codec applies to everything, so put it first and its exceptions after:
+                A plain codec applies to everything a <code>source:target</code> line doesn't name, whatever order the
+                lines are in:
               </p>
               <pre><code>hevc
 vp9:av1</code></pre>
               <p>
-                converts everything to HEVC, except VP9, which becomes AV1. Written the other way round, the
-                <code>hevc</code> line would also send VP9 to HEVC.
+                converts everything to HEVC, except VP9, which becomes AV1. Only one plain codec is allowed, and each
+                source codec can only be named once.
               </p>
               <ul>
                 <li>Video codecs: <code>av1</code>, <code>h264</code>, <code>hevc</code>, <code>mpeg2</code>, <code>vp8</code>, <code>vp9</code>. Audio codecs: <code>aac</code>, <code>ac3</code>, <code>alac</code>, <code>dts</code>, <code>eac3</code>, <code>flac</code>, <code>mp2</code>, <code>mp3</code>, <code>opus</code>, <code>pcm</code>, <code>truehd</code>, <code>vorbis</code>, <code>wav</code>. Common other names work too (<code>h265</code>, <code>x264</code>, <code>libmp3lame</code>).</li>

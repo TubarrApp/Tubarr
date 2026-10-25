@@ -197,7 +197,4 @@ func TestMakeMetarrCommandOverrides(t *testing.T) {
 			t.Errorf("args %q hold %q, which the overrides replace", args, unwanted)
 		}
 	}
-	if !slices.Contains(args, defaultFilenameSet) {
-		t.Errorf("args %q lack the default filename set", args)
-	}
 }

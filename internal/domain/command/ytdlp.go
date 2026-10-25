@@ -30,12 +30,13 @@ const (
 	YtDLPOutputExtension = "--merge-output-format"
 )
 
-// Progress line format (fields: downloaded bytes, total bytes, estimated total bytes, fragment index, fragment count).
+// Progress line format (fields: downloaded bytes, total bytes, estimated total bytes, fragment index, fragment count,
+// speed in bytes per second).
 const (
 	ProgressMarker      = "[tubarr-progress]"
 	ProgressTemplateFmt = "download:" + ProgressMarker +
 		" %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s" +
-		" %(progress.fragment_index)s %(progress.fragment_count)s"
+		" %(progress.fragment_index)s %(progress.fragment_count)s %(progress.speed)s"
 )
 
 // Scrape-related yt-dlp commands.

@@ -137,8 +137,8 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 	var value string
 	switch name {
 	case sharedtemplates.ChannelID:
-		if c == nil || c.ID == 0 {
-			return "", errors.New("templating: channel ID is 0")
+		if c == nil { // Removed c.ID == 0 error. Unexpected, but 0 is a valid character for a rename.
+			return "", errors.New("templating: channel sent in nil")
 		}
 		value = strconv.FormatInt(c.ID, 10)
 

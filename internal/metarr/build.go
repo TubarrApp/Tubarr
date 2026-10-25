@@ -3,7 +3,6 @@ package metarr
 
 import (
 	"cmp"
-	"slices"
 	"strconv"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -13,30 +12,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/abstractions"
-	"github.com/TubarrApp/gocommon/sharedconsts"
-	"github.com/TubarrApp/gocommon/sharedparsing"
-	"github.com/TubarrApp/gocommon/sharedtags"
 )
-
-// defaultFilenameSet renames finished videos to their full title. Downloads are named "title [id]", keeping apart
-// videos with the same (or a non-Latin) title.
-const defaultFilenameSet = sharedconsts.OpSet + ":{{" + sharedtags.JFulltitle + "}}"
-
-// withDefaultFilenameSet returns the filename ops to run: the video's overrides or channel URL's, else the global ones,
-// with defaultFilenameSet added when none of them sets the name.
-func withDefaultFilenameSet(v *models.Video, ops []string) []string {
-	if len(ops) == 0 && v.Overrides == nil && abstractions.IsSet(keys.MFilenameOps) {
-		ops = abstractions.GetStringSlice(keys.MFilenameOps)
-	}
-	parsed, _, err := sharedparsing.ParseFilenameOps(ops)
-	if err != nil {
-		return ops // Metarr reports the invalid op.
-	}
-	if slices.ContainsFunc(parsed, func(op models.FilenameOps) bool { return op.OpType == sharedconsts.OpSet }) {
-		return ops
-	}
-	return append(slices.Clip(ops), defaultFilenameSet)
-}
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
@@ -50,7 +26,13 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			metaOps = abstractions.GetStringSlice(keys.MMetaOps)
 		}
 	}
-	filenameOps = withDefaultFilenameSet(v, filenameOps)
+
+	// Grab global filename ops if no ops set for this video.
+	if len(filenameOps) == 0 &&
+		v.Overrides == nil &&
+		abstractions.IsSet(keys.MFilenameOps) {
+		filenameOps = abstractions.GetStringSlice(keys.MFilenameOps)
+	}
 
 	// 'Download As' args, blank ones using the channel URL's.
 	var o models.MetarrArgs

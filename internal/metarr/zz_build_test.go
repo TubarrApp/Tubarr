@@ -203,7 +203,6 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 		want      []string
 	}{
 		{"channel URL", nil, channelArgs, nil, slices.Concat(files, []string{
-			metkeys.FilenameOps, defaultFilenameSet,
 			metkeys.MetaOps, "artist:set:Cat", metkeys.MetaOW,
 			metkeys.MaxCPU, "50.00",
 			metkeys.MinFreeMem, "1G",
@@ -219,7 +218,6 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 		})},
 		{"global", globals, &models.MetarrArgs{}, nil, slices.Concat(files, []string{
 			metkeys.FilenameOps, "prefix:[G] ",
-			metkeys.FilenameOps, defaultFilenameSet,
 			metkeys.MetaOps, "title:set:Global", metkeys.MetaOW,
 			metkeys.MinFreeMem, "2G",
 			metkeys.OutputDir, "/moved",
@@ -232,7 +230,6 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			MetarrArgs: models.MetarrArgs{OutputExt: "webm", TranscodeGPU: validation.GPUNone, MaxCPU: 80},
 			Thumbnail:  "/thumb.png",
 		}, slices.Concat(files, []string{
-			metkeys.FilenameOps, defaultFilenameSet,
 			metkeys.MaxCPU, "80.00",
 			metkeys.MinFreeMem, "1G",
 			metkeys.OutputDir, "/moved",
@@ -246,7 +243,6 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.Debug, "2",
 		})},
 		{"strip thumbnail", nil, &models.MetarrArgs{}, &models.VideoOverrides{StripThumbnail: true}, slices.Concat(files, []string{
-			metkeys.FilenameOps, defaultFilenameSet,
 			metkeys.StripThumbnail,
 		})},
 	} {
@@ -260,43 +256,6 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 		if got := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); !slices.Equal(got, tc.want) {
 			t.Errorf("%s:\ngot  %q\nwant %q", tc.name, got, tc.want)
 		}
-	}
-}
-
-// TestWithDefaultFilenameSet tests finished videos are renamed to their full title unless an op that applies sets the
-// name, and that channels without ops of their own still get the global ones.
-func TestWithDefaultFilenameSet(t *testing.T) {
-	logger.Pl.Console = io.Discard
-	t.Cleanup(viper.Reset)
-	if ops, err := parsing.ParseFilenameOps([]string{defaultFilenameSet}); err != nil || len(ops) != 1 {
-		t.Fatalf("default op %q doesn't parse: %v", defaultFilenameSet, err)
-	}
-
-	for _, tc := range []struct {
-		name        string
-		global, ops []string
-		want        []string
-	}{
-		{"no ops", nil, nil, []string{defaultFilenameSet}},
-		{"ops without a set", nil, []string{"prefix:[A] "}, []string{"prefix:[A] ", defaultFilenameSet}},
-		{"own set", nil, []string{"set:{{title}}"}, []string{"set:{{title}}"}},
-		{"global set", []string{"set:{{title}}"}, nil, []string{"set:{{title}}"}},
-		{"global ops without a set", []string{"suffix: [G]"}, nil, []string{"suffix: [G]", defaultFilenameSet}},
-		{"own ops replace global ones", []string{"set:{{title}}"}, []string{"prefix:[A] "}, []string{"prefix:[A] ", defaultFilenameSet}},
-	} {
-		viper.Reset()
-		if tc.global != nil {
-			viper.Set(keys.MFilenameOps, tc.global)
-		}
-		if got := withDefaultFilenameSet(&models.Video{}, tc.ops); !slices.Equal(got, tc.want) {
-			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
-		}
-	}
-
-	// Download As overrides replace the global ops, even when they have none.
-	viper.Set(keys.MFilenameOps, []string{"set:{{title}}"})
-	if got := withDefaultFilenameSet(&models.Video{Overrides: &models.VideoOverrides{}}, nil); !slices.Equal(got, []string{defaultFilenameSet}) {
-		t.Errorf("overridden: got %q, want only %q", got, defaultFilenameSet)
 	}
 }
 

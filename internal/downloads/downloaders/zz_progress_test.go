@@ -9,26 +9,28 @@ import (
 // TestYTDLPProgressParser tests parsing of Tubarr's yt-dlp progress template lines.
 func TestYTDLPProgressParser(t *testing.T) {
 	tests := []struct {
-		line   string
-		want   float64
-		wantOK bool
+		line      string
+		want      float64
+		wantSpeed float64
+		wantOK    bool
 	}{
-		{"[tubarr-progress] 523264 1051142 NA NA NA", 523264.0 / 1051142 * 100, true},
-		{"[tubarr-progress] 1051142 1051142 NA NA NA", 100, true},
-		{"[tubarr-progress] 0 1051142 NA NA NA", 0, true},
-		{"[tubarr-progress] 250 NA 1000.5 NA NA", 250 / 1000.5 * 100, true},
-		{"[tubarr-progress] 4096 NA NA 3 12", 25, true},
-		{"[tubarr-progress] 2000 1000 NA NA NA", 100, true},
-		{"  [tubarr-progress] 500 1000 NA NA NA\r", 50, true},
-		{"[tubarr-progress] 4096 NA NA NA NA", 0, false},
-		{"[tubarr-progress] 4096 1000", 0, false},
-		{"[download]  49.8% of 1.00MiB at 2.00MiB/s ETA 00:00", 0, false},
-		{"", 0, false},
+		{"[tubarr-progress] 523264 1051142 NA NA NA 150000.5", 523264.0 / 1051142 * 100, 150000.5, true},
+		{"[tubarr-progress] 1051142 1051142 NA NA NA NA", 100, 0, true},
+		{"[tubarr-progress] 0 1051142 NA NA NA NA", 0, 0, true},
+		{"[tubarr-progress] 250 NA 1000.5 NA NA 2048", 250 / 1000.5 * 100, 2048, true},
+		{"[tubarr-progress] 4096 NA NA 3 12 1e6", 25, 1e6, true},
+		{"[tubarr-progress] 2000 1000 NA NA NA NA", 100, 0, true},
+		{"  [tubarr-progress] 500 1000 NA NA NA NA\r", 50, 0, true},
+		{"[tubarr-progress] 4096 NA NA NA NA 2048", 0, 0, false},
+		{"[tubarr-progress] 523264 1051142 NA NA NA", 0, 0, false},
+		{"[tubarr-progress] 4096 1000", 0, 0, false},
+		{"[download]  49.8% of 1.00MiB at 2.00MiB/s ETA 00:00", 0, 0, false},
+		{"", 0, 0, false},
 	}
 	for _, tt := range tests {
-		got, ok := YTDLPProgressParser(tt.line)
-		if ok != tt.wantOK || got != tt.want {
-			t.Errorf("YTDLPProgressParser(%q) = (%v, %v), want (%v, %v)", tt.line, got, ok, tt.want, tt.wantOK)
+		got, speed, ok := YTDLPProgressParser(tt.line)
+		if ok != tt.wantOK || got != tt.want || speed != tt.wantSpeed {
+			t.Errorf("YTDLPProgressParser(%q) = (%v, %v, %v), want (%v, %v, %v)", tt.line, got, speed, ok, tt.want, tt.wantSpeed, tt.wantOK)
 		}
 	}
 }
@@ -59,18 +61,18 @@ func TestExternalProgressParsers(t *testing.T) {
 		{"wget", "     0K  7% 1.32M 4s", 7, true},
 		{"wget", "[ 45%] looks like axel", 0, false},
 		{"/usr/bin/aria2c", "[#7b70f9 1.1MiB/5.0MiB(23%) CN:5 DL:717KiB ETA:5s]", 23, true},
-		{"", "[tubarr-progress] 500 1000 NA NA NA", 50, true},
+		{"", "[tubarr-progress] 500 1000 NA NA NA NA", 50, true},
 		{"", "[ 45%] not native output", 0, false},
 	}
 	for _, tt := range tests {
-		got, ok := NewProgressParser(tt.downloader, 10).Parse(tt.line)
+		got, _, ok := NewProgressParser(tt.downloader, 10).Parse(tt.line)
 		if ok != tt.wantOK || (ok && math.Abs(got-tt.want) > 1e-9) {
 			t.Errorf("%s: Parse(%q) = (%v, %v), want (%v, %v)", tt.downloader, tt.line, got, ok, tt.want, tt.wantOK)
 		}
 	}
 
 	// ffmpeg needs a duration to give a percentage.
-	if _, ok := NewProgressParser("ffmpeg", 0).Parse("out_time_us=3934000"); ok {
+	if _, _, ok := NewProgressParser("ffmpeg", 0).Parse("out_time_us=3934000"); ok {
 		t.Error("ffmpeg without duration: parsed progress, want none")
 	}
 }

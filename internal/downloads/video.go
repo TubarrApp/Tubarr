@@ -302,7 +302,8 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 		}
 
 		// yt-dlp and external downloader progress parsing.
-		if pct, ok := progress.Parse(line); ok {
+		if pct, speed, ok := progress.Parse(line); ok {
+			d.Video.DownloadStatus.Speed = speed
 			d.updateProgress(consts.DLStatusDownloading, pct)
 			continue
 		}

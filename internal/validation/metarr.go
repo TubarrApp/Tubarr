@@ -72,87 +72,49 @@ func ValidateGPUAcceleration(g string) (gpuType string, err error) {
 	return g, nil
 }
 
-// ValidateAudioTranscodeCodecSlice sets mappings for audio codec inputs.
+// ValidateAudioTranscodeCodecSlice validates audio codec entries, returning them deduplicated as typed.
 func ValidateAudioTranscodeCodecSlice(pairs []string) (validPairs []string, err error) {
-	// Deduplicate
-	dedupPairs := make([]string, 0, len(pairs))
-	for _, p := range pairs {
-		if p == "" {
-			continue
-		}
-		if !slices.Contains(dedupPairs, p) {
-			dedupPairs = append(dedupPairs, p)
-		}
+	dedupPairs := dedupSlice(pairs)
+
+	// Check the plain codec and pairs as Metarr will read them.
+	if _, _, err = sharedvalidation.ParseCodecMappings(dedupPairs, sharedvalidation.ValidateAudioCodec); err != nil {
+		return nil, err
 	}
 
-	// Iterate deduped pairs
-	for _, p := range dedupPairs {
-		split := strings.Split(p, ":")
-		if len(split) < 1 { // Impossible condition, added to silence nilaway
-			continue
-		}
-
-		if _, err := sharedvalidation.ValidateAudioCodec(split[0]); err != nil {
-			return nil, err
-		}
-
-		// Singular value, apply to every entry
-		if len(split) < 2 {
-			validPairs = append(validPairs, p)
-			continue
-		}
-
-		// Multi value entry, apply specific output to specific input
-		output := split[1]
-		if _, err = sharedvalidation.ValidateAudioCodec(output); err != nil {
-			return nil, err
-		}
-		validPairs = append(validPairs, p)
-	}
-
-	logger.Pl.D(5, "Got audio codec array: %v", validPairs)
-	return validPairs, nil
+	logger.Pl.D(5, "Got audio codec array: %v", dedupPairs)
+	return dedupPairs, nil
 }
 
-// ValidateVideoTranscodeCodecSlice validates the input video transcode slice.
+// ValidateVideoTranscodeCodecSlice validates video codec entries, returning them deduplicated as typed.
 func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs []string, err error) {
-	// Deduplicate
-	dedupPairs := make([]string, 0, len(pairs))
+	dedupPairs := dedupSlice(pairs)
+
+	// Check the plain codec and pairs as Metarr will read them.
+	validate := func(c string) (string, error) {
+		// NOTE: var inputs into the function below doesn't affect
+		// the above signature, only its return value matters.
+		return sharedvalidation.ValidateVideoCodecWithAccel(c, accel)
+	}
+	if _, _, err = sharedvalidation.ParseCodecMappings(dedupPairs, validate); err != nil {
+		return nil, err
+	}
+
+	logger.Pl.D(5, "Got video codec array: %v", dedupPairs)
+	return dedupPairs, nil
+}
+
+// dedupSlice deduplicates entries in a slice so each entry only appears once.
+func dedupSlice(pairs []string) []string {
+	dedup := make([]string, 0, len(pairs))
+
 	for _, p := range pairs {
 		if p == "" {
 			continue
 		}
-		if !slices.Contains(dedupPairs, p) {
-			dedupPairs = append(dedupPairs, p)
+		if !slices.Contains(dedup, p) {
+			dedup = append(dedup, p)
 		}
 	}
 
-	// Iterate deduped pairs
-	for _, p := range dedupPairs {
-		split := strings.Split(p, ":")
-		if len(split) < 1 { // Impossible condition, added to silence nilaway
-			continue
-		}
-
-		if _, err := sharedvalidation.ValidateVideoCodecWithAccel(split[0], accel); err != nil {
-			return nil, err
-		}
-
-		// Singular value, apply to every entry
-		if len(split) < 2 {
-			validPairs = append(validPairs, p)
-			continue
-		}
-
-		// Multi value entry, apply specific output to specific input
-		output := split[1]
-		if _, err = sharedvalidation.ValidateVideoCodecWithAccel(output, accel); err != nil {
-			return nil, err
-		}
-
-		validPairs = append(validPairs, p)
-	}
-
-	logger.Pl.D(5, "Got video codec array: %v", validPairs)
-	return validPairs, nil
+	return dedup
 }

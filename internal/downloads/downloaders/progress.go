@@ -43,14 +43,14 @@ func NewProgressParser(externalDownloader string, durationSec float64) *Progress
 	return &ProgressParser{downloader: Name(externalDownloader), durationSec: durationSec}
 }
 
-// Parse returns the download percentage if the line reports progress.
+// Parse returns the download percentage if the line reports progress, and the speed in bytes per second when known.
 //
 // httpie progress is captured by yt-dlp, so only yt-dlp's final report reaches here for it.
-func (p *ProgressParser) Parse(line string) (pct float64, ok bool) {
+func (p *ProgressParser) Parse(line string) (pct, speed float64, ok bool) {
 	// yt-dlp progress (also reports final progress for external downloaders).
-	if pct, ok = YTDLPProgressParser(line); ok {
+	if pct, speed, ok = YTDLPProgressParser(line); ok {
 		p.pct = pct
-		return pct, true
+		return pct, speed, true
 	}
 
 	switch p.downloader {
@@ -68,5 +68,5 @@ func (p *ProgressParser) Parse(line string) (pct float64, ok bool) {
 	if ok {
 		p.pct = pct
 	}
-	return pct, ok
+	return pct, 0, ok
 }

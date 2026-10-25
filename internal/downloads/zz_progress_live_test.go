@@ -89,7 +89,7 @@ func checkLiveProgress(t *testing.T, downloader, dlArgs, ytdlpArgs string, wantI
 	)
 	scanner.Split(scanLinesOrCR)
 	for scanner.Scan() {
-		if pct, ok := progress.Parse(scanner.Text()); ok {
+		if pct, _, ok := progress.Parse(scanner.Text()); ok {
 			pcts = append(pcts, pct)
 		}
 	}

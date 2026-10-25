@@ -11,6 +11,16 @@
     return m > 0 ? `${m}m ${String(sec).padStart(2, '0')}s` : `${sec}s`;
   };
 
+  // formatSpeed renders bytes per second as bits, e.g. "1.2 Mbps" or "128 Kbps", or "—" when unknown.
+  window.formatSpeed = (bytes) => {
+    if (!bytes || bytes <= 0) return '—';
+    const bits = bytes * 8;
+    if (bits >= 1e9) return `${(bits / 1e9).toFixed(1)} Gbps`;
+    if (bits >= 1e6) return `${(bits / 1e6).toFixed(1)} Mbps`;
+    if (bits >= 1e3) return `${Math.round(bits / 1e3)} Kbps`;
+    return `${Math.round(bits)} bps`;
+  };
+
   // videoThumb returns Tubarr's address for a video's thumbnail (Download As, else crawled), or null if it has none.
   window.videoThumb = (v) => (v.custom_thumbnail || safeURL(v.thumbnail_url) ? `${window.location.origin}/api/v1/videos/${v.id}/thumbnail` : null);
 
