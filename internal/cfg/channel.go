@@ -660,35 +660,55 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 
 		// Notification details.
 		notification []string
+		channelURL   string
 	)
 
 	addNotifyCmd := &cobra.Command{
 		Use:   "notify-add",
 		Short: "Adds notify function to a channel.",
-		Long:  "Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. (format is 'Notify URL', or 'Channel URL|Notify URL' for one channel URL only)",
+		Long:  fmt.Sprintf("Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. They're sent for new videos from any of the channel's URLs, or with --%s from just that one.", urlFlag),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Valid items set?
 			if len(notification) == 0 {
 				return errors.New("no notification URLs entered")
 			}
 
-			chanID, key, val, err := lookupChannelID(cs, channelID, channelName)
+			c, key, val, err := lookupChannel(cs, channelID, channelName)
 			if err != nil {
 				return err
+			}
+
+			// Resolve the channel URL the notifications are for, if given.
+			var notifyFor string
+			if channelURL != "" {
+				var valid []string
+				for _, cu := range c.URLModels {
+					if cu.IsManual {
+						continue
+					}
+					if sharedparsing.NormalizeChannelURL(cu.URL) == sharedparsing.NormalizeChannelURL(channelURL) {
+						notifyFor = cu.URL
+						break
+					}
+					valid = append(valid, cu.URL)
+				}
+				if notifyFor == "" {
+					return fmt.Errorf("--%s %q isn't one of channel %q's URLs: %v", urlFlag, channelURL, c.Name, valid)
+				}
 			}
 
 			// Parse notification URLs.
-			validPairs, err := parsing.ParseNotifications(notification)
+			notifications, err := parsing.ParseNotifications(notifyFor, notification)
 			if err != nil {
 				return err
 			}
 
-			if err := cs.AddNotifyURLs(chanID, validPairs); err != nil {
+			if err := cs.AddNotifyURLs(c.ID, notifications); err != nil {
 				return err
 			}
 
 			// Success.
-			logger.Pl.S("Added %d notify URL(s) for channel with %s %q", len(validPairs), key, val)
+			logger.Pl.S("Added %d notify URL(s) for channel with %s %q", len(notifications), key, val)
 			return nil
 		},
 	}
@@ -696,6 +716,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(addNotifyCmd, &channelName, nil, &channelID)
 	cmd.SetNotifyFlags(addNotifyCmd, &notification)
+	addNotifyCmd.Flags().StringVar(&channelURL, urlFlag, "", "One of the channel's URLs to send these notifications for, instead of all of them")
 
 	return addNotifyCmd
 }

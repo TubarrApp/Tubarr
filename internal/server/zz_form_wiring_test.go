@@ -330,6 +330,32 @@ func sameSet(a, b []string) bool {
 	return slices.Equal(a, b)
 }
 
+// notificationsJSON renders notifications as the channel pages send them, each a channel URL (blank for all) and notify URL.
+func notificationsJSON(rows ...[2]string) string {
+	ns := make([]models.Notification, 0, len(rows))
+	for _, r := range rows {
+		ns = append(ns, models.Notification{ChannelURL: r[0], NotifyURL: r[1]})
+	}
+	data, _ := json.Marshal(ns)
+	return string(data)
+}
+
+// notificationKeys renders notifications sent as JSON, or read back, comparably as "channel URL notify URL".
+func notificationKeys[T string | []models.Notification](v T) []string {
+	var ns []models.Notification
+	switch v := any(v).(type) {
+	case string:
+		_ = json.Unmarshal([]byte(v), &ns)
+	case []models.Notification:
+		ns = v
+	}
+	keys := make([]string, 0, len(ns))
+	for _, n := range ns {
+		keys = append(keys, n.ChannelURL+" "+n.NotifyURL)
+	}
+	return keys
+}
+
 // urlSettingValue types a per-URL value as the channel pages put it in their url_settings JSON.
 func urlSettingValue(key, v string, number bool) any {
 	switch {
@@ -365,9 +391,12 @@ func formSamples(t *testing.T) map[string][2]string {
 	}
 	return map[string][2]string{
 		// Request fields outside the models.
-		"name":          {"Wiring Add", "Wiring Edit"},
-		"auth_details":  {auth("user-a", "pass-a", "https://example.com/login"), auth("user-b", "pass-b", "https://example.com/login-b")},
-		"notifications": {"http://plex.local:32400/library/sections/1/refresh?X-Plex-Token=abc\n" + wiringURLB + "|http://notify.local/hook", "http://jellyfin.local/Library/Refresh\nhttp://bare.local/hook"},
+		"name":         {"Wiring Add", "Wiring Edit"},
+		"auth_details": {auth("user-a", "pass-a", "https://example.com/login"), auth("user-b", "pass-b", "https://example.com/login-b")},
+		"notifications": {
+			notificationsJSON([2]string{"", "http://plex.local:32400/library/sections/1/refresh?X-Plex-Token=abc"}, [2]string{wiringURLB, "http://notify.local/hook"}),
+			notificationsJSON([2]string{"", "http://jellyfin.local/Library/Refresh"}, [2]string{"", "http://bare.local/hook"}),
+		},
 
 		// Settings.
 		"video_directory":              {sub("videos-a"), sub("videos-b")},
@@ -408,11 +437,10 @@ func formSamples(t *testing.T) map[string][2]string {
 		"metarr_transcode_video_transcode_codecs": {"h264:hevc", "vp9:h264"},
 		"metarr_transcode_audio_codecs":           {"aac:opus", "flac:mp3"},
 		"metarr_transcode_quality":                {"23", "28"},
-		"metarr_transcode_video_filter":           {"scale=1280:-2", "scale=640:-2"},
 		"metarr_extra_ffmpeg_args":                {"-threads 2", "-threads 4"},
-		"metarr_filename_ops":                     {"prefix:[CAT] ", "append: [DOG]"},
+		"metarr_filename_ops":                     {"prefix:[CAT] ", "suffix: [DOG]"},
 		"metarr_filename_ops_file":                {file("filename-ops-a.txt", "prefix:[A] \n"), file("filename-ops-b.txt", "prefix:[B] \n")},
-		"metarr_filtered_filename_ops":            {"title:contains:cat||prefix:[CAT] ", "title:contains:dog||append: [DOG]"},
+		"metarr_filtered_filename_ops":            {"title:contains:cat||prefix:[CAT] ", "title:contains:dog||suffix: [DOG]"},
 		"metarr_filtered_filename_ops_file":       {file("filtered-filename-ops-a.txt", "title:contains:a||prefix:[A] \n"), file("filtered-filename-ops-b.txt", "title:contains:b||prefix:[B] \n")},
 		"metarr_meta_ops":                         {"title:set:Cat Title", "artist:set:Dog Band"},
 		"metarr_meta_ops_file":                    {file("meta-ops-a.txt", "title:set:A\n"), file("meta-ops-b.txt", "title:set:B\n")},
@@ -484,9 +512,9 @@ func TestChannelFormModels(t *testing.T) {
 			}
 		}
 
-		// Notifications are sent one per line.
-		if !regexp.MustCompile(`payload\.notifications = [^;]*\.join\('\\n'\)`).MatchString(src) {
-			t.Errorf("%s: notifications aren't sent newline-separated", page)
+		// Notifications are sent as JSON.
+		if !regexp.MustCompile(`payload\.notifications = notificationsJSON\(`).MatchString(src) {
+			t.Errorf("%s: notifications aren't sent as JSON", page)
 		}
 	}
 }
@@ -517,7 +545,7 @@ type channelDetails struct {
 	Metarr            map[string]any                       `json:"metarr"`
 	AuthDetails       []authDetailResponse                 `json:"auth_details"`
 	URLSettings       map[string]map[string]map[string]any `json:"url_settings"`
-	Notifications     []string                             `json:"notifications"`
+	Notifications     []models.Notification                `json:"notifications"`
 }
 
 // TestChannelFormRoundTrip adds a channel the way the add page does, then edits it the way the edit page does, with
@@ -623,8 +651,8 @@ func TestChannelFormRoundTrip(t *testing.T) {
 		if !sameSet(got.URLs, []string{wiringURLA, wiringURLB}) {
 			t.Errorf("%s: URLs read back as %v", page, got.URLs)
 		}
-		if want := strings.Split(normalizeLines(value("notifications", false)), "\n"); !sameSet(got.Notifications, want) {
-			t.Errorf("%s: notifications were sent as %q but read back as %q", page, want, got.Notifications)
+		if want := notificationKeys(value("notifications", false)); !sameSet(notificationKeys(got.Notifications), want) {
+			t.Errorf("%s: notifications were sent as %q but read back as %+v", page, want, got.Notifications)
 		}
 		var sentAuth []map[string]string
 		if err := json.Unmarshal([]byte(value("auth_details", false)), &sentAuth); err != nil {

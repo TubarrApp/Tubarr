@@ -63,10 +63,13 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Cookie source, for channel URLs without their own.
-	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" && abstractions.IsSet(keys.CookiesFromBrowser) {
+	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" &&
+		abstractions.IsSet(keys.CookiesFromBrowser) {
+
 		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
 		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
 		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)
+
 	} else {
 		logger.Pl.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
@@ -133,11 +136,8 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments.
-	if !abstractions.IsSet(keys.ExtraYTDLPVideoArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs != "" {
-		args = append(args, parsing.SplitArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs)...)
-	}
-	if abstractions.IsSet(keys.ExtraYTDLPVideoArgs) {
-		args = append(args, parsing.SplitArgs(abstractions.GetString(keys.ExtraYTDLPVideoArgs))...)
+	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs; extra != "" {
+		args = append(args, parsing.SplitArgs(extra)...)
 	}
 
 	// Add preferred codecs.

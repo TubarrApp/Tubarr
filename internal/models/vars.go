@@ -87,12 +87,11 @@ type MetarrArgsInput struct {
 	FilteredFilenameOps *[]string `viper:"metarr-filtered-filename-ops"`
 
 	// Transcoding.
-	TranscodeGPU         *string   `viper:"metarr-transcode-gpu"`
-	TranscodeGPUNode     *string   `viper:"metarr-transcode-gpu-node"`
-	TranscodeQuality     *string   `viper:"metarr-transcode-quality"`
-	TranscodeVideoFilter *string   `viper:"metarr-transcode-video-filter"`
-	TranscodeVideoCodec  *[]string `viper:"metarr-transcode-video-codecs"`
-	TranscodeAudioCodec  *[]string `viper:"metarr-transcode-audio-codecs"`
+	TranscodeGPU        *string   `viper:"metarr-transcode-gpu"`
+	TranscodeGPUNode    *string   `viper:"metarr-transcode-gpu-node"`
+	TranscodeQuality    *string   `viper:"metarr-transcode-quality"`
+	TranscodeVideoCodec *[]string `viper:"metarr-transcode-video-codecs"`
+	TranscodeAudioCodec *[]string `viper:"metarr-transcode-audio-codecs"`
 
 	// Resources and limits.
 	MinFreeMem        *string  `viper:"metarr-min-free-mem"`

@@ -24,17 +24,15 @@ const defaultFilenameSet = sharedconsts.OpSet + ":{{" + sharedtags.JFulltitle + 
 
 // withDefaultFilenameSet returns the filename ops to run: the video's overrides or channel URL's, else the global ones,
 // with defaultFilenameSet added when none of them sets the name.
-func withDefaultFilenameSet(v *models.Video, cu *models.ChannelURL, ops []string) []string {
+func withDefaultFilenameSet(v *models.Video, ops []string) []string {
 	if len(ops) == 0 && v.Overrides == nil && abstractions.IsSet(keys.MFilenameOps) {
 		ops = abstractions.GetStringSlice(keys.MFilenameOps)
 	}
-	parsed, _, err := sharedparsing.ParseFilenameOps(ops) // Global ops go to Metarr as written, channel URLs and all.
+	parsed, _, err := sharedparsing.ParseFilenameOps(ops)
 	if err != nil {
 		return ops // Metarr reports the invalid op.
 	}
-	if slices.ContainsFunc(parsed, func(op models.FilenameOps) bool {
-		return op.OpType == sharedconsts.OpSet && sharedparsing.AppliesToChannel(op.ChannelURL, cu.URL)
-	}) {
+	if slices.ContainsFunc(parsed, func(op models.FilenameOps) bool { return op.OpType == sharedconsts.OpSet }) {
 		return ops
 	}
 	return append(slices.Clip(ops), defaultFilenameSet)
@@ -52,7 +50,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 			metaOps = abstractions.GetStringSlice(keys.MMetaOps)
 		}
 	}
-	filenameOps = withDefaultFilenameSet(v, cu, filenameOps)
+	filenameOps = withDefaultFilenameSet(v, filenameOps)
 
 	// 'Download As' args, blank ones using the channel URL's.
 	var o models.MetarrArgs
@@ -121,7 +119,6 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	addEach(metkeys.TranscodeVideoCodecs, videoCodecs)
 	add(metkeys.TranscodeQuality, cmp.Or(o.TranscodeQuality, m.TranscodeQuality))
 	addEach(metkeys.TranscodeAudioCodecs, audioCodecs)
-	add(metkeys.TranscodeVideoFilter, cmp.Or(o.TranscodeVideoFilter, m.TranscodeVideoFilter))
 
 	// Other
 	add(metkeys.Debug, configString(keys.DebugLevel))

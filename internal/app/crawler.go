@@ -505,7 +505,7 @@ func AddChannelFromInput(cs contracts.ChannelStore, input models.ChannelInput) (
 	}
 	var notifications []*models.Notification
 	if input.Notification != nil {
-		if notifications, err = parsing.ParseNotifications(*input.Notification); err != nil {
+		if notifications, err = parsing.ParseNotifications("", *input.Notification); err != nil {
 			return nil, fmt.Errorf("%w: invalid notification URLs: %w", contracts.ErrInvalidChannel, err)
 		}
 	}

@@ -58,7 +58,6 @@ func fullMetarrArgs() *models.MetarrArgs {
 		MinFreeMem:              "1G",
 		TranscodeGPU:            "vaapi",
 		TranscodeGPUNode:        "/dev/dri/renderD128",
-		TranscodeVideoFilter:    "scale=1280:-2",
 		TranscodeVideoCodecs:    []string{"h264"},
 		TranscodeAudioCodecs:    []string{"aac"},
 		TranscodeQuality:        "23",
@@ -125,7 +124,7 @@ func TestMergeMetarrArgsInheritsAll(t *testing.T) {
 // TestMergeMetarrArgsKeepsOwn tests a channel URL keeps the Metarr args it sets itself, its ops added to the channel's.
 func TestMergeMetarrArgsKeepsOwn(t *testing.T) {
 	ownOp := models.MetaOps{Field: "title", OpType: "prefix", OpValue: "[B] "}
-	ownFilenameOp := models.FilenameOps{OpType: "append", OpValue: " [B]"}
+	ownFilenameOp := models.FilenameOps{OpType: "suffix", OpValue: " [B]"}
 	ownFiltered := models.FilteredMetaOps{Filters: []models.Filters{{Field: "title", FilterType: "contains", Value: "dog"}},
 		MetaOps: []models.MetaOps{{Field: "genre", OpType: "set", OpValue: "Dogs"}}}
 	ownCodecs := []string{"hevc"}
@@ -148,7 +147,7 @@ func TestMergeOpsReplaceConflicting(t *testing.T) {
 	parent := &models.MetarrArgs{
 		MetaOps: []models.MetaOps{
 			{Field: "artist", OpType: "set", OpValue: "Channel"},
-			{Field: "title", OpType: "append", OpValue: " [C]"},
+			{Field: "title", OpType: "suffix", OpValue: " [C]"},
 		},
 		FilenameOps: []models.FilenameOps{
 			{OpType: "set", OpValue: "{{title}}"},
@@ -156,15 +155,15 @@ func TestMergeOpsReplaceConflicting(t *testing.T) {
 		},
 	}
 	child := &models.MetarrArgs{
-		MetaOps:     []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "URL"}, {Field: "title", OpType: "append", OpValue: " [U]"}},
+		MetaOps:     []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "URL"}, {Field: "title", OpType: "suffix", OpValue: " [U]"}},
 		FilenameOps: []models.FilenameOps{{OpType: "set", OpValue: "{{fulltitle}}"}},
 	}
 	mergeMetarrArgs(child, parent)
 
 	wantMeta := []models.MetaOps{
-		{Field: "title", OpType: "append", OpValue: " [C]"},
+		{Field: "title", OpType: "suffix", OpValue: " [C]"},
 		{Field: "artist", OpType: "set", OpValue: "URL"},
-		{Field: "title", OpType: "append", OpValue: " [U]"},
+		{Field: "title", OpType: "suffix", OpValue: " [U]"},
 	}
 	wantFilename := []models.FilenameOps{{OpType: "prefix", OpValue: "[C] "}, {OpType: "set", OpValue: "{{fulltitle}}"}}
 	if !reflect.DeepEqual(child.MetaOps, wantMeta) {

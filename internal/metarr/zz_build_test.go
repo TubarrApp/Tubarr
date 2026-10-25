@@ -186,7 +186,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 	channelArgs := &models.MetarrArgs{
 		OutputExt: "mp4", RenameStyle: "spaces", MinFreeMem: "1G", ExtraFFmpegArgs: "-x", OutputDir: "/out", MaxCPU: 50,
 		MetaOps: metaOps, TranscodeGPU: "vaapi", TranscodeGPUNode: "/dev/dri/renderD128", TranscodeQuality: "23",
-		TranscodeVideoFilter: "scale=1280:-2", TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"},
+		TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"},
 	}
 	globals := map[string]any{
 		keys.MMinFreeMem: "2G", keys.OutputFiletype: "mkv", keys.MRenameStyle: "underscores", keys.MExtraFFmpegArgs: "-y",
@@ -216,7 +216,6 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeVideoCodecs, "h264:hevc",
 			metkeys.TranscodeQuality, "23",
 			metkeys.TranscodeAudioCodecs, "aac",
-			metkeys.TranscodeVideoFilter, "scale=1280:-2",
 		})},
 		{"global", globals, &models.MetarrArgs{}, nil, slices.Concat(files, []string{
 			metkeys.FilenameOps, "prefix:[G] ",
@@ -244,7 +243,6 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeVideoCodecs, "h264:hevc",
 			metkeys.TranscodeQuality, "23",
 			metkeys.TranscodeAudioCodecs, "aac",
-			metkeys.TranscodeVideoFilter, "scale=1280:-2",
 			metkeys.Debug, "2",
 		})},
 		{"strip thumbnail", nil, &models.MetarrArgs{}, &models.VideoOverrides{StripThumbnail: true}, slices.Concat(files, []string{
@@ -274,7 +272,6 @@ func TestWithDefaultFilenameSet(t *testing.T) {
 		t.Fatalf("default op %q doesn't parse: %v", defaultFilenameSet, err)
 	}
 
-	cu := &models.ChannelURL{URL: "https://example.com/@a"}
 	for _, tc := range []struct {
 		name        string
 		global, ops []string
@@ -283,23 +280,22 @@ func TestWithDefaultFilenameSet(t *testing.T) {
 		{"no ops", nil, nil, []string{defaultFilenameSet}},
 		{"ops without a set", nil, []string{"prefix:[A] "}, []string{"prefix:[A] ", defaultFilenameSet}},
 		{"own set", nil, []string{"set:{{title}}"}, []string{"set:{{title}}"}},
-		{"another channel's set", nil, []string{"https://example.com/@b|set:{{title}}"}, []string{"https://example.com/@b|set:{{title}}", defaultFilenameSet}},
 		{"global set", []string{"set:{{title}}"}, nil, []string{"set:{{title}}"}},
-		{"global ops without a set", []string{"append: [G]"}, nil, []string{"append: [G]", defaultFilenameSet}},
+		{"global ops without a set", []string{"suffix: [G]"}, nil, []string{"suffix: [G]", defaultFilenameSet}},
 		{"own ops replace global ones", []string{"set:{{title}}"}, []string{"prefix:[A] "}, []string{"prefix:[A] ", defaultFilenameSet}},
 	} {
 		viper.Reset()
 		if tc.global != nil {
 			viper.Set(keys.MFilenameOps, tc.global)
 		}
-		if got := withDefaultFilenameSet(&models.Video{}, cu, tc.ops); !slices.Equal(got, tc.want) {
+		if got := withDefaultFilenameSet(&models.Video{}, tc.ops); !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
 		}
 	}
 
 	// Download As overrides replace the global ops, even when they have none.
 	viper.Set(keys.MFilenameOps, []string{"set:{{title}}"})
-	if got := withDefaultFilenameSet(&models.Video{Overrides: &models.VideoOverrides{}}, cu, nil); !slices.Equal(got, []string{defaultFilenameSet}) {
+	if got := withDefaultFilenameSet(&models.Video{Overrides: &models.VideoOverrides{}}, nil); !slices.Equal(got, []string{defaultFilenameSet}) {
 		t.Errorf("overridden: got %q, want only %q", got, defaultFilenameSet)
 	}
 }

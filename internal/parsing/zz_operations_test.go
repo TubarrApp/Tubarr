@@ -31,7 +31,7 @@ func TestMetaOpsRoundTripThroughTubarr(t *testing.T) {
 		`title:replace:old:new`,
 		`title:date-tag:prefix:md`,
 		`title:set:cats\: the sequel`,
-		`description:append:back\\slash`,
+		`description:suffix:back\\slash`,
 		`title:prefix:[CATS] `,
 	}
 
@@ -45,7 +45,7 @@ func TestMetaOpsRoundTripThroughTubarr(t *testing.T) {
 
 	formatted := make([]string, 0, len(parsed))
 	for _, op := range parsed {
-		formatted = append(formatted, sharedparsing.FormatMetaOp(op, true))
+		formatted = append(formatted, sharedparsing.FormatMetaOp(op))
 	}
 
 	again, err := parsing.ParseMetaOps(formatted)
@@ -86,7 +86,7 @@ func TestFilenameOpsRoundTripThroughTubarr(t *testing.T) {
 
 	formatted := make([]string, 0, len(parsed))
 	for _, op := range parsed {
-		formatted = append(formatted, sharedparsing.FormatFilenameOp(op, true))
+		formatted = append(formatted, sharedparsing.FormatFilenameOp(op))
 	}
 
 	again, err := parsing.ParseFilenameOps(formatted)
@@ -100,9 +100,7 @@ func TestFilenameOpsRoundTripThroughTubarr(t *testing.T) {
 	}
 }
 
-// TestUnescapedPipeInValue covers titles such as "Cats | Dogs". The segment before the
-// pipe parses as a URI with a scheme, so requiring a host is what stops it being taken
-// for a channel URL prefix and the operation being discarded.
+// TestUnescapedPipeInValue covers titles such as "Cats | Dogs".
 func TestUnescapedPipeInValue(t *testing.T) {
 	parsed, err := parsing.ParseMetaOps([]string{"title:set:Cats | Dogs"})
 	if err != nil {
@@ -111,15 +109,12 @@ func TestUnescapedPipeInValue(t *testing.T) {
 	if len(parsed) != 1 {
 		t.Fatalf("parsed %d ops, want 1: %+v", len(parsed), parsed)
 	}
-	if parsed[0].ChannelURL != "" {
-		t.Errorf("ChannelURL = %q, want empty", parsed[0].ChannelURL)
-	}
 	if parsed[0].OpValue != "Cats | Dogs" {
 		t.Errorf("OpValue = %q, want %q", parsed[0].OpValue, "Cats | Dogs")
 	}
 
 	// It must also survive the handoff to Metarr.
-	formatted := sharedparsing.FormatMetaOp(parsed[0], false)
+	formatted := sharedparsing.FormatMetaOp(parsed[0])
 	again, err := parsing.ParseMetaOps([]string{formatted})
 	if err != nil {
 		t.Fatalf("re-parse of %q: %v", formatted, err)
@@ -129,7 +124,7 @@ func TestUnescapedPipeInValue(t *testing.T) {
 	}
 }
 
-// TestChannelURLRejected tests that every op and filter parser rejects an entry scoped to a channel URL.
+// TestChannelURLRejected tests that an entry starting with a channel URL fails as invalid, in parsing or validation.
 func TestChannelURLRejected(t *testing.T) {
 	const u = "https://example.com/@cats"
 	parsers := map[string]func(string) error{
@@ -142,7 +137,10 @@ func TestChannelURLRejected(t *testing.T) {
 			return err
 		},
 		"filter": func(s string) error {
-			_, err := parsing.ParseFilterOps([]string{s}, true)
+			filters, err := parsing.ParseFilterOps([]string{s}, true)
+			if err == nil {
+				err = validation.ValidateFilterOps(filters)
+			}
 			return err
 		},
 		"filtered meta": func(s string) error {
@@ -167,21 +165,6 @@ func TestChannelURLRejected(t *testing.T) {
 				t.Errorf("%s parser accepted %q", name, entry)
 			}
 		}
-	}
-}
-
-// TestFilteredOpsWithoutChannelURL keeps the unscoped form working, which must not be
-// mistaken for a channel URL prefix.
-func TestFilteredOpsWithoutChannelURL(t *testing.T) {
-	got, err := parsing.ParseFilteredMetaOps([]string{"title:contains:cat||director:set:Mr Cat"})
-	if err != nil {
-		t.Fatalf("ParseFilteredMetaOps: %v", err)
-	}
-	if len(got) != 1 || len(got[0].Filters) != 1 || len(got[0].MetaOps) != 1 {
-		t.Fatalf("got %+v", got)
-	}
-	if got[0].Filters[0].ChannelURL != "" || got[0].MetaOps[0].ChannelURL != "" {
-		t.Errorf("no channel URL expected, got filter=%q op=%q", got[0].Filters[0].ChannelURL, got[0].MetaOps[0].ChannelURL)
 	}
 }
 
@@ -306,14 +289,17 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 		"title:contains:cats||",     // Empty directory.
 		"title:contains:cats|/home", // A single '|'.
 		"title:morethan||/home",     // A comparison with no value.
-		"https://tubesite.com/@cats|title:contains:cats||/home/cats",  // A channel URL.
-		"https://tubesite.com/@cats||title:contains:cats||/home/cats", // A channel URL with "||".
 	} {
 		if _, err := parsing.ParseMetaFilterMoveOps([]string{bad}); err == nil {
 			t.Errorf("ParseMetaFilterMoveOps(%q) was accepted", bad)
 		}
 	}
-	for _, invalid := range []string{"title:morethan:soon||/home", "title:explodes:cats||/home"} {
+	for _, invalid := range []string{
+		"title:morethan:soon||/home",
+		"title:explodes:cats||/home",
+		"https://tubesite.com/@cats|title:contains:cats||/home/cats",  // A channel URL.
+		"https://tubesite.com/@cats||title:contains:cats||/home/cats", // A channel URL with "||".
+	} {
 		ops, err := parsing.ParseMetaFilterMoveOps([]string{invalid})
 		if err == nil {
 			err = validation.ValidateMetaFilterMoveOps(ops, false)
@@ -341,32 +327,22 @@ func TestMoveOpsOldBlob(t *testing.T) {
 	}
 }
 
-// TestParseNotificationsBareURL tests a notification can be a bare URL, and must be http(s).
-func TestParseNotificationsBareURL(t *testing.T) {
-	got, err := parsing.ParseNotifications([]string{"http://jellyfin.local/Library/Refresh"})
+// TestParseNotifications tests notification URLs must be http(s), and are for the channel URL given or all of them.
+func TestParseNotifications(t *testing.T) {
+	got, err := parsing.ParseNotifications("", []string{"http://jellyfin.local/Library/Refresh"})
 	if err != nil || len(got) != 1 || got[0].NotifyURL != "http://jellyfin.local/Library/Refresh" || got[0].ChannelURL != "" {
-		t.Errorf("bare URL = %+v, %v", got, err)
+		t.Errorf("for all channel URLs = %+v, %v", got, err)
 	}
-	if _, err := parsing.ParseNotifications([]string{"Plex Library"}); err == nil {
-		t.Error("a name alone was accepted as a notification URL")
-	}
-	if _, err := parsing.ParseNotifications([]string{"https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh"}); err == nil {
-		t.Error("a URL containing spaces and angle brackets was accepted")
-	}
-}
-
-// TestParseNotificationsChannelScoped tests "Channel URL|Notify URL" scopes a notification, and that both must be http(s) URLs.
-func TestParseNotificationsChannelScoped(t *testing.T) {
-	got, err := parsing.ParseNotifications([]string{"https://tubesite.com/@chan|http://plex:32400/refresh?X-Plex-Token=a"})
-	if err != nil || len(got) != 1 || got[0].ChannelURL != "https://tubesite.com/@chan" || got[0].NotifyURL != "http://plex:32400/refresh?X-Plex-Token=a" {
-		t.Errorf("channel scoped = %+v, %v", got, err)
+	got, err = parsing.ParseNotifications("https://tubesite.com/@chan", []string{"http://plex:32400/refresh?X-Plex-Token=a"})
+	if err != nil || len(got) != 1 || got[0].ChannelURL != "https://tubesite.com/@chan" {
+		t.Errorf("for one channel URL = %+v, %v", got, err)
 	}
 	for _, bad := range []string{
-		"http://plex:32400/refresh|Plex",                            // Old "Notify URL|Name" form.
-		"https://tubesite.com/@chan|http://plex:32400/refresh|Plex", // Old "Channel URL|Notify URL|Name" form.
-		"tubesite|http://plex:32400/refresh",                        // Channel URL isn't a URL.
+		"Plex Library", // A name alone.
+		"https://localhost:32400/library/sections/< YOUR LIBRARY NUMBER >/refresh", // Spaces and angle brackets.
+		"https://tubesite.com/@chan|http://plex:32400/refresh",                     // Old "Channel URL|Notify URL" form.
 	} {
-		if _, err := parsing.ParseNotifications([]string{bad}); err == nil {
+		if _, err := parsing.ParseNotifications("", []string{bad}); err == nil {
 			t.Errorf("%q was accepted", bad)
 		}
 	}

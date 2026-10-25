@@ -29,11 +29,8 @@ func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.C
 	// Merge with filtered filename ops (per-video, stored in Video struct)
 	mergedOps := applyFilteredFilenameOps(fileAndDBOps, v.FilteredFilenameOps, v.URL, c.Name)
 
-	// Omit operations with the wrong channel URL
-	channelMatchedOps := filterFilenameOpsByChannel(mergedOps, cu.URL)
-
 	// Convert to slice and deduplicate
-	return getDedupedFilenameOpStrings(channelMatchedOps)
+	return getDedupedFilenameOpStrings(mergedOps)
 }
 
 // overrideFilenameOps returns the video's Download As filename ops, with its matched filtered filename ops and any
@@ -85,7 +82,7 @@ func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.Fil
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.FilenameOps, 0, len(ops))
 	for _, op := range ops {
-		key := sharedparsing.FormatFilenameOp(op, false)
+		key := sharedparsing.FormatFilenameOp(op)
 		if !matchedFilteredKeys[key] {
 			logger.Pl.D(2, "Added filename operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -115,31 +112,20 @@ func buildFilenameOpKeySet(ops []models.FilenameOps, includeNonConflicting bool)
 	for _, op := range ops {
 		_, conflicts := models.ConflictingFilenameOps[op.OpType]
 		if includeNonConflicting || !conflicts {
-			filenameOpsKeys[sharedparsing.FormatFilenameOp(op, false)] = true
+			filenameOpsKeys[sharedparsing.FormatFilenameOp(op)] = true
 		}
 	}
 	return filenameOpsKeys
 }
 
-// filterFilenameOpsByChannel filters out meta operations not matching the current channel.
-func filterFilenameOpsByChannel(ops []models.FilenameOps, cURL string) []models.FilenameOps {
-	valid := make([]models.FilenameOps, 0, len(ops))
-	for _, op := range ops {
-		if sharedparsing.AppliesToChannel(op.ChannelURL, cURL) {
-			valid = append(valid, op)
-		}
-	}
-	return valid
-}
-
-// getDedupedFilenameOpStrings converts ops to deduplicated string slice for specific URL.
+// getDedupedFilenameOpStrings converts ops to deduplicated string slice.
 func getDedupedFilenameOpStrings(ops []models.FilenameOps) []string {
 	seen := make(map[string]bool, len(ops))
 	result := make([]string, 0, len(ops))
 
 	// Make deduplicated filename op slice
 	for _, op := range ops {
-		opStr := sharedparsing.FormatFilenameOp(op, false)
+		opStr := sharedparsing.FormatFilenameOp(op)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)

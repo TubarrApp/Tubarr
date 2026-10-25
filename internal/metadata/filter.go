@@ -102,7 +102,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 
 	// Use buildKey for consistency.
 	for _, mo := range metaOps {
-		dedupMetaOpsMap[sharedparsing.FormatMetaOp(mo, true)] = true
+		dedupMetaOpsMap[sharedparsing.FormatMetaOp(mo)] = true
 	}
 
 	// Check filtered meta ops.
@@ -114,7 +114,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		if filtersMatched {
 			dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
 			for _, mo := range fmo.MetaOps {
-				key := sharedparsing.FormatMetaOp(mo, true)
+				key := sharedparsing.FormatMetaOp(mo)
 				if !dedupMetaOpsMap[key] {
 					dedupMetaOpsMap[key] = true
 					dedupMetaOps = append(dedupMetaOps, mo)
@@ -132,7 +132,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		logger.Pl.P("Filtered meta op results for channel %q:", channelName)
 		for _, fmo := range result {
 			for _, mo := range fmo.MetaOps {
-				logger.Pl.P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatMetaOp(mo, true), fmo.FiltersMatched)
+				logger.Pl.P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatMetaOp(mo), fmo.FiltersMatched)
 			}
 		}
 	}
@@ -154,7 +154,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 	}
 
 	for _, fo := range filenameOps {
-		dedupFilenameOpsMap[sharedparsing.FormatFilenameOp(fo, true)] = true
+		dedupFilenameOpsMap[sharedparsing.FormatFilenameOp(fo)] = true
 	}
 
 	// Check filtered filename ops.
@@ -166,7 +166,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		if filtersMatched {
 			dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
 			for _, fo := range ffo.FilenameOps {
-				key := sharedparsing.FormatFilenameOp(fo, true)
+				key := sharedparsing.FormatFilenameOp(fo)
 				if !dedupFilenameOpsMap[key] {
 					dedupFilenameOpsMap[key] = true
 					dedupFilenameOps = append(dedupFilenameOps, fo)
@@ -184,7 +184,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		logger.Pl.P("Filtered filename op results for channel %q:", channelName)
 		for _, ffo := range result {
 			for _, fo := range ffo.FilenameOps {
-				logger.Pl.P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatFilenameOp(fo, true), ffo.FiltersMatched)
+				logger.Pl.P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatFilenameOp(fo), ffo.FiltersMatched)
 			}
 		}
 	}

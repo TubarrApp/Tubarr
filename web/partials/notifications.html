@@ -191,26 +191,8 @@
     };
   }
 
-  // notificationLine renders a notification row as the server reads it, escaping '\' and '|'.
-  function notificationLine(n) {
-    const esc = s => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
-    return n.channel_url ? `${esc(n.channel_url)}|${esc(n.notify_url)}` : esc(n.notify_url);
-  }
-
-  // notificationRow reads a notification line from the server into a row, splitting at unescaped '|'.
-  function notificationRow(line) {
-    const parts = [''];
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '\\' && '\\:|'.includes(line[i + 1])) {
-        parts[parts.length - 1] += line[++i];
-      } else if (line[i] === '|') {
-        parts.push('');
-      } else {
-        parts[parts.length - 1] += line[i];
-      }
-    }
-    return parts.length === 2
-      ? { channel_url: parts[0], notify_url: parts[1], checked: false }
-      : { channel_url: '', notify_url: parts[0], checked: false };
+  // notificationsJSON renders the notification rows as the server reads them.
+  function notificationsJSON(rows) {
+    return JSON.stringify(rows.map(({ channel_url, notify_url }) => ({ channel_url, notify_url })));
   }
 </script>

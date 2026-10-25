@@ -513,7 +513,6 @@ func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	u.MinFreeMem = cmp.Or(u.MinFreeMem, ch.MinFreeMem)
 	u.TranscodeGPU = cmp.Or(u.TranscodeGPU, ch.TranscodeGPU)
 	u.TranscodeGPUNode = cmp.Or(u.TranscodeGPUNode, ch.TranscodeGPUNode)
-	u.TranscodeVideoFilter = cmp.Or(u.TranscodeVideoFilter, ch.TranscodeVideoFilter)
 	u.TranscodeVideoCodecs = inheritSlice(u.TranscodeVideoCodecs, ch.TranscodeVideoCodecs)
 	u.TranscodeAudioCodecs = inheritSlice(u.TranscodeAudioCodecs, ch.TranscodeAudioCodecs)
 	u.TranscodeQuality = cmp.Or(u.TranscodeQuality, ch.TranscodeQuality)

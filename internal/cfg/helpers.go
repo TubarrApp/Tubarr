@@ -75,7 +75,7 @@ func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
 		&f.OutDir, &f.MetaPurge, &f.RenameStyle, &f.MetaOpsFile, &f.FilteredMetaOpsFile, &f.FilenameOpsFile,
 		&f.FilteredFilenameOpsFile, &f.FilenameOps, &f.FilteredFilenameOps, &f.MetaOps, &f.FilteredMetaOps)
 
-	cmd.SetTranscodeFlags(c, &f.TranscodeGPU, &f.TranscodeGPUNode, &f.TranscodeVideoFilter, &f.TranscodeQuality,
+	cmd.SetTranscodeFlags(c, &f.TranscodeGPU, &f.TranscodeGPUNode, &f.TranscodeQuality,
 		&f.TranscodeVideoCodec, &f.TranscodeAudioCodec)
 
 	cmd.SetCustomYDLPArgFlags(c, &f.ExtraYTDLPVideoArgs, &f.ExtraYTDLPMetaArgs, &f.ExtraYTDLPCrawlArgs)
@@ -133,7 +133,7 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.AuthDetails) {
 		in.AuthDetails = &f.AuthDetails
 	}
-	if cmd.Flags().Changed(keys.NotifyPair) {
+	if cmd.Flags().Changed(keys.Notify) {
 		in.Notification = &f.Notification
 	}
 	if cmd.Flags().Changed(keys.CookiesFromBrowser) {
@@ -207,9 +207,6 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	}
 	if cmd.Flags().Changed(keys.TranscodeQuality) {
 		in.TranscodeQuality = &f.TranscodeQuality
-	}
-	if cmd.Flags().Changed(keys.TranscodeVideoFilter) {
-		in.TranscodeVideoFilter = &f.TranscodeVideoFilter
 	}
 	if cmd.Flags().Changed(keys.TranscodeCodec) {
 		in.TranscodeVideoCodec = &f.TranscodeVideoCodec

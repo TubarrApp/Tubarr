@@ -233,8 +233,6 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 			m.TranscodeGPUNode = ""
 		case keys.TranscodeQuality:
 			m.TranscodeQuality = ""
-		case keys.TranscodeVideoFilter:
-			m.TranscodeVideoFilter = ""
 		case keys.TranscodeCodec:
 			m.TranscodeVideoCodecs = nil
 		case keys.TranscodeAudioCodec:

@@ -43,7 +43,6 @@ const (
 	MetarrGPUNode                 = "metarr_transcode_gpu_node"
 	MetarrOutputDirectory         = "metarr_output_directory"
 	MetarrMetaPurge               = "metarr_purge_metafile"
-	MetarrTranscodeVideoFilter    = "metarr_transcode_video_filter"
 	MetarrVideoCodecs             = "metarr_transcode_video_transcode_codecs"
 	MetarrAudioCodecs             = "metarr_transcode_audio_codecs"
 	MetarrTranscodeQuality        = "metarr_transcode_quality"

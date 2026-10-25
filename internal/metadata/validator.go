@@ -17,8 +17,6 @@ import (
 
 	"github.com/TubarrApp/gocommon/sharedfilters"
 	"github.com/TubarrApp/gocommon/sharedtags"
-
-	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
@@ -180,13 +178,10 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	filteredMetaOps, filteredFilenameOps := loadFilteredOps(v, cu, dirParser)
 
 	// Check filtered meta ops.
-	relevantFilteredMetaOps := getRelevantFilteredMetaOps(filteredMetaOps, cu.URL)
-	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, relevantFilteredMetaOps, c.Name)
+	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, filteredMetaOps, c.Name)
 
 	// Check filtered filename ops.
-
-	relevantFilteredFilenameOps := getRelevantFilteredFilenameOps(filteredFilenameOps, cu.URL)
-	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, relevantFilteredFilenameOps, c.Name)
+	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, filteredFilenameOps, c.Name)
 
 	// Videos the user chose skip download filters.
 	if v.SkipFilters || cu.IsManual {
@@ -200,9 +195,8 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 		return false, useFilteredMetaOps, useFilteredFilenameOps, err
 	}
 	allFilters := slices.Concat(cu.ChanURLSettings.Filters, fileFilters)
-	relevantFilters := getRelevantFilters(allFilters, cu.URL)
 
-	if !checkFilters(v, "Download filters", relevantFilters) {
+	if !checkFilters(v, "Download filters", allFilters) {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
@@ -238,55 +232,13 @@ func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.
 		slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, fileFilteredFilenameOps)
 }
 
-// getRelevantFilters returns filters applicable to the given URL.
-func getRelevantFilters(filters []models.Filters, currentURL string) []models.Filters {
-	relevant := make([]models.Filters, 0, len(filters))
-
-	for _, filter := range filters {
-		// Include if no specific URL specified, or if it matches current URL.
-		if sharedparsing.AppliesToChannel(filter.ChannelURL, currentURL) {
-			relevant = append(relevant, filter)
-		} else {
-			logger.Pl.D(2, "Skipping filter %v. This filter's specific channel URL %q does not match current channel URL %q",
-				filter, filter.ChannelURL, currentURL)
-		}
-	}
-
-	return relevant
-}
-
-// getRelevantFilteredMetaOps returns filtered meta ops applicable to the given URL.
-func getRelevantFilteredMetaOps(filteredMetaOps []models.FilteredMetaOps, currentURL string) []models.FilteredMetaOps {
-	relevantFilteredMetaOps := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
-
-	for _, fmo := range filteredMetaOps {
-		fmo.Filters = getRelevantFilters(fmo.Filters, currentURL)
-		relevantFilteredMetaOps = append(relevantFilteredMetaOps, fmo)
-	}
-	return relevantFilteredMetaOps
-}
-
-// getRelevantFilteredFilenameOps returns filtered filename ops applicable to the given URL.
-func getRelevantFilteredFilenameOps(filteredFilenameOps []models.FilteredFilenameOps, currentURL string) []models.FilteredFilenameOps {
-	relevantFilteredFilenameOps := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
-
-	for _, ffo := range filteredFilenameOps {
-		ffo.Filters = getRelevantFilters(ffo.Filters, currentURL)
-		relevantFilteredFilenameOps = append(relevantFilteredFilenameOps, ffo)
-	}
-	return relevantFilteredFilenameOps
-}
-
 // HandleMoveOps checks if Metarr should use an output directory based on existent metadata.
 func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
 	// Copy of the database move ops, plus file-based move ops.
 	allMoveOps := slices.Concat(cu.ChanURLSettings.MetaFilterMoveOps, loadMoveOpsFromFile(cu, dirParser))
 
-	// Filter to relevant ones for this URL.
-	relevantMoveOps := getRelevantMoveOps(allMoveOps, cu.URL)
-
 	// Check each move operation against video metadata.
-	for _, op := range relevantMoveOps {
+	for _, op := range allMoveOps {
 		f := op.Filter()
 		matched, skipped, err := sharedfilters.Match(v.MetadataMap, f)
 		if err != nil {
@@ -300,20 +252,4 @@ func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 	}
 
 	return ""
-}
-
-// getRelevantMoveOps returns move operations applicable to the given URL.
-func getRelevantMoveOps(moveOps []models.MetaFilterMoveOps, currentURL string) []models.MetaFilterMoveOps {
-	relevant := make([]models.MetaFilterMoveOps, 0, len(moveOps))
-
-	for _, op := range moveOps {
-		// Include if no specific URL specified, or if it matches current URL.
-		if sharedparsing.AppliesToChannel(op.ChannelURL, currentURL) {
-			relevant = append(relevant, op)
-		} else {
-			logger.Pl.D(2, "Skipping move op for different URL: %q != %q", op.ChannelURL, currentURL)
-		}
-	}
-
-	return relevant
 }

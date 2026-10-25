@@ -58,12 +58,11 @@ type ChannelFlagValues struct {
 	MetaPurge   string
 
 	// Transcoding settings
-	TranscodeGPU         string
-	TranscodeGPUNode     string
-	TranscodeQuality     string
-	TranscodeVideoFilter string
-	TranscodeVideoCodec  []string
-	TranscodeAudioCodec  []string
+	TranscodeGPU        string
+	TranscodeGPUNode    string
+	TranscodeQuality    string
+	TranscodeVideoCodec []string
+	TranscodeAudioCodec []string
 
 	// Extra arguments
 	ExtraYTDLPVideoArgs string

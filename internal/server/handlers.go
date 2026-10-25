@@ -294,7 +294,7 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	}
 	for _, n := range notifications {
 		if n.NotifyURL != "" {
-			response.Notifications = append(response.Notifications, notificationLine(n))
+			response.Notifications = append(response.Notifications, n)
 		}
 	}
 
@@ -1083,6 +1083,7 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 		Saved          *models.OverrideLines `json:"saved"`           // The video's earlier overrides, if any.
 		DefaultsMetarr *metarrArgsResponse   `json:"defaults_metarr"` // The channel URL's other Metarr args.
 		SavedMetarr    *metarrArgsResponse   `json:"saved_metarr"`    // The video's earlier other Metarr args, if any.
+		DefaultsYtdlp  *settingsResponse     `json:"defaults_ytdlp"`  // The channel URL's settings, for its yt-dlp options.
 	}
 	var err error
 	if response.Defaults, err = metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
@@ -1090,8 +1091,9 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	response.DefaultsMetarr = newMetarrArgsResponse(cu.ChanURLMetarrArgs)
+	response.DefaultsYtdlp = newSettingsResponse(cu.ChanURLSettings)
 	if overrides != nil {
-		saved := metarr.VideoOverrideLines(overrides, cu.URL)
+		saved := metarr.VideoOverrideLines(overrides)
 		response.Saved = &saved
 		response.SavedMetarr = newMetarrArgsResponse(&overrides.MetarrArgs)
 	}

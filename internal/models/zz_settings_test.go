@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -101,7 +102,7 @@ func TestChildMetarrArgsMatchParentLists(t *testing.T) {
 		{Filters: []Filters{dog}, MetaOps: []MetaOps{{Field: "artist", OpType: "set", OpValue: "C"}}},
 	}
 	filteredFilename := []FilteredFilenameOps{
-		{Filters: []Filters{cat, dog}, FilenameOps: []FilenameOps{{OpType: "prefix", OpValue: "[A] "}, {OpType: "append", OpValue: " [B]"}}},
+		{Filters: []Filters{cat, dog}, FilenameOps: []FilenameOps{{OpType: "prefix", OpValue: "[A] "}, {OpType: "suffix", OpValue: " [B]"}}},
 		{Filters: []Filters{dog}, FilenameOps: []FilenameOps{{OpType: "prefix", OpValue: "[C] "}}},
 	}
 	parent := &MetarrArgs{FilteredMetaOps: filteredMeta, FilteredFilenameOps: filteredFilename}
@@ -140,11 +141,11 @@ func TestFilterConflictingMetaOps(t *testing.T) {
 	base := []MetaOps{
 		{Field: "artist", OpType: "set", OpValue: "Base"},
 		{Field: "album", OpType: "set", OpValue: "Base"},
-		{Field: "title", OpType: "append", OpValue: " [Base]"},
+		{Field: "title", OpType: "suffix", OpValue: " [Base]"},
 	}
 	overrides := []MetaOps{
 		{Field: "artist", OpType: "set", OpValue: "Override"},
-		{Field: "title", OpType: "append", OpValue: " [Override]"},
+		{Field: "title", OpType: "suffix", OpValue: " [Override]"},
 	}
 	want := []MetaOps{base[1], base[2]}
 	if got := FilterConflictingMetaOps(overrides, base); !reflect.DeepEqual(got, want) {
@@ -229,13 +230,15 @@ func TestOldDBBlobStillReads(t *testing.T) {
 
 	// Re-marshal and confirm the operation arrays are written back in the same shape, so
 	// saving a channel after reading it does not rewrite existing rows into a new format.
+	// Only the channel URL keys, dropped with channel URL prefixes, are left out.
 	out, err := json.Marshal(args)
 	if err != nil {
 		t.Fatalf("re-marshal: %v", err)
 	}
 
+	withoutChannelURLs := regexp.MustCompile(`"(meta_op_channel_url|filename_op_channel_url|filter_url_specific)":"",\s*`).ReplaceAllString(oldBlob, "")
 	var before, after map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(oldBlob), &before); err != nil {
+	if err := json.Unmarshal([]byte(withoutChannelURLs), &before); err != nil {
 		t.Fatal(err)
 	}
 	if err := json.Unmarshal(out, &after); err != nil {

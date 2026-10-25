@@ -174,7 +174,8 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 	form.Set("name", got.Name)
 	form.Set("urls", strings.Join(got.URLs, " "))
 	if len(got.Notifications) > 0 {
-		form.Set("notifications", strings.Join(got.Notifications, "\n"))
+		data, _ = json.Marshal(got.Notifications)
+		form.Set("notifications", string(data))
 	}
 	return form
 }
@@ -324,12 +325,8 @@ func FuzzChannelForm(f *testing.F) {
 			t.Errorf("%s: name was sent as %q but reads back as %q", page, fuzzed.sent["name"], got.Name)
 		}
 		if !fuzzed.junk["notifications"] {
-			var want []string
-			if n := normalizeLines(fuzzed.sent["notifications"]); n != "" {
-				want = strings.Split(n, "\n")
-			}
-			if !sameSet(got.Notifications, want) {
-				t.Errorf("%s: notifications were sent as %q but read back as %q", page, want, got.Notifications)
+			if want := notificationKeys(fuzzed.sent["notifications"]); !sameSet(notificationKeys(got.Notifications), want) {
+				t.Errorf("%s: notifications were sent as %q but read back as %+v", page, want, got.Notifications)
 			}
 		}
 

@@ -88,8 +88,7 @@ func TestAvailableVideosAPI(t *testing.T) {
 		t.Fatalf("expected 2 available videos from Review Channel, got %+v", videos)
 	}
 
-	// Download As is filled with the channel URL's directories and ops, ops without their channel URL prefix, and the
-	// video's earlier overrides if it has any.
+	// Download As is filled with the channel URL's directories and ops, and the video's earlier overrides if it has any.
 	type overrideOps struct {
 		Defaults models.OverrideLines  `json:"defaults"`
 		Saved    *models.OverrideLines `json:"saved"`

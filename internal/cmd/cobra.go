@@ -151,22 +151,18 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 // SetNotifyFlags sets flags related to notification URLs (e.g. Plex library URL to ping for an update).
 func SetNotifyFlags(cmd *cobra.Command, notification *[]string) {
 	if notification != nil {
-		cmd.Flags().StringSliceVar(notification, keys.NotifyPair, nil, "URL to notify on completion (format is 'Notify URL', or 'Channel URL|Notify URL' for one channel URL only)")
+		cmd.Flags().StringSliceVar(notification, keys.Notify, nil, "URL to notify when new videos are downloaded (e.g. a Plex library refresh URL)")
 	}
 }
 
 // SetTranscodeFlags sets flags related to video transcoding.
-func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode, videoFilter, quality *string, videoCodec, audioCodec *[]string) {
+func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode, quality *string, videoCodec, audioCodec *[]string) {
 	if gpu != nil {
 		cmd.Flags().StringVar(gpu, keys.TranscodeGPU, "", "GPU for transcoding.")
 	}
 
 	if gpuNode != nil {
 		cmd.Flags().StringVar(gpuNode, keys.TranscodeGPUNode, "", "GPU node path for transcoding (e.g. '/dev/dri/renderD128')")
-	}
-
-	if videoFilter != nil {
-		cmd.Flags().StringVar(videoFilter, keys.TranscodeVideoFilter, "", "Video filter")
 	}
 
 	if quality != nil {

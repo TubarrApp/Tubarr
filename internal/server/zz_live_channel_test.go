@@ -647,7 +647,7 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	sc.outputDir = strings.ReplaceAll(outputDir, "{{year}}", "2026")
 	set("metarr_output_ext", pick("", "mkv", "mp4"))
 	set("metarr_rename_style", pick("", "underscores", "spaces", "fixes-only", "skip"))
-	set("metarr_filename_ops", pick("", "prefix:[Live] ", "append: [Live]"))
+	set("metarr_filename_ops", pick("", "prefix:[Live] ", "suffix: [Live]"))
 	set("metarr_meta_ops", pick("", "artist:set:Live Band"))
 	set("metarr_filtered_meta_ops", pick("", "title:contains:cats||artist:set:Cat Band"))
 	set("metarr_filtered_filename_ops", pick("", "title:contains:dogs||prefix:[Dog] "))
@@ -658,17 +658,18 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	set("metarr_transcode_video_transcode_codecs", pick(liveTranscodes("libx265", "h264:hevc", "libvpx-vp9", "h264:vp9")...))
 	set("metarr_transcode_audio_codecs", pick(liveTranscodes("libmp3lame", "aac:mp3", "libopus", "aac:opus")...))
 	set("metarr_transcode_quality", pick("", "28"))
-	set("metarr_transcode_video_filter", pick("", "hflip"))
 	set("metarr_extra_ffmpeg_args", pick("", "-threads 1"))
-	var notifications []string
+	var notifications [][2]string
 	n := pickIndex(4)
 	if sc.notify["all"] = n&1 != 0; sc.notify["all"] {
-		notifications = append(notifications, site.srv.URL+"/notify/all")
+		notifications = append(notifications, [2]string{"", site.srv.URL + "/notify/all"})
 	}
 	if sc.notify["b"] = n&2 != 0; sc.notify["b"] {
-		notifications = append(notifications, site.feedURL("b")+"|"+site.srv.URL+"/notify/b")
+		notifications = append(notifications, [2]string{site.feedURL("b"), site.srv.URL + "/notify/b"})
 	}
-	set("notifications", strings.Join(notifications, "\n"))
+	if len(notifications) > 0 {
+		set("notifications", notificationsJSON(notifications...))
+	}
 
 	// The second URL's own settings.
 	b := &liveURL{paused: pick("false", "true") == "true"}

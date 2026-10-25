@@ -317,10 +317,8 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 		// Build argument
 		args := []string{command.YtDLPFlatPlaylist}
 
-		// Add custom crawl arguments: CLI flag takes precedence over per-channel setting.
-		if abstractions.IsSet(keys.ExtraYTDLPCrawlArgs) {
-			args = append(args, parsing.SplitArgs(abstractions.GetString(keys.ExtraYTDLPCrawlArgs))...)
-		} else if crawlArgs != "" {
+		// Add custom crawl arguments.
+		if crawlArgs != "" {
 			args = append(args, parsing.SplitArgs(crawlArgs)...)
 		}
 

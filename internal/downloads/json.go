@@ -86,11 +86,8 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments.
-	if !abstractions.IsSet(keys.ExtraYTDLPMetaArgs) && d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs != "" {
-		args = append(args, parsing.SplitArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs)...)
-	}
-	if abstractions.IsSet(keys.ExtraYTDLPMetaArgs) {
-		args = append(args, parsing.SplitArgs(abstractions.GetString(keys.ExtraYTDLPMetaArgs))...)
+	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs; extra != "" {
+		args = append(args, parsing.SplitArgs(extra)...)
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).

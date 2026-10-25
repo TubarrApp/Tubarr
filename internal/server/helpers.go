@@ -100,7 +100,7 @@ type channelDetailResponse struct {
 	Metarr            *metarrArgsResponse            `json:"metarr,omitempty"`
 	AuthDetails       []authDetailResponse           `json:"auth_details"`
 	URLSettings       map[string]urlSettingsResponse `json:"url_settings"`
-	Notifications     []string                       `json:"notifications,omitempty"` // One line each, as the form takes them.
+	Notifications     []*models.Notification         `json:"notifications,omitempty"`
 	ConfigFile        *configFileResponse            `json:"config_file,omitempty"`
 }
 
@@ -164,7 +164,6 @@ type metarrArgsResponse struct {
 	VideoCodecs             []string `json:"metarr_transcode_video_transcode_codecs,omitempty"`
 	AudioCodecs             []string `json:"metarr_transcode_audio_codecs,omitempty"`
 	TranscodeQuality        string   `json:"metarr_transcode_quality,omitempty"`
-	TranscodeVideoFilter    string   `json:"metarr_transcode_video_filter,omitempty"`
 	ExtraFFmpegArgs         string   `json:"metarr_extra_ffmpeg_args,omitempty"`
 	FilenameOpsFile         string   `json:"metarr_filename_ops_file,omitempty"`
 	FilteredFilenameOpsFile string   `json:"metarr_filtered_filename_ops_file,omitempty"`
@@ -193,14 +192,13 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		VideoCodecs:             m.TranscodeVideoCodecs,
 		AudioCodecs:             m.TranscodeAudioCodecs,
 		TranscodeQuality:        m.TranscodeQuality,
-		TranscodeVideoFilter:    m.TranscodeVideoFilter,
 		ExtraFFmpegArgs:         m.ExtraFFmpegArgs,
 		FilenameOpsFile:         m.FilenameOpsFile,
 		FilteredFilenameOpsFile: m.FilteredFilenameOpsFile,
 		MetaOpsFile:             m.MetaOpsFile,
 		FilteredMetaOpsFile:     m.FilteredMetaOpsFile,
-		MetaOps:                 strings.Join(sharedparsing.FormatMetaOps(m.MetaOps, "", true), "\n"),
-		FilenameOps:             strings.Join(sharedparsing.FormatFilenameOps(m.FilenameOps, "", true), "\n"),
+		MetaOps:                 strings.Join(sharedparsing.FormatMetaOps(m.MetaOps), "\n"),
+		FilenameOps:             strings.Join(sharedparsing.FormatFilenameOps(m.FilenameOps), "\n"),
 	}
 	if m.MaxCPU >= 0 {
 		r.MaxCPU = &m.MaxCPU
@@ -298,13 +296,19 @@ func splitAuthDetails(s string) ([]string, error) {
 	return out, nil
 }
 
-// parseNotificationLines parses the notifications form value, one per line, checking scoped ones name one of urls.
-func parseNotificationLines(s string, urls []string) ([]*models.Notification, error) {
-	notifications, err := parsing.ParseNotifications(splitNonEmptyLines(s))
-	if err != nil {
-		return nil, err
+// parseNotifications parses the notifications form value, a JSON list, checking each is for one of urls or for all.
+func parseNotifications(s string, urls []string) ([]*models.Notification, error) {
+	if s == "" {
+		return nil, nil
+	}
+	var notifications []*models.Notification
+	if err := json.Unmarshal([]byte(s), &notifications); err != nil {
+		return nil, fmt.Errorf("invalid notifications JSON: %w", err)
 	}
 	for _, n := range notifications {
+		if err := validation.ValidateNotifyURL(n.NotifyURL); err != nil {
+			return nil, err
+		}
 		if n.ChannelURL != "" && !slices.ContainsFunc(urls, func(u string) bool {
 			return sharedparsing.NormalizeChannelURL(u) == sharedparsing.NormalizeChannelURL(n.ChannelURL)
 		}) {
@@ -312,18 +316,6 @@ func parseNotificationLines(s string, urls []string) ([]*models.Notification, er
 		}
 	}
 	return notifications, nil
-}
-
-// notificationEscaper escapes notification fields for parsing.ParseNotifications, leaving colons so URLs stay readable.
-var notificationEscaper = strings.NewReplacer(`\`, `\\`, `|`, `\|`)
-
-// notificationLine renders a notification as parseNotificationLines reads it.
-func notificationLine(n *models.Notification) string {
-	esc := notificationEscaper.Replace
-	if n.ChannelURL != "" {
-		return esc(n.ChannelURL) + "|" + esc(n.NotifyURL)
-	}
-	return esc(n.NotifyURL)
 }
 
 // formConfigFile returns the channel_config_file form value, checking the file exists.
@@ -381,7 +373,7 @@ func parseChannelForm(r *http.Request) (*channelForm, error) {
 	if f.urlSettings, err = parseURLSettings(r.FormValue("url_settings")); err != nil {
 		return nil, err
 	}
-	if f.notifications, err = parseNotificationLines(r.FormValue("notifications"), f.urls); err != nil {
+	if f.notifications, err = parseNotifications(r.FormValue("notifications"), f.urls); err != nil {
 		return nil, err
 	}
 	if f.configFile, err = formConfigFile(r); err != nil {
@@ -448,7 +440,6 @@ type metarrArgsInput struct {
 	GPUNode                 *string  `json:"metarr_transcode_gpu_node"`
 	OutputDir               *string  `json:"metarr_output_directory"`
 	MetaPurge               *string  `json:"metarr_purge_metafile"`
-	TranscodeVideoFilter    *string  `json:"metarr_transcode_video_filter"`
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
 	TranscodeQuality        *string  `json:"metarr_transcode_quality"`
@@ -649,7 +640,6 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 		TranscodeGPU:            in.GPU,
 		TranscodeGPUNode:        in.GPUNode,
 		TranscodeQuality:        in.TranscodeQuality,
-		TranscodeVideoFilter:    in.TranscodeVideoFilter,
 		TranscodeVideoCodec:     linesInput(in.VideoCodecs, splitNonEmptyLines),
 		TranscodeAudioCodec:     linesInput(in.AudioCodecs, splitNonEmptyLines),
 		MinFreeMem:              in.MinFreeMem,
@@ -810,7 +800,6 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 		TranscodeGPU:            formString(r, jsonkeys.MetarrGPU),
 		TranscodeGPUNode:        formString(r, jsonkeys.MetarrGPUNode),
 		TranscodeQuality:        formString(r, jsonkeys.MetarrTranscodeQuality),
-		TranscodeVideoFilter:    formString(r, jsonkeys.MetarrTranscodeVideoFilter),
 		TranscodeVideoCodec:     linesInput(formString(r, jsonkeys.MetarrVideoCodecs), splitNonEmptyLines),
 		TranscodeAudioCodec:     linesInput(formString(r, jsonkeys.MetarrAudioCodecs), splitNonEmptyLines),
 		MinFreeMem:              formString(r, jsonkeys.MetarrMinFreeMem),
@@ -839,7 +828,7 @@ func splitOpLines(s string) []string {
 	return result
 }
 
-// parseOverrideLines parses the Download As dialog's ops and other Metarr args into a video's overrides.
+// parseOverrideLines parses the Download As dialog's ops, yt-dlp options and other Metarr args into a video's overrides.
 func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.VideoOverrides, err error) {
 	o = &models.VideoOverrides{
 		Filename:       strings.TrimSpace(l.Filename),
@@ -851,6 +840,23 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 	if err := validation.ValidateThumbnail(o.Thumbnail, o.StripThumbnail); err != nil {
 		return nil, err
 	}
+
+	// yt-dlp options, checked as saved settings are.
+	o.YtdlpOutputExt = strings.TrimSpace(l.YtdlpOutputExt)
+	if err := validation.ValidateYtdlpOutputExtension(o.YtdlpOutputExt); err != nil {
+		return nil, err
+	}
+	if o.MaxFilesize, err = validation.ValidateMaxFilesize(l.MaxFilesize); err != nil {
+		return nil, err
+	}
+	o.ExtraYTDLPVideoArgs = strings.TrimSpace(l.ExtraYTDLPVideoArgs)
+	if o.YTDLPPreferredVideoCodecs, err = validation.ValidatePreferredVideoCodecs(splitNonEmptyLines(l.YTDLPPreferredVideoCodecs)); err != nil {
+		return nil, fmt.Errorf("invalid preferred video codecs: %w", err)
+	}
+	if o.YTDLPPreferredAudioCodecs, err = validation.ValidatePreferredAudioCodecs(splitNonEmptyLines(l.YTDLPPreferredAudioCodecs)); err != nil {
+		return nil, fmt.Errorf("invalid preferred audio codecs: %w", err)
+	}
+
 	if m != nil {
 		args, err := parseMetarrArgsInput(m)
 		if err != nil {

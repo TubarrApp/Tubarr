@@ -12,7 +12,7 @@ download-as-cancel if Download As closes without starting. -->
   class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4"
 >
   <div class="w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900" style="max-height: 90vh;">
-    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="mode === 'metarr' ? 'Customize Post-Processing' : 'Download As'"></h3>
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="mode === 'metarr' ? (video?.rerun ? 'Edit & Re-Process' : 'Edit & Post-Process') : 'Download As'"></h3>
     <p class="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" :title="video?.title" x-text="video?.title"></p>
 
     <div x-show="loading" class="py-8 text-center">
@@ -37,13 +37,13 @@ download-as-cancel if Download As closes without starting. -->
         <input
           type="text"
           x-model="form.filename"
-          placeholder="Blank keeps the usual naming"
+          placeholder="Blank keeps the default naming"
           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
         />
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Without the extension. Template tags like {{upload_date}} work. Replaces any set filename op.</p>
       </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        Blank directories use the usual ones, shown faded. Metarr moves the finished video to the output directory, if there is one.
+        Blank directories use the defaults, shown faded. Metarr moves the finished video to the output directory, if there is one.
       </p>
       <template x-for="dir in visibleDirs" :key="dir.key">
         <div>
@@ -63,7 +63,7 @@ download-as-cancel if Download As closes without starting. -->
             x-model="thumbChoice"
             class="h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
           >
-            <option value="usual">Usual (the metadata's)</option>
+            <option value="default">Default (the metadata's)</option>
             <option value="custom">Custom image</option>
             <option value="none">None (remove it)</option>
           </select>
@@ -91,7 +91,10 @@ download-as-cancel if Download As closes without starting. -->
       </p>
       <template x-for="box in boxes" :key="box.key">
         <div>
-          <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300" x-text="box.label"></label>
+          <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
+            <span x-text="box.label"></span>
+            <a :href="`help.html#${box.help}`" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+          </label>
           <div class="mb-1 flex gap-2">
             <input
               type="text"
@@ -108,62 +111,53 @@ download-as-cancel if Download As closes without starting. -->
               Load
             </button>
           </div>
-          <div x-show="box.key === 'meta_ops'" class="mb-1 flex flex-wrap gap-2">
-            <select
-              x-model="setField"
-              class="h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
-            >
-              <optgroup label="Groups">
-                <option value="all-titles">All titles</option>
-                <option value="all-credits">All credits</option>
-                <option value="all-dates">All dates</option>
-                <option value="all-descriptions">All descriptions</option>
-              </optgroup>
-              <optgroup label="Fields">
-                <option value="title">Title</option>
-                <option value="fulltitle">Full title</option>
-                <option value="description">Description</option>
-                <option value="director">Director</option>
-                <option value="artist">Artist</option>
-                <option value="studio">Studio</option>
-                <option value="genre">Genre</option>
-              </optgroup>
-              <option value="">Other…</option>
-            </select>
-            <input
-              x-show="setField === ''"
-              type="text"
-              x-model="setOther"
-              placeholder="Field name"
-              class="w-32 h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
-            />
-            <input
-              type="text"
-              x-model="setValue"
-              @keydown.enter.prevent="addSetOp()"
-              placeholder="Value"
-              class="min-w-0 flex-1 h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
-            />
-            <button
-              type="button"
-              @click="addSetOp()"
-              :disabled="!(setField || setOther.trim()) || setValue === ''"
-              class="w-16 shrink-0 rounded border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              Add
-            </button>
-          </div>
           <textarea x-model="form[box.key]" rows="3" :placeholder="box.placeholder" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300" style="font-family: monospace;"></textarea>
         </div>
       </template>
+      <details x-show="mode === 'download'">
+        <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">Download options</summary>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">How yt-dlp downloads this video. Blank options use the channel URL's. <a href="help.html#ytdlp" target="_blank" class="text-brand-500 hover:underline">Help</a></p>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Download Extension</label>
+            <select x-model="form.ytdlp_output_ext" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+              <option value="" x-text="defaultLabel('ytdlp_output_ext')"></option>
+              <option value="avi">avi</option>
+              <option value="flv">flv</option>
+              <option value="mkv">mkv</option>
+              <option value="mov">mov</option>
+              <option value="mp4">mp4</option>
+              <option value="webm">webm</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Filesize</label>
+            <input type="text" x-model="form.max_filesize" :placeholder="defaultLabel('max_filesize')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Preferred Video Codecs</label>
+            <textarea x-model="form.ytdlp_preferred_video_codecs" :placeholder="defaultLabel('ytdlp_preferred_video_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line, most wanted first (e.g., av1, vp9, h264)</p>
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Preferred Audio Codecs</label>
+            <textarea x-model="form.ytdlp_preferred_audio_codecs" :placeholder="defaultLabel('ytdlp_preferred_audio_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line, most wanted first (e.g., opus, aac)</p>
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
+            <input type="text" x-model="form.extra_ytdlp_video_args" :placeholder="defaultLabel('extra_ytdlp_video_args')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+        </div>
+      </details>
       <details>
         <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">More post-processing options</summary>
-        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Blank options use the channel URL's.</p>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Blank options use the channel URL's. <a href="help.html#transcoding" target="_blank" class="text-brand-500 hover:underline">Help</a></p>
         <div class="mt-3 grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
             <select x-model="form.metarr.metarr_purge_metafile" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
-              <option value="" x-text="usual('metarr_purge_metafile')"></option>
+              <option value="" x-text="defaultLabel('metarr_purge_metafile')"></option>
               <option value="json">JSON</option>
               <option value="nfo">NFO</option>
               <option value="all">All</option>
@@ -172,7 +166,7 @@ download-as-cancel if Download As closes without starting. -->
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Output Extension</label>
             <select x-model="form.metarr.metarr_output_ext" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
-              <option value="" x-text="usual('metarr_output_ext')"></option>
+              <option value="" x-text="defaultLabel('metarr_output_ext')"></option>
               <option value="avi">avi</option>
               <option value="flv">flv</option>
               <option value="mkv">mkv</option>
@@ -184,7 +178,7 @@ download-as-cancel if Download As closes without starting. -->
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Rename Style</label>
             <select x-model="form.metarr.metarr_rename_style" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
-              <option value="" x-text="usual('metarr_rename_style')"></option>
+              <option value="" x-text="defaultLabel('metarr_rename_style')"></option>
               <option value="spaces">Spaces</option>
               <option value="underscores">Underscores</option>
               <option value="fixes-only">Fixes Only</option>
@@ -192,16 +186,16 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
-            <input type="number" x-model.number="form.metarr.metarr_max_cpu_usage" :placeholder="usual('metarr_max_cpu_usage')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+            <input type="number" x-model.number="form.metarr.metarr_max_cpu_usage" :placeholder="defaultLabel('metarr_max_cpu_usage')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Min Free Memory</label>
-            <input type="text" x-model="form.metarr.metarr_min_free_mem" :placeholder="usual('metarr_min_free_mem')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+            <input type="text" x-model="form.metarr.metarr_min_free_mem" :placeholder="defaultLabel('metarr_min_free_mem')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
             <select x-model="form.metarr.metarr_gpu" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
-              <option value="" x-text="usual('metarr_gpu')"></option>
+              <option value="" x-text="defaultLabel('metarr_gpu')"></option>
               <option value="none">None (software)</option>
               <option value="auto">Auto</option>
               <option value="cuda">Nvidia (Cuda)</option>
@@ -211,29 +205,25 @@ download-as-cancel if Download As closes without starting. -->
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Node Path</label>
-            <input type="text" x-model="form.metarr.metarr_transcode_gpu_node" :placeholder="usual('metarr_transcode_gpu_node')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+            <input type="text" x-model="form.metarr.metarr_transcode_gpu_node" :placeholder="defaultLabel('metarr_transcode_gpu_node')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
-            <input type="number" min="0" max="51" x-model="form.metarr.metarr_transcode_quality" :placeholder="usual('metarr_transcode_quality')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+            <input type="number" min="0" max="51" x-model="form.metarr.metarr_transcode_quality" :placeholder="defaultLabel('metarr_transcode_quality')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
-            <textarea x-model="form.metarr.metarr_transcode_video_transcode_codecs" :placeholder="usual('metarr_transcode_video_transcode_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
+            <textarea x-model="form.metarr.metarr_transcode_video_transcode_codecs" :placeholder="defaultLabel('metarr_transcode_video_transcode_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., h264:hevc)</p>
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Audio Transcode Codecs</label>
-            <textarea x-model="form.metarr.metarr_transcode_audio_codecs" :placeholder="usual('metarr_transcode_audio_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
+            <textarea x-model="form.metarr.metarr_transcode_audio_codecs" :placeholder="defaultLabel('metarr_transcode_audio_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., dts:ac3)</p>
           </div>
           <div class="col-span-2">
-            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Video Filter</label>
-            <input type="text" x-model="form.metarr.metarr_transcode_video_filter" :placeholder="usual('metarr_transcode_video_filter')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-          </div>
-          <div class="col-span-2">
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
-            <input type="text" x-model="form.metarr.metarr_extra_ffmpeg_args" :placeholder="usual('metarr_extra_ffmpeg_args')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+            <input type="text" x-model="form.metarr.metarr_extra_ffmpeg_args" :placeholder="defaultLabel('metarr_extra_ffmpeg_args')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
         </div>
       </details>
@@ -265,16 +255,14 @@ download-as-cancel if Download As closes without starting. -->
       form: { metarr: {} },
       defaults: {}, // The channel URL's directories and ops.
       metarrDefaults: {}, // The channel URL's other Metarr args.
+      ytdlpDefaults: {}, // The channel URL's settings, for its yt-dlp options.
       opsFiles: {}, // Ops file paths typed in, by box.
-      thumbChoice: 'usual', // 'usual', 'custom' (form.thumbnail) or 'none' (stripped).
+      thumbChoice: 'default', // 'default', 'custom' (form.thumbnail) or 'none' (stripped).
       uploading: false,
-      setField: 'all-titles', // The meta op builder's field, '' for another typed into setOther.
-      setOther: '',
-      setValue: '',
       metarrKeys: [
         'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
         'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_quality', 'metarr_transcode_video_transcode_codecs',
-        'metarr_transcode_audio_codecs', 'metarr_transcode_video_filter', 'metarr_extra_ffmpeg_args'
+        'metarr_transcode_audio_codecs', 'metarr_extra_ffmpeg_args'
       ],
       loading: false,
       loaded: false, // Ops filled, so empty boxes mean the user cleared them.
@@ -286,10 +274,10 @@ download-as-cancel if Download As closes without starting. -->
         { key: 'output_dir', label: 'Post-Process Directory', none: 'Default', note: ' / Set by move ops' }
       ],
       boxes: [
-        { key: 'meta_ops', label: 'Meta Ops', placeholder: 'title:prefix:[Cats] ' },
-        { key: 'filtered_meta_ops', label: 'Filtered Meta Ops', placeholder: 'title:contains:cat||genre:set:Cats' },
-        { key: 'filename_ops', label: 'Filename Ops', placeholder: 'date-tag:prefix:ymd' },
-        { key: 'filtered_filename_ops', label: 'Filtered Filename Ops', placeholder: 'title:contains:cat||prefix:[Cats] ' }
+        { key: 'meta_ops', label: 'Meta Ops', placeholder: 'title:prefix:[Cats] ', help: 'meta-ops' },
+        { key: 'filtered_meta_ops', label: 'Filtered Meta Ops', placeholder: 'title:contains:cat||genre:set:Cats', help: 'filtered-ops' },
+        { key: 'filename_ops', label: 'Filename Ops', placeholder: 'date-tag:prefix:ymd', help: 'filename-ops' },
+        { key: 'filtered_filename_ops', label: 'Filtered Filename Ops', placeholder: 'title:contains:cat||prefix:[Cats] ', help: 'filtered-ops' }
       ],
 
       // A downloaded video's files are already in place, so only Metarr's output directory applies.
@@ -303,8 +291,8 @@ download-as-cancel if Download As closes without starting. -->
         this.mode = mode;
         this.defaults = {};
         this.metarrDefaults = {};
+        this.ytdlpDefaults = {};
         this.opsFiles = {};
-        this.setValue = '';
         this.form = { metarr: {} };
         this.error = null;
         this.loaded = false;
@@ -314,11 +302,12 @@ download-as-cancel if Download As closes without starting. -->
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }
-          const { defaults, saved, defaults_metarr, saved_metarr } = await response.json();
+          const { defaults, saved, defaults_metarr, saved_metarr, defaults_ytdlp } = await response.json();
           this.defaults = defaults;
           this.metarrDefaults = defaults_metarr || {};
+          this.ytdlpDefaults = defaults_ytdlp || {};
           this.form = saved ? { ...saved, metarr: this.metarrForm(saved_metarr) } : this.defaultForm();
-          this.thumbChoice = this.form.strip_thumbnail ? 'none' : (this.form.thumbnail ? 'custom' : 'usual');
+          this.thumbChoice = this.form.strip_thumbnail ? 'none' : (this.form.thumbnail ? 'custom' : 'default');
           this.loaded = true;
         } catch (err) {
           this.error = `Couldn't load the channel URL's ops: ${err.message}`;
@@ -327,18 +316,15 @@ download-as-cancel if Download As closes without starting. -->
         }
       },
 
-      // The channel URL's ops, with no filename and the usual directories and other args (blank, so move ops still apply).
       // Adds a field:set:value line to the top of the meta ops, replacing any other set of that field.
-      // Without arguments, uses the builder's field and value.
-      addSetOp(setField = this.setField || this.setOther, value = this.setValue) {
-        const field = setField.trim().replace(/[\\:|]/g, c => `\\${c}`);
-        if (!field || value === '') return;
+      addSetOp(field, value) {
+        if (value === '') return;
         const prefix = `${field}:set:`.toLowerCase();
         const kept = (this.form.meta_ops || '').split('\n').filter(l => l.trim() && !l.toLowerCase().startsWith(prefix));
         this.form.meta_ops = [`${field}:set:${value.replace(/\\/g, '\\\\')}`, ...kept].join('\n');
-        if (arguments.length === 0) this.setValue = '';
       },
 
+      // The channel URL's ops, with no filename and the default directories and other args (blank, so move ops still apply).
       defaultForm() {
         return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '', thumbnail: '', strip_thumbnail: false, metarr: {} };
       },
@@ -354,15 +340,15 @@ download-as-cancel if Download As closes without starting. -->
       },
 
       // A blank option's label: the channel URL's value, if it has one.
-      usual(key) {
-        const v = this.metarrDefaults[key];
+      defaultLabel(key) {
+        const v = this.metarrDefaults[key] ?? this.ytdlpDefaults[key];
         const shown = Array.isArray(v) ? v.join(', ') : v;
-        return shown ? `Usual (${shown})` : 'Usual setting';
+        return shown ? `Default (${shown})` : 'Default';
       },
 
       revert() {
         this.form = this.defaultForm();
-        this.thumbChoice = 'usual';
+        this.thumbChoice = 'default';
       },
 
       // Uploads the chosen image as the video's thumbnail, putting its saved path in the thumbnail box.

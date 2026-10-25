@@ -28,11 +28,8 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Chann
 	// Merge with filtered meta ops (per-video, stored in Video struct)
 	mergedOps := applyFilteredMetaOps(fileAndDBOps, v.FilteredMetaOps, v.URL, c.Name)
 
-	// Omit operations with the wrong channel URL
-	channelMatchedOps := filterMetaOpsByChannel(mergedOps, cu.URL)
-
-	// Convert to strings, filtering by URL and deduplicating
-	return getDedupedMetaOpStrings(channelMatchedOps)
+	// Convert to strings, deduplicating
+	return getDedupedMetaOpStrings(mergedOps)
 }
 
 // overrideMetaOps returns the video's Download As meta ops, with its matched filtered meta ops.
@@ -78,7 +75,7 @@ func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMet
 	// Keep only ops that aren't being replaced by MATCHED filtered ops
 	result := make([]models.MetaOps, 0, len(ops))
 	for _, op := range ops {
-		key := sharedparsing.FormatMetaOp(op, false)
+		key := sharedparsing.FormatMetaOp(op)
 		if !matchedFilteredKeys[key] {
 			logger.Pl.D(2, "Added operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
 			result = append(result, op)
@@ -108,30 +105,19 @@ func buildMetaOpKeySet(ops []models.MetaOps, includeNonConflicting bool) map[str
 	for _, op := range ops {
 		_, nonConflicting := models.NonConflictingMetaOps[op.OpType]
 		if includeNonConflicting || !nonConflicting {
-			metaOpsKeys[sharedparsing.FormatMetaOp(op, false)] = true
+			metaOpsKeys[sharedparsing.FormatMetaOp(op)] = true
 		}
 	}
 	return metaOpsKeys
 }
 
-// filterMetaOpsByChannel filters out meta operations not matching the current channel.
-func filterMetaOpsByChannel(ops []models.MetaOps, cURL string) []models.MetaOps {
-	valid := make([]models.MetaOps, 0, len(ops))
-	for _, op := range ops {
-		if sharedparsing.AppliesToChannel(op.ChannelURL, cURL) {
-			valid = append(valid, op)
-		}
-	}
-	return valid
-}
-
-// getDedupedMetaOpStrings converts ops to deduplicated string slice for specific URL.
+// getDedupedMetaOpStrings converts ops to deduplicated string slice.
 func getDedupedMetaOpStrings(ops []models.MetaOps) []string {
 	seen := make(map[string]bool, len(ops))
 	result := make([]string, 0, len(ops))
 
 	for _, op := range ops {
-		opStr := sharedparsing.FormatMetaOp(op, false)
+		opStr := sharedparsing.FormatMetaOp(op)
 		if !seen[opStr] {
 			seen[opStr] = true
 			result = append(result, opStr)

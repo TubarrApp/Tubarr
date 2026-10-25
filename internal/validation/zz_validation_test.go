@@ -316,50 +316,15 @@ func TestValidateMaxFilesize(t *testing.T) {
 	}
 }
 
-// TestValidateNotifications -----------------------------------------------------------------------------------------------
-func TestValidateNotifications(t *testing.T) {
-	// ---- SHOULD PASS ----
-	var valid = []*models.Notification{
-		{
-			ChannelID:  1,
-			NotifyURL:  "http://www.google.com",
-			ChannelURL: "http://www.example.com",
-		},
+// TestValidateNotifyURL tests a notify URL must be an http(s) URL with nothing a URL can't hold.
+func TestValidateNotifyURL(t *testing.T) {
+	if err := validation.ValidateNotifyURL("http://plex.local:32400/library/sections/1/refresh?X-Plex-Token=abc"); err != nil {
+		t.Errorf("valid notify URL rejected: %v", err)
 	}
-	if err := validation.ValidateNotifications(valid); err != nil {
-		t.Fatalf("Failed for valid notification")
-	}
-
-	var validNoURL = []*models.Notification{
-		{
-			ChannelID: 1,
-			NotifyURL: "http://www.google.com",
-		},
-	}
-	if err := validation.ValidateNotifications(validNoURL); err != nil {
-		t.Fatalf("Failed test")
-	}
-
-	// ---- SHOULD FAIL ----
-	var invalidNotifyURL = []*models.Notification{
-		{
-			ChannelID:  1,
-			NotifyURL:  "http://example.com/%😃",
-			ChannelURL: "http://www.example.com",
-		},
-	}
-	if err := validation.ValidateNotifications(invalidNotifyURL); err == nil {
-		t.Fatalf("Passed for invalid notification")
-	}
-
-	var noNotifyURL = []*models.Notification{
-		{
-			ChannelID: 1,
-			NotifyURL: "",
-		},
-	}
-	if err := validation.ValidateNotifications(noNotifyURL); err == nil {
-		t.Fatalf("Passed for invalid notification")
+	for _, bad := range []string{"", "plex.local/refresh", "http://example.com/%😃", "http://a.com/b|c", "http://a.com/b c"} {
+		if err := validation.ValidateNotifyURL(bad); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
 	}
 }
 
@@ -401,7 +366,6 @@ func TestValidateFilterOps_EmptySliceOK(t *testing.T) {
 func TestValidateFilterOps_Valid(t *testing.T) {
 	filters := []models.Filters{
 		{
-			ChannelURL: "",
 			Field:      "title",
 			FilterType: "contains",
 			MustAny:    "must",

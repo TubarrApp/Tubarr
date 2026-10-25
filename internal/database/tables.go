@@ -85,6 +85,31 @@ func migrateURLLastScan(tx *sql.Tx) error {
 	return nil
 }
 
+// migrateAppendOps renames stored "append" meta and filename operations to "suffix", once.
+func migrateAppendOps(tx *sql.Tx) error {
+	res, err := tx.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('migrated-append-ops', 'true')`)
+	if err != nil {
+		return fmt.Errorf("failed to record the append operation migration: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return nil // Already migrated.
+	}
+
+	// Ops are stored by json.Marshal, so each type is written exactly as matched here.
+	const rename = `REPLACE(REPLACE(%[2]s, '"meta_op_type":"append"', '"meta_op_type":"suffix"'), '"filename_op_type":"append"', '"filename_op_type":"suffix"')`
+	for _, tc := range [][2]string{{"channels", "metarr"}, {"channel_urls", "metarr"}, {"videos", "overrides"}} {
+		query := fmt.Sprintf(`UPDATE %[1]s SET %[2]s = `+rename+` WHERE %[2]s LIKE '%%"append"%%'`, tc[0], tc[1])
+		if _, err := tx.Exec(query); err != nil {
+			return fmt.Errorf("failed to migrate append operations in %s.%s: %w", tc[0], tc[1], err)
+		}
+	}
+	return nil
+}
+
 // migrateNotificationNames rebuilds a notifications table from older versions, which had a name column and allowed
 // a notify URL only once per channel, into the current schema.
 func migrateNotificationNames(tx *sql.Tx) error {

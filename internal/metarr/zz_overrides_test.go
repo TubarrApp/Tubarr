@@ -22,27 +22,21 @@ const (
 	otherURL = "https://example.com/@b"
 )
 
-// TestChannelURLOverrideLines tests the Download As dialog gets the channel URL's directories, and its ops without their
-// channel URL prefix, leaves out other channel URLs' ops, falls back to the global ops like Metarr does, and that its
-// lines parse back.
+// TestChannelURLOverrideLines tests the Download As dialog gets the channel URL's directories and ops, falls back to the
+// global ops like Metarr does, and that its lines parse back.
 func TestChannelURLOverrideLines(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
 
-	// Scoped ops as saved before channel URLs were taken from the URL's own settings.
-	metaOps, _, err := sharedparsing.ParseMetaOps([]string{ownURL + "|title:prefix:[A] ", otherURL + "|title:prefix:[B] ", "artist:set:Cats"})
+	metaOps, _, err := sharedparsing.ParseMetaOps([]string{"title:prefix:[A] ", "artist:set:Cats"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	filenameOps, _, err := sharedparsing.ParseFilenameOps([]string{otherURL + "|date-tag:prefix:ymd"})
+	filteredMetaOps, _, err := sharedparsing.ParseFilteredMetaOps([]string{"title:contains:cat||genre:set:Cats"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	filteredMetaOps, _, err := sharedparsing.ParseFilteredMetaOps([]string{ownURL + "|title:contains:cat||genre:set:Cats", otherURL + "|title:contains:dog||genre:set:Dogs"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	viper.Set(keys.MFilenameOps, []string{ownURL + "|append: [G]", otherURL + "|append: [H]"})
+	viper.Set(keys.MFilenameOps, []string{"suffix: [G]"})
 
 	c := &models.Channel{ID: 1, Name: "Test"}
 	cu := &models.ChannelURL{
@@ -51,7 +45,6 @@ func TestChannelURLOverrideLines(t *testing.T) {
 		ChanURLMetarrArgs: &models.MetarrArgs{
 			OutputDir:       "/out",
 			MetaOps:         metaOps,
-			FilenameOps:     filenameOps,
 			FilteredMetaOps: filteredMetaOps,
 		},
 	}
@@ -66,7 +59,7 @@ func TestChannelURLOverrideLines(t *testing.T) {
 		OutputDir:       "/out",
 		MetaOps:         "title:prefix:[A] \nartist:set:Cats",
 		FilteredMetaOps: "title:contains:cat||genre:set:Cats",
-		FilenameOps:     "append: [G]", // The channel URL has none of its own.
+		FilenameOps:     "suffix: [G]", // The channel URL has none of its own.
 	}
 	if lines != want {
 		t.Errorf("got %+v\nwant %+v", lines, want)
@@ -164,7 +157,7 @@ func TestOverrideFilenameOps(t *testing.T) {
 		Overrides: &models.VideoOverrides{Filename: "My: Name", FilenameOps: parse("set:{{title}}", "date-tag:prefix:ymd")},
 		FilteredFilenameOps: []models.FilteredFilenameOps{
 			{FiltersMatched: true, FilenameOps: parse("set:{{id}}")},
-			{FiltersMatched: false, FilenameOps: parse("append: [X]")},
+			{FiltersMatched: false, FilenameOps: parse("suffix: [X]")},
 		},
 	}
 
@@ -188,7 +181,7 @@ func TestMakeMetarrCommandOverrides(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
 	viper.Set(keys.MMetaOps, []string{"artist:set:Global"})
-	viper.Set(keys.MFilenameOps, []string{"append: [Global]"})
+	viper.Set(keys.MFilenameOps, []string{"suffix: [Global]"})
 
 	channelOps, err := parsing.ParseMetaOps([]string{"artist:set:Channel"})
 	if err != nil {
@@ -199,7 +192,7 @@ func TestMakeMetarrCommandOverrides(t *testing.T) {
 	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/v.mp4", JSONFilePath: "/v.json", Overrides: &models.VideoOverrides{}}
 
 	args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
-	for _, unwanted := range []string{"artist:set:Global", "append: [Global]", "artist:set:Channel"} {
+	for _, unwanted := range []string{"artist:set:Global", "suffix: [Global]", "artist:set:Channel"} {
 		if slices.Contains(args, unwanted) {
 			t.Errorf("args %q hold %q, which the overrides replace", args, unwanted)
 		}

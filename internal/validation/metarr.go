@@ -156,9 +156,3 @@ func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs 
 	logger.Pl.D(5, "Got video codec array: %v", validPairs)
 	return validPairs, nil
 }
-
-// ValidateTranscodeVideoFilter validates the transcode video filter preset.
-func ValidateTranscodeVideoFilter(q string) (vf string, err error) {
-	logger.Pl.D(1, "No checks in place for transcode video filter...")
-	return q, nil
-}

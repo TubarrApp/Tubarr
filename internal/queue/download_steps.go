@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -78,6 +79,7 @@ func (q *DownloadQueue) process(d *download) error {
 	if err := q.prepare(d); err != nil {
 		return err
 	}
+	cu = d.cu // Download As may have given the video yt-dlp options of its own.
 
 	// Process JSON metadata phase.
 	d.SetStatus(v, consts.DLStatusQueued, 0, "Fetching metadata", nil)
@@ -124,6 +126,9 @@ func (q *DownloadQueue) prepare(d *download) error {
 		var err error
 		if v.Overrides, err = q.store.VideoStore().GetVideoOverrides(v.ID); err != nil {
 			return err
+		}
+		if v.Overrides != nil {
+			d.cu = withYtdlpOverrides(d.cu, v.Overrides)
 		}
 	}
 
@@ -203,6 +208,25 @@ func (q *DownloadQueue) postProcess(d *download, hold *videoHold) {
 	if err := completeAndStoreVideo(cs, vs, v, d.c); err != nil {
 		logger.Pl.E("Failed to complete video %q after metarr: %v", v.URL, err)
 	}
+}
+
+// withYtdlpOverrides returns a copy of cu with the video's Download As yt-dlp options in place of its own, blank ones
+// keeping the channel URL's. It's a copy, so the channel URL's other videos keep its options.
+func withYtdlpOverrides(cu *models.ChannelURL, o *models.VideoOverrides) *models.ChannelURL {
+	s := *cu.ChanURLSettings
+	s.YtdlpOutputExt = cmp.Or(o.YtdlpOutputExt, s.YtdlpOutputExt)
+	s.MaxFilesize = cmp.Or(o.MaxFilesize, s.MaxFilesize)
+	s.ExtraYTDLPVideoArgs = cmp.Or(o.ExtraYTDLPVideoArgs, s.ExtraYTDLPVideoArgs)
+	if len(o.YTDLPPreferredVideoCodecs) > 0 {
+		s.YTDLPPreferredVideoCodecs = o.YTDLPPreferredVideoCodecs
+	}
+	if len(o.YTDLPPreferredAudioCodecs) > 0 {
+		s.YTDLPPreferredAudioCodecs = o.YTDLPPreferredAudioCodecs
+	}
+
+	copied := *cu
+	copied.ChanURLSettings = &s
+	return &copied
 }
 
 // overrideDir returns a Download As directory filled in, or dir if override is blank.

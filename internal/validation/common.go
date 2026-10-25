@@ -81,6 +81,16 @@ func IsHTTPURL(s string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
+// ValidateNotifyURL checks a notification URL can be sent an HTTP POST request.
+//
+// url.Parse allows characters URLs can't contain, like spaces and '|', so those are rejected too.
+func ValidateNotifyURL(u string) error {
+	if !IsHTTPURL(u) || strings.ContainsAny(u, " \"<>\\^`{}|") {
+		return fmt.Errorf("notification URL %q must be a valid http(s) URL", u)
+	}
+	return nil
+}
+
 // ValidateThumbnail checks a Download As thumbnail is an http(s) URL or an existing file, and isn't also stripped.
 func ValidateThumbnail(t string, strip bool) error {
 	switch {
@@ -122,31 +132,6 @@ func ValidateViperFlags() error {
 
 	// Logging.
 	ValidateLoggingLevel()
-	return nil
-}
-
-// ValidateNotifications validates notification models.
-func ValidateNotifications(notifications []*models.Notification) error {
-	if len(notifications) == 0 {
-		return nil
-	}
-
-	logger.Pl.D(5, "Validating %d notifications...", len(notifications))
-
-	for i, n := range notifications {
-		// Validate notify URL is not empty.
-		if n.NotifyURL == "" {
-			return fmt.Errorf("notification at position %d has empty notify URL", i)
-		}
-
-		// Validate notify URL format.
-		if _, err := url.Parse(n.NotifyURL); err != nil {
-			if u, err := url.Parse(n.NotifyURL); err != nil {
-				return fmt.Errorf("notify URL %q is not valid", u)
-			}
-			return fmt.Errorf("notification at position %d has invalid notify URL %q: %w", i, n.NotifyURL, err)
-		}
-	}
 	return nil
 }
 

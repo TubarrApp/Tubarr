@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/TubarrApp/gocommon v0.0.0-20261024104420-f062116a114e
+	github.com/TubarrApp/gocommon v0.0.0-20261025124646-142d037040e8
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0

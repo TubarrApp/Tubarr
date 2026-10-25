@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Help | Tubarr</title>
+    <link rel="icon" href="/src/images/favicon.ico">
+    <link href="style.css" rel="stylesheet">
+    <style>
+      .help { max-width: 900px; margin: 0 auto; color: #d0d5dd; font-size: 15px; line-height: 1.65; }
+      .help h1 { color: #fff; font-size: 1.6rem; font-weight: 600; margin: 0 0 8px; }
+      .help h2 { color: #fff; font-size: 1.25rem; font-weight: 600; margin: 44px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #344054; scroll-margin-top: 90px; }
+      .help h3 { color: #fff; font-size: 1.05rem; font-weight: 600; margin: 26px 0 8px; scroll-margin-top: 90px; }
+      .help p { margin: 10px 0; }
+      .help ul, .help ol { margin: 10px 0; padding-left: 22px; }
+      .help ul { list-style: disc; }
+      .help ol { list-style: decimal; }
+      .help li { margin: 4px 0; }
+      .help a { color: #f97066; text-decoration: underline; }
+      .help code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #1d2939; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: pre-wrap; }
+      .help pre { background: #1d2939; border: 1px solid #344054; border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 12px 0; }
+      .help pre code { background: none; padding: 0; white-space: pre; }
+      .help table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+      .help th, .help td { border: 1px solid #344054; padding: 6px 10px; text-align: left; vertical-align: top; }
+      .help th { background: #1d2939; color: #fff; font-weight: 600; }
+      .help .table-wrap { overflow-x: auto; }
+      .help .note { border-left: 3px solid #f97066; background: #1d2939; padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+      .help .toc { columns: 2; column-gap: 32px; margin: 14px 0 0; padding-left: 20px; }
+      .help .toc li { break-inside: avoid; }
+      @media (max-width: 640px) { .help .toc { columns: 1; } }
+    </style>
+  </head>
+  <body
+    class="dark bg-gray-900"
+    x-data="{ page: 'help', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+  >
+    <!-- ===== Preloader Start ===== -->
+    <div
+      x-show="loaded"
+      x-init="loaded = false"
+      class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black"
+    >
+      <div
+        class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"
+      ></div>
+    </div>
+    <!-- ===== Preloader End ===== -->
+
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden" x-cloak>
+      <!-- include:sidebar selected="Help" -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto"
+      >
+        <!-- include:header title="Help" -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main class="p-4 md:p-6 2xl:p-10">
+          <div class="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="help">
+              <p>
+                How to write Tubarr's operations, filters and settings, with examples. Tubarr downloads videos with
+                yt-dlp, then hands each finished video to Metarr, which edits its metadata and filename
+                (post-processing).
+              </p>
+              <ul class="toc">
+                <li><a href="#writing-ops">Writing an operation</a></li>
+                <li><a href="#meta-ops">Meta ops</a></li>
+                <li><a href="#groups">Group fields</a></li>
+                <li><a href="#meta-order">The order meta ops run in</a></li>
+                <li><a href="#filename-ops">Filename ops</a></li>
+                <li><a href="#date-tags">Date tags</a></li>
+                <li><a href="#filters">Download filters</a></li>
+                <li><a href="#filtered-ops">Filtered ops</a></li>
+                <li><a href="#move-ops">Move ops and output directories</a></li>
+                <li><a href="#transcoding">Transcoding</a></li>
+                <li><a href="#ytdlp">yt-dlp download options</a></li>
+                <li><a href="#templates">Template tags</a></li>
+                <li><a href="#precedence">Which setting wins</a></li>
+                <li><a href="#download-as">Download As</a></li>
+                <li><a href="#queue">Downloads and concurrency</a></li>
+                <li><a href="#notifications">Notifications</a></li>
+                <li><a href="#login">Logins and cookies</a></li>
+                <li><a href="#more">Blocked domains and site rules</a></li>
+              </ul>
+
+              <!-- ===== Writing an operation ===== -->
+              <h2 id="writing-ops">Writing an operation</h2>
+              <p>
+                An operation is one line made of parts divided by <code>:</code>. Meta ops start with the metadata field
+                they change; filename ops have no field, since they change the filename.
+              </p>
+              <pre><code>title:prefix:[Archive]       a meta op: field, operation, value
+prefix:[Archive]             a filename op: operation, value</code></pre>
+              <ul>
+                <li>
+                  <strong>The last part is the rest of the line.</strong> <code>title:set:Cats: The Movie</code> sets the
+                  title to <code>Cats: The Movie</code>, with no escaping.
+                </li>
+                <li>
+                  <strong>A <code>:</code> in a middle part</strong>, such as the text <code>replace</code> looks for, is
+                  written <code>\:</code>, and a <code>\</code> is written <code>\\</code>:
+                  <code>title:replace:Part 1\: :</code> removes <code>Part 1: </code>.
+                </li>
+                <li>
+                  <strong>Spaces count.</strong> <code>title:prefix:[Archive] </code> ends in a space, so the title
+                  becomes <code>[Archive] My Video</code>. Spaces at the end of a line are kept, in the boxes and in
+                  ops files.
+                </li>
+                <li>
+                  <strong>Operation names aren't case-sensitive</strong> (<code>title:SET:x</code> works). Field names
+                  and values are, since metadata field names are.
+                </li>
+                <li>
+                  <strong>One op per line</strong>, in the web boxes, in ops files and on the command line (one flag
+                  each). In an ops file, a line starting with <code>#</code> is a comment.
+                </li>
+                <li>
+                  <strong>Values can use the video's metadata</strong> with <code>{{field}}</code>, e.g.
+                  <code>title:prefix:{{uploader}} - </code>. A prefix, suffix or replacement whose tags can't be filled
+                  for a video is skipped for it. See <a href="#templates">Template tags</a>.
+                </li>
+              </ul>
+              <p>
+                Ops set on a channel apply to all its channel URLs. A channel URL's own ops (in its custom settings)
+                are added to the channel's.
+              </p>
+
+              <!-- ===== Meta ops ===== -->
+              <h2 id="meta-ops">Meta ops</h2>
+              <p>Meta ops change the video's metadata file (JSON or NFO), and through it the tags embedded in the video.</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Operation</th><th>Example</th><th>What it does</th></tr>
+                  <tr><td><code>set</code></td><td><code>artist:set:Kino Casino</code></td><td>Replaces the field's value, adding the field if it's missing.</td></tr>
+                  <tr><td><code>prefix</code></td><td><code>title:prefix:[Archive] </code></td><td>Adds text to the start. Several prefixes read in the order written, and running the same ops again doesn't add them twice. A prefix goes after a date tag already at the start.</td></tr>
+                  <tr><td><code>suffix</code></td><td><code>title:suffix: (Remaster)</code></td><td>Adds text to the end, the same way, before a date tag already at the end.</td></tr>
+                  <tr><td><code>replace</code></td><td><code>title:replace:Ep.:Episode</code></td><td>Replaces every match. Case-sensitive.</td></tr>
+                  <tr><td><code>replace-prefix</code></td><td><code>title:replace-prefix:[OLD] :[NEW] </code></td><td>Replaces the text only if the field starts with it.</td></tr>
+                  <tr><td><code>replace-suffix</code></td><td><code>title:replace-suffix: DVD: UHD</code></td><td>Replaces the text only if the field ends with it.</td></tr>
+                  <tr><td><code>regex-replace</code></td><td><code>title:regex-replace:[[^Show \d+ \| ]]:</code></td><td>Replaces every match of a regular expression (<a href="https://github.com/google/re2/wiki/Syntax">RE2 syntax</a>), written between <code>[[ ]]</code> exactly as the regex engine reads it. <code>$1</code> puts back a captured group, <code>(?i)</code> ignores case, and a blank replacement deletes the match.</td></tr>
+                  <tr><td><code>keep-after</code></td><td><code>title:keep-after:| </code></td><td>Keeps only the text after the first <code>| </code>, dropping <code>| </code> too. Unchanged if it isn't there.</td></tr>
+                  <tr><td><code>keep-before</code></td><td><code>title:keep-before: |</code></td><td>Keeps only the text before the first <code> |</code>.</td></tr>
+                  <tr><td><code>copy-to</code></td><td><code>uploader:copy-to:artist</code></td><td>Copies this field's value into another field.</td></tr>
+                  <tr><td><code>paste-from</code></td><td><code>artist:paste-from:uploader</code></td><td>The same, the other way round: fills this field from another.</td></tr>
+                  <tr><td><code>date-tag</code></td><td><code>title:date-tag:prefix:ymd</code></td><td>Adds the video's date, e.g. <code>[24-05-01] My Video</code>. See <a href="#date-tags">Date tags</a>.</td></tr>
+                  <tr><td><code>delete-date-tag</code></td><td><code>title:delete-date-tag:all:ymd</code></td><td>Removes date tags from the <code>prefix</code>, <code>suffix</code> or <code>all</code> of the field.</td></tr>
+                </table>
+              </div>
+              <p>Some rules:</p>
+              <ul>
+                <li>Dates must be written <code>YYYY-MM-DD</code> when set (<code>release_date:set:2024-05-01</code>), a year as <code>YYYY</code>.</li>
+                <li>
+                  NFO metadata files don't fill <code>{{field}}</code> tags, and filtered meta ops only work on JSON
+                  files when Metarr is run on its own. (In Tubarr, filters are checked by Tubarr, so they work for every
+                  video.)
+                </li>
+              </ul>
+
+              <h3 id="groups">Group fields</h3>
+              <p>
+                A group field changes several fields at once, so the same op reaches every place a player might read.
+                Some single fields cover their other forms too: <code>title</code> is the title players show, so it also
+                changes <code>fulltitle</code>, which the embedded title is taken from.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Field</th><th>JSON fields changed</th><th>NFO tags changed</th></tr>
+                  <tr><td><code>all-titles</code></td><td>title, fulltitle, subtitle</td><td>title, originaltitle, subtitle, tagline</td></tr>
+                  <tr><td><code>all-credits</code></td><td>creator, performer, author, artist, album_artist, channel, director, actor, studio, producer, writer, uploader, publisher, composer</td><td>actor, director, producer, writer, publisher, composer, studio, productioncompany</td></tr>
+                  <tr><td><code>all-descriptions</code></td><td>longdescription, long_description, description, synopsis, summary, comment</td><td>plot, outline, description</td></tr>
+                  <tr><td><code>all-dates</code></td><td colspan="2">Every date field. Only <code>set</code> (<code>all-dates:set:2024-05-01</code>) and <code>paste-from</code> (<code>all-dates:paste-from:upload_date</code>) work on it.</td></tr>
+                  <tr><td><code>title</code></td><td>title, fulltitle</td><td>title, originaltitle</td></tr>
+                  <tr><td><code>description</code></td><td>every description field, as <code>all-descriptions</code></td><td>plot, outline, description</td></tr>
+                  <tr><td><code>artist</code></td><td>artist, album_artist</td><td>artist</td></tr>
+                  <tr><td><code>year</code></td><td>year, release_year</td><td>year</td></tr>
+                </table>
+              </div>
+              <p>
+                A group can be copied into (<code>release_date:copy-to:all-titles</code>) but not copied from, since its
+                fields may hold different values: copy from one field instead.
+              </p>
+
+              <h3 id="meta-order">The order meta ops run in</h3>
+              <p>
+                Ops run in a fixed order by type, not in the order they're written, since a video's ops are gathered from
+                its channel, channel URL, ops files and matched filtered ops:
+              </p>
+              <ol>
+                <li><code>delete-date-tag</code>, so old tags are gone before anything else moves them</li>
+                <li><code>set</code> on a group, then other <code>set</code> ops</li>
+                <li><code>copy-to</code>, then <code>paste-from</code></li>
+                <li><code>replace</code>, <code>replace-prefix</code>, <code>replace-suffix</code>, <code>keep-after</code> / <code>keep-before</code>, <code>regex-replace</code></li>
+                <li><code>prefix</code>, then <code>suffix</code></li>
+                <li><code>date-tag</code>, outermost</li>
+              </ol>
+              <p>So <code>title:set:{{fulltitle}}</code> with <code>title:prefix:[Cats] </code> and <code>title:date-tag:prefix:ymd</code> gives <code>[24-05-01] [Cats] Full Title</code>.</p>
+
+              <!-- ===== Filename ops ===== -->
+              <h2 id="filename-ops">Filename ops</h2>
+              <p>Filename ops rename the finished video (and its metadata file), without the extension. They have no field.</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Operation</th><th>Example</th><th>What it does</th></tr>
+                  <tr><td><code>set</code></td><td><code>set:{{uploader}} - {{fulltitle}}</code></td><td>Sets the whole name. One per video.</td></tr>
+                  <tr><td><code>prefix</code> / <code>suffix</code></td><td><code>prefix:[Cats] </code></td><td>Add text to the start or end, as for meta ops.</td></tr>
+                  <tr><td><code>replace</code></td><td><code>replace:_: </code></td><td>Replaces every match (case-sensitive).</td></tr>
+                  <tr><td><code>replace-prefix</code> / <code>replace-suffix</code></td><td><code>replace-suffix: _v1:_final</code></td><td>Replace text only at the start or end.</td></tr>
+                  <tr><td><code>regex-replace</code></td><td><code>regex-replace:[[^(.*) - (\d{4})$]]:$2 $1</code></td><td>Replaces every regex match.</td></tr>
+                  <tr><td><code>keep-after</code> / <code>keep-before</code></td><td><code>keep-before: |</code></td><td>Keep only the text after or before the first delimiter.</td></tr>
+                  <tr><td><code>date-tag</code></td><td><code>date-tag:prefix:Ymd</code></td><td>Adds the video's date. One per video.</td></tr>
+                  <tr><td><code>delete-date-tag</code></td><td><code>delete-date-tag:all:ymd</code></td><td>Removes date tags. One per video.</td></tr>
+                </table>
+              </div>
+              <p>
+                yt-dlp names downloads <code>title [id]</code>, so two videos with the same title can't clash. If no
+                filename op sets the name, Tubarr adds <code>set:{{fulltitle}}</code>, renaming the finished video to its
+                full title.
+              </p>
+              <p>Filename ops run in this order:</p>
+              <ol>
+                <li><code>delete-date-tag</code></li>
+                <li><code>set</code></li>
+                <li><code>replace</code>, <code>replace-prefix</code>, <code>replace-suffix</code>, <code>keep-after</code> / <code>keep-before</code>, <code>regex-replace</code></li>
+                <li>The rename style (below)</li>
+                <li><code>prefix</code>, then <code>suffix</code>, so they keep their spaces as written</li>
+                <li><code>date-tag</code></li>
+              </ol>
+              <p>
+                The <strong>rename style</strong> is <code>spaces</code> (underscores become spaces),
+                <code>underscores</code> (spaces become underscores), <code>fixes-only</code> (only fixes broken
+                contractions, like <code>Don t</code> to <code>Dont</code>), or <code>skip</code>.
+              </p>
+
+              <!-- ===== Date tags ===== -->
+              <h2 id="date-tags">Date tags</h2>
+              <p>
+                A date tag is the video's date in brackets, made from its release or upload date. It goes at the
+                <code>prefix</code> or <code>suffix</code>; adding one replaces a date tag already in that place, so
+                running the ops again doesn't stack them. <code>delete-date-tag</code> also takes <code>all</code>, to remove
+                date tags from anywhere in the field.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Format</th><th>Tag for 1 May 2024</th><th>Format</th><th>Tag for 1 May 2024</th></tr>
+                  <tr><td><code>Ymd</code></td><td><code>[2024-05-01]</code></td><td><code>ymd</code></td><td><code>[24-05-01]</code></td></tr>
+                  <tr><td><code>Ydm</code></td><td><code>[2024-01-05]</code></td><td><code>ydm</code></td><td><code>[24-01-05]</code></td></tr>
+                  <tr><td><code>dmY</code></td><td><code>[01-05-2024]</code></td><td><code>dmy</code></td><td><code>[01-05-24]</code></td></tr>
+                  <tr><td><code>mdY</code></td><td><code>[05-01-2024]</code></td><td><code>mdy</code></td><td><code>[05-01-24]</code></td></tr>
+                  <tr><td><code>md</code></td><td><code>[05-01]</code></td><td><code>dm</code></td><td><code>[01-05]</code></td></tr>
+                </table>
+              </div>
+              <p>
+                A capital <code>Y</code> is a four-digit year, a lowercase <code>y</code> two digits, and <code>md</code>
+                and <code>dm</code> leave the year out. Because of those two, brackets holding two numbers like
+                <code>[10-12]</code> at the start or end of a field are read as a date tag, and replaced or deleted by
+                date tag ops.
+              </p>
+
+              <!-- ===== Download filters ===== -->
+              <h2 id="filters">Download filters</h2>
+              <p>Filters decide which of a channel's videos are downloaded. Each line is <code>field:type:value:must</code> or <code>field:type:value:any</code>.</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Type</th><th>Example</th><th>Passes when</th></tr>
+                  <tr><td><code>contains</code></td><td><code>title:contains:live:must</code></td><td>The field holds the value</td></tr>
+                  <tr><td><code>omits</code></td><td><code>title:omits:trailer:must</code></td><td>The field doesn't hold the value</td></tr>
+                  <tr><td><code>equals</code></td><td><code>uploader:equals:kino casino:must</code></td><td>The field is exactly the value</td></tr>
+                  <tr><td><code>notequals</code></td><td><code>language:notequals:de:must</code></td><td>The field is anything else</td></tr>
+                  <tr><td><code>morethan</code></td><td><code>duration:morethan:600:must</code></td><td>The field is a number above the value</td></tr>
+                  <tr><td><code>lessthan</code></td><td><code>duration:lessthan:3600:must</code></td><td>The field is a number below the value</td></tr>
+                </table>
+              </div>
+              <ul>
+                <li>Matching isn't case-sensitive.</li>
+                <li><strong><code>must</code></strong>: every <code>must</code> filter has to pass. <strong><code>any</code></strong>: at least one <code>any</code> filter has to pass.</li>
+                <li>
+                  Leave the value out to check whether the field is there at all: <code>chapters:contains:must</code> needs a
+                  <code>chapters</code> field, <code>is_live:omits:must</code> needs it to be missing.
+                </li>
+                <li>A <code>morethan</code> or <code>lessthan</code> filter on a field the video doesn't have is skipped.</li>
+                <li><strong>From Date</strong> and <strong>To Date</strong> (<code>YYYYMMDD</code>) only download videos uploaded in between.</li>
+                <li>Videos you choose yourself (from Available, Download As or by URL) skip download filters.</li>
+              </ul>
+              <pre><code>title:contains:podcast:any
+title:contains:interview:any
+title:omits:short:must</code></pre>
+              <p>Downloads videos with <em>podcast</em> or <em>interview</em> in the title, but never ones with <em>short</em>.</p>
+
+              <!-- ===== Filtered ops ===== -->
+              <h2 id="filtered-ops">Filtered ops</h2>
+              <p>
+                A filtered op only runs when the video's metadata matches its filter. Each line is one filter and one op,
+                divided by <code>||</code>. The filter is written as above, without <code>must</code>/<code>any</code>.
+              </p>
+              <pre><code>title:contains:cat||genre:set:Cats          filtered meta op
+title:contains:cat||prefix:[Cats]           filtered filename op (the filter reads metadata, the op renames)</code></pre>
+              <ul>
+                <li>To run several ops for one filter, repeat the filter on each line.</li>
+                <li>
+                  To limit an op to one channel's videos, filter on its channel URL:
+                  <code>channel_url:contains:youtube.com/@ChannelA||title:prefix:[A] </code>. (In Tubarr, a channel URL's
+                  custom settings do this more simply.)
+                </li>
+                <li>A single <code>|</code> needs no escaping; a <code>|</code> at the end of the filter's value is written <code>\|</code>.</li>
+              </ul>
+
+              <!-- ===== Move ops ===== -->
+              <h2 id="move-ops">Move ops and output directories</h2>
+              <p>
+                A move op sends finished videos whose metadata matches a filter to another directory:
+                <code>title:contains:podcast||/media/podcasts</code>. The first move op that matches wins, and a channel
+                URL's own move ops are checked before the channel's.
+              </p>
+              <p>Where a finished video goes, first match first:</p>
+              <ol>
+                <li>The Download As <strong>Post-Process Directory</strong> chosen for that video</li>
+                <li><code>--move-on-complete</code>, if Tubarr was started with it</li>
+                <li>The first matching move op</li>
+                <li>The channel URL's (or channel's) Metarr <strong>Output Directory</strong></li>
+                <li>Otherwise it stays in the video directory</li>
+              </ol>
+              <p>
+                Tubarr never creates download folders: a video or JSON directory must already exist, so an unmounted
+                drive isn't filled by mistake. A directory using <a href="#templates">template tags</a> needs its fixed
+                part to exist.
+              </p>
+
+              <!-- ===== Transcoding ===== -->
+              <h2 id="transcoding">Transcoding</h2>
+              <p>
+                <strong>Video Transcode Codecs</strong> and <strong>Audio Transcode Codecs</strong> say which codecs Metarr
+                converts the finished video to, one line each. Anything not mentioned is copied as it is.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Line</th><th>Means</th></tr>
+                  <tr><td><code>hevc</code></td><td>Convert every video codec to HEVC (HEVC itself is copied).</td></tr>
+                  <tr><td><code>h264:hevc</code></td><td>Convert only H.264 to HEVC.</td></tr>
+                  <tr><td><code>dts:ac3</code></td><td>Convert only DTS audio to AC-3.</td></tr>
+                </table>
+              </div>
+              <p>
+                Lines apply in order, and a plain codec applies to everything, so put it first and its exceptions after:
+              </p>
+              <pre><code>hevc
+vp9:av1</code></pre>
+              <p>
+                converts everything to HEVC, except VP9, which becomes AV1. Written the other way round, the
+                <code>hevc</code> line would also send VP9 to HEVC.
+              </p>
+              <ul>
+                <li>Video codecs: <code>av1</code>, <code>h264</code>, <code>hevc</code>, <code>mpeg2</code>, <code>vp8</code>, <code>vp9</code>. Audio codecs: <code>aac</code>, <code>ac3</code>, <code>alac</code>, <code>dts</code>, <code>eac3</code>, <code>flac</code>, <code>mp2</code>, <code>mp3</code>, <code>opus</code>, <code>pcm</code>, <code>truehd</code>, <code>vorbis</code>, <code>wav</code>. Common other names work too (<code>h265</code>, <code>x264</code>, <code>libmp3lame</code>).</li>
+                <li><strong>GPU Acceleration</strong> encodes on the graphics card (<code>auto</code>, <code>cuda</code>, <code>qsv</code> or <code>vaapi</code>, with <strong>GPU Node Path</strong> for VAAPI, e.g. <code>/dev/dri/renderD128</code>).</li>
+                <li><strong>Transcode Quality (CRF)</strong> is 0 to 51: lower is better quality and larger files.</li>
+                <li><strong>Extra FFmpeg Args</strong> are added to the FFmpeg command, e.g. <code>-vf scale=1280:-2</code> to scale the video to 1280 pixels wide.</li>
+              </ul>
+
+              <!-- ===== yt-dlp ===== -->
+              <h2 id="ytdlp">yt-dlp download options</h2>
+              <ul>
+                <li>
+                  <strong>Preferred Video Codecs</strong> and <strong>Preferred Audio Codecs</strong>, one per line, most
+                  wanted first. yt-dlp takes the best stream in the first codec it finds, then the next, and falls back
+                  to the best stream of any codec. E.g. <code>av1</code> then <code>vp9</code> gets AV1 where there is
+                  one, else VP9, else the best there is.
+                </li>
+                <li><strong>YT-DLP Output Ext</strong> is the container yt-dlp merges into (<code>mp4</code>, <code>mkv</code>, <code>webm</code> and so on). Metarr's <strong>Output Extension</strong> is separate: what the finished video is remuxed to.</li>
+                <li><strong>Max Filesize</strong> skips larger videos: <code>500m</code>, <code>2g</code>.</li>
+                <li><strong>Extra YT-DLP Video Args</strong> are added to the download command, <strong>Meta Args</strong> to the metadata fetch and <strong>Crawl Args</strong> to channel crawls. A channel URL's own extra args replace the channel's rather than adding to them, and Download As's replace the channel URL's.</li>
+                <li><strong>External Downloader</strong> hands the transfer to aria2c, axel, curl and the like, with its own <strong>Args</strong>.</li>
+              </ul>
+
+              <!-- ===== Template tags ===== -->
+              <h2 id="templates">Template tags</h2>
+              <p>Tags in <code>{{ }}</code> are filled in per channel or per video.</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Where</th><th>Tags</th></tr>
+                  <tr><td>Video and JSON directories</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code></td></tr>
+                  <tr><td>Metarr output directory, move ops</td><td>Those, plus <code>{{video_title}}</code>, <code>{{video_url}}</code>, <code>{{year}}</code>, <code>{{month}}</code>, <code>{{day}}</code>, <code>{{author}}</code>, <code>{{director}}</code>, <code>{{domain}}</code></td></tr>
+                  <tr><td>Op values</td><td>Any metadata field: <code>{{uploader}}</code>, <code>{{fulltitle}}</code>, <code>{{id}}</code>…</td></tr>
+                </table>
+              </div>
+              <p>
+                <code>{{year:yy}}</code> gives a two-digit year (<code>{{year}}</code> is four), and
+                <code>{{month:abbreviated}}</code> or <code>{{month:word}}</code> give <code>Jan</code> or
+                <code>January</code> (<code>{{month}}</code> is <code>01</code>). E.g. <code>/media/{{channel_name}}/{{year}}</code>.
+              </p>
+
+              <!-- ===== Precedence ===== -->
+              <h2 id="precedence">Which setting wins</h2>
+              <ol>
+                <li><strong>Channel</strong> settings apply to all its URLs.</li>
+                <li>
+                  A <strong>channel URL's custom settings</strong> replace the channel's where set, and leave the rest to
+                  the channel. Its filters and ops are <em>added</em> to the channel's instead; where a URL op and a
+                  channel op both set the same thing (e.g. both <code>title:set</code>), the URL's wins. Its move ops are
+                  checked first.
+                </li>
+                <li>
+                  <strong>Download As</strong> options are for one video. Blank ones use the channel URL's; its op boxes
+                  replace the channel URL's ops.
+                </li>
+              </ol>
+              <p>
+                Ops given to Tubarr on the command line or in its config file are used only for channel URLs with no ops
+                of their own. An ops file's ops replace the matching ops typed into the same settings.
+              </p>
+
+              <!-- ===== Download As ===== -->
+              <h2 id="download-as">Download As</h2>
+              <p>
+                <strong>Download As…</strong> downloads one video with its own filename, directories, thumbnail, ops,
+                yt-dlp options and post-processing options, starting from its channel URL's. They're kept with the video,
+                so <strong>Edit &amp; Post-Process</strong> and <strong>Edit &amp; Re-Process</strong> open with them
+                later. Those two only run Metarr on files already downloaded, so they have no download options.
+                <strong>Revert to Defaults</strong> goes back to the channel URL's.
+              </p>
+
+              <!-- ===== Queue ===== -->
+              <h2 id="queue">Downloads and concurrency</h2>
+              <p>Queued videos start first in, first out, through these limits in turn:</p>
+              <ol>
+                <li>
+                  The <strong>channel's Max Concurrency</strong> (one at a time when 0), or a channel URL's own if it has
+                  one. A channel's videos wait their turn here.
+                </li>
+                <li>The video's metadata is fetched.</li>
+                <li><strong>Domain Limits</strong> (Settings), per site.</li>
+                <li><strong>Download Concurrency</strong> (Settings), across all channels.</li>
+              </ol>
+              <p>
+                So within one channel videos start in the order queued; across channels, whichever channel's next video
+                finishes fetching its metadata first gets the next slot. <strong>Crawl Concurrency</strong> limits how
+                many channels are checked for new videos at once, and <strong>Post-processing Concurrency</strong> how
+                many Metarr runs happen at once (a channel can set a lower limit of its own). 0 means unlimited.
+              </p>
+
+              <!-- ===== Notifications ===== -->
+              <h2 id="notifications">Notifications</h2>
+              <p>
+                Notification URLs are called when a channel gets new videos, e.g. a Plex library refresh
+                (<code>http://plex:32400/library/sections/1/refresh?X-Plex-Token=…</code>) or a webhook. On a channel's
+                Notifications tab, choose the channel URLs (or all of them) and add the URLs. On the command line,
+                <code>--notify</code> sets them for every channel URL, and <code>tubarr channel notify-add --url
+                &lt;channel URL&gt;</code> for one.
+              </p>
+
+              <!-- ===== Login ===== -->
+              <h2 id="login">Logins and cookies</h2>
+              <ul>
+                <li>A channel URL can have a <strong>username, password and login URL</strong> for sites that need an account. Passwords are stored encrypted.</li>
+                <li><strong>Cookies From Browser</strong> uses a browser's cookies (e.g. <code>firefox</code>) for yt-dlp.</li>
+                <li><strong>Use Global Cookies</strong> uses the browser cookies set for all of Tubarr.</li>
+              </ul>
+
+              <!-- ===== More ===== -->
+              <h2 id="more">Blocked domains and site rules</h2>
+              <p>
+                When a site flags Tubarr as a bot, Tubarr stops using its domain for a while.
+                <a href="blocked-domains.html">Blocked Domains</a> lists them and can unblock one early.
+                <a href="site-rules.html">Site Rules</a> tell Tubarr how to handle a particular site: metadata to scrape,
+                how to find a channel's videos, and how to get past Cloudflare
+                (<a href="/src/files/site-rules-documentation.html">site rules documentation</a>).
+              </p>
+            </div>
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+    <script defer src="bundle.js"></script>
+  </body>
+</html>

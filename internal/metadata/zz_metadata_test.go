@@ -111,7 +111,6 @@ func TestHandleMoveOps(t *testing.T) {
 			{Field: "title", FilterType: "contains", Value: "two", OutputDir: "/two"},
 			{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/cats"},
 		}, "/two"},
-		{"another channel URL's", []models.MetaFilterMoveOps{{ChannelURL: "https://tubesite.com/@other", Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/cats"}}, ""},
 	}
 	for _, tt := range tests {
 		cu := &models.ChannelURL{URL: "https://tubesite.com/@cats", ChanURLSettings: &models.Settings{MetaFilterMoveOps: tt.ops}}

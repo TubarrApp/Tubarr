@@ -81,10 +81,7 @@ func FuzzParseNotifications(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(_ *testing.T, s string) {
-		ops, err := ParseNotifications(fuzzOps(s))
-		if err == nil {
-			_ = validation.ValidateNotifications(ops)
-		}
+		_, _ = ParseNotifications("", fuzzOps(s))
 	})
 }
 

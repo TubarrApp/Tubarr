@@ -33,6 +33,31 @@ func TestParseOverrideLinesChecksMetarrArgs(t *testing.T) {
 	}
 }
 
+// TestParseOverrideLinesYtdlpOptions tests that Download As yt-dlp options are read one codec per line, normalized and
+// checked as saved settings are.
+func TestParseOverrideLinesYtdlpOptions(t *testing.T) {
+	o, err := parseOverrideLines(&models.OverrideLines{
+		YtdlpOutputExt:            "mkv",
+		MaxFilesize:               "2G",
+		ExtraYTDLPVideoArgs:       " --no-mtime ",
+		YTDLPPreferredVideoCodecs: "AV1\n\nvp9",
+		YTDLPPreferredAudioCodecs: "opus",
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.YtdlpOutputExt != "mkv" || o.MaxFilesize != "2g" || o.ExtraYTDLPVideoArgs != "--no-mtime" ||
+		strings.Join(o.YTDLPPreferredVideoCodecs, ",") != "av1,vp9" || strings.Join(o.YTDLPPreferredAudioCodecs, ",") != "opus" {
+		t.Errorf("got %+v", o)
+	}
+
+	for _, bad := range []models.OverrideLines{{YtdlpOutputExt: "xyz"}, {MaxFilesize: "lots"}, {YTDLPPreferredVideoCodecs: "betamax"}} {
+		if _, err := parseOverrideLines(&bad, nil); err == nil {
+			t.Errorf("accepted %+v", bad)
+		}
+	}
+}
+
 // TestCheckOverridesFit tests that Download As options are checked together with the channel URL's they leave blank.
 func TestCheckOverridesFit(t *testing.T) {
 	c := &models.Channel{URLModels: []*models.ChannelURL{

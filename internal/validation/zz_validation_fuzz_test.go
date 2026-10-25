@@ -41,7 +41,6 @@ func FuzzValidateStrings(f *testing.F) {
 		_ = ValidateDateFormat(s)
 		_, _ = ValidatePurgeMetafiles(s)
 		_, _ = ValidateGPUAcceleration(s)
-		_, _ = ValidateTranscodeVideoFilter(s)
 	})
 }
 

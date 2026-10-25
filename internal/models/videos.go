@@ -45,29 +45,42 @@ type Video struct {
 	Overrides           *VideoOverrides       `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's settings.
 }
 
-// VideoOverrides holds a video's directories and Metarr args chosen with Download As, used instead of its channel URL's
-// (and global) ones.
+// VideoOverrides holds a video's directories, yt-dlp options and Metarr args chosen with Download As, used instead of its
+// channel URL's (and global) ones.
 type VideoOverrides struct {
 	Filename       string `json:"filename,omitempty"`
 	VideoDir       string `json:"video_dir,omitempty"` // Blank uses the channel URL's.
 	JSONDir        string `json:"json_dir,omitempty"`  // Blank uses the channel URL's.
 	Thumbnail      string `json:"thumbnail,omitempty"` // An image file or URL embedded in place of the metadata's.
 	StripThumbnail bool   `json:"strip_thumbnail,omitempty"`
-	MetarrArgs            // Ops replace the channel URL's. Other blank fields use the channel URL's.
+
+	// yt-dlp options, blank ones using the channel URL's.
+	YtdlpOutputExt            string   `json:"ytdlp_output_ext,omitempty"`
+	MaxFilesize               string   `json:"max_filesize,omitempty"`
+	ExtraYTDLPVideoArgs       string   `json:"extra_ytdlp_video_args,omitempty"`
+	YTDLPPreferredVideoCodecs []string `json:"ytdlp_preferred_video_codecs,omitempty"`
+	YTDLPPreferredAudioCodecs []string `json:"ytdlp_preferred_audio_codecs,omitempty"`
+
+	MetarrArgs // Ops replace the channel URL's. Other blank fields use the channel URL's.
 }
 
-// OverrideLines holds a video's overrides as edited in the Download As dialog, with ops newline-separated.
+// OverrideLines holds a video's overrides as edited in the Download As dialog, with ops and codecs newline-separated.
 type OverrideLines struct {
-	Filename            string `json:"filename"`
-	VideoDir            string `json:"video_dir"`
-	JSONDir             string `json:"json_dir"`
-	OutputDir           string `json:"output_dir"`
-	MetaOps             string `json:"meta_ops"`
-	FilteredMetaOps     string `json:"filtered_meta_ops"`
-	FilenameOps         string `json:"filename_ops"`
-	FilteredFilenameOps string `json:"filtered_filename_ops"`
-	Thumbnail           string `json:"thumbnail"`
-	StripThumbnail      bool   `json:"strip_thumbnail"`
+	Filename                  string `json:"filename"`
+	VideoDir                  string `json:"video_dir"`
+	JSONDir                   string `json:"json_dir"`
+	OutputDir                 string `json:"output_dir"`
+	MetaOps                   string `json:"meta_ops"`
+	FilteredMetaOps           string `json:"filtered_meta_ops"`
+	FilenameOps               string `json:"filename_ops"`
+	FilteredFilenameOps       string `json:"filtered_filename_ops"`
+	Thumbnail                 string `json:"thumbnail"`
+	StripThumbnail            bool   `json:"strip_thumbnail"`
+	YtdlpOutputExt            string `json:"ytdlp_output_ext"`
+	MaxFilesize               string `json:"max_filesize"`
+	ExtraYTDLPVideoArgs       string `json:"extra_ytdlp_video_args"`
+	YTDLPPreferredVideoCodecs string `json:"ytdlp_preferred_video_codecs"`
+	YTDLPPreferredAudioCodecs string `json:"ytdlp_preferred_audio_codecs"`
 }
 
 // SkipMetarr skips Metarr processing with a given reason.

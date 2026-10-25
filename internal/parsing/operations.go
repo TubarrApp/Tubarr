@@ -21,11 +21,6 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, op := range parsed {
-		if op.ChannelURL != "" {
-			return nil, channelURLError(sharedparsing.FormatFilenameOp(op, true))
-		}
-	}
 	logger.Pl.D(1, "Parsed %d filename operations from %v", len(parsed), filenameOps)
 	return parsed, nil
 }
@@ -39,26 +34,15 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, op := range parsed {
-		if op.ChannelURL != "" {
-			return nil, channelURLError(sharedparsing.FormatMetaOp(op, true))
-		}
-	}
 	logger.Pl.D(1, "Parsed %d meta operations from %v", len(parsed), metaOps)
 	return parsed, nil
 }
 
-// logWarnings logs parse warnings, which only cover duplicates and unusable channel URLs.
-// Malformed or invalid entries fail the parse itself.
+// logWarnings logs parse warnings, which only cover duplicates. Malformed or invalid entries fail the parse itself.
 func logWarnings(warnings []sharedparsing.Warning) {
 	for _, w := range warnings {
 		logger.Pl.W("%s", w)
 	}
-}
-
-// channelURLError rejects an entry scoped to a channel URL, which Tubarr scopes with that URL's custom settings.
-func channelURLError(entry string) error {
-	return fmt.Errorf("%q starts with a channel URL, add it to that URL's custom settings instead", entry)
 }
 
 // ParseFilterOps parses filter operation strings into models.
@@ -67,61 +51,24 @@ func channelURLError(entry string) error {
 //
 // When requireMustAny is false, must is added automatically to each filter.
 func ParseFilterOps(ops []string, requireMustAny bool) ([]models.Filters, error) {
-	filters, err := sharedparsing.ParseFilterOps(ops, requireMustAny)
-	if err != nil {
-		return nil, err
-	}
-	for _, f := range filters {
-		if f.ChannelURL != "" {
-			return nil, channelURLError(sharedparsing.FormatFilter(f, requireMustAny))
-		}
-	}
-	return filters, nil
+	return sharedparsing.ParseFilterOps(ops, requireMustAny)
 }
 
-// ParseNotifications parses notification strings into models.
-//
-// Format: "Notify URL" or "Channel URL|Notify URL".
-func ParseNotifications(notifications []string) ([]*models.Notification, error) {
-	if len(notifications) == 0 {
+// ParseNotifications parses notification URLs into models for channelURL, or for every channel URL if it's empty.
+func ParseNotifications(channelURL string, notifyURLs []string) ([]*models.Notification, error) {
+	if len(notifyURLs) == 0 {
 		return nil, nil
 	}
 	// Deduplicate.
-	notifications = validation.DeduplicateSliceEntries(notifications)
+	notifyURLs = validation.DeduplicateSliceEntries(notifyURLs)
 
-	notificationModels := make([]*models.Notification, 0, len(notifications))
-	for _, n := range notifications {
-		entry := sharedparsing.EscapedSplit(n, '|')
-
-		// Check entries for validity and fill field details.
-		var chanURL, nURL string
-		switch len(entry) {
-		case 1:
-			nURL = entry[0]
-		case 2:
-			chanURL, nURL = entry[0], entry[1]
-		default:
-			return nil, fmt.Errorf("malformed notification entry %q, should be in 'Notify URL' or 'Channel URL|Notify URL' format", n)
+	notificationModels := make([]*models.Notification, 0, len(notifyURLs))
+	for _, u := range notifyURLs {
+		if err := validation.ValidateNotifyURL(u); err != nil {
+			return nil, err
 		}
-
-		if chanURL != "" && !validation.IsHTTPURL(chanURL) {
-			return nil, fmt.Errorf("channel URL %q in notification entry %q must be a valid http(s) URL", chanURL, n)
-		}
-
-		// Notifications are sent as HTTP POST requests (url.Parse allows characters URLs can't contain, like spaces).
-		if !validation.IsHTTPURL(nURL) || strings.ContainsAny(nURL, " \"<>\\^`{}") {
-			return nil, fmt.Errorf("notification URL %q in entry %q must be a valid http(s) URL", nURL, n)
-		}
-
-		// Create model.
-		newNotificationModel := models.Notification{
-			ChannelURL: chanURL,
-			NotifyURL:  nURL,
-		}
-
-		// Append to collection.
-		notificationModels = append(notificationModels, &newNotificationModel)
-		logger.Pl.D(3, "Added notification model for channel URL %q", chanURL)
+		notificationModels = append(notificationModels, &models.Notification{ChannelURL: channelURL, NotifyURL: u})
+		logger.Pl.D(3, "Added notification model for channel URL %q", channelURL)
 	}
 	return notificationModels, nil
 }
@@ -141,10 +88,6 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 
 	m := make([]models.MetaFilterMoveOps, 0, len(ops))
 	for _, op := range ops {
-		if u, _, err := sharedparsing.SplitOpURL(op); u != "" || errors.Is(err, sharedparsing.ErrDoubledURLSeparator) {
-			return nil, channelURLError(op)
-		}
-
 		// An unescaped "||" leaves an empty part between its two '|'.
 		parts := sharedparsing.SplitUnescaped(op, '|')
 		div := slices.Index(parts[1:], "") + 1
@@ -179,18 +122,6 @@ func ParseFilteredMetaOps(filteredMetaOps []string) ([]models.FilteredMetaOps, e
 	if err != nil {
 		return nil, err
 	}
-	for _, fmo := range parsed {
-		for _, f := range fmo.Filters {
-			if f.ChannelURL != "" {
-				return nil, channelURLError(sharedparsing.FormatFilter(f, false))
-			}
-		}
-		for _, op := range fmo.MetaOps {
-			if op.ChannelURL != "" {
-				return nil, channelURLError(sharedparsing.FormatMetaOp(op, true))
-			}
-		}
-	}
 	return parsed, nil
 }
 
@@ -202,18 +133,6 @@ func ParseFilteredFilenameOps(filteredFilenameOps []string) ([]models.FilteredFi
 	logWarnings(warnings)
 	if err != nil {
 		return nil, err
-	}
-	for _, ffo := range parsed {
-		for _, f := range ffo.Filters {
-			if f.ChannelURL != "" {
-				return nil, channelURLError(sharedparsing.FormatFilter(f, false))
-			}
-		}
-		for _, op := range ffo.FilenameOps {
-			if op.ChannelURL != "" {
-				return nil, channelURLError(sharedparsing.FormatFilenameOp(op, true))
-			}
-		}
 	}
 	return parsed, nil
 }

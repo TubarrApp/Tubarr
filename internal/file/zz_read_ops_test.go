@@ -11,7 +11,7 @@ import (
 // as "title:keep-after:| ", surviving being read from a file.
 func TestReadOpLinesKeepsTrailingSpaces(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ops.txt")
-	content := "  title:keep-after:| \r\n\n   \n# comment\ntitle:append:!\n"
+	content := "  title:keep-after:| \r\n\n   \n# comment\ntitle:suffix:!\n"
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +20,7 @@ func TestReadOpLinesKeepsTrailingSpaces(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadOpLines: %v", err)
 	}
-	if want := []string{"title:keep-after:| ", "title:append:!"}; !slices.Equal(got, want) {
+	if want := []string{"title:keep-after:| ", "title:suffix:!"}; !slices.Equal(got, want) {
 		t.Errorf("ReadOpLines = %q, want %q", got, want)
 	}
 

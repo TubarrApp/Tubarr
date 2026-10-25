@@ -18,7 +18,7 @@ const (
 
 // Notification.
 const (
-	NotifyPair string = "notify"
+	Notify string = "notify"
 )
 
 // Files and directories.
@@ -34,12 +34,11 @@ const (
 
 // Transcoding.
 const (
-	TranscodeGPU         string = "metarr-transcode-gpu"
-	TranscodeGPUNode     string = "metarr-transcode-gpu-node"
-	TranscodeCodec       string = "metarr-transcode-video-codecs"
-	TranscodeAudioCodec  string = "metarr-transcode-audio-codecs"
-	TranscodeQuality     string = "metarr-transcode-quality"
-	TranscodeVideoFilter string = "metarr-transcode-video-filter"
+	TranscodeGPU        string = "metarr-transcode-gpu"
+	TranscodeGPUNode    string = "metarr-transcode-gpu-node"
+	TranscodeCodec      string = "metarr-transcode-video-codecs"
+	TranscodeAudioCodec string = "metarr-transcode-audio-codecs"
+	TranscodeQuality    string = "metarr-transcode-quality"
 )
 
 // Downloading.
@@ -121,7 +120,6 @@ const (
 	MNoFileOverwrite         string = "metarr-no-file-overwrite"
 	MTranscodeAudioCodec     string = "metarr-transcode-audio-codecs"
 	MTranscodeQuality        string = "metarr-transcode-quality"
-	MTranscodeVideoFilter    string = "metarr-transcode-video-filter"
 	MTranscodeVideoCodec     string = "metarr-transcode-video-codec"
 	MConcurrency             string = "metarr-concurrency"
 	MOutputDir               string = "metarr-output-directory"

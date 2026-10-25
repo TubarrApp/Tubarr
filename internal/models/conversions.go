@@ -47,7 +47,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	slice := make([]string, 0, len(f.Filters))
 
 	filterStrings := FiltersArrayToSlice(f.Filters, false)
-	metaOpStrings := sharedparsing.FormatMetaOps(f.MetaOps, "", true)
+	metaOpStrings := sharedparsing.FormatMetaOps(f.MetaOps)
 
 	if len(filterStrings) != len(metaOpStrings) {
 		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
@@ -67,7 +67,7 @@ func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	slice := make([]string, 0, len(f.Filters))
 
 	filterStrings := FiltersArrayToSlice(f.Filters, false)
-	filenameOpStrings := sharedparsing.FormatFilenameOps(f.FilenameOps, "", true)
+	filenameOpStrings := sharedparsing.FormatFilenameOps(f.FilenameOps)
 
 	if len(filterStrings) != len(filenameOpStrings) {
 		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))

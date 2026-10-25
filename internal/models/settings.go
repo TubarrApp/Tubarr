@@ -83,7 +83,6 @@ type MetarrArgs struct {
 	// FFmpeg transcoding operations.
 	TranscodeGPU         string   `json:"metarr_transcode_gpu"`
 	TranscodeGPUNode     string   `json:"metarr_transcode_gpu_node"`
-	TranscodeVideoFilter string   `json:"metarr_transcode_video_filter"`
 	TranscodeVideoCodecs []string `json:"metarr_transcode_video_codecs"`
 	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs"`
 	TranscodeQuality     string   `json:"metarr_transcode_quality"`
@@ -111,7 +110,6 @@ type Filters = sharedmodels.Filters
 
 // MetaFilterMoveOps are used to set an output directory in Metarr based on matching metadata fields.
 type MetaFilterMoveOps struct {
-	ChannelURL string `json:"move_url_specific"`
 	Field      string `json:"move_op_field"`
 	FilterType string `json:"move_op_filter_type"`
 	Value      string `json:"move_op_value"`
@@ -121,7 +119,6 @@ type MetaFilterMoveOps struct {
 // Filter returns the move op's filter. Move ops saved before filter types have none, and were always contains.
 func (m MetaFilterMoveOps) Filter() Filters {
 	return Filters{
-		ChannelURL: m.ChannelURL,
 		Field:      m.Field,
 		FilterType: cmp.Or(m.FilterType, sharedconsts.OpContains),
 		Value:      m.Value,
@@ -139,9 +136,9 @@ type MetaOps = sharedmodels.MetaOps
 
 // NonConflictingMetaOps contains meta op types which do not conflict with other writes.
 var NonConflictingMetaOps = map[string]struct{}{
-	sharedconsts.OpAppend:       {},
 	sharedconsts.OpCopyTo:       {},
 	sharedconsts.OpPrefix:       {},
+	sharedconsts.OpSuffix:       {},
 	sharedconsts.OpReplace:      {},
 	sharedconsts.OpRegexReplace: {},
 	sharedconsts.OpKeepAfter:    {},
@@ -172,7 +169,7 @@ func FilterConflictingMetaOps(overrides, base []MetaOps) []MetaOps {
 		if !overrideKeys[op.Field+":"+op.OpType] || nonConflicting {
 			result = append(result, op)
 		} else {
-			logger.Pl.D(2, "Meta op overridden: %s", sharedparsing.FormatMetaOp(op, false))
+			logger.Pl.D(2, "Meta op overridden: %s", sharedparsing.FormatMetaOp(op))
 		}
 	}
 	return result
@@ -196,7 +193,7 @@ func FilterConflictingFilenameOps(overrides, base []FilenameOps) []FilenameOps {
 		if !overrideKeys[op.OpType] || !conflicts {
 			result = append(result, op)
 		} else {
-			logger.Pl.D(2, "Filename op overridden: %s", sharedparsing.FormatFilenameOp(op, false))
+			logger.Pl.D(2, "Filename op overridden: %s", sharedparsing.FormatFilenameOp(op))
 		}
 	}
 	return result
@@ -330,9 +327,6 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 	if child.TranscodeGPUNode != "" && child.TranscodeGPUNode != parent.TranscodeGPUNode {
 		return false
 	}
-	if child.TranscodeVideoFilter != "" && child.TranscodeVideoFilter != parent.TranscodeVideoFilter {
-		return false
-	}
 	if child.TranscodeQuality != "" && child.TranscodeQuality != parent.TranscodeQuality {
 		return false
 	}
@@ -448,9 +442,6 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 		return false
 	}
 	if m.TranscodeGPUNode != "" {
-		return false
-	}
-	if m.TranscodeVideoFilter != "" {
 		return false
 	}
 	if len(m.TranscodeVideoCodecs) > 0 {

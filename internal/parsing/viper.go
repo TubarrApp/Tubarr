@@ -363,11 +363,6 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 			return fmt.Errorf("invalid %s: %w", keys.TranscodeQuality, err)
 		}
 	}
-	if v := in.TranscodeVideoFilter; v != nil {
-		if dst.TranscodeVideoFilter, err = validation.ValidateTranscodeVideoFilter(*v); err != nil {
-			return fmt.Errorf("invalid %s: %w", keys.TranscodeVideoFilter, err)
-		}
-	}
 	return nil
 }
 

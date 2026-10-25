@@ -44,6 +44,29 @@ func TestLane(t *testing.T) {
 	}
 }
 
+// TestWithYtdlpOverrides tests a video's Download As yt-dlp options replace its channel URL's, blank ones keeping the
+// channel URL's, without changing the channel URL itself.
+func TestWithYtdlpOverrides(t *testing.T) {
+	cu := &models.ChannelURL{URL: "https://example.com/@cats", ChanURLSettings: &models.Settings{
+		YtdlpOutputExt:            "mp4",
+		MaxFilesize:               "1g",
+		YTDLPPreferredVideoCodecs: []string{"h264"},
+		YTDLPPreferredAudioCodecs: []string{"aac"},
+	}}
+	got := withYtdlpOverrides(cu, &models.VideoOverrides{YtdlpOutputExt: "mkv", YTDLPPreferredVideoCodecs: []string{"av1", "vp9"}})
+
+	s := got.ChanURLSettings
+	if s.YtdlpOutputExt != "mkv" || s.MaxFilesize != "1g" || len(s.YTDLPPreferredVideoCodecs) != 2 || s.YTDLPPreferredAudioCodecs[0] != "aac" {
+		t.Errorf("got settings %+v", s)
+	}
+	if got.URL != cu.URL {
+		t.Errorf("got URL %q, want the channel URL's", got.URL)
+	}
+	if cu.ChanURLSettings.YtdlpOutputExt != "mp4" || len(cu.ChanURLSettings.YTDLPPreferredVideoCodecs) != 1 {
+		t.Errorf("the channel URL's own settings changed: %+v", cu.ChanURLSettings)
+	}
+}
+
 // waitFor waits until done reports true.
 func waitFor(t *testing.T, done func() bool) {
 	t.Helper()

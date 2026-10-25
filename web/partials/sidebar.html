@@ -457,6 +457,36 @@
             </a>
           </li>
           <!-- Menu Item Settings -->
+
+          <!-- Menu Item Help -->
+          <li>
+            <a
+              href="help.html"
+              class="menu-item group"
+              :class="(page === 'help') ? 'menu-item-active' : 'menu-item-inactive'"
+            >
+              <svg
+                :class="(page === 'help') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                <path d="M9.5 9.5C9.5 8.12 10.62 7 12 7C13.38 7 14.5 8.12 14.5 9.5C14.5 10.88 13.38 11.5 12 12.25V13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                <circle cx="12" cy="16.75" r="1" fill="currentColor"/>
+              </svg>
+
+              <span
+                class="menu-item-text"
+                :class="sidebarToggle ? 'xl:hidden' : ''"
+              >
+                Help
+              </span>
+            </a>
+          </li>
+          <!-- Menu Item Help -->
         </ul>
       </div>
     </nav>
