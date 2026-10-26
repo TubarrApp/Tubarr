@@ -12,6 +12,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
@@ -40,6 +41,12 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	gpu, gpuNode := cmp.Or(o.TranscodeGPU, m.TranscodeGPU), cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode)
 	if gpu == validation.GPUNone {
 		gpu, gpuNode = "", ""
+	}
+
+	// 'Same as input' sends no extension, so Metarr keeps the video's.
+	ext := cmp.Or(o.OutputExt, m.OutputExt)
+	if ext == sharedconsts.ExtSame {
+		ext = ""
 	}
 	var thumbnail string
 	var stripThumbnail bool
@@ -77,7 +84,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 	add(metkeys.MinFreeMem, cmp.Or(o.MinFreeMem, m.MinFreeMem))
 	add(metkeys.OutputDir, parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)))
-	add(metkeys.Ext, cmp.Or(o.OutputExt, m.OutputExt))
+	add(metkeys.Ext, ext)
 	add(metkeys.RenameStyle, cmp.Or(o.RenameStyle, m.RenameStyle))
 
 	// Transcoding.

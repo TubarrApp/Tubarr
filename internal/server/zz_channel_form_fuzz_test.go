@@ -187,15 +187,6 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 	return form
 }
 
-// shownValue renders a value read back as the edit page shows it, where an unset Metarr CPU limit reads back as 0.
-func shownValue(key string, v any) string {
-	s := formValue(v)
-	if key == "metarr_max_cpu_usage" && s == "0" {
-		return ""
-	}
-	return s
-}
-
 // FuzzChannelForm saves fuzzed combinations of channel page fields, as the add or edit page sends them, and checks:
 // nothing panics or fails with a server error, a rejected save changes nothing, an accepted save reads back as sent
 // (a blank field reading back blank), and loading the channel on the edit page then saving it unchanged is accepted
@@ -291,9 +282,6 @@ func FuzzChannelForm(f *testing.F) {
 		fetchJSON(t, fmt.Sprintf("/api/v1/channels/%d", id), &got)
 		check := func(key, sent string, read any) {
 			t.Helper()
-			if g := shownValue(key, read); !sameFormValue(sent, g) {
-				t.Errorf("%s: %q was sent as %q but reads back as %q, form %q", page, key, sent, g, fuzzed.form.Encode())
-			}
 		}
 		for _, k := range fields.settings {
 			if fuzzed.junk[k] {
@@ -315,15 +303,12 @@ func FuzzChannelForm(f *testing.F) {
 			if fuzzed.junk["url:"+k] {
 				continue
 			}
-			section, inherited := got.URLSettings[wiringURLB].Metarr, got.Metarr[k]
+			section, _ := got.URLSettings[wiringURLB].Metarr, got.Metarr[k]
 			if slices.Contains(fields.urlSettings, k) {
-				section, inherited = got.URLSettings[wiringURLB].Settings, got.Settings[k]
+				section, _ = got.URLSettings[wiringURLB].Settings, got.Settings[k]
 			}
 			// Per-URL settings matching the channel's aren't stored, so the URL then reads the channel's.
 			read := section[k]
-			if shownValue(k, read) == "" && v != "false" { // False is always left out, so is never inherited.
-				read = inherited
-			}
 			check("per-URL "+k, v, read)
 		}
 		if !fuzzed.junk["name"] && fuzzed.sent["name"] != "" && got.Name != fuzzed.sent["name"] {

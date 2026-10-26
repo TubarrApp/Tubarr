@@ -356,6 +356,26 @@ func TestValidateYtdlpOutputExtension(t *testing.T) {
 	}
 }
 
+// TestSameAndKeepChoices tests the 'Same as input' extensions and 'Keep' metadata files are accepted and kept as chosen.
+func TestSameAndKeepChoices(t *testing.T) {
+	// yt-dlp's extension.
+	if err := validation.ValidateYtdlpOutputExtension(sharedconsts.ExtSame); err != nil {
+		t.Errorf("yt-dlp extension %q: %v", sharedconsts.ExtSame, err)
+	}
+
+	// Metarr's extension, with codecs, and metadata files.
+	m := &models.MetarrArgs{OutputExt: sharedconsts.ExtSame, MetaPurge: "keep", TranscodeVideoCodecs: []string{"h264:hevc"}}
+	if err := validation.ValidateMetarrArgsModel(m, true); err != nil {
+		t.Errorf("ValidateMetarrArgsModel: %v", err)
+	}
+	if err := validation.ValidateMetarrArgsCombination(m); err != nil {
+		t.Errorf("ValidateMetarrArgsCombination: %v", err)
+	}
+	if m.OutputExt != sharedconsts.ExtSame || m.MetaPurge != "keep" {
+		t.Errorf("got output extension %q and purge %q, want %q and keep", m.OutputExt, m.MetaPurge, sharedconsts.ExtSame)
+	}
+}
+
 // TestValidateFilterOps --------------------------------------------------------------------------------------
 func TestValidateFilterOps_EmptySliceOK(t *testing.T) {
 	if err := validation.ValidateFilterOps(nil); err != nil {

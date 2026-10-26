@@ -236,9 +236,9 @@
             this.loadProfiles();
           },
 
-          // Blank fields show their usual placeholder, as a profile fills in nothing from elsewhere.
-          hint(section, key, fallback) {
-            return fallback;
+          // A profile fills in nothing from elsewhere, so blank dropdowns (given el) read 'Not set' and other fields keep their usual placeholder.
+          hint(section, key, fallback, el) {
+            return el ? 'Not set' : fallback;
           },
           boolHint() {
             return 'Not set';

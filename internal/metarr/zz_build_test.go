@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/spf13/viper"
 )
 
@@ -51,7 +52,7 @@ func TestFinishMetafile(t *testing.T) {
 	for _, tc := range []struct {
 		purge  string
 		purged bool
-	}{{"", false}, {"nfo", false}, {"json", true}, {"all", true}} {
+	}{{"", false}, {"keep", false}, {"nfo", false}, {"json", true}, {"all", true}} {
 		path := filepath.Join(t.TempDir(), "v.json")
 		body := `{"title": "Old", "fulltitle": "[2024-01-02] New", "description": "Short", "longdescription": "Long", "upload_date": "20240102"}`
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
@@ -143,6 +144,18 @@ func TestMakeMetarrCommandGPUNone(t *testing.T) {
 	}
 	if got, err := validation.ValidateGPUAcceleration("None"); err != nil || got != validation.GPUNone {
 		t.Errorf("ValidateGPUAcceleration(None) = %q, %v; want it kept as %q", got, err, validation.GPUNone)
+	}
+}
+
+// TestMakeMetarrCommandExtSame tests a channel URL's 'same' passes Metarr no output extension, so it keeps the video's.
+func TestMakeMetarrCommandExtSame(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{OutputExt: sharedconsts.ExtSame}}
+	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	if args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); slices.Contains(args, metkeys.Ext) {
+		t.Errorf("%q passed an extension to Metarr: %q", sharedconsts.ExtSame, args)
 	}
 }
 

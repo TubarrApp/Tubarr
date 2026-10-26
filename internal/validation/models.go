@@ -5,6 +5,7 @@ import (
 	"strings"
 	"tubarr/internal/models"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
@@ -95,7 +96,7 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 // Download As options over those), can't work together: codecs their output container can't hold, or a GPU without
 // the device node it needs.
 func ValidateMetarrArgsCombination(m *models.MetarrArgs) error {
-	if m.OutputExt != "" {
+	if m.OutputExt != "" && m.OutputExt != sharedconsts.ExtSame {
 		if err := sharedvalidation.ValidateCodecsForContainer(m.OutputExt, m.TranscodeVideoCodecs, m.TranscodeAudioCodecs); err != nil {
 			return err
 		}
@@ -183,7 +184,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 	}
 
 	// File output
-	if m.OutputExt != "" {
+	if m.OutputExt != "" && m.OutputExt != sharedconsts.ExtSame {
 		m.OutputExt = strings.ToLower(m.OutputExt)
 		if _, err := sharedvalidation.ValidateFFmpegOutputExt(m.OutputExt); err != nil {
 			return fmt.Errorf("invalid output filetype in Metarr settings: %w", err)

@@ -81,7 +81,9 @@
                         >
                           <option value="" x-text="boolHint('use_global_cookies', 'Yes', 'No')"></option>
                           <option value="true">Yes</option>
-                          <option value="false">No</option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="false">No</option>
+                          </template>
                         </select>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Reads the site's cookies from every browser Tubarr can find, for custom crawl rules and yt-dlp.</p>
                       </div>
@@ -182,7 +184,9 @@
                         >
                           <option value="" x-text="boolHint('auto_download', 'Download automatically', 'List as available to choose from')"></option>
                           <option value="true">Download automatically</option>
-                          <option value="false">List as available to choose from</option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="false">List as available to choose from</option>
+                          </template>
                         </select>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           Listed videos wait on the <a href="available.html" class="text-brand-500 hover:text-brand-600">Available</a> page to choose from
@@ -202,13 +206,16 @@
                           x-model="formData.settings.ytdlp_output_ext"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
-                          <option value="" x-text="hint('settings', 'ytdlp_output_ext', 'Default')"></option>
-                          <option value="mp4">mp4</option>
-                          <option value="mkv">mkv</option>
-                          <option value="webm">webm</option>
+                          <option value="" x-text="hint('settings', 'ytdlp_output_ext', 'Same as input', $el)"></option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="same">Same as input</option>
+                          </template>
                           <option value="avi">avi</option>
                           <option value="flv">flv</option>
+                          <option value="mkv">mkv</option>
                           <option value="mov">mov</option>
+                          <option value="mp4">mp4</option>
+                          <option value="webm">webm</option>
                         </select>
                       </div>
 
@@ -246,7 +253,10 @@
                           x-model="formData.settings.external_downloader"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
-                          <option value="" x-text="hint('settings', 'external_downloader', 'Default (yt-dlp built-in)')"></option>
+                          <option value="" x-text="hint('settings', 'external_downloader', 'yt-dlp built-in', $el)"></option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="native">yt-dlp built-in</option>
+                          </template>
                           <option value="aria2c">aria2c</option>
                           <option value="axel">axel</option>
                           <option value="curl">curl</option>
@@ -254,7 +264,7 @@
                           <option value="httpie">httpie</option>
                           <option value="wget">wget</option>
                           <!-- Keep a saved value not in the list (e.g. a path) rather than dropping it -->
-                          <template x-if="!['', 'aria2c', 'axel', 'curl', 'ffmpeg', 'httpie', 'wget'].includes(formData.settings.external_downloader || '')">
+                          <template x-if="!['', 'native', 'aria2c', 'axel', 'curl', 'ffmpeg', 'httpie', 'wget'].includes(formData.settings.external_downloader || '')">
                             <option :value="formData.settings.external_downloader" x-text="formData.settings.external_downloader + ' (custom)'" selected></option>
                           </template>
                         </select>
@@ -397,7 +407,10 @@
                           x-model="formData.metarr.metarr_output_ext"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
-                          <option value="" x-text="hint('metarr', 'metarr_output_ext', 'Same as input')"></option>
+                          <option value="" x-text="hint('metarr', 'metarr_output_ext', 'Same as input', $el)"></option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="same">Same as input</option>
+                          </template>
                           <option value="avi">avi</option>
                           <option value="flv">flv</option>
                           <option value="mkv">mkv</option>
@@ -415,7 +428,10 @@
                           x-model="formData.metarr.metarr_purge_metafile"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
-                          <option value="" x-text="hint('metarr', 'metarr_purge_metafile', 'Keep')"></option>
+                          <option value="" x-text="hint('metarr', 'metarr_purge_metafile', 'Keep', $el)"></option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="keep">Keep</option>
+                          </template>
                           <option value="json">JSON</option>
                           <option value="nfo">NFO</option>
                           <option value="all">All</option>
@@ -431,7 +447,10 @@
                           x-model="formData.metarr.metarr_rename_style"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
-                          <option value="" x-text="hint('metarr', 'metarr_rename_style', 'Skip')"></option>
+                          <option value="" x-text="hint('metarr', 'metarr_rename_style', 'Skip', $el)"></option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="skip">Skip</option>
+                          </template>
                           <option value="spaces">Spaces</option>
                           <option value="underscores">Underscores</option>
                           <option value="fixes-only">Fixes Only</option>
@@ -460,11 +479,14 @@
                           x-model="formData.metarr.metarr_gpu"
                           class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         >
-                          <option value="" x-text="hint('metarr', 'metarr_gpu', 'None')"></option>
+                          <option value="" x-text="hint('metarr', 'metarr_gpu', 'None', $el)"></option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="none">None</option>
+                          </template>
                           <option value="auto">Auto</option>
                           <option value="cuda">Nvidia (Cuda)</option>
                           <option value="qsv">Intel (QSV)</option>
-                          <option value="vaapi">VAAPI</option>
+                          <option value="vaapi">VA-API</option>
                         </select>
                       </div>
 
@@ -688,21 +710,22 @@
                       </div>
                     </div>
                   </div>
-
 <script>
   // profileHint returns a blank field's placeholder: the profile's value for it, else fallback.
-  function profileHint(profile, section, key, fallback) {
+  // Given a dropdown's blank option el, it shows the label of the option matching the profile's value.
+  function profileHint(profile, section, key, fallback, el) {
     const value = profile && profile[section] ? profile[section][key] : undefined;
     if (value === undefined || value === null || value === '' || value === 0 || (Array.isArray(value) && value.length === 0)) {
       return fallback;
     }
-    return `${Array.isArray(value) ? value.join(', ') : value} (from ${profile.name})`;
+    const label = el ? [...el.parentElement.options].find(o => o.value === value)?.text : undefined;
+    return `${label || (Array.isArray(value) ? value.join(', ') : value)} (from ${profile.name})`;
   }
 
   // profileBoolHint returns the label of a three-way setting's blank choice: the profile's setting, else fallback.
   function profileBoolHint(profile, key, on, off, fallback) {
     const value = profile && profile.settings ? profile.settings[key] : undefined;
-    return typeof value === 'boolean' ? `Profile's setting (${value ? on : off})` : fallback;
+    return typeof value === 'boolean' ? `${value ? on : off} (from ${profile.name})` : fallback;
   }
 
   // profileFields returns what a channel page's fields need from the profiles its channel and URLs can choose.
@@ -724,8 +747,8 @@
       },
 
       // Blank fields show what the channel's profile, or a URL's, fills in.
-      hint(section, key, fallback) {
-        return profileHint(this.profileByID(this.formData.profile_id), section, key, fallback);
+      hint(section, key, fallback, el) {
+        return profileHint(this.profileByID(this.formData.profile_id), section, key, el ? `Default (${fallback})` : fallback, el);
       },
       boolHint(key, on, off) {
         return profileBoolHint(this.profileByID(this.formData.profile_id), key, on, off, `Default (${off})`);

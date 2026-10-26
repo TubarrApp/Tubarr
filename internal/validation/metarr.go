@@ -35,17 +35,17 @@ func ValidateDateFormat(dateFmt string) bool {
 	return true
 }
 
-// ValidatePurgeMetafiles returns the normalized type of metafile purge for Metarr to perform: all, json, nfo or "".
+// ValidatePurgeMetafiles returns the normalized type of metafile purge for Metarr to perform: keep, all, json, nfo or "".
 func ValidatePurgeMetafiles(purgeType string) (string, error) {
 	purgeType = strings.TrimSpace(purgeType)
 	purgeType = strings.ToLower(purgeType)
 	purgeType = strings.ReplaceAll(purgeType, ".", "")
 
 	switch purgeType {
-	case "", "all", "json", "nfo":
+	case "", "keep", "all", "json", "nfo":
 		return purgeType, nil
 	}
-	return "", fmt.Errorf("invalid metadata purge type %q (all, json or nfo)", purgeType)
+	return "", fmt.Errorf("invalid metadata purge type %q (keep, all, json or nfo)", purgeType)
 }
 
 // GPUNone turns off a GPU set by the channel (or channel URL), so Metarr encodes in software.

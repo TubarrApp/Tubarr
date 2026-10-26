@@ -86,6 +86,59 @@ func TestProfileSettingsPrecedence(t *testing.T) {
 	}
 }
 
+// TestProfileOpsAdded tests that a profile's ops are added to those of the channel or URL using it, as a URL's are to
+// its channel's: the nearer op wins where both set the same thing, and the nearer move ops are checked first.
+func TestProfileOpsAdded(t *testing.T) {
+	cs := newTestChannelStore(t)
+	dir := t.TempDir()
+	catFilter := models.Filters{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}
+	profileTitle := models.MetaOps{Field: "title", OpType: "prefix", OpValue: "[P] "}
+	profileArtist := models.MetaOps{Field: "artist", OpType: "set", OpValue: "Profile Band"}
+	channelArtist := models.MetaOps{Field: "artist", OpType: "set", OpValue: "Channel Band"}
+	urlAlbum := models.MetaOps{Field: "album", OpType: "set", OpValue: "URL Album"}
+	profilePrefix := models.FilenameOps{OpType: "prefix", OpValue: "[P] "}
+	channelSuffix := models.FilenameOps{OpType: "suffix", OpValue: " [C]"}
+	profileFiltered := models.FilteredMetaOps{Filters: []models.Filters{catFilter}, MetaOps: []models.MetaOps{{Field: "genre", OpType: "set", OpValue: "Cats"}}}
+	profileMove := models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cat", OutputDir: dir}
+	channelMove := models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "dog", OutputDir: dir}
+
+	chanProfile := addTestProfile(t, cs, "ops profile",
+		&models.Settings{MetaFilterMoveOps: []models.MetaFilterMoveOps{profileMove}},
+		&models.MetarrArgs{MetaOps: []models.MetaOps{profileTitle, profileArtist}, FilenameOps: []models.FilenameOps{profilePrefix}, FilteredMetaOps: []models.FilteredMetaOps{profileFiltered}})
+	urlProfile := addTestProfile(t, cs, "URL ops profile", nil, &models.MetarrArgs{MetaOps: []models.MetaOps{urlAlbum}})
+
+	c := testChannel(t, "ops chan", "https://example.com/@ops")
+	c.ProfileID = chanProfile.ID
+	c.ChanSettings.MetaFilterMoveOps = []models.MetaFilterMoveOps{channelMove}
+	c.ChanMetarrArgs.MetaOps = []models.MetaOps{channelArtist}
+	c.ChanMetarrArgs.FilenameOps = []models.FilenameOps{channelSuffix}
+	c.URLModels[0].ProfileID = urlProfile.ID
+	if err := cs.AddChannelWithDetails(c, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, _, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(c.ID, 10), true)
+	if err != nil || loaded.LoadErr != nil {
+		t.Fatalf("GetChannelModel = %v, LoadErr %v", err, loaded.LoadErr)
+	}
+	check := func(what string, got, want any) {
+		t.Helper()
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s = %+v, want %+v", what, got, want)
+		}
+	}
+	m := loaded.ChanMetarrArgs
+	check("channel meta ops", m.MetaOps, []models.MetaOps{profileTitle, channelArtist})
+	check("channel filename ops", m.FilenameOps, []models.FilenameOps{profilePrefix, channelSuffix})
+	check("channel filtered meta ops", m.FilteredMetaOps, []models.FilteredMetaOps{profileFiltered})
+	check("channel move ops", loaded.ChanSettings.MetaFilterMoveOps, []models.MetaFilterMoveOps{channelMove, profileMove})
+
+	// The URL's profile's ops are added to the channel's, which hold the channel profile's.
+	cu := loaded.URLModels[0]
+	check("URL meta ops", cu.ChanURLMetarrArgs.MetaOps, []models.MetaOps{profileTitle, channelArtist, urlAlbum})
+	check("URL filename ops", cu.ChanURLMetarrArgs.FilenameOps, []models.FilenameOps{profilePrefix, channelSuffix})
+}
+
 // TestChannelVideoDirFromProfile tests that a channel can use its profile's video directory, but must have one.
 func TestChannelVideoDirFromProfile(t *testing.T) {
 	cs := newTestChannelStore(t)

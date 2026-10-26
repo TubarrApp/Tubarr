@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/viper"
@@ -237,7 +238,7 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 // checks those it adds or changes.
 func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (err error) {
 	if v := in.MetarrExt; v != nil {
-		if *v != "" {
+		if *v != "" && *v != sharedconsts.ExtSame {
 			if _, err := sharedvalidation.ValidateFFmpegOutputExt(*v); err != nil {
 				return fmt.Errorf("invalid %s: %w", keys.MOutputExt, err)
 			}

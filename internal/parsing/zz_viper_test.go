@@ -7,6 +7,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/spf13/viper"
 )
 
@@ -80,6 +81,24 @@ func TestGivenKeys(t *testing.T) {
 	want := []string{"channel-name", "crawl-freq", "metarr-output-ext"}
 	if got := GivenKeys(&in); !slices.Equal(got, want) {
 		t.Errorf("GivenKeys = %v, want %v", got, want)
+	}
+}
+
+// TestApplySameAndKeep tests the 'Same as input' extensions and 'Keep' metadata files are accepted and stored as chosen.
+func TestApplySameAndKeep(t *testing.T) {
+	same := sharedconsts.ExtSame
+	keep := "keep"
+
+	// yt-dlp's extension.
+	var s models.Settings
+	if err := ApplySettingsInput(&s, &models.SettingsInput{YTDLPOutputExt: &same}); err != nil || s.YtdlpOutputExt != same {
+		t.Errorf("yt-dlp extension: got %q, %v; want %q", s.YtdlpOutputExt, err, same)
+	}
+
+	// Metarr's extension and metadata files.
+	var m models.MetarrArgs
+	if err := ApplyMetarrArgsInput(&m, &models.MetarrArgsInput{MetarrExt: &same, MetaPurge: &keep}); err != nil || m.OutputExt != same || m.MetaPurge != keep {
+		t.Errorf("Metarr args: got output extension %q and purge %q, %v; want %q and %q", m.OutputExt, m.MetaPurge, err, same, keep)
 	}
 }
 

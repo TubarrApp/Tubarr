@@ -110,8 +110,8 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	}
 
 	// Merge output formats to extension if set.
-	if d.ChannelURL.ChanURLSettings.YtdlpOutputExt != "" {
-		args = append(args, command.YtDLPOutputExtension, d.ChannelURL.ChanURLSettings.YtdlpOutputExt)
+	if ext := d.ChannelURL.ChanURLSettings.YtdlpOutputExt; ext != "" && ext != sharedconsts.ExtSame {
+		args = append(args, command.YtDLPOutputExtension, ext)
 	}
 
 	// Randomize requests (avoid detection as bot).

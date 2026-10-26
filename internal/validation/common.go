@@ -121,7 +121,7 @@ func ValidateChannelURL(u string) error {
 
 // ValidateYtdlpOutputExtension validates the merge-output-format compatibility of the inputted extension.
 func ValidateYtdlpOutputExtension(e string) error {
-	if e == "" {
+	if e == "" || e == sharedconsts.ExtSame {
 		return nil
 	}
 	e = strings.TrimSpace(e)

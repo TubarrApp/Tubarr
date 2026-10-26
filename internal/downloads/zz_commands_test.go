@@ -3,7 +3,10 @@ package downloads
 import (
 	"slices"
 	"testing"
+	"tubarr/internal/domain/command"
 	"tubarr/internal/models"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // TestCommandsLeaveRetriesToTubarr tests that Download Retries isn't passed to yt-dlp, as Tubarr runs the retries itself.
@@ -32,5 +35,22 @@ func TestCommandsCombineCookies(t *testing.T) {
 		if !slices.Contains(args, "--cookies") || !slices.Contains(args, "--cookies-from-browser") {
 			t.Errorf("%s command doesn't pass both the cookie file and the browser: %q", what, args)
 		}
+	}
+}
+
+// TestVideoCommandExtSame tests an extension is passed to yt-dlp as its merge output format, and 'same' passes none.
+func TestVideoCommandExtSame(t *testing.T) {
+	vd, _ := newTestDownloads(t.Context(), t, "https://ext.example/v", 1)
+
+	// An extension.
+	vd.ChannelURL.ChanURLSettings.YtdlpOutputExt = "mkv"
+	if args := vd.buildVideoCommand().Args; !slices.Contains(args, command.YtDLPOutputExtension) {
+		t.Errorf("mkv not passed to yt-dlp: %q", args)
+	}
+
+	// Same as input.
+	vd.ChannelURL.ChanURLSettings.YtdlpOutputExt = sharedconsts.ExtSame
+	if args := vd.buildVideoCommand().Args; slices.Contains(args, command.YtDLPOutputExtension) {
+		t.Errorf("%q passed a merge output format to yt-dlp: %q", sharedconsts.ExtSame, args)
 	}
 }
