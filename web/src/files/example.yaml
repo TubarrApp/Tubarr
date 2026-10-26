@@ -46,6 +46,7 @@ ignore_run: true
 # URL-specific settings apply specifically to a given URL belonging to this channel
 url-settings:
   "https://www.tubesite.com/@CoolChannel":
+    # name: "Main" # Optional, fills {{channel_url_name}} in directories (blank uses the URL)
     # profile: "Podcasts" # Optional, a profile filling in this URL's unset settings before the channel's
     settings:
       crawl_freq: 60

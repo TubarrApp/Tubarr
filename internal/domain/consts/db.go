@@ -90,6 +90,7 @@ const (
 	QChanURLCreatedAt = "created_at"
 	QChanURLUpdatedAt = "updated_at"
 	QChanURLProfileID = "profile_id"
+	QChanURLName      = "name"
 )
 
 // ValidChannelURLKeys holds valid keys for the channel URL database.
@@ -107,6 +108,7 @@ var ValidChannelURLKeys = map[string]struct{}{
 	QChanURLCreatedAt: {},
 	QChanURLUpdatedAt: {},
 	QChanURLProfileID: {},
+	QChanURLName:      {},
 }
 
 // Profile database entry keys.

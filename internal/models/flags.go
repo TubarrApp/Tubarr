@@ -53,10 +53,11 @@ type ChannelFlagValues struct {
 	URLOutputDirs       []string
 
 	// Metarr settings
-	MetarrExt   string
-	RenameStyle string
-	MinFreeMem  string
-	MetaPurge   string
+	MetarrExt          string
+	RenameStyle        string
+	MinFreeMem         string
+	MetaPurge          string
+	PurgeOriginalVideo bool
 
 	// Transcoding settings
 	TranscodeGPU        string

@@ -1,5 +1,5 @@
                       <!-- Custom Settings (shown when hasCustomSettings is true) -->
-                      <div x-show="urlEntry.hasCustomSettings" x-data="{ urlTab: 'overview', open: false }" x-init="$watch('urlEntry.hasCustomSettings', on => open = on)" class="mt-4 p-4 border-2 border-brand-500 dark:border-brand-600 rounded-lg space-y-3 bg-blue-50 dark:bg-blue-900/20">
+                      <div x-show="urlEntry.hasCustomSettings" x-data="{ urlTab: 'overview', open: false }" x-init="$watch('urlEntry.hasCustomSettings', (on, was) => { if (on !== was) open = on })" class="mt-4 p-4 border-2 border-brand-500 dark:border-brand-600 rounded-lg space-y-3 bg-blue-50 dark:bg-blue-900/20">
                         <div class="flex items-center justify-between gap-2">
                           <div>
                             <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">🔧 Per-URL Override Settings</p>
@@ -190,6 +190,15 @@
                               </select>
                             </div>
                             <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Keep Original Video Files</label>
+                              <!-- Values are whether Metarr deletes the original, so Yes is false. -->
+                              <select x-model="urlEntry.custom.metarr_purge_original_video" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlBoolHint(urlEntry, 'metarr_purge_original_video', 'No', 'Yes')"></option>
+                                <option value="true">No</option>
+                                <option value="false">Yes</option>
+                              </select>
+                            </div>
+                            <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Rename Style</label>
                               <select x-model="urlEntry.custom.metarr_rename_style" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="" x-text="urlHint(urlEntry, 'metarr', 'metarr_rename_style', 'Use channel setting')"></option>
@@ -211,7 +220,7 @@
                                 <option value="auto">Auto</option>
                                 <option value="cuda">Nvidia (Cuda)</option>
                                 <option value="qsv">Intel (QSV)</option>
-                                <option value="vaapi">VAAPI</option>
+                                <option value="vaapi">VA-API</option>
                               </select>
                             </div>
                             <div>

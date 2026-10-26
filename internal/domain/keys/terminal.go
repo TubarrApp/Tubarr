@@ -3,9 +3,10 @@ package keys
 
 // Channel identifiers.
 const (
-	ChannelURLs string = "channel-urls"
-	ChannelName string = "channel-name"
-	ChannelID   string = "channel-id"
+	ChannelURLs    string = "channel-urls"
+	ChannelName    string = "channel-name"
+	ChannelID      string = "channel-id"
+	ChannelURLName string = "name" // A URL's name, in its url-settings entry.
 )
 
 // Profiles.
@@ -115,6 +116,7 @@ const (
 	MFilteredMetaOps         string = "metarr-filtered-meta-ops"
 	MFilteredMetaOpsFile     string = "metarr-filtered-meta-ops-file"
 	MMetaPurge               string = "metarr-purge-metafile"
+	MPurgeOriginalVideo      string = "metarr-purge-original-video"
 	MRenameStyle             string = "metarr-rename-style"
 	MMaxCPU                  string = "metarr-max-cpu"
 	MMinFreeMem              string = "metarr-min-free-mem"

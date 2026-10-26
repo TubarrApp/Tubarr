@@ -84,6 +84,24 @@ func TestGivenKeys(t *testing.T) {
 	}
 }
 
+// TestURLSettingsName tests a URL's name is read from its url-settings entry, trimmed, and must be text.
+func TestURLSettingsName(t *testing.T) {
+	v := viper.New()
+	v.Set("url-settings", map[string]any{"https://example.com/@a": map[string]any{"name": " Main "}})
+	urlSettings, err := ParseURLSettingsFromViper(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o := urlSettings["https://example.com/@a"]; o == nil || o.Name == nil || *o.Name != "Main" {
+		t.Errorf("got %+v, want name %q", o, "Main")
+	}
+
+	v.Set("url-settings", map[string]any{"https://example.com/@a": map[string]any{"name": 3}})
+	if _, err := ParseURLSettingsFromViper(v); err == nil {
+		t.Error("a name that isn't text was accepted")
+	}
+}
+
 // TestApplySameAndKeep tests the 'Same as input' extensions and 'Keep' metadata files are accepted and stored as chosen.
 func TestApplySameAndKeep(t *testing.T) {
 	same := sharedconsts.ExtSame

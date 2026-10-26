@@ -150,6 +150,24 @@ download-as-cancel if Download As closes without starting. -->
           </div>
         </div>
       </details>
+      <details x-ref="login" x-show="mode === 'download'">
+        <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">Login</summary>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Used to log in for this download only, and not saved. Blank uses the channel URL's login, if it has one.</p>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Username</label>
+            <input type="text" x-model="auth.username" autocomplete="off" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Password</label>
+            <input type="password" x-model="auth.password" autocomplete="new-password" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Login URL</label>
+            <input type="text" x-model="auth.login_url" placeholder="https://example.com/login" autocomplete="off" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+        </div>
+      </details>
       <details>
         <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">More post-processing options</summary>
         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Blank options use the channel URL's. <a href="help.html#transcoding" target="_blank" class="text-brand-500 hover:underline">Help</a></p>
@@ -202,7 +220,7 @@ download-as-cancel if Download As closes without starting. -->
               <option value="auto">Auto</option>
               <option value="cuda">Nvidia (Cuda)</option>
               <option value="qsv">Intel (QSV)</option>
-              <option value="vaapi">VAAPI</option>
+              <option value="vaapi">VA-API</option>
             </select>
           </div>
           <div>
@@ -260,6 +278,7 @@ download-as-cancel if Download As closes without starting. -->
       ytdlpDefaults: {}, // The channel URL's settings, for its yt-dlp options.
       opsFiles: {}, // Ops file paths typed in, by box.
       thumbChoice: 'default', // 'default', 'custom' (form.thumbnail) or 'none' (stripped).
+      auth: { username: '', password: '', login_url: '' }, // Login for this download only, never saved.
       uploading: false,
       metarrKeys: [
         'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
@@ -296,6 +315,9 @@ download-as-cancel if Download As closes without starting. -->
         this.ytdlpDefaults = {};
         this.opsFiles = {};
         this.form = { metarr: {} };
+        // A login passed in (from Manual Downloads) is shown, ready to send.
+        this.auth = { username: '', password: '', login_url: '', ...video.auth };
+        if (video.auth) this.$refs.login.open = true;
         this.error = null;
         this.loaded = false;
         this.loading = true;
@@ -411,12 +433,15 @@ download-as-cancel if Download As closes without starting. -->
         if (this.thumbChoice !== 'custom') overrides.thumbnail = '';
         // Blank args are left out, so they use the channel URL's.
         const metarr = Object.fromEntries(Object.entries(metarrForm).filter(([, v]) => v !== '' && v != null));
+        // The login is sent if any of its fields is filled in, else the channel URL's is used.
+        const auth = { username: this.auth.username.trim(), password: this.auth.password, login_url: this.auth.login_url.trim() };
+        const login = auth.username || auth.password || auth.login_url ? auth : undefined;
         this.working = true;
         this.error = null;
         try {
           const response = this.mode === 'metarr'
             ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides, metarr, rerun: video.rerun }) })
-            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides, metarr, auth: video.auth }) });
+            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides, metarr, auth: login }) });
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }

@@ -198,6 +198,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 	}
 	globals := map[string]any{keys.DebugLevel: 2}
 	files := []string{metkeys.VideoFile, "/videos/v.mp4", metkeys.MetaFile, "/videos/v.json"}
+	no := false
 
 	for _, tc := range []struct {
 		name      string
@@ -213,6 +214,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.OutputDir, "/out",
 			metkeys.Ext, "mp4",
 			metkeys.RenameStyle, "spaces",
+			metkeys.PurgeOriginalVideo,
 			metkeys.ExtraFFmpegArgs, "-x",
 			metkeys.TranscodeGPU, "vaapi",
 			metkeys.TranscodeGPUNode, "/dev/dri/renderD128",
@@ -229,6 +231,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.OutputDir, "/out",
 			metkeys.Ext, "webm",
 			metkeys.RenameStyle, "spaces",
+			metkeys.PurgeOriginalVideo,
 			metkeys.ExtraFFmpegArgs, "-x",
 			metkeys.Thumbnail, "/thumb.png",
 			metkeys.TranscodeVideoCodecs, "h264:hevc",
@@ -237,8 +240,10 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.Debug, "2",
 		})},
 		{"strip thumbnail", nil, &models.MetarrArgs{}, &models.VideoOverrides{StripThumbnail: true}, slices.Concat(files, []string{
+			metkeys.PurgeOriginalVideo,
 			metkeys.StripThumbnail,
 		})},
+		{"original kept", nil, &models.MetarrArgs{PurgeOriginalVideo: &no}, nil, files},
 	} {
 		viper.Reset()
 		for k, val := range tc.globals {
@@ -249,6 +254,33 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 		v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json", Overrides: tc.overrides}
 		if got := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); !slices.Equal(got, tc.want) {
 			t.Errorf("%s:\ngot  %q\nwant %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestMakeMetarrCommandChannelTags tests channel tags in ops are filled before Metarr gets them.
+func TestMakeMetarrCommandChannelTags(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	metaOps, err := parsing.ParseMetaOps([]string{"all-credits:set:{{channel_name}}", "title:prefix:{{channel_url_name}} - "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filenameOps, err := parsing.ParseFilenameOps([]string{"set:{{channel_name}} - {{fulltitle}}"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &models.Channel{ID: 1, Name: "Devon: Tracey"}
+	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: metaOps, FilenameOps: filenameOps}}
+	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
+	want := []string{`all-credits:set:Devon\: Tracey`, "title:prefix:example.com/@a - ", `set:Devon\: Tracey - {{fulltitle}}`}
+
+	for _, overrides := range []*models.VideoOverrides{nil, {MetaOps: metaOps, FilenameOps: filenameOps}} {
+		v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/v.mp4", JSONFilePath: "/v.json", Overrides: overrides}
+		args := makeMetarrCommand(v, cu, c, dp)
+		for _, op := range want {
+			if !slices.Contains(args, op) {
+				t.Errorf("Download As %v: args %q are missing %q", overrides != nil, args, op)
+			}
 		}
 	}
 }

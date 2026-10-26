@@ -10,7 +10,6 @@ import (
 	"slices"
 	"testing"
 	"time"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
@@ -185,7 +184,7 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 			{Name: sharedtags.JTitle, Selector: "h5"},
 			{Name: sharedtags.JThumbnail, Selector: "img[data-src]", Attr: "data-src"},
 			{Name: sharedtags.JThumbnail, Selector: "img[src]", Attr: "src"},
-			{Name: consts.CrawlFieldDuration, Selector: ".duration"},
+			{Name: sharedtags.JDurationString, Selector: ".duration"},
 			{Name: sharedtags.JUploadDate, Selector: "time"},
 		},
 	}
@@ -212,7 +211,7 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 		PreviewFields: []models.MetadataRule{
 			{Name: sharedtags.JTitle, JSONPath: "title"},
 			{Name: sharedtags.JThumbnail, JSONPath: "thumb"},
-			{Name: consts.CrawlFieldDuration, JSONPath: "duration"},
+			{Name: sharedtags.JDuration, JSONPath: "duration"},
 			{Name: sharedtags.JUploadDate, JSONPath: "upload_date"},
 		},
 	}
@@ -229,11 +228,27 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 	}
 }
 
-// TestParseDuration tests the duration formats crawl preview fields accept.
-func TestParseDuration(t *testing.T) {
-	for in, want := range map[string]int{"00:47:35": 2855, "1:02:03": 3723, "62:03": 3723, "3723": 3723, "312.5": 312, "PT1H2M3S": 3723, "pt47m": 2820, "abc": 0, "1:xx": 0, "": 0} {
-		if got := parseDuration(in); got != want {
-			t.Errorf("parseDuration(%q) = %d, want %d", in, got, want)
+// TestSetListedFieldDuration checks duration wins over duration_string in either order, and the first duration is kept.
+func TestSetListedFieldDuration(t *testing.T) {
+	type field struct{ name, value string }
+	tests := []struct {
+		fields []field
+		want   int
+	}{
+		{[]field{{sharedtags.JDurationString, "1:00"}}, 60},
+		{[]field{{sharedtags.JDuration, "90"}}, 90},
+		{[]field{{sharedtags.JDurationString, "1:00"}, {sharedtags.JDuration, "90"}}, 90},
+		{[]field{{sharedtags.JDuration, "90"}, {sharedtags.JDurationString, "1:00"}}, 90},
+		{[]field{{sharedtags.JDuration, "90"}, {sharedtags.JDuration, "120"}}, 90},
+		{[]field{{sharedtags.JDuration, "abc"}, {sharedtags.JDurationString, "1:00"}}, 60},
+	}
+	for _, tt := range tests {
+		lv := &listedVideo{}
+		for _, f := range tt.fields {
+			setListedField(lv, f.name, f.value, nil)
+		}
+		if lv.Duration != tt.want {
+			t.Errorf("%v: got duration %d, want %d", tt.fields, lv.Duration, tt.want)
 		}
 	}
 }

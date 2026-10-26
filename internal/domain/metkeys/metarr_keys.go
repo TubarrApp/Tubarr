@@ -11,10 +11,11 @@ const (
 
 // File operations.
 const (
-	Ext           = "--output-ext"
-	FilenameOps   = "--filename-ops"
-	OutputDir     = "--output-directory"
-	PurgeMetaFile = "--purge-metafile"
+	Ext                = "--output-ext"
+	FilenameOps        = "--filename-ops"
+	PurgeOriginalVideo = "--purge-original-video"
+	OutputDir          = "--output-directory"
+	PurgeMetaFile      = "--purge-metafile"
 )
 
 // Metadata operations.

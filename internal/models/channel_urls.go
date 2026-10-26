@@ -11,6 +11,7 @@ import (
 type ChannelURL struct {
 	ID                int64                 `json:"id" db:"id"`
 	URL               string                `json:"url" db:"url"`
+	Name              string                `json:"name" db:"name"`
 	Videos            []*Video              `json:"videos,omitempty"`
 	Username          string                `json:"username" db:"username"`
 	Password          string                `json:"-" db:"-"`

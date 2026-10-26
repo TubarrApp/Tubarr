@@ -48,6 +48,11 @@ domain = "censored.tv"
   selector = "video-js[poster]"
   attr = "poster"
 
+  # Shown as "1:02:03", so read as duration_string and written to the metadata JSON as duration in seconds.
+  [[sites.selectors]]
+  field = "duration_string"
+  selector = ".duration"
+
 [[sites]]
 domain = "odysee.com"
 
@@ -101,6 +106,12 @@ impersonate = "chrome"
   field = "thumbnail"
   selector = "meta[property='og:image']"
   attr = "content"
+
+  # The JSON-LD's VideoObject holds an ISO 8601 duration, e.g. "PT07H24M44S".
+  [[sites.selectors]]
+  field = "duration"
+  selector = 'script[type="application/ld+json"]'
+  json_path = '#(@type=="VideoObject").duration'
 
   # As of October 2026, a Rumble video page holds its embed ID (e.g. "v7egj9a") in the JSON-LD's embedUrl, and the
   # player gets the HLS playlist from Rumble's embedJS API using that ID.

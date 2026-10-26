@@ -104,6 +104,9 @@ func BuildChannelFromInput(input models.ChannelInput) (
 			cu.Username, cu.Password, cu.LoginURL = a.Username, a.Password, a.LoginURL
 		}
 		if override, ok := input.URLSettings[strings.ToLower(u)]; ok {
+			if override.Name != nil {
+				cu.Name = *override.Name
+			}
 			if override.Settings != nil {
 				cu.ChanURLSettings = &models.Settings{}
 				if err := ApplySettingsInput(cu.ChanURLSettings, override.Settings); err != nil {
@@ -308,6 +311,10 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 		if dst.MetaPurge, err = validation.ValidatePurgeMetafiles(*v); err != nil {
 			return fmt.Errorf("invalid %s: %w", keys.MMetaPurge, err)
 		}
+	}
+	if v := in.PurgeOriginalVideo; v != nil {
+		b := *v
+		dst.PurgeOriginalVideo = &b
 	}
 	if v := in.MetarrConcurrency; v != nil {
 		dst.MetarrConcurrency = max(*v, 0)
@@ -562,6 +569,16 @@ func ParseURLSettingsFromViper(v configGetter) (map[string]*models.URLSettingsOv
 			return nil, fmt.Errorf("settings for URL %q must be a map", channelURL)
 		}
 		override := &models.URLSettingsOverride{}
+
+		// Handle "name".
+		if nameRaw, hasName := dataMap[keys.ChannelURLName]; hasName {
+			name, ok := nameRaw.(string)
+			if !ok {
+				return nil, fmt.Errorf("name for URL %q must be text", channelURL)
+			}
+			name = strings.TrimSpace(name)
+			override.Name = &name
+		}
 
 		// Handle "profile", by name.
 		if profileRaw, hasProfile := dataMap[keys.Profile]; hasProfile {

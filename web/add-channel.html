@@ -147,6 +147,19 @@
                         />
                       </div>
 
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Name
+                        </label>
+                        <input
+                          type="text"
+                          x-model="urlEntry.name"
+                          placeholder="Optional"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fills <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">{{channel_url_name}}</code> in directories. Blank uses the URL.</p>
+                      </div>
+
                       <!-- Auth Details Toggle -->
                       <div>
                         <label class="flex items-center cursor-pointer">
@@ -346,6 +359,7 @@
             urls: [
               {
                 url: '',
+                name: '',
                 hasAuth: false,
                 username: '',
                 password: '',
@@ -382,6 +396,7 @@
                   // Metarr settings
                   metarr_output_directory: '',
                   metarr_purge_metafile: '',
+                  metarr_purge_original_video: '',
                   metarr_output_ext: '',
                   metarr_rename_style: '',
                   metarr_concurrency: null,
@@ -434,6 +449,7 @@
             metarr: {
               metarr_output_directory: '',
               metarr_purge_metafile: '',
+              metarr_purge_original_video: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: '',
@@ -509,6 +525,7 @@
           addURL() {
             this.formData.urls.push({
               url: '',
+              name: '',
               hasAuth: false,
               username: '',
               password: '',
@@ -543,6 +560,7 @@
                 ytdlp_preferred_audio_codecs: '',
                 metarr_output_directory: '',
                 metarr_purge_metafile: '',
+                metarr_purge_original_video: '',
                 metarr_output_ext: '',
                 metarr_rename_style: '',
                 metarr_concurrency: null,
@@ -792,11 +810,19 @@
                     }
                   }
                 });
+
+                // Process Keep Original Video Files from its dropdown (empty inherits from the channel)
+                const purgeOriginalValue = normalizeBool(urlEntry.custom.metarr_purge_original_video);
+                if (typeof purgeOriginalValue === 'boolean') {
+                  metarr.metarr_purge_original_video = purgeOriginalValue;
+                }
               }
 
-              // Only add if there are overrides or a profile
-              if (Object.keys(settings).length > 0 || Object.keys(metarr).length > 0 || urlEntry.profile_id) {
+              // Only add if there are overrides, a profile or a name
+              const name = (urlEntry.name || '').trim();
+              if (Object.keys(settings).length > 0 || Object.keys(metarr).length > 0 || urlEntry.profile_id || name) {
                 perURL[channelURL] = {};
+                if (name) perURL[channelURL].name = name;
                 if (urlEntry.profile_id) perURL[channelURL].profile_id = Number(urlEntry.profile_id);
                 if (Object.keys(settings).length > 0) perURL[channelURL].settings = settings;
                 if (Object.keys(metarr).length > 0) perURL[channelURL].metarr = metarr;

@@ -43,7 +43,7 @@ type scrapeCrawlConfig struct {
 }
 
 // crawlPreviewFields are the fields a crawl rule can read for previewing videos before download.
-var crawlPreviewFields = []string{sharedtags.JTitle, sharedtags.JThumbnail, sharedtags.JUploadDate, consts.CrawlFieldDuration}
+var crawlPreviewFields = []string{sharedtags.JTitle, sharedtags.JThumbnail, sharedtags.JUploadDate, sharedtags.JDuration, sharedtags.JDurationString}
 
 // scrapeSelectorConfig mirrors a single selector entry for a site in a scrape config file.
 type scrapeSelectorConfig struct {

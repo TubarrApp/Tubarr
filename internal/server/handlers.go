@@ -283,8 +283,9 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 				LoginURL:    urlModel.LoginURL,
 			})
 		}
-		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil || urlModel.ProfileID != 0 {
+		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil || urlModel.ProfileID != 0 || urlModel.Name != "" {
 			response.URLSettings[urlModel.URL] = urlSettingsResponse{
+				Name:      urlModel.Name,
 				ProfileID: urlModel.ProfileID,
 				Settings:  newSettingsResponse(urlModel.ChanURLSettings),
 				Metarr:    newMetarrArgsResponse(urlModel.ChanURLMetarrArgs),
@@ -345,6 +346,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		if s, hasCustom := f.urlSettings[u]; hasCustom {
 			cu.ChanURLSettings, cu.ChanURLMetarrArgs = s.Settings, s.Metarr
 			cu.ProfileID = s.ProfileID
+			cu.Name = s.Name
 		}
 		c.URLModels = append(c.URLModels, cu)
 	}

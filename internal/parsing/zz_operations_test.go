@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"tubarr/internal/domain/logger"
@@ -20,6 +21,36 @@ import (
 func TestMain(m *testing.M) {
 	logger.Pl.Console = io.Discard
 	os.Exit(m.Run())
+}
+
+// TestFillChannelTags tests channel tags in ops are filled and read back as written, and other tags left for Metarr.
+func TestFillChannelTags(t *testing.T) {
+	c := &models.Channel{ID: 3, Name: `AC/DC: Live \ Loud`}
+	cu := &models.ChannelURL{URL: "https://www.youtube.com/@acdc", Name: "Main"}
+	ops := []string{
+		"all-credits:set:{{channel_name}}",
+		"title:prefix:[{{ Channel_URL_Name }}] {{year}} ",
+		"title:replace:{{channel_name}}:{{channel_id}} {{channel_url}}",
+		"title:suffix: {{channel_name:word}} {{uploader}} {{",
+	}
+	got, err := parsing.ParseMetaOps(parsing.FillChannelTags(ops, c, cu))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []models.MetaOps{
+		{Field: "all-credits", OpType: "set", OpValue: `AC/DC: Live \ Loud`},
+		{Field: "title", OpType: "prefix", OpValue: "[Main] {{year}} "},
+		{Field: "title", OpType: "replace", OpFindString: `AC/DC: Live \ Loud`, OpValue: "3 www.youtube.com/@acdc"},
+		{Field: "title", OpType: "suffix", OpValue: " {{channel_name:word}} {{uploader}} {{"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got  %+v\nwant %+v", got, want)
+	}
+
+	// No channel URL to fill from, so the op is kept as written.
+	if got := parsing.FillChannelTags([]string{"title:set:{{channel_url}}"}, c, nil); got[0] != "title:set:{{channel_url}}" {
+		t.Errorf("FillChannelTags() without a channel URL = %q, want the op as written", got)
+	}
 }
 
 // TestMetaOpsRoundTripThroughTubarr checks the pipeline Tubarr actually runs: parse and

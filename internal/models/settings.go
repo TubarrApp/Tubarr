@@ -59,6 +59,7 @@ type Settings struct {
 type MetarrArgs struct {
 	// Metarr file operations.
 	OutputExt               string                `json:"metarr_output_ext"`
+	PurgeOriginalVideo      *bool                 `json:"metarr_purge_original_video,omitempty"`
 	FilenameOps             []FilenameOps         `json:"metarr_filename_ops"`
 	FilenameOpsFile         string                `json:"metarr_filename_ops_file"`
 	FilteredFilenameOps     []FilteredFilenameOps `json:"metarr_filtered_filename_ops"`
@@ -334,6 +335,11 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 		return false
 	}
 
+	// Boolean comparisons
+	if child.PurgeOriginalVideo != nil && (parent.PurgeOriginalVideo == nil || *parent.PurgeOriginalVideo != *child.PurgeOriginalVideo) {
+		return false
+	}
+
 	// Numeric comparisons
 	if child.MetarrConcurrency != 0 && child.MetarrConcurrency != parent.MetarrConcurrency {
 		return false
@@ -386,6 +392,9 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 
 	// Metarr file operations.
 	if m.OutputExt != "" {
+		return false
+	}
+	if m.PurgeOriginalVideo != nil {
 		return false
 	}
 	if len(m.FilenameOps) > 0 {

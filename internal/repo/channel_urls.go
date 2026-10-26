@@ -76,8 +76,8 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 
 	now := time.Now()
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		consts.DBChannelURLs,
 		consts.QChanURLChannelID,
 		consts.QChanURLURL,
@@ -91,6 +91,7 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		consts.QChanURLCreatedAt,
 		consts.QChanURLUpdatedAt,
 		consts.QChanURLProfileID,
+		consts.QChanURLName,
 	)
 
 	result, err := cs.q.Exec(query,
@@ -106,6 +107,7 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		now,
 		now,
 		cu.ProfileID,
+		cu.Name,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert channel URL: %w", err)
@@ -211,6 +213,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 			"%s = ?, "+
 			"%s = ?, "+
 			"%s = ?, "+
+			"%s = ?, "+
 			"%s = ? "+
 			"WHERE %s = ?",
 		consts.DBChannelURLs,
@@ -220,6 +223,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		consts.QChanURLMetarr,
 		consts.QChanURLSettings,
 		consts.QChanURLProfileID,
+		consts.QChanURLName,
 		consts.QChanURLID,
 	)
 
@@ -231,6 +235,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		metarrJSON,
 		settingsJSON,
 		cu.ProfileID,
+		cu.Name,
 		cu.ID,
 	); err != nil {
 		return err
@@ -266,7 +271,7 @@ func (cs *ChannelStore) UpdateChannelURLsLastScan(ids []int64) error {
 // GetChannelURLModels fetches a filled list of ChannelURL models.
 func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent bool) ([]*models.ChannelURL, error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s "+
 			"WHERE %s = ?",
 		consts.QChanURLID,
@@ -281,6 +286,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		consts.QChanURLCreatedAt,
 		consts.QChanURLUpdatedAt,
 		consts.QChanURLProfileID,
+		consts.QChanURLName,
 		consts.DBChannelURLs,
 		consts.QChanURLChannelID,
 	)
@@ -316,6 +322,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 			&cu.CreatedAt,
 			&cu.UpdatedAt,
 			&cu.ProfileID,
+			&cu.Name,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan channel URL: %w", err)
 		}
@@ -524,6 +531,7 @@ func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 		return
 	}
 	u.OutputExt = cmp.Or(u.OutputExt, ch.OutputExt)
+	u.PurgeOriginalVideo = inheritBool(u.PurgeOriginalVideo, ch.PurgeOriginalVideo)
 	u.FilenameOps = slices.Concat(models.FilterConflictingFilenameOps(u.FilenameOps, ch.FilenameOps), u.FilenameOps)
 	u.FilenameOpsFile = cmp.Or(u.FilenameOpsFile, ch.FilenameOpsFile)
 	u.FilteredFilenameOps = slices.Concat(ch.FilteredFilenameOps, u.FilteredFilenameOps)

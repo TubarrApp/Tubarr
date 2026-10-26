@@ -2,7 +2,6 @@ package siterules
 
 import (
 	"regexp"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/sharedtags"
@@ -74,7 +73,7 @@ var censored = models.SiteRules{
 			{Name: sharedtags.JTitle, Selector: "h5"},
 			{Name: sharedtags.JThumbnail, Selector: "img[data-src]", Attr: "data-src"},
 			{Name: sharedtags.JThumbnail, Selector: "img[src]", Attr: "src"},
-			{Name: consts.CrawlFieldDuration, Selector: ".duration"},
+			{Name: sharedtags.JDurationString, Selector: ".duration"},
 			{Name: sharedtags.JUploadDate, Selector: "time"},
 		},
 	},
@@ -83,6 +82,7 @@ var censored = models.SiteRules{
 		{Name: sharedtags.JDescription, Selector: "#about .raised-content"},
 		{Name: sharedtags.JReleaseDate, Selector: "#about time"},
 		{Name: sharedtags.JDirectVideoURL, Selector: "source[src*='master.m3u8']", Attr: "src"},
+		{Name: sharedtags.JDurationString, Selector: ".duration"},
 		{Name: sharedtags.JThumbnail, Selector: "video-js[poster]", Attr: "poster"},
 	},
 }
@@ -113,7 +113,7 @@ var rumble = models.SiteRules{
 		PreviewFields: []models.MetadataRule{
 			{Name: sharedtags.JTitle, JSONPath: "title"},
 			{Name: sharedtags.JThumbnail, JSONPath: "thumb"},
-			{Name: consts.CrawlFieldDuration, JSONPath: "duration"},
+			{Name: sharedtags.JDuration, JSONPath: "duration"},
 			{Name: sharedtags.JUploadDate, JSONPath: "upload_date"},
 		},
 	},
@@ -123,5 +123,6 @@ var rumble = models.SiteRules{
 		{Name: sharedtags.JDescription, Selector: `meta[property="og:description"]`, Attr: "content"},
 		{Name: sharedtags.JReleaseDate, Selector: "time", Attr: "datetime"},
 		{Name: sharedtags.JThumbnail, Selector: `meta[property="og:image"]`, Attr: "content"},
+		{Name: sharedtags.JDuration, Selector: `script[type="application/ld+json"]`, JSONPath: `#(@type=="VideoObject").duration`},
 	},
 }

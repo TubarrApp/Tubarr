@@ -2,6 +2,7 @@
 package scraper
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -644,6 +645,8 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		description    string
 		directVideoURL string
 		thumbnailURL   string
+		duration       string
+		durationString string
 	)
 
 	logger.Pl.I("Scraping %q using rules for %s...", urlStr, query.Site)
@@ -660,6 +663,8 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		sharedtags.JDescription:    true,
 		sharedtags.JDirectVideoURL: true,
 		sharedtags.JThumbnail:      true,
+		sharedtags.JDuration:       true,
+		sharedtags.JDurationString: true,
 	}
 
 	// Recognized date fields, each validated as a full date string. Includes an order of preference for v.UploadDate.
@@ -688,6 +693,12 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 	}
 	if rules, ok := rulesByField[sharedtags.JThumbnail]; ok {
 		setupFieldScraping(collector, sharedtags.JThumbnail, rules, &thumbnailURL)
+	}
+	if rules, ok := rulesByField[sharedtags.JDuration]; ok {
+		setupFieldScraping(collector, sharedtags.JDuration, rules, &duration)
+	}
+	if rules, ok := rulesByField[sharedtags.JDurationString]; ok {
+		setupFieldScraping(collector, sharedtags.JDurationString, rules, &durationString)
 	}
 
 	// Setup scraping for recognized date fields. Each is written into the metadata JSON
@@ -746,6 +757,17 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		if thumbnailURL != "" {
 			v.ThumbnailURL = thumbnailURL
 			metadata[sharedtags.JThumbnail] = thumbnailURL
+		}
+
+		// Duration is written in seconds, from the duration field, or else parsed from duration_string (kept as scraped).
+		if durationString != "" {
+			metadata[sharedtags.JDurationString] = durationString
+		}
+		if secs := cmp.Or(parsing.ParseDuration(duration), parsing.ParseDuration(durationString)); secs > 0 {
+			v.Duration = secs
+			metadata[sharedtags.JDuration] = secs
+		} else if duration != "" || durationString != "" {
+			logger.Pl.W("Failed to parse a duration from field %q (%q) or %q (%q)", sharedtags.JDuration, duration, sharedtags.JDurationString, durationString)
 		}
 
 		parsedDates := make(map[string]time.Time, len(dateValues))

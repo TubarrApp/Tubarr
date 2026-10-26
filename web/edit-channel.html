@@ -164,6 +164,19 @@
                         />
                       </div>
 
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Name
+                        </label>
+                        <input
+                          type="text"
+                          x-model="urlEntry.name"
+                          placeholder="Optional"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Fills <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">{{channel_url_name}}</code> in directories. Blank uses the URL.</p>
+                      </div>
+
                       <!-- Auth Details Toggle -->
                       <div>
                         <label class="flex items-center cursor-pointer">
@@ -382,6 +395,7 @@
             metarr: {
               metarr_output_directory: '',
               metarr_purge_metafile: '',
+              metarr_purge_original_video: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: '',
@@ -501,6 +515,7 @@
                 const urlEntry = {
                   url: url,
                   original: url, // As saved, so an edited address renames the URL rather than replacing it.
+                  name: '',
                   hasAuth: false,
                   username: '',
                   password: '',
@@ -527,6 +542,7 @@
                 if (data.url_settings && data.url_settings[url]) {
                   const urlSettings = data.url_settings[url];
                   urlEntry.profile_id = urlSettings.profile_id ? String(urlSettings.profile_id) : '';
+                  urlEntry.name = urlSettings.name || '';
 
                   // Populate custom settings
                   if (urlSettings.settings) {
@@ -566,6 +582,8 @@
                           urlEntry.custom[key] = value.join('\n');
                         } else if (key === 'metarr_max_cpu_usage' && value === 0) {
                           urlEntry.custom[key] = null;
+                        } else if (key === 'metarr_purge_original_video') {
+                          urlEntry.custom[key] = String(value);
                         } else {
                           urlEntry.custom[key] = value;
                         }
@@ -609,6 +627,8 @@
                     this.formData.metarr[key] = value.join('\n');
                   } else if (key === 'metarr_max_cpu_usage' && value === 0) {
                     this.formData.metarr[key] = '';
+                  } else if (key === 'metarr_purge_original_video') {
+                    this.formData.metarr[key] = String(value);
                   } else {
                     this.formData.metarr[key] = value;
                   }
@@ -645,6 +665,7 @@
               ytdlp_preferred_audio_codecs: '',
               metarr_output_directory: '',
               metarr_purge_metafile: '',
+              metarr_purge_original_video: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: null,
@@ -688,6 +709,7 @@
           addURL() {
             this.formData.urls.push({
               url: '',
+              name: '',
               hasAuth: false,
               username: '',
               password: '',
@@ -933,11 +955,19 @@
                     }
                   }
                 });
+
+                // Process Keep Original Video Files from its dropdown (empty inherits from the channel)
+                const purgeOriginalValue = normalizeBool(urlEntry.custom.metarr_purge_original_video);
+                if (typeof purgeOriginalValue === 'boolean') {
+                  metarr.metarr_purge_original_video = purgeOriginalValue;
+                }
               }
 
-              // Only add if there are overrides or a profile
-              if (Object.keys(settings).length > 0 || Object.keys(metarr).length > 0 || urlEntry.profile_id) {
+              // Only add if there are overrides, a profile or a name
+              const name = (urlEntry.name || '').trim();
+              if (Object.keys(settings).length > 0 || Object.keys(metarr).length > 0 || urlEntry.profile_id || name) {
                 perURL[channelURL] = {};
+                if (name) perURL[channelURL].name = name;
                 if (urlEntry.profile_id) perURL[channelURL].profile_id = Number(urlEntry.profile_id);
                 if (Object.keys(settings).length > 0) perURL[channelURL].settings = settings;
                 if (Object.keys(metarr).length > 0) perURL[channelURL].metarr = metarr;

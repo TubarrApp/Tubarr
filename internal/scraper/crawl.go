@@ -7,12 +7,10 @@ import (
 	"html"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
-	"time"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 
 	"github.com/PuerkitoBio/goquery"
@@ -180,9 +178,15 @@ func setListedField(lv *listedVideo, name, value string, absURL func(string) str
 		if _, t := parseScrapedDate(value); lv.UploadDate.IsZero() && !t.IsZero() {
 			lv.UploadDate = t
 		}
-	case consts.CrawlFieldDuration:
+	case sharedtags.JDuration:
+		// Replaces a duration parsed from duration_string, even one read first.
+		if secs := parsing.ParseDuration(value); secs > 0 && !lv.durationField {
+			lv.Duration = secs
+			lv.durationField = true
+		}
+	case sharedtags.JDurationString:
 		if lv.Duration == 0 {
-			lv.Duration = parseDuration(value)
+			lv.Duration = parsing.ParseDuration(value)
 		}
 	}
 }
@@ -202,34 +206,6 @@ func mergeListed(urls map[string]*listedVideo, link string, lv *listedVideo) {
 	if existing.UploadDate.IsZero() {
 		existing.UploadDate = lv.UploadDate
 	}
-}
-
-// parseDuration parses a duration in seconds, as "1:02:03", "62:03", "3723", or ISO 8601 "PT1H2M3S", returning 0 if invalid.
-func parseDuration(s string) int {
-	s = strings.TrimSpace(s)
-	if secs, err := strconv.ParseFloat(s, 64); err == nil {
-		return max(int(secs), 0)
-	}
-	if rest, ok := strings.CutPrefix(strings.ToUpper(s), "PT"); ok {
-		d, err := time.ParseDuration(strings.ToLower(rest))
-		if err != nil {
-			return 0
-		}
-		return int(d.Seconds())
-	}
-	parts := strings.Split(s, ":")
-	if len(parts) < 2 || len(parts) > 3 {
-		return 0
-	}
-	total := 0
-	for _, p := range parts {
-		n, err := strconv.Atoi(strings.TrimSpace(p))
-		if err != nil || n < 0 {
-			return 0
-		}
-		total = total*60 + n
-	}
-	return total
 }
 
 // jsonPathValues returns the value itself, or the values at jsonPath if one is set.

@@ -70,10 +70,11 @@ type SettingsInput struct {
 // MetarrArgsInput is MetarrArgs as given, its viper tags naming each key. A nil field wasn't given.
 type MetarrArgsInput struct {
 	// Output settings.
-	OutDir      *string `viper:"metarr-output-directory"`
-	MetaPurge   *string `viper:"metarr-purge-metafile"`
-	MetarrExt   *string `viper:"metarr-output-ext"`
-	RenameStyle *string `viper:"metarr-rename-style"`
+	OutDir             *string `viper:"metarr-output-directory"`
+	MetaPurge          *string `viper:"metarr-purge-metafile"`
+	MetarrExt          *string `viper:"metarr-output-ext"`
+	RenameStyle        *string `viper:"metarr-rename-style"`
+	PurgeOriginalVideo *bool   `viper:"metarr-purge-original-video"`
 
 	// Op files.
 	MetaOpsFile             *string `viper:"metarr-meta-ops-file"`
@@ -105,6 +106,7 @@ type MetarrArgsInput struct {
 
 // URLSettingsOverride contains per-URL setting overrides.
 type URLSettingsOverride struct {
+	Name     *string
 	Profile  *string
 	Settings *SettingsInput
 	Metarr   *MetarrArgsInput

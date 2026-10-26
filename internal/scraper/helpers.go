@@ -18,6 +18,8 @@ type listedVideo struct {
 	UploadDate   time.Time
 	Duration     int // Seconds.
 	Order        int // Position in the channel's listing, as the site lists it.
+
+	durationField bool // Duration came from a duration field rather than duration_string.
 }
 
 // listedInOrder returns the URLs of listed videos in the order the channel lists them.

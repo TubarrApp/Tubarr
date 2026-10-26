@@ -40,8 +40,10 @@ func fullSettings() *models.Settings {
 // fullMetarrArgs returns MetarrArgs with every field set.
 func fullMetarrArgs() *models.MetarrArgs {
 	cat := models.Filters{Field: "title", FilterType: "contains", Value: "cat"}
+	yes := true
 	return &models.MetarrArgs{
 		OutputExt:               "mp4",
+		PurgeOriginalVideo:      &yes,
 		FilenameOps:             []models.FilenameOps{{OpType: "prefix", OpValue: "[A] "}},
 		FilenameOpsFile:         "/filename-ops",
 		FilteredFilenameOps:     []models.FilteredFilenameOps{{Filters: []models.Filters{cat}, FilenameOps: []models.FilenameOps{{OpType: "prefix", OpValue: "[C] "}}}},

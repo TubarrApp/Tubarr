@@ -118,6 +118,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := addColumnIfMissing(tx, "channel_urls", consts.QChanURLName, "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+
 	if err := initProfilesTable(tx); err != nil {
 		return err
 	}

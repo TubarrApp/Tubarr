@@ -443,6 +443,24 @@
 
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Keep Original Video Files
+                        </label>
+                        <!-- Values are whether Metarr deletes the original, so Yes is false. -->
+                        <select
+                          x-model="formData.metarr.metarr_purge_original_video"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="boolHint('metarr_purge_original_video', 'No', 'Yes', 'No')"></option>
+                          <option value="false">Yes</option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="true">No</option>
+                          </template>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Keeps the downloaded video where it is once Metarr writes a new one from it. Tubarr doesn't track it, so deleting the video's files leaves it.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Rename Style
                         </label>
                         <select
@@ -726,7 +744,7 @@
 
   // profileBoolHint returns the label of a three-way setting's blank choice: the profile's setting, else fallback.
   function profileBoolHint(profile, key, on, off, fallback) {
-    const value = profile && profile.settings ? profile.settings[key] : undefined;
+    const value = profile?.settings?.[key] ?? profile?.metarr?.[key];
     return typeof value === 'boolean' ? `${value ? on : off} (from ${profile.name})` : fallback;
   }
 
@@ -752,8 +770,8 @@
       hint(section, key, fallback, el) {
         return profileHint(this.profileByID(this.formData.profile_id), section, key, el ? `Default (${fallback})` : fallback, el);
       },
-      boolHint(key, on, off) {
-        return profileBoolHint(this.profileByID(this.formData.profile_id), key, on, off, `Default (${off})`);
+      boolHint(key, on, off, def = off) {
+        return profileBoolHint(this.profileByID(this.formData.profile_id), key, on, off, `Default (${def})`);
       },
       urlHint(urlEntry, section, key, fallback) {
         return profileHint(this.profileByID(urlEntry.profile_id), section, key, fallback);

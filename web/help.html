@@ -360,9 +360,15 @@ vp9:av1</code></pre>
               </p>
               <ul>
                 <li>Video codecs: <code>av1</code>, <code>h264</code>, <code>hevc</code>, <code>mpeg2</code>, <code>vp8</code>, <code>vp9</code>. Audio codecs: <code>aac</code>, <code>ac3</code>, <code>alac</code>, <code>dts</code>, <code>eac3</code>, <code>flac</code>, <code>mp2</code>, <code>mp3</code>, <code>opus</code>, <code>pcm</code>, <code>truehd</code>, <code>vorbis</code>, <code>wav</code>. Common other names work too (<code>h265</code>, <code>x264</code>, <code>libmp3lame</code>).</li>
-                <li><strong>GPU Acceleration</strong> encodes on the graphics card (<code>auto</code>, <code>cuda</code>, <code>qsv</code> or <code>vaapi</code>, with <strong>GPU Node Path</strong> for VAAPI, e.g. <code>/dev/dri/renderD128</code>).</li>
+                <li><strong>GPU Acceleration</strong> encodes on the graphics card (<code>auto</code>, <code>cuda</code>, <code>qsv</code> or <code>vaapi</code>, with <strong>GPU Node Path</strong> for VA-API, e.g. <code>/dev/dri/renderD128</code>).</li>
                 <li><strong>Transcode Quality (CRF)</strong> is 0 to 51: lower is better quality and larger files.</li>
                 <li><strong>Extra FFmpeg Args</strong> are added to the FFmpeg command, e.g. <code>-vf scale=1280:-2</code> to scale the video to 1280 pixels wide.</li>
+                <li>
+                  <strong>Keep Original Video Files</strong> keeps the downloaded video whenever Metarr writes a new one
+                  from it, even just to add metadata. It stays where it was downloaded, under its own name, unless the
+                  new video ends up with exactly the same path; then it's renamed <code>name_mbackup.ext</code>. Tubarr
+                  doesn't keep track of it, so deleting the video's files leaves it.
+                </li>
               </ul>
 
               <!-- ===== yt-dlp ===== -->
@@ -386,15 +392,20 @@ vp9:av1</code></pre>
               <div class="table-wrap">
                 <table>
                   <tr><th>Where</th><th>Tags</th></tr>
-                  <tr><td>Video and JSON directories</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code></td></tr>
+                  <tr><td>Video and JSON directories</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code>, <code>{{channel_url_name}}</code></td></tr>
                   <tr><td>Metarr output directory, move ops</td><td>Those, plus <code>{{video_title}}</code>, <code>{{video_url}}</code>, <code>{{year}}</code>, <code>{{month}}</code>, <code>{{day}}</code>, <code>{{author}}</code>, <code>{{director}}</code>, <code>{{domain}}</code></td></tr>
-                  <tr><td>Op values</td><td>Any metadata field: <code>{{uploader}}</code>, <code>{{fulltitle}}</code>, <code>{{id}}</code>…</td></tr>
+                  <tr><td>Op values</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code>, <code>{{channel_url_name}}</code>, plus any metadata field: <code>{{uploader}}</code>, <code>{{fulltitle}}</code>, <code>{{id}}</code>…</td></tr>
                 </table>
               </div>
               <p>
                 <code>{{year:yy}}</code> gives a two-digit year (<code>{{year}}</code> is four), and
                 <code>{{month:abbreviated}}</code> or <code>{{month:word}}</code> give <code>Jan</code> or
                 <code>January</code> (<code>{{month}}</code> is <code>01</code>). E.g. <code>/media/{{channel_name}}/{{year}}</code>.
+              </p>
+              <p>
+                <code>{{channel_url_name}}</code> is the name given to a channel URL on its channel's page, or the URL
+                itself if it has none, e.g. <code>/media/{{channel_name}}/{{channel_url_name}}</code> to keep each URL's
+                videos in their own folder.
               </p>
 
               <!-- ===== Precedence ===== -->
@@ -444,6 +455,7 @@ vp9:av1</code></pre>
                 yt-dlp options and post-processing options, starting from its channel URL's. They're kept with the video,
                 so <strong>Edit &amp; Post-Process</strong> and <strong>Edit &amp; Re-Process</strong> open with them
                 later. Those two only run Metarr on files already downloaded, so they have no download options.
+                A <strong>Login</strong> entered there is used for that one download and never saved.
                 <strong>Revert to Defaults</strong> goes back to the channel URL's.
               </p>
 

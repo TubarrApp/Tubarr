@@ -100,6 +100,22 @@ func metadataDate(m map[string]any) time.Time {
 	return time.Time{}
 }
 
+// metadataDuration returns the duration in m in seconds, from duration or else duration_string, or 0 if neither parses.
+func metadataDuration(m map[string]any) int {
+	switch d := m[sharedtags.JDuration].(type) {
+	case float64:
+		if d > 0 {
+			return int(d)
+		}
+	case string:
+		if secs := parsing.ParseDuration(d); secs > 0 {
+			return secs
+		}
+	}
+	s, _ := m[sharedtags.JDurationString].(string)
+	return parsing.ParseDuration(s)
+}
+
 // parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
 func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	m, err := readJSONFile(v.JSONFilePath)
@@ -120,6 +136,11 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	}
 	if v.Description == "" {
 		v.Description = sharedtags.FirstString(m, sharedtags.DescriptionKeys)
+	}
+
+	// The video's own duration replaces the crawl listing's.
+	if secs := metadataDuration(m); secs > 0 {
+		v.Duration = secs
 	}
 
 	// Select thumbnail

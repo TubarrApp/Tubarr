@@ -2,6 +2,7 @@
 package parsing
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -128,12 +129,36 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 
 // replaceTemplateTags makes template replacements in the directory string.
 func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
-	c := dp.C
 	name, directive := sharedtemplates.ParseTag(tag)
 	if directive != "" && !sharedtemplates.ValidTag(tag, sharedtemplates.AllTemplatesMap) {
 		return "", fmt.Errorf("tag %q detected as invalid, supported tags: %v", tag, sharedtemplates.DescribeTags(sharedtemplates.AllTemplatesMap))
 	}
 
+	// Metarr tags are left for Metarr to fill.
+	if _, ok := sharedtemplates.MetarrTemplateTags[name]; ok {
+		if _, err := exec.LookPath("metarr"); err != nil {
+			return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %w", tag, err)
+		}
+		if directive != "" {
+			name += ":" + directive
+		}
+		return "{{" + name + "}}", nil
+	}
+
+	value, err := channelTagValue(name, dp.C, dp.CU)
+	if err != nil {
+		return "", err
+	}
+
+	// One directory level, e.g. "AC/DC" can't nest and ".." can't climb out.
+	if value = sharedtemplates.SanitizePathComponent(value, sharedtemplates.MaxNameBytes); value == "" {
+		return "", fmt.Errorf("templating: %q is empty once made safe for a path", tag)
+	}
+	return value, nil
+}
+
+// channelTagValue returns the channel's value for a channel tag, e.g. its name for "channel_name".
+func channelTagValue(name string, c *models.Channel, cu *models.ChannelURL) (string, error) {
 	var value string
 	switch name {
 	case sharedtemplates.ChannelID:
@@ -149,27 +174,20 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 		value = c.Name
 
 	case sharedtemplates.ChannelURL:
-		if dp.CU == nil || dp.CU.URL == "" {
+		if cu == nil || cu.URL == "" {
 			return "", errors.New("templating: channel URL empty")
 		}
-		value = sharedtemplates.StripURLScheme(dp.CU.URL)
+		value = sharedtemplates.StripURLScheme(cu.URL)
+
+	// The URL's name, or the URL itself if it has none.
+	case sharedtemplates.ChannelURLName:
+		if cu == nil || cu.URL == "" {
+			return "", errors.New("templating: channel URL empty")
+		}
+		value = cmp.Or(cu.Name, sharedtemplates.StripURLScheme(cu.URL))
 
 	default:
-		if _, ok := sharedtemplates.MetarrTemplateTags[name]; ok {
-			if _, err := exec.LookPath("metarr"); err != nil {
-				return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %w", tag, err)
-			}
-			if directive != "" {
-				name += ":" + directive // Left for Metarr to fill.
-			}
-			return "{{" + name + "}}", nil
-		}
-		return "", fmt.Errorf("tag %q detected as invalid", tag)
-	}
-
-	// One directory level, e.g. "AC/DC" can't nest and ".." can't climb out.
-	if value = sharedtemplates.SanitizePathComponent(value, sharedtemplates.MaxNameBytes); value == "" {
-		return "", fmt.Errorf("templating: %q is empty once made safe for a path", tag)
+		return "", fmt.Errorf("tag %q detected as invalid", name)
 	}
 	return value, nil
 }

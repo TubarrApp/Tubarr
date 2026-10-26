@@ -2,11 +2,7 @@
 package consts
 
 // File prefix and suffix
-const (
-	OldTag  = "_metarrbackup"
-	TempTag = "tmp_"
-	IDTag   = "id_"
-)
+const ()
 
 // BotTimeoutMap holds the cooldown times in minutes for popular domains (used if a domain blocks Tubarr).
 var BotTimeoutMap = map[string]float64{

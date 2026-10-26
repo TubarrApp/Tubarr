@@ -137,6 +137,12 @@ flaresolverr = true</code></pre>
             <li>Strings: <code>title</code>, <code>description</code>, <code>thumbnail</code>, <code>direct_video_url</code></li>
             <li>Full dates: <code>upload_date</code>, <code>release_date</code>, <code>date</code></li>
             <li>Years: <code>year</code>, <code>release_year</code></li>
+            <li>
+              Durations: <code>duration</code> (e.g. <code>3723</code>) and <code>duration_string</code> (e.g.
+              <code>1:02:03</code>). <code>duration</code> is written to the metadata JSON in seconds, taken from
+              <code>duration</code>, or from <code>duration_string</code> if there's none. Either can be
+              <code>1:02:03</code>, seconds, or an ISO 8601 duration like <code>PT1H2M3S</code> or <code>P1DT2H</code>.
+            </li>
             <li>Any other field is written to the metadata JSON as is.</li>
           </ul>
         </dd>
@@ -281,11 +287,15 @@ attr = "src"
           </p>
           <p>
             Read from the channel page Tubarr already loads, so they cost no extra requests. Each entry has a
-            <code>field</code> (<code>title</code>, <code>thumbnail</code>, <code>upload_date</code>, or
-            <code>duration</code>), plus <code>selector</code>, <code>attr</code>, <code>json_path</code>, and
-            <code>regex</code> as for metadata selectors. <code>fetch</code> isn't allowed. If a field is listed
-            more than once, the first one found is used. Durations can be <code>1:02:03</code>, seconds, or
-            <code>PT1H2M3S</code>.
+            <code>field</code> (<code>title</code>, <code>thumbnail</code>, <code>upload_date</code>,
+            <code>duration</code>, or <code>duration_string</code>), plus <code>selector</code>, <code>attr</code>,
+            <code>json_path</code>, and <code>regex</code> as for metadata selectors. <code>fetch</code> isn't
+            allowed. If a field is listed more than once, the first one found is used.
+          </p>
+          <p>
+            <code>duration</code> and <code>duration_string</code> give the length shown on each video's thumbnail.
+            <code>duration</code> is used if found, otherwise <code>duration_string</code>. Either can be
+            <code>1:02:03</code>, seconds, or an ISO 8601 duration like <code>PT1H2M3S</code>.
           </p>
         </dd>
       </dl>
@@ -297,7 +307,7 @@ item = ".episode"
 preview_fields = [
   { field = "title", selector = "h5" },
   { field = "thumbnail", selector = "img", attr = "data-src" },
-  { field = "duration", selector = ".duration" },
+  { field = "duration_string", selector = ".duration" },
   { field = "upload_date", selector = "time" },
 ]</code></pre>
     </main>

@@ -144,6 +144,47 @@ func TestScrapeFetchChain(t *testing.T) {
 	}
 }
 
+// TestScrapeDuration checks scraped metadata gets duration in seconds, from duration or else duration_string.
+func TestScrapeDuration(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><head><script type=application/ld+json>[{"@context":"http://schema.org","@type":"VideoObject","duration":"PT07H24M44S","interactionStatistic":{"@type":"InteractionCounter"}},{"@context":"http://schema.org","@type":"WebSite"},{"@context":"http://schema.org","@type":"Organization"}]</script></head>` +
+			`<body><span class="duration">1:02:03</span><span class="secs">90</span><span class="bad">abc</span></body></html>`))
+	}))
+	defer srv.Close()
+
+	tests := []struct {
+		name       string
+		rules      []models.MetadataRule
+		wantSecs   any
+		wantString any
+	}{
+		{"string only", []models.MetadataRule{{Name: sharedtags.JDurationString, Selector: ".duration"}}, 3723, "1:02:03"},
+		{"duration preferred", []models.MetadataRule{{Name: sharedtags.JDurationString, Selector: ".duration"}, {Name: sharedtags.JDuration, Selector: ".secs"}}, 90, "1:02:03"},
+		{"bad duration falls back", []models.MetadataRule{{Name: sharedtags.JDuration, Selector: ".bad"}, {Name: sharedtags.JDurationString, Selector: ".duration"}}, 3723, "1:02:03"},
+		{"nothing parses", []models.MetadataRule{{Name: sharedtags.JDuration, Selector: ".bad"}}, nil, nil},
+		{"rumble json-ld", []models.MetadataRule{{Name: sharedtags.JDuration, Selector: `script[type="application/ld+json"]`, JSONPath: `#(@type=="VideoObject").duration`}}, 26684, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := New()
+			v := &models.Video{URL: srv.URL}
+			query := models.SiteRules{Site: "test", Metadata: tt.rules}
+			var metadata map[string]any
+			if err := s.visitPage(t.Context(), srv.URL, nil, query, func(c *colly.Collector) {
+				metadata = s.ScrapeWithRules(srv.URL, c, v, query)
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if got := metadata[sharedtags.JDuration]; got != tt.wantSecs {
+				t.Errorf("duration = %v, want %v", got, tt.wantSecs)
+			}
+			if got := metadata[sharedtags.JDurationString]; got != tt.wantString {
+				t.Errorf("duration_string = %v, want %v", got, tt.wantString)
+			}
+		})
+	}
+}
+
 // TestExtractValue tests applying a JSON path and regex to a value.
 func TestExtractValue(t *testing.T) {
 	tests := []struct {
@@ -158,6 +199,7 @@ func TestExtractValue(t *testing.T) {
 		{"regex whole match", "id=v42;", "", regexp.MustCompile(`v\d+`), "v42"},
 		{"regex no match", "abc", "", regexp.MustCompile(`\d`), ""},
 		{"json path then regex", `{"u":"https://x/embed/v7/"}`, "u", regexp.MustCompile(`embed/(\w+)`), "v7"},
+		{"json-ld query", `[{"@type":"WebSite"},{"@type":"VideoObject","duration":"PT07H24M44S"}]`, `#(@type=="VideoObject").duration`, nil, "PT07H24M44S"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -164,3 +164,22 @@ func TestMetadataDate(t *testing.T) {
 		}
 	}
 }
+
+// TestMetadataDuration tests duration is preferred over duration_string, and either may be a string to parse.
+func TestMetadataDuration(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		m    map[string]any
+		want int
+	}{
+		{"duration", map[string]any{"duration": 312.5, "duration_string": "1:00"}, 312},
+		{"duration string", map[string]any{"duration_string": "7:24:44"}, 26684},
+		{"iso duration", map[string]any{"duration": "PT07H24M44S"}, 26684},
+		{"zero duration falls back", map[string]any{"duration": 0.0, "duration_string": "1:00"}, 60},
+		{"none", map[string]any{"title": "x"}, 0},
+	} {
+		if got := metadataDuration(tc.m); got != tc.want {
+			t.Errorf("%s: got %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}

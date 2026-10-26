@@ -257,6 +257,7 @@
                           <td class="px-6 py-4">
                             <div class="max-w-md">
                               <p class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" x-text="video.title"></p>
+                              <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400" :title="video.channel_url" x-text="shortURL(video.channel_url)"></p>
                               <p
                                 x-show="video.finished && video.filesize > 0"
                                 class="mt-1 text-xs text-gray-500 dark:text-gray-400"

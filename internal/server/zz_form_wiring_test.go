@@ -32,6 +32,9 @@ const (
 // perURLFixedKeys are the per-URL fields the channel pages send whether or not custom settings are on.
 var perURLFixedKeys = []string{"paused", "use_global_cookies", "auto_download"}
 
+// perURLMetarrBools are the per-URL Metarr choices the channel pages send as booleans, with the custom settings.
+var perURLMetarrBools = []string{"metarr_purge_original_video"}
+
 // ---- Page parsing ----
 
 // webRoot is the repository's web folder.
@@ -369,7 +372,7 @@ func notificationKeys[T string | []models.Notification](v T) []string {
 // urlSettingValue types a per-URL value as the channel pages put it in their url_settings JSON.
 func urlSettingValue(key, v string, number bool) any {
 	switch {
-	case slices.Contains(perURLFixedKeys, key):
+	case slices.Contains(perURLFixedKeys, key) || slices.Contains(perURLMetarrBools, key):
 		return v == "true"
 	case key == "ytdlp_preferred_video_codecs" || key == "ytdlp_preferred_audio_codecs":
 		return strings.Split(v, "\n")
@@ -457,6 +460,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		"metarr_filtered_meta_ops":                {"title:contains:ep 5 | cat: finale||artist:set:Cat", "title:contains:dog||artist:set:Dog"},
 		"metarr_filtered_meta_ops_file":           {file("filtered-meta-ops-a.txt", "title:contains:a||artist:set:A\n"), file("filtered-meta-ops-b.txt", "title:contains:b||artist:set:B\n")},
 		"metarr_purge_metafile":                   {"json", "all"},
+		"metarr_purge_original_video":             {"false", "true"},
 	}
 }
 
@@ -480,7 +484,7 @@ func TestChannelFormModels(t *testing.T) {
 		settingsKeys := objectKeys(t, src, "formData: {", "settings: {")
 		metarrKeys := objectKeys(t, src, "formData: {", "metarr: {")
 		urlKeys := perURLKeys(t, page, src)
-		urlFields := slices.Concat(arrayStrings(t, src, "settingsFields"), arrayStrings(t, src, "metarrFields"), perURLFixedKeys)
+		urlFields := slices.Concat(arrayStrings(t, src, "settingsFields"), arrayStrings(t, src, "metarrFields"), perURLFixedKeys, perURLMetarrBools)
 
 		for _, model := range []struct {
 			prefix string
@@ -607,7 +611,7 @@ func TestChannelFormRoundTrip(t *testing.T) {
 		settingsKeys := objectKeys(t, src, "formData: {", "settings: {")
 		metarrKeys := objectKeys(t, src, "formData: {", "metarr: {")
 		urlSettingsFields := slices.Concat(arrayStrings(t, src, "settingsFields"), perURLFixedKeys)
-		urlMetarrFields := arrayStrings(t, src, "metarrFields")
+		urlMetarrFields := slices.Concat(arrayStrings(t, src, "metarrFields"), perURLMetarrBools)
 		urlNumbers := boundKeys(bindings(src), "urlEntry.custom.")
 
 		value := func(key string, perURL bool) string {

@@ -95,7 +95,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 }
 
 // SetMetarrFlags sets flags for interaction with the Metarr software.
-func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
+func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, purgeOriginalVideo *bool,
 	outputExt, extraFFmpegargs, minFreeMem, outDir, metaPurge, renameStyle, metaOpsFile,
 	filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile *string,
 	filenameOps, filteredFilenameOps, metaOps, filteredMetaOps *[]string) {
@@ -106,6 +106,11 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	}
 	if metarrConcurrency != nil {
 		cmd.Flags().IntVar(metarrConcurrency, keys.MConcurrency, 0, "Max concurrent processes for Metarr")
+	}
+
+	// Booleans
+	if purgeOriginalVideo != nil {
+		cmd.Flags().BoolVar(purgeOriginalVideo, keys.MPurgeOriginalVideo, false, "Delete the original video once Metarr writes a new one from it (the default, false keeps it)")
 	}
 
 	// String

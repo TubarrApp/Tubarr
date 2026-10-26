@@ -25,6 +25,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		metaOps, filenameOps = loadAndMergeMetaOps(v, cu, c, dirParser), loadAndMergeFilenameOps(v, cu, c, dirParser)
 	}
 
+	// Fill Tubarr's tags in the ops, leaving the rest for Metarr.
+	metaOps = parsing.FillChannelTags(metaOps, c, cu)
+	filenameOps = parsing.FillChannelTags(filenameOps, c, cu)
+
 	// 'Download As' args, blank ones using the channel URL's.
 	var o models.MetarrArgs
 	if v.Overrides != nil {
@@ -86,6 +90,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	add(metkeys.OutputDir, parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)))
 	add(metkeys.Ext, ext)
 	add(metkeys.RenameStyle, cmp.Or(o.RenameStyle, m.RenameStyle))
+	// Metarr keeps the original video unless told otherwise, and Tubarr deletes it unless the channel keeps it.
+	if m.PurgeOriginalVideo == nil || *m.PurgeOriginalVideo {
+		args = append(args, metkeys.PurgeOriginalVideo)
+	}
 
 	// Transcoding.
 	add(metkeys.ExtraFFmpegArgs, cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs))

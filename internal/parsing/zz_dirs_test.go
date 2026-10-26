@@ -57,3 +57,18 @@ func TestParseTemplateChannelTags(t *testing.T) {
 		t.Errorf("parseTemplate() without a channel URL = %q, want an error", got)
 	}
 }
+
+// TestParseTemplateChannelURLName tests a channel URL's name fills its tag, made path-safe, and the URL fills it when
+// the name is blank.
+func TestParseTemplateChannelURLName(t *testing.T) {
+	c := &models.Channel{ID: 3, Name: "Cats"}
+	for _, tc := range []struct{ name, want string }{
+		{"Shorts/Clips", "/media/Shorts-Clips"},
+		{"", "/media/www.youtube.com-@cats"},
+	} {
+		dp := NewDirectoryParser(c, &models.ChannelURL{URL: "https://www.youtube.com/@cats", Name: tc.name}, TubarrTags)
+		if got, err := dp.parseTemplate("/media/{{channel_url_name}}"); err != nil || got != tc.want {
+			t.Errorf("name %q: parseTemplate() = %q, %v; want %q", tc.name, got, err, tc.want)
+		}
+	}
+}

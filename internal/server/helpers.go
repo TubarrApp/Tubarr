@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/auth"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/jsonkeys"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -125,6 +126,9 @@ func newConfigFileResponse(path string) *configFileResponse {
 	}
 	for u, override := range input.URLSettings {
 		var given []string
+		if override.Name != nil {
+			given = append(given, keys.ChannelURLName)
+		}
 		if override.Settings != nil {
 			given = parsing.GivenKeys(override.Settings)
 		}
@@ -148,6 +152,7 @@ type authDetailResponse struct {
 
 // urlSettingsResponse is a channel URL's custom settings.
 type urlSettingsResponse struct {
+	Name      string              `json:"name,omitempty"`
 	ProfileID int64               `json:"profile_id,omitempty"`
 	Settings  *settingsResponse   `json:"settings,omitempty"`
 	Metarr    *metarrArgsResponse `json:"metarr,omitempty"`
@@ -157,6 +162,7 @@ type urlSettingsResponse struct {
 type metarrArgsResponse struct {
 	OutputDir               string   `json:"metarr_output_directory,omitempty"`
 	MetaPurge               string   `json:"metarr_purge_metafile,omitempty"`
+	PurgeOriginalVideo      *bool    `json:"metarr_purge_original_video,omitempty"`
 	OutputExt               string   `json:"metarr_output_ext,omitempty"`
 	RenameStyle             string   `json:"metarr_rename_style,omitempty"`
 	MetarrConcurrency       int      `json:"metarr_concurrency,omitempty"`
@@ -186,6 +192,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 	r := &metarrArgsResponse{
 		OutputDir:               m.OutputDir,
 		MetaPurge:               m.MetaPurge,
+		PurgeOriginalVideo:      m.PurgeOriginalVideo,
 		OutputExt:               m.OutputExt,
 		RenameStyle:             m.RenameStyle,
 		MetarrConcurrency:       max(m.MetarrConcurrency, 0),
@@ -403,6 +410,7 @@ func parseChannelForm(r *http.Request) (*channelForm, error) {
 
 // urlSettingsInput is the per-URL settings JSON sent by the web UI, keyed by channel URL.
 type urlSettingsInput struct {
+	Name      string           `json:"name"`
 	ProfileID int64            `json:"profile_id"`
 	Settings  *settingsInput   `json:"settings"`
 	Metarr    *metarrArgsInput `json:"metarr"`
@@ -450,6 +458,7 @@ type metarrArgsInput struct {
 	GPUNode                 *string  `json:"metarr_transcode_gpu_node"`
 	OutputDir               *string  `json:"metarr_output_directory"`
 	MetaPurge               *string  `json:"metarr_purge_metafile"`
+	PurgeOriginalVideo      *bool    `json:"metarr_purge_original_video"`
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
 	TranscodeQuality        *string  `json:"metarr_transcode_quality"`
@@ -473,7 +482,7 @@ func parseURLSettings(raw string) (map[string]urlSettings, error) {
 	}
 	for channelURL, in := range input {
 		var (
-			out = urlSettings{ProfileID: in.ProfileID}
+			out = urlSettings{Name: strings.TrimSpace(in.Name), ProfileID: in.ProfileID}
 			err error
 		)
 		if in.Settings != nil {
@@ -545,6 +554,7 @@ func syncChannelURLs(cs contracts.ChannelStore, channelID int64, existing []*mod
 			existingURLModel.ChanURLSettings = urlSettings.Settings
 			existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
 			existingURLModel.ProfileID = urlSettings.ProfileID
+			existingURLModel.Name = urlSettings.Name
 
 			if err := cs.UpdateChannelURLSettings(existingURLModel); err != nil {
 				return fmt.Errorf("failed to update URL %q: %w", u, err)
@@ -560,6 +570,7 @@ func syncChannelURLs(cs contracts.ChannelStore, channelID int64, existing []*mod
 			ChanURLSettings:   urlSettings.Settings,
 			ChanURLMetarrArgs: urlSettings.Metarr,
 			ProfileID:         urlSettings.ProfileID,
+			Name:              urlSettings.Name,
 			LastScan:          now,
 			CreatedAt:         now,
 			UpdatedAt:         now,
@@ -600,6 +611,7 @@ func replaceNotifications(cs contracts.ChannelStore, channelID int64, f *channel
 
 // urlSettings are a channel URL's parsed custom settings.
 type urlSettings struct {
+	Name      string
 	ProfileID int64
 	Settings  *models.Settings
 	Metarr    *models.MetarrArgs
@@ -640,6 +652,7 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 	return &models.MetarrArgsInput{
 		OutDir:                  in.OutputDir,
 		MetaPurge:               in.MetaPurge,
+		PurgeOriginalVideo:      in.PurgeOriginalVideo,
 		MetarrExt:               in.OutputExt,
 		RenameStyle:             in.RenameStyle,
 		MetaOpsFile:             in.MetaOpsFile,
@@ -822,6 +835,11 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 		MaxCPU:                  &maxCPU,
 		MetarrConcurrency:       &concurrency,
 		ExtraFFmpegArgs:         formString(r, jsonkeys.MetarrExtraFFmpegArgs),
+	}
+	// Left unset, this uses the profile's setting, else deletes the original.
+	if v := r.FormValue(jsonkeys.MetarrPurgeOriginalVideo); v != "" {
+		purgeOriginalVideo := v == "true"
+		in.PurgeOriginalVideo = &purgeOriginalVideo
 	}
 
 	m := &models.MetarrArgs{}

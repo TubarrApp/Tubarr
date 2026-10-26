@@ -922,7 +922,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 		}
 
 		urlInsertQuery := fmt.Sprintf(
-			"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 			consts.DBChannelURLs,
 			consts.QChanURLChannelID,
 			consts.QChanURLURL,
@@ -936,6 +936,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			consts.QChanURLCreatedAt,
 			consts.QChanURLUpdatedAt,
 			consts.QChanURLProfileID,
+			consts.QChanURLName,
 		)
 
 		urlInsertResult, err := cs.q.Exec(
@@ -952,6 +953,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			now,
 			now,
 			cu.ProfileID,
+			cu.Name,
 		)
 		if err != nil {
 			return 0, fmt.Errorf("failed to insert URL %q for channel ID %d: %w", cu.URL, id, err)
@@ -1641,6 +1643,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 			continue
 		}
 		fmt.Printf("%sURL %q%s\n", sharedconsts.ColorCyan, u.URL, sharedconsts.ColorReset)
+		fmt.Printf("Name: %s\n", u.Name)
 		fmt.Printf("Paused? %v\n", u.ChanURLSettings.Paused)
 		fmt.Printf("Auto Download? %v\n", c.AutoDownloads(u))
 		fmt.Printf("Profile: %s\n", profileName(u.ProfileID, u.Profile))
@@ -1787,15 +1790,20 @@ func (cs *ChannelStore) applyConfigURLSettings(c *models.Channel, cfgFile string
 				return nil, fmt.Errorf("profile for URL %q in config file %q: %w", cu.URL, cfgFile, err)
 			}
 		}
+		name := cu.Name
+		if override.Name != nil {
+			name = *override.Name
+		}
 		cu.ChanURLSettings, cu.ChanURLMetarrArgs = s, m
 		if err := validateURLSettings(cu); err != nil { // Normalizes, as saving would, before comparing.
 			return nil, fmt.Errorf("config file %q: %w", cfgFile, err)
 		}
 		settingsAfterJSON, metarrAfterJSON := makeSettingsMetarrArgsCopy(s, m, cu.URL)
-		if bytes.Equal(settingsBeforeJSON, settingsAfterJSON) && bytes.Equal(metarrBeforeJSON, metarrAfterJSON) && profileID == cu.ProfileID {
+		if bytes.Equal(settingsBeforeJSON, settingsAfterJSON) && bytes.Equal(metarrBeforeJSON, metarrAfterJSON) && profileID == cu.ProfileID && name == cu.Name {
 			continue
 		}
 		cu.ProfileID = profileID
+		cu.Name = name
 		changed = append(changed, cu)
 	}
 	return changed, nil

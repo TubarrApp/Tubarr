@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
+	"github.com/TubarrApp/gocommon/sharedtemplates"
 )
 
 // ParseFilenameOps parses filename transformation operation strings into models.
@@ -36,6 +37,55 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	}
 	logger.Pl.D(1, "Parsed %d meta operations from %v", len(parsed), metaOps)
 	return parsed, nil
+}
+
+// FillChannelTags fills the channel tags in each op, leaving any other tag for Metarr to fill from the metadata.
+func FillChannelTags(ops []string, c *models.Channel, cu *models.ChannelURL) []string {
+	filled := make([]string, 0, len(ops))
+	for _, op := range ops {
+		f, err := fillOpTags(op, c, cu)
+		if err != nil {
+			logger.Pl.E("Failed to fill tags in op %q: %v", op, err)
+			f = op
+		}
+		filled = append(filled, f)
+	}
+	return filled
+}
+
+// fillOpTags fills the channel tags in one op.
+func fillOpTags(op string, c *models.Channel, cu *models.ChannelURL) (string, error) {
+	var b strings.Builder
+	remaining := op
+	for {
+		// Find the next tag.
+		startIdx := strings.Index(remaining, openTemplate)
+		if startIdx == -1 {
+			break
+		}
+		endIdx := strings.Index(remaining[startIdx:], closeTemplate)
+		if endIdx == -1 {
+			break
+		}
+		endIdx += startIdx
+		tag := remaining[startIdx+len(openTemplate) : endIdx]
+
+		// Fill channel tags, writing any other as it is.
+		b.WriteString(remaining[:startIdx])
+		if sharedtemplates.ValidTag(tag, sharedtemplates.TubarrTemplateTags) {
+			name, _ := sharedtemplates.ParseTag(tag)
+			value, err := channelTagValue(name, c, cu)
+			if err != nil {
+				return "", err
+			}
+			b.WriteString(sharedparsing.Escape(value)) // Escaped, as a ':' in the value would split the op.
+		} else {
+			b.WriteString(remaining[startIdx : endIdx+len(closeTemplate)])
+		}
+		remaining = remaining[endIdx+len(closeTemplate):]
+	}
+	b.WriteString(remaining)
+	return b.String(), nil
 }
 
 // logWarnings logs parse warnings, which only cover duplicates. Malformed or invalid entries fail the parse itself.

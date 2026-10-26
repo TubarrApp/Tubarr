@@ -22,9 +22,6 @@ const (
 	FlareSolverrMaxTimeout     = 300 * time.Second
 )
 
-// CrawlFieldDuration is the crawl preview field holding a video's duration (the others reuse metadata field names).
-const CrawlFieldDuration = "duration"
-
 // ValidImpersonateValues is a set of valid impersonation values for scraping.
 var ValidImpersonateValues = map[Impersonate]struct{}{
 	ImpersonateNone:    {},
