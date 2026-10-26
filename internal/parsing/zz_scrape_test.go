@@ -362,12 +362,3 @@ func TestParseScrapeSelectorsFileUserAgent(t *testing.T) {
 		t.Errorf("unexpected sites: %+v", sites)
 	}
 }
-
-// TestParseDuration tests the duration formats scraped and metadata durations accept.
-func TestParseDuration(t *testing.T) {
-	for in, want := range map[string]int{"00:47:35": 2855, "1:02:03": 3723, "62:03": 3723, "3723": 3723, "312.5": 312, "PT1H2M3S": 3723, "pt47m": 2820, "PT07H24M44S": 26684, "P1DT2H3M4S": 93784, "P2D": 172800, "P1Y": 0, "PT-1H": 0, "P": 0, "abc": 0, "1:xx": 0, "": 0} {
-		if got := ParseDuration(in); got != want {
-			t.Errorf("ParseDuration(%q) = %d, want %d", in, got, want)
-		}
-	}
-}

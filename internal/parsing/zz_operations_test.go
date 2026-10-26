@@ -206,13 +206,13 @@ func TestParseFilterOps(t *testing.T) {
 		"title:contains:cat:must",
 		"title:omits:frogs:any",
 		"date:omits:must",
-		"duration:morethan:3600:must",
+		"duration:more-than:3600:must",
 	}
 	invalidMustAnyFilterOps := []string{
 		"title:contains:cat",
 		"title:omits:frogs",
 		"date:omits",
-		"duration:morethan:3600",
+		"duration:more-than:3600",
 	}
 
 	mustAnyFilters, err := parsing.ParseFilterOps(mustAnyFilterOps, true)
@@ -248,13 +248,13 @@ func TestParseFilterOps(t *testing.T) {
 		"title:contains:cat",
 		"title:omits:frogs",
 		"date:omits",
-		"duration:morethan:3600",
+		"duration:more-than:3600",
 	}
 	invalidNonMustAnyFilterOps := []string{
 		"title:contains:cat:must",
 		"title:omits:frogs:any",
 		"date:omits:must",
-		"duration:morethan:3600:any",
+		"duration:more-than:3600:any",
 	}
 
 	noMustAnyFilters, err := parsing.ParseFilterOps(nonMustAnyFilterOps, false)
@@ -296,11 +296,12 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 		{"Title:contains:Cats||/home/cats", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/cats"}},
 		{"title:contains:Ep 5 | Show: Finale||/home/show", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "ep 5 | show: finale", OutputDir: "/home/show"}},
 		{"title:omits:dogs||/home/no dogs", models.MetaFilterMoveOps{Field: "title", FilterType: "omits", Value: "dogs", OutputDir: "/home/no dogs"}},
-		{"duration:morethan:3600||/home/long", models.MetaFilterMoveOps{Field: "duration", FilterType: "morethan", Value: "3600", OutputDir: "/home/long"}},
+		{"duration:more-than:3600||/home/long", models.MetaFilterMoveOps{Field: "duration", FilterType: "more-than", Value: "3600", OutputDir: "/home/long"}},
 		{"director:contains||/home/directed", models.MetaFilterMoveOps{Field: "director", FilterType: "contains", OutputDir: "/home/directed"}},
 		{`title:contains:cats||C:\Videos\Cats`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: `C:\Videos\Cats`}},
 		{"title:contains:cats||/home/a|b||c", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/a|b||c"}},
 		{`title:contains:ends in a pipe\|||/home/pipe`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "ends in a pipe|", OutputDir: "/home/pipe"}},
+		{`title:regex-contains:[[^Cat|^Dog \d+]]||/home/pets`, models.MetaFilterMoveOps{Field: "title", FilterType: "regex-contains", Value: `^Cat|^Dog \d+`, OutputDir: "/home/pets"}},
 	}
 	for _, tt := range tests {
 		got, err := parsing.ParseMetaFilterMoveOps([]string{tt.in})
@@ -319,14 +320,14 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 		"title:contains:cats",       // No directory.
 		"title:contains:cats||",     // Empty directory.
 		"title:contains:cats|/home", // A single '|'.
-		"title:morethan||/home",     // A comparison with no value.
+		"title:more-than||/home",    // A comparison with no value.
 	} {
 		if _, err := parsing.ParseMetaFilterMoveOps([]string{bad}); err == nil {
 			t.Errorf("ParseMetaFilterMoveOps(%q) was accepted", bad)
 		}
 	}
 	for _, invalid := range []string{
-		"title:morethan:soon||/home",
+		"title:more-than:soon||/home",
 		"title:explodes:cats||/home",
 		"https://tubesite.com/@cats|title:contains:cats||/home/cats",  // A channel URL.
 		"https://tubesite.com/@cats||title:contains:cats||/home/cats", // A channel URL with "||".

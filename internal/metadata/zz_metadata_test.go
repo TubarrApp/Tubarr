@@ -91,6 +91,86 @@ func TestMustAndAnyFilters(t *testing.T) {
 	}
 }
 
+// TestCheckFiltersFieldValues tests download filters on durations, empty values, and missing fields.
+func TestCheckFiltersFieldValues(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	meta := map[string]any{"title": "Cats", "description": "", "duration_string": "7:24:44"}
+	tests := []struct {
+		name   string
+		filter models.Filters
+		want   bool
+	}{
+		{"duration string more-than", models.Filters{Field: "duration_string", FilterType: "more-than", Value: "3600", MustAny: "must"}, true},
+		{"duration string less-than", models.Filters{Field: "duration_string", FilterType: "less-than", Value: "3600", MustAny: "must"}, false},
+		{"missing numeric field is skipped", models.Filters{Field: "duration", FilterType: "more-than", Value: "3600", MustAny: "must"}, true},
+		{"text field fails a numeric filter", models.Filters{Field: "title", FilterType: "more-than", Value: "1", MustAny: "must"}, false},
+		{"equals empty", models.Filters{Field: "description", FilterType: "equals", MustAny: "must"}, true},
+		{"not-equals empty", models.Filters{Field: "title", FilterType: "not-equals", MustAny: "must"}, true},
+		{"missing field equals empty", models.Filters{Field: "absent", FilterType: "equals", MustAny: "must"}, true},
+	}
+	for _, tt := range tests {
+		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: meta}
+		if got := checkFilters(v, "Download filters", []models.Filters{tt.filter}); got != tt.want {
+			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// TestPresenceAnyFilters tests contains and omits 'any' filters with no value act as ordinary 'any' filters on whether
+// the field is present.
+func TestPresenceAnyFilters(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	hasDate := models.Filters{Field: "date", FilterType: "contains", MustAny: "any"}
+	noDate := models.Filters{Field: "date", FilterType: "omits", MustAny: "any"}
+	cats := models.Filters{Field: "title", FilterType: "contains", Value: "cats", MustAny: "any"}
+	tests := []struct {
+		name    string
+		meta    map[string]any
+		filters []models.Filters
+		want    bool
+	}{
+		{"no date but cats", map[string]any{"title": "Cats"}, []models.Filters{hasDate, cats}, true},
+		{"no date and no cats", map[string]any{"title": "Dogs"}, []models.Filters{hasDate, cats}, false},
+		{"date but no cats", map[string]any{"title": "Dogs", "date": "2024-01-02"}, []models.Filters{hasDate, cats}, true},
+		{"omits date", map[string]any{"title": "Dogs"}, []models.Filters{noDate}, true},
+		{"date and no cats", map[string]any{"title": "Dogs", "date": "2024-01-02"}, []models.Filters{noDate, cats}, false},
+	}
+	for _, tt := range tests {
+		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: tt.meta}
+		if got := checkFilters(v, "Download filters", tt.filters); got != tt.want {
+			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+// TestFilteredOpsNumericField tests filtered ops apply by a numeric field's value, and not when it's missing.
+func TestFilteredOpsNumericField(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	cu := &models.ChannelURL{ChanURLMetarrArgs: &models.MetarrArgs{}}
+	long := []models.Filters{{Field: "duration", FilterType: "more-than", Value: "3600", MustAny: "must"}}
+	metaOps := []models.FilteredMetaOps{{Filters: long, MetaOps: []models.MetaOps{{Field: "title", OpType: "prefix", OpValue: "[LONG] "}}}}
+	filenameOps := []models.FilteredFilenameOps{{Filters: long, FilenameOps: []models.FilenameOps{{OpType: "prefix", OpValue: "[LONG] "}}}}
+
+	for _, tt := range []struct {
+		name string
+		meta map[string]any
+		want bool
+	}{
+		{"missing", map[string]any{"title": "Cats"}, false},
+		{"short", map[string]any{"title": "Cats", "duration": 60.0}, false},
+		{"long", map[string]any{"title": "Cats", "duration": 4000.0}, true},
+		{"long duration string", map[string]any{"title": "Cats", "duration": "1:06:40"}, true},
+	} {
+		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: tt.meta}
+		if got := filteredMetaOpsMatches(v, cu, metaOps, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
+			t.Errorf("%s: filtered meta ops got %+v, want matched %v", tt.name, got, tt.want)
+		}
+		if got := filteredFilenameOpsMatches(v, cu, filenameOps, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
+			t.Errorf("%s: filtered filename ops got %+v, want matched %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 // TestHandleMoveOps tests move ops pick the first matching op's directory, by any filter type, for their channel URL.
 func TestHandleMoveOps(t *testing.T) {
 	logger.Pl.Console = io.Discard
@@ -104,8 +184,8 @@ func TestHandleMoveOps(t *testing.T) {
 		{"saved before filter types, read as contains", []models.MetaFilterMoveOps{{Field: "title", Value: "cats", OutputDir: "/cats"}}, "/cats"},
 		{"no match", []models.MetaFilterMoveOps{{Field: "title", FilterType: "contains", Value: "dogs", OutputDir: "/dogs"}}, ""},
 		{"omits", []models.MetaFilterMoveOps{{Field: "title", FilterType: "omits", Value: "dogs", OutputDir: "/no-dogs"}}, "/no-dogs"},
-		{"morethan", []models.MetaFilterMoveOps{{Field: "duration", FilterType: "morethan", Value: "3600", OutputDir: "/long"}}, "/long"},
-		{"missing field for a comparison", []models.MetaFilterMoveOps{{Field: "views", FilterType: "morethan", Value: "1", OutputDir: "/popular"}}, ""},
+		{"more-than", []models.MetaFilterMoveOps{{Field: "duration", FilterType: "more-than", Value: "3600", OutputDir: "/long"}}, "/long"},
+		{"missing field for a comparison", []models.MetaFilterMoveOps{{Field: "views", FilterType: "more-than", Value: "1", OutputDir: "/popular"}}, ""},
 		{"first match wins", []models.MetaFilterMoveOps{
 			{Field: "title", FilterType: "contains", Value: "dogs", OutputDir: "/dogs"},
 			{Field: "title", FilterType: "contains", Value: "two", OutputDir: "/two"},

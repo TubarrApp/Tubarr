@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/parsing"
 
 	"github.com/TubarrApp/gocommon/sharedfilters"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtags"
 )
 
@@ -108,12 +109,15 @@ func metadataDuration(m map[string]any) int {
 			return int(d)
 		}
 	case string:
-		if secs := parsing.ParseDuration(d); secs > 0 {
+		if secs, _ := sharedparsing.ParseDuration(d); secs > 0 {
 			return secs
 		}
 	}
 	s, _ := m[sharedtags.JDurationString].(string)
-	return parsing.ParseDuration(s)
+
+	// Parse and return.
+	parsed, _ := sharedparsing.ParseDuration(s)
+	return parsed
 }
 
 // parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
-	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtags"
 	"github.com/gocolly/colly"
 	"github.com/tidwall/gjson"
@@ -180,13 +180,13 @@ func setListedField(lv *listedVideo, name, value string, absURL func(string) str
 		}
 	case sharedtags.JDuration:
 		// Replaces a duration parsed from duration_string, even one read first.
-		if secs := parsing.ParseDuration(value); secs > 0 && !lv.durationField {
+		if secs, _ := sharedparsing.ParseDuration(value); secs > 0 && !lv.durationField {
 			lv.Duration = secs
 			lv.durationField = true
 		}
 	case sharedtags.JDurationString:
 		if lv.Duration == 0 {
-			lv.Duration = parsing.ParseDuration(value)
+			lv.Duration, _ = sharedparsing.ParseDuration(value)
 		}
 	}
 }

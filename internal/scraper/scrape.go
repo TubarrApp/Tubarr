@@ -33,6 +33,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtags"
 
 	"github.com/gocolly/colly"
@@ -763,7 +764,9 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		if durationString != "" {
 			metadata[sharedtags.JDurationString] = durationString
 		}
-		if secs := cmp.Or(parsing.ParseDuration(duration), parsing.ParseDuration(durationString)); secs > 0 {
+		parsedDuration, _ := sharedparsing.ParseDuration(duration)
+		parsedDurationStr, _ := sharedparsing.ParseDuration(durationString)
+		if secs := cmp.Or(parsedDuration, parsedDurationStr); secs > 0 {
 			v.Duration = secs
 			metadata[sharedtags.JDuration] = secs
 		} else if duration != "" || durationString != "" {

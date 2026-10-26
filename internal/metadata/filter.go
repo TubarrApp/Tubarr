@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/logging"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedfilters"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
@@ -26,48 +26,32 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 	// Filter loop.
 	for _, filter := range filters {
-		// Retrieve the metadata value for the filter's field.
-		val, exists := v.MetadataMap[filter.Field]
-		strVal := strings.ToLower(fmt.Sprint(val))
-		filterVal := strings.ToLower(filter.Value)
+		matched, skipped, err := sharedfilters.Match(v.MetadataMap, filter)
+		if err != nil {
+			logger.Pl.E("%s error: Video %q: %v", filterType, v.URL, err)
+			return false
+		}
 
 		// Numerical filters with an absent or empty field are skipped rather than failed,
 		// since there is nothing meaningful to compare against.
-		if isNumericalFilter(filter.FilterType) && (!exists || strVal == "" || strVal == "<nil>") {
-			if !exists {
-				logger.Pl.D(1, "%s skip: Video %q does not have field %q in its metadata, skipping numerical filter", filterType, v.URL, filter.Field)
-			} else {
-				logger.Pl.D(1, "%s skip: Video %q has an empty value for field %q, skipping numerical filter", filterType, v.URL, filter.Field)
-			}
+		if skipped {
+			logger.Pl.D(1, "%s skip: Video %q has no value for field %q, skipping numerical filter", filterType, v.URL, filter.Field)
 			continue
+		}
+		if !matched {
+			logger.Pl.D(3, "%s mismatch: Video %q has %v for field %q, which fails filter %q", filterType, v.URL, v.MetadataMap[filter.Field], filter.Field, sharedparsing.FormatFilter(filter, true))
 		}
 
 		// Add to must/any.
 		switch filter.MustAny {
 		case sharedconsts.OpMust:
 			mustTotal++
+			if matched {
+				mustPassed++
+			}
 		case sharedconsts.OpAny:
 			anyTotal++
-		}
-
-		// Check the filter against the video's metadata value.
-		// equals/notequals with an empty filter value compare the field against "".
-		var passed, failHard bool
-		if filter.Value == "" && filter.FilterType != sharedconsts.OpEquals && filter.FilterType != sharedconsts.OpNotEquals {
-			passed, failHard = checkFilterWithEmptyValue(filter, filterType, v.URL, exists)
-		} else {
-			passed, failHard = checkFilterWithValue(filter, filterType, v.URL, strVal, filterVal)
-		}
-
-		if failHard {
-			return false
-		}
-
-		if passed {
-			switch filter.MustAny {
-			case sharedconsts.OpMust:
-				mustPassed++
-			case sharedconsts.OpAny:
+			if matched {
 				anyPassed++
 			}
 		}
@@ -108,7 +92,10 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 	// Check filtered meta ops.
 	for _, fmo := range filteredMetaOps {
 		// Check if filters match.
-		filtersMatched := checkFilters(v, "Filtered meta ops", fmo.Filters)
+		filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, fmo.Filters)
+		if err != nil {
+			logger.Pl.E("Filtered meta ops error: Video %q: %v", v.URL, err)
+		}
 
 		// Only deduplicate entries whose filters matched.
 		if filtersMatched {
@@ -160,7 +147,10 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 	// Check filtered filename ops.
 	for _, ffo := range filteredFilenameOps {
 		// Check if filters match.
-		filtersMatched := checkFilters(v, "Filtered filename ops", ffo.Filters)
+		filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, ffo.Filters)
+		if err != nil {
+			logger.Pl.E("Filtered filename ops error: Video %q: %v", v.URL, err)
+		}
 
 		// Only deduplicate entries whose filters matched.
 		if filtersMatched {
@@ -189,75 +179,6 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		}
 	}
 	return result
-}
-
-// isNumericalFilter reports whether the filter type requires numeric comparison.
-func isNumericalFilter(filterType string) bool {
-	return filterType == sharedconsts.OpMoreThan || filterType == sharedconsts.OpLessThan
-}
-
-// checkFilterWithEmptyValue checks a filter's empty value against its matching metadata field.
-func checkFilterWithEmptyValue(filter models.Filters, filterType, videoURL string, exists bool) (passed, failHard bool) {
-	switch filter.FilterType {
-	case sharedconsts.OpContains:
-		if !exists {
-			logger.Pl.I("%s mismatch: Video %q does not contain desired field %q.", filterType, videoURL, filter.Field)
-			return false, true
-		}
-		return true, false
-	case sharedconsts.OpOmits:
-		if exists && filter.MustAny == sharedconsts.OpMust {
-			logger.Pl.I("%s mismatch: Video %q contains unwanted field %q.", filterType, videoURL, filter.Field)
-			return false, true
-		}
-		return !exists, false
-	}
-	return false, false
-}
-
-// checkFilterWithValue checks a filter's value against its matching metadata field.
-func checkFilterWithValue(filter models.Filters, filterType, videoURL, strVal, filterVal string) (passed, failHard bool) {
-	var mismatch string
-	switch filter.FilterType {
-	case sharedconsts.OpContains:
-		passed = strings.Contains(strVal, filterVal)
-		mismatch = fmt.Sprintf("does not contain desired %q in %q", filter.Value, filter.Field)
-	case sharedconsts.OpOmits:
-		passed = !strings.Contains(strVal, filterVal)
-		mismatch = fmt.Sprintf("contains unwanted %q in %q", filter.Value, filter.Field)
-	case sharedconsts.OpEquals:
-		passed = strVal == filterVal
-		mismatch = fmt.Sprintf("has value %q for field %q which does not equal %q", strVal, filter.Field, filterVal)
-	case sharedconsts.OpNotEquals:
-		passed = strVal != filterVal
-		mismatch = fmt.Sprintf("has value %q for field %q which equals %q", strVal, filter.Field, filterVal)
-	case sharedconsts.OpMoreThan, sharedconsts.OpLessThan:
-		videoNum, err1 := strconv.ParseFloat(strVal, 64)
-		filterNum, err2 := strconv.ParseFloat(filterVal, 64)
-		if err1 != nil || err2 != nil {
-			logger.Pl.E("%s filter error: Video %q has non-numeric value for field %q (video: %q, filter: %q), skipping check", filterType, videoURL, filter.Field, strVal, filter.Value)
-			return false, false
-		}
-		if filter.FilterType == sharedconsts.OpMoreThan {
-			passed = videoNum > filterNum
-			mismatch = fmt.Sprintf("has value %g for field %q which is not more than %g", videoNum, filter.Field, filterNum)
-		} else {
-			passed = videoNum < filterNum
-			mismatch = fmt.Sprintf("has value %g for field %q which is not less than %g", videoNum, filter.Field, filterNum)
-		}
-	default:
-		logger.Pl.E("%s mismatch: Video %q has unknown filter type %q for field %q", filterType, videoURL, filter.FilterType, filter.Field)
-		return false, true
-	}
-
-	if passed {
-		return true, false
-	}
-	if filter.MustAny == sharedconsts.OpMust {
-		logger.Pl.D(3, "%s mismatch: Video %q %s", filterType, videoURL, mismatch)
-		return false, true
-	}
-	return false, false
 }
 
 // uploadDateFilter filters a video based on its upload date.

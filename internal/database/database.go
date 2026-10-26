@@ -186,6 +186,10 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := migrateFilterTypeNames(tx); err != nil {
+		return err
+	}
+
 	if err := initWebSessionsTable(tx); err != nil {
 		return err
 	}

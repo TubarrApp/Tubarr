@@ -399,7 +399,7 @@ func TestValidateFilterOps_Valid(t *testing.T) {
 		},
 		{
 			Field:      "duration",
-			FilterType: "morethan",
+			FilterType: "more-than",
 			MustAny:    "must",
 			Value:      "60",
 		},

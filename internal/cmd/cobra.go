@@ -82,7 +82,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 	}
 
 	if dlFilterFile != nil {
-		cmd.Flags().StringVar(dlFilterFile, keys.FilterOpsFile, "", "Path to a filter operations file (one operation per line [Format is: 'field:contains/omits/morethan/lessthan/equals/notequals:VALUE:must/any'])")
+		cmd.Flags().StringVar(dlFilterFile, keys.FilterOpsFile, "", "Path to a filter operations file (one operation per line [Format is: 'field:contains/regex-contains/omits/more-than/less-than/equals/not-equals:VALUE:must/any', with a regex-contains VALUE wrapped in [[ ]]])")
 	}
 
 	if ytdlpPreferredVideoCodecs != nil {

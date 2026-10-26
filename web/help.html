@@ -273,21 +273,22 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                 <table>
                   <tr><th>Type</th><th>Example</th><th>Passes when</th></tr>
                   <tr><td><code>contains</code></td><td><code>title:contains:live:must</code></td><td>The field holds the value</td></tr>
+                  <tr><td><code>regex-contains</code></td><td><code>title:regex-contains:[[(?i)^ep\.? ?\d+]]:must</code></td><td>The field matches a regular expression (<a href="https://github.com/google/re2/wiki/Syntax">RE2 syntax</a>), written between <code>[[ ]]</code> exactly as the regex engine reads it. Unlike the other types it keeps case, so start the pattern with <code>(?i)</code> to ignore it.</td></tr>
                   <tr><td><code>omits</code></td><td><code>title:omits:trailer:must</code></td><td>The field doesn't hold the value</td></tr>
                   <tr><td><code>equals</code></td><td><code>uploader:equals:kino casino:must</code></td><td>The field is exactly the value</td></tr>
-                  <tr><td><code>notequals</code></td><td><code>language:notequals:de:must</code></td><td>The field is anything else</td></tr>
-                  <tr><td><code>morethan</code></td><td><code>duration:morethan:600:must</code></td><td>The field is a number above the value</td></tr>
-                  <tr><td><code>lessthan</code></td><td><code>duration:lessthan:3600:must</code></td><td>The field is a number below the value</td></tr>
+                  <tr><td><code>not-equals</code></td><td><code>language:not-equals:de:must</code></td><td>The field is anything else</td></tr>
+                  <tr><td><code>more-than</code></td><td><code>duration:more-than:600:must</code></td><td>The field is a number above the value</td></tr>
+                  <tr><td><code>less-than</code></td><td><code>duration:less-than:3600:must</code></td><td>The field is a number below the value</td></tr>
                 </table>
               </div>
               <ul>
-                <li>Matching isn't case-sensitive.</li>
+                <li>Matching isn't case-sensitive, except for <code>regex-contains</code>.</li>
                 <li><strong><code>must</code></strong>: every <code>must</code> filter has to pass. <strong><code>any</code></strong>: at least one <code>any</code> filter has to pass.</li>
                 <li>
                   Leave the value out to check whether the field is there at all: <code>chapters:contains:must</code> needs a
                   <code>chapters</code> field, <code>is_live:omits:must</code> needs it to be missing.
                 </li>
-                <li>A <code>morethan</code> or <code>lessthan</code> filter on a field the video doesn't have is skipped.</li>
+                <li>A <code>more-than</code> or <code>less-than</code> filter on a field the video doesn't have is skipped.</li>
                 <li><strong>From Date</strong> and <strong>To Date</strong> (<code>YYYYMMDD</code>) only download videos uploaded in between.</li>
                 <li>Videos you choose yourself (from Available, Download As or by URL) skip download filters.</li>
               </ul>

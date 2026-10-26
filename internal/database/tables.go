@@ -116,6 +116,38 @@ func migrateAppendOps(tx *sql.Tx) error {
 	return nil
 }
 
+// migrateFilterTypeNames renames stored "notequals", "morethan" and "lessthan" filter types to "not-equals",
+// "more-than" and "less-than", once.
+func migrateFilterTypeNames(tx *sql.Tx) error {
+	res, err := tx.Exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('migrated-filter-type-names', 'true')`)
+	if err != nil {
+		return fmt.Errorf("failed to record the filter type migration: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return nil // Already migrated.
+	}
+
+	// Filters are stored by json.Marshal, so each type is written exactly as matched here. Matching from
+	// 'filter_type"' covers both filters' "filter_type" and move ops' "move_op_filter_type".
+	const rename = `REPLACE(REPLACE(REPLACE(%[2]s, 'filter_type":"notequals"', 'filter_type":"not-equals"'), 'filter_type":"morethan"', 'filter_type":"more-than"'), 'filter_type":"lessthan"', 'filter_type":"less-than"')`
+	for _, tc := range [][2]string{
+		{"channels", "settings"}, {"channels", "metarr"},
+		{"channel_urls", "settings"}, {"channel_urls", "metarr"},
+		{"profiles", "settings"}, {"profiles", "metarr"},
+		{"videos", "overrides"},
+	} {
+		query := fmt.Sprintf(`UPDATE %[1]s SET %[2]s = `+rename+` WHERE %[2]s LIKE '%%filter_type%%'`, tc[0], tc[1])
+		if _, err := tx.Exec(query); err != nil {
+			return fmt.Errorf("failed to migrate filter types in %s.%s: %w", tc[0], tc[1], err)
+		}
+	}
+	return nil
+}
+
 // migrateNotificationNames rebuilds a notifications table from older versions, which had a name column and allowed
 // a notify URL only once per channel, into the current schema.
 func migrateNotificationNames(tx *sql.Tx) error {
