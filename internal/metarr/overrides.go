@@ -7,8 +7,6 @@ import (
 	"tubarr/internal/metadata"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
-
-	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // ChannelURLOverrideLines returns the directories and ops a channel URL's videos use, as the defaults for a video's
@@ -93,24 +91,20 @@ func VideoOverrideLines(o *models.VideoOverrides) models.OverrideLines {
 	}
 }
 
-// filteredMetaOpLines returns the filtered meta ops as lines, each filter with its op.
+// filteredMetaOpLines returns the filtered meta ops as lines, each op with all its filters.
 func filteredMetaOpLines(ops []models.FilteredMetaOps) []string {
 	lines := make([]string, 0, len(ops))
 	for _, fmo := range ops {
-		for i := range min(len(fmo.Filters), len(fmo.MetaOps)) {
-			lines = append(lines, sharedparsing.FormatFilter(fmo.Filters[i], false)+sharedparsing.FilterSeparator+sharedparsing.FormatMetaOp(fmo.MetaOps[i]))
-		}
+		lines = append(lines, models.FilteredMetaOpsToSlice(fmo)...)
 	}
 	return lines
 }
 
-// filteredFilenameOpLines returns the filtered filename ops as lines, each filter with its op.
+// filteredFilenameOpLines returns the filtered filename ops as lines, each op with all its filters.
 func filteredFilenameOpLines(ops []models.FilteredFilenameOps) []string {
 	lines := make([]string, 0, len(ops))
 	for _, ffo := range ops {
-		for i := range min(len(ffo.Filters), len(ffo.FilenameOps)) {
-			lines = append(lines, sharedparsing.FormatFilter(ffo.Filters[i], false)+sharedparsing.FilterSeparator+sharedparsing.FormatFilenameOp(ffo.FilenameOps[i]))
-		}
+		lines = append(lines, models.FilteredFilenameOpsToSlice(ffo)...)
 	}
 	return lines
 }

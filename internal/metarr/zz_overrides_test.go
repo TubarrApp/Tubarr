@@ -29,7 +29,14 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	filteredMetaOps, _, err := sharedparsing.ParseFilteredMetaOps([]string{"title:contains:cat||genre:set:Cats"})
+	filteredMetaOps, _, err := sharedparsing.ParseFilteredMetaOps([]string{
+		"title:contains:cat||genre:set:Cats",
+		"title:contains:cat&&duration:more-than:600||album:set:Long Cats",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filteredFilenameOps, _, err := sharedparsing.ParseFilteredFilenameOps([]string{"title:contains:cat&&duration:more-than:600||prefix:[LONG CAT] "})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,9 +46,10 @@ func TestChannelURLOverrideLines(t *testing.T) {
 		URL:             ownURL,
 		ChanURLSettings: &models.Settings{VideoDir: "/videos/{{channel_name}}", JSONDir: "/json"},
 		ChanURLMetarrArgs: &models.MetarrArgs{
-			OutputDir:       "/out",
-			MetaOps:         metaOps,
-			FilteredMetaOps: filteredMetaOps,
+			OutputDir:           "/out",
+			MetaOps:             metaOps,
+			FilteredMetaOps:     filteredMetaOps,
+			FilteredFilenameOps: filteredFilenameOps,
 		},
 	}
 	lines, err := ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
@@ -50,11 +58,12 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	}
 
 	want := models.OverrideLines{
-		VideoDir:        "/videos/{{channel_name}}", // Shown as written, as the user would enter it.
-		JSONDir:         "/json",
-		OutputDir:       "/out",
-		MetaOps:         "title:prefix:[A] \nartist:set:Cats",
-		FilteredMetaOps: "title:contains:cat||genre:set:Cats",
+		VideoDir:            "/videos/{{channel_name}}", // Shown as written, as the user would enter it.
+		JSONDir:             "/json",
+		OutputDir:           "/out",
+		MetaOps:             "title:prefix:[A] \nartist:set:Cats",
+		FilteredMetaOps:     "title:contains:cat||genre:set:Cats\ntitle:contains:cat&&duration:more-than:600||album:set:Long Cats",
+		FilteredFilenameOps: "title:contains:cat&&duration:more-than:600||prefix:[LONG CAT] ",
 	}
 	if lines != want {
 		t.Errorf("got %+v\nwant %+v", lines, want)
@@ -63,8 +72,38 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	if parsed, err := parsing.ParseMetaOps(strings.Split(lines.MetaOps, "\n")); err != nil || len(parsed) != 2 {
 		t.Errorf("meta op lines parse back as %d ops, %v, want 2", len(parsed), err)
 	}
-	if parsed, err := parsing.ParseFilteredMetaOps(strings.Split(lines.FilteredMetaOps, "\n")); err != nil || len(parsed) != 1 {
-		t.Errorf("filtered meta op lines parse back as %d ops, %v, want 1", len(parsed), err)
+	if parsed, err := parsing.ParseFilteredMetaOps(strings.Split(lines.FilteredMetaOps, "\n")); err != nil || len(parsed) != 2 || len(parsed[1].Filters) != 2 {
+		t.Errorf("filtered meta op lines parse back as %+v, %v, want 2 ops, the second with 2 filters", parsed, err)
+	}
+	if parsed, err := parsing.ParseFilteredFilenameOps(strings.Split(lines.FilteredFilenameOps, "\n")); err != nil || len(parsed) != 1 || len(parsed[0].Filters) != 2 {
+		t.Errorf("filtered filename op lines parse back as %+v, %v, want 1 op with 2 filters", parsed, err)
+	}
+}
+
+// TestVideoOverrideLinesJoinedFilters tests saved Download As filtered ops refill the dialog with all their filters on
+// each op.
+func TestVideoOverrideLinesJoinedFilters(t *testing.T) {
+	logger.Pl.Console = io.Discard
+
+	cat := models.Filters{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}
+	long := models.Filters{Field: "duration", FilterType: "more-than", Value: "600", MustAny: "must"}
+	o := &models.VideoOverrides{MetarrArgs: models.MetarrArgs{
+		FilteredMetaOps: []models.FilteredMetaOps{{
+			Filters: []models.Filters{cat, long},
+			MetaOps: []models.MetaOps{{Field: "album", OpType: "set", OpValue: "Long Cats"}, {Field: "genre", OpType: "set", OpValue: "Cats"}},
+		}},
+		FilteredFilenameOps: []models.FilteredFilenameOps{{
+			Filters:     []models.Filters{cat, long},
+			FilenameOps: []models.FilenameOps{{OpType: "prefix", OpValue: "[LONG CAT] "}},
+		}},
+	}}
+
+	lines := VideoOverrideLines(o)
+	if want := "title:contains:cat&&duration:more-than:600||album:set:Long Cats\ntitle:contains:cat&&duration:more-than:600||genre:set:Cats"; lines.FilteredMetaOps != want {
+		t.Errorf("filtered meta ops = %q, want %q", lines.FilteredMetaOps, want)
+	}
+	if want := "title:contains:cat&&duration:more-than:600||prefix:[LONG CAT] "; lines.FilteredFilenameOps != want {
+		t.Errorf("filtered filename ops = %q, want %q", lines.FilteredFilenameOps, want)
 	}
 }
 
@@ -91,9 +130,11 @@ func TestFileOverrideLines(t *testing.T) {
 		want         []string
 	}{
 		{"meta_ops", "title:prefix:[A] \nartist:set:Cats\n", []string{"title:prefix:[A] ", "artist:set:Cats"}},
-		{"filtered_meta_ops", "title:contains:cat||genre:set:Cats\n", []string{"title:contains:cat||genre:set:Cats"}},
+		{"filtered_meta_ops", "title:contains:cat||genre:set:Cats\ntitle:contains:cat&&duration:more-than:600||album:set:Long Cats\n",
+			[]string{"title:contains:cat||genre:set:Cats", "title:contains:cat&&duration:more-than:600||album:set:Long Cats"}},
 		{"filename_ops", "date-tag:prefix:ymd\n", []string{"date-tag:prefix:ymd"}},
-		{"filtered_filename_ops", "title:contains:cat||prefix:[Cats] \n", []string{"title:contains:cat||prefix:[Cats] "}},
+		{"filtered_filename_ops", "title:contains:cat||prefix:[Cats] \ntitle:contains:cat&&duration:more-than:600||suffix: (long)\n",
+			[]string{"title:contains:cat||prefix:[Cats] ", "title:contains:cat&&duration:more-than:600||suffix: (long)"}},
 	} {
 		got, err := FileOverrideLines(tc.box, write(tc.box+".txt", tc.content), cu, dp)
 		if err != nil || !slices.Equal(got, tc.want) {
