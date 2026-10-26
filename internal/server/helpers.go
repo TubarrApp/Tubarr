@@ -203,7 +203,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		MetaOps:                 strings.Join(sharedparsing.FormatMetaOps(m.MetaOps), "\n"),
 		FilenameOps:             strings.Join(sharedparsing.FormatFilenameOps(m.FilenameOps), "\n"),
 	}
-	if m.MaxCPU >= 0 {
+	if m.MaxCPU > 0 {
 		r.MaxCPU = &m.MaxCPU
 	}
 	filteredMeta := make([]string, 0, len(m.FilteredMetaOps))
