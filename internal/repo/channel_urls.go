@@ -47,6 +47,9 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		if err := checkOutputDir(nil, cu.ChanURLMetarrArgs); err != nil {
 			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 		}
+		if err := cs.checkProfile(cu.ProfileID); err != nil {
+			return 0, err
+		}
 	}
 
 	var settingsJSON, metarrJSON []byte
@@ -73,8 +76,8 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 
 	now := time.Now()
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		consts.DBChannelURLs,
 		consts.QChanURLChannelID,
 		consts.QChanURLURL,
@@ -87,6 +90,7 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		consts.QChanURLLastScan,
 		consts.QChanURLCreatedAt,
 		consts.QChanURLUpdatedAt,
+		consts.QChanURLProfileID,
 	)
 
 	result, err := cs.q.Exec(query,
@@ -101,6 +105,7 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		now,
 		now,
 		now,
+		cu.ProfileID,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert channel URL: %w", err)
@@ -148,10 +153,11 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		oldMetarr              *models.MetarrArgs
 		oldJSON, oldMetarrJSON sql.NullString
 		channelID              int64
+		oldProfileID           int64
 	)
-	oldQuery := fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s = ?", consts.QChanURLChannelID, consts.QChanURLSettings,
-		consts.QChanURLMetarr, consts.DBChannelURLs, consts.QChanURLID)
-	if err := cs.q.QueryRow(oldQuery, cu.ID).Scan(&channelID, &oldJSON, &oldMetarrJSON); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	oldQuery := fmt.Sprintf("SELECT %s, %s, %s, %s FROM %s WHERE %s = ?", consts.QChanURLChannelID, consts.QChanURLSettings,
+		consts.QChanURLMetarr, consts.QChanURLProfileID, consts.DBChannelURLs, consts.QChanURLID)
+	if err := cs.q.QueryRow(oldQuery, cu.ID).Scan(&channelID, &oldJSON, &oldMetarrJSON, &oldProfileID); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to read settings of channel URL %q: %w", cu.URL, err)
 	}
 	cs.touch(channelID)
@@ -177,6 +183,11 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 	if err := checkOutputDir(oldMetarr, cu.ChanURLMetarrArgs); err != nil {
 		return fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
+	if cu.ProfileID != oldProfileID {
+		if err := cs.checkProfile(cu.ProfileID); err != nil {
+			return err
+		}
+	}
 	metarrJSON, err := json.Marshal(cu.ChanURLMetarrArgs)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metarr args: %w", err)
@@ -199,6 +210,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 			"%s = ?, "+
 			"%s = ?, "+
 			"%s = ?, "+
+			"%s = ?, "+
 			"%s = ? "+
 			"WHERE %s = ?",
 		consts.DBChannelURLs,
@@ -207,6 +219,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		consts.QChanURLLoginURL,
 		consts.QChanURLMetarr,
 		consts.QChanURLSettings,
+		consts.QChanURLProfileID,
 		consts.QChanURLID,
 	)
 
@@ -217,6 +230,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		cu.LoginURL,
 		metarrJSON,
 		settingsJSON,
+		cu.ProfileID,
 		cu.ID,
 	); err != nil {
 		return err
@@ -252,7 +266,7 @@ func (cs *ChannelStore) UpdateChannelURLsLastScan(ids []int64) error {
 // GetChannelURLModels fetches a filled list of ChannelURL models.
 func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent bool) ([]*models.ChannelURL, error) {
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s "+
 			"FROM %s "+
 			"WHERE %s = ?",
 		consts.QChanURLID,
@@ -266,6 +280,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		consts.QChanURLLastScan,
 		consts.QChanURLCreatedAt,
 		consts.QChanURLUpdatedAt,
+		consts.QChanURLProfileID,
 		consts.DBChannelURLs,
 		consts.QChanURLChannelID,
 	)
@@ -300,6 +315,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 			&cu.LastScan,
 			&cu.CreatedAt,
 			&cu.UpdatedAt,
+			&cu.ProfileID,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan channel URL: %w", err)
 		}
@@ -336,7 +352,17 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 	}
 
 	for _, cu := range urlModels {
+		if cu.Profile, err = cs.profileByID(cu.ProfileID); err != nil {
+			return nil, err
+		}
 		if mergeWithParent {
+			// Its profile fills in its unset settings before its channel.
+			if cu.Profile != nil {
+				cu.ChanURLSettings = cmp.Or(cu.ChanURLSettings, &models.Settings{})
+				cu.ChanURLMetarrArgs = cmp.Or(cu.ChanURLMetarrArgs, &models.MetarrArgs{})
+				mergeSettings(cu.ChanURLSettings, cu.Profile.ProfileSettings)
+				mergeMetarrArgs(cu.ChanURLMetarrArgs, cu.Profile.ProfileMetarrArgs)
+			}
 			inheritChannelSettings(cu, c)
 		}
 		if cu.ChanURLSettings == nil {
@@ -461,7 +487,8 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 	return count > 0
 }
 
-// mergeSettings fills a channel URL's unset settings from the channel's, adding to its filters and move ops. Pausing isn't inherited.
+// mergeSettings fills u's unset settings from ch, its channel's or profile's, adding to its filters and move ops.
+// Pausing isn't inherited.
 func mergeSettings(u, ch *models.Settings) {
 	if ch == nil {
 		return
@@ -491,7 +518,7 @@ func mergeSettings(u, ch *models.Settings) {
 	u.AutoDownload = inheritBool(u.AutoDownload, ch.AutoDownload)
 }
 
-// mergeMetarrArgs fills a channel URL's unset Metarr args from the channel's, adding to its op lists.
+// mergeMetarrArgs fills u's unset Metarr args from ch, its channel's or profile's, adding to its op lists.
 func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	if ch == nil {
 		return

@@ -96,7 +96,7 @@ func channelErrStatus(err error) int {
 	switch {
 	case errors.Is(err, errChannelNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, contracts.ErrInvalidChannel):
+	case errors.Is(err, contracts.ErrInvalidChannel), errors.Is(err, contracts.ErrInvalidProfile):
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
@@ -186,9 +186,9 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 	writeText(w, http.StatusCreated, responseMsg)
 }
 
-// handleListChannels lists Tubarr channels.
+// handleListChannels lists Tubarr channels, with the settings in effect (their profiles' filling in what they leave unset).
 func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request) {
-	channels, found, err := ss.cs.GetAllChannels(false)
+	channels, found, err := ss.cs.GetAllChannels(true)
 	if err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -218,6 +218,9 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request
 			FailedPostProcessing: failedMetarr[c.ID],
 			Settings:             newSettingsResponse(c.ChanSettings),
 			Metarr:               newMetarrArgsResponse(c.ChanMetarrArgs),
+		}
+		if c.Profile != nil {
+			cr.Profile = c.Profile.Name
 		}
 		for _, urlModel := range c.URLModels {
 			cr.URLModels = append(cr.URLModels, channelURLResponse{
@@ -260,6 +263,7 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		UpdatedAt:         c.UpdatedAt,
 		ChannelConfigFile: c.ChannelConfigFile,
 		LoadError:         loadError(c),
+		ProfileID:         c.ProfileID,
 		Settings:          newSettingsResponse(c.ChanSettings),
 		Metarr:            newMetarrArgsResponse(c.ChanMetarrArgs),
 		AuthDetails:       []authDetailResponse{},
@@ -279,10 +283,11 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 				LoginURL:    urlModel.LoginURL,
 			})
 		}
-		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil {
+		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil || urlModel.ProfileID != 0 {
 			response.URLSettings[urlModel.URL] = urlSettingsResponse{
-				Settings: newSettingsResponse(urlModel.ChanURLSettings),
-				Metarr:   newMetarrArgsResponse(urlModel.ChanURLMetarrArgs),
+				ProfileID: urlModel.ProfileID,
+				Settings:  newSettingsResponse(urlModel.ChanURLSettings),
+				Metarr:    newMetarrArgsResponse(urlModel.ChanURLMetarrArgs),
 			}
 		}
 	}
@@ -323,6 +328,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		ChannelConfigFile: f.configFile,
 		ChanSettings:      f.settings,
 		ChanMetarrArgs:    f.metarr,
+		ProfileID:         f.profileID,
 		CreatedAt:         now,
 		LastScan:          now,
 		UpdatedAt:         now,
@@ -338,6 +344,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		// Apply per-URL custom settings if they exist.
 		if s, hasCustom := f.urlSettings[u]; hasCustom {
 			cu.ChanURLSettings, cu.ChanURLMetarrArgs = s.Settings, s.Metarr
+			cu.ProfileID = s.ProfileID
 		}
 		c.URLModels = append(c.URLModels, cu)
 	}
@@ -394,6 +401,11 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		if f.configFile != existingChannel.ChannelConfigFile {
 			if err := cs.UpdateChannelValue(consts.QChanID, idStr, consts.QChanConfigFile, f.configFile); err != nil {
 				return fmt.Errorf("failed to update channel config file: %w", err)
+			}
+		}
+		if f.profileID != existingChannel.ProfileID {
+			if err := cs.SetChannelProfile(consts.QChanID, idStr, f.profileID); err != nil {
+				return fmt.Errorf("failed to set channel profile: %w", err)
 			}
 		}
 		if _, err := cs.UpdateChannelSettingsJSON(consts.QChanID, idStr, func(s *models.Settings) error {

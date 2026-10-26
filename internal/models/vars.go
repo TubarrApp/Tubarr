@@ -6,6 +6,7 @@ type ChannelInput struct {
 	Name              *string   `viper:"channel-name"`
 	URLs              *[]string `viper:"channel-urls"`
 	ChannelConfigFile *string   `viper:"channel-config-file"`
+	Profile           *string   `viper:"profile"`
 
 	// Authentication details.
 	Username    *string   `viper:"auth-username"`
@@ -104,6 +105,7 @@ type MetarrArgsInput struct {
 
 // URLSettingsOverride contains per-URL setting overrides.
 type URLSettingsOverride struct {
+	Profile  *string
 	Settings *SettingsInput
 	Metarr   *MetarrArgsInput
 }

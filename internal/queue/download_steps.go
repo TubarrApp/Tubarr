@@ -290,7 +290,7 @@ func processJSON(
 	// ONLY download JSON if it's NOT a custom file (custom scraper already created it).
 	if v.JSONCustomFile == "" {
 		dl, err := downloads.NewJSONDownload(ctx, v, cu, c, ds, tracker, &downloads.Options{
-			MaxRetries:       3,
+			MaxAttempts:      downloadAttempts(cu),
 			RetryMaxInterval: 5,
 		})
 		if err != nil {
@@ -352,7 +352,7 @@ func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c
 	logger.Pl.I("Processing video download for URL: %s", v.URL)
 
 	dl, err := downloads.NewVideoDownload(ctx, v, cu, c, ds, tracker, &downloads.Options{
-		MaxRetries:       3,
+		MaxAttempts:      downloadAttempts(cu),
 		RetryMaxInterval: 20,
 	})
 	if err != nil {
@@ -365,4 +365,13 @@ func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c
 
 	logger.Pl.D(1, "Successfully processed and marked as downloaded: %s", v.URL)
 	return nil
+}
+
+// downloadAttempts returns how many times a download runs: once, plus its Download Retries setting (else the default).
+func downloadAttempts(cu *models.ChannelURL) int {
+	retries := consts.DefaultDownloadRetries
+	if cu.ChanURLSettings != nil && cu.ChanURLSettings.Retries > 0 {
+		retries = cu.ChanURLSettings.Retries
+	}
+	return 1 + retries
 }

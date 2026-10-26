@@ -12,6 +12,9 @@ import (
 // ErrInvalidChannel wraps errors for channels rejected for their content (not storage failures), e.g. by AddChannel.
 var ErrInvalidChannel = errors.New("invalid channel")
 
+// ErrInvalidProfile wraps errors for profiles rejected for their content, or deleted while in use.
+var ErrInvalidProfile = errors.New("invalid profile")
+
 // Store allows access to the main store repo methods.
 type Store interface {
 	ChannelStore() ChannelStore
@@ -78,8 +81,18 @@ type ChannelStore interface {
 	GetNotifyURLs(id int64) ([]*models.Notification, error)
 	GetNewVideoURLs(key, val string) ([]string, error)
 
+	// Profile operations.
+	AddProfile(p *models.Profile) error
+	UpdateProfile(p *models.Profile) error
+	DeleteProfile(key, val string) error
+	GetProfile(key, val string) (p *models.Profile, found bool, err error)
+	GetAllProfiles() ([]*models.Profile, error)
+	GetProfileID(name string) (int64, error)
+	SetChannelProfile(key, val string, profileID int64) error
+
 	// Other channel database functions.
 	DisplaySettings(c *models.Channel)
+	DisplayProfile(p *models.Profile)
 }
 
 // DownloadStore allows access to download repo methods.

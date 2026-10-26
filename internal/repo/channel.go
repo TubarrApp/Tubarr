@@ -35,7 +35,7 @@ type ChannelStore struct {
 	q           querier
 	tx          *sql.Tx
 	PasswordMgr *auth.PasswordManager
-	touched     map[int64]struct{} // Channels whose Metarr args the transaction changed, checked before it commits.
+	touched     map[int64]struct{} // Channels the transaction changed, checked before it commits.
 }
 
 // GetChannelStore returns a channel store instance with injected database.
@@ -74,76 +74,41 @@ func (cs *ChannelStore) inTx(fn func(tcs *ChannelStore) error) error {
 		if err := fn(tcs); err != nil {
 			return err
 		}
-		return tcs.checkTouchedMetarrArgs()
+		return tcs.checkTouchedChannels()
 	})
 }
 
-// touch records that the transaction changed a channel's (or one of its URLs') Metarr args.
+// touch records that the transaction changed a channel, one of its URLs, or the profile of either.
 func (cs *ChannelStore) touch(channelID int64) {
 	if cs.touched != nil {
 		cs.touched[channelID] = struct{}{}
 	}
 }
 
-// checkTouchedMetarrArgs checks the Metarr args of each channel the transaction changed, alone and under each of its
-// URLs', once all are written, so settings saved together (e.g. by the edit page) are judged together.
-func (cs *ChannelStore) checkTouchedMetarrArgs() error {
+// checkTouchedChannels checks each channel the transaction changed once all its changes are written, so settings saved
+// together are judged together. It needs a video directory, and Metarr args that work together under each of its URLs.
+func (cs *ChannelStore) checkTouchedChannels() error {
 	for id := range cs.touched {
-		var raw sql.NullString
-		query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QChanMetarr, consts.DBChannels, consts.QChanID)
-		if err := cs.q.QueryRow(query, id).Scan(&raw); err != nil {
-			return fmt.Errorf("failed to read Metarr settings of channel %d: %w", id, err)
+		c, found, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(id, 10), true)
+		if err != nil {
+			return fmt.Errorf("failed to read settings of channel %d: %w", id, err)
 		}
-		var ch models.MetarrArgs
-		if raw.String != "" {
-			if err := json.Unmarshal([]byte(raw.String), &ch); err != nil {
-				return fmt.Errorf("failed to read Metarr settings of channel %d: %w", id, err)
-			}
+		if !found {
+			continue
 		}
-		if err := validation.ValidateMetarrArgsCombination(&ch); err != nil {
+		if c.ChanSettings.VideoDir == "" {
+			return fmt.Errorf("%w: channel %q needs a video directory where downloads will be stored, its own or its profile's", contracts.ErrInvalidChannel, c.Name)
+		}
+		if err := validation.ValidateMetarrArgsCombination(c.ChanMetarrArgs); err != nil {
 			return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidChannel, err)
 		}
-
-		query = fmt.Sprintf("SELECT %s, %s FROM %s WHERE %s = ?", consts.QChanURLURL, consts.QChanURLMetarr,
-			consts.DBChannelURLs, consts.QChanURLChannelID)
-		rows, err := cs.q.Query(query, id)
-		if err != nil {
-			return fmt.Errorf("failed to read Metarr settings of channel %d's URLs: %w", id, err)
-		}
-		if err := checkURLMetarrArgs(rows, &ch); err != nil {
-			return err
+		for _, cu := range c.URLModels {
+			if err := validation.ValidateMetarrArgsCombination(cu.ChanURLMetarrArgs); err != nil {
+				return fmt.Errorf("%w: Metarr settings for URL %q: %w", contracts.ErrInvalidChannel, cu.URL, err)
+			}
 		}
 	}
 	return nil
-}
-
-// checkURLMetarrArgs checks each URL row's Metarr args over its channel's, closing rows.
-func checkURLMetarrArgs(rows *sql.Rows, ch *models.MetarrArgs) error {
-	defer func() {
-		if err := rows.Close(); err != nil {
-			logger.Pl.E("Failed to close rows: %v", err)
-		}
-	}()
-	for rows.Next() {
-		var (
-			u   string
-			raw sql.NullString
-			m   models.MetarrArgs
-		)
-		if err := rows.Scan(&u, &raw); err != nil {
-			return fmt.Errorf("failed to read a URL's Metarr settings: %w", err)
-		}
-		if raw.String != "" && raw.String != "null" {
-			if err := json.Unmarshal([]byte(raw.String), &m); err != nil {
-				return fmt.Errorf("failed to read Metarr settings of URL %q: %w", u, err)
-			}
-		}
-		mergeMetarrArgs(&m, ch)
-		if err := validation.ValidateMetarrArgsCombination(&m); err != nil {
-			return fmt.Errorf("%w: Metarr settings for URL %q: %w", contracts.ErrInvalidChannel, u, err)
-		}
-	}
-	return rows.Err()
 }
 
 // GetNewVideoURLs returns the slice of new video URLs from the database (used for notification dot).
@@ -457,41 +422,64 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
+	// The file applies to the channel's own settings, not those its profile fills in.
+	chanID := strconv.FormatInt(c.ID, 10)
+	saved, found, err := cs.GetChannelModel(consts.QChanID, chanID, false)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("channel %q is no longer in the database", c.Name)
+	}
+
 	// Make []byte copy of settings before.
-	settingsBeforeJSON, metarrBeforeJSON := makeSettingsMetarrArgsCopy(c.ChanSettings, c.ChanMetarrArgs, c.Name)
+	settingsBeforeJSON, metarrBeforeJSON := makeSettingsMetarrArgsCopy(saved.ChanSettings, saved.ChanMetarrArgs, c.Name)
 
 	// Apply changes to model.
-	if err := applyConfigChannel(c, cfgFile, &input); err != nil {
+	if err := applyConfigChannel(saved, cfgFile, &input); err != nil {
 		return err
 	}
 
 	// []byte copy of settings after for comparison.
-	settingsAfterJSON, metarrAfterJSON := makeSettingsMetarrArgsCopy(c.ChanSettings, c.ChanMetarrArgs, c.Name)
+	settingsAfterJSON, metarrAfterJSON := makeSettingsMetarrArgsCopy(saved.ChanSettings, saved.ChanMetarrArgs, c.Name)
 	channelChanged := !bytes.Equal(settingsBeforeJSON, settingsAfterJSON) || !bytes.Equal(metarrBeforeJSON, metarrAfterJSON)
 
-	changedURLs, err := cs.applyConfigURLSettings(c, cfgFile, input.URLSettings)
+	// Its profile, if the file names one.
+	profileID := saved.ProfileID
+	if input.Profile != nil {
+		if profileID, err = cs.GetProfileID(*input.Profile); err != nil {
+			return fmt.Errorf("config file %q: %w", cfgFile, err)
+		}
+	}
+	profileChanged := profileID != saved.ProfileID
+
+	changedURLs, err := cs.applyConfigURLSettings(saved, cfgFile, input.URLSettings)
 	if err != nil {
 		return err
 	}
 
 	// Return early if unchanged.
-	if !channelChanged && len(changedURLs) == 0 {
+	if !channelChanged && !profileChanged && len(changedURLs) == 0 {
 		logger.Pl.D(1, "No changes to channel from config file.")
 		return nil
 	}
 
 	// Propagate into database.
-	chanID := strconv.FormatInt(c.ID, 10)
 	if err := cs.inTx(func(tcs *ChannelStore) error {
+		if profileChanged {
+			if err := tcs.SetChannelProfile(consts.QChanID, chanID, profileID); err != nil {
+				return err
+			}
+		}
 		if channelChanged {
 			if _, err := tcs.UpdateChannelSettingsJSON(consts.QChanID, chanID, func(s *models.Settings) error {
-				*s = *c.ChanSettings
+				*s = *saved.ChanSettings
 				return nil
 			}); err != nil {
 				return err
 			}
 			if _, err := tcs.UpdateChannelMetarrArgsJSON(consts.QChanID, chanID, func(m *models.MetarrArgs) error {
-				*m = *c.ChanMetarrArgs
+				*m = *saved.ChanMetarrArgs
 				return nil
 			}); err != nil {
 				return err
@@ -507,11 +495,19 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return err
 	}
 
-	// Reload URL models.
-	c.URLModels, err = cs.GetChannelURLModels(c, true)
+	// Reload, filled in as jobs use it.
+	merged, found, err := cs.GetChannelModel(consts.QChanID, chanID, true)
 	if err != nil {
-		return fmt.Errorf("failed to reload URL models after cascade: %w", err)
+		return fmt.Errorf("failed to reload channel %q after applying its config file: %w", c.Name, err)
 	}
+	if !found {
+		return fmt.Errorf("channel %q is no longer in the database", c.Name)
+	}
+	c.ChanSettings = merged.ChanSettings
+	c.ChanMetarrArgs = merged.ChanMetarrArgs
+	c.ProfileID = merged.ProfileID
+	c.Profile = merged.Profile
+	c.URLModels = merged.URLModels
 
 	logger.Pl.S("Updated channel %q from config file", c.Name)
 	return nil
@@ -778,22 +774,20 @@ func (cs *ChannelStore) AddChannelWithDetails(c *models.Channel, authDetails map
 
 // AddChannel adds a new channel to the database.
 func (cs *ChannelStore) AddChannel(c *models.Channel) (int64, error) {
-	if c.ChanSettings.VideoDir == "" {
-		return 0, fmt.Errorf("%w: must enter a video directory where downloads will be stored", contracts.ErrInvalidChannel)
+	if err := cs.checkProfile(c.ProfileID); err != nil {
+		return 0, err
 	}
 	for _, cu := range c.URLModels {
 		if err := validation.ValidateChannelURL(cu.URL); err != nil {
 			return 0, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 		}
+		if err := cs.checkProfile(cu.ProfileID); err != nil {
+			return 0, err
+		}
 	}
 
 	if cs.channelExists(consts.QChanName, c.Name) {
 		return 0, fmt.Errorf("%w: channel with name %q already exists", contracts.ErrInvalidChannel, c.Name)
-	}
-
-	// JSON dir.
-	if c.ChanSettings.JSONDir == "" {
-		c.ChanSettings.JSONDir = c.ChanSettings.VideoDir
 	}
 
 	// Validate complete models at DB write boundary.
@@ -857,7 +851,7 @@ func (cs *ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSON, newVideoURLs []byte) (int64, error) {
 	now := time.Now()
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		consts.DBChannels,
 		consts.QChanName,
 		consts.QChanConfigFile,
@@ -867,6 +861,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 		consts.QChanLastScan,
 		consts.QChanCreatedAt,
 		consts.QChanUpdatedAt,
+		consts.QChanProfileID,
 	)
 
 	result, err := cs.q.Exec(
@@ -879,6 +874,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 		now,
 		now,
 		now,
+		c.ProfileID,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert channel: %w", err)
@@ -926,7 +922,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 		}
 
 		urlInsertQuery := fmt.Sprintf(
-			"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 			consts.DBChannelURLs,
 			consts.QChanURLChannelID,
 			consts.QChanURLURL,
@@ -939,6 +935,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			consts.QChanURLLastScan,
 			consts.QChanURLCreatedAt,
 			consts.QChanURLUpdatedAt,
+			consts.QChanURLProfileID,
 		)
 
 		urlInsertResult, err := cs.q.Exec(
@@ -954,6 +951,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			now,
 			now,
 			now,
+			cu.ProfileID,
 		)
 		if err != nil {
 			return 0, fmt.Errorf("failed to insert URL %q for channel ID %d: %w", cu.URL, id, err)
@@ -1031,6 +1029,7 @@ var channelColumns = strings.Join([]string{
 	consts.QChanLastScan,
 	consts.QChanCreatedAt,
 	consts.QChanUpdatedAt,
+	consts.QChanProfileID,
 }, ", ")
 
 // scanChannel reads a row of channelColumns into c, returning its saved settings JSON.
@@ -1045,6 +1044,7 @@ func scanChannel(row interface{ Scan(...any) error }, c *models.Channel) (settin
 		&c.LastScan,
 		&c.CreatedAt,
 		&c.UpdatedAt,
+		&c.ProfileID,
 	)
 	return settingsJSON, metarrJSON, err
 }
@@ -1055,11 +1055,28 @@ func (cs *ChannelStore) loadChannelDetails(c *models.Channel, settingsJSON, meta
 		return err
 	}
 	loadErr := validateLoadedSettings(c) // Before the URLs are merged with them, as validation normalizes values.
+
+	// Profile.
+	var err error
+	if c.Profile, err = cs.profileByID(c.ProfileID); err != nil {
+		return err
+	}
+	if mergeURLsWithParent {
+		if c.Profile != nil {
+			mergeSettings(c.ChanSettings, c.Profile.ProfileSettings)
+			mergeMetarrArgs(c.ChanMetarrArgs, c.Profile.ProfileMetarrArgs)
+		}
+		c.ChanSettings.JSONDir = cmp.Or(c.ChanSettings.JSONDir, c.ChanSettings.VideoDir) // Without a JSON directory, metadata is saved with the videos.
+	}
+
 	urlModels, err := cs.GetChannelURLModels(c, mergeURLsWithParent)
 	if err != nil {
 		return fmt.Errorf("failed to fetch URL models for channel: %w", err)
 	}
 	c.URLModels = urlModels
+	if loadErr == nil {
+		loadErr = profilesErr(c)
+	}
 	if loadErr == nil {
 		loadErr = validateLoadedURLSettings(c)
 	}
@@ -1297,6 +1314,11 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 	}
 	if err := checkDownloadDirs(&old, &settings); err != nil {
 		return 0, fmt.Errorf("%w: updated settings are invalid: %w", contracts.ErrInvalidChannel, err)
+	}
+
+	// It still needs a video directory, its own or its profile's, checked once the transaction's changes are written.
+	if settings.VideoDir != old.VideoDir {
+		cs.touch(channelID)
 	}
 
 	// Marshal updated settings.
@@ -1541,6 +1563,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	fmt.Printf("ID: %d\n", c.ID)
 	fmt.Printf("Name: %s\n", c.Name)
 	fmt.Printf("Config File: %s\n", c.ChannelConfigFile)
+	fmt.Printf("Profile: %s\n", profileName(c.ProfileID, c.Profile))
 	fmt.Printf("URLs: %+v\n", cURLs)
 
 	// Channel settings.
@@ -1620,6 +1643,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		fmt.Printf("%sURL %q%s\n", sharedconsts.ColorCyan, u.URL, sharedconsts.ColorReset)
 		fmt.Printf("Paused? %v\n", u.ChanURLSettings.Paused)
 		fmt.Printf("Auto Download? %v\n", c.AutoDownloads(u))
+		fmt.Printf("Profile: %s\n", profileName(u.ProfileID, u.Profile))
 
 		fmt.Printf("\n%sSettings:%s\n", sharedconsts.ColorCyan, sharedconsts.ColorReset)
 		displaySettingsStruct(u.ChanURLSettings)
@@ -1713,7 +1737,7 @@ func applyConfigChannel(c *models.Channel, cfgFile string, input *models.Channel
 	}
 
 	// Files and folders are checked when saved, and only those the file changes.
-	if err := parsing.ApplyChannelSettingsInput(c.ChanSettings, &input.SettingsInput); err != nil {
+	if err := parsing.ApplySettingsInput(c.ChanSettings, &input.SettingsInput); err != nil {
 		return fmt.Errorf("invalid settings in config file %q: %w", cfgFile, err)
 	}
 	if err := validation.ValidateSettingsModel(c.ChanSettings, false); err != nil {
@@ -1757,14 +1781,21 @@ func (cs *ChannelStore) applyConfigURLSettings(c *models.Channel, cfgFile string
 				return nil, fmt.Errorf("invalid metarr config for URL %q in config file %q: %w", cu.URL, cfgFile, err)
 			}
 		}
+		profileID := cu.ProfileID
+		if override.Profile != nil {
+			if profileID, err = cs.GetProfileID(*override.Profile); err != nil {
+				return nil, fmt.Errorf("profile for URL %q in config file %q: %w", cu.URL, cfgFile, err)
+			}
+		}
 		cu.ChanURLSettings, cu.ChanURLMetarrArgs = s, m
 		if err := validateURLSettings(cu); err != nil { // Normalizes, as saving would, before comparing.
 			return nil, fmt.Errorf("config file %q: %w", cfgFile, err)
 		}
 		settingsAfterJSON, metarrAfterJSON := makeSettingsMetarrArgsCopy(s, m, cu.URL)
-		if bytes.Equal(settingsBeforeJSON, settingsAfterJSON) && bytes.Equal(metarrBeforeJSON, metarrAfterJSON) {
+		if bytes.Equal(settingsBeforeJSON, settingsAfterJSON) && bytes.Equal(metarrBeforeJSON, metarrAfterJSON) && profileID == cu.ProfileID {
 			continue
 		}
+		cu.ProfileID = profileID
 		changed = append(changed, cu)
 	}
 	return changed, nil

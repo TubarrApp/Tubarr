@@ -307,9 +307,6 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 	if cu.ChanURLSettings != nil {
 		crawlArgs, browser = cu.ChanURLSettings.ExtraYTDLPCrawlArgs, cu.ChanURLSettings.CookiesFromBrowser
 	}
-	if browser == "" && abstractions.IsSet(keys.CookiesFromBrowser) {
-		browser = abstractions.GetString(keys.CookiesFromBrowser)
-	}
 
 	// Run yt-dlp, refreshing the FlareSolverr solve and retrying once if Cloudflare blocks a FlareSolverr site.
 	var j []byte
@@ -322,10 +319,11 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 			args = append(args, parsing.SplitArgs(crawlArgs)...)
 		}
 
-		// Cookies: the cookie file, else the browser's.
+		// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
 		if cu.CookiePath != "" {
 			args = append(args, command.CookiePath, cu.CookiePath)
-		} else if browser != "" {
+		}
+		if browser != "" {
 			args = append(args, command.CookiesFromBrowser, browser)
 		}
 

@@ -47,9 +47,7 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		if err := validation.ValidateViperFlags(); err != nil {
-			return err
-		}
+		validation.ValidateLoggingLevel()
 
 		// Load persisted settings from DB, applying them only if the CLI flag was not explicitly set.
 		if settingsStore != nil {
@@ -158,19 +156,13 @@ func InitCommands(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 
 	// CLI flags.
 	cmd.InitProgramFlags(rootCmd)
-	if err := cmd.InitFileTransformers(rootCmd); err != nil {
-		return err
-	}
-	if err := cmd.InitMetaTransformers(rootCmd); err != nil {
-		return err
-	}
-	cmd.InitVideoTransformers(rootCmd)
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err
 	}
 
 	// Add Channel and Video function commands.
 	rootCmd.AddCommand(InitChannelCmds(ctx, s, dq, pp))
+	rootCmd.AddCommand(InitProfileCmds(s.ChannelStore()))
 	rootCmd.AddCommand(InitVideoCmds(s))
 	rootCmd.AddCommand(InitAuthCmds(s))
 

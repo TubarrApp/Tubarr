@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 	"tubarr/internal/app"
 	"tubarr/internal/cmd"
@@ -42,7 +43,7 @@ type settingsPath struct {
 	apply func(t *testing.T, cs *repo.ChannelStore, name string, base, in []settingsKey) (*models.Settings, *models.MetarrArgs, error)
 }
 
-// settingsPaths are the ways a channel's or URL's settings are read from config files and flags.
+// settingsPaths are the ways a channel's, URL's or profile's settings are read from config files and flags.
 var settingsPaths = []settingsPath{
 	{"add", func(t *testing.T, cs *repo.ChannelStore, name string, _, in []settingsKey) (*models.Settings, *models.MetarrArgs, error) {
 		c, err := addSettingsChannel(t, cs, name, in, nil)
@@ -74,7 +75,7 @@ var settingsPaths = []settingsPath{
 		if _, err := addSettingsChannel(t, cs, name, base, nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := runSettingsCmd(updateChannelSettingsCmd(cs), name, in); err != nil {
+		if err := runSettingsCmd(updateChannelSettingsCmd(cs), keys.ChannelName, name, in); err != nil {
 			return nil, nil, err
 		}
 		c := savedSettingsChannel(t, cs, name)
@@ -84,10 +85,25 @@ var settingsPaths = []settingsPath{
 		if _, err := addSettingsChannel(t, cs, name, nil, base); err != nil {
 			t.Fatal(err)
 		}
-		if err := runSettingsCmd(updateChannelURLSettingsCmd(cs), name, in); err != nil {
+		if err := runSettingsCmd(updateChannelURLSettingsCmd(cs), keys.ChannelName, name, in); err != nil {
 			return nil, nil, err
 		}
 		return urlSettings(savedSettingsChannel(t, cs, name))
+	}},
+	{"profile add", func(t *testing.T, cs *repo.ChannelStore, name string, _, in []settingsKey) (*models.Settings, *models.MetarrArgs, error) {
+		if err := runSettingsCmd(addProfileCmd(cs), keys.ProfileName, name, withoutPause(in)); err != nil {
+			return nil, nil, err
+		}
+		return savedProfile(t, cs, name)
+	}},
+	{"profile edit", func(t *testing.T, cs *repo.ChannelStore, name string, base, in []settingsKey) (*models.Settings, *models.MetarrArgs, error) {
+		if err := runSettingsCmd(addProfileCmd(cs), keys.ProfileName, name, withoutPause(base)); err != nil {
+			t.Fatal(err)
+		}
+		if err := runSettingsCmd(editProfileCmd(cs), keys.ProfileName, name, withoutPause(in)); err != nil {
+			return nil, nil, err
+		}
+		return savedProfile(t, cs, name)
 	}},
 }
 
@@ -95,8 +111,11 @@ var settingsPaths = []settingsPath{
 func TestSettingsInputPaths(t *testing.T) {
 	in, wantS, wantM := settingsFixture(t)
 
-	// The fields a path can't set, with the value it leaves.
-	known := map[string]map[string]string{}
+	// The fields a path can't set, with the value it leaves. Profiles don't pause.
+	known := map[string]map[string]string{
+		"profile add":  {"Paused": "false"},
+		"profile edit": {"Paused": "false"},
+	}
 
 	for _, p := range settingsPaths {
 		t.Run(p.name, func(t *testing.T) {
@@ -117,10 +136,9 @@ func TestSettingsInputPaths(t *testing.T) {
 func TestSettingsInputEmptyValues(t *testing.T) {
 	full, wantS, wantM := settingsFixture(t)
 
-	// The settings a path doesn't clear, and what it does instead. A channel needs a video directory, a blank JSON
-	// directory means the video directory, and VAAPI (set on every channel and URL here) needs a GPU node.
+	// The settings a path doesn't clear, and what it does instead. A channel needs a video directory, and VAAPI (set on
+	// every channel and URL here) needs a GPU node.
 	channel := map[string]string{
-		keys.JSONDir:  "set to the video directory",
 		keys.VideoDir: "error",
 	}
 	updated := maps.Clone(channel)
@@ -130,6 +148,7 @@ func TestSettingsInputEmptyValues(t *testing.T) {
 		"reload":              updated,
 		"update-channel":      updated,
 		"update-url-settings": {keys.TranscodeGPUNode: "error"},
+		"profile edit":        {keys.TranscodeGPUNode: "error"},
 	}
 
 	for _, p := range settingsPaths {
@@ -180,8 +199,8 @@ func TestClearSettingNamesEveryFlag(t *testing.T) {
 			}
 		}
 	})
-	if err := clearURLSettings(&models.Settings{}, &models.MetarrArgs{}, []string{keys.Name}); err == nil {
-		t.Errorf("--%s accepted %q, which isn't a setting", keys.ClearSetting, keys.Name)
+	if err := clearURLSettings(&models.Settings{}, &models.MetarrArgs{}, []string{keys.ChannelName}); err == nil {
+		t.Errorf("--%s accepted %q, which isn't a setting", keys.ClearSetting, keys.ChannelName)
 	}
 }
 
@@ -194,7 +213,7 @@ func TestClearSettingClearsEachURLSetting(t *testing.T) {
 		if _, err := addSettingsChannel(t, cs, name, nil, full); err != nil {
 			t.Fatal(err)
 		}
-		err := runSettingsCmd(updateChannelURLSettingsCmd(cs), name, []settingsKey{{key: keys.ClearSetting, val: k.key}})
+		err := runSettingsCmd(updateChannelURLSettingsCmd(cs), keys.ChannelName, name, []settingsKey{{key: keys.ClearSetting, val: k.key}})
 		if k.key == keys.TranscodeGPUNode { // The URL's GPU still needs a node.
 			if err == nil {
 				t.Errorf("%s: cleared, leaving a GPU without the node it needs", k.key)
@@ -409,9 +428,9 @@ func addSettingsChannel(t *testing.T, cs *repo.ChannelStore, name string, chanKe
 	t.Helper()
 	url := "https://example.com/@" + name
 	cfg := map[string]any{
-		keys.Name:     name,
-		keys.URL:      []string{url},
-		keys.VideoDir: t.TempDir(),
+		keys.ChannelName: name,
+		keys.ChannelURLs: []string{url},
+		keys.VideoDir:    t.TempDir(),
 	}
 	maps.Copy(cfg, settingsMap(chanKeys))
 	if urlKeys != nil {
@@ -483,9 +502,25 @@ func writeSettingsConfig(t *testing.T, cfg map[string]any) string {
 	return path
 }
 
-// runSettingsCmd runs an update command on channel name with settings in as flags, skipping any it has no flag for.
-func runSettingsCmd(c *cobra.Command, name string, in []settingsKey) error {
-	args := []string{"--" + keys.Name + "=" + name}
+// savedProfile returns profile name's settings as saved.
+func savedProfile(t *testing.T, cs *repo.ChannelStore, name string) (*models.Settings, *models.MetarrArgs, error) {
+	t.Helper()
+	p, found, err := cs.GetProfile(consts.QProfileName, name)
+	if err != nil || !found {
+		t.Fatalf("loading profile %q: found %t, error %v", name, found, err)
+	}
+	return p.ProfileSettings, p.ProfileMetarrArgs, nil
+}
+
+// withoutPause returns the settings bar pausing, which profiles don't have.
+func withoutPause(in []settingsKey) []settingsKey {
+	return slices.DeleteFunc(slices.Clone(in), func(k settingsKey) bool { return k.key == keys.Pause })
+}
+
+// runSettingsCmd runs a command on the channel or profile name, given by the nameFlag flag, with settings in as flags,
+// skipping any it has no flag for.
+func runSettingsCmd(c *cobra.Command, nameFlag, name string, in []settingsKey) error {
+	args := []string{"--" + nameFlag + "=" + name}
 	for _, k := range in {
 		if c.Flags().Lookup(k.key) == nil {
 			continue

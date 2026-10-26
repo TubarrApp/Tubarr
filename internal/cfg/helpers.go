@@ -85,14 +85,17 @@ func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
 
 // mergeFlagsIntoInput merges flag values into the pointer struct.
 func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *models.ChannelInput) {
-	if cmd.Flags().Changed(keys.Name) {
+	if cmd.Flags().Changed(keys.ChannelName) {
 		in.Name = &f.Name
 	}
-	if cmd.Flags().Changed(keys.URL) {
+	if cmd.Flags().Changed(keys.ChannelURLs) {
 		in.URLs = &f.URLs
 	}
 	if cmd.Flags().Changed(keys.ChannelConfigFile) {
 		in.ChannelConfigFile = &f.ChannelConfigFile
+	}
+	if cmd.Flags().Changed(keys.Profile) {
+		in.Profile = &f.Profile
 	}
 	if cmd.Flags().Changed(keys.VideoDir) {
 		in.VideoDir = &f.VideoDir

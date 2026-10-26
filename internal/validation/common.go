@@ -119,22 +119,6 @@ func ValidateChannelURL(u string) error {
 	return nil
 }
 
-// ValidateViperFlags verifies that the user input flags are valid, modifying them to defaults or returning bools/errors.
-func ValidateViperFlags() error {
-	// Meta purge.
-	if abstractions.IsSet(keys.MMetaPurge) {
-		purge, err := ValidatePurgeMetafiles(abstractions.GetString(keys.MMetaPurge))
-		if err != nil {
-			return err
-		}
-		abstractions.Set(keys.MMetaPurge, purge)
-	}
-
-	// Logging.
-	ValidateLoggingLevel()
-	return nil
-}
-
 // ValidateYtdlpOutputExtension validates the merge-output-format compatibility of the inputted extension.
 func ValidateYtdlpOutputExtension(e string) error {
 	if e == "" {

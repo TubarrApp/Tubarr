@@ -110,6 +110,18 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	if err := addColumnIfMissing(tx, "channels", consts.QChanProfileID, "INTEGER DEFAULT 0"); err != nil {
+		return err
+	}
+
+	if err := addColumnIfMissing(tx, "channel_urls", consts.QChanURLProfileID, "INTEGER DEFAULT 0"); err != nil {
+		return err
+	}
+
+	if err := initProfilesTable(tx); err != nil {
+		return err
+	}
+
 	if err := initVideosTable(tx); err != nil {
 		return err
 	}

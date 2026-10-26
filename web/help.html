@@ -86,6 +86,7 @@
                 <li><a href="#ytdlp">yt-dlp download options</a></li>
                 <li><a href="#templates">Template tags</a></li>
                 <li><a href="#precedence">Which setting wins</a></li>
+                <li><a href="#profiles">Profiles</a></li>
                 <li><a href="#download-as">Download As</a></li>
                 <li><a href="#queue">Downloads and concurrency</a></li>
                 <li><a href="#notifications">Notifications</a></li>
@@ -121,8 +122,7 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                   and values are, since metadata field names are.
                 </li>
                 <li>
-                  <strong>One op per line</strong>, in the web boxes, in ops files and on the command line (one flag
-                  each). In an ops file, a line starting with <code>#</code> is a comment.
+                  <strong>Entered one op per line</strong>. In an ops file, a line starting with <code>#</code> is a comment.
                 </li>
                 <li>
                   <strong>Values can use the video's metadata</strong> with <code>{{field}}</code>, e.g.
@@ -311,7 +311,7 @@ title:contains:cat||prefix:[Cats]           filtered filename op (the filter rea
                   <code>channel_url:contains:youtube.com/@ChannelA||title:prefix:[A] </code>. (In Tubarr, a channel URL's
                   custom settings do this more simply.)
                 </li>
-                <li>A single <code>|</code> needs no escaping; a <code>|</code> at the end of the filter's value is written <code>\|</code>.</li>
+                <li>A <code>|</code> at the end of the filter's value is written <code>\|</code> to distinguish it from the filter/operation <code>||</code> separator. For example, <code>title:contains:|CATS\|||description:suffix: - Cat videos.</code> would look for <code>|cats|</code> in the title field and, if found, suffix the description field with <code> - Cat videos.</code></li>
               </ul>
 
               <!-- ===== Move ops ===== -->
@@ -324,7 +324,6 @@ title:contains:cat||prefix:[Cats]           filtered filename op (the filter rea
               <p>Where a finished video goes, first match first:</p>
               <ol>
                 <li>The Download As <strong>Post-Process Directory</strong> chosen for that video</li>
-                <li><code>--move-on-complete</code>, if Tubarr was started with it</li>
                 <li>The first matching move op</li>
                 <li>The channel URL's (or channel's) Metarr <strong>Output Directory</strong></li>
                 <li>Otherwise it stays in the video directory</li>
@@ -401,12 +400,12 @@ vp9:av1</code></pre>
               <!-- ===== Precedence ===== -->
               <h2 id="precedence">Which setting wins</h2>
               <ol>
-                <li><strong>Channel</strong> settings apply to all its URLs.</li>
+                <li><strong>Channel</strong> settings apply to all its URLs. Settings the channel leaves blank come from its <a href="#profiles">profile</a>, if it has one.</li>
                 <li>
                   A <strong>channel URL's custom settings</strong> replace the channel's where set, and leave the rest to
                   the channel. Its filters and ops are <em>added</em> to the channel's instead; where a URL op and a
                   channel op both set the same thing (e.g. both <code>title:set</code>), the URL's wins. Its move ops are
-                  checked first.
+                  checked first. A URL's own profile fills in what the URL leaves blank, before the channel's settings do.
                 </li>
                 <li>
                   <strong>Download As</strong> options are for one video. Blank ones use the channel URL's; its op boxes
@@ -414,8 +413,28 @@ vp9:av1</code></pre>
                 </li>
               </ol>
               <p>
-                Ops given to Tubarr on the command line or in its config file are used only for channel URLs with no ops
-                of their own. An ops file's ops replace the matching ops typed into the same settings.
+                An ops file's ops replace the matching ops typed into the same settings.
+              </p>
+
+              <!-- ===== Profiles ===== -->
+              <h2 id="profiles">Profiles</h2>
+              <p>
+                A profile is a named set of settings, made on <a href="profiles.html">Settings → Profiles</a>. Choose one
+                for a channel, or for one of its URLs, and it fills in whatever is left blank there. Each setting comes
+                from the first of these that sets it:
+              </p>
+              <ol>
+                <li>The channel URL's custom settings</li>
+                <li>The channel URL's profile</li>
+                <li>The channel's settings</li>
+                <li>The channel's profile</li>
+              </ol>
+              <p>
+                Filters and ops are added together the same way, the nearer one winning where two set the same thing.
+                A profile's video directory can use <a href="#templates">template tags</a>, e.g.
+                <code>/media/{{channel_name}}</code>, so one profile can serve many channels. A channel with no video
+                directory of its own needs a profile with one, and a profile can't be deleted while a channel or URL
+                uses it. Profiles can't pause channels.
               </p>
 
               <!-- ===== Download As ===== -->
@@ -446,23 +465,27 @@ vp9:av1</code></pre>
                 many channels are checked for new videos at once, and <strong>Post-processing Concurrency</strong> how
                 many Metarr runs happen at once (a channel can set a lower limit of its own). 0 means unlimited.
               </p>
+              <p>
+                A download that fails is run again up to <strong>Download Retries</strong> times (2 when blank), after a
+                short random wait. If the site flags Tubarr as a bot, it stops at once. yt-dlp also retries dropped
+                connections itself within each run. On channel URLs that download new videos automatically, a video that
+                still fails is tried again by up to 3 later crawls, then waits on the Available page for you to retry.
+              </p>
 
               <!-- ===== Notifications ===== -->
               <h2 id="notifications">Notifications</h2>
               <p>
                 Notification URLs are called when a channel gets new videos, e.g. a Plex library refresh
                 (<code>http://plex:32400/library/sections/1/refresh?X-Plex-Token=…</code>) or a webhook. On a channel's
-                Notifications tab, choose the channel URLs (or all of them) and add the URLs. On the command line,
-                <code>--notify</code> sets them for every channel URL, and <code>tubarr channel notify-add --url
-                &lt;channel URL&gt;</code> for one.
+                Notifications tab, choose the channel URLs (or all of them) and add the URLs.
               </p>
 
               <!-- ===== Login ===== -->
               <h2 id="login">Logins and cookies</h2>
               <ul>
                 <li>A channel URL can have a <strong>username, password and login URL</strong> for sites that need an account. Passwords are stored encrypted.</li>
-                <li><strong>Cookies From Browser</strong> uses a browser's cookies (e.g. <code>firefox</code>) for yt-dlp.</li>
-                <li><strong>Use Global Cookies</strong> uses the browser cookies set for all of Tubarr.</li>
+                <li><strong>Cookies From Browser</strong> uses a browser's cookies (e.g. <code>firefox</code>) for yt-dlp, along with any login or global cookies. Where both have the same cookie, the login or global one is used.</li>
+                <li><strong>Use Global Cookies</strong> reads the site's cookies from every browser Tubarr can find, for custom crawl rules and yt-dlp.</li>
               </ul>
 
               <!-- ===== More ===== -->

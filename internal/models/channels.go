@@ -15,6 +15,8 @@ type Channel struct {
 	ChannelConfigFile    string      `db:"channel_config_file"`
 	ChanSettings         *Settings   `db:"settings"`
 	ChanMetarrArgs       *MetarrArgs `db:"metarr"`
+	ProfileID            int64       `db:"profile_id"`
+	Profile              *Profile
 	UpdatedFromConfig    bool
 	LastScan             time.Time `db:"last_scan"`
 	CreatedAt            time.Time `db:"created_at"`

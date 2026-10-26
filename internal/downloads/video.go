@@ -10,20 +10,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/file"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 
-	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
@@ -53,25 +50,15 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Machine-readable progress lines.
 	args = append(args, command.Progress, command.ProgressNewline, command.ProgressTemplate, command.ProgressTemplateFmt)
 
-	// Cookie path.
-	if d.ChannelURL.CookiePath == "" {
-		if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
-			args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
-		}
-	} else {
+	// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
+	if d.ChannelURL.CookiePath != "" {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
-
-	// Cookie source, for channel URLs without their own.
-	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" &&
-		abstractions.IsSet(keys.CookiesFromBrowser) {
-
-		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
-		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
-		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)
-
-	} else {
-		logger.Pl.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
+	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
+		args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
+	}
+	if d.ChannelURL.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
+		logger.Pl.D(1, "No cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
 
 	// Max filesize specified.
@@ -120,11 +107,6 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 				args = append(args, command.ExternalDLArgs, d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs)
 			}
 		}
-	}
-
-	// Retry download X times.
-	if d.ChannelURL.ChanURLSettings.Retries != 0 {
-		args = append(args, command.Retries, strconv.Itoa(d.ChannelURL.ChanURLSettings.Retries))
 	}
 
 	// Merge output formats to extension if set.

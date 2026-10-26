@@ -666,7 +666,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	addNotifyCmd := &cobra.Command{
 		Use:   "notify-add",
 		Short: "Adds notify function to a channel.",
-		Long:  fmt.Sprintf("Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. They're sent for new videos from any of the channel's URLs, or with --%s from just that one.", urlFlag),
+		Long:  fmt.Sprintf("Enter fully qualified notification URLs here to send update requests to platforms like Plex etc. They're sent for new videos from any of the channel's URLs, or with --%s from just that one.", keys.URL),
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Valid items set?
 			if len(notification) == 0 {
@@ -693,7 +693,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 					valid = append(valid, cu.URL)
 				}
 				if notifyFor == "" {
-					return fmt.Errorf("--%s %q isn't one of channel %q's URLs: %v", urlFlag, channelURL, c.Name, valid)
+					return fmt.Errorf("--%s %q isn't one of channel %q's URLs: %v", keys.URL, channelURL, c.Name, valid)
 				}
 			}
 
@@ -716,7 +716,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 	// Primary channel elements.
 	cmd.SetPrimaryChannelFlags(addNotifyCmd, &channelName, nil, &channelID)
 	cmd.SetNotifyFlags(addNotifyCmd, &notification)
-	addNotifyCmd.Flags().StringVar(&channelURL, urlFlag, "", "One of the channel's URLs to send these notifications for, instead of all of them")
+	addNotifyCmd.Flags().StringVar(&channelURL, keys.URL, "", "One of the channel's URLs to send these notifications for, instead of all of them")
 
 	return addNotifyCmd
 }
@@ -1009,6 +1009,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 	cmd.SetFileDirFlags(addCmd, &flags.ChannelConfigFile, &flags.JSONDir, &flags.VideoDir)
 
 	setChannelSettingsFlags(addCmd, &flags)
+	cmd.SetProfileFlag(addCmd, &flags.Profile)
 
 	cmd.SetAuthFlags(addCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 
@@ -1102,6 +1103,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 	cmd.SetPrimaryChannelFlags(batchCmd, &flags.Name, &flags.URLs, nil)
 	cmd.SetFileDirFlags(batchCmd, &flags.ChannelConfigFile, &flags.JSONDir, &flags.VideoDir)
 	setChannelSettingsFlags(batchCmd, &flags)
+	cmd.SetProfileFlag(batchCmd, &flags.Profile)
 	cmd.SetAuthFlags(batchCmd, &flags.Username, &flags.Password, &flags.LoginURL, &flags.AuthDetails)
 	cmd.SetNotifyFlags(batchCmd, &flags.Notification)
 
@@ -1288,9 +1290,18 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			return resetCobraFlagsAndLoadViper(cmd, v)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			c, key, val, err := lookupChannel(cs, id, flags.Name)
+			key, val, err := getChanKeyVal(id, flags.Name)
 			if err != nil {
 				return err
+			}
+
+			// The update applies to the channel's own settings, not those its profile fills in.
+			c, found, err := cs.GetChannelModel(key, val, false)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return fmt.Errorf("no channel in database with %s %q", key, val)
 			}
 
 			// Load the channel's saved config file, unless one was given (PreRunE loaded that).
@@ -1304,59 +1315,74 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				}
 			}
 
-			// Change name.
-			if newName != "" && newName != c.Name {
-				if err := cs.UpdateChannelValue(key, val, consts.QChanName, newName); err != nil {
-					return err
-				}
-			}
-
 			// Check if the user got auth details from flags.
 			gotAuthDetails := cmd.Flags().Changed(keys.AuthUsername) ||
 				cmd.Flags().Changed(keys.AuthPassword) ||
 				cmd.Flags().Changed(keys.AuthURL) ||
 				cmd.Flags().Changed(keys.AuthDetails)
 
-			// Parse and set authentication details if set by user, clear all if flag is set.
+			// Parse authentication details if set by user, clearing all if the flag is set.
+			var authDetails map[string]*models.ChannelAccessDetails
 			if gotAuthDetails || deleteAuth {
-				cURLs := c.GetURLs()
-				authDetails, err := auth.ParseAuthDetails(flags.Username, flags.Password, flags.LoginURL, flags.AuthDetails, cURLs, deleteAuth)
-				if err != nil {
+				if authDetails, err = auth.ParseAuthDetails(flags.Username, flags.Password, flags.LoginURL, flags.AuthDetails, c.GetURLs(), deleteAuth); err != nil {
 					return err
-				}
-
-				if len(authDetails) > 0 {
-					if err := cs.AddAuth(c.ID, authDetails); err != nil {
-						return err
-					}
 				}
 			}
 
-			// Apply the settings given, saving those that change.
+			// Apply the settings given.
 			var input models.ChannelInput
 			mergeFlagsIntoInput(cmd, &flags, &input)
 			s, m := *c.ChanSettings, *c.ChanMetarrArgs
-			if err := parsing.ApplyChannelSettingsInput(&s, &input.SettingsInput); err != nil {
+			if err := parsing.ApplySettingsInput(&s, &input.SettingsInput); err != nil {
 				return err
 			}
 			if err := parsing.ApplyMetarrArgsInput(&m, &input.MetarrArgsInput); err != nil {
 				return err
 			}
-			if !reflect.DeepEqual(s, *c.ChanSettings) {
-				if _, err := cs.UpdateChannelSettingsJSON(key, val, func(saved *models.Settings) error {
-					*saved = s
-					return nil
-				}); err != nil {
+			profileID := c.ProfileID
+			if input.Profile != nil {
+				if profileID, err = cs.GetProfileID(*input.Profile); err != nil {
 					return err
 				}
 			}
-			if !reflect.DeepEqual(m, *c.ChanMetarrArgs) {
-				if _, err := cs.UpdateChannelMetarrArgsJSON(key, val, func(saved *models.MetarrArgs) error {
-					*saved = m
-					return nil
-				}); err != nil {
-					return err
+
+			// Save what changes in one transaction, so the changes are checked together.
+			chanID := strconv.FormatInt(c.ID, 10)
+			if err := cs.WithTx(func(tcs contracts.ChannelStore) error {
+				if newName != "" && newName != c.Name {
+					if err := tcs.UpdateChannelValue(consts.QChanID, chanID, consts.QChanName, newName); err != nil {
+						return err
+					}
 				}
+				if len(authDetails) > 0 {
+					if err := tcs.AddAuth(c.ID, authDetails); err != nil {
+						return err
+					}
+				}
+				if profileID != c.ProfileID {
+					if err := tcs.SetChannelProfile(consts.QChanID, chanID, profileID); err != nil {
+						return err
+					}
+				}
+				if !reflect.DeepEqual(s, *c.ChanSettings) {
+					if _, err := tcs.UpdateChannelSettingsJSON(consts.QChanID, chanID, func(saved *models.Settings) error {
+						*saved = s
+						return nil
+					}); err != nil {
+						return err
+					}
+				}
+				if !reflect.DeepEqual(m, *c.ChanMetarrArgs) {
+					if _, err := tcs.UpdateChannelMetarrArgsJSON(consts.QChanID, chanID, func(saved *models.MetarrArgs) error {
+						*saved = m
+						return nil
+					}); err != nil {
+						return err
+					}
+				}
+				return nil
+			}); err != nil {
+				return err
 			}
 
 			// Success.
@@ -1373,12 +1399,13 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 
 	// Settings.
 	setChannelSettingsFlags(updateSettingsCmd, &flags)
+	cmd.SetProfileFlag(updateSettingsCmd, &flags.Profile)
 
 	// Auth.
 	cmd.SetAuthFlags(updateSettingsCmd, &flags.Username, &flags.Password,
 		&flags.LoginURL, &flags.AuthDetails)
 
-	updateSettingsCmd.Flags().StringVar(&newName, "change-name-to", "", "Change the channel name to this value")
+	updateSettingsCmd.Flags().StringVar(&newName, keys.ChangeNameTo, "", "Change the channel name to this value")
 	updateSettingsCmd.Flags().BoolVar(&deleteAuth, "delete-auth", false, "Clear all authentication details for this channel and its URLs")
 
 	return updateSettingsCmd
@@ -1452,7 +1479,14 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 }
 
 // runIgnoreCrawl runs an ignore crawl of a newly added channel, so only videos uploaded from now on download.
-func runIgnoreCrawl(ctx context.Context, s contracts.Store, c *models.Channel) {
+func runIgnoreCrawl(ctx context.Context, s contracts.Store, added *models.Channel) {
+	// Reloaded, with its settings filled in as jobs use them.
+	c, found, err := s.ChannelStore().GetChannelModel(consts.QChanID, strconv.FormatInt(added.ID, 10), true)
+	if err != nil || !found {
+		logger.Pl.E("Failed to load channel %q for its ignore crawl (found: %t): %v", added.Name, found, err)
+		return
+	}
+
 	crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID)
 	if !ok {
 		logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
@@ -1465,8 +1499,8 @@ func runIgnoreCrawl(ctx context.Context, s contracts.Store, c *models.Channel) {
 	}
 }
 
-// lookupChannel returns the channel given by id or name, its URLs' unset settings filled in from the channel's as jobs
-// use them, with the key and value it was found by.
+// lookupChannel returns the channel given by id or name, its unset settings filled in as jobs use them, with the key
+// and value it was found by.
 func lookupChannel(cs contracts.ChannelStore, id int, name string) (c *models.Channel, key, val string, err error) {
 	if key, val, err = getChanKeyVal(id, name); err != nil {
 		return nil, "", "", err

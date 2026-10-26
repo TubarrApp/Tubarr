@@ -33,6 +33,33 @@ func TestExampleConfigFiles(t *testing.T) {
 	}
 }
 
+// TestProfileConfigKeys tests that the profile key names a channel's profile, and a URL's in its url-settings.
+func TestProfileConfigKeys(t *testing.T) {
+	const url = "https://example.com/@a"
+	v := viper.New()
+	v.Set("profile", "music")
+	v.Set("url-settings", map[string]any{url: map[string]any{"profile": "podcasts"}})
+	var in models.ChannelInput
+	if err := LoadViperIntoStruct(v, &in); err != nil {
+		t.Fatal(err)
+	}
+	urlSettings, err := ParseURLSettingsFromViper(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := NilOrZeroValue(in.Profile); got != "music" {
+		t.Errorf("channel profile %q, want music", got)
+	}
+	if o := urlSettings[url]; o == nil || NilOrZeroValue(o.Profile) != "podcasts" {
+		t.Errorf("URL settings %+v, want profile podcasts", o)
+	}
+
+	v.Set("url-settings", map[string]any{url: map[string]any{"profile": []any{"podcasts"}}})
+	if _, err := ParseURLSettingsFromViper(v); err == nil {
+		t.Error("read a URL profile given as a list")
+	}
+}
+
 // TestDownloadConcurrencyKey tests only the download-concurrency config key sets download concurrency.
 func TestDownloadConcurrencyKey(t *testing.T) {
 	for key, want := range map[string]int{"download-concurrency": 4, "download_concurrency": 4, "concurrency-limit": 0, "concurrency": 0} {

@@ -3,9 +3,16 @@ package keys
 
 // Channel identifiers.
 const (
-	URL  string = "channel-urls"
-	Name string = "channel-name"
-	ID   string = "channel-id"
+	ChannelURLs string = "channel-urls"
+	ChannelName string = "channel-name"
+	ChannelID   string = "channel-id"
+)
+
+// Profiles.
+const (
+	Profile      string = "profile"
+	ProfileName  string = "profile-name"
+	ChangeNameTo string = "change-name-to"
 )
 
 // Auth.
@@ -29,7 +36,6 @@ const (
 	VideoDir          string = "video-directory"
 	JSONDir           string = "json-directory"
 	MetarrPreset      string = "metarr-preset"
-	OutputFiletype    string = "output-ext"
 )
 
 // Transcoding.
@@ -67,11 +73,11 @@ const (
 	PostProcessConcurrency    string = "post-process-concurrency"
 	DomainDownloadLimits      string = "domain-download-limits"
 	DomainCrawlLimits         string = "domain-crawl-limits"
-	MoveOnComplete            string = "move-on-complete"
 	URLFile                   string = "url-file"
 	URLAdd                    string = "add-url"
 	URLs                      string = "urls"
 	ChannelURL                string = "channel-url"
+	URL                       string = "url"
 	SendToAvailable           string = "send-to-available"
 	VideoIDs                  string = "video-ids"
 	AllVideos                 string = "all-videos"
@@ -100,8 +106,6 @@ const (
 
 // Metarr operations.
 const (
-	MDescDatePfx             string = "metarr-desc-date-prefix"
-	MDescDateSfx             string = "metarr-desc-date-suffix"
 	MMetaOps                 string = "metarr-meta-ops"
 	MMetaOpsFile             string = "metarr-meta-ops-file"
 	MFilenameOps             string = "metarr-filename-ops"
@@ -111,7 +115,6 @@ const (
 	MFilteredMetaOps         string = "metarr-filtered-meta-ops"
 	MFilteredMetaOpsFile     string = "metarr-filtered-meta-ops-file"
 	MMetaPurge               string = "metarr-purge-metafile"
-	MFilenamePfx             string = "metarr-metadata-filename-prefix"
 	MRenameStyle             string = "metarr-rename-style"
 	MMaxCPU                  string = "metarr-max-cpu"
 	MMinFreeMem              string = "metarr-min-free-mem"
@@ -158,6 +161,5 @@ const (
 
 // Miscellaneous.
 const (
-	DebugLevel    string = "debug"
-	PurgeMetaFile string = "purge-metafile"
+	DebugLevel string = "debug"
 )

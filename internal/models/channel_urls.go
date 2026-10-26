@@ -25,6 +25,8 @@ type ChannelURL struct {
 	LastScan          time.Time             `json:"last_scan" db:"last_scan"`
 	CreatedAt         time.Time             `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time             `json:"updated_at" db:"updated_at"`
+	ProfileID         int64                 `json:"profile_id" db:"profile_id"`
+	Profile           *Profile              `json:"-" db:"-"`
 }
 
 // NeedsAuth checks if this channel URL has details for authorization.

@@ -94,7 +94,6 @@ func TestWebSettingsNormalized(t *testing.T) {
 	const u = "https://example.com/@web-normalized"
 	form := webChannelForm(t, "Web Normalized", u)
 	for k, v := range map[string]string{
-		"json_directory":       "", // Blank means the video directory.
 		"ytdlp_output_ext":     "MKV",
 		"metarr_output_ext":    "MP4",
 		"crawl_freq":           "-5",
@@ -120,7 +119,6 @@ func TestWebSettingsNormalized(t *testing.T) {
 		read any
 		want string
 	}{
-		{"json_directory", got.Settings["json_directory"], form.Get("video_directory")},
 		{"ytdlp_output_ext", got.Settings["ytdlp_output_ext"], "mkv"},
 		{"metarr_output_ext", got.Metarr["metarr_output_ext"], "mp4"},
 		{"crawl_freq", got.Settings["crawl_freq"], ""},
@@ -128,10 +126,10 @@ func TestWebSettingsNormalized(t *testing.T) {
 		{"download_concurrency", got.Settings["download_concurrency"], ""},
 		{"metarr_concurrency", got.Metarr["metarr_concurrency"], ""},
 		{"metarr_max_cpu_usage", got.Metarr["metarr_max_cpu_usage"], "101"},
-		{"per-URL ytdlp_output_ext", got.URLSettings[u]["settings"]["ytdlp_output_ext"], "webm"},
-		{"per-URL metarr_output_ext", got.URLSettings[u]["metarr"]["metarr_output_ext"], "mkv"},
-		{"per-URL crawl_freq", got.URLSettings[u]["settings"]["crawl_freq"], ""},
-		{"per-URL metarr_max_cpu_usage", got.URLSettings[u]["metarr"]["metarr_max_cpu_usage"], "101"},
+		{"per-URL ytdlp_output_ext", got.URLSettings[u].Settings["ytdlp_output_ext"], "webm"},
+		{"per-URL metarr_output_ext", got.URLSettings[u].Metarr["metarr_output_ext"], "mkv"},
+		{"per-URL crawl_freq", got.URLSettings[u].Settings["crawl_freq"], ""},
+		{"per-URL metarr_max_cpu_usage", got.URLSettings[u].Metarr["metarr_max_cpu_usage"], "101"},
 	} {
 		if g := formValue(c.read); g != c.want {
 			t.Errorf("%s reads back as %q, want %q", c.what, g, c.want)

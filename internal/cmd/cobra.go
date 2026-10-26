@@ -2,6 +2,8 @@
 package cmd
 
 import (
+	"fmt"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 
 	"github.com/spf13/cobra"
@@ -10,14 +12,19 @@ import (
 // SetPrimaryChannelFlags sets the main flags for channels in, or intended for, the database.
 func SetPrimaryChannelFlags(cmd *cobra.Command, name *string, urls *[]string, id *int) {
 	if id != nil {
-		cmd.Flags().IntVarP(id, keys.ID, "i", 0, "Channel ID in the DB")
+		cmd.Flags().IntVarP(id, keys.ChannelID, "i", 0, "Channel ID in the DB")
 	}
 	if name != nil {
-		cmd.Flags().StringVarP(name, keys.Name, "n", "", "Channel name")
+		cmd.Flags().StringVarP(name, keys.ChannelName, "n", "", "Channel name")
 	}
 	if urls != nil {
-		cmd.Flags().StringSliceVarP(urls, keys.URL, "u", nil, "Channel URLs")
+		cmd.Flags().StringSliceVarP(urls, keys.ChannelURLs, "u", nil, "Channel URLs")
 	}
+}
+
+// SetProfileFlag sets the flag choosing a channel's or URL's profile.
+func SetProfileFlag(cmd *cobra.Command, profile *string) {
+	cmd.Flags().StringVar(profile, keys.Profile, "", "Name of the profile filling in the settings left unset (empty for none)")
 }
 
 // SetAuthFlags sets flags related to channel authorization.
@@ -59,11 +66,11 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 	}
 
 	if retries != nil {
-		cmd.Flags().IntVar(retries, keys.DLRetries, 0, "Number of retries to attempt a download before failure")
+		cmd.Flags().IntVar(retries, keys.DLRetries, 0, fmt.Sprintf("Times Tubarr runs a failed video or metadata download again before giving up (0 uses %d)", consts.DefaultDownloadRetries))
 	}
 
 	if cookiesFromBrowser != nil {
-		cmd.Flags().StringVar(cookiesFromBrowser, keys.CookiesFromBrowser, "", "Browser to read cookies from for yt-dlp crawls and downloads, when there's no login cookie file (e.g. firefox). Custom crawl rules don't use it")
+		cmd.Flags().StringVar(cookiesFromBrowser, keys.CookiesFromBrowser, "", "Browser to read cookies from for yt-dlp crawls and downloads, together with any login or global cookies (e.g. firefox). Custom crawl rules don't use it")
 	}
 
 	if maxFilesize != nil {

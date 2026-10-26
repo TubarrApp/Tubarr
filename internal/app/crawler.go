@@ -503,6 +503,21 @@ func AddChannelFromInput(cs contracts.ChannelStore, input models.ChannelInput) (
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", contracts.ErrInvalidChannel, err)
 	}
+
+	// Profiles, by name.
+	if input.Profile != nil {
+		if c.ProfileID, err = cs.GetProfileID(*input.Profile); err != nil {
+			return nil, err
+		}
+	}
+	for _, cu := range c.URLModels {
+		if override, ok := input.URLSettings[strings.ToLower(cu.URL)]; ok && override.Profile != nil {
+			if cu.ProfileID, err = cs.GetProfileID(*override.Profile); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	var notifications []*models.Notification
 	if input.Notification != nil {
 		if notifications, err = parsing.ParseNotifications("", *input.Notification); err != nil {

@@ -18,30 +18,25 @@ import (
 	"github.com/spf13/viper"
 )
 
-// TestMetaPurge tests the metadata purge isn't passed to Metarr, and is Download As's, else the channel URL's, else the
-// global one.
+// TestMetaPurge tests the metadata purge isn't passed to Metarr, and is Download As's, else the channel URL's.
 func TestMetaPurge(t *testing.T) {
 	logger.Pl.Console = io.Discard
-	t.Cleanup(viper.Reset)
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{MetaPurge: "json"}}
 	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
-	viper.Set(keys.MMetaPurge, "nfo")
 	if args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); slices.Contains(args, metkeys.PurgeMetaFile) {
 		t.Errorf("purge passed to Metarr: %q", args)
 	}
 
 	for _, tc := range []struct {
-		name, override, url, global, want string
+		name, override, url, want string
 	}{
-		{"Download As", "all", "json", "nfo", "all"},
-		{"channel URL", "", "json", "nfo", "json"},
-		{"global", "", "", "NFO", "nfo"},
-		{"none", "", "", "", ""},
+		{"Download As", "all", "json", "all"},
+		{"channel URL", "", "JSON", "json"},
+		{"none", "", "", ""},
 	} {
 		v.Overrides = &models.VideoOverrides{MetarrArgs: models.MetarrArgs{MetaPurge: tc.override}}
 		cu.ChanURLMetarrArgs.MetaPurge = tc.url
-		viper.Set(keys.MMetaPurge, tc.global)
 		if got, err := metaPurge(v, cu); err != nil || got != tc.want {
 			t.Errorf("%s: got %q, %v, want %q", tc.name, got, err, tc.want)
 		}
@@ -175,7 +170,7 @@ func TestMakeMetarrCommandThumbnail(t *testing.T) {
 	}
 }
 
-// TestMakeMetarrCommandArgs tests the whole Metarr command for channel URL, global and Download As values.
+// TestMakeMetarrCommandArgs tests the whole Metarr command for channel URL and Download As values.
 func TestMakeMetarrCommandArgs(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
@@ -188,11 +183,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 		MetaOps: metaOps, TranscodeGPU: "vaapi", TranscodeGPUNode: "/dev/dri/renderD128", TranscodeQuality: "23",
 		TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"},
 	}
-	globals := map[string]any{
-		keys.MMinFreeMem: "2G", keys.OutputFiletype: "mkv", keys.MRenameStyle: "underscores", keys.MExtraFFmpegArgs: "-y",
-		keys.DebugLevel: 2, keys.MMetaOps: []string{"title:set:Global"}, keys.MFilenameOps: []string{"prefix:[G] "},
-		keys.MoveOnComplete: "/moved",
-	}
+	globals := map[string]any{keys.DebugLevel: 2}
 	files := []string{metkeys.VideoFile, "/videos/v.mp4", metkeys.MetaFile, "/videos/v.json"}
 
 	for _, tc := range []struct {
@@ -216,23 +207,13 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeQuality, "23",
 			metkeys.TranscodeAudioCodecs, "aac",
 		})},
-		{"global", globals, &models.MetarrArgs{}, nil, slices.Concat(files, []string{
-			metkeys.FilenameOps, "prefix:[G] ",
-			metkeys.MetaOps, "title:set:Global", metkeys.MetaOW,
-			metkeys.MinFreeMem, "2G",
-			metkeys.OutputDir, "/moved",
-			metkeys.Ext, "mkv",
-			metkeys.RenameStyle, "underscores",
-			metkeys.ExtraFFmpegArgs, "-y",
-			metkeys.Debug, "2",
-		})},
 		{"Download As", globals, channelArgs, &models.VideoOverrides{
 			MetarrArgs: models.MetarrArgs{OutputExt: "webm", TranscodeGPU: validation.GPUNone, MaxCPU: 80},
 			Thumbnail:  "/thumb.png",
 		}, slices.Concat(files, []string{
 			metkeys.MaxCPU, "80.00",
 			metkeys.MinFreeMem, "1G",
-			metkeys.OutputDir, "/moved",
+			metkeys.OutputDir, "/out",
 			metkeys.Ext, "webm",
 			metkeys.RenameStyle, "spaces",
 			metkeys.ExtraFFmpegArgs, "-x",
@@ -259,11 +240,10 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 	}
 }
 
-// TestParseMetarrOutputDirPerVideo tests --move-on-complete is filled afresh for each channel and URL, not the first one's.
+// TestParseMetarrOutputDirPerVideo tests a templated output directory is filled afresh for each channel and URL, not the
+// first one's.
 func TestParseMetarrOutputDirPerVideo(t *testing.T) {
 	logger.Pl.Console = io.Discard
-	viper.Set(keys.MoveOnComplete, "/media/{{channel_name}}/{{channel_url}}")
-	t.Cleanup(viper.Reset)
 
 	for _, tc := range []struct{ channel, url, want string }{
 		{"Cats", "https://example.com/@a", "/media/Cats/example.com-@a"},
@@ -271,7 +251,7 @@ func TestParseMetarrOutputDirPerVideo(t *testing.T) {
 		{"Dogs", "https://example.com/@c", "/media/Dogs/example.com-@c"},
 	} {
 		c := &models.Channel{ID: 1, Name: tc.channel}
-		cu := &models.ChannelURL{URL: tc.url, ChanURLMetarrArgs: &models.MetarrArgs{}}
+		cu := &models.ChannelURL{URL: tc.url, ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: "/media/{{channel_name}}/{{channel_url}}"}}
 		if got := parseMetarrOutputDir(&models.Video{}, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); got != tc.want {
 			t.Errorf("parseMetarrOutputDir(%s, %s) = %q, want %q", tc.channel, tc.url, got, tc.want)
 		}

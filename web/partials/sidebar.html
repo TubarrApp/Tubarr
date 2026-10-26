@@ -37,7 +37,7 @@
   >
     <!-- Sidebar Menu -->
     <!-- Highlights come from the page itself, not a remembered click, so they can't go stale. -->
-    <nav x-data="{ channelsOpen: ['addChannel', 'addChannelFromFile', 'editChannel', 'listChannels', 'channelVideos'].includes(page) }">
+    <nav x-data="{ channelsOpen: ['addChannel', 'addChannelFromFile', 'editChannel', 'listChannels', 'channelVideos'].includes(page), settingsOpen: ['settings', 'profiles'].includes(page) }">
       <!-- Menu Group -->
       <div>
         <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
@@ -430,12 +430,13 @@
           <!-- Menu Item Settings -->
           <li>
             <a
-              href="settings.html"
+              href="#"
+              @click.prevent="settingsOpen = !settingsOpen"
               class="menu-item group"
-              :class="(page === 'settings') ? 'menu-item-active' : 'menu-item-inactive'"
+              :class="['settings', 'profiles'].includes(page) ? 'menu-item-active' : 'menu-item-inactive'"
             >
               <svg
-                :class="(page === 'settings') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
+                :class="['settings', 'profiles'].includes(page) ? 'menu-item-icon-active' : 'menu-item-icon-inactive'"
                 width="24"
                 height="24"
                 viewBox="0 0 24 24"
@@ -454,7 +455,56 @@
               >
                 Settings
               </span>
+
+              <svg
+                class="menu-item-arrow"
+                :class="[settingsOpen ? 'menu-item-arrow-active' : 'menu-item-arrow-inactive', sidebarToggle ? 'xl:hidden' : '' ]"
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M4.79175 7.39584L10.0001 12.6042L15.2084 7.39585"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </a>
+
+            <!-- Dropdown Menu Start -->
+            <div
+              class="translate transform overflow-hidden"
+              :class="settingsOpen ? 'block' :'hidden'"
+            >
+              <ul
+                :class="sidebarToggle ? 'xl:hidden' : 'flex'"
+                class="menu-dropdown mt-2 flex flex-col gap-1 pl-9"
+              >
+                <li>
+                  <a
+                    href="settings.html"
+                    class="menu-dropdown-item group"
+                    :class="page === 'settings' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'"
+                  >
+                    General
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="profiles.html"
+                    class="menu-dropdown-item group"
+                    :class="page === 'profiles' ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'"
+                  >
+                    Profiles
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <!-- Dropdown Menu End -->
           </li>
           <!-- Menu Item Settings -->
 

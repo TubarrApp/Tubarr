@@ -4,6 +4,7 @@ channel_urls:
   - "https://www.tubesite.com/@CoolChannel"
 video_directory: "/home/user/tubarr/{{channel_name}}"
 json_directory: "/home/user/tubarr/{{channel_name}}" # Optional, defaults to video_directory
+# profile: "Music" # Optional, a profile filling in the settings this file leaves unset
 
 # Tubarr crawling and downloading
 external_downloader: "aria2c"
@@ -45,6 +46,7 @@ ignore_run: true
 # URL-specific settings apply specifically to a given URL belonging to this channel
 url-settings:
   "https://www.tubesite.com/@CoolChannel":
+    # profile: "Podcasts" # Optional, a profile filling in this URL's unset settings before the channel's
     settings:
       crawl_freq: 60
     metarr:

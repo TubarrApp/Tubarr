@@ -6,6 +6,7 @@ type ChannelFlagValues struct {
 	Name              string
 	URLs              []string
 	ChannelConfigFile string
+	Profile           string
 
 	// Directory paths
 	VideoDir string

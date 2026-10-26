@@ -1,6 +1,11 @@
 // Package jsonkeys holds constants for JSON keys used in settings and metarr args.
 package jsonkeys
 
+// JSON profile keys.
+const (
+	ProfileID = "profile_id"
+)
+
 // JSON setting keys.
 const (
 	SettingsCookiesFromBrowser        = "cookies_from_browser"

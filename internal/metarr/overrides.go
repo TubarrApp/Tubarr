@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/metadata"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 
-	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
@@ -34,30 +32,17 @@ func ChannelURLOverrideLines(cu *models.ChannelURL, dirParser *parsing.Directory
 		return lines, err
 	}
 
-	// Channel URL ops, else the global ones, as Metarr is given them.
+	// Channel URL ops, as Metarr is given them.
 	metaOps := slices.Concat(fileMetaOps, models.FilterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps))
-	metaOpLines := getDedupedMetaOpStrings(metaOps)
-	if len(metaOpLines) == 0 {
-		metaOpLines = abstractions.GetStringSlice(keys.MMetaOps)
-	}
 	filenameOps := slices.Concat(fileFilenameOps, models.FilterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps))
-	filenameOpLines := getDedupedFilenameOpStrings(filenameOps)
-	if len(filenameOpLines) == 0 {
-		filenameOpLines = abstractions.GetStringSlice(keys.MFilenameOps)
-	}
-
-	outputDir := cu.ChanURLMetarrArgs.OutputDir
-	if abstractions.IsSet(keys.MoveOnComplete) {
-		outputDir = abstractions.GetString(keys.MoveOnComplete)
-	}
 
 	return models.OverrideLines{
 		VideoDir:            cu.ChanURLSettings.VideoDir,
 		JSONDir:             cu.ChanURLSettings.JSONDir,
-		OutputDir:           outputDir,
-		MetaOps:             strings.Join(metaOpLines, "\n"),
+		OutputDir:           cu.ChanURLMetarrArgs.OutputDir,
+		MetaOps:             strings.Join(getDedupedMetaOpStrings(metaOps), "\n"),
 		FilteredMetaOps:     strings.Join(filteredMetaOpLines(slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, fileFilteredMetaOps)), "\n"),
-		FilenameOps:         strings.Join(filenameOpLines, "\n"),
+		FilenameOps:         strings.Join(getDedupedFilenameOpStrings(filenameOps), "\n"),
 		FilteredFilenameOps: strings.Join(filteredFilenameOpLines(slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, fileFilteredFilenameOps)), "\n"),
 	}, nil
 }

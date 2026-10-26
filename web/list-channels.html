@@ -182,6 +182,10 @@
                           <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Basic Settings</h4>
                           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                             <div>
+                              <span class="text-gray-500 dark:text-gray-400">Profile:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.profile || 'None'"></span>
+                            </div>
+                            <div>
                               <span class="text-gray-500 dark:text-gray-400">Video Directory:</span>
                               <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.video_directory || 'Not set'"></span>
                             </div>
@@ -200,11 +204,11 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Download Retries:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.download_retries || 3"></span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.download_retries || 2"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Max Filesize:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.max_filesize || 'Not set'"></span>
+                              <span class="text-gray-500 dark:text-gray-400">Use Global Cookies:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.use_global_cookies ? 'Yes' : 'No'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Channel Config File:</span>
@@ -233,9 +237,9 @@
                           </div>
                         </div>
 
-                        <!-- Advanced Settings Section -->
+                        <!-- Yt-dlp Settings Section -->
                         <div x-show="channel.settings">
-                          <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Advanced Settings</h4>
+                          <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Yt-dlp Settings</h4>
                           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">YT-DLP Output Extension:</span>
@@ -246,8 +250,8 @@
                               <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.cookies_from_browser || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Use Global Cookies:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.use_global_cookies ? 'Yes' : 'No'"></span>
+                              <span class="text-gray-500 dark:text-gray-400">Max Filesize:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.max_filesize || 'Not set'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">External Downloader:</span>
@@ -269,14 +273,6 @@
                               <span class="text-gray-500 dark:text-gray-400">Extra YT-DLP Crawl Args:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.extra_ytdlp_crawl_args || 'Not set'"></span>
                             </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Move Ops File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.move_ops_file || 'Not set'"></span>
-                            </div>
-                            <div class="md:col-span-2">
-                              <span class="text-gray-500 dark:text-gray-400">Move Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.settings?.move_ops ? (typeof channel.settings.move_ops === 'string' ? channel.settings.move_ops.split('\\n').join('\n') : channel.settings.move_ops.map(op => typeof op === 'string' ? op : ((op.move_op_field || '') + ':' + (op.move_op_value || '') + ' → ' + (op.move_op_output_dir || ''))).join('\n')) : 'Not set'"></span>
-                            </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">YT-DLP Preferred Video Codecs:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="formatPreferredCodecs(channel.settings?.ytdlp_preferred_video_codecs)"></span>
@@ -289,12 +285,20 @@
                         </div>
 
                         <!-- Metarr Settings Section -->
-                        <div x-show="channel.metarr">
+                        <div x-show="channel.metarr || channel.settings?.move_ops || channel.settings?.move_ops_file">
                           <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Post-processing</h4>
                           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Output Directory:</span>
                               <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.metarr?.metarr_output_directory || 'Not configured'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Move Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.settings?.move_ops_file || 'Not set'"></span>
+                            </div>
+                            <div class="md:col-span-2">
+                              <span class="text-gray-500 dark:text-gray-400">Move Operations:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.settings?.move_ops ? (typeof channel.settings.move_ops === 'string' ? channel.settings.move_ops.split('\\n').join('\n') : channel.settings.move_ops.map(op => typeof op === 'string' ? op : ((op.move_op_field || '') + ':' + (op.move_op_value || '') + ' → ' + (op.move_op_output_dir || ''))).join('\n')) : 'Not set'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Output Extension:</span>

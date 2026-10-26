@@ -49,6 +49,16 @@ func readWebFile(t *testing.T, name string) string {
 	return string(data)
 }
 
+// readBuiltPage returns a page as it's served, with its includes filled in.
+func readBuiltPage(t *testing.T, name string) string {
+	t.Helper()
+	built, err := fillIncludes(webRoot(), []byte(readWebFile(t, name)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(built)
+}
+
 // webPages returns every page and partial in the web folder, by path relative to it.
 func webPages(t *testing.T) map[string]string {
 	t.Helper()
@@ -464,7 +474,7 @@ func TestChannelFormModels(t *testing.T) {
 	}
 
 	for _, page := range []string{"add-channel.html", "edit-channel.html"} {
-		src := readWebFile(t, page)
+		src := readBuiltPage(t, page)
 		bs := bindings(src)
 		topKeys := objectKeys(t, src, "channelForm()", "formData: {")
 		settingsKeys := objectKeys(t, src, "formData: {", "settings: {")
@@ -516,6 +526,19 @@ func TestChannelFormModels(t *testing.T) {
 		if !regexp.MustCompile(`payload\.notifications = notificationsJSON\(`).MatchString(src) {
 			t.Errorf("%s: notifications aren't sent as JSON", page)
 		}
+
+		// Profiles are chosen by ID, the channel's sent as a form field and each URL's in its url_settings entry.
+		for _, path := range []string{"formData.profile_id", "urlEntry.profile_id"} {
+			if !slices.ContainsFunc(bs, func(b binding) bool { return b.path == path }) {
+				t.Errorf("%s: no field is bound to %s", page, path)
+			}
+		}
+		if !regexp.MustCompile(`payload\.profile_id = this\.formData\.profile_id`).MatchString(src) {
+			t.Errorf("%s: the channel's profile isn't sent", page)
+		}
+		if !regexp.MustCompile(`\.profile_id = Number\(urlEntry\.profile_id\)`).MatchString(src) {
+			t.Errorf("%s: URL profiles aren't sent", page)
+		}
 	}
 }
 
@@ -538,14 +561,22 @@ func TestChannelListPagesRead(t *testing.T) {
 
 // channelDetails is a channel as the edit page loads it.
 type channelDetails struct {
-	Name              string                               `json:"name"`
-	URLs              []string                             `json:"urls"`
-	ChannelConfigFile string                               `json:"channel_config_file"`
-	Settings          map[string]any                       `json:"settings"`
-	Metarr            map[string]any                       `json:"metarr"`
-	AuthDetails       []authDetailResponse                 `json:"auth_details"`
-	URLSettings       map[string]map[string]map[string]any `json:"url_settings"`
-	Notifications     []models.Notification                `json:"notifications"`
+	Name              string                       `json:"name"`
+	ProfileID         int64                        `json:"profile_id"`
+	URLs              []string                     `json:"urls"`
+	ChannelConfigFile string                       `json:"channel_config_file"`
+	Settings          map[string]any               `json:"settings"`
+	Metarr            map[string]any               `json:"metarr"`
+	AuthDetails       []authDetailResponse         `json:"auth_details"`
+	URLSettings       map[string]urlSettingsDetail `json:"url_settings"`
+	Notifications     []models.Notification        `json:"notifications"`
+}
+
+// urlSettingsDetail is a channel URL's own settings and profile, as the edit page loads them.
+type urlSettingsDetail struct {
+	ProfileID int64          `json:"profile_id"`
+	Settings  map[string]any `json:"settings"`
+	Metarr    map[string]any `json:"metarr"`
 }
 
 // TestChannelFormRoundTrip adds a channel the way the add page does, then edits it the way the edit page does, with
@@ -555,9 +586,24 @@ func TestChannelFormRoundTrip(t *testing.T) {
 	samples := formSamples(t)
 	used := map[string]bool{}
 
+	// Profiles for the channel and URL B to choose, deleted after the channel.
+	profileIDs := make([]int64, 2)
+	for i, name := range []string{"Wiring Round Trip A", "Wiring Round Trip B"} {
+		if w := sendForm(t, http.MethodPost, "/api/v1/profiles/add", url.Values{"name": {name}}); w.Code != http.StatusCreated {
+			t.Fatalf("adding profile %q = %d %s", name, w.Code, w.Body.String())
+		}
+		if err := fuzzServer.db.QueryRow("SELECT id FROM profiles WHERE name = ?", name).Scan(&profileIDs[i]); err != nil {
+			t.Fatal(err)
+		}
+		profileID := profileIDs[i]
+		t.Cleanup(func() {
+			sendRequest(t, http.MethodDelete, fmt.Sprintf("/api/v1/profiles/%d/delete", profileID), "", "")
+		})
+	}
+
 	var id int64
 	for step, page := range []string{"add-channel.html", "edit-channel.html"} {
-		src := readWebFile(t, page)
+		src := readBuiltPage(t, page)
 		settingsKeys := objectKeys(t, src, "formData: {", "settings: {")
 		metarrKeys := objectKeys(t, src, "formData: {", "metarr: {")
 		urlSettingsFields := slices.Concat(arrayStrings(t, src, "settingsFields"), perURLFixedKeys)
@@ -580,9 +626,7 @@ func TestChannelFormRoundTrip(t *testing.T) {
 		form := url.Values{}
 		for _, k := range slices.Concat(settingsKeys, metarrKeys) {
 			switch v := value(k, false); {
-			case k == "auto_download":
-				form.Set(k, v)
-			case k == "paused" || k == "use_global_cookies":
+			case k == "paused":
 				if v == "true" {
 					form.Set(k, v)
 				}
@@ -590,6 +634,7 @@ func TestChannelFormRoundTrip(t *testing.T) {
 				form.Set(k, v)
 			}
 		}
+		form.Set("profile_id", strconv.FormatInt(profileIDs[step], 10))
 		urlSettings, urlMetarr := map[string]any{}, map[string]any{}
 		for _, k := range urlSettingsFields {
 			urlSettings[k] = urlSettingValue(k, value(k, true), urlNumbers[k])
@@ -597,7 +642,7 @@ func TestChannelFormRoundTrip(t *testing.T) {
 		for _, k := range urlMetarrFields {
 			urlMetarr[k] = urlSettingValue(k, value(k, true), urlNumbers[k])
 		}
-		perURL, err := json.Marshal(map[string]any{wiringURLB: map[string]any{"settings": urlSettings, "metarr": urlMetarr}})
+		perURL, err := json.Marshal(map[string]any{wiringURLB: map[string]any{"profile_id": profileIDs[1-step], "settings": urlSettings, "metarr": urlMetarr}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -642,12 +687,18 @@ func TestChannelFormRoundTrip(t *testing.T) {
 			check("Metarr setting", k, value(k, false), got.Metarr[k])
 		}
 		for _, k := range urlSettingsFields {
-			check("per-URL setting", k, value(k, true), got.URLSettings[wiringURLB]["settings"][k])
+			check("per-URL setting", k, value(k, true), got.URLSettings[wiringURLB].Settings[k])
 		}
 		for _, k := range urlMetarrFields {
-			check("per-URL Metarr setting", k, value(k, true), got.URLSettings[wiringURLB]["metarr"][k])
+			check("per-URL Metarr setting", k, value(k, true), got.URLSettings[wiringURLB].Metarr[k])
 		}
 		check("channel field", "name", value("name", false), got.Name)
+		if got.ProfileID != profileIDs[step] {
+			t.Errorf("%s: the channel's profile was sent as %d but reads back as %d", page, profileIDs[step], got.ProfileID)
+		}
+		if p := got.URLSettings[wiringURLB].ProfileID; p != profileIDs[1-step] {
+			t.Errorf("%s: URL B's profile was sent as %d but reads back as %d", page, profileIDs[1-step], p)
+		}
 		if !sameSet(got.URLs, []string{wiringURLA, wiringURLB}) {
 			t.Errorf("%s: URLs read back as %v", page, got.URLs)
 		}
@@ -666,6 +717,104 @@ func TestChannelFormRoundTrip(t *testing.T) {
 	for key := range samples {
 		if !used[key] {
 			t.Errorf("formSamples has %q, which no channel page field uses", key)
+		}
+	}
+}
+
+// profileDetails is a profile as the profiles page lists it.
+type profileDetails struct {
+	ID       int64          `json:"id"`
+	Name     string         `json:"name"`
+	Settings map[string]any `json:"settings"`
+	Metarr   map[string]any `json:"metarr"`
+}
+
+// TestProfileFormRoundTrip adds a profile the way the profiles page does, then edits it, with every field filled, and
+// checks each value reads back.
+func TestProfileFormRoundTrip(t *testing.T) {
+	setupFuzzServer(t)
+	samples := formSamples(t)
+	src := readBuiltPage(t, "profiles.html")
+	settingsKeys := objectKeys(t, src, "function emptyProfileForm()", "settings: {")
+	metarrKeys := objectKeys(t, src, "function emptyProfileForm()", "metarr: {")
+
+	// Every model key has a field, and every field a model key, other than the channel-only ones the page hides.
+	bs := bindings(src)
+	for _, model := range []struct {
+		prefix string
+		keys   []string
+		hidden []string
+	}{
+		{"formData.settings.", settingsKeys, []string{"paused", "channel_config_file"}},
+		{"formData.metarr.", metarrKeys, nil},
+	} {
+		bound := boundKeys(bs, model.prefix)
+		for k := range bound {
+			if !slices.Contains(model.keys, k) && !slices.Contains(model.hidden, k) {
+				t.Errorf("profiles.html: a field is bound to %s%s, which isn't in that model, so it never loads or sends", model.prefix, k)
+			}
+		}
+		for _, k := range model.keys {
+			if _, ok := bound[k]; !ok {
+				t.Errorf("profiles.html: model key %s%s has no field", model.prefix, k)
+			}
+		}
+	}
+	reportDiff(t, "profiles.html", "settings model", settingsKeys, "settings the server returns", without(jsonTags(settingsResponse{}), "paused"))
+	reportDiff(t, "profiles.html", "Metarr model", metarrKeys, "Metarr settings the server returns", jsonTags(metarrArgsResponse{}))
+
+	var id int64
+	for step, name := range []string{"Wiring Profile A", "Wiring Profile B"} {
+		value := func(key string) string {
+			s, ok := samples[key]
+			if !ok {
+				t.Fatalf("profiles.html: field %q has no value in formSamples: add one so its wiring is tested", key)
+			}
+			return s[step]
+		}
+
+		// Built as save builds it.
+		form := url.Values{"name": {name}}
+		for _, k := range slices.Concat(settingsKeys, metarrKeys) {
+			if v := value(k); v != "" {
+				form.Set(k, v)
+			}
+		}
+		var w *httptest.ResponseRecorder
+		if step == 0 {
+			w = sendForm(t, http.MethodPost, "/api/v1/profiles/add", form)
+		} else {
+			w = sendForm(t, http.MethodPut, fmt.Sprintf("/api/v1/profiles/%d/update", id), form)
+		}
+		if w.Code >= 300 {
+			t.Fatalf("%s: saving = %d %s", name, w.Code, w.Body.String())
+		}
+		if step == 0 {
+			if err := fuzzServer.db.QueryRow("SELECT id FROM profiles WHERE name = ?", name).Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { sendRequest(t, http.MethodDelete, fmt.Sprintf("/api/v1/profiles/%d/delete", id), "", "") })
+		}
+
+		var profiles []profileDetails
+		fetchJSON(t, "/api/v1/profiles/all", &profiles)
+		i := slices.IndexFunc(profiles, func(p profileDetails) bool { return p.ID == id })
+		if i < 0 {
+			t.Fatalf("%s: saved profile %d isn't listed", name, id)
+		}
+		got := profiles[i]
+		if got.Name != name {
+			t.Errorf("profile name was sent as %q but reads back as %q", name, got.Name)
+		}
+		for _, k := range settingsKeys {
+			if g := formValue(got.Settings[k]); !sameFormValue(value(k), g) {
+				t.Errorf("%s: setting %q was sent as %q but reads back as %q", name, k, value(k), g)
+			}
+		}
+		for _, k := range metarrKeys {
+			if g := formValue(got.Metarr[k]); !sameFormValue(value(k), g) {
+				t.Errorf("%s: Metarr setting %q was sent as %q but reads back as %q", name, k, value(k), g)
+			}
 		}
 	}
 }
@@ -851,6 +1000,27 @@ func pageRequests() []pageRequest {
 		// Channel forms, replayed by TestChannelFormRoundTrip.
 		{path: "/api/v1/channels/add"},
 		{path: "/api/v1/channels/{}/update"},
+
+		// Profile form, replayed by TestProfileFormRoundTrip.
+		{path: "/api/v1/profiles/add", keys: []string{"name"}},
+		{path: "/api/v1/profiles/{}/update", keys: []string{"name"}},
+		{path: "/api/v1/profiles/all", replay: readsJSON("/api/v1/profiles/all")},
+		{path: "/api/v1/profiles/{}/delete", replay: func(t *testing.T) {
+			if w := sendForm(t, post, "/api/v1/profiles/add", url.Values{"name": {"Wiring Delete"}}); w.Code != http.StatusCreated {
+				t.Fatalf("adding a profile = %d %s", w.Code, w.Body.String())
+			}
+			var profileID int64
+			if err := fuzzServer.db.QueryRow("SELECT id FROM profiles WHERE name = ?", "Wiring Delete").Scan(&profileID); err != nil {
+				t.Fatal(err)
+			}
+			if w := sendRequest(t, del, fmt.Sprintf("/api/v1/profiles/%d/delete", profileID), "", ""); w.Code != http.StatusNoContent {
+				t.Fatalf("deleting a profile = %d %s", w.Code, w.Body.String())
+			}
+			var count int
+			if err := fuzzServer.db.QueryRow("SELECT COUNT(*) FROM profiles WHERE id = ?", profileID).Scan(&count); err != nil || count != 0 {
+				t.Errorf("deleted profile still saved (count %d, %v)", count, err)
+			}
+		}},
 
 		{path: "/api/v1/blocked-domains", replay: readsJSON("/api/v1/blocked-domains")},
 		{path: "/api/v1/blocked-domains/{}?context={}", keys: []string{"context"}, replay: func(t *testing.T) {

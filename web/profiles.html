@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <style>
+      [x-cloak] { display: none !important; }
+    </style>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Profiles | Tubarr</title>
+    <link rel="icon" href="/src/images/favicon.ico">
+    <link href="style.css" rel="stylesheet">
+  </head>
+  <body
+    x-data="{ page: 'profiles', 'loaded': true, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }"
+    class="dark bg-gray-900"
+  >
+    <!-- ===== Preloader Start ===== -->
+    <div
+      x-show="loaded"
+      x-init="loaded = false"
+      class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black"
+    >
+      <div
+        class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"
+      ></div>
+    </div>
+    <!-- ===== Preloader End ===== -->
+
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden" x-cloak>
+      <!-- include:sidebar selected="Settings" -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto"
+      >
+        <!-- include:header title="Profiles" -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main>
+          <div x-data="profileForm()" x-init="init()" class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 space-y-6">
+
+            <!-- Profile Editor -->
+            <div
+              x-show="editing"
+              x-ref="editor"
+              class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+            >
+              <div class="px-5 py-4 sm:px-6 sm:py-5 border-b border-gray-200 dark:border-gray-800">
+                <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="editing && editing.id ? 'Edit Profile' : 'New Profile'"></h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Fields left blank aren't set by this profile, so channels using it keep their own setting or the default.
+                </p>
+              </div>
+
+              <form @submit.prevent="save()" class="p-5 sm:p-6 space-y-6">
+                <!-- Error Display -->
+                <div x-show="editError" x-text="editError" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+
+                <!-- Saved settings failing validation, which stop the profile being used until saved valid -->
+                <div x-show="editing && editing.load_error" x-text="editing && editing.load_error" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Profile Name <span class="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    x-model="formData.name"
+                    required
+                    placeholder="e.g. Music videos"
+                    class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                  />
+                </div>
+
+                <!-- Tabs for Settings -->
+                <div class="space-y-4">
+                  <div class="border-b border-gray-200 dark:border-gray-700">
+                    <nav class="flex flex-wrap">
+                      <button
+                        type="button"
+                        @click="activeTab = 'basic'"
+                        :class="activeTab === 'basic' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
+                        class="py-2 px-4 border-b-2 font-medium text-sm"
+                      >
+                        Basic Settings
+                      </button>
+                      <button
+                        type="button"
+                        @click="activeTab = 'ytdlp'"
+                        :class="activeTab === 'ytdlp' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
+                        class="py-2 px-4 border-b-2 font-medium text-sm"
+                      >
+                        Yt-dlp Settings
+                      </button>
+                      <button
+                        type="button"
+                        @click="activeTab = 'metarr'"
+                        :class="activeTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'"
+                        class="py-2 px-4 border-b-2 font-medium text-sm"
+                      >
+                        Post-processing
+                      </button>
+                    </nav>
+                  </div>
+
+                  <!-- include:settings-fields -->
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    type="button"
+                    @click="editing = null"
+                    class="inline-flex items-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    :disabled="submitting"
+                    class="inline-flex items-center px-4 py-2.5 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span x-show="!submitting">Save Profile</span>
+                    <span x-show="submitting">Saving...</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Profile List -->
+            <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+              <div class="px-5 py-4 sm:px-6 sm:py-5 border-b border-gray-200 dark:border-gray-800 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="text-base font-medium text-gray-800 dark:text-white/90">
+                    Profiles
+                  </h3>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Named sets of settings. A channel or channel URL using a profile gets its settings for anything it leaves blank.
+                    <a href="help.html#profiles" class="text-brand-500 hover:text-brand-600">How profiles work</a>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  @click="startAdd()"
+                  class="inline-flex shrink-0 items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                >
+                  New Profile
+                </button>
+              </div>
+
+              <div class="p-5 sm:p-6 space-y-4">
+                <!-- Error Display -->
+                <div x-show="error" x-text="error" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+
+                <!-- Success Display -->
+                <div x-show="success" x-text="success" class="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"></div>
+
+                <!-- Loading Display -->
+                <div x-show="loading" class="p-8 text-center">
+                  <div class="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
+                </div>
+
+                <p x-show="!loading && profiles.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+                  No profiles yet.
+                </p>
+
+                <ul x-show="profiles.length > 0" class="divide-y divide-gray-200 dark:divide-gray-800">
+                  <template x-for="p in profiles" :key="p.id">
+                    <li class="py-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div class="text-sm">
+                        <p class="font-medium text-gray-800 dark:text-white/90" x-text="p.name"></p>
+                        <p x-show="p.load_error" class="mt-1 text-xs text-error-600" x-text="p.load_error"></p>
+                        <p x-show="p.used_by.length === 0" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Not used by any channel</p>
+                        <ul x-show="p.used_by.length > 0" class="mt-1 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                          <template x-for="u in p.used_by" :key="u.channel_id + '|' + (u.url || '')">
+                            <li class="break-words">
+                              <span x-text="u.url ? 'URL of' : 'Channel'"></span>
+                              <a :href="'edit-channel.html?id=' + u.channel_id" class="text-brand-500 hover:text-brand-600" x-text="u.channel"></a><span x-show="u.url" x-text="': ' + u.url"></span>
+                            </li>
+                          </template>
+                        </ul>
+                      </div>
+                      <div class="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          @click="startEdit(p)"
+                          class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          @click="remove(p)"
+                          :disabled="p.used_by.length > 0"
+                          :title="p.used_by.length > 0 ? 'Choose another profile for the channels and URLs using it first' : ''"
+                          class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+    <script defer src="bundle.js"></script>
+    <script>
+      function profileForm() {
+        return {
+          profiles: [],
+          editing: null, // The profile being edited, {} for a new one.
+          activeTab: 'basic',
+          formData: emptyProfileForm(),
+          loading: true,
+          submitting: false,
+          error: '',
+          editError: '',
+          success: '',
+          globalPostProcessLimit: 0,
+          globalDownloadLimit: 0,
+
+          init() {
+            this.loadGlobalLimits();
+            this.loadProfiles();
+          },
+
+          // Blank fields show their usual placeholder, as a profile fills in nothing from elsewhere.
+          hint(section, key, fallback) {
+            return fallback;
+          },
+          boolHint() {
+            return 'Not set';
+          },
+
+          // A profile needs a video directory while channels without their own rely on it.
+          videoDirRequired() {
+            return !!(this.editing && this.editing.video_dir_needed_by && this.editing.video_dir_needed_by.length);
+          },
+          videoDirNote() {
+            if (!this.videoDirRequired()) return '';
+            return `Channels using this as their video directory: ${this.editing.video_dir_needed_by.join(', ')}`;
+          },
+
+          // A note when a limit is above the global one (0 = unlimited), which caps it.
+          capNote(value, global) {
+            return global > 0 && value > global ? `Capped at ${global} by the global limit (Settings)` : '';
+          },
+          globalPostProcessHint() {
+            return this.globalPostProcessLimit > 0 ? `Use global (${this.globalPostProcessLimit})` : 'Use global (unlimited)';
+          },
+          async loadGlobalLimits() {
+            try {
+              const [postProcess, download] = await Promise.all([
+                fetch('/api/v1/settings/post-process-concurrency'),
+                fetch('/api/v1/settings/global-download-concurrency')
+              ]);
+              if (postProcess.ok) this.globalPostProcessLimit = (await postProcess.json()).limit ?? 0;
+              if (download.ok) this.globalDownloadLimit = (await download.json()).limit ?? 0;
+            } catch (err) {
+              console.error('Error loading global concurrency limits:', err);
+            }
+          },
+
+          async loadProfiles() {
+            try {
+              const response = await fetch('/api/v1/profiles/all');
+              if (!response.ok) {
+                throw new Error((await response.text()) || 'Failed to load profiles');
+              }
+              this.profiles = await response.json();
+            } catch (err) {
+              this.error = err.message || 'An error occurred while loading profiles';
+              console.error('Error loading profiles:', err);
+            } finally {
+              this.loading = false;
+            }
+          },
+
+          startAdd() {
+            this.openEditor({}, emptyProfileForm());
+          },
+
+          startEdit(p) {
+            // Fill the form from the profile's settings, lists one item per line and choices as strings
+            const form = emptyProfileForm();
+            form.name = p.name;
+            for (const section of ['settings', 'metarr']) {
+              for (const [key, value] of Object.entries(p[section] || {})) {
+                if (!(key in form[section]) || value === null || value === undefined) continue;
+                if (typeof value === 'boolean') {
+                  form[section][key] = String(value);
+                } else if (Array.isArray(value)) {
+                  form[section][key] = value.join('\n');
+                } else {
+                  form[section][key] = value;
+                }
+              }
+            }
+            this.openEditor(p, form);
+          },
+
+          openEditor(profile, form) {
+            this.editError = '';
+            this.success = '';
+            this.activeTab = 'basic';
+            this.formData = form;
+            this.editing = profile;
+            this.$nextTick(() => this.$refs.editor.scrollIntoView({ behavior: 'smooth' }));
+          },
+
+          async save() {
+            this.editError = '';
+            this.success = '';
+            this.submitting = true;
+
+            try {
+              // Send the name and every field set, as the channel forms do
+              const payload = new URLSearchParams({ name: this.formData.name });
+              for (const section of ['settings', 'metarr']) {
+                for (const [key, value] of Object.entries(this.formData[section])) {
+                  if (value !== null && value !== undefined && value !== '') {
+                    payload.set(key, value);
+                  }
+                }
+              }
+
+              const isNew = !this.editing.id;
+              const response = await fetch(isNew ? '/api/v1/profiles/add' : `/api/v1/profiles/${this.editing.id}/update`, {
+                method: isNew ? 'POST' : 'PUT',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: payload
+              });
+              const message = await response.text();
+              if (!response.ok) {
+                throw new Error(message || 'Failed to save profile');
+              }
+
+              this.editing = null;
+              this.success = message;
+              await this.loadProfiles();
+            } catch (err) {
+              this.editError = err.message || 'An error occurred while saving the profile';
+              console.error('Error saving profile:', err);
+            } finally {
+              this.submitting = false;
+            }
+          },
+
+          async remove(p) {
+            if (!confirm(`Delete the profile "${p.name}"? This action cannot be undone.`)) return;
+            this.error = '';
+            this.success = '';
+
+            try {
+              const response = await fetch(`/api/v1/profiles/${p.id}/delete`, { method: 'DELETE' });
+              if (!response.ok) {
+                throw new Error((await response.text()) || 'Failed to delete profile');
+              }
+              if (this.editing && this.editing.id === p.id) this.editing = null;
+              this.success = `Profile "${p.name}" deleted`;
+              await this.loadProfiles();
+            } catch (err) {
+              this.error = err.message || 'An error occurred while deleting the profile';
+              console.error('Error deleting profile:', err);
+            }
+          }
+        };
+      }
+
+      // emptyProfileForm returns a blank profile form, holding the settings a profile can set.
+      function emptyProfileForm() {
+        return {
+          name: '',
+          settings: {
+            video_directory: '',
+            json_directory: '',
+            download_concurrency: '',
+            crawl_freq: '',
+            download_retries: '',
+            max_filesize: '',
+            ytdlp_output_ext: '',
+            cookies_from_browser: '',
+            external_downloader: '',
+            external_downloader_args: '',
+            extra_ytdlp_video_args: '',
+            extra_ytdlp_meta_args: '',
+            extra_ytdlp_crawl_args: '',
+            use_global_cookies: '',
+            auto_download: '',
+            from_date: '',
+            to_date: '',
+            filter_file: '',
+            filters: '',
+            move_ops_file: '',
+            move_ops: '',
+            ytdlp_preferred_video_codecs: '',
+            ytdlp_preferred_audio_codecs: ''
+          },
+          metarr: {
+            metarr_output_directory: '',
+            metarr_purge_metafile: '',
+            metarr_output_ext: '',
+            metarr_rename_style: '',
+            metarr_concurrency: '',
+            metarr_max_cpu_usage: '',
+            metarr_min_free_mem: '',
+            metarr_gpu: '',
+            metarr_transcode_gpu_node: '',
+            metarr_transcode_video_transcode_codecs: '',
+            metarr_transcode_audio_codecs: '',
+            metarr_transcode_quality: '',
+            metarr_extra_ffmpeg_args: '',
+            metarr_filename_ops: '',
+            metarr_filename_ops_file: '',
+            metarr_filtered_filename_ops: '',
+            metarr_filtered_filename_ops_file: '',
+            metarr_meta_ops: '',
+            metarr_meta_ops_file: '',
+            metarr_filtered_meta_ops: '',
+            metarr_filtered_meta_ops_file: ''
+          }
+        };
+      }
+    </script>
+  </body>
+</html>

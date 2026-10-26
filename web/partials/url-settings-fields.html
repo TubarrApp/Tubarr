@@ -1,0 +1,290 @@
+                      <!-- Custom Settings (shown when hasCustomSettings is true) -->
+                      <div x-show="urlEntry.hasCustomSettings" x-data="{ urlTab: 'overview', open: false }" x-init="$watch('urlEntry.hasCustomSettings', on => open = on)" class="mt-4 p-4 border-2 border-brand-500 dark:border-brand-600 rounded-lg space-y-3 bg-blue-50 dark:bg-blue-900/20">
+                        <div class="flex items-center justify-between gap-2">
+                          <div>
+                            <p class="text-sm font-semibold text-gray-700 dark:text-gray-300">🔧 Per-URL Override Settings</p>
+                            <p x-show="open" class="text-xs text-gray-600 dark:text-gray-400">(Leave empty to use this URL's profile, or the channel setting)</p>
+                          </div>
+                          <button type="button" @click="open = !open" class="inline-flex shrink-0 items-center gap-1 px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50">
+                            <span x-text="open ? 'Hide' : 'Show'"></span>
+                            <svg class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <!-- Per-URL Tabs -->
+                        <div x-show="open" class="border-b border-gray-300 dark:border-gray-600">
+                          <nav class="flex flex-wrap gap-1">
+                            <button type="button" @click="urlTab = 'overview'" :class="urlTab === 'overview' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm font-medium rounded-t">Overview</button>
+                            <button type="button" @click="urlTab = 'basic'" :class="urlTab === 'basic' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm">Basic</button>
+                            <button type="button" @click="urlTab = 'ytdlp'" :class="urlTab === 'ytdlp' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm">Yt-dlp</button>
+                            <button type="button" @click="urlTab = 'metarr'" :class="urlTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-white dark:bg-gray-800' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'" class="py-2 px-4 border-b-2 text-sm">Post-processing</button>
+                          </nav>
+                        </div>
+
+                        <!-- Overview Tab -->
+                        <div x-show="open && urlTab === 'overview'" class="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                          <p class="font-medium">This URL can override ANY channel setting.</p>
+                          <ul class="list-disc list-inside space-y-1 ml-2">
+                            <li><strong>Basic:</strong> Directories, concurrency, crawl frequency, retries, global cookies, dates, filters</li>
+                            <li><strong>Yt-dlp:</strong> Output extension, browser cookies, external downloaders, max filesize, extra args, preferred codecs</li>
+                            <li><strong>Post-processing:</strong> Metarr output directory, move operations, transcoding, meta/filename operations</li>
+                          </ul>
+                          <p class="mt-2 text-brand-600 dark:text-brand-400">💡 Any field left empty uses this URL's profile, if it sets one, else the channel setting.</p>
+                          <p class="text-brand-600 dark:text-brand-400">💡 Filters and operations are added to the channel's. Where both set the same thing, such as a field's value or the filename, this URL's is used.</p>
+                        </div>
+
+                        <!-- Basic Tab for This URL -->
+                        <div x-show="open && urlTab === 'basic'" class="space-y-4">
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Video Directory</label>
+                              <input type="text" x-model="urlEntry.custom.video_directory" :placeholder="urlHint(urlEntry, 'settings', 'video_directory', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">JSON Directory</label>
+                              <input type="text" x-model="urlEntry.custom.json_directory" :placeholder="urlHint(urlEntry, 'settings', 'json_directory', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max Concurrency</label>
+                              <input type="number" x-model.number="urlEntry.custom.download_concurrency" :placeholder="urlHint(urlEntry, 'settings', 'download_concurrency', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Crawl Frequency (min)</label>
+                              <input type="number" x-model.number="urlEntry.custom.crawl_freq" :placeholder="urlHint(urlEntry, 'settings', 'crawl_freq', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Download Retries</label>
+                              <input type="number" x-model.number="urlEntry.custom.download_retries" :placeholder="urlHint(urlEntry, 'settings', 'download_retries', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Use Global Cookies</label>
+                              <select x-model="urlEntry.custom.use_global_cookies" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlBoolHint(urlEntry, 'use_global_cookies', 'Yes', 'No')"></option>
+                                <option value="false">No</option>
+                                <option value="true">Yes</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">From Date</label>
+                              <input type="text" x-model="urlEntry.custom.from_date" :placeholder="urlHint(urlEntry, 'settings', 'from_date', 'YYYYMMDD')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">To Date</label>
+                              <input type="text" x-model="urlEntry.custom.to_date" :placeholder="urlHint(urlEntry, 'settings', 'to_date', 'YYYYMMDD')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filter File</label>
+                              <input type="text" x-model="urlEntry.custom.filter_file" :placeholder="urlHint(urlEntry, 'settings', 'filter_file', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filters (one per line, added to the channel's) <a href="help.html#filters" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea x-model="urlEntry.custom.filters" rows="4" :placeholder="urlHint(urlEntry, 'settings', 'filters', 'title:contains:keyword:must')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Yt-dlp Tab for This URL -->
+                        <div x-show="open && urlTab === 'ytdlp'" class="space-y-4">
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Output Ext</label>
+                              <select x-model="urlEntry.custom.ytdlp_output_ext" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlHint(urlEntry, 'settings', 'ytdlp_output_ext', 'Use channel setting')"></option>
+                                <option value="mp4">mp4</option>
+                                <option value="mkv">mkv</option>
+                                <option value="webm">webm</option>
+                                <option value="avi">avi</option>
+                                <option value="flv">flv</option>
+                                <option value="mov">mov</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Cookies From Browser</label>
+                              <input type="text" x-model="urlEntry.custom.cookies_from_browser" :placeholder="urlHint(urlEntry, 'settings', 'cookies_from_browser', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max Filesize</label>
+                              <input type="text" x-model="urlEntry.custom.max_filesize" :placeholder="urlHint(urlEntry, 'settings', 'max_filesize', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">External Downloader</label>
+                              <select x-model="urlEntry.custom.external_downloader" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlHint(urlEntry, 'settings', 'external_downloader', 'Use channel setting')"></option>
+                                <option value="native">yt-dlp built-in</option>
+                                <option value="aria2c">aria2c</option>
+                                <option value="axel">axel</option>
+                                <option value="curl">curl</option>
+                                <option value="ffmpeg">ffmpeg</option>
+                                <option value="httpie">httpie</option>
+                                <option value="wget">wget</option>
+                                <template x-if="!['', 'native', 'aria2c', 'axel', 'curl', 'ffmpeg', 'httpie', 'wget'].includes(urlEntry.custom.external_downloader || '')">
+                                  <option :value="urlEntry.custom.external_downloader" x-text="urlEntry.custom.external_downloader + ' (custom)'" selected></option>
+                                </template>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">External Downloader Args</label>
+                              <input type="text" x-model="urlEntry.custom.external_downloader_args" :placeholder="urlHint(urlEntry, 'settings', 'external_downloader_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_video_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Meta Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_meta_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Crawl Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_crawl_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_crawl_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Preferred Video Codecs (one per line, in order of priority) <a href="help.html#ytdlp" target="_blank" title="How these work" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                            <textarea x-model="urlEntry.custom.ytdlp_preferred_video_codecs" rows="2" :placeholder="urlHint(urlEntry, 'settings', 'ytdlp_preferred_video_codecs', 'vp9\nav1\nh264')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Preferred Audio Codecs (one per line, in order of priority) <a href="help.html#ytdlp" target="_blank" title="How these work" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                            <textarea x-model="urlEntry.custom.ytdlp_preferred_audio_codecs" rows="2" :placeholder="urlHint(urlEntry, 'settings', 'ytdlp_preferred_audio_codecs', 'opus\naac\nvorbis')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                          </div>
+                        </div>
+
+                        <!-- Metarr Tab for This URL -->
+                        <div x-show="open && urlTab === 'metarr'" class="space-y-4">
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Output Directory</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_output_directory" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_output_directory', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Move Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.move_ops_file" :placeholder="urlHint(urlEntry, 'settings', 'move_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div class="md:col-span-2">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Move Operations (one per line, checked before the channel's) <a href="help.html#move-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea x-model="urlEntry.custom.move_ops" rows="2" :placeholder="urlHint(urlEntry, 'settings', 'move_ops', 'title:contains:keyword||/path')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Output Extension</label>
+                              <select x-model="urlEntry.custom.metarr_output_ext" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlHint(urlEntry, 'metarr', 'metarr_output_ext', 'Use channel setting')"></option>
+                                <option value="avi">avi</option>
+                                <option value="flv">flv</option>
+                                <option value="mkv">mkv</option>
+                                <option value="mov">mov</option>
+                                <option value="mp4">mp4</option>
+                                <option value="webm">webm</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>
+                              <select x-model="urlEntry.custom.metarr_purge_metafile" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlHint(urlEntry, 'metarr', 'metarr_purge_metafile', 'Use channel setting')"></option>
+                                <option value="json">JSON</option>
+                                <option value="nfo">NFO</option>
+                                <option value="all">All</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Rename Style</label>
+                              <select x-model="urlEntry.custom.metarr_rename_style" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlHint(urlEntry, 'metarr', 'metarr_rename_style', 'Use channel setting')"></option>
+                                <option value="spaces">Spaces</option>
+                                <option value="underscores">Underscores</option>
+                                <option value="fixes-only">Fixes Only</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Concurrency</label>
+                              <input type="number" x-model.number="urlEntry.custom.metarr_concurrency" min="0" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_concurrency', urlPostProcessHint())" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <p x-show="capNote(urlEntry.custom.metarr_concurrency, globalPostProcessLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(urlEntry.custom.metarr_concurrency, globalPostProcessLimit)"></p>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
+                              <select x-model="urlEntry.custom.metarr_gpu" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
+                                <option value="" x-text="urlHint(urlEntry, 'metarr', 'metarr_gpu', 'Use channel setting')"></option>
+                                <option value="none">None (software)</option>
+                                <option value="auto">Auto</option>
+                                <option value="cuda">Nvidia (Cuda)</option>
+                                <option value="qsv">Intel (QSV)</option>
+                                <option value="vaapi">VAAPI</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">GPU Node Path</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_transcode_gpu_node" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_transcode_gpu_node', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Video Transcode Codecs <a href="help.html#transcoding" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea
+                                x-model="urlEntry.custom.metarr_transcode_video_transcode_codecs"
+                                :placeholder="urlHint(urlEntry, 'metarr', 'metarr_transcode_video_transcode_codecs', 'Use channel setting (one per line, e.g. h264:hevc or av1)')"
+                                rows="2"
+                                class="w-full rounded-lg border px-4 py-2.5 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
+                              ></textarea>
+                              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., h264:hevc)</p>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Audio Transcode Codecs <a href="help.html#transcoding" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea
+                                x-model="urlEntry.custom.metarr_transcode_audio_codecs"
+                                :placeholder="urlHint(urlEntry, 'metarr', 'metarr_transcode_audio_codecs', 'Use channel setting (one per line, e.g. aac or dts:ac3)')"
+                                rows="2"
+                                class="w-full rounded-lg border px-4 py-2.5 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
+                              ></textarea>
+                              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., dts:ac3)</p>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
+                              <input type="number" min="0" max="51" x-model="urlEntry.custom.metarr_transcode_quality" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_transcode_quality', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Min Free Memory</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_min_free_mem" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_min_free_mem', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
+                              <input type="number" x-model.number="urlEntry.custom.metarr_max_cpu_usage" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_max_cpu_usage', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div class="md:col-span-2">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_extra_ffmpeg_args" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_extra_ffmpeg_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Meta Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_meta_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_meta_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div class="md:col-span-2">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Meta Operations (one per line, added to the channel's) <a href="help.html#meta-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_meta_ops', 'artist:set:Value')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Meta Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_filtered_meta_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_meta_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div class="md:col-span-2">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line, added to the channel's) <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_meta_ops', 'filter_rule||meta_op')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filename Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_filename_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filename_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div class="md:col-span-2">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filename Operations (one per line, added to the channel's) <a href="help.html#filename-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filename_ops', 'prefix:[PREFIX] ')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Filename Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_filtered_filename_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_filename_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div class="md:col-span-2">
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line, added to the channel's) <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea x-model="urlEntry.custom.metarr_filtered_filename_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_filename_ops', 'filter_rule||filename_op')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>

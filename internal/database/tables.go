@@ -15,6 +15,7 @@ const (
 	channelURLsSQL    = "sql/channel_urls.sql"
 	downloadSQL       = "sql/downloads.sql"
 	notificationSQL   = "sql/notifications.sql"
+	profilesSQL       = "sql/profiles.sql"
 	programSQL        = "sql/program.sql"
 	settingsSQL       = "sql/settings.sql"
 	videoSQL          = "sql/videos.sql"
@@ -34,6 +35,11 @@ func initChannelsTable(tx *sql.Tx) error {
 // initChannelURLsTable intializes channel tables.
 func initChannelURLsTable(tx *sql.Tx) error {
 	return executeSQLFile(tx, channelURLsSQL, "channel urls table")
+}
+
+// initProfilesTable initializes the settings profiles table.
+func initProfilesTable(tx *sql.Tx) error {
+	return executeSQLFile(tx, profilesSQL, "profiles table")
 }
 
 // initNotifyTable initializes notification service tables.

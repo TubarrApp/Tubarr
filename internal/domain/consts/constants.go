@@ -37,6 +37,7 @@ var BotTimeoutMap = map[string]float64{
 // Web keys are keys used by the web UI as URL parameters and so on.
 const (
 	WebParamChannelID = "id"
+	WebParamProfileID = "id"
 	WebParamVideoID   = "videoID"
 	WebParamURLID     = "urlID"
 	WebParamLogLevel  = "level"

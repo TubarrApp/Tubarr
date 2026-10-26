@@ -4,15 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"tubarr/internal/domain/command"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
-
-	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
@@ -29,22 +25,15 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 		command.P, d.Video.JSONDir,
 		command.Output, command.FilenameSyntax)
 
-	// Cookie path.
-	if d.ChannelURL.CookiePath == "" {
-		if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
-			args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
-		}
-	} else {
+	// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
+	if d.ChannelURL.CookiePath != "" {
 		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
 	}
-
-	// Cookie source, for channel URLs without their own.
-	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" && abstractions.IsSet(keys.CookiesFromBrowser) {
-		browserCookiesFromBrowser := abstractions.GetString(keys.CookiesFromBrowser)
-		logger.Pl.I("Using cookies from browser %q", browserCookiesFromBrowser)
-		args = append(args, command.CookiesFromBrowser, browserCookiesFromBrowser)
-	} else {
-		logger.Pl.D(1, "No browser cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
+	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
+		args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
+	}
+	if d.ChannelURL.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
+		logger.Pl.D(1, "No cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 
 	// Max filesize specified.
@@ -75,11 +64,6 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 				args = append(args, command.ExternalDLArgs, d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs)
 			}
 		}
-	}
-
-	// Retry download X times.
-	if d.ChannelURL.ChanURLSettings.Retries != 0 {
-		args = append(args, command.Retries, strconv.Itoa(d.ChannelURL.ChanURLSettings.Retries))
 	}
 
 	// Randomize requests (avoid detection as bot).

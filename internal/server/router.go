@@ -179,6 +179,14 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 			r.Post("/{id}/toggle-pause", ss.handleTogglePauseChannel)
 		})
 
+		// Profiles API.
+		r.Route("/profiles", func(r chi.Router) {
+			r.Get("/all", ss.handleListProfiles)
+			r.Post("/add", ss.handleAddProfile)
+			r.Put("/{id}/update", ss.handleUpdateProfile)
+			r.Delete("/{id}/delete", ss.handleDeleteProfile)
+		})
+
 		// Status API (200 when idle, 503 while jobs run; for container update hooks).
 		r.Get("/status/idle", ss.handleGetIdle)
 
@@ -396,14 +404,24 @@ var (
 	includeArgRe = regexp.MustCompile(`([\w-]+)="([^"]*)"`)
 )
 
-// servePage serves an HTML page, replacing each <!-- include:name key="value" --> with web/partials/name.html, filling its {{key}} placeholders.
+// servePage serves an HTML page, with its includes filled in.
 func servePage(w http.ResponseWriter, r *http.Request, webRoot, page string) {
 	content, err := os.ReadFile(page)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	if content, err = fillIncludes(webRoot, content); err != nil {
+		logger.Pl.E("Failed to build page %q: %v", page, err)
+		http.Error(w, "failed to build page", http.StatusInternalServerError)
+		return
+	}
+	http.ServeContent(w, r, filepath.Base(page), time.Time{}, bytes.NewReader(content))
+}
 
+// fillIncludes replaces each <!-- include:name key="value" --> in a page with web/partials/name.html, filling its
+// {{key}} placeholders.
+func fillIncludes(webRoot string, content []byte) ([]byte, error) {
 	var includeErr error
 	content = includeRe.ReplaceAllFunc(content, func(marker []byte) []byte {
 		m := includeRe.FindSubmatch(marker)
@@ -417,10 +435,5 @@ func servePage(w http.ResponseWriter, r *http.Request, webRoot, page string) {
 		}
 		return partial
 	})
-	if includeErr != nil {
-		logger.Pl.E("Failed to build page %q: %v", page, includeErr)
-		http.Error(w, "failed to build page", http.StatusInternalServerError)
-		return
-	}
-	http.ServeContent(w, r, filepath.Base(page), time.Time{}, bytes.NewReader(content))
+	return content, includeErr
 }

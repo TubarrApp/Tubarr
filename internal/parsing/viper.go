@@ -1,7 +1,6 @@
 package parsing
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"reflect"
@@ -70,7 +69,7 @@ func BuildChannelFromInput(input models.ChannelInput) (
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
-	if err := ApplyChannelSettingsInput(c.ChanSettings, &input.SettingsInput); err != nil {
+	if err := ApplySettingsInput(c.ChanSettings, &input.SettingsInput); err != nil {
 		return nil, nil, err
 	}
 	if err := ApplyMetarrArgsInput(c.ChanMetarrArgs, &input.MetarrArgsInput); err != nil {
@@ -120,19 +119,6 @@ func BuildChannelFromInput(input models.ChannelInput) (
 		c.URLModels = append(c.URLModels, cu)
 	}
 	return c, authMap, nil
-}
-
-// ApplyChannelSettingsInput is ApplySettingsInput for a channel's own settings, which need a video directory, and save
-// metadata there when there's no JSON directory.
-func ApplyChannelSettingsInput(dst *models.Settings, in *models.SettingsInput) error {
-	if err := ApplySettingsInput(dst, in); err != nil {
-		return err
-	}
-	if dst.VideoDir == "" {
-		return errors.New("channels require a video directory")
-	}
-	dst.JSONDir = cmp.Or(dst.JSONDir, dst.VideoDir)
-	return nil
 }
 
 // ApplySettingsInput validates each setting in gives and sets it in dst, an empty value clearing it.
@@ -575,6 +561,15 @@ func ParseURLSettingsFromViper(v configGetter) (map[string]*models.URLSettingsOv
 			return nil, fmt.Errorf("settings for URL %q must be a map", channelURL)
 		}
 		override := &models.URLSettingsOverride{}
+
+		// Handle "profile", by name.
+		if profileRaw, hasProfile := dataMap[keys.Profile]; hasProfile {
+			name, ok := profileRaw.(string)
+			if !ok {
+				return nil, fmt.Errorf("profile for URL %q must be a profile name", channelURL)
+			}
+			override.Profile = &name
+		}
 
 		// Handle "settings" section.
 		if settingsRaw, hasSettings := dataMap["settings"]; hasSettings {

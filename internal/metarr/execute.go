@@ -15,7 +15,6 @@ import (
 	"sync"
 	"syscall"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
@@ -23,8 +22,6 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
-
-	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 // runningFiles holds a map of files already being processed by Metarr.
@@ -98,13 +95,13 @@ func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
 }
 
 // metaPurge returns which metadata files to delete once Metarr finishes with v: Download As's setting, else the channel
-// URL's, else the global one.
+// URL's.
 func metaPurge(v *models.Video, cu *models.ChannelURL) (string, error) {
 	var o string
 	if v.Overrides != nil {
 		o = v.Overrides.MetaPurge
 	}
-	return validation.ValidatePurgeMetafiles(cmp.Or(o, cu.ChanURLMetarrArgs.MetaPurge, abstractions.GetString(keys.MMetaPurge)))
+	return validation.ValidatePurgeMetafiles(cmp.Or(o, cu.ChanURLMetarrArgs.MetaPurge))
 }
 
 // runWithProgress runs a Metarr command, recording its progress lines for the video and returning the rest of stdout.

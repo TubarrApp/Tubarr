@@ -112,6 +112,30 @@ Videos download as `Title [video ID]`, so videos with the same title, or a title
 
 ---
 
+## Profiles
+
+A profile is a named set of settings for channels that share them, such as a library folder or an output format. A channel or channel URL using a profile gets its value for each setting it leaves blank.
+
+```bash
+tubarr profile add \
+  --profile-name 'Music' \
+  --video-directory /home/user/Music/{{channel_name}} \
+  --metarr-output-ext mp4
+
+tubarr channel add \
+  --channel-urls 'https://www.tubesite.com/@CoolBand' \
+  --channel-name 'Cool Band' \
+  --profile 'Music'
+```
+
+`profile add` takes the same settings flags as `channel add`. Change a profile with `tubarr profile edit --profile-name 'Music'` and the settings to change, list profiles and what uses them with `tubarr profile list`, and delete one nothing uses with `tubarr profile delete`.
+
+`--profile` works on `channel add`, `add-batch`, `update-channel` and `update-url-settings`. Give it an empty name to stop using a profile. In a config file, set `profile: 'Music'` for the channel, or `profile:` inside a URL's `url-settings` entry.
+
+Each setting comes from the first of these that sets it: the URL's own settings, the URL's profile, the channel's own settings, then the channel's profile. Filters, move ops and filename/meta ops are added together instead, as a URL's are to its channel's.
+
+---
+
 ## Running the Crawler
 
 - Default behavior (`tubarr`) crawls every channel that isn't paused and is due for a crawl, then exits. Each channel URL is due on its own crawl frequency if it has one, or the channel's `--crawl-freq`, and a crawl only checks the URLs that are due.
@@ -208,7 +232,7 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 
 ## Configuration Highlights
 
-- **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's. Its filters, move ops and filename/meta ops (filtered or not) are added to the channel's instead, with the URL's op used where both set the same thing.
+- **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's. Its filters, move ops and filename/meta ops (filtered or not) are added to the channel's instead, with the URL's op used where both set the same thing. A [profile](#profiles) fills in what a channel or URL leaves blank.
 - **Metarr args**: filename/meta operations, filtered operations, metadata-based move rules, FFmpeg transcode settings, metadata file deletion, per-URL output directories.
 - **Notifications**: URLs called when new videos are downloaded, for every channel URL or just one. `--notify` and config files set them for every channel URL; `channel notify-add --url` sets them for one. The web UI picks the channel URLs from a list.
 - **Global settings**: crawl concurrency, global and per-domain download limits, FlareSolverr URL, and custom site scraping rules (`--scrape-config-file`), also editable on the web UI's Settings page.

@@ -16,22 +16,12 @@ import (
 
 // makeMetarrCommand combines arguments from both Viper config and model settings.
 func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
-	// 'Download As' overrides replace the channel URL's and global ops. Otherwise file ops override DB ops, then apply filtering.
+	// 'Download As' overrides replace the channel URL's ops. Otherwise file ops override DB ops, then apply filtering.
 	var metaOps, filenameOps []string
 	if v.Overrides != nil {
 		metaOps, filenameOps = overrideMetaOps(v, c), overrideFilenameOps(v, c)
 	} else {
 		metaOps, filenameOps = loadAndMergeMetaOps(v, cu, c, dirParser), loadAndMergeFilenameOps(v, cu, c, dirParser)
-		if len(metaOps) == 0 && abstractions.IsSet(keys.MMetaOps) {
-			metaOps = abstractions.GetStringSlice(keys.MMetaOps)
-		}
-	}
-
-	// Grab global filename ops if no ops set for this video.
-	if len(filenameOps) == 0 &&
-		v.Overrides == nil &&
-		abstractions.IsSet(keys.MFilenameOps) {
-		filenameOps = abstractions.GetStringSlice(keys.MFilenameOps)
 	}
 
 	// 'Download As' args, blank ones using the channel URL's.
@@ -85,13 +75,13 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	if maxCPU := cmp.Or(o.MaxCPU, m.MaxCPU); maxCPU > 0 {
 		add(metkeys.MaxCPU, strconv.FormatFloat(maxCPU, 'f', 2, 64))
 	}
-	add(metkeys.MinFreeMem, cmp.Or(o.MinFreeMem, m.MinFreeMem, configString(keys.MMinFreeMem)))
+	add(metkeys.MinFreeMem, cmp.Or(o.MinFreeMem, m.MinFreeMem))
 	add(metkeys.OutputDir, parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)))
-	add(metkeys.Ext, cmp.Or(o.OutputExt, m.OutputExt, configString(keys.OutputFiletype)))
-	add(metkeys.RenameStyle, cmp.Or(o.RenameStyle, m.RenameStyle, configString(keys.MRenameStyle)))
+	add(metkeys.Ext, cmp.Or(o.OutputExt, m.OutputExt))
+	add(metkeys.RenameStyle, cmp.Or(o.RenameStyle, m.RenameStyle))
 
 	// Transcoding.
-	add(metkeys.ExtraFFmpegArgs, cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs, configString(keys.MExtraFFmpegArgs)))
+	add(metkeys.ExtraFFmpegArgs, cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs))
 	add(metkeys.TranscodeGPU, gpu)
 	add(metkeys.TranscodeGPUNode, gpuNode)
 	add(metkeys.Thumbnail, thumbnail)
@@ -124,13 +114,10 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *par
 	// Download As output directory, chosen for this video.
 	case v.Overrides != nil && v.Overrides.OutputDir != "":
 		dir, name = v.Overrides.OutputDir, "Download As output directory"
-	// #1 Priority: Explicit Viper flag set.
-	case abstractions.IsSet(keys.MoveOnComplete):
-		dir = abstractions.GetString(keys.MoveOnComplete)
-	// #2 Priority: Move operation filter output directory.
+	// #1 Priority: Move operation filter output directory.
 	case v.MoveOpOutputDir != "":
 		dir = v.MoveOpOutputDir
-	// #3 Priority: Use the output directory stored in channel URL directly.
+	// #2 Priority: Use the output directory stored in channel URL directly.
 	case cu.ChanURLMetarrArgs.OutputDir != "":
 		dir = cu.ChanURLMetarrArgs.OutputDir
 	default:

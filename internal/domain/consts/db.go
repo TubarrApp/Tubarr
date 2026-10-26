@@ -5,6 +5,7 @@ const (
 	DBProgram        = "program"
 	DBChannels       = "channels"
 	DBChannelURLs    = "channel_urls"
+	DBProfiles       = "profiles"
 	DBVideos         = "videos"
 	DBDownloads      = "downloads"
 	DBNotifications  = "notifications"
@@ -50,6 +51,7 @@ const (
 	QChanUpdatedAt            = "updated_at"
 	QChanNewVideoNotification = "new_video_notification"
 	QChanNewVideoURLs         = "new_video_urls"
+	QChanProfileID            = "profile_id"
 )
 
 // ValidChannelKeys holds valid keys for the channel database.
@@ -64,6 +66,7 @@ var ValidChannelKeys = map[string]struct{}{
 	QChanUpdatedAt:            {},
 	QChanNewVideoNotification: {},
 	QChanNewVideoURLs:         {},
+	QChanProfileID:            {},
 }
 
 // ChannelTextColumns holds channel columns which users may set to plain text (the rest are JSON or managed by Tubarr).
@@ -86,6 +89,7 @@ const (
 	QChanURLLastScan  = "last_scan"
 	QChanURLCreatedAt = "created_at"
 	QChanURLUpdatedAt = "updated_at"
+	QChanURLProfileID = "profile_id"
 )
 
 // ValidChannelURLKeys holds valid keys for the channel URL database.
@@ -102,6 +106,27 @@ var ValidChannelURLKeys = map[string]struct{}{
 	QChanURLLastScan:  {},
 	QChanURLCreatedAt: {},
 	QChanURLUpdatedAt: {},
+	QChanURLProfileID: {},
+}
+
+// Profile database entry keys.
+const (
+	QProfileID        = "id"
+	QProfileName      = "name"
+	QProfileSettings  = "settings"
+	QProfileMetarr    = "metarr"
+	QProfileCreatedAt = "created_at"
+	QProfileUpdatedAt = "updated_at"
+)
+
+// ValidProfileKeys holds valid keys for the profile database.
+var ValidProfileKeys = map[string]struct{}{
+	QProfileID:        {},
+	QProfileName:      {},
+	QProfileSettings:  {},
+	QProfileMetarr:    {},
+	QProfileCreatedAt: {},
+	QProfileUpdatedAt: {},
 }
 
 // Video database entry keys.

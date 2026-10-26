@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS channel_urls (
     last_scan TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    profile_id INTEGER DEFAULT 0,
     FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
     UNIQUE(channel_id, url)
 );

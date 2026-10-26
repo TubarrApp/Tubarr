@@ -1263,7 +1263,7 @@ var liveActions = [...]struct {
 			}
 			perURL[u]["settings"]["paused"] = b.paused
 		})
-		if got := sc.details().URLSettings[sc.site.feedURL("b")]["settings"]["paused"] == true; got != b.paused {
+		if got := sc.details().URLSettings[sc.site.feedURL("b")].Settings["paused"] == true; got != b.paused {
 			sc.errorf("the second URL reads back paused: %t, want %t", got, b.paused)
 		}
 		sc.expect(before, liveRows(sc.t, sc.id), nil)

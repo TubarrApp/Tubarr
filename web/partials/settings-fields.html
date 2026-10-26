@@ -1,0 +1,749 @@
+                  <!-- Basic Settings Tab -->
+                  <div x-show="activeTab === 'basic'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Video Directory <span x-show="videoDirRequired()" class="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.video_directory"
+                          :required="videoDirRequired()"
+                          :placeholder="hint('settings', 'video_directory', '/path/to/save/videos')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p x-show="videoDirNote()" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="videoDirNote()"></p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          JSON Directory
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.json_directory"
+                          :placeholder="hint('settings', 'json_directory', 'Same as video directory')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Leave empty to save metadata in the video directory.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max Concurrency
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.settings.download_concurrency"
+                          min="1"
+                          :placeholder="hint('settings', 'download_concurrency', '1')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p x-show="capNote(formData.settings.download_concurrency, globalDownloadLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(formData.settings.download_concurrency, globalDownloadLimit)"></p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">WARNING: Higher concurrency can cause bot detection on some tube sites.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Crawl Frequency (minutes)
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.settings.crawl_freq"
+                          min="1"
+                          :placeholder="hint('settings', 'crawl_freq', '30')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">WARNING: Higher frequency increases request rate to site.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Download Retries
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.settings.download_retries"
+                          min="1"
+                          :placeholder="hint('settings', 'download_retries', '2')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Times Tubarr runs a failed download again before marking it failed.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Use Global Cookies
+                        </label>
+                        <select
+                          x-model="formData.settings.use_global_cookies"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="boolHint('use_global_cookies', 'Yes', 'No')"></option>
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Reads the site's cookies from every browser Tubarr can find, for custom crawl rules and yt-dlp.</p>
+                      </div>
+                      <template x-if="page !== 'profiles'">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Channel Config File
+                          </label>
+                          <input
+                            type="text"
+                            x-model="formData.settings.channel_config_file"
+                            placeholder="/path/to/config.yaml"
+                            class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                          />
+                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Settings in this file are applied each time the channel runs, replacing those saved here.</p>
+                        </div>
+                      </template>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          From Date
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.from_date"
+                          :placeholder="hint('settings', 'from_date', '20240101 or 2024y1m1d or today')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Only download videos uploaded after this date (YYYYMMDD format)</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          To Date
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.to_date"
+                          :placeholder="hint('settings', 'to_date', '20241231 or 2024y12m31d or today')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Only download videos uploaded before this date (YYYYMMDD format)</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filter File
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.filter_file"
+                          :placeholder="hint('settings', 'filter_file', '/path/to/filters.txt')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Path to file containing filter operations (one per line)</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filters
+                          <a href="help.html#filters" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.settings.filters"
+                          rows="4"
+                          :placeholder="hint('settings', 'filters', 'title:contains:cat:must\ntitle:omits:dog:any\ndate:omits::must')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Filter operations (one per line). Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">field:contains|omits:value:must|any</code><br>
+                          Example: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">title:contains:tutorial:must</code> (only videos with "tutorial" in title)
+                        </p>
+                      </div>
+
+                      <template x-if="page !== 'profiles'">
+                        <div>
+                          <label class="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              x-model="formData.settings.paused"
+                              class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                            />
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Pause Channel</span>
+                          </label>
+                          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Paused channels will not be crawled automatically
+                          </p>
+                        </div>
+                      </template>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          New Videos
+                        </label>
+                        <select
+                          x-model="formData.settings.auto_download"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="boolHint('auto_download', 'Download automatically', 'List as available to choose from')"></option>
+                          <option value="true">Download automatically</option>
+                          <option value="false">List as available to choose from</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Listed videos wait on the <a href="available.html" class="text-brand-500 hover:text-brand-600">Available</a> page to choose from
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Yt-dlp Settings Tab -->
+                  <div x-show="activeTab === 'ytdlp'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          YT-DLP Output Extension
+                        </label>
+                        <select
+                          x-model="formData.settings.ytdlp_output_ext"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="hint('settings', 'ytdlp_output_ext', 'Default')"></option>
+                          <option value="mp4">mp4</option>
+                          <option value="mkv">mkv</option>
+                          <option value="webm">webm</option>
+                          <option value="avi">avi</option>
+                          <option value="flv">flv</option>
+                          <option value="mov">mov</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Cookies From Browser
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.cookies_from_browser"
+                          :placeholder="hint('settings', 'cookies_from_browser', 'e.g. Firefox')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Used by yt-dlp crawls and downloads, together with any login or global cookies. Custom crawl rules don't use it.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max Filesize
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.max_filesize"
+                          :placeholder="hint('settings', 'max_filesize', '2GB')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Example: 100MB, 2GB, 500M</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          External Downloader
+                        </label>
+                        <select
+                          x-model="formData.settings.external_downloader"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="hint('settings', 'external_downloader', 'Default (yt-dlp built-in)')"></option>
+                          <option value="aria2c">aria2c</option>
+                          <option value="axel">axel</option>
+                          <option value="curl">curl</option>
+                          <option value="ffmpeg">ffmpeg</option>
+                          <option value="httpie">httpie</option>
+                          <option value="wget">wget</option>
+                          <!-- Keep a saved value not in the list (e.g. a path) rather than dropping it -->
+                          <template x-if="!['', 'aria2c', 'axel', 'curl', 'ffmpeg', 'httpie', 'wget'].includes(formData.settings.external_downloader || '')">
+                            <option :value="formData.settings.external_downloader" x-text="formData.settings.external_downloader + ' (custom)'" selected></option>
+                          </template>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          External Downloader Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.external_downloader_args"
+                          :placeholder="hint('settings', 'external_downloader_args', 'Additional arguments (e.g. \'-x 16 -s 16\' for aria2c)')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Extra YT-DLP Video Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.extra_ytdlp_video_args"
+                          :placeholder="hint('settings', 'extra_ytdlp_video_args', 'Additional yt-dlp arguments for video downloads')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Extra YT-DLP Meta Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.extra_ytdlp_meta_args"
+                          :placeholder="hint('settings', 'extra_ytdlp_meta_args', 'Additional yt-dlp arguments for JSON metafile downloads')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Extra YT-DLP Crawl Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.extra_ytdlp_crawl_args"
+                          :placeholder="hint('settings', 'extra_ytdlp_crawl_args', 'Additional yt-dlp arguments for channel crawling')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          YT-DLP Preferred Video Codecs
+                          <a href="help.html#ytdlp" target="_blank" title="How these work" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.settings.ytdlp_preferred_video_codecs"
+                          rows="3"
+                          :placeholder="hint('settings', 'ytdlp_preferred_video_codecs', 'vp9\nav1\nh264')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 font-mono focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Preferred video codecs (one per line, in order of priority). Examples: vp9, av1, h264, hevc, vp8
+                        </p>
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          YT-DLP Preferred Audio Codecs
+                          <a href="help.html#ytdlp" target="_blank" title="How these work" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.settings.ytdlp_preferred_audio_codecs"
+                          rows="3"
+                          :placeholder="hint('settings', 'ytdlp_preferred_audio_codecs', 'opus\naac\nvorbis')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 font-mono focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Preferred audio codecs (one per line, in order of priority). Examples: opus, aac, vorbis, mp3, flac
+                        </p>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <!-- Metarr Settings Tab -->
+                  <div x-show="activeTab === 'metarr'" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Output Directory
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_output_directory"
+                          :placeholder="hint('metarr', 'metarr_output_directory', '/output/here/after/metarr')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Move Operations File
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.settings.move_ops_file"
+                          :placeholder="hint('settings', 'move_ops_file', '/path/to/move_ops.txt')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Path to file containing move operations (one per line)</p>
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Move Operations
+                          <a href="help.html#move-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.settings.move_ops"
+                          rows="4"
+                          :placeholder="hint('settings', 'move_ops', 'title:contains:dog||/home/videos/dogs\ntitle:contains:cat||/home/videos/cats\nuploader:equals:MyChannel||/home/videos/mychannel')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          One per line, a filter and a directory. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">field:filter_type:value||output_directory</code><br>
+                          The first one matching a video's metadata sets its output directory in place of the one above. Filter types are the same as filtered operations' (contains, omits, equals, notequals, morethan, lessthan).<br>
+                          Example: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">title:contains:tutorial||/home/tutorials</code>
+                        </p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Output Extension
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_output_ext"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="hint('metarr', 'metarr_output_ext', 'Same as input')"></option>
+                          <option value="avi">avi</option>
+                          <option value="flv">flv</option>
+                          <option value="mkv">mkv</option>
+                          <option value="mov">mov</option>
+                          <option value="mp4">mp4</option>
+                          <option value="webm">webm</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Delete Metadata Files
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_purge_metafile"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="hint('metarr', 'metarr_purge_metafile', 'Keep')"></option>
+                          <option value="json">JSON</option>
+                          <option value="nfo">NFO</option>
+                          <option value="all">All</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Metadata files Metarr deletes once it has processed a video.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Rename Style
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_rename_style"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="hint('metarr', 'metarr_rename_style', 'Skip')"></option>
+                          <option value="spaces">Spaces</option>
+                          <option value="underscores">Underscores</option>
+                          <option value="fixes-only">Fixes Only</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Concurrency
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.metarr.metarr_concurrency"
+                          min="0"
+                          :placeholder="hint('metarr', 'metarr_concurrency', globalPostProcessHint())"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p x-show="capNote(formData.metarr.metarr_concurrency, globalPostProcessLimit)" class="mt-1 text-xs text-warning-600 dark:text-warning-500" x-text="capNote(formData.metarr.metarr_concurrency, globalPostProcessLimit)"></p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          GPU Acceleration
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_gpu"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="hint('metarr', 'metarr_gpu', 'None')"></option>
+                          <option value="auto">Auto</option>
+                          <option value="cuda">Nvidia (Cuda)</option>
+                          <option value="qsv">Intel (QSV)</option>
+                          <option value="vaapi">VAAPI</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          GPU Node Path
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_transcode_gpu_node"
+                          :placeholder="hint('metarr', 'metarr_transcode_gpu_node', '/dev/dri/renderD128')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Video Transcode Codecs
+                          <a href="help.html#transcoding" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.metarr.metarr_transcode_video_transcode_codecs"
+                          :placeholder="hint('metarr', 'metarr_transcode_video_transcode_codecs', 'Leave empty for copy (no transcoding)')"
+                          rows="3"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 font-mono"
+                        ></textarea>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          One per line. Examples: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">h264:hevc</code> (convert H.264 to HEVC),
+                          <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">av1</code> (transcode to AV1), or leave empty to copy.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Audio Transcode Codecs
+                          <a href="help.html#transcoding" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.metarr.metarr_transcode_audio_codecs"
+                          :placeholder="hint('metarr', 'metarr_transcode_audio_codecs', 'Leave empty for copy (no transcoding)')"
+                          rows="3"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 font-mono"
+                        ></textarea>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          One per line. Examples: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">dts:ac3</code> (convert DTS to AC3),
+                          <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">aac</code> (transcode to AAC), or leave empty to copy.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Transcode Quality (CRF)
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.metarr.metarr_transcode_quality"
+                          min="0"
+                          max="51"
+                          :placeholder="hint('metarr', 'metarr_transcode_quality', '23')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Lower = better quality, 18-28 recommended</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Min Free Memory
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_min_free_mem"
+                          :placeholder="hint('metarr', 'metarr_min_free_mem', '2GB')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max CPU Usage (%)
+                        </label>
+                        <input
+                          type="number"
+                          x-model.number="formData.metarr.metarr_max_cpu_usage"
+                          min="0.00"
+                          max="100.00"
+                          :placeholder="hint('metarr', 'metarr_max_cpu_usage', '80.00')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Extra FFmpeg Args
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_extra_ffmpeg_args"
+                          :placeholder="hint('metarr', 'metarr_extra_ffmpeg_args', 'Additional FFmpeg arguments')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                      </div>
+
+                      <!-- Meta Operations -->
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Meta Operations File
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_meta_ops_file"
+                          :placeholder="hint('metarr', 'metarr_meta_ops_file', '/path/to/meta_ops.txt')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Path to file containing metadata operations</p>
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Meta Operations
+                          <a href="help.html#meta-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.metarr.metarr_meta_ops"
+                          rows="3"
+                          :placeholder="hint('metarr', 'metarr_meta_ops', 'title:set:My Title\nartist:set:My Artist\nalbum:set:My Album')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Metadata operations (one per line). Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">field:operation:value</code>
+                        </p>
+                      </div>
+
+                      <!-- Filtered Meta Operations -->
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filtered Meta Operations File
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_filtered_meta_ops_file"
+                          :placeholder="hint('metarr', 'metarr_filtered_meta_ops_file', '/path/to/filtered_meta_ops.txt')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Path to file containing filtered metadata operations</p>
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filtered Meta Operations
+                          <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.metarr.metarr_filtered_meta_ops"
+                          rows="3"
+                          :placeholder="hint('metarr', 'metarr_filtered_meta_ops', 'title:contains:cat||title:prefix:[CAT VIDEO]\ntitle:contains:dog||artist:set:Dog Channel')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Filter rules with metadata operations. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">filter_rule||meta_operation</code>
+                        </p>
+                      </div>
+
+                      <!-- Filename Operations -->
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filename Operations File
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_filename_ops_file"
+                          :placeholder="hint('metarr', 'metarr_filename_ops_file', '/path/to/filename_ops.txt')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Path to file containing filename operations</p>
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filename Operations
+                          <a href="help.html#filename-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.metarr.metarr_filename_ops"
+                          rows="3"
+                          :placeholder="hint('metarr', 'metarr_filename_ops', 'prefix:[VIDEOS] \nsuffix: - Downloaded\nreplace:_: ')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Filename operations (one per line). Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">operation:value</code>
+                        </p>
+                      </div>
+
+                      <!-- Filtered Filename Operations -->
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filtered Filename Operations File
+                        </label>
+                        <input
+                          type="text"
+                          x-model="formData.metarr.metarr_filtered_filename_ops_file"
+                          :placeholder="hint('metarr', 'metarr_filtered_filename_ops_file', '/path/to/filtered_filename_ops.txt')"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Path to file containing filtered filename operations</p>
+                      </div>
+
+                      <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Filtered Filename Operations
+                          <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                        </label>
+                        <textarea
+                          x-model="formData.metarr.metarr_filtered_filename_ops"
+                          rows="3"
+                          :placeholder="hint('metarr', 'metarr_filtered_filename_ops', 'title:contains:tutorial||prefix:[TUTORIAL] \ntitle:contains:review||prefix:[REVIEW] ')"
+                          class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Filter rules with filename operations. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">filter_rule||filename_operation</code>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+<script>
+  // profileHint returns a blank field's placeholder: the profile's value for it, else fallback.
+  function profileHint(profile, section, key, fallback) {
+    const value = profile && profile[section] ? profile[section][key] : undefined;
+    if (value === undefined || value === null || value === '' || value === 0 || (Array.isArray(value) && value.length === 0)) {
+      return fallback;
+    }
+    return `${Array.isArray(value) ? value.join(', ') : value} (from ${profile.name})`;
+  }
+
+  // profileBoolHint returns the label of a three-way setting's blank choice: the profile's setting, else fallback.
+  function profileBoolHint(profile, key, on, off, fallback) {
+    const value = profile && profile.settings ? profile.settings[key] : undefined;
+    return typeof value === 'boolean' ? `Profile's setting (${value ? on : off})` : fallback;
+  }
+
+  // profileFields returns what a channel page's fields need from the profiles its channel and URLs can choose.
+  function profileFields() {
+    return {
+      profiles: [],
+
+      async loadProfiles() {
+        try {
+          const response = await fetch('/api/v1/profiles/all');
+          if (response.ok) this.profiles = await response.json();
+        } catch (err) {
+          console.error('Error loading profiles:', err);
+        }
+      },
+
+      profileByID(id) {
+        return this.profiles.find(p => String(p.id) === String(id));
+      },
+
+      // Blank fields show what the channel's profile, or a URL's, fills in.
+      hint(section, key, fallback) {
+        return profileHint(this.profileByID(this.formData.profile_id), section, key, fallback);
+      },
+      boolHint(key, on, off) {
+        return profileBoolHint(this.profileByID(this.formData.profile_id), key, on, off, `Default (${off})`);
+      },
+      urlHint(urlEntry, section, key, fallback) {
+        return profileHint(this.profileByID(urlEntry.profile_id), section, key, fallback);
+      },
+      urlBoolHint(urlEntry, key, on, off) {
+        return profileBoolHint(this.profileByID(urlEntry.profile_id), key, on, off, 'Use channel setting');
+      },
+
+      // A channel needs a video directory of its own unless its profile has one.
+      videoDirRequired() {
+        return !this.profileByID(this.formData.profile_id)?.settings?.video_directory;
+      },
+      videoDirNote() {
+        return '';
+      },
+    };
+  }
+</script>

@@ -10,13 +10,10 @@ import (
 	"tubarr/internal/blocking"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/limits"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/validation"
-
-	"github.com/TubarrApp/gocommon/abstractions"
 )
 
 // Entry is one video in a queue, as its page shows it.
@@ -190,8 +187,6 @@ func CheckDestinations(c *models.Channel, cu *models.ChannelURL, o *models.Video
 	switch {
 	case o != nil && o.OutputDir != "":
 		dirs = append(dirs, o.OutputDir)
-	case abstractions.IsSet(keys.MoveOnComplete):
-		dirs = append(dirs, abstractions.GetString(keys.MoveOnComplete))
 	default:
 		if s != nil {
 			for _, op := range s.MetaFilterMoveOps {

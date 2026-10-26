@@ -12,7 +12,8 @@ import (
 	"testing"
 )
 
-// channelFormBools are the channel page fields set by checkboxes and dropdowns, which can't be blank or hold free text.
+// channelFormBools are the channel page fields set by a checkbox or a dropdown, which can't hold free text. Only the
+// dropdowns, which leave the setting to the profile, can be blank.
 var channelFormBools = []string{"paused", "use_global_cookies", "auto_download"}
 
 // channelFormFields are a channel page's field names, read from the page.
@@ -25,7 +26,7 @@ type channelFormFields struct {
 // readChannelFormFields reads a channel page's field names.
 func readChannelFormFields(t *testing.T, page string) channelFormFields {
 	t.Helper()
-	src := readWebFile(t, page)
+	src := readBuiltPage(t, page)
 	return channelFormFields{
 		settings:    objectKeys(t, src, "formData: {", "settings: {"),
 		metarr:      objectKeys(t, src, "formData: {", "metarr: {"),
@@ -55,8 +56,11 @@ func buildFuzzedChannelForm(f channelFormFields, samples map[string][2]string, c
 		}
 		i++
 		s := samples[key]
-		if slices.Contains(channelFormBools, key) {
+		switch {
+		case key == "paused":
 			return s[c%2], false
+		case slices.Contains(channelFormBools, key):
+			return []string{"", s[0], s[1]}[c%3], false
 		}
 		switch c % 4 {
 		case 1:
@@ -73,9 +77,7 @@ func buildFuzzedChannelForm(f channelFormFields, samples map[string][2]string, c
 		v, isJunk := pick(k)
 		out.sent[k], out.junk[k] = v, isJunk
 		switch {
-		case k == "auto_download":
-			out.form.Set(k, v)
-		case k == "paused" || k == "use_global_cookies":
+		case k == "paused":
 			if v == "true" {
 				out.form.Set(k, v)
 			}
@@ -120,15 +122,16 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 			v = got.ChannelConfigFile
 		}
 		switch s := formValue(v); {
-		case k == "auto_download":
-			form.Set(k, strconv.FormatBool(s != "false"))
-		case k == "paused" || k == "use_global_cookies":
+		case k == "paused":
 			if s == "true" {
 				form.Set(k, s)
 			}
 		case s != "":
 			form.Set(k, s)
 		}
+	}
+	if got.ProfileID != 0 {
+		form.Set("profile_id", strconv.FormatInt(got.ProfileID, 10))
 	}
 	for _, k := range f.metarr {
 		if s := formValue(got.Metarr[k]); s != "" && (k != "metarr_max_cpu_usage" || s != "0") {
@@ -139,12 +142,12 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 	perURL := map[string]any{}
 	for u, sections := range got.URLSettings {
 		settings, metarr := map[string]any{}, map[string]any{}
-		for k, v := range sections["settings"] {
+		for k, v := range sections.Settings {
 			if v != nil && v != "" && slices.Contains(f.urlSettings, k) {
 				settings[k] = v
 			}
 		}
-		for k, v := range sections["metarr"] {
+		for k, v := range sections.Metarr {
 			switch {
 			case v == nil || v == "" || !slices.Contains(f.urlMetarr, k):
 			case k == "metarr_max_cpu_usage" && v == float64(0):
@@ -154,8 +157,12 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 				metarr[k] = v
 			}
 		}
-		if len(settings) > 0 || len(metarr) > 0 {
-			perURL[u] = map[string]any{"settings": settings, "metarr": metarr}
+		if len(settings) > 0 || len(metarr) > 0 || sections.ProfileID != 0 {
+			entry := map[string]any{"settings": settings, "metarr": metarr}
+			if sections.ProfileID != 0 { // The page sends a URL's profile only when it has one.
+				entry["profile_id"] = sections.ProfileID
+			}
+			perURL[u] = entry
 		}
 	}
 	data, _ := json.Marshal(perURL)
@@ -292,11 +299,9 @@ func FuzzChannelForm(f *testing.F) {
 			if fuzzed.junk[k] {
 				continue
 			}
-			switch {
-			case k == "channel_config_file":
+			switch k {
+			case "channel_config_file":
 				check(k, fuzzed.sent[k], got.ChannelConfigFile)
-			case k == "json_directory" && fuzzed.sent[k] == "":
-				check(k, formValue(got.Settings["video_directory"]), got.Settings[k]) // A blank JSON directory is the video directory.
 			default:
 				check(k, fuzzed.sent[k], got.Settings[k])
 			}
@@ -310,12 +315,12 @@ func FuzzChannelForm(f *testing.F) {
 			if fuzzed.junk["url:"+k] {
 				continue
 			}
-			section, inherited := "metarr", got.Metarr[k]
+			section, inherited := got.URLSettings[wiringURLB].Metarr, got.Metarr[k]
 			if slices.Contains(fields.urlSettings, k) {
-				section, inherited = "settings", got.Settings[k]
+				section, inherited = got.URLSettings[wiringURLB].Settings, got.Settings[k]
 			}
 			// Per-URL settings matching the channel's aren't stored, so the URL then reads the channel's.
-			read := got.URLSettings[wiringURLB][section][k]
+			read := section[k]
 			if shownValue(k, read) == "" && v != "false" { // False is always left out, so is never inherited.
 				read = inherited
 			}

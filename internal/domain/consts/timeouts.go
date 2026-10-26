@@ -17,9 +17,9 @@ const (
 
 // Retry configuration
 const (
-	DefaultMaxRetries = 3
-	RetryInterval     = 5 * time.Second
-	RetryBackoff      = 100 * time.Millisecond
+	DefaultDownloadRetries = 2 // Times a failed download runs again when its settings don't set Download Retries.
+	RetryInterval          = 5 * time.Second
+	RetryBackoff           = 100 * time.Millisecond
 )
 
 // File operations

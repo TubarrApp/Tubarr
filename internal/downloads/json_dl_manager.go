@@ -53,13 +53,13 @@ func (d *JSONDownload) Execute() error {
 	)
 
 	// JSON download attempt loop
-	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
+	for attempt := 1; attempt <= d.Options.MaxAttempts; attempt++ {
 		// Check if URL should be avoided (set by previous videos or persistent blocks).
 		if err := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
 			return err
 		}
 
-		logger.Pl.I("Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxRetries, d.Video.URL)
+		logger.Pl.I("Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
 		if d.Context.Err() != nil {
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
 			return d.cancelJSONDownload()
@@ -88,7 +88,7 @@ func (d *JSONDownload) Execute() error {
 		// Other errors - retry, unless that was the last attempt.
 		lastErr = err
 		logger.Pl.E("Download attempt %d failed: %v", attempt, err)
-		if attempt == d.Options.MaxRetries {
+		if attempt == d.Options.MaxAttempts {
 			break
 		}
 		if !fsRefreshed {
@@ -106,7 +106,7 @@ func (d *JSONDownload) Execute() error {
 	}
 
 	// All failed
-	return fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
+	return fmt.Errorf("all %d JSON download attempts failed for %s: %w", d.Options.MaxAttempts, d.Video.URL, lastErr)
 }
 
 // jsonDLAttempt performs a single download attempt.

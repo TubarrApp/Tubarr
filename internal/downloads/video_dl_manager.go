@@ -50,13 +50,13 @@ func (d *VideoDownload) Execute() error {
 		lastErr     error
 		fsRefreshed bool
 	)
-	for attempt := 1; attempt <= d.Options.MaxRetries; attempt++ {
+	for attempt := 1; attempt <= d.Options.MaxAttempts; attempt++ {
 		// Check if URL should be avoided (set by previous videos or persistent blocks).
 		if err := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
 			return err
 		}
 
-		logger.Pl.I("Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxRetries, d.Video.URL)
+		logger.Pl.I("Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
 		if d.Context.Err() != nil {
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
 			return d.cancelVideoDownload()
@@ -87,7 +87,7 @@ func (d *VideoDownload) Execute() error {
 		lastErr = err
 		logger.Pl.E("Download attempt %d failed: %v", attempt, err)
 		d.DLTracker.SetStatus(d.Video, consts.DLStatusFailed, d.Video.DownloadStatus.Percent, "", err)
-		if attempt == d.Options.MaxRetries {
+		if attempt == d.Options.MaxAttempts {
 			break
 		}
 		if !fsRefreshed {
@@ -97,7 +97,7 @@ func (d *VideoDownload) Execute() error {
 		randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
 		logger.Pl.I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
 		d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0,
-			fmt.Sprintf("Retrying in %.0fs (attempt %d/%d)", randWait.Seconds(), attempt+1, d.Options.MaxRetries), nil)
+			fmt.Sprintf("Retrying in %.0fs (attempt %d/%d)", randWait.Seconds(), attempt+1, d.Options.MaxAttempts), nil)
 		select {
 		case <-d.Context.Done():
 			logger.Pl.W("Download canceled: %v", d.Context.Err())
@@ -105,7 +105,7 @@ func (d *VideoDownload) Execute() error {
 		case <-time.After(randWait):
 		}
 	}
-	return fmt.Errorf("all %d download attempts failed for %s: %w", d.Options.MaxRetries, d.Video.URL, lastErr)
+	return fmt.Errorf("all %d download attempts failed for %s: %w", d.Options.MaxAttempts, d.Video.URL, lastErr)
 }
 
 // videoDLAttempt performs a single download attempt.

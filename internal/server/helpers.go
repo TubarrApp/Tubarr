@@ -39,6 +39,7 @@ type channelResponse struct {
 	NewVideoNotification bool                 `json:"new_video_notification"`
 	LoadError            string               `json:"load_error,omitempty"` // Why it won't run until its settings are fixed.
 	FailedPostProcessing int                  `json:"failed_post_processing"`
+	Profile              string               `json:"profile,omitempty"`
 	Settings             *settingsResponse    `json:"settings,omitempty"`
 	Metarr               *metarrArgsResponse  `json:"metarr,omitempty"`
 	URLModels            []channelURLResponse `json:"url_models,omitempty"`
@@ -96,6 +97,7 @@ type channelDetailResponse struct {
 	UpdatedAt         time.Time                      `json:"updated_at"`
 	ChannelConfigFile string                         `json:"channel_config_file"`
 	LoadError         string                         `json:"load_error,omitempty"`
+	ProfileID         int64                          `json:"profile_id,omitempty"`
 	Settings          *settingsResponse              `json:"settings,omitempty"`
 	Metarr            *metarrArgsResponse            `json:"metarr,omitempty"`
 	AuthDetails       []authDetailResponse           `json:"auth_details"`
@@ -146,8 +148,9 @@ type authDetailResponse struct {
 
 // urlSettingsResponse is a channel URL's custom settings.
 type urlSettingsResponse struct {
-	Settings *settingsResponse   `json:"settings,omitempty"`
-	Metarr   *metarrArgsResponse `json:"metarr,omitempty"`
+	ProfileID int64               `json:"profile_id,omitempty"`
+	Settings  *settingsResponse   `json:"settings,omitempty"`
+	Metarr    *metarrArgsResponse `json:"metarr,omitempty"`
 }
 
 // metarrArgsResponse is MetarrArgs as sent to the web UI, with operations as newline-separated text. Unset fields are left out.
@@ -339,6 +342,7 @@ type channelForm struct {
 	urlSettings   map[string]urlSettings
 	notifications []*models.Notification
 	configFile    string
+	profileID     int64
 	settings      *models.Settings
 	metarr        *models.MetarrArgs
 }
@@ -379,6 +383,11 @@ func parseChannelForm(r *http.Request) (*channelForm, error) {
 	if f.configFile, err = formConfigFile(r); err != nil {
 		return nil, err
 	}
+	profileID, err := formInt(r, jsonkeys.ProfileID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid profile: %w", err)
+	}
+	f.profileID = int64(profileID)
 	if v := r.FormValue("url_renames"); v != "" {
 		if err := json.Unmarshal([]byte(v), &f.renames); err != nil {
 			return nil, fmt.Errorf("invalid URL renames: %w", err)
@@ -394,8 +403,9 @@ func parseChannelForm(r *http.Request) (*channelForm, error) {
 
 // urlSettingsInput is the per-URL settings JSON sent by the web UI, keyed by channel URL.
 type urlSettingsInput struct {
-	Settings *settingsInput   `json:"settings"`
-	Metarr   *metarrArgsInput `json:"metarr"`
+	ProfileID int64            `json:"profile_id"`
+	Settings  *settingsInput   `json:"settings"`
+	Metarr    *metarrArgsInput `json:"metarr"`
 }
 
 // settingsInput holds the per-URL Settings the web UI sent. Nil fields were not sent.
@@ -463,7 +473,7 @@ func parseURLSettings(raw string) (map[string]urlSettings, error) {
 	}
 	for channelURL, in := range input {
 		var (
-			out urlSettings
+			out = urlSettings{ProfileID: in.ProfileID}
 			err error
 		)
 		if in.Settings != nil {
@@ -534,6 +544,7 @@ func syncChannelURLs(cs contracts.ChannelStore, channelID int64, existing []*mod
 			existingURLModel.UpdatedAt = now
 			existingURLModel.ChanURLSettings = urlSettings.Settings
 			existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
+			existingURLModel.ProfileID = urlSettings.ProfileID
 
 			if err := cs.UpdateChannelURLSettings(existingURLModel); err != nil {
 				return fmt.Errorf("failed to update URL %q: %w", u, err)
@@ -548,6 +559,7 @@ func syncChannelURLs(cs contracts.ChannelStore, channelID int64, existing []*mod
 			LoginURL:          parsedLoginURL,
 			ChanURLSettings:   urlSettings.Settings,
 			ChanURLMetarrArgs: urlSettings.Metarr,
+			ProfileID:         urlSettings.ProfileID,
 			LastScan:          now,
 			CreatedAt:         now,
 			UpdatedAt:         now,
@@ -588,8 +600,9 @@ func replaceNotifications(cs contracts.ChannelStore, channelID int64, f *channel
 
 // urlSettings are a channel URL's parsed custom settings.
 type urlSettings struct {
-	Settings *models.Settings
-	Metarr   *models.MetarrArgs
+	ProfileID int64
+	Settings  *models.Settings
+	Metarr    *models.MetarrArgs
 }
 
 // input returns the per-URL Settings sent, as settings input.
@@ -731,7 +744,6 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert retries: %w", err)
 	}
-	useGlobalCookies := r.FormValue(jsonkeys.SettingsUseGlobalCookies) == "true"
 	paused := r.FormValue(jsonkeys.SettingsPaused) == "true"
 
 	in := &models.SettingsInput{
@@ -746,7 +758,6 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 		ToDate:                    formString(r, jsonkeys.SettingsToDate),
 		YTDLPPreferredVideoCodecs: linesInput(formString(r, jsonkeys.SettingsYTDLPPreferredVideoCodecs), splitNonEmptyLines),
 		YTDLPPreferredAudioCodecs: linesInput(formString(r, jsonkeys.SettingsYTDLPPreferredAudioCodecs), splitNonEmptyLines),
-		UseGlobalCookies:          &useGlobalCookies,
 		DLFilters:                 linesInput(formString(r, jsonkeys.SettingsFilters), splitNonEmptyLines),
 		DLFilterFile:              formString(r, jsonkeys.SettingsFilterFile),
 		MoveOps:                   linesInput(formString(r, jsonkeys.SettingsMoveOps), splitNonEmptyLines),
@@ -759,13 +770,18 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 		Retries:                   &retries,
 		Pause:                     &paused,
 	}
-	if v := r.FormValue(jsonkeys.SettingsAutoDownload); v != "" { // Unset means false.
+	// Left unset, these use the profile's setting, else are off.
+	if v := r.FormValue(jsonkeys.SettingsAutoDownload); v != "" {
 		autoDownload := v == "true"
 		in.AutoDownload = &autoDownload
 	}
+	if v := r.FormValue(jsonkeys.SettingsUseGlobalCookies); v != "" {
+		useGlobalCookies := v == "true"
+		in.UseGlobalCookies = &useGlobalCookies
+	}
 
 	s := &models.Settings{}
-	if err := parsing.ApplyChannelSettingsInput(s, in); err != nil {
+	if err := parsing.ApplySettingsInput(s, in); err != nil {
 		return nil, err
 	}
 	return s, nil

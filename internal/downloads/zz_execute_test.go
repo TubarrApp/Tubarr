@@ -85,9 +85,9 @@ func countRuns(t *testing.T, runs string) int {
 }
 
 // newTestDownloads returns a video and a JSON download of url, with no wait between attempts.
-func newTestDownloads(ctx context.Context, t *testing.T, url string, maxRetries int) (*VideoDownload, *JSONDownload) {
+func newTestDownloads(ctx context.Context, t *testing.T, url string, maxAttempts int) (*VideoDownload, *JSONDownload) {
 	t.Helper()
-	opts := &Options{MaxRetries: maxRetries}
+	opts := &Options{MaxAttempts: maxAttempts}
 	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{}}
 	c := &models.Channel{ChanSettings: &models.Settings{}, ChanMetarrArgs: &models.MetarrArgs{}}
 	tracker := statusTracker{}
@@ -102,7 +102,7 @@ func newTestDownloads(ctx context.Context, t *testing.T, url string, maxRetries 
 	return vd, jd
 }
 
-// TestExecuteRetries tests that failing downloads are tried MaxRetries times, then report every attempt failed.
+// TestExecuteRetries tests that failing downloads are tried MaxAttempts times, then report every attempt failed.
 func TestExecuteRetries(t *testing.T) {
 	origLogger := logger.Pl
 	logger.Pl = &logging.ProgramLogger{Console: &lockedBuffer{}}
@@ -194,7 +194,7 @@ func TestExecuteBlockedDomainSkipsYTDLP(t *testing.T) {
 	})
 
 	runs := fakeYTDLP(t, "exit 1")
-	opts := &Options{MaxRetries: 3}
+	opts := &Options{MaxAttempts: 3}
 	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{}}
 	c := &models.Channel{ChanSettings: &models.Settings{}, ChanMetarrArgs: &models.MetarrArgs{}}
 	tracker := statusTracker{}

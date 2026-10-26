@@ -25,7 +25,6 @@ const (
 	ProgressNewline      = "--newline"
 	ProgressTemplate     = "--progress-template"
 	RestrictFilenames    = "--restrict-filenames"
-	Retries              = "--retries"
 	YTDLP                = "yt-dlp"
 	YtDLPOutputExtension = "--merge-output-format"
 )
