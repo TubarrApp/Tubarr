@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
@@ -163,7 +164,7 @@ func (q *DownloadQueue) prepare(d *download) error {
 	}
 
 	// Use custom scraper if needed.
-	if v.JSONFilePath, err = executeCustomScraper(d.startCtx, d.session.scraper, v); err != nil {
+	if v.JSONFilePath, err = executeCustomScraper(d.startCtx, d.session.scraper, v, d.cu.Cookies); err != nil {
 		return fmt.Errorf("custom scraper failed: %w", err)
 	}
 	return nil
@@ -242,13 +243,13 @@ func overrideDir(dp *parsing.DirectoryParser, override, dir, name string) (strin
 }
 
 // executeCustomScraper checks if a custom scraper should be used for this release.
-func executeCustomScraper(ctx context.Context, s *scraper.Scraper, v *models.Video) (customJSON string, err error) {
+func executeCustomScraper(ctx context.Context, s *scraper.Scraper, v *models.Video, cookies []*http.Cookie) (customJSON string, err error) {
 	if v == nil || s == nil {
 		return "", fmt.Errorf("invalid nil parameter (video: %v, scraper: %v)", v == nil, s == nil)
 	}
 
 	// Detect custom site.
-	if err := s.ScrapeCustomSite(ctx, v.URL, v.JSONDir, v); err != nil {
+	if err := s.ScrapeCustomSite(ctx, v.URL, v.JSONDir, v, cookies); err != nil {
 		return "", err
 	}
 

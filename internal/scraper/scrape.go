@@ -175,8 +175,8 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 	return newRequests, urlErrs
 }
 
-// ScrapeCustomSite scrapes custom sites for metadata.
-func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string, v *models.Video) error {
+// ScrapeCustomSite scrapes custom sites for metadata, sending cookies (e.g. a crawl's login) with the page request.
+func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string, v *models.Video, cookies []*http.Cookie) error {
 	// Find a registered rule set (built-in or user-supplied) based on URL domain.
 	query, ok := siterules.MatchMetadata(v.URL)
 	if !ok {
@@ -186,7 +186,7 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 
 	// Visit the webpage.
 	var metadata map[string]any
-	if err := s.visitPage(ctx, urlStr, nil, query, func(c *colly.Collector) {
+	if err := s.visitPage(ctx, urlStr, cookies, query, func(c *colly.Collector) {
 		metadata = s.ScrapeWithRules(urlStr, c, v, query)
 	}); err != nil {
 		return fmt.Errorf("failed to visit URL: %w", err)
