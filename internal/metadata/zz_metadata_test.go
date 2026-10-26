@@ -171,29 +171,31 @@ func TestFilteredOpsNumericField(t *testing.T) {
 	}
 }
 
-// TestHandleMoveOps tests move ops pick the first matching op's directory, by any filter type, for their channel URL.
+// TestHandleMoveOps tests move ops pick the first op whose filters all match, by any filter type, for their channel URL.
 func TestHandleMoveOps(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	video := &models.Video{MetadataMap: map[string]any{"title": "Two Cats Playing", "duration": 4000}}
 
 	tests := []struct {
 		name string
-		ops  []models.MetaFilterMoveOps
+		ops  []string
 		want string
 	}{
-		{"saved before filter types, read as contains", []models.MetaFilterMoveOps{{Field: "title", Value: "cats", OutputDir: "/cats"}}, "/cats"},
-		{"no match", []models.MetaFilterMoveOps{{Field: "title", FilterType: "contains", Value: "dogs", OutputDir: "/dogs"}}, ""},
-		{"omits", []models.MetaFilterMoveOps{{Field: "title", FilterType: "omits", Value: "dogs", OutputDir: "/no-dogs"}}, "/no-dogs"},
-		{"more-than", []models.MetaFilterMoveOps{{Field: "duration", FilterType: "more-than", Value: "3600", OutputDir: "/long"}}, "/long"},
-		{"missing field for a comparison", []models.MetaFilterMoveOps{{Field: "views", FilterType: "more-than", Value: "1", OutputDir: "/popular"}}, ""},
-		{"first match wins", []models.MetaFilterMoveOps{
-			{Field: "title", FilterType: "contains", Value: "dogs", OutputDir: "/dogs"},
-			{Field: "title", FilterType: "contains", Value: "two", OutputDir: "/two"},
-			{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/cats"},
-		}, "/two"},
+		{"contains", []string{"title:contains:cats||/cats"}, "/cats"},
+		{"no match", []string{"title:contains:dogs||/dogs"}, ""},
+		{"omits", []string{"title:omits:dogs||/no-dogs"}, "/no-dogs"},
+		{"more-than", []string{"duration:more-than:3600||/long"}, "/long"},
+		{"missing field for a comparison", []string{"views:more-than:1||/popular"}, ""},
+		{"all filters match", []string{"title:contains:cats&&duration:more-than:3600||/long cats"}, "/long cats"},
+		{"one filter fails", []string{"title:contains:cats&&duration:less-than:3600||/short cats"}, ""},
+		{"first match wins", []string{"title:contains:dogs||/dogs", "title:contains:two||/two", "title:contains:cats||/cats"}, "/two"},
 	}
 	for _, tt := range tests {
-		cu := &models.ChannelURL{URL: "https://tubesite.com/@cats", ChanURLSettings: &models.Settings{MetaFilterMoveOps: tt.ops}}
+		ops, err := parsing.ParseMetaFilterMoveOps(tt.ops)
+		if err != nil {
+			t.Fatalf("%s: %v", tt.name, err)
+		}
+		cu := &models.ChannelURL{URL: "https://tubesite.com/@cats", ChanURLSettings: &models.Settings{MetaFilterMoveOps: ops}}
 		if got := HandleMoveOps(video, cu, nil); got != tt.want {
 			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
 		}

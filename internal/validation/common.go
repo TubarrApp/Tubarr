@@ -188,7 +188,10 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps, checkPaths bo
 	logger.Pl.D(5, "Validating %d meta filter move operations...", len(moveOps))
 
 	for i, op := range moveOps {
-		if err := ValidateFilterOps([]models.Filters{op.Filter()}); err != nil {
+		if len(op.Filters) == 0 {
+			return fmt.Errorf("move operation at position %d has no filters", i)
+		}
+		if err := ValidateFilterOps(op.Filters); err != nil {
 			return fmt.Errorf("move operation at position %d: %w", i, err)
 		}
 

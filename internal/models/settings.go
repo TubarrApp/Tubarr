@@ -2,6 +2,7 @@ package models
 
 import (
 	"cmp"
+	"encoding/json"
 	"slices"
 	"tubarr/internal/domain/logger"
 
@@ -109,22 +110,36 @@ type FilteredFilenameOps = sharedmodels.FilteredFilenameOps
 // Filters are used to filter in or out videos (download, or operations) by metafields.
 type Filters = sharedmodels.Filters
 
-// MetaFilterMoveOps are used to set an output directory in Metarr based on matching metadata fields.
+// MetaFilterMoveOps are used to set an output directory in Metarr when all their filters match.
 type MetaFilterMoveOps struct {
-	Field      string `json:"move_op_field"`
-	FilterType string `json:"move_op_filter_type"`
-	Value      string `json:"move_op_value"`
-	OutputDir  string `json:"move_op_output_dir"`
+	Filters   []Filters `json:"move_op_filters"`
+	OutputDir string    `json:"move_op_output_dir"`
 }
 
-// Filter returns the move op's filter. Move ops saved before filter types have none, and were always contains.
-func (m MetaFilterMoveOps) Filter() Filters {
-	return Filters{
-		Field:      m.Field,
-		FilterType: cmp.Or(m.FilterType, sharedconsts.OpContains),
-		Value:      m.Value,
-		MustAny:    sharedconsts.OpMust,
+// UnmarshalJSON reads a move op, including one saved with a single filter.
+func (m *MetaFilterMoveOps) UnmarshalJSON(b []byte) error {
+	type moveOp MetaFilterMoveOps
+	var saved struct {
+		moveOp
+		Field      string `json:"move_op_field"`
+		FilterType string `json:"move_op_filter_type"`
+		Value      string `json:"move_op_value"`
 	}
+	if err := json.Unmarshal(b, &saved); err != nil {
+		return err
+	}
+	*m = MetaFilterMoveOps(saved.moveOp)
+
+	// Saved with a single filter, which was always contains before filter types.
+	if len(m.Filters) == 0 && saved.Field != "" {
+		m.Filters = []Filters{{
+			Field:      saved.Field,
+			FilterType: cmp.Or(saved.FilterType, sharedconsts.OpContains),
+			Value:      saved.Value,
+			MustAny:    sharedconsts.OpMust,
+		}}
+	}
+	return nil
 }
 
 // FilenameOps are applied to fields by Metarr.
@@ -276,7 +291,7 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 	if len(child.Filters) > 0 && !slices.Equal(parent.Filters, child.Filters) {
 		return false
 	}
-	if len(child.MetaFilterMoveOps) > 0 && !slices.Equal(parent.MetaFilterMoveOps, child.MetaFilterMoveOps) {
+	if len(child.MetaFilterMoveOps) > 0 && !slices.EqualFunc(parent.MetaFilterMoveOps, child.MetaFilterMoveOps, moveOpsEqual) {
 		return false
 	}
 	if len(child.YTDLPPreferredVideoCodecs) > 0 && !slices.Equal(parent.YTDLPPreferredVideoCodecs, child.YTDLPPreferredVideoCodecs) {
@@ -286,6 +301,11 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 		return false
 	}
 	return true
+}
+
+// moveOpsEqual reports whether two move ops have the same filters and output directory.
+func moveOpsEqual(a, b MetaFilterMoveOps) bool {
+	return a.OutputDir == b.OutputDir && slices.Equal(a.Filters, b.Filters)
 }
 
 // ChildMetarrArgsMatchParent checks if the child MetarrArgs are empty/mismatch the parent on each entry.

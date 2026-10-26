@@ -287,40 +287,48 @@ func TestParseFilterOps(t *testing.T) {
 
 }
 
-// TestParseMetaFilterMoveOps tests the filter|directory form, and that it's written back the same way.
+// TestParseMetaFilterMoveOps tests the filters||directory form, and that it's written back the same way.
 func TestParseMetaFilterMoveOps(t *testing.T) {
+	must := func(field, filterType, value string) models.Filters {
+		return models.Filters{Field: field, FilterType: filterType, Value: value, MustAny: "must"}
+	}
 	tests := []struct {
-		in   string
-		want models.MetaFilterMoveOps
+		in        string
+		filters   []models.Filters
+		outputDir string
 	}{
-		{"Title:contains:Cats||/home/cats", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/cats"}},
-		{"title:contains:Ep 5 | Show: Finale||/home/show", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "ep 5 | show: finale", OutputDir: "/home/show"}},
-		{"title:omits:dogs||/home/no dogs", models.MetaFilterMoveOps{Field: "title", FilterType: "omits", Value: "dogs", OutputDir: "/home/no dogs"}},
-		{"duration:more-than:3600||/home/long", models.MetaFilterMoveOps{Field: "duration", FilterType: "more-than", Value: "3600", OutputDir: "/home/long"}},
-		{"director:contains||/home/directed", models.MetaFilterMoveOps{Field: "director", FilterType: "contains", OutputDir: "/home/directed"}},
-		{`title:contains:cats||C:\Videos\Cats`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: `C:\Videos\Cats`}},
-		{"title:contains:cats||/home/a|b||c", models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cats", OutputDir: "/home/a|b||c"}},
-		{`title:contains:ends in a pipe\|||/home/pipe`, models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "ends in a pipe|", OutputDir: "/home/pipe"}},
-		{`title:regex-contains:[[^Cat|^Dog \d+]]||/home/pets`, models.MetaFilterMoveOps{Field: "title", FilterType: "regex-contains", Value: `^Cat|^Dog \d+`, OutputDir: "/home/pets"}},
+		{"Title:contains:Cats||/home/cats", []models.Filters{must("title", "contains", "cats")}, "/home/cats"},
+		{"title:contains:Ep 5 | Show: Finale||/home/show", []models.Filters{must("title", "contains", "ep 5 | show: finale")}, "/home/show"},
+		{"title:omits:dogs||/home/no dogs", []models.Filters{must("title", "omits", "dogs")}, "/home/no dogs"},
+		{"duration:more-than:3600||/home/long", []models.Filters{must("duration", "more-than", "3600")}, "/home/long"},
+		{"director:contains||/home/directed", []models.Filters{must("director", "contains", "")}, "/home/directed"},
+		{`title:contains:cats||C:\Videos\Cats`, []models.Filters{must("title", "contains", "cats")}, `C:\Videos\Cats`},
+		{"title:contains:cats||/home/a|b||c", []models.Filters{must("title", "contains", "cats")}, "/home/a|b||c"},
+		{`title:contains:ends in a pipe\|||/home/pipe`, []models.Filters{must("title", "contains", "ends in a pipe|")}, "/home/pipe"},
+		{`title:regex-contains:[[^Cat|^Dog \d+]]||/home/pets`, []models.Filters{must("title", "regex-contains", `^Cat|^Dog \d+`)}, "/home/pets"},
+		{"title:contains:cats&&duration:more-than:3600||/home/long cats", []models.Filters{must("title", "contains", "cats"), must("duration", "more-than", "3600")}, "/home/long cats"},
+		{`title:contains:tom \&& jerry\&&&title:omits:r&b||/home/tj`, []models.Filters{must("title", "contains", "tom && jerry&"), must("title", "omits", "r&b")}, "/home/tj"},
 	}
 	for _, tt := range tests {
 		got, err := parsing.ParseMetaFilterMoveOps([]string{tt.in})
-		if err != nil || len(got) != 1 || got[0] != tt.want {
-			t.Errorf("ParseMetaFilterMoveOps(%q) = %+v, %v; want %+v", tt.in, got, err, tt.want)
+		if err != nil || len(got) != 1 || !slices.Equal(got[0].Filters, tt.filters) || got[0].OutputDir != tt.outputDir {
+			t.Errorf("ParseMetaFilterMoveOps(%q) = %+v, %v; want %+v to %q", tt.in, got, err, tt.filters, tt.outputDir)
 			continue
 		}
 		// The written form reads back the same.
 		line := models.MetaFilterMoveOpsToString(got[0])
-		if again, err := parsing.ParseMetaFilterMoveOps([]string{line}); err != nil || len(again) != 1 || again[0] != tt.want {
+		again, err := parsing.ParseMetaFilterMoveOps([]string{line})
+		if err != nil || len(again) != 1 || !slices.Equal(again[0].Filters, tt.filters) || again[0].OutputDir != tt.outputDir {
 			t.Errorf("%q written as %q read back as %+v, %v", tt.in, line, again, err)
 		}
 	}
 
 	for _, bad := range []string{
-		"title:contains:cats",       // No directory.
-		"title:contains:cats||",     // Empty directory.
-		"title:contains:cats|/home", // A single '|'.
-		"title:more-than||/home",    // A comparison with no value.
+		"title:contains:cats",               // No directory.
+		"title:contains:cats||",             // Empty directory.
+		"title:contains:cats|/home",         // A single '|'.
+		"title:more-than||/home",            // A comparison with no value.
+		"title:contains:cats&&||/home/cats", // An empty filter.
 	} {
 		if _, err := parsing.ParseMetaFilterMoveOps([]string{bad}); err == nil {
 			t.Errorf("ParseMetaFilterMoveOps(%q) was accepted", bad)
@@ -342,20 +350,35 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 	}
 }
 
-// TestMoveOpsOldBlob tests move ops saved before filter types still read, as contains filters.
+// TestMoveOpsOldBlob tests move ops saved with a single filter still read, as contains if saved before filter types.
 func TestMoveOpsOldBlob(t *testing.T) {
 	var s models.Settings
-	if err := json.Unmarshal([]byte(`{"move_ops":[{"move_url_specific":"","move_op_field":"title","move_op_value":"cats","move_op_output_dir":"/cats"}]}`), &s); err != nil {
+	blob := `{"move_ops":[{"move_url_specific":"","move_op_field":"title","move_op_value":"cats","move_op_output_dir":"/cats"},` +
+		`{"move_op_field":"duration","move_op_filter_type":"less-than","move_op_value":"600","move_op_output_dir":"/short"}]}`
+	if err := json.Unmarshal([]byte(blob), &s); err != nil {
 		t.Fatal(err)
 	}
-	if len(s.MetaFilterMoveOps) != 1 {
-		t.Fatalf("got %d move ops, want 1", len(s.MetaFilterMoveOps))
+	got := models.MetaFilterMoveOpsArrayToSlice(s.MetaFilterMoveOps)
+	if want := []string{"title:contains:cats||/cats", "duration:less-than:600||/short"}; !slices.Equal(got, want) {
+		t.Errorf("old move ops written as %q, want %q", got, want)
 	}
-	if f := s.MetaFilterMoveOps[0].Filter(); f.FilterType != "contains" || f.Field != "title" || f.Value != "cats" {
-		t.Errorf("old move op's filter = %+v, want title contains cats", f)
+
+	// Saved again, they're stored with a filter list and read back the same.
+	saved, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got := models.MetaFilterMoveOpsToString(s.MetaFilterMoveOps[0]); got != "title:contains:cats||/cats" {
-		t.Errorf("old move op written as %q, want the new form", got)
+	if strings.Contains(string(saved), "move_op_field") {
+		t.Errorf("saved move ops still use the single filter form: %s", saved)
+	}
+	var again models.Settings
+	if err := json.Unmarshal(saved, &again); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.EqualFunc(again.MetaFilterMoveOps, s.MetaFilterMoveOps, func(a, b models.MetaFilterMoveOps) bool {
+		return a.OutputDir == b.OutputDir && slices.Equal(a.Filters, b.Filters)
+	}) {
+		t.Errorf("saved move ops read back as %+v, want %+v", again.MetaFilterMoveOps, s.MetaFilterMoveOps)
 	}
 }
 

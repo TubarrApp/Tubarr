@@ -389,13 +389,13 @@
                         <textarea
                           x-model="formData.settings.move_ops"
                           rows="4"
-                          :placeholder="hint('settings', 'move_ops', 'title:contains:dog||/home/videos/dogs\ntitle:contains:cat||/home/videos/cats\nuploader:equals:MyChannel||/home/videos/mychannel')"
+                          :placeholder="hint('settings', 'move_ops', 'title:contains:dog||/home/videos/dogs\ntitle:contains:cat&&duration:more-than:3600||/home/videos/long-cats\nuploader:equals:MyChannel||/home/videos/mychannel')"
                           class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
                         ></textarea>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          One per line, a filter and a directory. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">field:filter_type:value||output_directory</code><br>
-                          The first one matching a video's metadata sets its output directory in place of the one above. Filter types are the same as filtered operations' (contains, regex-contains, omits, equals, not-equals, more-than, less-than).<br>
-                          Example: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">title:contains:tutorial||/home/tutorials</code>
+                          One per line, one or more filters and a directory. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">field:filter_type:value||output_directory</code>, with several filters joined by <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">&amp;&amp;</code>, all of which must match.<br>
+                          The first one whose filters all match a video's metadata sets its output directory in place of the one above. Filter types are the same as filtered operations' (contains, regex-contains, omits, equals, not-equals, more-than, less-than).<br>
+                          Examples: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">title:contains:tutorial||/home/tutorials</code>, <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">title:contains:tutorial&amp;&amp;duration:more-than:3600||/home/long-tutorials</code>
                         </p>
                       </div>
 
@@ -661,11 +661,11 @@
                         <textarea
                           x-model="formData.metarr.metarr_filtered_meta_ops"
                           rows="3"
-                          :placeholder="hint('metarr', 'metarr_filtered_meta_ops', 'title:contains:cat||title:prefix:[CAT VIDEO]\ntitle:contains:dog||artist:set:Dog Channel')"
+                          :placeholder="hint('metarr', 'metarr_filtered_meta_ops', 'title:contains:cat||title:prefix:[CAT VIDEO]\ntitle:contains:dog||artist:set:Dog Channel\ntitle:contains:dog&&duration:more-than:3600||genre:set:Long Dog Videos')"
                           class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
                         ></textarea>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Filter rules with metadata operations. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">filter_rule||meta_operation</code>
+                          Filter rules with metadata operations. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">filter_rule||meta_operation</code>, with several filter rules joined by <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">&amp;&amp;</code>, all of which must match.
                         </p>
                       </div>
 
@@ -721,11 +721,11 @@
                         <textarea
                           x-model="formData.metarr.metarr_filtered_filename_ops"
                           rows="3"
-                          :placeholder="hint('metarr', 'metarr_filtered_filename_ops', 'title:contains:tutorial||prefix:[TUTORIAL] \ntitle:contains:review||prefix:[REVIEW] ')"
+                          :placeholder="hint('metarr', 'metarr_filtered_filename_ops', 'title:contains:tutorial||prefix:[TUTORIAL] \ntitle:contains:review||prefix:[REVIEW] \ntitle:contains:review&&duration:less-than:600||suffix: (short)')"
                           class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
                         ></textarea>
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          Filter rules with filename operations. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">filter_rule||filename_operation</code>
+                          Filter rules with filename operations. Format: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">filter_rule||filename_operation</code>, with several filter rules joined by <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">&amp;&amp;</code>, all of which must match.
                         </p>
                       </div>
                     </div>

@@ -79,7 +79,10 @@ func TestMigrateFilterTypeNames(t *testing.T) {
 		{Field: "duration", FilterType: "more-than", Value: "60", MustAny: "must"},
 		{Field: "title", FilterType: "contains", Value: "morethan", MustAny: "must"},
 	}
-	c.ChanSettings.MetaFilterMoveOps = []models.MetaFilterMoveOps{{Field: "duration", FilterType: "less-than", Value: "600", OutputDir: t.TempDir()}}
+	c.ChanSettings.MetaFilterMoveOps = []models.MetaFilterMoveOps{{
+		Filters:   []models.Filters{{Field: "duration", FilterType: "less-than", Value: "600", MustAny: "must"}},
+		OutputDir: t.TempDir(),
+	}}
 	c.ChanMetarrArgs.FilteredMetaOps = []models.FilteredMetaOps{{
 		Filters: []models.Filters{{Field: "language", FilterType: "not-equals", Value: "de", MustAny: "must"}},
 		MetaOps: []models.MetaOps{{Field: "title", OpType: "suffix", OpValue: "!"}},
@@ -102,7 +105,7 @@ func TestMigrateFilterTypeNames(t *testing.T) {
 	if err := cs.db.QueryRow("SELECT settings FROM channels").Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stored, `"filter_type":"morethan"`) || !strings.Contains(stored, `"move_op_filter_type":"lessthan"`) {
+	if !strings.Contains(stored, `"filter_type":"morethan"`) || !strings.Contains(stored, `"filter_type":"lessthan"`) {
 		t.Fatalf("old filter types weren't stored: %s", stored)
 	}
 
@@ -128,7 +131,7 @@ func TestMigrateFilterTypeNames(t *testing.T) {
 	if s.Filters[0].FilterType != "more-than" || s.Filters[1].Value != "morethan" {
 		t.Errorf("filters = %+v, want more-than and a value of \"morethan\" kept", s.Filters)
 	}
-	if got := s.MetaFilterMoveOps[0].FilterType; got != "less-than" {
+	if got := s.MetaFilterMoveOps[0].Filters[0].FilterType; got != "less-than" {
 		t.Errorf("move op filter type = %q, want less-than", got)
 	}
 	if got := loaded.ChanMetarrArgs.FilteredMetaOps[0].Filters[0].FilterType; got != "not-equals" {

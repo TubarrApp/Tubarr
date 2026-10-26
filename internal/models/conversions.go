@@ -2,7 +2,6 @@ package models
 
 import (
 	"strings"
-	"tubarr/internal/domain/logger"
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
@@ -35,47 +34,31 @@ func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 
 // MetaFilterMoveOpsToString converts a meta filter move op back to its string form.
 //
-// url|title:contains:dog||/dogs
+// title:contains:dog&&duration:more-than:600||/dogs
 func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
-	return sharedparsing.FormatFilter(m.Filter(), false) + sharedparsing.FilterSeparator + strings.ReplaceAll(m.OutputDir, `\`, `\\`)
+	return sharedparsing.FormatFilters(m.Filters) + sharedparsing.FilterSeparator + strings.ReplaceAll(m.OutputDir, `\`, `\\`)
 }
 
 // ------ Filtered Meta Ops -----------------------------------------------------------------
 
-// FilteredMetaOpsToSlice converts filtered meta ops back to slice.
+// FilteredMetaOpsToSlice converts filtered meta ops back to slice, one entry per meta op.
 func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
-	slice := make([]string, 0, len(f.Filters))
-
-	filterStrings := FiltersArrayToSlice(f.Filters, false)
-	metaOpStrings := sharedparsing.FormatMetaOps(f.MetaOps)
-
-	if len(filterStrings) != len(metaOpStrings) {
-		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(metaOpStrings))
-		return []string{}
-	}
-
-	for i := range filterStrings {
-		slice = append(slice, filterStrings[i]+sharedparsing.FilterSeparator+metaOpStrings[i])
+	filters := sharedparsing.FormatFilters(f.Filters)
+	slice := make([]string, 0, len(f.MetaOps))
+	for _, op := range sharedparsing.FormatMetaOps(f.MetaOps) {
+		slice = append(slice, filters+sharedparsing.FilterSeparator+op)
 	}
 	return slice
 }
 
 // ------ Filtered Filename Ops -----------------------------------------------------------------
 
-// FilteredFilenameOpsToSlice converts filtered filename ops back to slice.
+// FilteredFilenameOpsToSlice converts filtered filename ops back to slice, one entry per filename op.
 func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
-	slice := make([]string, 0, len(f.Filters))
-
-	filterStrings := FiltersArrayToSlice(f.Filters, false)
-	filenameOpStrings := sharedparsing.FormatFilenameOps(f.FilenameOps)
-
-	if len(filterStrings) != len(filenameOpStrings) {
-		logger.Pl.E("Mismatch in filter string and meta op string entry amounts for %v (got filters: %d, meta ops %d)", f, len(filterStrings), len(filenameOpStrings))
-		return []string{}
-	}
-
-	for i := range filterStrings {
-		slice = append(slice, filterStrings[i]+sharedparsing.FilterSeparator+filenameOpStrings[i])
+	filters := sharedparsing.FormatFilters(f.Filters)
+	slice := make([]string, 0, len(f.FilenameOps))
+	for _, op := range sharedparsing.FormatFilenameOps(f.FilenameOps) {
+		slice = append(slice, filters+sharedparsing.FilterSeparator+op)
 	}
 	return slice
 }

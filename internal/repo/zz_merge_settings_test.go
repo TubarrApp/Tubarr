@@ -26,7 +26,7 @@ func fullSettings() *models.Settings {
 		ExtraYTDLPCrawlArgs:       "--c",
 		Filters:                   []models.Filters{{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}},
 		FilterFile:                "/filters",
-		MetaFilterMoveOps:         []models.MetaFilterMoveOps{{Field: "title", Value: "cat", OutputDir: "/cats"}},
+		MetaFilterMoveOps:         []models.MetaFilterMoveOps{{Filters: []models.Filters{{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}}, OutputDir: "/cats"}},
 		MetaFilterMoveOpFile:      "/moves",
 		FromDate:                  "20240101",
 		ToDate:                    "20250101",
@@ -96,7 +96,7 @@ func TestMergeSettingsInheritsAll(t *testing.T) {
 func TestMergeSettingsKeepsOwn(t *testing.T) {
 	no := false
 	ownFilter := models.Filters{Field: "title", FilterType: "omits", Value: "dog", MustAny: "any"}
-	ownMove := models.MetaFilterMoveOps{Field: "title", Value: "dog", OutputDir: "/dogs"}
+	ownMove := models.MetaFilterMoveOps{Filters: []models.Filters{{Field: "title", FilterType: "contains", Value: "dog", MustAny: "must"}}, OutputDir: "/dogs"}
 	ownCodecs := []string{"vp9"}
 	child := &models.Settings{VideoDir: "/own", Retries: 5, Filters: []models.Filters{ownFilter}, MetaFilterMoveOps: []models.MetaFilterMoveOps{ownMove},
 		YTDLPPreferredVideoCodecs: ownCodecs, UseGlobalCookies: &no, Paused: true}

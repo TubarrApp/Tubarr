@@ -77,7 +77,7 @@ func TestSettingsRefuseMissingFolder(t *testing.T) {
 		if err := ValidateSettingsModel(&models.Settings{JSONDir: missing}, true); err == nil {
 			t.Errorf("JSON folder %q: accepted", missing)
 		}
-		moveOps := []models.MetaFilterMoveOps{{Field: "title", Value: "cats", OutputDir: missing}}
+		moveOps := []models.MetaFilterMoveOps{{Filters: []models.Filters{{Field: "title", FilterType: "contains", Value: "cats", MustAny: "must"}}, OutputDir: missing}}
 		if err := ValidateSettingsModel(&models.Settings{MetaFilterMoveOps: moveOps}, true); err == nil {
 			t.Errorf("move op folder %q: accepted", missing)
 		}

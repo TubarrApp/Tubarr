@@ -125,7 +125,7 @@ func ParseNotifications(channelURL string, notifyURLs []string) ([]*models.Notif
 
 // ParseMetaFilterMoveOps parses meta filter move operation strings into models.
 //
-// Format: "title:contains:frogs||/home/frogs", a filter and a directory.
+// Format: "title:contains:frogs&&duration:more-than:600||/home/frogs", filters and a directory.
 func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	if len(ops) == 0 {
 		return nil, nil
@@ -133,8 +133,9 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 	// Deduplicate.
 	ops = validation.DeduplicateSliceEntries(ops)
 
-	const moveOpFormatError string = "please enter move operations in the format 'field:filter_type:value||output directory'.\n\n" +
-		"'title:contains:frogs||/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion"
+	const moveOpFormatError string = "please enter move operations in the format 'field:filter_type:value||output directory', joining several filters with '&&' to require all of them.\n\n" +
+		"'title:contains:frogs||/home/frogs' moves files with 'frogs' in the metatitle to the directory '/home/frogs' upon Metarr completion.\n" +
+		"'title:contains:frogs&&duration:more-than:3600||/home/long frogs' moves files with 'frogs' in the metatitle that are over an hour long to '/home/long frogs'"
 
 	m := make([]models.MetaFilterMoveOps, 0, len(ops))
 	for _, op := range ops {
@@ -144,7 +145,7 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 		if div == 0 || div == len(parts)-1 {
 			return nil, errors.New(moveOpFormatError)
 		}
-		filters, err := ParseFilterOps([]string{strings.Join(parts[:div], "|")}, false)
+		filters, err := ParseFilterOps(sharedparsing.SplitFilters(strings.Join(parts[:div], "|")), false)
 		if err != nil {
 			return nil, fmt.Errorf("move operation %q: %w", op, err)
 		}
@@ -154,10 +155,8 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 		}
 
 		m = append(m, models.MetaFilterMoveOps{
-			Field:      filters[0].Field,
-			FilterType: filters[0].FilterType,
-			Value:      filters[0].Value,
-			OutputDir:  outputDir,
+			Filters:   filters,
+			OutputDir: outputDir,
 		})
 	}
 	return m, nil

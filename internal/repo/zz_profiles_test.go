@@ -99,8 +99,8 @@ func TestProfileOpsAdded(t *testing.T) {
 	profilePrefix := models.FilenameOps{OpType: "prefix", OpValue: "[P] "}
 	channelSuffix := models.FilenameOps{OpType: "suffix", OpValue: " [C]"}
 	profileFiltered := models.FilteredMetaOps{Filters: []models.Filters{catFilter}, MetaOps: []models.MetaOps{{Field: "genre", OpType: "set", OpValue: "Cats"}}}
-	profileMove := models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "cat", OutputDir: dir}
-	channelMove := models.MetaFilterMoveOps{Field: "title", FilterType: "contains", Value: "dog", OutputDir: dir}
+	profileMove := models.MetaFilterMoveOps{Filters: []models.Filters{{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}}, OutputDir: dir}
+	channelMove := models.MetaFilterMoveOps{Filters: []models.Filters{{Field: "title", FilterType: "contains", Value: "dog", MustAny: "must"}}, OutputDir: dir}
 
 	chanProfile := addTestProfile(t, cs, "ops profile",
 		&models.Settings{MetaFilterMoveOps: []models.MetaFilterMoveOps{profileMove}},

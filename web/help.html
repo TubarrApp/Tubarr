@@ -300,27 +300,33 @@ title:omits:short:must</code></pre>
               <!-- ===== Filtered ops ===== -->
               <h2 id="filtered-ops">Filtered ops</h2>
               <p>
-                A filtered op only runs when the video's metadata matches its filter. Each line is one filter and one op,
-                divided by <code>||</code>. The filter is written as above, without <code>must</code>/<code>any</code>.
+                A filtered op only runs when the video's metadata matches all of its filters. Each line is one or more
+                filters and one op, divided by <code>||</code>. Filters are written as above, without
+                <code>must</code>/<code>any</code>, and joined with <code>&amp;&amp;</code> when there are several.
               </p>
-              <pre><code>title:contains:cat||genre:set:Cats          filtered meta op
-title:contains:cat||prefix:[Cats]           filtered filename op (the filter reads metadata, the op renames)</code></pre>
+              <pre><code>title:contains:cat||genre:set:Cats                                filtered meta op
+title:contains:cat||prefix:[Cats]                                 filtered filename op (the filter reads metadata, the op renames)
+title:contains:cat&amp;&amp;duration:more-than:3600||prefix:[Long Cats]   only for cat videos over an hour long</code></pre>
               <ul>
-                <li>To run several ops for one filter, repeat the filter on each line.</li>
+                <li>To run several ops for the same filters, repeat the filters on each line.</li>
+                <li>To run an op when either of two filters matches, write the line once for each filter.</li>
                 <li>
                   To limit an op to one channel's videos, filter on its channel URL:
                   <code>channel_url:contains:youtube.com/@ChannelA||title:prefix:[A] </code>. (In Tubarr, a channel URL's
                   custom settings do this more simply.)
                 </li>
                 <li>A <code>|</code> at the end of the filter's value is written <code>\|</code> to distinguish it from the filter/operation <code>||</code> separator. For example, <code>title:contains:|CATS\|||description:suffix: - Cat videos.</code> would look for <code>|cats|</code> in the title field and, if found, suffix the description field with <code> - Cat videos.</code></li>
+                <li>Likewise, a <code>&amp;&amp;</code> in a filter's value is written <code>\&amp;&amp;</code>, and a <code>&amp;</code> at the end of it <code>\&amp;</code>, so they aren't read as joining two filters. For example, <code>title:contains:Tom \&amp;&amp; Jerry||genre:set:Cartoons</code> looks for <code>tom &amp;&amp; jerry</code> in the title field.</li>
               </ul>
 
               <!-- ===== Move ops ===== -->
               <h2 id="move-ops">Move ops and output directories</h2>
               <p>
-                A move op sends finished videos whose metadata matches a filter to another directory:
-                <code>title:contains:podcast||/media/podcasts</code>. The first move op that matches wins, and a channel
-                URL's own move ops are checked before the channel's.
+                A move op sends finished videos whose metadata matches its filters to another directory:
+                <code>title:contains:podcast||/media/podcasts</code>. As with filtered ops, join several filters with
+                <code>&amp;&amp;</code> to require all of them:
+                <code>title:contains:podcast&amp;&amp;duration:more-than:3600||/media/long podcasts</code>. The first move op
+                that matches wins, and a channel URL's own move ops are checked before the channel's.
               </p>
               <p>Where a finished video goes, first match first:</p>
               <ol>

@@ -298,7 +298,7 @@
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Move Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.settings?.move_ops ? (typeof channel.settings.move_ops === 'string' ? channel.settings.move_ops.split('\\n').join('\n') : channel.settings.move_ops.map(op => typeof op === 'string' ? op : ((op.move_op_field || '') + ':' + (op.move_op_value || '') + ' → ' + (op.move_op_output_dir || ''))).join('\n')) : 'Not set'"></span>
+                              <span :class="channel.settings?.move_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.settings?.move_ops ? formatFilteredOps(channel.settings.move_ops) : 'Not set'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Output Extension:</span>
@@ -367,7 +367,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Meta Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_filtered_meta_ops || 'Not set'"></span>
+                              <span :class="channel.metarr?.metarr_filtered_meta_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_meta_ops ? formatFilteredOps(channel.metarr.metarr_filtered_meta_ops) : 'Not set'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Filename Ops File:</span>
@@ -375,7 +375,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Filename Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_filtered_filename_ops || 'Not set'"></span>
+                              <span :class="channel.metarr?.metarr_filtered_filename_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_filename_ops ? formatFilteredOps(channel.metarr.metarr_filtered_filename_ops) : 'Not set'"></span>
                             </div>
                           </div>
                         </div>
@@ -541,6 +541,30 @@
             } catch (e) {
               return 'Invalid date';
             }
+          },
+
+          // Shows each filtered op with its filters and op on separate rows, and a blank line between ops.
+          formatFilteredOps(text) {
+            return text.split('\n').filter(line => line.trim()).map(line => {
+              let rows = '    ';
+              let escaped = false;
+              for (let i = 0; i < line.length; i++) {
+                // A backslash escapes the next character, so an escaped "&&" or "||" stays in its value.
+                if (escaped) {
+                  escaped = false;
+                } else if (line[i] === '\\') {
+                  escaped = true;
+                } else if (line.startsWith('||', i)) {
+                  return rows + '\n||  ' + line.slice(i + 2);
+                } else if (line.startsWith('&&', i)) {
+                  rows += '\n&&  ';
+                  i++;
+                  continue;
+                }
+                rows += line[i];
+              }
+              return rows;
+            }).join('\n\n');
           },
 
           formatPreferredCodecs(codecs) {

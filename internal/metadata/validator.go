@@ -264,14 +264,14 @@ func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 
 	// Check each move operation against video metadata.
 	for _, op := range allMoveOps {
-		f := op.Filter()
-		matched, skipped, err := sharedfilters.Match(v.MetadataMap, f)
+		filters := sharedparsing.FormatFilters(op.Filters)
+		matched, err := sharedfilters.MatchAll(v.MetadataMap, op.Filters)
 		if err != nil {
-			logger.Pl.E("Skipping move op for field %q: %v", f.Field, err)
+			logger.Pl.E("Skipping move op %q: %v", filters, err)
 			continue
 		}
-		if matched && !skipped {
-			logger.Pl.I("Move op matched: Field %q %s %q. Output directory retrieved as %q", f.Field, f.FilterType, f.Value, op.OutputDir)
+		if matched {
+			logger.Pl.I("Move op matched: %q. Output directory retrieved as %q", filters, op.OutputDir)
 			return op.OutputDir
 		}
 	}

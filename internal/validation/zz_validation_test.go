@@ -479,7 +479,7 @@ func TestValidateMetaFilterMoveOps_Valid(t *testing.T) {
 
 	moveOps := []models.MetaFilterMoveOps{
 		{
-			Field:     "channel",
+			Filters:   []models.Filters{{Field: "channel", FilterType: "contains", MustAny: "must"}},
 			OutputDir: tmp,
 		},
 	}
@@ -494,7 +494,7 @@ func TestValidateMetaFilterMoveOps_EmptyField(t *testing.T) {
 
 	moveOps := []models.MetaFilterMoveOps{
 		{
-			Field:     "",
+			Filters:   []models.Filters{{FilterType: "contains", MustAny: "must"}},
 			OutputDir: tmp,
 		},
 	}
@@ -508,6 +508,14 @@ func TestValidateMetaFilterMoveOps_EmptyField(t *testing.T) {
 	}
 }
 
+// TestValidateMetaFilterMoveOps_NoFilters tests a move op with no filters is refused, rather than matching every video.
+func TestValidateMetaFilterMoveOps_NoFilters(t *testing.T) {
+	err := validation.ValidateMetaFilterMoveOps([]models.MetaFilterMoveOps{{OutputDir: t.TempDir()}}, true)
+	if err == nil || !strings.Contains(err.Error(), "no filters") {
+		t.Fatalf("expected an error for no filters, got %v", err)
+	}
+}
+
 func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 	// A file where a directory should be is invalid, as is a missing directory (it may be on an unmounted drive).
 	tmp := t.TempDir()
@@ -518,7 +526,7 @@ func TestValidateMetaFilterMoveOps_InvalidDirectory(t *testing.T) {
 
 	moveOps := []models.MetaFilterMoveOps{
 		{
-			Field:     "channel",
+			Filters:   []models.Filters{{Field: "channel", FilterType: "contains", MustAny: "must"}},
 			OutputDir: file,
 		},
 	}
