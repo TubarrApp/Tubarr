@@ -26,7 +26,7 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 	// Filter loop.
 	for _, filter := range filters {
-		matched, skipped, err := sharedfilters.Match(v.MetadataMap, filter)
+		matched, skipped, metaText, err := sharedfilters.Match(v.MetadataMap, filter)
 		if err != nil {
 			logger.Pl.E("%s error: Video %q: %v", filterType, v.URL, err)
 			return false
@@ -35,11 +35,11 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 		// Numerical filters with an absent or empty field are skipped rather than failed,
 		// since there is nothing meaningful to compare against.
 		if skipped {
-			logger.Pl.D(1, "%s skip: Video %q has no value for field(s) %q, skipping numerical filter", filterType, v.URL, filter.Field)
+			logger.Pl.D(1, "%s skip: Video %q has no value for field %q, skipping numerical filter", filterType, v.URL, filter.Field)
 			continue
 		}
 		if !matched {
-			logger.Pl.D(3, "%s mismatch: Video %q fails filter %q", filterType, v.URL, sharedparsing.FormatFilter(filter, true))
+			logger.Pl.D(1, "%s mismatch: Video %q has %v for field(s) %q, which fails filter %q", filterType, v.URL, metaText, filter.Field, sharedparsing.FormatFilter(filter, true))
 		}
 
 		// Add to must/any.
