@@ -197,7 +197,7 @@ func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps, checkPaths bo
 
 		// Validate output directory
 		if checkPaths && op.OutputDir != "" {
-			if err := CheckDirectory(op.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
+			if err := CheckDirectory(op.OutputDir, sharedtemplates.MoveOpTemplateTags); err != nil {
 				return fmt.Errorf("move operation at position %d has invalid directory: %w", i, err)
 			}
 			if err := CheckDestination(op.OutputDir); err != nil {

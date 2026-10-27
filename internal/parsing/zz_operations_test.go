@@ -303,6 +303,8 @@ func TestParseMetaFilterMoveOps(t *testing.T) {
 		{"duration:more-than:3600||/home/long", []models.Filters{must("duration", "more-than", "3600")}, "/home/long"},
 		{"director:contains||/home/directed", []models.Filters{must("director", "contains", "")}, "/home/directed"},
 		{`title:contains:cats||C:\Videos\Cats`, []models.Filters{must("title", "contains", "cats")}, `C:\Videos\Cats`},
+		{`title:contains:cats||/home/a\|b\\c`, []models.Filters{must("title", "contains", "cats")}, `/home/a\|b\\c`},
+		{`title:contains:cats||\\nas\videos`, []models.Filters{must("title", "contains", "cats")}, `\\nas\videos`},
 		{"title:contains:cats||/home/a|b||c", []models.Filters{must("title", "contains", "cats")}, "/home/a|b||c"},
 		{`title:contains:ends in a pipe\|||/home/pipe`, []models.Filters{must("title", "contains", "ends in a pipe|")}, "/home/pipe"},
 		{`title:regex-contains:[[^Cat|^Dog \d+]]||/home/pets`, []models.Filters{must("title", "regex-contains", `^Cat|^Dog \d+`)}, "/home/pets"},

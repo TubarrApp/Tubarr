@@ -3,7 +3,6 @@ package parsing
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -139,24 +138,32 @@ func ParseMetaFilterMoveOps(ops []string) ([]models.MetaFilterMoveOps, error) {
 
 	m := make([]models.MetaFilterMoveOps, 0, len(ops))
 	for _, op := range ops {
-		// An unescaped "||" leaves an empty part between its two '|'.
-		parts := sharedparsing.SplitUnescaped(op, '|')
-		div := slices.Index(parts[1:], "") + 1
-		if div == 0 || div == len(parts)-1 {
+		// Divide at the first unescaped "||", keeping escapes.
+		//
+		// `title:contains:a|b&&duration:more-than:600||/home/a|b\|c` -> `title:contains:a|b&&duration:more-than:600`, `/home/a|b\|c`.
+		filterPart, dirPart, ok := sharedparsing.SplitFiltered(op)
+		if !ok {
 			return nil, errors.New(moveOpFormatError)
 		}
-		filters, err := ParseFilterOps(sharedparsing.SplitFilters(strings.Join(parts[:div], "|")), false)
+
+		// FILTER PORTION:
+		// Split at each unescaped "&&", escapes still in: -> [`title:contains:a|b`, `duration:more-than:600`].
+		splitFilters := sharedparsing.SplitFilters(filterPart)
+		filters, err := ParseFilterOps(splitFilters, false)
 		if err != nil {
 			return nil, fmt.Errorf("move operation %q: %w", op, err)
 		}
-		outputDir := strings.TrimSpace(strings.Join(sharedparsing.EscapedSplit(strings.Join(parts[div+1:], "|"), '|'), "|"))
-		if outputDir == "" {
+
+		// DIRECTORY PORTION:
+		// Everything after first || is left in: `/home/a|b\|c` -> `/home/a|b\|c`.
+		dirPart = strings.TrimSpace(dirPart)
+		if dirPart == "" {
 			return nil, errors.New(moveOpFormatError)
 		}
 
 		m = append(m, models.MetaFilterMoveOps{
 			Filters:   filters,
-			OutputDir: outputDir,
+			OutputDir: dirPart,
 		})
 	}
 	return m, nil

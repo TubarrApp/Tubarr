@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/limits"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 )
 
@@ -190,7 +191,10 @@ func CheckDestinations(c *models.Channel, cu *models.ChannelURL, o *models.Video
 	default:
 		if s != nil {
 			for _, op := range s.MetaFilterMoveOps {
-				dirs = append(dirs, op.OutputDir)
+				// An op inside {{output_directory}} is covered by the output directory's own check.
+				if _, hasTag := parsing.FillOutputDirectory(op.OutputDir, ""); !hasTag {
+					dirs = append(dirs, op.OutputDir)
+				}
 			}
 		}
 		if m := cmp.Or(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); m != nil {

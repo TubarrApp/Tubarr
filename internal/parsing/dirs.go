@@ -12,6 +12,8 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 )
 
@@ -63,10 +65,9 @@ func (dp *DirectoryParser) ParseDirectory(dir string, fileType string) (parsedDi
 		}
 	}
 
-	if !filepath.IsAbs(parsed) {
-		if parsed, err = filepath.Abs(parsed); err != nil {
-			return parsed, err
-		}
+	// Abs also cleans, collapsing a "//" left by {{output_directory}}'s trailing slash.
+	if parsed, err = filepath.Abs(parsed); err != nil {
+		return parsed, err
 	}
 
 	logger.Pl.I("Parsed %s file output directory as %q", fileType, parsed)
@@ -127,6 +128,37 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 	return b.String(), nil
 }
 
+// FillOutputDirectory replaces each {{output_directory}} tag in a move op's dir with outputDir, reporting whether it had one.
+func FillOutputDirectory(dir, outputDir string) (filled string, hasTag bool) {
+	var b strings.Builder
+	remaining := dir
+
+	for {
+		start := strings.Index(remaining, openTemplate)
+		if start == -1 {
+			break
+		}
+		end := strings.Index(remaining[start:], closeTemplate)
+		if end == -1 {
+			break
+		}
+		end += start
+
+		// Swap the output directory tag, keeping any other tag for ParseDirectory.
+		b.WriteString(remaining[:start])
+		if name, _ := sharedtemplates.ParseTag(remaining[start+len(openTemplate) : end]); name == sharedtemplates.OutputDirectory {
+			b.WriteString(outputDir)
+			hasTag = true
+		} else {
+			b.WriteString(remaining[start : end+len(closeTemplate)])
+		}
+		remaining = remaining[end+len(closeTemplate):]
+	}
+
+	b.WriteString(remaining)
+	return b.String(), hasTag
+}
+
 // replaceTemplateTags makes template replacements in the directory string.
 func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 	name, directive := sharedtemplates.ParseTag(tag)
@@ -151,7 +183,7 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 	}
 
 	// One directory level, e.g. "AC/DC" can't nest and ".." can't climb out.
-	if value = sharedtemplates.SanitizePathComponent(value, sharedtemplates.MaxNameBytes); value == "" {
+	if value = sharedparsing.SanitizePathComponent(value, sharedconsts.MaxNameBytes); value == "" {
 		return "", fmt.Errorf("templating: %q is empty once made safe for a path", tag)
 	}
 	return value, nil
@@ -177,14 +209,14 @@ func channelTagValue(name string, c *models.Channel, cu *models.ChannelURL) (str
 		if cu == nil || cu.URL == "" {
 			return "", errors.New("templating: channel URL empty")
 		}
-		value = sharedtemplates.StripURLScheme(cu.URL)
+		value = sharedparsing.StripURLScheme(cu.URL)
 
 	// The URL's name, or the URL itself if it has none.
 	case sharedtemplates.ChannelURLName:
 		if cu == nil || cu.URL == "" {
 			return "", errors.New("templating: channel URL empty")
 		}
-		value = cmp.Or(cu.Name, sharedtemplates.StripURLScheme(cu.URL))
+		value = cmp.Or(cu.Name, sharedparsing.StripURLScheme(cu.URL))
 
 	default:
 		return "", fmt.Errorf("tag %q detected as invalid", name)

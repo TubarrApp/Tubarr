@@ -72,3 +72,23 @@ func TestParseTemplateChannelURLName(t *testing.T) {
 		}
 	}
 }
+
+// TestFillOutputDirectory tests only {{output_directory}} is swapped, in any case or spacing, leaving other tags.
+func TestFillOutputDirectory(t *testing.T) {
+	const out = "/media/{{channel_name}}"
+	tests := []struct {
+		dir, want string
+		hasTag    bool
+	}{
+		{"{{output_directory}}/Destiny", "/media/{{channel_name}}/Destiny", true},
+		{"{{ Output_Directory }}/{{year}}", "/media/{{channel_name}}/{{year}}", true},
+		{"/other/{{channel_name}}/Destiny", "/other/{{channel_name}}/Destiny", false},
+		{"/plain/dir", "/plain/dir", false},
+		{"/broken/{{output_directory", "/broken/{{output_directory", false},
+	}
+	for _, tt := range tests {
+		if got, hasTag := FillOutputDirectory(tt.dir, out); got != tt.want || hasTag != tt.hasTag {
+			t.Errorf("FillOutputDirectory(%q) = %q, %v; want %q, %v", tt.dir, got, hasTag, tt.want, tt.hasTag)
+		}
+	}
+}

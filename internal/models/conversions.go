@@ -1,8 +1,7 @@
 package models
 
 import (
-	"strings"
-
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
@@ -36,7 +35,7 @@ func MetaFilterMoveOpsArrayToSlice(mf []MetaFilterMoveOps) []string {
 //
 // title:contains:dog&&duration:more-than:600||/dogs
 func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
-	return sharedparsing.FormatFilters(m.Filters) + sharedparsing.FilterSeparator + strings.ReplaceAll(m.OutputDir, `\`, `\\`)
+	return sharedparsing.FormatFilters(m.Filters) + sharedconsts.FilterSeparator + m.OutputDir
 }
 
 // ------ Filtered Meta Ops -----------------------------------------------------------------
@@ -46,7 +45,7 @@ func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
 	filters := sharedparsing.FormatFilters(f.Filters)
 	slice := make([]string, 0, len(f.MetaOps))
 	for _, op := range sharedparsing.FormatMetaOps(f.MetaOps) {
-		slice = append(slice, filters+sharedparsing.FilterSeparator+op)
+		slice = append(slice, filters+sharedconsts.FilterSeparator+op)
 	}
 	return slice
 }
@@ -58,7 +57,7 @@ func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
 	filters := sharedparsing.FormatFilters(f.Filters)
 	slice := make([]string, 0, len(f.FilenameOps))
 	for _, op := range sharedparsing.FormatFilenameOps(f.FilenameOps) {
-		slice = append(slice, filters+sharedparsing.FilterSeparator+op)
+		slice = append(slice, filters+sharedconsts.FilterSeparator+op)
 	}
 	return slice
 }

@@ -328,6 +328,12 @@ title:contains:cat&amp;&amp;duration:more-than:3600||prefix:[Long Cats]   only f
                 <code>title:contains:podcast&amp;&amp;duration:more-than:3600||/media/long podcasts</code>. The first move op
                 that matches wins, and a channel URL's own move ops are checked before the channel's.
               </p>
+              <p>
+                In a move op, <code>{{output_directory}}</code> is the Metarr <strong>Output Directory</strong>, e.g.
+                <code>title:contains:podcast||{{output_directory}}/Podcasts</code> puts podcasts in a folder inside it,
+                so changing the output directory moves them too. A move op using it is skipped when no output directory
+                is set.
+              </p>
               <p>Where a finished video goes, first match first:</p>
               <ol>
                 <li>The Download As <strong>Post-Process Directory</strong> chosen for that video</li>
@@ -401,6 +407,7 @@ vp9:av1</code></pre>
                   <tr><th>Where</th><th>Tags</th></tr>
                   <tr><td>Video and JSON directories</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code>, <code>{{channel_url_name}}</code></td></tr>
                   <tr><td>Metarr output directory, move ops</td><td>Those, plus <code>{{video_title}}</code>, <code>{{video_url}}</code>, <code>{{year}}</code>, <code>{{month}}</code>, <code>{{day}}</code>, <code>{{author}}</code>, <code>{{director}}</code>, <code>{{domain}}</code></td></tr>
+                  <tr><td>Move ops only</td><td><code>{{output_directory}}</code></td></tr>
                   <tr><td>Op values</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code>, <code>{{channel_url_name}}</code>, plus any metadata field: <code>{{uploader}}</code>, <code>{{fulltitle}}</code>, <code>{{id}}</code>…</td></tr>
                 </table>
               </div>
