@@ -1,6 +1,8 @@
 package models
 
 import (
+	"strings"
+
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
@@ -40,24 +42,20 @@ func MetaFilterMoveOpsToString(m MetaFilterMoveOps) string {
 
 // ------ Filtered Meta Ops -----------------------------------------------------------------
 
-// FilteredMetaOpsToSlice converts filtered meta ops back to slice, one entry per meta op.
-func FilteredMetaOpsToSlice(f FilteredMetaOps) []string {
-	filters := sharedparsing.FormatFilters(f.Filters)
-	slice := make([]string, 0, len(f.MetaOps))
-	for _, op := range sharedparsing.FormatMetaOps(f.MetaOps) {
-		slice = append(slice, filters+sharedconsts.FilterSeparator+op)
-	}
-	return slice
+// FilteredMetaOpsToString converts filtered meta ops back to their string form, the ops joined by "&&".
+//
+// title:contains:dog&&duration:more-than:600||title:suffix: [dogs]&&genre:set:Dogs
+func FilteredMetaOpsToString(f FilteredMetaOps) string {
+	ops := sharedparsing.FormatMetaOps(f.MetaOps)
+	return sharedparsing.FormatFilters(f.Filters) + sharedconsts.FilterSeparator + strings.Join(ops, sharedconsts.FilterJoiner)
 }
 
 // ------ Filtered Filename Ops -----------------------------------------------------------------
 
-// FilteredFilenameOpsToSlice converts filtered filename ops back to slice, one entry per filename op.
-func FilteredFilenameOpsToSlice(f FilteredFilenameOps) []string {
-	filters := sharedparsing.FormatFilters(f.Filters)
-	slice := make([]string, 0, len(f.FilenameOps))
-	for _, op := range sharedparsing.FormatFilenameOps(f.FilenameOps) {
-		slice = append(slice, filters+sharedconsts.FilterSeparator+op)
-	}
-	return slice
+// FilteredFilenameOpsToString converts filtered filename ops back to their string form, the ops joined by "&&".
+//
+// title:contains:dog||prefix:[Dogs] &&suffix: (dog)
+func FilteredFilenameOpsToString(f FilteredFilenameOps) string {
+	ops := sharedparsing.FormatFilenameOps(f.FilenameOps)
+	return sharedparsing.FormatFilters(f.Filters) + sharedconsts.FilterSeparator + strings.Join(ops, sharedconsts.FilterJoiner)
 }

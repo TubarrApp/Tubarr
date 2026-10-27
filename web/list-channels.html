@@ -367,7 +367,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Meta Operations:</span>
-                              <span :class="channel.metarr?.metarr_filtered_meta_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_meta_ops ? formatFilteredOps(channel.metarr.metarr_filtered_meta_ops) : 'Not set'"></span>
+                              <span :class="channel.metarr?.metarr_filtered_meta_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_meta_ops ? formatFilteredOps(channel.metarr.metarr_filtered_meta_ops, true) : 'Not set'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Filename Ops File:</span>
@@ -375,7 +375,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filtered Filename Operations:</span>
-                              <span :class="channel.metarr?.metarr_filtered_filename_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_filename_ops ? formatFilteredOps(channel.metarr.metarr_filtered_filename_ops) : 'Not set'"></span>
+                              <span :class="channel.metarr?.metarr_filtered_filename_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_filename_ops ? formatFilteredOps(channel.metarr.metarr_filtered_filename_ops, true) : 'Not set'"></span>
                             </div>
                           </div>
                         </div>
@@ -543,19 +543,28 @@
             }
           },
 
-          // Shows each filtered op with its filters and op on separate rows, and a blank line between ops.
-          formatFilteredOps(text) {
+          // Shows each filtered entry with its filters and ops on separate rows, and a blank line between entries.
+          // A move op's directory is taken as written, so only filtered meta and filename ops (splitOps) split what follows
+          // the "||" at each "&&".
+          formatFilteredOps(text, splitOps = false) {
             return text.split('\n').filter(line => line.trim()).map(line => {
               let rows = '    ';
               let escaped = false;
+              let pastDivider = false;
               for (let i = 0; i < line.length; i++) {
                 // A backslash escapes the next character, so an escaped "&&" or "||" stays in its value.
                 if (escaped) {
                   escaped = false;
                 } else if (line[i] === '\\') {
                   escaped = true;
-                } else if (line.startsWith('||', i)) {
-                  return rows + '\n||  ' + line.slice(i + 2);
+                } else if (!pastDivider && line.startsWith('||', i)) {
+                  if (!splitOps) {
+                    return rows + '\n||  ' + line.slice(i + 2);
+                  }
+                  rows += '\n||  ';
+                  pastDivider = true;
+                  i++;
+                  continue;
                 } else if (line.startsWith('&&', i)) {
                   rows += '\n&&  ';
                   i++;

@@ -158,6 +158,12 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
               </div>
               <p>Some rules:</p>
               <ul>
+                <li>
+                  One op can change several fields, listed with commas: <code>actor,director:set:Spielberg</code> sets
+                  both. Don't list a field another one already covers (see <a href="#groups">Group fields</a>):
+                  <code>title</code> already changes <code>fulltitle</code>, so <code>title,fulltitle:prefix:[Cats] </code>
+                  would add the prefix to <code>fulltitle</code> twice.
+                </li>
                 <li>Dates must be written <code>YYYY-MM-DD</code> when set (<code>release_date:set:2024-05-01</code>), a year as <code>YYYY</code>.</li>
                 <li>
                   NFO metadata files don't fill <code>{{field}}</code> tags, and filtered meta ops only work on JSON
@@ -288,6 +294,12 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                   Leave the value out to check whether the field is there at all: <code>chapters:contains:must</code> needs a
                   <code>chapters</code> field, <code>is_live:omits:must</code> needs it to be missing.
                 </li>
+                <li>
+                  List several fields with commas to check them all: <code>title,fulltitle:contains:lion:must</code>
+                  passes when either field holds <em>lion</em>. <code>omits</code> and <code>not-equals</code> need every
+                  field to pass, so <code>title,description:omits:sponsor:must</code> skips videos with <em>sponsor</em>
+                  in either.
+                </li>
                 <li>A <code>more-than</code> or <code>less-than</code> filter on a field the video doesn't have is skipped.</li>
                 <li><strong>From Date</strong> and <strong>To Date</strong> (<code>YYYYMMDD</code>) only download videos uploaded in between.</li>
                 <li>Videos you choose yourself (from Available, Download As or by URL) skip download filters.</li>
@@ -301,14 +313,31 @@ title:omits:short:must</code></pre>
               <h2 id="filtered-ops">Filtered ops</h2>
               <p>
                 A filtered op only runs when the video's metadata matches all of its filters. Each line is one or more
-                filters and one op, divided by <code>||</code>. Filters are written as above, without
-                <code>must</code>/<code>any</code>, and joined with <code>&amp;&amp;</code> when there are several.
+                filters and one or more ops, divided by <code>||</code>. Filters are written as above, without
+                <code>must</code>/<code>any</code>. Several filters, or several ops, are joined with
+                <code>&amp;&amp;</code>: every filter must match, and then every op runs.
               </p>
               <pre><code>title:contains:cat||genre:set:Cats                                filtered meta op
 title:contains:cat||prefix:[Cats]                                 filtered filename op (the filter reads metadata, the op renames)
-title:contains:cat&amp;&amp;duration:more-than:3600||prefix:[Long Cats]   only for cat videos over an hour long</code></pre>
+title:contains:cat&amp;&amp;duration:more-than:3600||prefix:[Long Cats]   only for cat videos over an hour long
+title:contains:cat||title:suffix: [Cats]&amp;&amp;genre:set:Cats          two meta ops for the same filter
+title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffix: - Animal Kingdom   three filename ops</code></pre>
               <ul>
-                <li>To run several ops for the same filters, repeat the filters on each line.</li>
+                <li>
+                  Put the <code>&amp;&amp;</code> straight after an op's value, as a space before it becomes part of the
+                  value: <code>title:suffix: [Cats] &amp;&amp;genre:set:Cats</code> adds <code> [Cats] </code>, ending in a
+                  space. A space after the <code>&amp;&amp;</code> is fine.
+                </li>
+                <li>
+                  A <code>&amp;&amp;</code> inside an op's value is written <code>\&amp;&amp;</code>, so it isn't read as
+                  joining two ops: <code>title:contains:tom||title:set:Tom \&amp;&amp; Jerry</code> sets the title to
+                  <code>Tom &amp;&amp; Jerry</code>. A regex can't hold a <code>&amp;&amp;</code> at all, so write
+                  <code>&amp;{2}</code> instead.
+                </li>
+                <li>
+                  The ops still run in their usual order (see <a href="#meta-order">meta ops</a> and
+                  <a href="#filename-ops">filename ops</a>), not the order they're written in.
+                </li>
                 <li>To run an op when either of two filters matches, write the line once for each filter.</li>
                 <li>
                   To limit an op to one channel's videos, filter on its channel URL:

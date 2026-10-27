@@ -150,13 +150,13 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 		cmd.Flags().StringArrayVar(filenameOps, keys.MFilenameOps, nil, "Filename operation for Metarr (e.g. 'prefix:[CATEGORY] ' or 'date-tag:prefix:ymd'). Repeat the flag for each operation.")
 	}
 	if filteredFilenameOps != nil {
-		cmd.Flags().StringArrayVar(filteredFilenameOps, keys.MFilteredFilenameOps, nil, "Filename operation to perform in Metarr when its filters all match (filter&&filter||operation). Repeat the flag for each operation.")
+		cmd.Flags().StringArrayVar(filteredFilenameOps, keys.MFilteredFilenameOps, nil, "Filename operation to perform in Metarr when its filters all match (filter&&filter||operation&&operation). Repeat the flag for each operation.")
 	}
 	if metaOps != nil {
 		cmd.Flags().StringArrayVar(metaOps, keys.MMetaOps, nil, "Meta operation to perform in Metarr. Repeat the flag for each operation.")
 	}
 	if filteredMetaOps != nil {
-		cmd.Flags().StringArrayVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operation to perform in Metarr when its filters all match (filter&&filter||operation). Repeat the flag for each operation.")
+		cmd.Flags().StringArrayVar(filteredMetaOps, keys.MFilteredMetaOps, nil, "Meta operation to perform in Metarr when its filters all match (filter&&filter||operation&&operation). Repeat the flag for each operation.")
 	}
 }
 

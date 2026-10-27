@@ -80,8 +80,8 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	}
 }
 
-// TestVideoOverrideLinesJoinedFilters tests saved Download As filtered ops refill the dialog with all their filters on
-// each op.
+// TestVideoOverrideLinesJoinedFilters tests saved Download As filtered ops refill the dialog as one line per entry, with
+// all its filters and its ops joined by "&&".
 func TestVideoOverrideLinesJoinedFilters(t *testing.T) {
 	logger.Pl.Console = io.Discard
 
@@ -99,7 +99,7 @@ func TestVideoOverrideLinesJoinedFilters(t *testing.T) {
 	}}
 
 	lines := VideoOverrideLines(o)
-	if want := "title:contains:cat&&duration:more-than:600||album:set:Long Cats\ntitle:contains:cat&&duration:more-than:600||genre:set:Cats"; lines.FilteredMetaOps != want {
+	if want := "title:contains:cat&&duration:more-than:600||album:set:Long Cats&&genre:set:Cats"; lines.FilteredMetaOps != want {
 		t.Errorf("filtered meta ops = %q, want %q", lines.FilteredMetaOps, want)
 	}
 	if want := "title:contains:cat&&duration:more-than:600||prefix:[LONG CAT] "; lines.FilteredFilenameOps != want {

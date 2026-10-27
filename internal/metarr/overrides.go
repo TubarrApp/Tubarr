@@ -91,20 +91,20 @@ func VideoOverrideLines(o *models.VideoOverrides) models.OverrideLines {
 	}
 }
 
-// filteredMetaOpLines returns the filtered meta ops as lines, each op with all its filters.
+// filteredMetaOpLines returns the filtered meta ops as lines, one per entry with all its filters and ops.
 func filteredMetaOpLines(ops []models.FilteredMetaOps) []string {
 	lines := make([]string, 0, len(ops))
 	for _, fmo := range ops {
-		lines = append(lines, models.FilteredMetaOpsToSlice(fmo)...)
+		lines = append(lines, models.FilteredMetaOpsToString(fmo))
 	}
 	return lines
 }
 
-// filteredFilenameOpLines returns the filtered filename ops as lines, each op with all its filters.
+// filteredFilenameOpLines returns the filtered filename ops as lines, one per entry with all its filters and ops.
 func filteredFilenameOpLines(ops []models.FilteredFilenameOps) []string {
 	lines := make([]string, 0, len(ops))
 	for _, ffo := range ops {
-		lines = append(lines, models.FilteredFilenameOpsToSlice(ffo)...)
+		lines = append(lines, models.FilteredFilenameOpsToString(ffo))
 	}
 	return lines
 }

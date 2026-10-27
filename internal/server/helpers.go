@@ -215,12 +215,12 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 	}
 	filteredMeta := make([]string, 0, len(m.FilteredMetaOps))
 	for i := range m.FilteredMetaOps {
-		filteredMeta = append(filteredMeta, models.FilteredMetaOpsToSlice(m.FilteredMetaOps[i])...)
+		filteredMeta = append(filteredMeta, models.FilteredMetaOpsToString(m.FilteredMetaOps[i]))
 	}
 	r.FilteredMetaOps = strings.Join(filteredMeta, "\n")
 	filteredFilename := make([]string, 0, len(m.FilteredFilenameOps))
 	for i := range m.FilteredFilenameOps {
-		filteredFilename = append(filteredFilename, models.FilteredFilenameOpsToSlice(m.FilteredFilenameOps[i])...)
+		filteredFilename = append(filteredFilename, models.FilteredFilenameOpsToString(m.FilteredFilenameOps[i]))
 	}
 	r.FilteredFilenameOps = strings.Join(filteredFilename, "\n")
 	return r
