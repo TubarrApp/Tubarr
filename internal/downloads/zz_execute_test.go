@@ -18,6 +18,7 @@ import (
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/logging"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // nilDBStore is a download store without a database, so Execute's domain block checks are skipped.
@@ -36,9 +37,12 @@ func (statusTracker) SetStatus(v *models.Video, status consts.DownloadStatus, pc
 func (statusTracker) SendUpdate(*models.Video) {}
 
 // blockCheckStore is a download store with a database handle, so Execute's domain block checks run.
-type blockCheckStore struct{ nilDBStore }
+type blockCheckStore struct {
+	nilDBStore
+	db *sql.DB
+}
 
-func (blockCheckStore) GetDB() *sql.DB { return &sql.DB{} }
+func (s blockCheckStore) GetDB() *sql.DB { return s.db }
 
 // lockedBuffer is a goroutine-safe bytes.Buffer.
 type lockedBuffer struct {
@@ -183,8 +187,8 @@ func TestExecuteBlockedDomainSkipsYTDLP(t *testing.T) {
 
 	vars.BlockedDomainsMutex.Lock()
 	origBlocked := vars.BlockedDomains
-	vars.BlockedDomains = map[string]map[vars.BlockContext]time.Time{
-		"blocked.example": {vars.BlockContextUnauth: time.Now()},
+	vars.BlockedDomains = map[string]map[vars.BlockContext]vars.BlockedDomain{
+		"blocked.example": {vars.BlockContextUnauth: {BlockedAt: time.Now()}},
 	}
 	vars.BlockedDomainsMutex.Unlock()
 	t.Cleanup(func() {
@@ -193,18 +197,47 @@ func TestExecuteBlockedDomainSkipsYTDLP(t *testing.T) {
 		vars.BlockedDomainsMutex.Unlock()
 	})
 
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { db.Close() })
+
+	if _, err := db.Exec(`
+		CREATE TABLE blocked_domains (
+			domain TEXT NOT NULL,
+			context TEXT NOT NULL CHECK (context IN ('unauth', 'cookie', 'auth')),
+			blocked_at TIMESTAMP NOT NULL,
+			PRIMARY KEY (domain, context)
+		);
+		CREATE TABLE blocked_domain_videos (
+			domain TEXT NOT NULL,
+			context TEXT NOT NULL CHECK (context IN ('unauth', 'cookie', 'auth')),
+			video_id INTEGER NOT NULL,
+			channel_id INTEGER NOT NULL,
+			PRIMARY KEY (domain, context, video_id),
+			FOREIGN KEY (domain, context)
+				REFERENCES blocked_domains (domain, context)
+				ON DELETE CASCADE
+		);
+	`); err != nil {
+		t.Fatal(err)
+	}
+
 	runs := fakeYTDLP(t, "exit 1")
 	opts := &Options{MaxAttempts: 3}
 	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{}}
 	c := &models.Channel{ChanSettings: &models.Settings{}, ChanMetarrArgs: &models.MetarrArgs{}}
 	tracker := statusTracker{}
+	store := blockCheckStore{db: db}
 	url := "https://www.blocked.example/v"
 
-	vd, err := NewVideoDownload(t.Context(), &models.Video{URL: url, VideoDir: t.TempDir()}, cu, c, blockCheckStore{}, tracker, opts)
+	vd, err := NewVideoDownload(t.Context(), &models.Video{URL: url, VideoDir: t.TempDir()}, cu, c, store, tracker, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jd, err := NewJSONDownload(t.Context(), &models.Video{URL: url, JSONDir: t.TempDir()}, cu, c, blockCheckStore{}, tracker, opts)
+	jd, err := NewJSONDownload(t.Context(), &models.Video{URL: url, JSONDir: t.TempDir()}, cu, c, store, tracker, opts)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -64,7 +64,7 @@ func (q *DownloadQueue) process(d *download) error {
 	}
 
 	// Fail fast once an earlier video's bot detection has blocked the domain.
-	if err := downloads.CheckIfAvoidURL(v.URL, cu, cs.GetDB()); err != nil {
+	if err := downloads.CheckIfAvoidURL(v, cu, cs.GetDB()); err != nil {
 		return err
 	}
 	if err := DomainBlocked(cu); err != nil {

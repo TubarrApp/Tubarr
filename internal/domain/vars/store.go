@@ -24,6 +24,18 @@ var (
 	MetarrLogURL    string // Passed to Metarr, where it sends its logs. Empty outside web mode.
 )
 
+// DomainBlock contains information about a domain block.
+type BlockedDomain struct {
+	BlockedAt     time.Time
+	BlockedVideos []BlockedVideo
+}
+
+// BlockedVideo contains information about a video that failed from a block.
+type BlockedVideo struct {
+	ID        int64 `json:"id"`
+	ChannelID int64 `json:"channel_id"`
+}
+
 // BlockContext represents the authentication context for domain blocking.
 type BlockContext string
 
@@ -36,6 +48,6 @@ const (
 
 // Global bot blocking.
 var (
-	BlockedDomains      map[string]map[BlockContext]time.Time
+	BlockedDomains      map[string]map[BlockContext]BlockedDomain
 	BlockedDomainsMutex sync.RWMutex
 )

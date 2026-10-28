@@ -2,15 +2,16 @@ package consts
 
 // Database table names.
 const (
-	DBProgram        = "program"
-	DBChannels       = "channels"
-	DBChannelURLs    = "channel_urls"
-	DBProfiles       = "profiles"
-	DBVideos         = "videos"
-	DBDownloads      = "downloads"
-	DBNotifications  = "notifications"
-	DBBlockedDomains = "blocked_domains"
-	DBSettings       = "settings"
+	DBProgram             = "program"
+	DBChannels            = "channels"
+	DBChannelURLs         = "channel_urls"
+	DBProfiles            = "profiles"
+	DBVideos              = "videos"
+	DBDownloads           = "downloads"
+	DBNotifications       = "notifications"
+	DBBlockedDomains      = "blocked_domains"
+	DBBlockedDomainVideos = "blocked_domain_videos"
+	DBSettings            = "settings"
 )
 
 // Settings database entry keys.
@@ -241,6 +242,22 @@ var ValidBlockedDomainKeys = map[string]struct{}{
 	QBlockedDomain:  {},
 	QBlockedContext: {},
 	QBlockedAt:      {},
+}
+
+// Blocked domain videos database entry keys.
+const (
+	QBlockedVideoDomain    = "domain"
+	QBlockedVideoContext   = "context"
+	QBlockedVideoID        = "video_id"
+	QBlockedVideoChannelID = "channel_id"
+)
+
+// ValidBlockedVideoDomainKeys holds valid keys for the blocked domains database.
+var ValidBlockedVideoDomainKeys = map[string]struct{}{
+	QBlockedVideoDomain:    {},
+	QBlockedVideoContext:   {},
+	QBlockedVideoID:        {},
+	QBlockedVideoChannelID: {},
 }
 
 // Misc

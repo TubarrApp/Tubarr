@@ -1529,7 +1529,7 @@ func (ss *serverStore) handlePostMetarrLogs(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleGetBlockedDomains returns all currently blocked domains with their contexts and timestamps.
+// handleGetBlockedDomains returns all currently blocked domains with their contexts, timestamps, and blocked videos.
 func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, r *http.Request) {
 	// Clean expired blocks first.
 	if err := blocking.CleanExpiredBlocks(ss.db); err != nil {
@@ -1540,21 +1540,21 @@ func (ss *serverStore) handleGetBlockedDomains(w http.ResponseWriter, r *http.Re
 
 	// Build response structure.
 	type BlockedDomainResponse struct {
-		Domain        string                          `json:"domain"`
-		Contexts      map[vars.BlockContext]time.Time `json:"contexts"`
-		TimeRemaining map[vars.BlockContext]string    `json:"time_remaining"`
+		Domain        string                                   `json:"domain"`
+		Contexts      map[vars.BlockContext]vars.BlockedDomain `json:"contexts"`
+		TimeRemaining map[vars.BlockContext]string             `json:"time_remaining"`
 	}
 
 	response := make([]BlockedDomainResponse, 0, len(allBlocked))
 	for domain, contexts := range allBlocked {
-		activeContexts := make(map[vars.BlockContext]time.Time)
+		activeContexts := make(map[vars.BlockContext]vars.BlockedDomain)
 		timeRemaining := make(map[vars.BlockContext]string)
 
 		// Only include non-expired contexts.
-		for blockCtx, blockedAt := range contexts {
+		for blockCtx, block := range contexts {
 			isBlocked, _, remaining := blocking.IsBlocked(domain, blockCtx)
 			if isBlocked {
-				activeContexts[blockCtx] = blockedAt
+				activeContexts[blockCtx] = block
 				timeRemaining[blockCtx] = remaining.Round(time.Second).String()
 			}
 		}

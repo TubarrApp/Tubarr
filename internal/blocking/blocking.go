@@ -58,15 +58,19 @@ func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) erro
 	defer vars.BlockedDomainsMutex.Unlock()
 
 	if vars.BlockedDomains == nil {
-		vars.BlockedDomains = make(map[string]map[vars.BlockContext]time.Time)
+		vars.BlockedDomains = make(map[string]map[vars.BlockContext]vars.BlockedDomain)
 	}
 	if vars.BlockedDomains[normalizedDomain] == nil {
-		vars.BlockedDomains[normalizedDomain] = make(map[vars.BlockContext]time.Time)
+		vars.BlockedDomains[normalizedDomain] = make(map[vars.BlockContext]vars.BlockedDomain)
 	}
-	vars.BlockedDomains[normalizedDomain][blockContext] = now
+	block, exists := vars.BlockedDomains[normalizedDomain][blockContext]
+	if !exists {
+		block.BlockedAt = now
+	}
+	vars.BlockedDomains[normalizedDomain][blockContext] = block
 
 	// Persist to database.
-	query := fmt.Sprintf(`INSERT OR REPLACE INTO %s (%s, %s, %s) VALUES (?, ?, ?)`,
+	query := fmt.Sprintf(`INSERT OR IGNORE INTO %s (%s, %s, %s) VALUES (?, ?, ?)`,
 		consts.DBBlockedDomains,
 		consts.QBlockedDomain,
 		consts.QBlockedContext,
@@ -78,6 +82,50 @@ func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) erro
 	}
 
 	logger.Pl.W("Blocked domain %q for context %q due to bot detection", normalizedDomain, blockContext)
+	return nil
+}
+
+// AddBlockedVideo adds a video to the list of blocked videos for a given context.
+func AddBlockedVideo(db *sql.DB, hostname string, blockContext vars.BlockContext, videoID, channelID int64) error {
+	normalizedDomain := limits.RegisteredDomain(hostname)
+
+	vars.BlockedDomainsMutex.Lock()
+	defer vars.BlockedDomainsMutex.Unlock()
+
+	contexts := vars.BlockedDomains[normalizedDomain]
+	if contexts == nil {
+		return nil
+	}
+
+	block, exists := contexts[blockContext]
+	if !exists {
+		return nil
+	}
+
+	video := vars.BlockedVideo{
+		ID:        videoID,
+		ChannelID: channelID,
+	}
+
+	if slices.Contains(block.BlockedVideos, video) {
+		return nil
+	}
+
+	query := fmt.Sprintf(`INSERT OR IGNORE INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)`,
+		consts.DBBlockedDomainVideos,
+		consts.QBlockedVideoDomain,
+		consts.QBlockedVideoContext,
+		consts.QBlockedVideoID,
+		consts.QBlockedVideoChannelID,
+	)
+
+	if _, err := db.Exec(query, normalizedDomain, string(blockContext), videoID, channelID); err != nil {
+		return fmt.Errorf("failed to persist blocked video %d for domain %q: %w", videoID, normalizedDomain, err)
+	}
+
+	block.BlockedVideos = append(block.BlockedVideos, video)
+	contexts[blockContext] = block
+
 	return nil
 }
 
@@ -102,15 +150,15 @@ func IsBlocked(domain string, blockContext vars.BlockContext) (isBlocked bool, b
 	// Check if timeout has expired.
 	timeoutMinutes := GetTimeoutForDomain(normalizedDomain)
 	timeout := time.Duration(timeoutMinutes) * time.Minute
-	unlockTime := blockedTime.Add(timeout)
+	unlockTime := blockedTime.BlockedAt.Add(timeout)
 
 	if time.Now().After(unlockTime) {
 		// Timeout expired, not blocked anymore.
-		return false, blockedTime, 0
+		return false, blockedTime.BlockedAt, 0
 	}
 
 	remaining := time.Until(unlockTime)
-	return true, blockedTime, remaining
+	return true, blockedTime.BlockedAt, remaining
 }
 
 // UnblockDomain unblocks a domain for a specific context (or all contexts if context is empty).
@@ -159,8 +207,9 @@ func UnblockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) er
 	return nil
 }
 
-// LoadBlockedDomains loads all blocked domains from the database into memory on startup.
+// LoadBlockedDomains loads blocked domains and their associated videos from the database.
 func LoadBlockedDomains(db *sql.DB) error {
+	// Load blocked domains.
 	query := fmt.Sprintf(`SELECT %s, %s, %s FROM %s`,
 		consts.QBlockedDomain,
 		consts.QBlockedContext,
@@ -170,45 +219,93 @@ func LoadBlockedDomains(db *sql.DB) error {
 
 	rows, err := db.Query(query)
 	if err != nil {
-		return fmt.Errorf("failed to load blocked domains: %w", err)
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			logger.Pl.E("Could not close rows for blocked domains: %v", closeErr)
-		}
-	}()
-
-	vars.BlockedDomainsMutex.Lock()
-	defer vars.BlockedDomainsMutex.Unlock()
-
-	if vars.BlockedDomains == nil {
-		vars.BlockedDomains = make(map[string]map[vars.BlockContext]time.Time)
+		return fmt.Errorf("failed to query blocked domains: %w", err)
 	}
 
+	blockedDomains := make(map[string]map[vars.BlockContext]vars.BlockedDomain)
 	count := 0
+
 	for rows.Next() {
 		var domain, contextStr string
 		var blockedAt time.Time
 
 		if err := rows.Scan(&domain, &contextStr, &blockedAt); err != nil {
-			logger.Pl.W("Failed to scan blocked domain row: %v", err)
-			continue
+			rows.Close()
+			return fmt.Errorf("failed to scan blocked domain: %w", err)
 		}
 
 		blockContext := vars.BlockContext(contextStr)
-		if vars.BlockedDomains[domain] == nil {
-			vars.BlockedDomains[domain] = make(map[vars.BlockContext]time.Time)
+		if blockedDomains[domain] == nil {
+			blockedDomains[domain] = make(map[vars.BlockContext]vars.BlockedDomain)
 		}
-		vars.BlockedDomains[domain][blockContext] = blockedAt
+
+		blockedDomains[domain][blockContext] = vars.BlockedDomain{
+			BlockedAt:     blockedAt,
+			BlockedVideos: []vars.BlockedVideo{},
+		}
 		count++
 	}
 
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error iterating blocked domains: %w", err)
+		rows.Close()
+		return fmt.Errorf("failed to iterate blocked domains: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("failed to close blocked domain rows: %w", err)
 	}
 
+	// Load videos associated with blocked domains.
+	query = fmt.Sprintf(`SELECT %s, %s, %s, %s FROM %s`,
+		consts.QBlockedVideoDomain,
+		consts.QBlockedVideoContext,
+		consts.QBlockedVideoID,
+		consts.QBlockedVideoChannelID,
+		consts.DBBlockedDomainVideos,
+	)
+
+	rows, err = db.Query(query)
+	if err != nil {
+		return fmt.Errorf("failed to query blocked domain videos: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var domain, contextStr string
+		var videoID, channelID int64
+
+		if err := rows.Scan(&domain, &contextStr, &videoID, &channelID); err != nil {
+			return fmt.Errorf("failed to scan blocked domain video: %w", err)
+		}
+
+		blockContext := vars.BlockContext(contextStr)
+		contexts := blockedDomains[domain]
+		if contexts == nil {
+			continue
+		}
+
+		block, exists := contexts[blockContext]
+		if !exists {
+			continue
+		}
+
+		block.BlockedVideos = append(block.BlockedVideos, vars.BlockedVideo{
+			ID:        videoID,
+			ChannelID: channelID,
+		})
+		contexts[blockContext] = block
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate blocked domain videos: %w", err)
+	}
+
+	// Replace the in-memory data after both queries succeed.
+	vars.BlockedDomainsMutex.Lock()
+	vars.BlockedDomains = blockedDomains
+	vars.BlockedDomainsMutex.Unlock()
+
 	if count > 0 {
-		logger.Pl.I("Loaded %d blocked domain(s) from database", count)
+		logger.Pl.I("Loaded %d blocked domain contexts.", count)
 	}
 
 	return nil
@@ -228,10 +325,10 @@ func CleanExpiredBlocks(db *sql.DB) error {
 
 	// Find expired blocks.
 	for domain, contexts := range vars.BlockedDomains {
-		for blockContext, blockedTime := range contexts {
+		for blockContext, domainBlock := range contexts {
 			timeoutMinutes := GetTimeoutForDomain(domain)
 			timeout := time.Duration(timeoutMinutes) * time.Minute
-			unlockTime := blockedTime.Add(timeout)
+			unlockTime := domainBlock.BlockedAt.Add(timeout)
 
 			if time.Now().After(unlockTime) {
 				domainsToRemove = append(domainsToRemove, struct {
@@ -287,16 +384,19 @@ func GetTimeoutForDomain(domain string) float64 {
 	return 720.0 // Default: 12 hours.
 }
 
-// GetAllBlockedDomains returns all currently blocked domains with their contexts and block times.
-func GetAllBlockedDomains() map[string]map[vars.BlockContext]time.Time {
+// GetAllBlockedDomains returns all currently blocked domains with their contexts, block times, and videos.
+func GetAllBlockedDomains() map[string]map[vars.BlockContext]vars.BlockedDomain {
 	vars.BlockedDomainsMutex.RLock()
 	defer vars.BlockedDomainsMutex.RUnlock()
 
 	// Create a deep copy to avoid race conditions.
-	result := make(map[string]map[vars.BlockContext]time.Time)
+	result := make(map[string]map[vars.BlockContext]vars.BlockedDomain)
 	for domain, contexts := range vars.BlockedDomains {
-		result[domain] = make(map[vars.BlockContext]time.Time)
-		maps.Copy(result[domain], contexts)
+		result[domain] = make(map[vars.BlockContext]vars.BlockedDomain)
+		for blockContext, block := range contexts {
+			block.BlockedVideos = slices.Clone(block.BlockedVideos)
+			result[domain][blockContext] = block
+		}
 	}
 
 	return result

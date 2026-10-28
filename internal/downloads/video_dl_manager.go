@@ -52,7 +52,7 @@ func (d *VideoDownload) Execute() error {
 	)
 	for attempt := 1; attempt <= d.Options.MaxAttempts; attempt++ {
 		// Check if URL should be avoided (set by previous videos or persistent blocks).
-		if err := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); err != nil {
+		if err := CheckIfAvoidURL(d.Video, d.ChannelURL, d.DLStore.GetDB()); err != nil {
 			return err
 		}
 
@@ -74,12 +74,12 @@ func (d *VideoDownload) Execute() error {
 		}
 
 		// Check bot detection FIRST - abort immediately if detected.
-		if botErr := checkBotDetection(d.Video.URL, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
+		if botErr := checkBotDetection(d.Video, d.ChannelURL, d.DLStore.GetDB(), err); botErr != nil {
 			return botErr
 		}
 
 		// Check if URL should be avoided (in case bot was just detected).
-		if avoidErr := CheckIfAvoidURL(d.Video.URL, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
+		if avoidErr := CheckIfAvoidURL(d.Video, d.ChannelURL, d.DLStore.GetDB()); avoidErr != nil {
 			return avoidErr
 		}
 

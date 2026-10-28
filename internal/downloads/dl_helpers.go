@@ -115,7 +115,14 @@ func (d *JSONDownload) cancelJSONDownload() error {
 }
 
 // checkBotDetection checks for detection of bot activity, blocking the video's domain if found.
-func checkBotDetection(uri string, cu *models.ChannelURL, db *sql.DB, inputErr error) error {
+func checkBotDetection(v *models.Video, cu *models.ChannelURL, db *sql.DB, inputErr error) error {
+	if inputErr == nil {
+		return nil
+	}
+	if v == nil || cu == nil {
+		return fmt.Errorf("video or channel URL model is nil when checking bot detection")
+	}
+
 	lowerErr := strings.ToLower(inputErr.Error())
 	if !strings.Contains(lowerErr, "confirm you’re not a bot") && // Curly apostrophe (used by some tube sites)
 		!strings.Contains(lowerErr, "confirm you're not a bot") && // Straight apostrophe
@@ -124,30 +131,41 @@ func checkBotDetection(uri string, cu *models.ChannelURL, db *sql.DB, inputErr e
 	}
 
 	// Avoid using the 'ChannelURL' URL, which can be the manual download value.
-	if host := hostname(uri); host != "" && db != nil {
-		if err := blocking.BlockDomain(db, host, blocking.GetBlockContext(cu)); err != nil {
+	host := hostname(v.URL)
+	switch {
+	case host == "":
+		logger.Pl.E("Failed to parse URL %q after bot detection", v.URL)
+	case db == nil:
+		logger.Pl.E("Cannot record bot detection for %q: database is nil", host)
+	default:
+		blockContext := blocking.GetBlockContext(cu)
+		if err := blocking.BlockDomain(db, host, blockContext); err != nil {
 			logger.Pl.E("Failed to block %q after bot detection: %v", host, err)
+		} else if err := blocking.AddBlockedVideo(db, host, blockContext, v.ID, v.ChannelID); err != nil {
+			logger.Pl.W("Failed to record blocked video %d: %v", v.ID, err)
 		}
-	} else {
-		logger.Pl.E("Failed to parse URL %q after bot detection", uri)
 	}
-	return fmt.Errorf("url %q %s. Aborting without retries. Error message: %w", uri, consts.BotActivitySentinel, inputErr)
+
+	return fmt.Errorf("url %q %s. Aborting without retries. Error message: %w", v.URL, consts.BotActivitySentinel, inputErr)
 }
 
 // CheckIfAvoidURL checks if the hostname of the URL is blocked for the channel URL's context.
-func CheckIfAvoidURL(uri string, cu *models.ChannelURL, db *sql.DB) error {
-	if cu == nil || db == nil {
+func CheckIfAvoidURL(v *models.Video, cu *models.ChannelURL, db *sql.DB) error {
+	if v == nil || cu == nil || db == nil {
 		return nil
 	}
 
-	siteHost := hostname(uri)
+	siteHost := hostname(v.URL)
 	if siteHost == "" {
-		logger.Pl.E("Could not parse URL %q, will check against full URL instead", uri)
-		siteHost = uri
+		logger.Pl.E("Could not parse URL %q, will check against full URL instead", v.URL)
+		siteHost = v.URL
 	}
 
 	blockCtx := blocking.GetBlockContext(cu)
 	if isBlocked, _, remaining := blocking.IsBlocked(siteHost, blockCtx); isBlocked {
+		if err := blocking.AddBlockedVideo(db, siteHost, blockCtx, v.ID, v.ChannelID); err != nil {
+			logger.Pl.W("Failed to record blocked video %d: %v", v.ID, err)
+		}
 		return fmt.Errorf("%s is blocked for %s requests until %s", siteHost, blockCtx, time.Now().Add(remaining).Format("2006-01-02 15:04 MST"))
 	}
 	return nil
