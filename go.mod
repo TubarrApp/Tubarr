@@ -4,8 +4,7 @@ go 1.27.3
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/TubarrApp/gocommon v0.0.0-20261027114821-fc735f97fbf9
-	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
+	github.com/TubarrApp/gocommon v0.0.0-20261028093514-c9ac5d671180
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
 	github.com/browserutils/kooky v0.2.2
@@ -29,6 +28,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.5 // indirect
 	github.com/antchfx/xmlquery v1.5.0 // indirect
 	github.com/antchfx/xpath v1.3.8 // indirect
+	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/bdandy/go-errors v1.2.2 // indirect
 	github.com/bdandy/go-socks4 v1.2.3 // indirect
 	github.com/bogdanfinn/quic-go-utls v1.0.10-utls // indirect

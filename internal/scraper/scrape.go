@@ -33,6 +33,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/shareddates"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtags"
 
@@ -612,7 +613,7 @@ func parseScrapedDate(raw string) (string, time.Time) {
 	}
 
 	// Word date, e.g. "December 7, 2020".
-	parsedDate, err := parsing.ParseWordDate(raw)
+	parsedDate, err := shareddates.ParseWordDate(raw)
 	if err != nil {
 		return raw, time.Time{}
 	}

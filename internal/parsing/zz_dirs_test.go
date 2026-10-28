@@ -81,6 +81,8 @@ func TestFillOutputDirectory(t *testing.T) {
 		hasTag    bool
 	}{
 		{"{{output_directory}}/Destiny", "/media/{{channel_name}}/Destiny", true},
+		{"{{output_directory}}/Destiny/", "/media/{{channel_name}}/Destiny/", true},
+		{"{{output_directory}}Destiny", "/media/{{channel_name}}Destiny", true},
 		{"{{ Output_Directory }}/{{year}}", "/media/{{channel_name}}/{{year}}", true},
 		{"/other/{{channel_name}}/Destiny", "/other/{{channel_name}}/Destiny", false},
 		{"/plain/dir", "/plain/dir", false},

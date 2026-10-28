@@ -131,31 +131,33 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 // FillOutputDirectory replaces each {{output_directory}} tag in a move op's dir with outputDir, reporting whether it had one.
 func FillOutputDirectory(dir, outputDir string) (filled string, hasTag bool) {
 	var b strings.Builder
-	remaining := dir
 
 	for {
-		start := strings.Index(remaining, openTemplate)
-		if start == -1 {
+		before, remaining, found := strings.Cut(dir, openTemplate)
+		b.WriteString(before)
+		if !found {
 			break
 		}
-		end := strings.Index(remaining[start:], closeTemplate)
-		if end == -1 {
-			break
-		}
-		end += start
 
-		// Swap the output directory tag, keeping any other tag for ParseDirectory.
-		b.WriteString(remaining[:start])
-		if name, _ := sharedtemplates.ParseTag(remaining[start+len(openTemplate) : end]); name == sharedtemplates.OutputDirectory {
+		tag, after, found := strings.Cut(remaining, closeTemplate)
+		if !found {
+			b.WriteString(openTemplate)
+			b.WriteString(remaining)
+			break
+		}
+
+		if name, _ := sharedtemplates.ParseTag(tag); name == sharedtemplates.OutputDirectory {
 			b.WriteString(outputDir)
 			hasTag = true
 		} else {
-			b.WriteString(remaining[start : end+len(closeTemplate)])
+			b.WriteString(openTemplate)
+			b.WriteString(tag)
+			b.WriteString(closeTemplate)
 		}
-		remaining = remaining[end+len(closeTemplate):]
+
+		dir = after
 	}
 
-	b.WriteString(remaining)
 	return b.String(), hasTag
 }
 

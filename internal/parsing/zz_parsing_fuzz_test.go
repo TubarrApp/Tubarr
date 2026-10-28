@@ -118,17 +118,6 @@ func FuzzParseFilteredFilenameOps(f *testing.F) {
 	})
 }
 
-// FuzzDates tests that the date helpers never panic on any input.
-func FuzzDates(f *testing.F) {
-	for _, s := range []string{"2026-10-11", "20261011", "October 11 2026", "11/10/2026", "", "2026", "-", "    "} {
-		f.Add(s)
-	}
-	f.Fuzz(func(_ *testing.T, s string) {
-		_ = HyphenateYyyyMmDd(s)
-		_, _ = ParseWordDate(s)
-	})
-}
-
 // channelConfigSeeds are channel config files in each supported format.
 var channelConfigSeeds = []struct{ ext, content string }{
 	{".yaml", "channel_name: \"Cool\"\nchannel_urls:\n  - \"https://www.tubesite.com/@Cool\"\nvideo_directory: \"x\"\nurl-settings:\n  \"https://www.tubesite.com/@Cool\":\n    settings:\n      crawl_freq: 60\n    metarr:\n      metarr_output_directory: \"y\"\n"},
