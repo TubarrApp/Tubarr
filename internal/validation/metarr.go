@@ -29,7 +29,7 @@ func ValidateRenameFlag(flag string) error {
 // ValidateDateFormat reports whether dateFmt is a date format directive Metarr accepts.
 func ValidateDateFormat(dateFmt string) bool {
 	if _, err := sharedenums.ParseDateFormat(dateFmt); err != nil {
-		logger.Pl.E("%v", err)
+		logger.Pl.E(err.Error())
 		return false
 	}
 	return true

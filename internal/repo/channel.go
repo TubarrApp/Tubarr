@@ -1135,7 +1135,7 @@ func validateLoadedURLSettings(c *models.Channel) error {
 // setLoadErr marks a loaded channel with invalid saved settings, so it's kept but can't run until they're fixed.
 func setLoadErr(c *models.Channel, err error) {
 	c.LoadErr = fmt.Errorf("channel %q has invalid saved settings, fix them on its edit page: %w", c.Name, err)
-	logger.Pl.D(1, "%v", c.LoadErr)
+	logger.Pl.D(1, c.LoadErr.Error())
 }
 
 // GetAllChannels retrieves all channels in the database.
@@ -1852,7 +1852,7 @@ func (cs *ChannelStore) addNotifyURL(id int64, chanURL, notifyURL string) error 
 // channelExists returns true if the channel exists in the database.
 func (cs *ChannelStore) channelExists(key, val string) bool {
 	if err := validKey(key, consts.ValidChannelKeys); err != nil {
-		logger.Pl.E("%v", err)
+		logger.Pl.E(err.Error())
 		return false
 	}
 
