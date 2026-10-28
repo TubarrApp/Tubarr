@@ -16,7 +16,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/tidwall/gjson v1.20.0
 	golang.org/x/crypto v0.58.0
-	golang.org/x/net v0.60.0
+	golang.org/x/net v0.62.0
 )
 
 require (
