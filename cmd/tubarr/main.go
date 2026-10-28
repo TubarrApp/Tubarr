@@ -65,6 +65,7 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Pl = pl
+	logging.TestLogger(pl)
 
 	// Initialize application (DB, stores, etc).
 	noLock := skipsInstanceLock(os.Args[1:])
