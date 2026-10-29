@@ -326,26 +326,12 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 				return nil, err
 			}
 
-			// Remove disallowed options and value.
-			blockedValue := false
-			deletedKey := ""
-			extraArgs = slices.DeleteFunc(extraArgs, func(arg string) bool {
-				if blockedValue {
-					logger.Pl.W("Deleted disallowed option %q and value %q from command for channel %q", deletedKey, arg, channelName)
-					blockedValue = false
-					deletedKey = ""
-					return true
-				}
-
-				if _, blocked := sharedconsts.BlockedYtdlpOptions[arg]; blocked {
-					blockedValue = true
-					deletedKey = arg
-					return true
-				}
-
-				return false
-			})
-			args = append(args, extraArgs...)
+			// Refuse extra yt-dlp arguments containing disallowed options.
+			if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
+				logger.Pl.W("Refusing extra YT-DLP arguments for channel URL %q: Option %q is not allowed for YT-DLP.", cu.URL, blockedKey)
+			} else {
+				args = append(args, extraArgs...)
+			}
 		}
 
 		// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).

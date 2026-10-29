@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -125,26 +124,12 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 			return nil, err
 		}
 
-		// Remove disallowed options and value.
-		blockedValue := false
-		deletedKey := ""
-		extraArgs = slices.DeleteFunc(extraArgs, func(arg string) bool {
-			if blockedValue {
-				logger.Pl.W("Deleted disallowed option %q and value %q from command for channel %q", deletedKey, arg, d.Channel.Name)
-				blockedValue = false
-				deletedKey = ""
-				return true
-			}
-
-			if _, blocked := sharedconsts.BlockedYtdlpOptions[arg]; blocked {
-				blockedValue = true
-				deletedKey = arg
-				return true
-			}
-
-			return false
-		})
-		args = append(args, extraArgs...)
+		// Refuse extra yt-dlp arguments containing disallowed options.
+		if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
+			logger.Pl.W("Refusing extra YT-DLP arguments for video URL %q: Option %q is not allowed for YT-DLP.", d.Video.URL, blockedKey)
+		} else {
+			args = append(args, extraArgs...)
+		}
 	}
 
 	// Add preferred codecs.
