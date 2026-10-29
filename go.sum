@@ -16,6 +16,12 @@ github.com/TubarrApp/gocommon v0.0.0-20261029134655-d735a6ae37d5 h1:N0ehguqZXQiK
 github.com/TubarrApp/gocommon v0.0.0-20261029134655-d735a6ae37d5/go.mod h1:ju2o5keS8p+1MAnCkheWcJr2C+tIBG+6P2oQyaD+ojw=
 github.com/TubarrApp/gocommon v0.0.0-20261029134859-f99f74d433a9 h1:KSw9B+28FQB8xuIRYvw4h5K3QmzDyjOogTZLrW0lEF4=
 github.com/TubarrApp/gocommon v0.0.0-20261029134859-f99f74d433a9/go.mod h1:RZUYO6xW+QTIXduyxgVp4+1iPVf/qDlZsd3o+mbHfmY=
+github.com/TubarrApp/gocommon v0.0.0-20261029140011-05a7475d1b0b h1:OV+UlrBFj5lkqWNEWdS/vG2+6JQZSXoo50bPVuUv628=
+github.com/TubarrApp/gocommon v0.0.0-20261029140011-05a7475d1b0b/go.mod h1:RZUYO6xW+QTIXduyxgVp4+1iPVf/qDlZsd3o+mbHfmY=
+github.com/TubarrApp/gocommon v0.0.0-20261029141102-ba38a9e04a29 h1:Y/FJx1bPwFZpfA05VBAcO2Ls15TieFjmUG6mxoufjrQ=
+github.com/TubarrApp/gocommon v0.0.0-20261029141102-ba38a9e04a29/go.mod h1:RZUYO6xW+QTIXduyxgVp4+1iPVf/qDlZsd3o+mbHfmY=
+github.com/TubarrApp/gocommon v0.0.0-20261029141937-82f9ae986e82 h1:fwMFyW2oC40QAijNB3Rb767GdcCyqfUHnKwYB/3eZW8=
+github.com/TubarrApp/gocommon v0.0.0-20261029141937-82f9ae986e82/go.mod h1:RZUYO6xW+QTIXduyxgVp4+1iPVf/qDlZsd3o+mbHfmY=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a h1:AeXPUzhU0yhID/v5JJEIkjaE85ASe+Vh4Kuv1RSLL+4=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a/go.mod h1:ukJBuruT9b24pdgZwWDvOaCYHeS03B7oQPCUWh25bwM=
 github.com/Velocidex/ordereddict v0.0.0-20220107075049-3dbe58412844/go.mod h1:Y5Tfx5SKGOzkulpqfonrdILSPIuNg+GqKE/DhVJgnpg=

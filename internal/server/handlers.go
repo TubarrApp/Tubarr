@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -36,6 +37,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedfiles"
 	"github.com/go-chi/chi/v5"
 	"github.com/spf13/viper"
@@ -1214,9 +1216,9 @@ func (ss *serverStore) handleUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	upload, _, err := r.FormFile("thumbnail")
+	upload, header, err := r.FormFile("thumbnail")
 	if err != nil {
-		http.Error(w, fmt.Sprintf("no thumbnail image received (the limit is 10 MB): %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("no thumbnail image received (the limit is %d MB): %v", sharedconsts.ImageUploadMaxBytes/(1<<20), err), http.StatusBadRequest)
 		return
 	}
 	defer func() {
@@ -1232,6 +1234,15 @@ func (ss *serverStore) handleUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	data, err := io.ReadAll(upload)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to read thumbnail image: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Sanitize image file.
+	headerExt := filepath.Ext(header.Filename)
+	headerExt = strings.ToLower(headerExt)
+	headerExt = strings.TrimPrefix(headerExt, ".")
+	if data, err = sharedfiles.SanitizeUploadedImage(data, headerExt); err != nil {
+		http.Error(w, fmt.Sprintf("could not sanitize user uploaded image: %v", err), http.StatusBadRequest)
 		return
 	}
 
