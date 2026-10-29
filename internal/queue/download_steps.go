@@ -26,13 +26,13 @@ import (
 func (q *DownloadQueue) run(d *download) {
 	// Holding the video cancels any Metarr run on it, so the run and this download never use its files simultaneously.
 	hold, held, err := q.postProcessing.hold(d.startCtx, d.c, d.video.URL)
-	if err == nil && !held { // Hold failed, also an error state.
+	if err == nil && (hold == nil || !held) {
 		err = fmt.Errorf("video %q is already being downloaded elsewhere in channel %q", d.video.URL, d.c.Name)
 	}
 
 	// Check that neither of the above errors triggered.
 	if err != nil {
-		q.finish(d, err) // Drop from queue.
+		q.finish(d, err)
 		return
 	}
 
@@ -40,7 +40,9 @@ func (q *DownloadQueue) run(d *download) {
 	err = q.process(d)
 	q.finish(d, err)
 	if d.video.DownloadStatus.Status != consts.DLStatusCompleted {
-		hold.release()
+		if hold != nil {
+			hold.release()
+		}
 		return
 	}
 	q.postProcess(d, hold)
@@ -182,6 +184,10 @@ func (q *DownloadQueue) acquireLane(d *download) (release func(), err error) {
 	}
 
 	lane := q.lanes.lane(d.c, d.cu, chanLimit, urlLimit)
+	if lane == nil {
+		return nil, nil
+	}
+
 	if err := lane.Acquire(d.startCtx); err != nil {
 		return nil, err
 	}
@@ -190,7 +196,16 @@ func (q *DownloadQueue) acquireLane(d *download) (release func(), err error) {
 
 // postProcess hands a downloaded video to the post-processing queue, then stores it as finished.
 func (q *DownloadQueue) postProcess(d *download, hold *videoHold) {
+	if hold == nil {
+		logger.Pl.E("Video hold model nil")
+		return
+	}
 	defer hold.release()
+
+	if d == nil {
+		logger.Pl.E("Download model nil")
+		return
+	}
 	v := d.video
 	vs, cs := q.store.VideoStore(), q.store.ChannelStore()
 

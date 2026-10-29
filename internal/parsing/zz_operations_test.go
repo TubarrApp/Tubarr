@@ -83,7 +83,12 @@ func TestMetaOpsRoundTripThroughTubarr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("re-parse of %v: %v", formatted, err)
 	}
+
 	for i := range parsed {
+		if len(again) < i || len(formatted) < i {
+			t.Errorf("malformed test: length issue")
+			break
+		}
 		if parsed[i] != again[i] {
 			t.Errorf("operation %d changed across the handoff:\n first %+v\n again %+v\n via   %q", i, parsed[i], again[i], formatted[i])
 		}
@@ -121,6 +126,9 @@ func TestFilenameOpsRoundTripThroughTubarr(t *testing.T) {
 	}
 
 	again, err := parsing.ParseFilenameOps(formatted)
+	if again == nil {
+		t.Fatalf("retrieved nil filename ops")
+	}
 	if err != nil {
 		t.Fatalf("re-parse of %v: %v", formatted, err)
 	}

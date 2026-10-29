@@ -24,7 +24,7 @@ var (
 	MetarrLogURL    string // Passed to Metarr, where it sends its logs. Empty outside web mode.
 )
 
-// DomainBlock contains information about a domain block.
+// BlockedDomain contains information about a domain block.
 type BlockedDomain struct {
 	BlockedAt     time.Time
 	BlockedVideos []BlockedVideo

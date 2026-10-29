@@ -138,6 +138,9 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		// Filter and create video requests, in the order the channel lists them.
 		for _, newURL := range listedInOrder(newEpisodes) {
 			lv := newEpisodes[newURL]
+			if lv == nil {
+				continue
+			}
 			if !validation.IsHTTPURL(newURL) {
 				logger.Pl.W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
 				continue
@@ -187,7 +190,7 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 	}
 
 	// Visit the webpage.
-	var metadata map[string]any
+	metadata := make(map[string]any)
 	if err := s.visitPage(ctx, urlStr, cookies, query, func(c *colly.Collector) {
 		metadata = s.ScrapeWithRules(urlStr, c, v, query)
 	}); err != nil {

@@ -78,9 +78,15 @@ func (dp *DirectoryParser) ParseDirectory(dir string, fileType string) (parsedDi
 //
 // Returns error if the desired data isn't present, to prevent unexpected results for the user.
 func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
+	if dp == nil {
+		return dir, fmt.Errorf("directory parser sent in nil, not parsing template for %q", dir)
+	}
+
+	// Count opens and closes (number of likely template elements.)
 	opens := strings.Count(dir, openTemplate)
 	closes := strings.Count(dir, closeTemplate)
 
+	// Mismatch in 'opens' and 'closes', likely syntax mistake.
 	if opens != closes {
 		return "", fmt.Errorf("mismatched template delimiters: %d opens, %d closes", opens, closes)
 	}
@@ -90,11 +96,11 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 	remaining := dir
 
 	for range opens {
+		// Retrieve index of {{ and }}
 		startIdx := strings.Index(remaining, openTemplate)
 		if startIdx == -1 {
 			return "", errors.New("missing opening delimiter")
 		}
-
 		endIdx := strings.Index(remaining, closeTemplate)
 		if endIdx == -1 {
 			return "", errors.New("missing closing delimiter")

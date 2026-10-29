@@ -36,6 +36,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedfiles"
 	"github.com/go-chi/chi/v5"
 	"github.com/spf13/viper"
 )
@@ -57,8 +58,8 @@ func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ign
 // startNewChannelIgnoreCrawl starts an ignore crawl of a channel just added, reloaded so its per-URL settings apply.
 func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 	saved, found, err := ss.cs.GetChannelModel(consts.QChanID, strconv.FormatInt(c.ID, 10), true)
-	if err != nil || !found {
-		logger.Pl.E("Failed to load channel %q for its ignore crawl (found: %t): %v", c.Name, found, err)
+	if err != nil || !found || saved == nil {
+		logger.Pl.E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", c.Name, found, err)
 		return
 	}
 	ss.startIgnoreCrawl(saved)
@@ -783,7 +784,7 @@ func (ss *serverStore) channelFromRequest(w http.ResponseWriter, r *http.Request
 		return nil, false
 	}
 	if !found || c == nil {
-		http.Error(w, "channel not found", http.StatusNotFound)
+		http.Error(w, "channel nil or not found", http.StatusNotFound)
 		return nil, false
 	}
 	return c, true
@@ -1153,7 +1154,7 @@ func (ss *serverStore) handleGetThumbnail(w http.ResponseWriter, r *http.Request
 
 // serveThumbnailFile serves an image file, and nothing else, as the path may be whatever was typed into Download As.
 func serveThumbnailFile(w http.ResponseWriter, r *http.Request, path string) {
-	f, err := os.Open(path)
+	f, err := sharedfiles.OpenRegularInRoot(path)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -1234,6 +1235,7 @@ func (ss *serverStore) handleUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Save thumbnail.
 	path, err := file.SaveThumbnail(videoID, data)
 	if err != nil {
 		status := http.StatusInternalServerError
@@ -1347,6 +1349,11 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if awaiting == nil {
+			http.Error(w, "videos awaiting Metarr received nil", http.StatusInternalServerError)
+			return
+		}
+
 		i := slices.IndexFunc(awaiting, func(v *models.Video) bool { return v.ID == requestBody.VideoIDs[0] })
 		if i < 0 {
 			http.Error(w, "video isn't waiting for Metarr in this channel", http.StatusConflict)
@@ -1955,14 +1962,33 @@ func (ss *serverStore) handleReloadScrapeConfigFile(w http.ResponseWriter, r *ht
 func (ss *serverStore) handleGetScrapeConfigContent(w http.ResponseWriter, r *http.Request) {
 	path := viper.GetString(keys.ScrapeConfigFile)
 	resp := map[string]any{"path": path, "content": "", "version": ""}
-	if path != "" {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to read scrape config file: %v", err), http.StatusInternalServerError)
-			return
-		}
-		resp["content"], resp["version"] = string(content), contentVersion(content)
+
+	// Empty path.
+	if path == "" {
+		writeJSON(w, r, http.StatusOK, resp)
+		return
 	}
+
+	// Open file.
+	f, err := sharedfiles.OpenRegularInRoot(path)
+	if err != nil {
+		writeJSON(w, r, http.StatusBadRequest, err)
+		return
+	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			logger.Pl.E("Failed to close file at %q: %v", path, closeErr)
+		}
+	}()
+
+	// Retrieve bytes from file.
+	content, err := io.ReadAll(f)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to read scrape config file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	resp["content"], resp["version"] = string(content), contentVersion(content)
+
 	writeJSON(w, r, http.StatusOK, resp)
 }
 

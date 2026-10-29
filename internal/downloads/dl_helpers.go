@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/url"
 	"os"
@@ -16,11 +17,23 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+
+	"github.com/TubarrApp/gocommon/sharedfiles"
 )
 
 // verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
 func verifyJSONDownload(jsonPath string) error {
-	jsonData, err := os.ReadFile(jsonPath)
+	j, err := sharedfiles.OpenRegularInRoot(jsonPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := j.Close(); closeErr != nil {
+			logger.Pl.E("Failed to close JSON file %q: %v", jsonPath, closeErr)
+		}
+	}()
+
+	jsonData, err := io.ReadAll(j)
 	if err != nil {
 		return fmt.Errorf("failed to read JSON file: %w", err)
 	}
@@ -42,7 +55,7 @@ func verifyVideoDownload(videoPath string) error {
 		return fmt.Errorf("video file is empty: %s", videoPath)
 	}
 	if videoInfo.IsDir() {
-		return errors.New("dev error: video path created is a directory")
+		return errors.New("video path created is a directory")
 	}
 
 	return nil

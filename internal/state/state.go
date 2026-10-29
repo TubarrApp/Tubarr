@@ -46,7 +46,7 @@ func StopCrawl(channelID int64) bool {
 	}
 	l, ok := v.(*crawlLock)
 	if !ok {
-		logger.Pl.E("Dev Error: Wrong type %T stored in crawlLocks for channel ID %d", v, channelID)
+		logger.Pl.DevE("Wrong type %T stored in crawlLocks for channel ID %d", v, channelID)
 		return false
 	}
 	l.stopped.Store(true)

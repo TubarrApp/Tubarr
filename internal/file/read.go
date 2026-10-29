@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 
+	"github.com/TubarrApp/gocommon/sharedfiles"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/viper"
@@ -80,32 +81,36 @@ func TrimOpLine(s string) string {
 
 // readLines loads non-blank, non-comment lines from a file, tidied by clean.
 func readLines(path string, clean func(string) string) ([]string, error) {
-	file, err := os.Open(path)
+	// Open file at path.
+	f, err := sharedfiles.OpenRegularInRoot(path)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
+		if err := f.Close(); err != nil {
 			logger.Pl.E("failed to close file %v due to error: %v", path, err)
 		}
 	}()
 
-	f := []string{}
-	scanner := bufio.NewScanner(file)
+	// Initialize slice and scanner.
+	fLines := []string{}
+	scanner := bufio.NewScanner(f)
 
+	// Scan lines, ignore comment lines (defined by a line beginning with '#').
 	for scanner.Scan() {
 		line := clean(scanner.Text())
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
 			continue // skip blank lines and comments.
 		}
-		f = append(f, line)
+		fLines = append(fLines, line)
 	}
 
+	// Check scanner errors.
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 
-	return f, nil
+	return fLines, nil
 }
 
 // ScanDirectoryForConfigFiles scans a directory for Viper-compatible config files.
@@ -148,7 +153,8 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 
 // LoadMetarrLogs loads in Metarr logs to a [][]byte.
 func LoadMetarrLogs() [][]byte {
-	f, err := os.Open(paths.MetarrLogFilePath)
+	// Open file at path.
+	f, err := sharedfiles.OpenRegularInRoot(paths.MetarrLogFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -157,13 +163,13 @@ func LoadMetarrLogs() [][]byte {
 		return nil
 	}
 	defer func() {
-		if closeErr := f.Close(); closeErr != nil {
-			logger.Pl.E("Could not close file %q: %v", f, err)
+		if err := f.Close(); err != nil {
+			logger.Pl.E("failed to close file %v due to error: %v", paths.MetarrLogFilePath, err)
 		}
 	}()
 
+	// Initialize slice and scanner.
 	var lines [][]byte
-
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 

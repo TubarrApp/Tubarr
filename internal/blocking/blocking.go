@@ -217,7 +217,7 @@ func LoadBlockedDomains(db *sql.DB) error {
 		consts.DBBlockedDomains,
 	)
 
-	rows, err := db.Query(query)
+	blockedDomainRows, err := db.Query(query)
 	if err != nil {
 		return fmt.Errorf("failed to query blocked domains: %w", err)
 	}
@@ -225,12 +225,11 @@ func LoadBlockedDomains(db *sql.DB) error {
 	blockedDomains := make(map[string]map[vars.BlockContext]vars.BlockedDomain)
 	count := 0
 
-	for rows.Next() {
+	for blockedDomainRows.Next() {
 		var domain, contextStr string
 		var blockedAt time.Time
 
-		if err := rows.Scan(&domain, &contextStr, &blockedAt); err != nil {
-			rows.Close()
+		if err := blockedDomainRows.Scan(&domain, &contextStr, &blockedAt); err != nil {
 			return fmt.Errorf("failed to scan blocked domain: %w", err)
 		}
 
@@ -245,12 +244,10 @@ func LoadBlockedDomains(db *sql.DB) error {
 		}
 		count++
 	}
-
-	if err := rows.Err(); err != nil {
-		rows.Close()
+	if err := blockedDomainRows.Err(); err != nil {
 		return fmt.Errorf("failed to iterate blocked domains: %w", err)
 	}
-	if err := rows.Close(); err != nil {
+	if err := blockedDomainRows.Close(); err != nil {
 		return fmt.Errorf("failed to close blocked domain rows: %w", err)
 	}
 
@@ -263,17 +260,16 @@ func LoadBlockedDomains(db *sql.DB) error {
 		consts.DBBlockedDomainVideos,
 	)
 
-	rows, err = db.Query(query)
+	blockedVideoRows, err := db.Query(query)
 	if err != nil {
 		return fmt.Errorf("failed to query blocked domain videos: %w", err)
 	}
-	defer rows.Close()
 
-	for rows.Next() {
+	for blockedVideoRows.Next() {
 		var domain, contextStr string
 		var videoID, channelID int64
 
-		if err := rows.Scan(&domain, &contextStr, &videoID, &channelID); err != nil {
+		if err := blockedVideoRows.Scan(&domain, &contextStr, &videoID, &channelID); err != nil {
 			return fmt.Errorf("failed to scan blocked domain video: %w", err)
 		}
 
@@ -294,9 +290,11 @@ func LoadBlockedDomains(db *sql.DB) error {
 		})
 		contexts[blockContext] = block
 	}
-
-	if err := rows.Err(); err != nil {
+	if err := blockedVideoRows.Err(); err != nil {
 		return fmt.Errorf("failed to iterate blocked domain videos: %w", err)
+	}
+	if err := blockedVideoRows.Close(); err != nil {
+		return fmt.Errorf("failed to close blocked video rows: %w", err)
 	}
 
 	// Replace the in-memory data after both queries succeed.

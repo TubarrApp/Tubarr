@@ -154,8 +154,18 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 			errs = append(errs, err)
 			continue
 		}
-
 		queued = append(queued, v)
+
+		// Nil guard.
+		if d == nil {
+			err := fmt.Errorf("video %q: newDownload returned nil without an error", v.URL)
+			logger.Pl.E("Not downloading video %q: %v", v.URL, err)
+			q.storeStatus(v, consts.DLStatusFailed, 0, err)
+			errs = append(errs, err)
+			continue
+		}
+
+		// Begin download.
 		go q.run(d)
 	}
 	return queued, errors.Join(errs...)

@@ -106,6 +106,7 @@ func RandomSecsDuration(s int) time.Duration {
 	if s <= 0 {
 		return 0
 	}
+	//nolint:gosec // Cryptographic randomness is unnecessary for timing delays.
 	return time.Duration(rand.IntN(s+1)) * time.Second
 }
 
@@ -114,6 +115,7 @@ func RandomMinsDuration(s int) time.Duration {
 	if s <= 0 {
 		return 0
 	}
+	//nolint:gosec // Cryptographic randomness is unnecessary for timing delays.
 	return time.Duration(rand.IntN(s+1)) * time.Minute
 }
 

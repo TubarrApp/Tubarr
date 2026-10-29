@@ -2,12 +2,6 @@ version: "2"
 run:
   tests: true
 
-external:
-  - name: nilaway
-    command: nilaway
-    args:
-      - ./... # DOES NOT RUN, RUN MANUALLY IN TERMINAL: nilaway ./...
-
 linters:
   enable:
     # Core bug detection (universally recommended)
@@ -16,6 +10,7 @@ linters:
     - errcheck     # Ensures errors are checked
     - unused       # Finds unused code
     - ineffassign  # Detects ineffectual assignments
+    - nilaway
     
     # Modern Go best practices
     - errorlint    # Error wrapping issues
@@ -32,17 +27,26 @@ linters:
     - wastedassign # Wasted assignments
     
     # Security
-    #- gosec        # Security issues
+    - gosec        # Security issues
     
     # Performance hints
     - prealloc     # Slice preallocation
     - bodyclose    # HTTP response body closes
+  settings:
+    custom:
+      nilaway:
+        type: module
+        description: Detect potential nil panics
+        settings:
+          include-pkgs: 'tubarr'
+          exclude-test-files: 'true'
   exclusions:
     generated: lax
     paths:
       - third_party$
       - builtin$
       - examples$
+      - '.*_test\.go$'
 issues:
   max-issues-per-linter: 50
   max-same-issues: 3

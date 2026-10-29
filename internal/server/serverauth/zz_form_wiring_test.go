@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"tubarr/internal/domain/consts"
 )
 
 // readPage returns a page from the repository's web folder.
@@ -133,7 +134,7 @@ func TestAuthPagesWired(t *testing.T) {
 	refusesUnknownKey(http.MethodPost, "/api/v1/auth/login", login)
 
 	settings := call("settings.html", http.MethodGet, "/api/v1/settings/auth", "", http.StatusOK,
-		"login_from_env", "auth_mode_from_env", "username", "api_key", "access.auth_mode", "access.skip_login", "access.allowed_hosts", "access.trusted_proxies")
+		"login_from_env", "auth_mode_from_env", "username", consts.AuthAPIKey, "access.auth_mode", "access.skip_login", "access.allowed_hosts", "access.trusted_proxies")
 	if settings["username"] != "admin" {
 		t.Errorf("username reads back as %v, want admin", settings["username"])
 	}
@@ -153,7 +154,7 @@ func TestAuthPagesWired(t *testing.T) {
 	call("login.html", http.MethodPost, "/api/v1/auth/login", `{"username":"admin2","password":"battery staple"}`, http.StatusOK)
 	refusesUnknownKey(http.MethodPut, "/api/v1/settings/auth/password", `{"current_password":"battery staple","username":"admin2","new_password":"battery staple"}`)
 
-	if got := call("settings.html", http.MethodPost, "/api/v1/settings/auth/api-key", "", http.StatusOK, "api_key"); got["api_key"] == settings["api_key"] {
+	if got := call("settings.html", http.MethodPost, "/api/v1/settings/auth/api-key", "", http.StatusOK, consts.AuthAPIKey); got[consts.AuthAPIKey] == settings[consts.AuthAPIKey] {
 		t.Error("regenerating the API key returned the old one")
 	}
 	call(header, http.MethodPost, "/api/v1/auth/logout", "", http.StatusNoContent)

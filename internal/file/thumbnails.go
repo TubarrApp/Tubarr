@@ -105,6 +105,9 @@ func CacheThumbnail(ctx context.Context, thumbURL string) (string, error) {
 			logger.Pl.E("Failed to close thumbnail response for %q: %v", thumbURL, err)
 		}
 	}()
+	if resp == nil {
+		return "", fmt.Errorf("no response for thumbnail request")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("thumbnail request returned %s", resp.Status)
 	}

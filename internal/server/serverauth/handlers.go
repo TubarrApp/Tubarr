@@ -158,12 +158,12 @@ func (m *Manager) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	m.mu.RUnlock()
 
 	writeJSON(w, map[string]any{
-		"username":           username,
-		"api_key":            apiKey,
-		"login_required":     s.AuthMode != ModeNone,
-		"login_from_env":     os.Getenv(consts.EnvWebPassword) != "", // Set again at each start.
-		"auth_mode_from_env": m.envMode != "",
-		"access":             s,
+		consts.AuthUsername:      username,
+		consts.AuthAPIKey:        apiKey,
+		consts.AuthLoginRequired: s.AuthMode != ModeNone,
+		consts.AuthLoginFromEnv:  os.Getenv(consts.EnvWebPassword) != "", // Set again at each start.
+		consts.AuthModeFromEnv:   m.envMode != "",
+		consts.AuthAccess:        s,
 	})
 }
 
@@ -260,10 +260,10 @@ func (m *Manager) handleSetPassword(w http.ResponseWriter, r *http.Request) {
 func (m *Manager) handleRegenerateAPIKey(w http.ResponseWriter, _ *http.Request) {
 	key, err := m.regenerateAPIKey()
 	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("failed to regenerate API key: %v", err), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]string{"api_key": key})
+	writeJSON(w, map[string]string{consts.AuthAPIKey: key})
 }
 
 // decodeJSON decodes a JSON request body into v, refusing unknown keys.

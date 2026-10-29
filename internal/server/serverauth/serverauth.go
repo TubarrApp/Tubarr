@@ -57,8 +57,8 @@ var errNoLogin = errors.New("no login has been set up")
 
 // Manager controls access to the web interface.
 type Manager struct {
-	db       *sql.DB
 	settings contracts.TubarrSettingsStore
+	db       *sql.DB
 	envMode  string // Login mode set by --web-auth or TUBARR_WEB_AUTH, which overrides the saved one.
 	logToken string
 
@@ -82,7 +82,7 @@ func New(db *sql.DB, settings contracts.TubarrSettingsStore, envMode string) (*M
 	if envMode != "" && !validMode(envMode) {
 		return nil, fmt.Errorf("invalid --%s (%s) %q: must be %q, %q or %q", keys.WebAuth, consts.EnvWebAuth, envMode, ModeRequired, ModeLocal, ModeNone)
 	}
-	token, err := randomToken()
+	token, err := RandomToken()
 	if err != nil {
 		return nil, err
 	}
@@ -491,15 +491,17 @@ func (m *Manager) apiKey() (string, error) {
 	return m.regenerateAPIKey()
 }
 
-// regenerateAPIKey replaces the API key with a new random one.
+// regenerateAPIKey generates and saves a new web API key.
 func (m *Manager) regenerateAPIKey() (string, error) {
-	key, err := randomToken()
+	key, err := RandomToken()
 	if err != nil {
 		return "", err
 	}
+
 	if err := m.settings.SetSetting(keys.WebAPIKey, key); err != nil {
 		return "", err
 	}
+
 	return key, nil
 }
 
@@ -516,7 +518,7 @@ func (m *Manager) validAPIKey(key string) bool {
 
 // createSession starts a session and sets its cookie.
 func (m *Manager) createSession(w http.ResponseWriter, r *http.Request) error {
-	token, err := randomToken()
+	token, err := RandomToken()
 	if err != nil {
 		return err
 	}
@@ -567,7 +569,13 @@ func (m *Manager) endSession(w http.ResponseWriter, r *http.Request) {
 			logger.Pl.W("Failed to delete web session: %v", err)
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookie,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode})
 }
 
 // setSessionCookie sets the session cookie, marked Secure when the request came over HTTPS.
@@ -591,8 +599,8 @@ func (m *Manager) setSessionCookie(w http.ResponseWriter, r *http.Request, token
 	})
 }
 
-// randomToken returns 32 random bytes, base64url encoded.
-func randomToken() (string, error) {
+// RandomToken returns 32 random bytes, base64url encoded.
+func RandomToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("failed to generate random token: %w", err)

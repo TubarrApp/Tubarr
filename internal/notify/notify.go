@@ -21,6 +21,7 @@ import (
 func newNotifyHTTPClients(noLANtimeout, lanTimeout time.Duration) (nolan *http.Client, lan *http.Client) {
 	nolan = &http.Client{Timeout: noLANtimeout}
 
+	// nolint:gosec // This is for LAN clients.
 	lan = &http.Client{
 		Timeout: lanTimeout,
 		Transport: &http.Transport{

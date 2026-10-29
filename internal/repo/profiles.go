@@ -93,8 +93,8 @@ func (cs *ChannelStore) updateProfile(p *models.Profile) error {
 	if err != nil {
 		return err
 	}
-	if !found {
-		return fmt.Errorf("%w: no profile with ID %d", contracts.ErrInvalidProfile, p.ID)
+	if !found || old == nil {
+		return fmt.Errorf("%w: no (or nil) profile with ID %d", contracts.ErrInvalidProfile, p.ID)
 	}
 	if err := cs.checkProfileName(p); err != nil {
 		return err
@@ -237,8 +237,8 @@ func (cs *ChannelStore) GetProfileID(name string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if !found {
-		return 0, fmt.Errorf("%w: no profile named %q", contracts.ErrInvalidChannel, name)
+	if !found || p == nil {
+		return 0, fmt.Errorf("%w: no (or nil) profile named %q", contracts.ErrInvalidChannel, name)
 	}
 	return p.ID, nil
 }
@@ -342,8 +342,13 @@ func (cs *ChannelStore) checkProfileName(p *models.Profile) error {
 	if err != nil {
 		return err
 	}
-	if found && other.ID != p.ID {
-		return fmt.Errorf("%w: a profile named %q already exists", contracts.ErrInvalidProfile, p.Name)
+	if found {
+		if other == nil {
+			return fmt.Errorf("database profile found but retrieved nil for %q", p.Name)
+		}
+		if other.ID != p.ID {
+			return fmt.Errorf("%w: a profile named %q already exists", contracts.ErrInvalidProfile, p.Name)
+		}
 	}
 	return nil
 }

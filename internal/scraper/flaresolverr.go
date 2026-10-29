@@ -136,7 +136,10 @@ func flareSolverrGet(ctx context.Context, baseURL, pageURL string, timeout time.
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("FlareSolverr request to %q failed: %w", endpoint, err)
+		return nil, fmt.Errorf("flaresolverr request to %q failed: %w", endpoint, err)
+	}
+	if resp == nil {
+		return nil, fmt.Errorf("flaresolverr response body nil from endpoint %q", endpoint)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {

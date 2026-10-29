@@ -404,10 +404,15 @@ func inheritChannelSettings(cu *models.ChannelURL, c *models.Channel) {
 
 // GetChannelURLModel fetches a single ChannelURL model by channel ID and URL.
 func (cs *ChannelStore) GetChannelURLModel(channelID int64, urlStr string, mergeWithParent bool) (chanURL *models.ChannelURL, hasRows bool, err error) {
-	c, found, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(channelID, 10), mergeWithParent)
+	cID := strconv.FormatInt(channelID, 10)
+	c, found, err := cs.GetChannelModel(consts.QChanID, cID, mergeWithParent)
 	if err != nil || !found {
 		return nil, found, err
 	}
+	if c == nil {
+		return nil, false, fmt.Errorf("channel with ID %s retrieved nil", cID)
+	}
+
 	for _, cu := range c.URLModels {
 		if cu.URL == urlStr {
 			return cu, true, nil

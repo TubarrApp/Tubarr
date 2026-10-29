@@ -85,7 +85,7 @@ func TestMustAndAnyFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: map[string]any{"title": tt.title}}
-		if got := checkFilters(v, "Download filters", tt.filters); got != tt.want {
+		if got := checkFilters(v, tt.filters); got != tt.want {
 			t.Errorf("checkFilters(%q, %v) = %v, want %v", tt.title, tt.filters, got, tt.want)
 		}
 	}
@@ -110,7 +110,7 @@ func TestCheckFiltersFieldValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: meta}
-		if got := checkFilters(v, "Download filters", []models.Filters{tt.filter}); got != tt.want {
+		if got := checkFilters(v, []models.Filters{tt.filter}); got != tt.want {
 			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
 		}
 	}
@@ -137,7 +137,7 @@ func TestPresenceAnyFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: tt.meta}
-		if got := checkFilters(v, "Download filters", tt.filters); got != tt.want {
+		if got := checkFilters(v, tt.filters); got != tt.want {
 			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
 		}
 	}

@@ -20,7 +20,7 @@ import (
 var errFilterFile = errors.New("filter file can't be used")
 
 // checkFilters determines whether a video matches the given filters.
-func checkFilters(v *models.Video, filterType string, filters []models.Filters) bool {
+func checkFilters(v *models.Video, filters []models.Filters) bool {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
@@ -28,18 +28,18 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 	for _, filter := range filters {
 		matched, skipped, metaText, err := sharedfilters.Match(v.MetadataMap, filter)
 		if err != nil {
-			logger.Pl.E("%s error: Video %q: %v", filterType, v.URL, err)
+			logger.Pl.E("Download filter error: Video %q: %v", v.URL, err)
 			return false
 		}
 
 		// Numerical filters with an absent or empty field are skipped rather than failed,
 		// since there is nothing meaningful to compare against.
 		if skipped {
-			logger.Pl.D(1, "%s skip: Video %q has no value for field %q, skipping numerical filter", filterType, v.URL, filter.Field)
+			logger.Pl.D(1, "Download filter skip: Video %q has no value for field %q, skipping numerical filter", v.URL, filter.Field)
 			continue
 		}
 		if !matched {
-			logger.Pl.D(1, "%s mismatch: Video %q has %v for field(s) %q, which fails filter %q", filterType, v.URL, metaText, filter.Field, sharedparsing.FormatFilter(filter, true))
+			logger.Pl.D(1, "Download filter mismatch: Video %q has %v for field(s) %q, which fails filter %q", v.URL, metaText, filter.Field, sharedparsing.FormatFilter(filter, true))
 		}
 
 		// Add to must/any.
@@ -59,11 +59,11 @@ func checkFilters(v *models.Video, filterType string, filters []models.Filters) 
 
 	// Post-loop evaluation of must/any filters.
 	if mustPassed != mustTotal {
-		logger.Pl.D(2, "%s mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", filterType, v.URL, mustPassed, mustTotal)
+		logger.Pl.D(2, "Download filter mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", v.URL, mustPassed, mustTotal)
 		return false
 	}
 	if anyTotal > 0 && anyPassed == 0 { // At least one 'any' filter must pass, whatever the 'must' filters did.
-		logger.Pl.D(2, "%s mismatch: Video %q did not pass any 'any' filters (passed %d out of %d)", filterType, v.URL, anyPassed, anyTotal)
+		logger.Pl.D(2, "Download filter mismatch: Video %q did not pass any 'any' filters (passed %d out of %d)", v.URL, anyPassed, anyTotal)
 		return false
 	}
 

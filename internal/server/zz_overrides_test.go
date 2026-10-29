@@ -77,7 +77,7 @@ func TestCheckOverridesFit(t *testing.T) {
 		{"unknown URL", 3, models.MetarrArgs{OutputExt: "webm"}, true},
 	}
 	for _, tt := range tests {
-		err := checkOverridesFit(nil, c, tt.urlID, &models.VideoOverrides{MetarrArgs: tt.o})
+		err := checkOverridesFit(&repo.ChannelStore{}, c, tt.urlID, &models.VideoOverrides{MetarrArgs: tt.o})
 		if (err == nil) != tt.fits {
 			t.Errorf("%s: got error %v, want fits %t", tt.name, err, tt.fits)
 		}

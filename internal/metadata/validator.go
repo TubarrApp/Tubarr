@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 
+	"github.com/TubarrApp/gocommon/sharedfiles"
 	"github.com/TubarrApp/gocommon/sharedfilters"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtags"
@@ -67,7 +67,7 @@ func RefreshFromMetarr(v *models.Video) error {
 
 // readJSONFile decodes a JSON metadata file.
 func readJSONFile(path string) (map[string]any, error) {
-	f, err := os.Open(path)
+	f, err := sharedfiles.OpenRegularInRoot(path)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	}
 	allFilters := slices.Concat(cu.ChanURLSettings.Filters, fileFilters)
 
-	if !checkFilters(v, "Download filters", allFilters) {
+	if !checkFilters(v, allFilters) {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 

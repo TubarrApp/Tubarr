@@ -93,7 +93,7 @@ func (cs *ChannelStore) checkTouchedChannels() error {
 		if err != nil {
 			return fmt.Errorf("failed to read settings of channel %d: %w", id, err)
 		}
-		if !found {
+		if !found || c == nil {
 			continue
 		}
 		if c.ChanSettings.VideoDir == "" {
@@ -404,7 +404,7 @@ func (cs *ChannelStore) videoFilePaths(channelID int64, urls []string) ([]string
 // UpdateChannelFromConfig updates the channel settings from a config file if it exists.
 func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	if c == nil {
-		return errors.New("dev error: channel sent in nil")
+		return errors.New("channel sent in nil")
 	}
 
 	cfgFile := c.ChannelConfigFile
@@ -428,8 +428,8 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	if err != nil {
 		return err
 	}
-	if !found {
-		return fmt.Errorf("channel %q is no longer in the database", c.Name)
+	if !found || saved == nil {
+		return fmt.Errorf("channel %q is nil or no longer in the database", c.Name)
 	}
 
 	// Make []byte copy of settings before.
@@ -500,8 +500,8 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to reload channel %q after applying its config file: %w", c.Name, err)
 	}
-	if !found {
-		return fmt.Errorf("channel %q is no longer in the database", c.Name)
+	if !found || merged == nil {
+		return fmt.Errorf("channel %q is nil or no longer in the database", c.Name)
 	}
 	c.ChanSettings = merged.ChanSettings
 	c.ChanMetarrArgs = merged.ChanMetarrArgs

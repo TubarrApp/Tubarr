@@ -78,6 +78,10 @@ func CheckDestination(dir string) error {
 // IsHTTPURL reports whether s is an absolute http or https URL with a host.
 func IsHTTPURL(s string) bool {
 	u, err := url.Parse(s)
+	if u == nil {
+		logger.Pl.E("Failed to parse URL from %q", s)
+		return false
+	}
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 

@@ -1482,8 +1482,8 @@ func getChanKeyVal(id int, name string) (key, val string, err error) {
 func runIgnoreCrawl(ctx context.Context, s contracts.Store, added *models.Channel) {
 	// Reloaded, with its settings filled in as jobs use them.
 	c, found, err := s.ChannelStore().GetChannelModel(consts.QChanID, strconv.FormatInt(added.ID, 10), true)
-	if err != nil || !found {
-		logger.Pl.E("Failed to load channel %q for its ignore crawl (found: %t): %v", added.Name, found, err)
+	if err != nil || !found || c == nil {
+		logger.Pl.E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", added.Name, found, err)
 		return
 	}
 
