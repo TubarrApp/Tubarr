@@ -7,66 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
-	"tubarr/internal/database"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/models"
 )
-
-// TestURLLastScanMigration tests that after upgrading, channel URLs start at their channel's last crawl, only once, and
-// that crawling a URL restarts its crawl frequency.
-func TestURLLastScanMigration(t *testing.T) {
-	cs := newTestChannelStore(t)
-	c := testChannel(t, "Migrated", "https://example.com/@migrated")
-	id, err := cs.AddChannel(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := cs.db.Exec(query, args...); err != nil {
-			t.Fatal(err)
-		}
-	}
-	reopen := func() {
-		t.Helper()
-		db, err := database.InitDB()
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = db.Close()
-	}
-	urlScan := func() (urlID int64, ts time.Time) {
-		t.Helper()
-		if err := cs.db.QueryRow(`SELECT id, last_scan FROM channel_urls WHERE channel_id = ?`, id).Scan(&urlID, &ts); err != nil {
-			t.Fatal(err)
-		}
-		return urlID, ts
-	}
-
-	// A database from before the migration.
-	old := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
-	exec(`UPDATE channels SET last_scan = ? WHERE id = ?`, old, id)
-	exec(`DELETE FROM settings WHERE key = 'migrated-url-last-scan'`)
-	reopen()
-	if _, got := urlScan(); !got.Equal(old) {
-		t.Errorf("after upgrading, the URL's last scan is %s, want the channel's %s", got, old)
-	}
-
-	exec(`UPDATE channels SET last_scan = ? WHERE id = ?`, time.Now(), id)
-	reopen()
-	urlID, got := urlScan()
-	if !got.Equal(old) {
-		t.Errorf("the migration ran again, setting the URL's last scan to %s", got)
-	}
-
-	if err := cs.UpdateChannelURLsLastScan([]int64{urlID}); err != nil {
-		t.Fatal(err)
-	}
-	if _, got := urlScan(); time.Since(got) > time.Minute {
-		t.Errorf("after a crawl, the URL's last scan is %s, want now", got)
-	}
-}
 
 // TestInvalidChannelLoadsWithError tests that a channel whose saved settings fail validation loads with its LoadErr,
 // without stopping other channels loading.

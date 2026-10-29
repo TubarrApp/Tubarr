@@ -59,6 +59,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 	}
 
 	// Update finished and ignored status
+	//nolint:gosec // SQL identifiers are trusted constants.
 	updateQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ?",
 		consts.DBVideos,
@@ -70,6 +71,7 @@ func (vs *VideoStore) AddVideos(videos []*models.Video, channelID int64) (videoM
 	)
 
 	// Insert or update download status using SQLite UPSERT (INSERT ... ON CONFLICT)
+	//nolint:gosec // SQL identifiers are trusted constants.
 	statusQuery := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s) "+
 			"VALUES (?, ?, ?, ?, ?) "+
@@ -151,6 +153,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	// Insert into downloads table
 	logger.Pl.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	dlSQL := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)",
 		consts.DBDownloads,
@@ -178,6 +181,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 // UpdateVideoPaths stores a video's file paths only while its row still holds oldVideo and oldJSON, so paths from a
 // newer download are never overwritten. It reports whether the row was updated.
 func (vs *VideoStore) UpdateVideoPaths(videoID int64, oldVideo, oldJSON, newVideo, newJSON string) (bool, error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ? AND %s = ?",
 		consts.DBVideos,
@@ -218,6 +222,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	defer rollback(tx)
 
 	// Update videos table. Metarr's error changes only with its status, which only changes when given.
+	//nolint:gosec // SQL identifiers are trusted constants.
 	videoQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = COALESCE(NULLIF(?, ''), %s), %s = COALESCE(NULLIF(?, ''), %s), "+
 			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = COALESCE(NULLIF(?, 0), %s), %s = COALESCE(NULLIF(?, 0), %s), %s = COALESCE(?, %s), %s = ?, "+
@@ -275,6 +280,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	}
 
 	// Update downloads table
+	//nolint:gosec // SQL identifiers are trusted constants.
 	dlQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
 		consts.DBDownloads,
@@ -298,6 +304,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 
 // GetVideoURLByID returns a video's URL by its ID in the database.
 func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ?",
 		consts.QVidURL,
@@ -315,6 +322,7 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 
 // GetVideoThumbnailURL returns a video's crawled thumbnail URL by its ID in the database.
 func (vs *VideoStore) GetVideoThumbnailURL(videoID int64) (thumbURL string, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT COALESCE(%s, '') FROM %s WHERE %s = ?",
 		consts.QVidThumbnailURL,
@@ -330,6 +338,7 @@ func (vs *VideoStore) GetVideoThumbnailURL(videoID int64) (thumbURL string, err 
 
 // GetVideoChannelURLID returns the ID of the channel URL a video belongs to.
 func (vs *VideoStore) GetVideoChannelURLID(videoID int64) (int64, error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ?",
 		consts.QVidChanURLID,
@@ -347,6 +356,7 @@ func (vs *VideoStore) GetVideoChannelURLID(videoID int64) (int64, error) {
 // GetVideosAwaitingMetarr returns finished videos in a channel which Metarr has not yet successfully processed, and with
 // includeDone those it has too (for re-runs).
 func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s "+
 			"WHERE %s = ? AND %s = 1 AND %s = 0 AND (? OR %s != ?)",
@@ -431,6 +441,7 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64, includeDone bool)
 
 // GetLatestFinishedVideos returns a channel's n most recently updated finished videos, without their metadata.
 func (vs *VideoStore) GetLatestFinishedVideos(ctx context.Context, channelID int64, n int) ([]*models.Video, error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ? AND %s = 1 ORDER BY %s DESC LIMIT ?",
 		videoListColumns,
@@ -454,6 +465,7 @@ func (vs *VideoStore) GetLatestFinishedVideos(ctx context.Context, channelID int
 
 // CountFinishedVideos returns how many finished videos a channel has.
 func (vs *VideoStore) CountFinishedVideos(ctx context.Context, channelID int64) (n int, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT COUNT(*) FROM %s WHERE %s = ? AND %s = 1",
 		consts.DBVideos,
@@ -468,6 +480,7 @@ func (vs *VideoStore) CountFinishedVideos(ctx context.Context, channelID int64) 
 
 // CountFailedMetarrVideos returns how many downloaded videos Metarr failed on, by channel ID.
 func (vs *VideoStore) CountFailedMetarrVideos(ctx context.Context) (counts map[int64]int, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, COUNT(*) FROM %s WHERE %s = 1 AND %s = 0 AND %s = ? GROUP BY %s",
 		consts.QVidChanID,
@@ -510,6 +523,7 @@ func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64
 	}
 	defer rollback(tx)
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	vidQuery := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
 			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(%s, %s) DO NOTHING",
@@ -526,6 +540,7 @@ func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64
 		consts.QVidUpdatedAt,
 		consts.QVidChanID, consts.QVidURL,
 	)
+	//nolint:gosec // SQL identifiers are trusted constants.
 	dlQuery := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s) VALUES (?, ?)",
 		consts.DBDownloads,
@@ -571,6 +586,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 	if len(statuses) == 0 {
 		return nil, nil
 	}
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, d.%s, d.%s, c.%s "+
 			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
@@ -675,6 +691,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	}
 	defer rollback(tx)
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	claimQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = 0, %s = ? WHERE %s = ? AND %s IN (%s) AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = 0 AND %s = ?)",
 		consts.DBDownloads,
@@ -685,6 +702,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		consts.QDLStatus, placeholders(len(from)),
 		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID, consts.QVidFinished, consts.QVidIgnored,
 	)
+	//nolint:gosec // SQL identifiers are trusted constants.
 	selectQuery := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QVidURL,
@@ -694,6 +712,7 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		consts.DBVideos,
 		consts.QVidID,
 	)
+	//nolint:gosec // SQL identifiers are trusted constants.
 	ignoreQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
 		consts.DBVideos,
@@ -767,6 +786,7 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 			if v.ID, err = insertVideo(tx, v, channelID, v.ChannelURLID, now); err != nil {
 				return false, err
 			}
+			//nolint:gosec // SQL identifiers are trusted constants.
 			insertQuery := fmt.Sprintf(
 				"INSERT INTO %s (%s, %s) VALUES (?, ?)",
 				consts.DBDownloads,
@@ -783,6 +803,7 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 		v.ID = id
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	claimQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = 0, %s = '', %s = CASE WHEN ? THEN 0 ELSE %s END, %s = ? "+
 			"WHERE %s = ? AND %s IN (%s) AND %s IN (SELECT %s FROM %s WHERE %s = ?)",
@@ -808,6 +829,7 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 		return false, nil // Already queued or downloading, not a crawl retry, or in another channel.
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	selectQuery := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QVidURL,
@@ -857,8 +879,16 @@ func (vs *VideoStore) ReconnectOrphanedVideos() (reconnected int64, err error) {
 	defer rollback(tx)
 
 	targets := map[channelURLKey]*target{} // nil where two of a channel's URLs match the same address.
-	rows, err := tx.Query(fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s = 0",
-		consts.QChanURLID, consts.QChanURLChannelID, consts.QChanURLURL, consts.DBChannelURLs, consts.QChanURLIsManual))
+
+	//nolint:gosec // SQL identifiers are trusted constants.
+	rows, err := tx.Query(
+		//nolint:gosec // SQL identifiers are trusted constants.
+		fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s = 0",
+			consts.QChanURLID,
+			consts.QChanURLChannelID,
+			consts.QChanURLURL,
+			consts.DBChannelURLs,
+			consts.QChanURLIsManual))
 	if err != nil {
 		return 0, fmt.Errorf("failed to read channel URLs: %w", err)
 	}
@@ -885,8 +915,15 @@ func (vs *VideoStore) ReconnectOrphanedVideos() (reconnected int64, err error) {
 		addr          string
 	}
 	var orphans []orphan
-	rows, err = tx.Query(fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s IS NULL AND COALESCE(%s, '') != ''",
-		consts.QVidID, consts.QVidChanID, consts.QVidChanURL, consts.DBVideos, consts.QVidChanURLID, consts.QVidChanURL))
+	rows, err = tx.Query(
+		//nolint:gosec // SQL identifiers are trusted constants.
+		fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s IS NULL AND COALESCE(%s, '') != ''",
+			consts.QVidID,
+			consts.QVidChanID,
+			consts.QVidChanURL,
+			consts.DBVideos,
+			consts.QVidChanURLID,
+			consts.QVidChanURL))
 	if err != nil {
 		return 0, fmt.Errorf("failed to read videos without a channel URL: %w", err)
 	}
@@ -950,6 +987,7 @@ func (vs *VideoStore) VideoExists(v *models.Video, channelID int64) (int64, bool
 
 // GetVideoOverrides returns a video's Download As overrides, nil if it has none.
 func (vs *VideoStore) GetVideoOverrides(videoID int64) (*models.VideoOverrides, error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ?",
 		consts.QVidOverrides,
@@ -966,9 +1004,13 @@ func (vs *VideoStore) GetVideoOverrides(videoID int64) (*models.VideoOverrides, 
 
 // ThumbnailURLs returns every crawled thumbnail URL videos use.
 func (vs *VideoStore) ThumbnailURLs() ([]string, error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT DISTINCT %s FROM %s WHERE %s IS NOT NULL AND %s != ''",
-		consts.QVidThumbnailURL, consts.DBVideos, consts.QVidThumbnailURL, consts.QVidThumbnailURL,
+		consts.QVidThumbnailURL,
+		consts.DBVideos,
+		consts.QVidThumbnailURL,
+		consts.QVidThumbnailURL,
 	)
 	rows, err := vs.DB.Query(query)
 	if err != nil {
@@ -993,10 +1035,16 @@ func (vs *VideoStore) ThumbnailURLs() ([]string, error) {
 
 // ThumbnailOverrides returns the thumbnail choices of videos whose Download As overrides set or strip one, by video ID.
 func (vs *VideoStore) ThumbnailOverrides() (map[int64]models.VideoOverrides, error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, COALESCE(json_extract(%s, '$.thumbnail'), ''), COALESCE(json_extract(%s, '$.strip_thumbnail'), 0) FROM %s "+
 			"WHERE json_extract(%s, '$.thumbnail') IS NOT NULL OR json_extract(%s, '$.strip_thumbnail')",
-		consts.QVidID, consts.QVidOverrides, consts.QVidOverrides, consts.DBVideos, consts.QVidOverrides, consts.QVidOverrides,
+		consts.QVidID,
+		consts.QVidOverrides,
+		consts.QVidOverrides,
+		consts.DBVideos,
+		consts.QVidOverrides,
+		consts.QVidOverrides,
 	)
 	rows, err := vs.DB.Query(query)
 	if err != nil {
@@ -1037,6 +1085,7 @@ func (vs *VideoStore) SetVideoOverrides(videoIDs []int64, o *models.VideoOverrid
 	}
 	defer rollback(tx)
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = ?",
 		consts.DBVideos,
@@ -1059,13 +1108,21 @@ func (vs *VideoStore) SetVideoOverrides(videoIDs []int64, o *models.VideoOverrid
 
 // recoverInterruptedPending marks unfinished videos with a finished download and a stored file as finished, Metarr pending.
 func (vs *VideoStore) recoverInterruptedPending(tx *sql.Tx) (pending int64, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	pendingQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = 1, %s = ?, %s = ? WHERE %s = 0 AND %s = 0 AND COALESCE(%s, '') != '' "+
 			"AND %s IN (SELECT %s FROM %s WHERE %s = ?)",
 		consts.DBVideos,
-		consts.QVidFinished, consts.QVidMetarrStatus, consts.QVidUpdatedAt,
-		consts.QVidFinished, consts.QVidIgnored, consts.QVidVideoPath,
-		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
+		consts.QVidFinished,
+		consts.QVidMetarrStatus,
+		consts.QVidUpdatedAt,
+		consts.QVidFinished,
+		consts.QVidIgnored,
+		consts.QVidVideoPath,
+		consts.QVidID,
+		consts.QDLVidID,
+		consts.DBDownloads,
+		consts.QDLStatus,
 	)
 	result, err := tx.Exec(pendingQuery, consts.MetarrStatusPending, time.Now(), consts.DLStatusCompleted)
 	if err != nil {
@@ -1082,13 +1139,20 @@ func (vs *VideoStore) recoverInterruptedPending(tx *sql.Tx) (pending int64, err 
 //
 // Run after recoverInterruptedPending, so the finished downloads left are the ones with no stored file.
 func (vs *VideoStore) recoverInterruptedFailed(tx *sql.Tx) (failed int64, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	failedQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = CURRENT_TIMESTAMP WHERE %s IN (?, ?, ?) "+
 			"AND %s IN (SELECT %s FROM %s WHERE %s = 0 AND %s = 0)",
 		consts.DBDownloads,
-		consts.QDLStatus, consts.QDLError, consts.QDLUpdatedAt,
 		consts.QDLStatus,
-		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidFinished, consts.QVidIgnored,
+		consts.QDLError,
+		consts.QDLUpdatedAt,
+		consts.QDLStatus,
+		consts.QDLVidID,
+		consts.QVidID,
+		consts.DBVideos,
+		consts.QVidFinished,
+		consts.QVidIgnored,
 	)
 	result, err := tx.Exec(failedQuery, consts.DLStatusFailed, "Tubarr stopped before this video finished",
 		consts.DLStatusQueued, consts.DLStatusDownloading, consts.DLStatusCompleted)
@@ -1117,6 +1181,7 @@ func unmarshalVideoOverrides(raw sql.NullString) (*models.VideoOverrides, error)
 // videoExists returns the ID and true if the channel has a video with videoURL, looked up through q.
 func videoExists(q querier, videoURL string, channelID int64) (int64, bool) {
 	var id int64
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ? AND %s = ?",
 		consts.QVidID,
@@ -1144,6 +1209,7 @@ func insertVideo(q querier, v *models.Video, channelID, channelURLID int64, now 
 		return 0, err
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
 			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",

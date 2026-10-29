@@ -29,6 +29,7 @@ func (ds *DownloadStore) GetDB() *sql.DB {
 
 // SetDownloadStatus updates the download status of a single video.
 func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
 		consts.DBDownloads,
@@ -54,6 +55,7 @@ func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
 func (ds *DownloadStore) UpdateDownloadStatus(ctx context.Context, update models.StatusUpdate) error {
 	normalizeDownloadStatus(&update.Percent, &update.Status, update.VideoID)
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
 		consts.DBDownloads,

@@ -73,11 +73,11 @@ func TestThumbnailUpload(t *testing.T) {
 		var err error
 
 		switch format {
-		case "png":
+		case sharedconsts.ITypePNG:
 			err = png.Encode(&buf, img)
-		case "jpg":
+		case sharedconsts.ITypeJPG, sharedconsts.ITypeJPEG:
 			err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
-		case "gif":
+		case sharedconsts.ITypeGIF:
 			err = gif.Encode(&buf, img, nil)
 		default:
 			t.Fatalf("unsupported test image format %q", format)
@@ -119,13 +119,13 @@ func TestThumbnailUpload(t *testing.T) {
 	}
 
 	// Valid PNG, GIF and JPEG uploads must succeed.
-	pngData := encodeImage(t, "png", 2, 2)
+	pngData := encodeImage(t, sharedconsts.ITypePNG, 2, 2)
 	pngPath := savedPath(upload(videoID, "cover.png", pngData))
 	if pngPath != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.png", videoID)) {
 		t.Errorf("PNG saved to %q", pngPath)
 	}
 
-	gifData := encodeImage(t, "gif", 2, 2)
+	gifData := encodeImage(t, sharedconsts.ITypeGIF, 2, 2)
 	gifPath := savedPath(upload(videoID, "cover.gif", gifData))
 	if _, err := os.Stat(pngPath); !os.IsNotExist(err) {
 		t.Errorf("earlier PNG %q kept after a GIF replaced it", pngPath)
@@ -134,7 +134,7 @@ func TestThumbnailUpload(t *testing.T) {
 		t.Errorf("GIF saved to %q", gifPath)
 	}
 
-	jpgData := encodeImage(t, "jpg", 2, 2)
+	jpgData := encodeImage(t, sharedconsts.ITypeJPG, 2, 2)
 	jpg := savedPath(upload(videoID, "cover.jpg", jpgData))
 	if _, err := os.Stat(gifPath); !os.IsNotExist(err) {
 		t.Errorf("earlier GIF %q kept after a JPEG replaced it", gifPath)
@@ -164,7 +164,7 @@ func TestThumbnailUpload(t *testing.T) {
 
 	// Images exceeding the maximum file size must fail.
 	t.Run("maximum filesize", func(t *testing.T) {
-		data := encodeImage(t, "png", 2, 2)
+		data := encodeImage(t, sharedconsts.ITypePNG, 2, 2)
 		data = append(data, make([]byte, sharedconsts.ImageUploadMaxBytes-len(data)+1)...)
 
 		if w := upload(videoID, "cover.png", data); w.Code != http.StatusBadRequest {
@@ -218,7 +218,7 @@ func TestThumbnailUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	orphan := filepath.Join(paths.UploadedThumbnailDir, "424242.png")
-	if err := os.WriteFile(orphan, []byte("png"), 0o600); err != nil {
+	if err := os.WriteFile(orphan, []byte(sharedconsts.ITypePNG), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	overrides, err := s.VideoStore().ThumbnailOverrides()

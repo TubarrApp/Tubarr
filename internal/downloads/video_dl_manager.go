@@ -109,10 +109,14 @@ func (d *VideoDownload) Execute() error {
 }
 
 // videoDLAttempt performs a single download attempt.
-func (d *VideoDownload) videoDLAttempt() error {
+func (d *VideoDownload) videoDLAttempt() (err error) {
 	d.mu.Lock()
-	d.cmd = d.buildVideoCommand()
+	d.cmd, err = d.buildVideoCommand()
 	d.mu.Unlock()
+
+	if err != nil {
+		return err
+	}
 
 	// Start each attempt from 0%, the first progress line may be a finished stream or resumed part.
 	d.DLTracker.SetStatus(d.Video, consts.DLStatusDownloading, 0, "", nil)

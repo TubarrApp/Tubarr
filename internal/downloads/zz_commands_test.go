@@ -1,6 +1,7 @@
 package downloads
 
 import (
+	"os/exec"
 	"slices"
 	"testing"
 	"tubarr/internal/domain/command"
@@ -15,10 +16,10 @@ func TestCommandsLeaveRetriesToTubarr(t *testing.T) {
 	vd.ChannelURL.ChanURLSettings.Retries = 5
 	jd.ChannelURL.ChanURLSettings.Retries = 5
 
-	if args := vd.buildVideoCommand().Args; slices.Contains(args, "--retries") {
+	if args, _ := vd.buildVideoCommand(); slices.Contains(args.Args, "--retries") {
 		t.Errorf("video command passes --retries to yt-dlp: %q", args)
 	}
-	if args := jd.buildJSONCommand().Args; slices.Contains(args, "--retries") {
+	if args, _ := jd.buildJSONCommand(); slices.Contains(args.Args, "--retries") {
 		t.Errorf("JSON command passes --retries to yt-dlp: %q", args)
 	}
 }
@@ -31,7 +32,16 @@ func TestCommandsCombineCookies(t *testing.T) {
 		cu.ChanURLSettings.CookiesFromBrowser = "firefox"
 	}
 
-	for what, args := range map[string][]string{"video": vd.buildVideoCommand().Args, "JSON": jd.buildJSONCommand().Args} {
+	for what, build := range map[string]func() (*exec.Cmd, error){
+		"video": vd.buildVideoCommand,
+		"JSON":  jd.buildJSONCommand,
+	} {
+		cmd, err := build()
+		if err != nil {
+			t.Fatalf("building %s command: %v", what, err)
+		}
+
+		args := cmd.Args
 		if !slices.Contains(args, "--cookies") || !slices.Contains(args, "--cookies-from-browser") {
 			t.Errorf("%s command doesn't pass both the cookie file and the browser: %q", what, args)
 		}
@@ -44,13 +54,13 @@ func TestVideoCommandExtSame(t *testing.T) {
 
 	// An extension.
 	vd.ChannelURL.ChanURLSettings.YtdlpOutputExt = "mkv"
-	if args := vd.buildVideoCommand().Args; !slices.Contains(args, command.YtDLPOutputExtension) {
+	if args, _ := vd.buildVideoCommand(); !slices.Contains(args.Args, command.YtDLPOutputExtension) {
 		t.Errorf("mkv not passed to yt-dlp: %q", args)
 	}
 
 	// Same as input.
 	vd.ChannelURL.ChanURLSettings.YtdlpOutputExt = sharedconsts.ExtSame
-	if args := vd.buildVideoCommand().Args; slices.Contains(args, command.YtDLPOutputExtension) {
+	if args, _ := vd.buildVideoCommand(); slices.Contains(args.Args, command.YtDLPOutputExtension) {
 		t.Errorf("%q passed a merge output format to yt-dlp: %q", sharedconsts.ExtSame, args)
 	}
 }

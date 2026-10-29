@@ -117,6 +117,7 @@ func (cs *ChannelStore) GetNewVideoURLs(key, val string) ([]string, error) {
 		return []string{}, err
 	}
 
+	//nolint:gosec // Key validated above.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ?",
 		consts.QChanNewVideoURLs,
@@ -156,6 +157,7 @@ func (cs *ChannelStore) UpdateNewVideoURLs(key, val string, newVideoURLs []strin
 		return err
 	}
 
+	//nolint:gosec // Key validated above.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = ?",
 		consts.DBChannels,
@@ -230,6 +232,7 @@ func (cs *ChannelStore) GetChannelName(key, val string) (string, error) {
 	}
 
 	var name string
+	//nolint:gosec // Key validated above.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ?",
 		consts.QChanName,
@@ -255,6 +258,7 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 	}
 
 	var id int64
+	//nolint:gosec // Key validated above.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ?",
 		consts.QChanID,
@@ -275,8 +279,9 @@ func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 
 // GetAuth retrieves authentication details for a specific URL in a channel.
 func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password, loginURL string, err error) {
-	var u, p, l sql.NullString // Use sql.NullString to handle NULL values.
+	var u, p, l sql.NullString
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s FROM %s WHERE %s = ? AND %s = ?",
 		consts.QChanURLUsername,
@@ -319,6 +324,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string, delet
 	}
 
 	// Remove videos from database.
+	//nolint:gosec // SQL identifiers are trusted constants.
 	deleteQuery := fmt.Sprintf(
 		"DELETE FROM %s WHERE %s = ? AND %s IN (%s)",
 		consts.DBVideos,
@@ -366,6 +372,8 @@ func (cs *ChannelStore) videoFilePaths(channelID int64, urls []string) ([]string
 	for _, u := range urls {
 		args = append(args, u)
 	}
+
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, %s FROM %s WHERE %s = ? AND %s IN (%s)",
 		consts.QVidVideoPath,
@@ -519,6 +527,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)",
 		consts.DBVideos,
@@ -537,6 +546,7 @@ func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error 
 
 // GetNotifyURLs returns all notification URLs for a given channel.
 func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QNotifyChanID,
@@ -585,11 +595,11 @@ func (cs *ChannelStore) GetNotifyURLs(id int64) ([]*models.Notification, error) 
 
 // DeleteNotifyURLs deletes notify URLs from the channel, for every channel URL they're set for.
 func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls []string) error {
-
 	if !cs.channelExistsID(channelID) {
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"DELETE FROM %s WHERE %s = ? AND %s IN (%s)",
 		consts.DBNotifications,
@@ -640,6 +650,7 @@ func (cs *ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Cha
 		return nil
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ? AND %s = ?",
 		consts.DBChannelURLs,
@@ -850,6 +861,7 @@ func (cs *ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 // insertChannel inserts the channel and its URLs, returning the new channel ID.
 func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSON, newVideoURLs []byte) (int64, error) {
 	now := time.Now()
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		consts.DBChannels,
@@ -921,6 +933,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			}
 		}
 
+		//nolint:gosec // SQL identifiers are trusted constants.
 		urlInsertQuery := fmt.Sprintf(
 			"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 			consts.DBChannelURLs,
@@ -976,6 +989,7 @@ func (cs *ChannelStore) DeleteChannel(key, val string) error {
 		return err
 	}
 
+	//nolint:gosec // Key validated above.
 	query := fmt.Sprintf(
 		"DELETE FROM %s WHERE %s = ?",
 		consts.DBChannels,
@@ -1192,6 +1206,7 @@ func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn fu
 		channelName string
 		metarrArgs  json.RawMessage
 	)
+	//nolint:gosec // Key validated above.
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QChanID,
@@ -1243,6 +1258,7 @@ func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn fu
 	logger.Pl.S("Updated MetarrArgs for channel %q (ID %d): %s", channelName, channelID, string(updatedArgs))
 
 	// Update the database with the new settings.
+	//nolint:gosec // Key validated above.
 	updateQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = ?",
 		consts.DBChannels,
@@ -1278,6 +1294,7 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 		channelName  string
 		settingsJSON json.RawMessage
 	)
+	//nolint:gosec // Key validated above.
 	query := fmt.Sprintf(
 		"SELECT %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QChanID,
@@ -1333,6 +1350,7 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 	logger.Pl.S("Updated ChannelSettings for channel %q (ID %d): %s", channelName, channelID, string(updatedSettings))
 
 	// Update the database with the new settings.
+	//nolint:gosec // Key validated above.
 	updateQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = ?",
 		consts.DBChannels,
@@ -1364,6 +1382,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, updateWithVal a
 		return fmt.Errorf("%w: channel with name %q already exists", contracts.ErrInvalidChannel, updateWithVal)
 	}
 
+	//nolint:gosec // Key and volumn names validated above.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = ?",
 		consts.DBChannels,
@@ -1403,6 +1422,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, updateWithVal a
 // UpdateLastScan updates the DB entry for when the channel was last scanned.
 func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	now := time.Now()
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ? WHERE %s = ?",
 		consts.DBChannels,
@@ -1435,6 +1455,7 @@ func (cs *ChannelStore) GetDownloadedVideos(c *models.Channel) (videos []*models
 		return nil, false, errors.New("model entered has no ID")
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = ? AND %s = 1 ORDER BY %s DESC",
 		videoListColumns,
@@ -1469,6 +1490,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 		return nil, nil, errors.New("model entered has no ID")
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	seen := fmt.Sprintf(
 		"%s = 1 OR %s = 1 OR %s IN (SELECT %s FROM %s WHERE %s IN (?, ?, ?, ?) OR (%s = ? AND %s >= ?))",
 		consts.QVidFinished,
@@ -1476,6 +1498,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 		consts.QVidID, consts.QDLVidID, consts.DBDownloads, consts.QDLStatus,
 		consts.QDLStatus, consts.QCrawlDLRetries,
 	)
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, %s FROM %s WHERE %s = ? AND (%s OR %s IN (SELECT %s FROM %s WHERE %s = ?))",
 		consts.QVidURL, seen,
@@ -1525,6 +1548,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 
 // AddCrawlDLRetries counts a crawl's download retry for each of the channel's failed videos with the given URLs.
 func (cs *ChannelStore) AddCrawlDLRetries(channelID int64, videoURLs []string) error {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = %s + 1 WHERE %s = ? AND %s IN (SELECT %s FROM %s WHERE %s = ? AND %s = ?)",
 		consts.DBDownloads,

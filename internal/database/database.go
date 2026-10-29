@@ -166,27 +166,11 @@ func (d *Database) initTables() error {
 		return err
 	}
 
-	if err := migrateNotificationNames(tx); err != nil {
-		return err
-	}
-
 	if err := initBlockedDomainsTable(tx); err != nil {
 		return err
 	}
 
 	if err := initSettingsTable(tx); err != nil {
-		return err
-	}
-
-	if err := migrateURLLastScan(tx); err != nil {
-		return err
-	}
-
-	if err := migrateAppendOps(tx); err != nil {
-		return err
-	}
-
-	if err := migrateFilterTypeNames(tx); err != nil {
 		return err
 	}
 

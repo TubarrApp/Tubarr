@@ -23,7 +23,6 @@ import (
 
 // The web pages name every field and request key in plain HTML and JavaScript, separately from the handlers. These
 // tests fail when the two drift apart.
-
 const (
 	wiringURLA = "https://example.com/@wiring-a"
 	wiringURLB = "https://example.com/@wiring-b"

@@ -110,10 +110,14 @@ func (d *JSONDownload) Execute() error {
 }
 
 // jsonDLAttempt performs a single download attempt.
-func (d *JSONDownload) jsonDLAttempt() error {
+func (d *JSONDownload) jsonDLAttempt() (err error) {
 	d.mu.Lock()
-	d.cmd = d.buildJSONCommand()
+	d.cmd, err = d.buildJSONCommand()
 	d.mu.Unlock()
+
+	if err != nil {
+		return err
+	}
 
 	return d.executeJSONDownload(d.cmd)
 }

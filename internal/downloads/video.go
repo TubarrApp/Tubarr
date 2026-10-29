@@ -18,14 +18,14 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/file"
-	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
-func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
+func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	args := make([]string, 0, 32)
 
 	// Restrict filenames.
@@ -119,7 +119,11 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 
 	// Additional user arguments.
 	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs; extra != "" {
-		args = append(args, parsing.SplitArgs(extra)...)
+		splitArgs, err := sharedparsing.ShellSplit(extra)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, splitArgs...)
 	}
 
 	// Add preferred codecs.
@@ -148,7 +152,7 @@ func (d *VideoDownload) buildVideoCommand() *exec.Cmd {
 	// Combine command...
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
 	useProcessGroup(cmd)
-	return cmd
+	return cmd, nil
 }
 
 // videoParseResult is the outcome read from a video download's output.

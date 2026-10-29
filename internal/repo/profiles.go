@@ -59,6 +59,7 @@ func (cs *ChannelStore) AddProfile(p *models.Profile) error {
 	}
 
 	now := time.Now()
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?)",
 		consts.DBProfiles,
@@ -135,7 +136,9 @@ func (cs *ChannelStore) updateProfile(p *models.Profile) error {
 	if err != nil {
 		return err
 	}
+
 	now := time.Now()
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ? WHERE %s = ?",
 		consts.DBProfiles,
@@ -189,6 +192,7 @@ func (cs *ChannelStore) GetProfile(key, val string) (*models.Profile, bool, erro
 	if err := validKey(key, consts.ValidProfileKeys); err != nil {
 		return nil, false, err
 	}
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", profileColumns, consts.DBProfiles, key)
 
 	var p models.Profile
@@ -204,6 +208,7 @@ func (cs *ChannelStore) GetProfile(key, val string) (*models.Profile, bool, erro
 
 // GetAllProfiles returns every profile, by name.
 func (cs *ChannelStore) GetAllProfiles() (profiles []*models.Profile, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s", profileColumns, consts.DBProfiles, consts.QProfileName)
 	rows, err := cs.q.Query(query)
 	if err != nil {
@@ -276,6 +281,7 @@ func (cs *ChannelStore) SetChannelProfile(key, val string, profileID int64) erro
 		}
 		tcs.touch(channelID)
 
+		//nolint:gosec // SQL identifiers are trusted constants.
 		query := fmt.Sprintf("UPDATE %s SET %s = ? WHERE %s = ?", consts.DBChannels, consts.QChanProfileID, consts.QChanID)
 		if _, err := tcs.q.Exec(query, profileID, channelID); err != nil {
 			return fmt.Errorf("failed to set the profile of channel %d: %w", channelID, err)
@@ -399,6 +405,7 @@ func profilesErr(c *models.Channel) error {
 
 // profileUsers returns the channels using a profile, and the channel URLs that do, by channel name.
 func (cs *ChannelStore) profileUsers(id int64) (users []profileUser, err error) {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %[1]s, %[2]s, '' FROM %[3]s WHERE %[4]s = ? "+
 			"UNION ALL SELECT c.%[1]s, c.%[2]s, u.%[5]s FROM %[6]s u JOIN %[3]s c ON c.%[1]s = u.%[7]s WHERE u.%[8]s = ? "+

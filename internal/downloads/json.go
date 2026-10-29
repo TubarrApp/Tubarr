@@ -7,12 +7,13 @@ import (
 	"strings"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
+
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
-func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
+func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 	args := make([]string, 0, 32)
 
 	// Restrict filenames.
@@ -71,7 +72,11 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 
 	// Additional user arguments.
 	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs; extra != "" {
-		args = append(args, parsing.SplitArgs(extra)...)
+		splitArgs, err := sharedparsing.ShellSplit(extra)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, splitArgs...)
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
@@ -83,7 +88,7 @@ func (d *JSONDownload) buildJSONCommand() *exec.Cmd {
 	// Build command with context.
 	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
 	useProcessGroup(cmd)
-	return cmd
+	return cmd, nil
 }
 
 // executeJSONDownload executes a JSON download command.

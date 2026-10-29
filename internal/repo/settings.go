@@ -29,6 +29,7 @@ func (ss *TubarrSettingsStore) GetDB() *sql.DB {
 func (ss *TubarrSettingsStore) GetSetting(key string) (string, bool, error) {
 	var val string
 	err := ss.DB.QueryRow(
+		//nolint:gosec // SQL identifiers are trusted constants.
 		fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QSettingsVal, consts.DBSettings, consts.QSettingsKey),
 		key,
 	).Scan(&val)
@@ -44,6 +45,7 @@ func (ss *TubarrSettingsStore) GetSetting(key string) (string, bool, error) {
 // SetSetting upserts a setting value by key.
 func (ss *TubarrSettingsStore) SetSetting(key, value string) error {
 	_, err := ss.DB.Exec(
+		//nolint:gosec // SQL identifiers are trusted constants.
 		fmt.Sprintf("INSERT OR REPLACE INTO %s (%s, %s) VALUES (?, ?)", consts.DBSettings, consts.QSettingsKey, consts.QSettingsVal),
 		key, value,
 	)

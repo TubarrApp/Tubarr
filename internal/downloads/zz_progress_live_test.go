@@ -67,7 +67,10 @@ func checkLiveProgress(t *testing.T, downloader, dlArgs, ytdlpArgs string, wantI
 		}},
 		Context: ctx,
 	}
-	cmd := d.buildVideoCommand()
+	cmd, err := d.buildVideoCommand()
+	if err != nil {
+		t.Fatal(err)
+	}
 	cleanup, err := d.setDownloaderEnv(cmd)
 	if err != nil {
 		t.Fatal(err)

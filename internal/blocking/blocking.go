@@ -70,6 +70,7 @@ func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) erro
 	vars.BlockedDomains[normalizedDomain][blockContext] = block
 
 	// Persist to database.
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(`INSERT OR IGNORE INTO %s (%s, %s, %s) VALUES (?, ?, ?)`,
 		consts.DBBlockedDomains,
 		consts.QBlockedDomain,
@@ -111,6 +112,7 @@ func AddBlockedVideo(db *sql.DB, hostname string, blockContext vars.BlockContext
 		return nil
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(`INSERT OR IGNORE INTO %s (%s, %s, %s, %s) VALUES (?, ?, ?, ?)`,
 		consts.DBBlockedDomainVideos,
 		consts.QBlockedVideoDomain,
@@ -172,6 +174,7 @@ func UnblockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) er
 		// Unblock all contexts for this domain.
 		delete(vars.BlockedDomains, normalizedDomain)
 
+		//nolint:gosec // SQL identifiers are trusted constants.
 		query := fmt.Sprintf(`DELETE FROM %s WHERE %s = ?`,
 			consts.DBBlockedDomains,
 			consts.QBlockedDomain,
@@ -191,6 +194,7 @@ func UnblockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) er
 			}
 		}
 
+		//nolint:gosec // SQL identifiers are trusted constants.
 		query := fmt.Sprintf(`DELETE FROM %s WHERE %s = ? AND %s = ?`,
 			consts.DBBlockedDomains,
 			consts.QBlockedDomain,
@@ -210,6 +214,7 @@ func UnblockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) er
 // LoadBlockedDomains loads blocked domains and their associated videos from the database.
 func LoadBlockedDomains(db *sql.DB) error {
 	// Load blocked domains.
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(`SELECT %s, %s, %s FROM %s`,
 		consts.QBlockedDomain,
 		consts.QBlockedContext,
@@ -348,6 +353,7 @@ func CleanExpiredBlocks(db *sql.DB) error {
 		}
 
 		// Remove from database.
+		//nolint:gosec // SQL identifiers are trusted constants.
 		query := fmt.Sprintf(`DELETE FROM %s WHERE %s = ? AND %s = ?`,
 			consts.DBBlockedDomains,
 			consts.QBlockedDomain,

@@ -11,6 +11,7 @@ import (
 	"tubarr/internal/validation"
 	"unicode/utf8"
 
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/spf13/viper"
 )
 
@@ -226,7 +227,7 @@ func FuzzSplitArgs(f *testing.F) {
 		if !utf8.ValidString(s) {
 			return
 		}
-		got := SplitArgs(s)
+		got, _ := sharedparsing.ShellSplit(s)
 		if !strings.ContainsAny(s, `'"\`) && !slices.Equal(got, strings.Fields(s)) {
 			t.Errorf("SplitArgs(%q) = %q, want strings.Fields result %q", s, got, strings.Fields(s))
 		}
@@ -235,7 +236,7 @@ func FuzzSplitArgs(f *testing.F) {
 		for i, a := range got {
 			quoted[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 		}
-		if again := SplitArgs(strings.Join(quoted, " ")); !slices.Equal(again, got) {
+		if again, _ := sharedparsing.ShellSplit(strings.Join(quoted, " ")); !slices.Equal(again, got) {
 			t.Errorf("quoting and re-splitting %q gave %q", got, again)
 		}
 	})

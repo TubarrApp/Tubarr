@@ -49,6 +49,7 @@ func (pc *ProgControl) StartTubarr() (pid int, err error) {
 	}
 
 	now := time.Now()
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ?, %s = ? WHERE %s = 1",
 		consts.DBProgram,
@@ -89,6 +90,7 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 	}
 
 	// Update program elements in database.
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ?, %s = ?, %s = ?, %s = ? WHERE %s = 1",
 		consts.DBProgram,
@@ -121,6 +123,7 @@ func (pc *ProgControl) QuitTubarr(startTime time.Time) error {
 // This function is crucial for ensuring things like powercuts don't
 // permanently lock the user out of the database.
 func (pc *ProgControl) UpdateHeartbeat() error {
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s = ? WHERE %s = 1",
 		consts.DBProgram,
@@ -144,6 +147,7 @@ func (pc *ProgControl) checkProgRunning() (int, bool, error) {
 		pid     sql.NullInt64
 	)
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s, %s FROM %s WHERE %s = 1",
 		consts.QProgRunning,
@@ -167,6 +171,7 @@ func (pc *ProgControl) checkProgRunning() (int, bool, error) {
 func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 	var lastHeartbeat time.Time
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s WHERE %s = 1",
 		consts.QProgHeartbeat,
@@ -182,6 +187,7 @@ func (pc *ProgControl) resetStaleProcess() (reset bool, err error) {
 
 		logger.Pl.I("Detected stale process, resetting state...")
 
+		//nolint:gosec // SQL identifiers are trusted constants.
 		resetQuery := fmt.Sprintf(
 			"UPDATE %s SET %s = ?, %s = ? WHERE %s = 1",
 			consts.DBProgram,

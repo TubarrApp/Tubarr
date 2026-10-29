@@ -26,7 +26,6 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/limits"
 	"tubarr/internal/models"
-	"tubarr/internal/parsing"
 	"tubarr/internal/siterules"
 	"tubarr/internal/times"
 	"tubarr/internal/validation"
@@ -322,7 +321,11 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 
 		// Add custom crawl arguments.
 		if crawlArgs != "" {
-			args = append(args, parsing.SplitArgs(crawlArgs)...)
+			splitArgs, err := sharedparsing.ShellSplit(crawlArgs)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, splitArgs...)
 		}
 
 		// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
