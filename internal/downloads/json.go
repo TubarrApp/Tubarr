@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/siterules"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
@@ -72,11 +74,31 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 
 	// Additional user arguments.
 	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs; extra != "" {
-		splitArgs, err := sharedparsing.ShellSplit(extra)
+		extraArgs, err := sharedparsing.ShellSplit(extra)
 		if err != nil {
 			return nil, err
 		}
-		args = append(args, splitArgs...)
+
+		// Remove disallowed options and value.
+		blockedValue := false
+		deletedKey := ""
+		extraArgs = slices.DeleteFunc(extraArgs, func(arg string) bool {
+			if blockedValue {
+				logger.Pl.W("Deleted disallowed option %q and value %q from command for channel %q", deletedKey, arg, d.Channel.Name)
+				blockedValue = false
+				deletedKey = ""
+				return true
+			}
+
+			if _, blocked := sharedconsts.BlockedYtdlpOptions[arg]; blocked {
+				blockedValue = true
+				deletedKey = arg
+				return true
+			}
+
+			return false
+		})
+		args = append(args, extraArgs...)
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).

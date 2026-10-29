@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -119,11 +120,31 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 
 	// Additional user arguments.
 	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs; extra != "" {
-		splitArgs, err := sharedparsing.ShellSplit(extra)
+		extraArgs, err := sharedparsing.ShellSplit(extra)
 		if err != nil {
 			return nil, err
 		}
-		args = append(args, splitArgs...)
+
+		// Remove disallowed options and value.
+		blockedValue := false
+		deletedKey := ""
+		extraArgs = slices.DeleteFunc(extraArgs, func(arg string) bool {
+			if blockedValue {
+				logger.Pl.W("Deleted disallowed option %q and value %q from command for channel %q", deletedKey, arg, d.Channel.Name)
+				blockedValue = false
+				deletedKey = ""
+				return true
+			}
+
+			if _, blocked := sharedconsts.BlockedYtdlpOptions[arg]; blocked {
+				blockedValue = true
+				deletedKey = arg
+				return true
+			}
+
+			return false
+		})
+		args = append(args, extraArgs...)
 	}
 
 	// Add preferred codecs.
