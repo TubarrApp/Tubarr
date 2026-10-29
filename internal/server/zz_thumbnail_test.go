@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
+	"image"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -18,9 +23,11 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/repo"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-// TestThumbnailUpload tests uploading, serving and cleaning up Download As thumbnails.
+// TestThumbnailUpload checks thumbnail uploading works.
 func TestThumbnailUpload(t *testing.T) {
 	setupFuzzServer(t)
 	oldDir := paths.UploadedThumbnailDir
@@ -58,11 +65,35 @@ func TestThumbnailUpload(t *testing.T) {
 	}
 	videoID := videos[0].ID
 
-	upload := func(id int64, data []byte) *httptest.ResponseRecorder {
+	encodeImage := func(t *testing.T, format string, width, height int) []byte {
+		t.Helper()
+
+		img := image.NewRGBA(image.Rect(0, 0, width, height))
+		var buf bytes.Buffer
+		var err error
+
+		switch format {
+		case "png":
+			err = png.Encode(&buf, img)
+		case "jpg":
+			err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
+		case "gif":
+			err = gif.Encode(&buf, img, nil)
+		default:
+			t.Fatalf("unsupported test image format %q", format)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return buf.Bytes()
+	}
+
+	upload := func(id int64, filename string, data []byte) *httptest.ResponseRecorder {
 		t.Helper()
 		var body bytes.Buffer
 		mw := multipart.NewWriter(&body)
-		part, err := mw.CreateFormFile("thumbnail", "cover")
+		part, err := mw.CreateFormFile("thumbnail", filename)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -87,18 +118,84 @@ func TestThumbnailUpload(t *testing.T) {
 		return got.Path
 	}
 
-	png := savedPath(upload(videoID, []byte("\x89PNG\r\n\x1a\n rest of image")))
-	if png != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.png", videoID)) {
-		t.Errorf("PNG saved to %q", png)
+	// Valid PNG, GIF and JPEG uploads must succeed.
+	pngData := encodeImage(t, "png", 2, 2)
+	pngPath := savedPath(upload(videoID, "cover.png", pngData))
+	if pngPath != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.png", videoID)) {
+		t.Errorf("PNG saved to %q", pngPath)
 	}
-	jpg := savedPath(upload(videoID, []byte("\xFF\xD8\xFF\xE0 rest of image")))
-	if _, err := os.Stat(png); !os.IsNotExist(err) {
-		t.Errorf("earlier PNG %q kept after a JPEG replaced it", png)
+
+	gifData := encodeImage(t, "gif", 2, 2)
+	gifPath := savedPath(upload(videoID, "cover.gif", gifData))
+	if _, err := os.Stat(pngPath); !os.IsNotExist(err) {
+		t.Errorf("earlier PNG %q kept after a GIF replaced it", pngPath)
 	}
-	if w := upload(videoID, []byte("not an image")); w.Code != http.StatusUnsupportedMediaType {
-		t.Errorf("text upload: got %d, want 415", w.Code)
+	if gifPath != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.gif", videoID)) {
+		t.Errorf("GIF saved to %q", gifPath)
 	}
-	if w := upload(999999, []byte("\xFF\xD8\xFF\xE0")); w.Code != http.StatusNotFound {
+
+	jpgData := encodeImage(t, "jpg", 2, 2)
+	jpg := savedPath(upload(videoID, "cover.jpg", jpgData))
+	if _, err := os.Stat(gifPath); !os.IsNotExist(err) {
+		t.Errorf("earlier GIF %q kept after a JPEG replaced it", gifPath)
+	}
+	if jpg != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.jpg", videoID)) {
+		t.Errorf("JPEG saved to %q", jpg)
+	}
+
+	// Invalid image data must fail.
+	if w := upload(videoID, "cover.png", []byte("not an image")); w.Code != http.StatusBadRequest {
+		t.Errorf("text upload: got %d, want 400", w.Code)
+	}
+
+	// The file extension must match the actual image format.
+	if w := upload(videoID, "cover.jpg", pngData); w.Code != http.StatusBadRequest {
+		t.Errorf("mismatched image extension: got %d, want 400", w.Code)
+	}
+
+	// Unsupported extensions must fail.
+	for _, filename := range []string{"cover.webp", "cover.bmp", "cover"} {
+		t.Run("unsupported extension "+filename, func(t *testing.T) {
+			if w := upload(videoID, filename, pngData); w.Code != http.StatusBadRequest {
+				t.Errorf("upload with filename %q: got %d, want 400", filename, w.Code)
+			}
+		})
+	}
+
+	// Images exceeding the maximum file size must fail.
+	t.Run("maximum filesize", func(t *testing.T) {
+		data := encodeImage(t, "png", 2, 2)
+		data = append(data, make([]byte, sharedconsts.ImageUploadMaxBytes-len(data)+1)...)
+
+		if w := upload(videoID, "cover.png", data); w.Code != http.StatusBadRequest {
+			t.Errorf("oversized upload: got %d, want 400", w.Code)
+		}
+	})
+
+	// Images exceeding the pixel limit must fail.
+	t.Run("maximum pixels", func(t *testing.T) {
+		width := uint32(sharedconsts.ImageUploadMaxPixels + 1)
+
+		// Build a PNG header with an oversized width and a valid IHDR CRC.
+		data := []byte{
+			0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n',
+			0x00, 0x00, 0x00, 0x0d,
+			'I', 'H', 'D', 'R',
+			byte(width >> 24), byte(width >> 16), byte(width >> 8), byte(width),
+			0x00, 0x00, 0x00, 0x01,
+			0x08, 0x02, 0x00, 0x00, 0x00,
+		}
+		crc := crc32.ChecksumIEEE(data[12:])
+		data = append(data,
+			byte(crc>>24), byte(crc>>16), byte(crc>>8), byte(crc),
+		)
+
+		if w := upload(videoID, "cover.png", data); w.Code != http.StatusBadRequest {
+			t.Errorf("oversized image dimensions: got %d, want 400", w.Code)
+		}
+	})
+
+	if w := upload(999999, "cover.jpg", jpgData); w.Code != http.StatusNotFound {
 		t.Errorf("upload for an unknown video: got %d, want 404", w.Code)
 	}
 

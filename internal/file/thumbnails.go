@@ -20,11 +20,15 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-// ErrThumbnailType is returned for an uploaded thumbnail that isn't a JPEG, PNG or WebP image.
-var ErrThumbnailType = errors.New("thumbnails must be JPEG, PNG or WebP images")
+// ErrThumbnailType is returned for an uploaded thumbnail that isn't a JPEG, PNG, or WebP image.
+var ErrThumbnailType = errors.New("thumbnails must be JPEG, PNG, or GIF images")
 
 // thumbnailExts maps the image types accepted for uploaded thumbnails to their file extensions.
-var thumbnailExts = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+var thumbnailExts = map[string]string{
+	"image/jpeg": ".jpg",
+	"image/png":  ".png",
+	"image/gif":  ".gif",
+}
 
 // SaveThumbnail stores an uploaded image as a video's thumbnail, replacing any earlier one, and returns its path.
 func SaveThumbnail(videoID int64, data []byte) (string, error) {
