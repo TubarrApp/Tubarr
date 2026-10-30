@@ -311,7 +311,7 @@ func ValidateYtdlpVideoCodecs(codecs []string) ([]string, error) {
 	// Normalize strings.
 	for i := range codecs { // Do not use _, c :=
 		codecs[i] = strings.ToLower(strings.TrimSpace(codecs[i]))
-		if _, ok := sharedconsts.ValidAudioCodecs[codecs[i]]; !ok {
+		if _, ok := sharedconsts.ValidVideoCodecs[codecs[i]]; !ok {
 			return nil, fmt.Errorf("invalid audio codec preference %q", codecs[i])
 		}
 	}
