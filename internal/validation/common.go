@@ -295,8 +295,10 @@ func ValidateToFromDate(d string) (string, error) {
 	return output, nil
 }
 
-// ValidatePreferredVideoCodecs validates video codec preferences.
-func ValidatePreferredVideoCodecs(codecs []string) ([]string, error) {
+// ValidateYtdlpVideoCodecs validates video codec preferences.
+//
+// This is for codecs received by YT-DLP. NOT user 'h264:av1' type entries.
+func ValidateYtdlpVideoCodecs(codecs []string) ([]string, error) {
 	if len(codecs) == 0 {
 		return nil, nil
 	}
@@ -307,18 +309,20 @@ func ValidatePreferredVideoCodecs(codecs []string) ([]string, error) {
 	})
 
 	// Normalize strings.
-	for i := range codecs {
+	for i := range codecs { // Do not use _, c :=
 		codecs[i] = strings.ToLower(strings.TrimSpace(codecs[i]))
-		if _, ok := sharedconsts.ValidVideoCodecs[codecs[i]]; !ok {
-			return nil, fmt.Errorf("invalid video codec preference %q", codecs[i])
+		if _, ok := sharedconsts.ValidAudioCodecs[codecs[i]]; !ok {
+			return nil, fmt.Errorf("invalid audio codec preference %q", codecs[i])
 		}
 	}
 
 	return codecs, nil
 }
 
-// ValidatePreferredAudioCodecs validates audio codec preferences.
-func ValidatePreferredAudioCodecs(codecs []string) ([]string, error) {
+// ValidateYtdlpAudioCodecs validates audio codec preferences.
+//
+// This is for codecs received by YT-DLP. NOT user 'opus:aac' type entries.
+func ValidateYtdlpAudioCodecs(codecs []string) ([]string, error) {
 	if len(codecs) == 0 {
 		return nil, nil
 	}
@@ -329,7 +333,7 @@ func ValidatePreferredAudioCodecs(codecs []string) ([]string, error) {
 	})
 
 	// Normalize strings.
-	for i := range codecs {
+	for i := range codecs { // Do not use _, c :=
 		codecs[i] = strings.ToLower(strings.TrimSpace(codecs[i]))
 		if _, ok := sharedconsts.ValidAudioCodecs[codecs[i]]; !ok {
 			return nil, fmt.Errorf("invalid audio codec preference %q", codecs[i])

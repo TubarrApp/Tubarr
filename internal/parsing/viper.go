@@ -163,12 +163,12 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 		dst.YtdlpOutputExt = *v
 	}
 	if v := in.YTDLPPreferredVideoCodecs; v != nil {
-		if dst.YTDLPPreferredVideoCodecs, err = validation.ValidatePreferredVideoCodecs(*v); err != nil {
+		if dst.YTDLPPreferredVideoCodecs, err = validation.ValidateYtdlpVideoCodecs(*v); err != nil {
 			return fmt.Errorf("invalid %s: %w", keys.YTDLPPreferredVideoCodecs, err)
 		}
 	}
 	if v := in.YTDLPPreferredAudioCodecs; v != nil {
-		if dst.YTDLPPreferredAudioCodecs, err = validation.ValidatePreferredAudioCodecs(*v); err != nil {
+		if dst.YTDLPPreferredAudioCodecs, err = validation.ValidateYtdlpAudioCodecs(*v); err != nil {
 			return fmt.Errorf("invalid %s: %w", keys.YTDLPPreferredAudioCodecs, err)
 		}
 	}

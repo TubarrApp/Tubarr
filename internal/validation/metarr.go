@@ -77,11 +77,12 @@ func ValidateAudioTranscodeCodecSlice(pairs []string) (validPairs []string, err 
 	dedupPairs := dedupSlice(pairs)
 
 	// Check the plain codec and pairs as Metarr will read them.
-	if _, _, err = sharedvalidation.ParseCodecMappings(dedupPairs, sharedvalidation.ValidateAudioCodec); err != nil {
+	_, result, err := sharedvalidation.ParseCodecMappings(dedupPairs, sharedvalidation.ValidateAudioCodec)
+	if err != nil {
 		return nil, err
 	}
 
-	logger.Pl.D(5, "Got audio codec array: %v", dedupPairs)
+	logger.Pl.D(5, "Got audio codec array: %v and map %+v", dedupPairs, result)
 	return dedupPairs, nil
 }
 

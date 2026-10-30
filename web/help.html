@@ -412,6 +412,17 @@ vp9:av1</code></pre>
                   doesn't keep track of it, so deleting the video's files leaves it.
                 </li>
               </ul>
+              <p>
+                Prefixing a 'from' codec entry with <code>lc_</code>, <code>mc_</code>, or <code>hc_</code>_ can be used to selectively encode based on detected compression level.
+                <ul>
+                <li><strong>lc_:</strong> Low compression.</li>
+                <li><strong>mc_:</strong> Medium compression.</li>
+                <li><strong>hc_:</strong> High compression.</li>
+                </ul>
+                An entry such as <code>lc_h264:av1</code> would only transcode from <code>h264</code> to <code>av1</code> if the compression level
+                in the video with a <code>h264</code> codec had low compression. This can avoid unnecessary transcodes when filesize improvements are
+                likely to be minimal.
+              </p>
 
               <!-- ===== yt-dlp ===== -->
               <h2 id="ytdlp">yt-dlp download options</h2>

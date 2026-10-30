@@ -884,10 +884,10 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 		return nil, err
 	}
 	o.ExtraYTDLPVideoArgs = strings.TrimSpace(l.ExtraYTDLPVideoArgs)
-	if o.YTDLPPreferredVideoCodecs, err = validation.ValidatePreferredVideoCodecs(splitNonEmptyLines(l.YTDLPPreferredVideoCodecs)); err != nil {
+	if o.YTDLPPreferredVideoCodecs, err = validation.ValidateYtdlpVideoCodecs(splitNonEmptyLines(l.YTDLPPreferredVideoCodecs)); err != nil {
 		return nil, fmt.Errorf("invalid preferred video codecs: %w", err)
 	}
-	if o.YTDLPPreferredAudioCodecs, err = validation.ValidatePreferredAudioCodecs(splitNonEmptyLines(l.YTDLPPreferredAudioCodecs)); err != nil {
+	if o.YTDLPPreferredAudioCodecs, err = validation.ValidateYtdlpAudioCodecs(splitNonEmptyLines(l.YTDLPPreferredAudioCodecs)); err != nil {
 		return nil, fmt.Errorf("invalid preferred audio codecs: %w", err)
 	}
 

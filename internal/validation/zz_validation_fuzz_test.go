@@ -52,8 +52,8 @@ func FuzzValidateLists(f *testing.F) {
 	}
 	f.Fuzz(func(_ *testing.T, s, accel string) {
 		list := strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == '\n' })
-		_, _ = ValidatePreferredVideoCodecs(list)
-		_, _ = ValidatePreferredAudioCodecs(list)
+		_, _ = ValidateYtdlpVideoCodecs(list)
+		_, _ = ValidateYtdlpAudioCodecs(list)
 		_, _ = ValidateAudioTranscodeCodecSlice(list)
 		_, _ = ValidateVideoTranscodeCodecSlice(list, accel)
 	})
