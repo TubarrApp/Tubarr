@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 
+	"github.com/TubarrApp/gocommon/logging"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/spf13/viper"
 )
@@ -183,10 +183,12 @@ func TestMakeMetarrCommandThumbnail(t *testing.T) {
 	}
 }
 
-// TestMakeMetarrCommandArgs tests the whole Metarr command for channel URL and Download As values.
+// TestMakeMetarrCommandArgs tests the whole Metarr command for channel URL and Download As values, with Tubarr's debug
+// level.
 func TestMakeMetarrCommandArgs(t *testing.T) {
 	logger.Pl.Console = io.Discard
-	t.Cleanup(viper.Reset)
+	prevLevel := logging.Level()
+	t.Cleanup(func() { logging.SetLevel(prevLevel) })
 	metaOps, err := parsing.ParseMetaOps([]string{"artist:set:Cat"})
 	if err != nil {
 		t.Fatal(err)
@@ -196,18 +198,17 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 		MetaOps: metaOps, TranscodeGPU: "vaapi", TranscodeGPUNode: "/dev/dri/renderD128", TranscodeQuality: "23",
 		TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"},
 	}
-	globals := map[string]any{keys.DebugLevel: 2}
 	files := []string{metkeys.VideoFile, "/videos/v.mp4", metkeys.MetaFile, "/videos/v.json"}
 	no := false
 
 	for _, tc := range []struct {
 		name      string
-		globals   map[string]any
+		level     int // Tubarr's debug level, which Metarr is given when above 0.
 		args      *models.MetarrArgs
 		overrides *models.VideoOverrides
 		want      []string
 	}{
-		{"channel URL", nil, channelArgs, nil, slices.Concat(files, []string{
+		{"channel URL", 0, channelArgs, nil, slices.Concat(files, []string{
 			metkeys.MetaOps, "artist:set:Cat", metkeys.MetaOW,
 			metkeys.MaxCPU, "50.00",
 			metkeys.MinFreeMem, "1G",
@@ -222,7 +223,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeQuality, "23",
 			metkeys.TranscodeAudioCodecs, "aac",
 		})},
-		{"Download As", globals, channelArgs, &models.VideoOverrides{
+		{"Download As", 2, channelArgs, &models.VideoOverrides{
 			MetarrArgs: models.MetarrArgs{OutputExt: "webm", TranscodeGPU: validation.GPUNone, MaxCPU: 80},
 			Thumbnail:  "/thumb.png",
 		}, slices.Concat(files, []string{
@@ -239,16 +240,13 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeAudioCodecs, "aac",
 			metkeys.Debug, "2",
 		})},
-		{"strip thumbnail", nil, &models.MetarrArgs{}, &models.VideoOverrides{StripThumbnail: true}, slices.Concat(files, []string{
+		{"strip thumbnail", 0, &models.MetarrArgs{}, &models.VideoOverrides{StripThumbnail: true}, slices.Concat(files, []string{
 			metkeys.PurgeOriginalVideo,
 			metkeys.StripThumbnail,
 		})},
-		{"original kept", nil, &models.MetarrArgs{PurgeOriginalVideo: &no}, nil, files},
+		{"original kept", 0, &models.MetarrArgs{PurgeOriginalVideo: &no}, nil, files},
 	} {
-		viper.Reset()
-		for k, val := range tc.globals {
-			viper.Set(k, val)
-		}
+		logging.SetLevel(tc.level)
 		c := &models.Channel{ID: 1, Name: "Cats"}
 		cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: tc.args}
 		v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json", Overrides: tc.overrides}

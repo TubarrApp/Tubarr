@@ -112,7 +112,9 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	// if debugLevel == "" || debugLevel == "0" {
 	// 	debugLevel = configString(keys.DebugLevel)
 	// }
-	add(metkeys.Debug, strconv.FormatInt(int64(logging.Level()), 10))
+	if dLevel := logging.Level(); dLevel > 0 {
+		add(metkeys.Debug, strconv.FormatInt(int64(dLevel), 10))
+	}
 
 	// No metadata purge: Tubarr purges once it has read the file, see finishMetafile.
 	return args
