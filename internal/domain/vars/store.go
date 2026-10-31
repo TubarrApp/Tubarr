@@ -26,8 +26,8 @@ var (
 
 // BlockedDomain contains information about a domain block.
 type BlockedDomain struct {
-	BlockedAt     time.Time
-	BlockedVideos []BlockedVideo
+	BlockedAt     time.Time      `json:"blocked_at"`
+	BlockedVideos []BlockedVideo `json:"blocked_videos"`
 }
 
 // BlockedVideo contains information about a video that failed from a block.

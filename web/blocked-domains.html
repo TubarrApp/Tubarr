@@ -262,8 +262,8 @@
                     domain: item.domain,
                     context: context,
                     contextLabel: this.getContextLabel(context),
-                    blockedAt: item.contexts[context],
-                    blockedAtFormatted: this.formatDate(item.contexts[context]),
+                    blockedAt: item.contexts[context].blocked_at,
+                    blockedAtFormatted: this.formatDate(item.contexts[context].blocked_at),
                     timeRemaining: item.time_remaining[context] || 'Calculating...'
                   });
                 });
