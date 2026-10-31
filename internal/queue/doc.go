@@ -27,7 +27,8 @@
 //   - Crawled videos (ByUser false) go through the channel's download filters, and a failed one is only queued
 //     again as a crawl retry.
 //   - Videos the user chose from Available or entered as a URL (ByUser true) skip the filters, can be downloaded again
-//     whatever their status (unless already queued or downloading), and use their Download As options.
+//     whatever their status (unless already queued or downloading), and use their Download As options. Crawls don't
+//     retry one that fails, so it waits on the Available list for the user.
 //   - Auth is login details for this download only, never stored. ReplaceOverrides stores Overrides as the video's
 //     Download As options, nil clearing them.
 //

@@ -729,6 +729,9 @@ func (sc *liveScenario) loadURLIDs() {
 			}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		sc.t.Fatal(err)
+	}
 }
 
 // feeds returns the channel's feeds, leaving out paused ones unless withPaused.

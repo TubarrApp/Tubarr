@@ -112,8 +112,9 @@ func TestAvailableVideos(t *testing.T) {
 	if dismissed, err := vs.ClaimVideos(chanID, ids[:1], app.AvailableStatuses, consts.DLStatusIgnored); err != nil || len(dismissed) != 1 {
 		t.Fatalf("dismiss: got %d, %v, want 1", len(dismissed), err)
 	}
-	if seen, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 1 || !slices.Equal(failed, []string{"https://example.com/v/2"}) {
-		t.Errorf("expected the dismissed video to be seen and the other failed, got %v and %v", seen, failed)
+	// The user downloaded both, so crawls leave the failed one to them, as they do the dismissed one.
+	if seen, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 2 || len(failed) != 0 {
+		t.Errorf("expected the dismissed and failed videos seen and none retried, got %v and %v", seen, failed)
 	}
 
 	// Ignored videos are listed only when asked for, and restoring returns them to Available.
@@ -133,37 +134,11 @@ func TestAvailableVideos(t *testing.T) {
 	if again, err := vs.ClaimVideos(chanID, ids[:1], []consts.DownloadStatus{consts.DLStatusIgnored}, consts.DLStatusAvailable); err != nil || len(again) != 0 {
 		t.Errorf("second restore: got %d, %v, want 0", len(again), err)
 	}
-	if seen, _, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 1 {
+	if seen, _, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); !slices.Contains(seen, "https://example.com/v/1") {
 		t.Errorf("expected the restored video still seen by crawls, got %v", seen)
 	}
 	if dismissed, err := vs.ClaimVideos(chanID, ids[:1], app.AvailableStatuses, consts.DLStatusIgnored); err != nil || len(dismissed) != 1 {
 		t.Fatalf("dismiss again: got %d, %v, want 1", len(dismissed), err)
-	}
-
-	// Failed videos are retried by crawls until they run out of crawl retries, and downloading one gives them back.
-	failedURL := []string{"https://example.com/v/2"}
-	for range consts.MaxCrawlDLRetries {
-		if _, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); !slices.Equal(failed, failedURL) {
-			t.Fatalf("expected the failed video retried, got %v", failed)
-		}
-		if err := cs.AddCrawlDLRetries(chanID, failedURL); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if seen, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); len(seen) != 2 || len(failed) != 0 {
-		t.Errorf("expected the failed video seen once out of crawl retries, got %v and %v", seen, failed)
-	}
-	if available, _ := vs.GetAvailableVideos(consts.DLStatusFailed); len(available) != 1 || available[0].CrawlDLRetries != consts.MaxCrawlDLRetries {
-		t.Errorf("expected the failed video listed with %d crawl download retries, got %+v", consts.MaxCrawlDLRetries, available)
-	}
-	if claimed, err := vs.QueueVideo(chanID, &models.Video{ID: ids[1]}, true); err != nil || !claimed {
-		t.Fatalf("download: got %t, %v, want claimed", claimed, err)
-	}
-	if reset, err := vs.ClaimVideos(chanID, ids[1:], []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil || len(reset) != 1 {
-		t.Fatalf("fail again: got %d, %v, want 1", len(reset), err)
-	}
-	if _, failed, _ := cs.GetDownloadedOrIgnoredVideoURLs(c); !slices.Equal(failed, failedURL) {
-		t.Errorf("expected the downloaded video's crawl retries reset, got failed %v", failed)
 	}
 
 	// Canceled videos count as seen, so crawls never retry them.
@@ -177,6 +152,103 @@ func TestAvailableVideos(t *testing.T) {
 	// Videos can't be claimed through another channel.
 	if claimed, err := vs.ClaimVideos(chanID+1, ids[1:], app.AvailableStatuses, consts.DLStatusIgnored); err != nil || len(claimed) != 0 {
 		t.Errorf("other channel claim: got %d, %v, want 0", len(claimed), err)
+	}
+}
+
+// TestCrawlDLRetries checks crawls retry the failed videos they queued until their retries run out, and leave a failed
+// video to the user once the user downloads it or a crawl finds its URL not downloading automatically.
+func TestCrawlDLRetries(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	res, err := db.Exec("INSERT INTO channels (name) VALUES ('Test')")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chanID, _ := res.LastInsertId()
+	var urlIDs []int64
+	for _, u := range []string{"https://example.com/@a", "https://example.com/@b"} {
+		if res, err = db.Exec("INSERT INTO channel_urls (channel_id, url) VALUES (?, ?)", chanID, u); err != nil {
+			t.Fatal(err)
+		}
+		id, _ := res.LastInsertId()
+		urlIDs = append(urlIDs, id)
+	}
+	c := &models.Channel{ID: chanID, Name: "Test"}
+	vs := GetVideoStore(db)
+	cs, err := GetChannelStore(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// fail queues a video as a crawl or the user does, then fails its download.
+	fail := func(v *models.Video, byUser bool) {
+		t.Helper()
+		if claimed, err := vs.QueueVideo(chanID, v, byUser); err != nil || !claimed {
+			t.Fatalf("queue %q: got %t, %v, want claimed", v.URL, claimed, err)
+		}
+		if reset, err := vs.ClaimVideos(chanID, []int64{v.ID}, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil || len(reset) != 1 {
+			t.Fatalf("fail %q: got %d, %v, want 1", v.URL, len(reset), err)
+		}
+	}
+	// retried returns the failed videos' URLs crawls would retry.
+	retried := func() []string {
+		t.Helper()
+		_, failed, err := cs.GetDownloadedOrIgnoredVideoURLs(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.Sort(failed)
+		return failed
+	}
+
+	// A video a crawl queued is retried by crawls until its retries run out.
+	crawled := &models.Video{ChannelURLID: urlIDs[0], ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1"}
+	fail(crawled, false)
+	for range consts.MaxCrawlDLRetries {
+		if got := retried(); !slices.Equal(got, []string{crawled.URL}) {
+			t.Fatalf("expected the crawled video retried, got %v", got)
+		}
+		if err := cs.AddCrawlDLRetries(chanID, []string{crawled.URL}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := retried(); len(got) != 0 {
+		t.Errorf("expected none retried once out of crawl retries, got %v", got)
+	}
+
+	// Once the user downloads a video, crawls leave it to them if it fails, whether it was stored or a new URL.
+	fail(&models.Video{ID: crawled.ID}, true)
+	fail(&models.Video{ChannelURLID: urlIDs[0], ChannelURL: "https://example.com/@a", URL: "https://example.com/v/2"}, true)
+	if got := retried(); len(got) != 0 {
+		t.Errorf("expected the user's failed videos left to them, got %v retried", got)
+	}
+	available, err := vs.GetAvailableVideos(consts.DLStatusFailed)
+	if err != nil || len(available) != 2 {
+		t.Fatalf("got %d failed videos, %v, want 2", len(available), err)
+	}
+	for _, v := range available {
+		if v.CrawlDLRetries != consts.MaxCrawlDLRetries {
+			t.Errorf("video %q listed with %d crawl retries used, want all %d", v.URL, v.CrawlDLRetries, consts.MaxCrawlDLRetries)
+		}
+	}
+
+	// A crawl of a URL not downloading automatically leaves its failed videos to the user, and no other URL's.
+	onA := &models.Video{ChannelURLID: urlIDs[0], ChannelURL: "https://example.com/@a", URL: "https://example.com/v/3"}
+	onB := &models.Video{ChannelURLID: urlIDs[1], ChannelURL: "https://example.com/@b", URL: "https://example.com/v/4"}
+	fail(onA, false)
+	fail(onB, false)
+	if err := cs.UseUpCrawlDLRetries(urlIDs[0]); err != nil {
+		t.Fatal(err)
+	}
+	if got := retried(); !slices.Equal(got, []string{onB.URL}) {
+		t.Errorf("expected only the other URL's failed video retried, got %v", got)
 	}
 }
 

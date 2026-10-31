@@ -119,8 +119,9 @@ const (
 type AvailableVideo struct {
 	Video
 	ChannelName        string `json:"channel_name"`
+	Customized         bool   `json:"customized,omitempty"`       // Has Download As options, which downloading it uses.
 	RetriesOnCrawl     bool   `json:"retries_on_crawl,omitempty"` // A failed video the channel URL's next crawl downloads again.
-	CrawlDLRetries     int    `json:"-"`                          // Crawls which have retried it since the user last downloaded it.
+	CrawlDLRetries     int    `json:"-"`                          // Crawl retries it has used, all of them once it's left to the user.
 	CrawlDLRetriesLeft int    `json:"crawl_dl_retries_left,omitempty"`
 }
 

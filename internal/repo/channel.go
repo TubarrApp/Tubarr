@@ -1564,6 +1564,23 @@ func (cs *ChannelStore) AddCrawlDLRetries(channelID int64, videoURLs []string) e
 	return nil
 }
 
+// UseUpCrawlDLRetries uses up the crawl retries of the channel URL's failed videos, leaving them for the user to retry.
+func (cs *ChannelStore) UseUpCrawlDLRetries(channelURLID int64) error {
+	//nolint:gosec // SQL identifiers are trusted constants.
+	query := fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ? AND %s < ? AND %s IN (SELECT %s FROM %s WHERE %s = ?)",
+		consts.DBDownloads,
+		consts.QCrawlDLRetries,
+		consts.QDLStatus,
+		consts.QCrawlDLRetries,
+		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanURLID,
+	)
+	if _, err := cs.q.Exec(query, consts.MaxCrawlDLRetries, consts.DLStatusFailed, consts.MaxCrawlDLRetries, channelURLID); err != nil {
+		return fmt.Errorf("failed to use up crawl retries for channel URL %d: %w", channelURLID, err)
+	}
+	return nil
+}
+
 // DisplaySettings displays fields relevant to a channel.
 func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	notifyURLs, err := cs.GetNotifyURLs(c.ID)

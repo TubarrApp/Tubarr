@@ -52,7 +52,7 @@
               </p>
             </div>
 
-            <div x-data="availableData()" x-init="init()" @download-as-done.window="delete selected[$event.detail.id]; refreshAfterAction()">
+            <div x-data="availableData()" x-init="init()" @download-as-done.window="downloadAsDone($event.detail)">
               <!-- Loading State -->
               <div x-show="loading" class="text-center py-12">
                 <div class="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
@@ -161,6 +161,15 @@
                     </button>
                     <button
                       x-show="!ignoredView"
+                      @click="$dispatch('download-as', downloadAsVideos)"
+                      :disabled="downloadAsVideos.length === 0 || working"
+                      :title="selectedCount > 0 && downloadAsVideos.length === 0 ? 'Download As gives the same options to videos from one channel URL, so select videos from just one.' : 'Download the selected videos with the same Download As options.'"
+                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      Download As…<span x-show="selectedCount > 0" x-text="` (${selectedCount})`"></span>
+                    </button>
+                    <button
+                      x-show="!ignoredView"
                       @click="act('download')"
                       :disabled="selectedCount === 0 || working"
                       class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -226,6 +235,12 @@
                           style="bottom: 0.5rem; right: 0.5rem;"
                           x-text="formatDuration(video.duration)"
                         ></span>
+                        <span
+                          x-show="video.customized"
+                          class="available-overlay"
+                          style="bottom: 0.5rem; left: 0.5rem;"
+                          title="Downloads of this video use its own Download As options. Open Download As to see or change them."
+                        >Customized</span>
                       </div>
                       <div class="p-3">
                         <a
@@ -529,6 +544,22 @@
             if (errors.length > 0) {
               alert(`Some videos could not be updated:\n\n${errors.join('\n')}`);
             }
+          },
+
+          // The selected videos, if they're all from one channel URL, for Download As to give the same options.
+          get downloadAsVideos() {
+            const chosen = Object.values(this.selected);
+            const first = chosen[0];
+            const oneURL = chosen.every(v => v.channel_id === first.channel_id && v.channel_url_id === first.channel_url_id);
+            return chosen.length > 0 && oneURL ? chosen : [];
+          },
+
+          // Deselects the videos Download As started, then reloads the list.
+          downloadAsDone(detail) {
+            for (const v of [].concat(detail)) {
+              delete this.selected[v.id];
+            }
+            this.refreshAfterAction();
           },
 
           // Reloads the list, keeping the filters and page valid.

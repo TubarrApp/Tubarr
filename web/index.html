@@ -522,6 +522,12 @@
                                     style="bottom: 0.5rem; right: 0.5rem;"
                                     x-text="formatDuration(video.duration)"
                                   ></span>
+                                  <span
+                                    x-show="video.customized"
+                                    class="available-overlay"
+                                    style="bottom: 0.5rem; left: 0.5rem;"
+                                    title="Downloads of this video use its own Download As options. Open Download As to see or change them."
+                                  >Customized</span>
                                 </div>
                                 <div class="p-4 bg-white dark:bg-white/[0.03]">
                                   <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-2 line-clamp-2 min-h-[2.5rem]" x-text="video.title"></h4>

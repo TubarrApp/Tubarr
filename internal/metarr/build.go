@@ -4,14 +4,13 @@ package metarr
 import (
 	"cmp"
 	"strconv"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 
-	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/logging"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
@@ -80,7 +79,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	addEach(metkeys.FilenameOps, filenameOps)
 	addEach(metkeys.MetaOps, metaOps)
 	if len(metaOps) > 0 {
-		logger.Pl.I("User set meta ops, will set meta overwrite key...")
+		logger.Pl.D(3, "User set meta ops, will set meta overwrite key...")
 		args = append(args, metkeys.MetaOW)
 	}
 	if maxCPU := cmp.Or(o.MaxCPU, m.MaxCPU); maxCPU > 0 {
@@ -90,6 +89,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	add(metkeys.OutputDir, parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)))
 	add(metkeys.Ext, ext)
 	add(metkeys.RenameStyle, cmp.Or(o.RenameStyle, m.RenameStyle))
+
 	// Metarr keeps the original video unless told otherwise, and Tubarr deletes it unless the channel keeps it.
 	if m.PurgeOriginalVideo == nil || *m.PurgeOriginalVideo {
 		args = append(args, metkeys.PurgeOriginalVideo)
@@ -107,19 +107,24 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	add(metkeys.TranscodeQuality, cmp.Or(o.TranscodeQuality, m.TranscodeQuality))
 	addEach(metkeys.TranscodeAudioCodecs, audioCodecs)
 
-	// Other
-	add(metkeys.Debug, configString(keys.DebugLevel))
+	// Other.
+	// debugLevel := strconv.FormatInt(int64(logging.Level()), 10)
+	// if debugLevel == "" || debugLevel == "0" {
+	// 	debugLevel = configString(keys.DebugLevel)
+	// }
+	add(metkeys.Debug, strconv.FormatInt(int64(logging.Level()), 10))
+
 	// No metadata purge: Tubarr purges once it has read the file, see finishMetafile.
 	return args
 }
 
-// configString returns the global config value for key if it was set, never a flag's default.
-func configString(key string) string {
-	if !abstractions.IsSet(key) {
-		return ""
-	}
-	return abstractions.GetString(key)
-}
+// // configString returns the global config value for key if it was set, never a flag's default.
+// func configString(key string) string {
+// 	if !abstractions.IsSet(key) {
+// 		return ""
+// 	}
+// 	return abstractions.GetString(key)
+// }
 
 // parseMetarrOutputDir parses and returns the output directory.
 func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
@@ -128,7 +133,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *par
 	switch {
 	// Download As output directory, chosen for this video.
 	case v.Overrides != nil && v.Overrides.OutputDir != "":
-		dir, name = v.Overrides.OutputDir, "Download As output directory"
+		dir, name = v.Overrides.OutputDir, "'Download As...' output directory"
 	// #1 Priority: Move operation filter output directory.
 	case v.MoveOpOutputDir != "":
 		dir = v.MoveOpOutputDir

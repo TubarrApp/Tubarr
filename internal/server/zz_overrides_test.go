@@ -12,7 +12,9 @@ import (
 	"tubarr/internal/app"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/jsonkeys"
+	"tubarr/internal/metarr"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/repo"
 )
 
@@ -80,6 +82,98 @@ func TestCheckOverridesFit(t *testing.T) {
 		err := checkOverridesFit(&repo.ChannelStore{}, c, tt.urlID, &models.VideoOverrides{MetarrArgs: tt.o})
 		if (err == nil) != tt.fits {
 			t.Errorf("%s: got error %v, want fits %t", tt.name, err, tt.fits)
+		}
+	}
+}
+
+// TestMatchesChannelURL tests that Download As options are only overrides where they differ from the channel URL's, so
+// the dialog's defaults sent back unchanged aren't kept.
+func TestMatchesChannelURL(t *testing.T) {
+	metaOps, err := parsing.ParseMetaOps([]string{"title:prefix:[Cats] "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filteredMetaOps, err := parsing.ParseFilteredMetaOps([]string{"title:contains:cat||genre:set:Cats"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filenameOps, err := parsing.ParseFilenameOps([]string{"date-tag:prefix:ymd"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filteredFilenameOps, err := parsing.ParseFilteredFilenameOps([]string{"title:contains:cat||prefix:[Cats] "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cu := &models.ChannelURL{
+		ID:              1,
+		ChanURLSettings: &models.Settings{VideoDir: "/videos", YtdlpOutputExt: "mkv"},
+		ChanURLMetarrArgs: &models.MetarrArgs{
+			MetaOps:             metaOps,
+			FilteredMetaOps:     filteredMetaOps,
+			FilenameOps:         filenameOps,
+			FilteredFilenameOps: filteredFilenameOps,
+			OutputExt:           "mp4",
+			OutputDir:           "/out",
+		},
+	}
+	c := &models.Channel{URLModels: []*models.ChannelURL{cu}}
+	cs := &repo.ChannelStore{}
+
+	// The dialog's defaults sent back as Revert to Defaults leaves them: the channel URL's ops, the rest blank.
+	defaults, err := metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent, err := parseOverrideLines(&models.OverrideLines{
+		MetaOps:             defaults.MetaOps,
+		FilteredMetaOps:     defaults.FilteredMetaOps,
+		FilenameOps:         defaults.FilenameOps,
+		FilteredFilenameOps: defaults.FilteredFilenameOps,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !matchesChannelURL(cs, c, cu.ID, sent) {
+		t.Fatalf("the dialog's defaults %+v didn't match the channel URL's", defaults)
+	}
+
+	// Anything else set must be the channel URL's own value.
+	tests := []struct {
+		name    string
+		o       models.VideoOverrides
+		matches bool
+	}{
+		{"the channel URL's values typed in", models.VideoOverrides{VideoDir: "/videos", YtdlpOutputExt: "mkv", MetarrArgs: models.MetarrArgs{OutputExt: "mp4"}}, true},
+		{"a filename", models.VideoOverrides{Filename: "Chosen"}, false},
+		{"a stripped thumbnail", models.VideoOverrides{StripThumbnail: true}, false},
+		{"another video directory", models.VideoOverrides{VideoDir: "/elsewhere"}, false},
+		{"preferred video codecs", models.VideoOverrides{YTDLPPreferredVideoCodecs: []string{"av1"}}, false},
+		{"another output extension", models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputExt: "mkv"}}, false},
+		{"a transcode quality", models.VideoOverrides{MetarrArgs: models.MetarrArgs{TranscodeQuality: "23"}}, false},
+		{"the channel URL's output directory, which beats move ops", models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputDir: "/out"}}, false},
+	}
+	for _, tt := range tests {
+		o := tt.o
+		o.MetaOps = sent.MetaOps
+		o.FilteredMetaOps = sent.FilteredMetaOps
+		o.FilenameOps = sent.FilenameOps
+		o.FilteredFilenameOps = sent.FilteredFilenameOps
+		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+			t.Errorf("%s: got match %t, want %t", tt.name, got, tt.matches)
+		}
+	}
+
+	// The op boxes replace the channel URL's ops, so emptying or adding to them makes overrides.
+	moreOps, err := parsing.ParseMetaOps([]string{"title:prefix:[Cats] ", "album:set:Pets"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, ops := range map[string][]models.MetaOps{"emptied": nil, "added to": moreOps} {
+		o := *sent
+		o.MetaOps = ops
+		if matchesChannelURL(cs, c, cu.ID, &o) {
+			t.Errorf("meta ops %s matched the channel URL's", name)
 		}
 	}
 }

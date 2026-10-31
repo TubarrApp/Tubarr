@@ -130,7 +130,7 @@ func TestAvailableVideosAPI(t *testing.T) {
 		t.Errorf("expected 400 for a missing file, got %d", w.Code)
 	}
 
-	// Overrides are rejected when invalid, or not for downloading one video, leaving the videos available.
+	// Overrides are rejected when invalid or not for a download, leaving the videos available.
 	notADir := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(notADir, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -138,12 +138,27 @@ func TestAvailableVideosAPI(t *testing.T) {
 	for name, body := range map[string]string{
 		"invalid op":  fmt.Sprintf(`{"action":"download","video_ids":[%d],"overrides":{"meta_ops":"artist:bogus:x"}}`, videos[0].ID),
 		"file as dir": fmt.Sprintf(`{"action":"download","video_ids":[%d],"overrides":{"video_dir":%q}}`, videos[0].ID, notADir),
-		"two videos":  fmt.Sprintf(`{"action":"download","video_ids":[%d,%d],"overrides":{"filename":"x"}}`, videos[0].ID, videos[1].ID),
 		"dismiss":     fmt.Sprintf(`{"action":"dismiss","video_ids":[%d],"overrides":{"filename":"x"}}`, videos[0].ID),
 		"unknown key": fmt.Sprintf(`{"action":"download","video_ids":[%d],"overrides":{"name":"x"}}`, videos[0].ID),
 	} {
 		if w := serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/available", chanID), "application/json", body); w.Code != http.StatusBadRequest {
 			t.Errorf("%s: expected 400, got %d %s", name, w.Code, w.Body.String())
+		}
+	}
+
+	// So are a filename or thumbnail for several videos, and options for videos from more than one channel URL.
+	noURL, err := fuzzServer.db.Exec(`INSERT INTO videos (channel_id, channel_url, finished, ignored, url) VALUES (?, '', 0, 0, 'https://example.com/v/no-url')`, chanID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noURLID, _ := noURL.LastInsertId()
+	for body, want := range map[string]string{
+		fmt.Sprintf(`{"action":"download","video_ids":[%d,%d],"overrides":{"filename":"x"}}`, videos[0].ID, videos[1].ID):                          "not several",
+		fmt.Sprintf(`{"action":"download","video_ids":[%d,%d],"overrides":{"thumbnail":"https://example.com/t.jpg"}}`, videos[0].ID, videos[1].ID): "not several",
+		fmt.Sprintf(`{"action":"download","video_ids":[%d,%d],"overrides":{"meta_ops":"album:set:Pets"}}`, videos[0].ID, noURLID):                  "one channel URL",
+	} {
+		if w := serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/available", chanID), "application/json", body); w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), want) {
+			t.Errorf("%s: got %d %s, want 400 saying %q", body, w.Code, w.Body.String(), want)
 		}
 	}
 	if remaining := listAvailable(); len(remaining) != 2 {
@@ -156,6 +171,22 @@ func TestAvailableVideosAPI(t *testing.T) {
 	}
 	if w := serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/available", chanID), "application/json", fmt.Sprintf(`{"action":"download","video_ids":[%d],"overrides":{"filename":"x"}}`, videos[0].ID)); w.Code != http.StatusConflict {
 		t.Errorf("already downloading: expected 409, got %d %s", w.Code, w.Body.String())
+	}
+
+	// So does Download As with only the channel URL's options, though they aren't kept.
+	if w := serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/available", chanID), "application/json", fmt.Sprintf(`{"action":"download","video_ids":[%d],"overrides":{"meta_ops":"artist:set:Cats"}}`, videos[0].ID)); w.Code != http.StatusConflict {
+		t.Errorf("already downloading, with the channel URL's options: expected 409, got %d %s", w.Code, w.Body.String())
+	}
+
+	// Download As for several videos from one channel URL gets past its checks too.
+	if _, err := vs.ClaimVideos(chanID, []int64{videos[1].ID}, app.AvailableStatuses, consts.DLStatusQueued); err != nil {
+		t.Fatal(err)
+	}
+	if w := serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/available", chanID), "application/json", fmt.Sprintf(`{"action":"download","video_ids":[%d,%d],"overrides":{"meta_ops":"album:set:Pets"}}`, videos[0].ID, videos[1].ID)); w.Code != http.StatusConflict {
+		t.Errorf("several videos already downloading: expected 409, got %d %s", w.Code, w.Body.String())
+	}
+	if _, err := vs.ClaimVideos(chanID, []int64{videos[1].ID}, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusAvailable); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := vs.ClaimVideos(chanID, []int64{videos[0].ID}, []consts.DownloadStatus{consts.DLStatusQueued}, consts.DLStatusFailed); err != nil {
 		t.Fatal(err)
@@ -171,6 +202,13 @@ func TestAvailableVideosAPI(t *testing.T) {
 	}
 	if got := getOverrideOps(videos[0].ID); got.Saved == nil || got.Saved.Filename != "Chosen" || got.Saved.OutputDir != "/chosen" || got.Saved.MetaOps != "album:set:Pets" || got.Defaults.MetaOps != "artist:set:Cats" {
 		t.Errorf("earlier overrides: got %+v", got)
+	}
+
+	// Available marks the video with them customized.
+	for _, v := range listAvailable() {
+		if v.Customized != (v.ID == videos[0].ID) {
+			t.Errorf("video %d: got customized %t", v.ID, v.Customized)
+		}
 	}
 
 	// Unknown actions are rejected, and dismissing removes the video from the list.
@@ -213,6 +251,23 @@ func TestAvailableVideosAPI(t *testing.T) {
 	}
 	if o, err := vs.GetVideoOverrides(pendingID); err != nil || o == nil || o.OutputDir != out || len(o.MetaOps) != 1 || o.OutputExt != "mkv" {
 		t.Errorf("edit & run stored overrides %+v, %v", o, err)
+	}
+
+	// Edit & Run with only the channel URL's options, its video directory typed in, clears the video's own.
+	res, err = fuzzServer.db.Exec(`INSERT INTO videos (channel_id, channel_url_id, channel_url, finished, ignored, url, metarr_status)
+		VALUES (?, ?, 'https://example.com/@review', 1, 0, 'https://example.com/v/reverted', ?)`, chanID, cuID, consts.MetarrStatusFailed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revertedID, _ := res.LastInsertId()
+	if err := vs.SetVideoOverrides([]int64{revertedID}, &models.VideoOverrides{Filename: "Chosen"}); err != nil {
+		t.Fatal(err)
+	}
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"meta_ops":"artist:set:Cats","video_dir":%q}}`, revertedID, out)); code != http.StatusAccepted {
+		t.Fatalf("edit & run with the channel URL's options: got %d, want 202", code)
+	}
+	if o, err := vs.GetVideoOverrides(revertedID); err != nil || o != nil {
+		t.Errorf("edit & run with the channel URL's options kept overrides %+v, %v", o, err)
 	}
 
 	// Edit & Re-Run takes a video Metarr already processed, only as a re-run of given videos.

@@ -507,10 +507,15 @@ vp9:av1</code></pre>
               <p>
                 <strong>Download As…</strong> downloads one video with its own filename, directories, thumbnail, ops,
                 yt-dlp options and post-processing options, starting from its channel URL's. They're kept with the video,
-                so <strong>Edit &amp; Post-Process</strong> and <strong>Edit &amp; Re-Process</strong> open with them
-                later. Those two only run Metarr on files already downloaded, so they have no download options.
-                A <strong>Login</strong> entered there is used for that one download and never saved.
-                <strong>Revert to Defaults</strong> goes back to the channel URL's.
+                which Available marks <strong>Customized</strong>: downloading it again from there, e.g. after it fails
+                or is canceled, uses them too, and <strong>Edit &amp; Post-Process</strong> and
+                <strong>Edit &amp; Re-Process</strong> open with them later. Those two only run Metarr on files already
+                downloaded, so they have no download options. A <strong>Login</strong> entered in Download As is used
+                for that one download and never saved. <strong>Revert to Defaults</strong> goes back to the channel
+                URL's. Options left the same as the channel URL's aren't kept, so the video then isn't customized and
+                follows later changes to the channel URL. To give several videos from one channel URL the same options,
+                select them on Available and choose <strong>Download As…</strong> above the list. A filename or custom
+                thumbnail is for one video only.
               </p>
 
               <!-- ===== Queue ===== -->
@@ -536,6 +541,8 @@ vp9:av1</code></pre>
                 short random wait. If the site flags Tubarr as a bot, it stops at once. yt-dlp also retries dropped
                 connections itself within each run. On channel URLs that download new videos automatically, a video that
                 still fails is tried again by up to 3 later crawls, then waits on the Available page for you to retry.
+                Crawls don't retry videos you downloaded yourself. A crawl while the URL doesn't download automatically
+                leaves its failed videos to you as well, so turning automatic downloads back on only downloads new videos.
               </p>
 
               <!-- ===== Notifications ===== -->

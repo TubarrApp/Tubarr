@@ -588,7 +588,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 	}
 	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
-		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, d.%s, d.%s, d.%s, c.%s "+
+		"SELECT v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, v.%s, COALESCE(v.%s, '') != '', d.%s, d.%s, d.%s, c.%s "+
 			"FROM %s v JOIN %s d ON d.%s = v.%s JOIN %s c ON c.%s = v.%s "+
 			"WHERE v.%s = 0 AND (v.%s = 0 OR d.%s = ?) AND d.%s IN (%s) "+
 			"ORDER BY v.%s DESC, v.%s DESC, v.%s DESC",
@@ -602,6 +602,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		consts.QVidUploadDate,
 		consts.QVidDuration,
 		consts.QVidCreatedAt,
+		consts.QVidOverrides, // Customized, as only options differing from the channel URL's are stored.
 		consts.QDLStatus,
 		consts.QDLError,
 		consts.QCrawlDLRetries,
@@ -651,6 +652,7 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 			&uploadDate,
 			&duration,
 			&v.CreatedAt,
+			&v.Customized,
 			&v.DownloadStatus.Status,
 			&errorMsg,
 			&v.CrawlDLRetries,
@@ -764,13 +766,15 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 // QueueVideo claims one of the channel's videos for download, and reports whether it was claimed. A video the channel
 // doesn't have yet is stored as queued.
 //
-// A video the user chose can be claimed from any status except Queued or Downloading, and its crawls get their retries
-// back. A crawled video can only be claimed from Failed, as a crawl retry. A claimed video gets its stored URL, channel
-// URL and title.
+// A video the user chose can be claimed from any status except Queued or Downloading, and uses up its crawl retries, so
+// if its download fails it waits for the user. A crawled video can only be claimed from Failed, as a crawl retry. A
+// claimed video gets its stored URL, channel URL and title.
 func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) (bool, error) {
 	from := []consts.DownloadStatus{consts.DLStatusFailed}
+	crawlRetries := 0
 	if byUser {
 		from = []consts.DownloadStatus{consts.DLStatusAvailable, consts.DLStatusFailed, consts.DLStatusCanceled, consts.DLStatusCompleted, consts.DLStatusIgnored}
+		crawlRetries = consts.MaxCrawlDLRetries
 	}
 
 	tx, err := vs.DB.Begin()
@@ -788,12 +792,13 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 			}
 			//nolint:gosec // SQL identifiers are trusted constants.
 			insertQuery := fmt.Sprintf(
-				"INSERT INTO %s (%s, %s) VALUES (?, ?)",
+				"INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)",
 				consts.DBDownloads,
 				consts.QDLVidID,
 				consts.QDLStatus,
+				consts.QCrawlDLRetries,
 			)
-			if _, err := tx.Exec(insertQuery, v.ID, consts.DLStatusQueued); err != nil {
+			if _, err := tx.Exec(insertQuery, v.ID, consts.DLStatusQueued, crawlRetries); err != nil {
 				return false, fmt.Errorf("failed to queue video %q: %w", v.URL, err)
 			}
 			v.ChannelID = channelID
@@ -805,7 +810,7 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 
 	//nolint:gosec // SQL identifiers are trusted constants.
 	claimQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = 0, %s = '', %s = CASE WHEN ? THEN 0 ELSE %s END, %s = ? "+
+		"UPDATE %s SET %s = ?, %s = 0, %s = '', %s = CASE WHEN ? THEN ? ELSE %s END, %s = ? "+
 			"WHERE %s = ? AND %s IN (%s) AND %s IN (SELECT %s FROM %s WHERE %s = ?)",
 		consts.DBDownloads,
 		consts.QDLStatus,
@@ -817,7 +822,7 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 		consts.QDLStatus, placeholders(len(from)),
 		consts.QDLVidID, consts.QVidID, consts.DBVideos, consts.QVidChanID,
 	)
-	args := []any{consts.DLStatusQueued, byUser, now, v.ID}
+	args := []any{consts.DLStatusQueued, byUser, crawlRetries, now, v.ID}
 	for _, s := range from {
 		args = append(args, s)
 	}

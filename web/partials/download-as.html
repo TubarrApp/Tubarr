@@ -1,5 +1,6 @@
-<!-- Download As dialog: open with $dispatch('download-as', video), or $dispatch('edit-metarr', video) to edit a downloaded
-video's options and run Metarr (again, on its finished files, if video.rerun). Dispatches download-as-done or edit-metarr-done with the video once it starts, or
+<!-- Download As dialog: open with $dispatch('download-as', video), or an array of one channel URL's videos to give them the
+same options, or $dispatch('edit-metarr', video) to edit a downloaded video's options and run Metarr (again, on its finished
+files, if video.rerun). Dispatches download-as-done or edit-metarr-done with what it opened with once it starts, or
 download-as-cancel if Download As closes without starting. -->
 <div
   x-data="downloadAsDialog()"
@@ -13,7 +14,10 @@ download-as-cancel if Download As closes without starting. -->
 >
   <div class="w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900" style="max-height: 90vh;">
     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90" x-text="mode === 'metarr' ? (video?.rerun ? 'Edit & Re-Process' : 'Edit & Post-Process') : 'Download As'"></h3>
-    <p class="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" :title="video?.title" x-text="video?.title"></p>
+    <p class="mt-1 truncate text-sm text-gray-600 dark:text-gray-400" :title="videos.map(v => v.title).join('\n')" x-text="multiple ? `${videos.length} videos` : video?.title"></p>
+    <p x-show="multiple && videos.some(v => v.customized)" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      Some of these videos have their own Download As options, which these replace.
+    </p>
 
     <div x-show="loading" class="py-8 text-center">
       <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
@@ -24,11 +28,16 @@ download-as-cancel if Download As closes without starting. -->
         <div class="mb-1 flex items-center justify-between">
           <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">Filename</label>
           <div class="flex gap-3">
-            <button type="button" @click="form.filename = video.title" class="text-xs text-brand-500 hover:underline">Use title</button>
+            <button
+              type="button"
+              @click="form.filename = video.title"
+              :disabled="multiple"
+              class="text-xs text-brand-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+            >Use title</button>
             <button
               type="button"
               @click="addSetOp('all-titles', form.filename)"
-              :disabled="!form.filename?.trim()"
+              :disabled="multiple || !form.filename?.trim()"
               title="Add all-titles:set: with this filename to the meta ops, so the video's titles match it."
               class="text-xs text-brand-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
             >Apply to metadata</button>
@@ -37,10 +46,12 @@ download-as-cancel if Download As closes without starting. -->
         <input
           type="text"
           x-model="form.filename"
-          placeholder="Blank keeps the default naming"
-          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          :disabled="multiple"
+          :placeholder="multiple ? 'Not for several videos' : 'Blank keeps the default naming'"
+          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:bg-gray-800 dark:text-white"
         />
-        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Without the extension. Template tags like {{upload_date}} work. Replaces any set filename op.</p>
+        <p x-show="!multiple" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Without the extension. Template tags like {{upload_date}} work. Replaces any set filename op.</p>
+        <p x-show="multiple" class="mt-1 text-xs text-gray-500 dark:text-gray-400">A filename is for one video. To rename several, use filename ops.</p>
       </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         Blank directories use the defaults, shown faded. Metarr moves the finished video to the output directory, if there is one.
@@ -64,7 +75,7 @@ download-as-cancel if Download As closes without starting. -->
             class="h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90"
           >
             <option value="default">Default (the metadata's)</option>
-            <option value="custom">Custom image</option>
+            <option value="custom" :disabled="multiple" x-text="multiple ? 'Custom image (one video only)' : 'Custom image'"></option>
             <option value="none">None (remove it)</option>
           </select>
           <input
@@ -87,7 +98,7 @@ download-as-cancel if Download As closes without starting. -->
         <p x-show="thumbChoice === 'custom'" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload a JPEG, PNG or WebP image (up to 10 MB), or give a path on the server or a URL.</p>
       </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        The ops below are this video's channel URL's (or its last edits), one per line. Edits apply to this video only, and are kept for later post-processing runs. Filtered ops still apply only if all their filters match the video's metadata. Load adds an ops file's ops to its box.
+        The ops below are <span x-text="multiple ? `their channel URL's` : `this video's channel URL's (or its last edits)`"></span>, one per line. Edits apply to <span x-text="multiple ? 'these videos' : 'this video'"></span> only, and are kept for later post-processing runs. Filtered ops still apply only if all their filters match the video's metadata. Load adds an ops file's ops to its box.
       </p>
       <template x-for="box in boxes" :key="box.key">
         <div>
@@ -263,7 +274,7 @@ download-as-cancel if Download As closes without starting. -->
         Revert to Defaults
       </button>
       <button type="button" @click="close()" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
-      <button type="button" @click="submit()" :disabled="!loaded || working" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed" x-text="mode === 'metarr' ? (video?.rerun ? 'Re-Process' : 'Post-Process') : 'Download'"></button>
+      <button type="button" @click="submit()" :disabled="!loaded || working" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed" x-text="mode === 'metarr' ? (video?.rerun ? 'Re-Process' : 'Post-Process') : (multiple ? `Download (${videos.length})` : 'Download')"></button>
     </div>
   </div>
 </div>
@@ -271,6 +282,7 @@ download-as-cancel if Download As closes without starting. -->
   function downloadAsDialog() {
     return {
       video: null,
+      videos: [], // What it's open for: one video, or several from one channel URL, video being the first.
       mode: 'download', // Or 'metarr', for a downloaded video.
       form: { metarr: {} },
       defaults: {}, // The channel URL's directories and ops.
@@ -306,8 +318,15 @@ download-as-cancel if Download As closes without starting. -->
         return this.mode === 'metarr' ? this.dirs.filter(d => d.key === 'output_dir') : this.dirs;
       },
 
-      // Opens for a video, filled with its earlier edits, else its channel URL's ops.
-      async open(video, mode) {
+      // Several videos share the options, so they get no filename or custom thumbnail.
+      get multiple() {
+        return this.videos.length > 1;
+      },
+
+      // Opens for a video, filled with its earlier edits, else its channel URL's ops. Several videos open with the ops.
+      async open(detail, mode) {
+        this.videos = [].concat(detail);
+        const video = this.videos[0];
         this.video = video;
         this.mode = mode;
         this.defaults = {};
@@ -322,7 +341,7 @@ download-as-cancel if Download As closes without starting. -->
         this.loaded = false;
         this.loading = true;
         try {
-          const response = await fetch(`/api/v1/channels/${video.channel_id}/override-ops/${video.channel_url_id}?video=${video.id}`);
+          const response = await fetch(`/api/v1/channels/${video.channel_id}/override-ops/${video.channel_url_id}?video=${this.multiple ? '' : video.id}`);
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }
@@ -419,14 +438,15 @@ download-as-cancel if Download As closes without starting. -->
 
       close() {
         if (this.working || !this.video) return;
-        const video = this.video;
+        const opened = this.multiple ? this.videos : this.video;
         this.video = null;
-        if (this.mode === 'download') this.$dispatch('download-as-cancel', video);
+        if (this.mode === 'download') this.$dispatch('download-as-cancel', opened);
       },
 
       // Downloads the video, or runs Metarr on it, with the dialog's options, staying open on errors.
       async submit() {
         const video = this.video;
+        const opened = this.multiple ? this.videos : video;
         const options = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
         const { metarr: metarrForm, ...overrides } = this.form;
         overrides.strip_thumbnail = this.thumbChoice === 'none';
@@ -441,7 +461,7 @@ download-as-cancel if Download As closes without starting. -->
         try {
           const response = this.mode === 'metarr'
             ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides, metarr, rerun: video.rerun }) })
-            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: [video.id], overrides, metarr, auth: login }) });
+            : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: this.videos.map(v => v.id), overrides, metarr, auth: login }) });
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }
@@ -452,7 +472,7 @@ download-as-cancel if Download As closes without starting. -->
           this.working = false;
         }
         this.video = null;
-        this.$dispatch(this.mode === 'metarr' ? 'edit-metarr-done' : 'download-as-done', video);
+        this.$dispatch(this.mode === 'metarr' ? 'edit-metarr-done' : 'download-as-done', opened);
       }
     };
   }

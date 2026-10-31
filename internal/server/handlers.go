@@ -970,7 +970,7 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	var requestBody struct {
 		Action    string                `json:"action"`
 		VideoIDs  []int64               `json:"video_ids"`
-		Overrides *models.OverrideLines `json:"overrides"` // Download As, for one video.
+		Overrides *models.OverrideLines `json:"overrides"` // Download As, for one video or several from one channel URL.
 		Metarr    *metarrArgsInput      `json:"metarr"`    // Download As's other Metarr args, with the overrides.
 		Auth      *models.ManualAuth    `json:"auth"`      // Login details for this download only, never stored.
 	}
@@ -1004,13 +1004,19 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 
 	var overrides *models.VideoOverrides
 	if requestBody.Overrides != nil {
-		if status != consts.DLStatusQueued || len(requestBody.VideoIDs) != 1 {
-			http.Error(w, "overrides need a download of one video", http.StatusBadRequest)
+		if status != consts.DLStatusQueued {
+			http.Error(w, "overrides need a download", http.StatusBadRequest)
 			return
 		}
 		var err error
 		if overrides, err = parseOverrideLines(requestBody.Overrides, requestBody.Metarr); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Several videos can't share a filename or a custom thumbnail.
+		if len(requestBody.VideoIDs) > 1 && (overrides.Filename != "" || overrides.Thumbnail != "") {
+			http.Error(w, "a filename or custom thumbnail is for one video, not several", http.StatusBadRequest)
 			return
 		}
 	}
@@ -1024,21 +1030,38 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if overrides != nil {
+		// Videos given the same options must share the channel URL they're checked against.
 		channelURLID, err := ss.vs.GetVideoChannelURLID(requestBody.VideoIDs[0])
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		for _, id := range requestBody.VideoIDs[1:] {
+			otherURLID, err := ss.vs.GetVideoChannelURLID(id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if otherURLID != channelURLID {
+				http.Error(w, "videos given Download As options together must be from one channel URL", http.StatusBadRequest)
+				return
+			}
+		}
 		if err := checkOverridesFit(ss.cs, c, channelURLID, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		// Options no different from the channel URL's aren't overrides, so the video keeps following the channel URL's.
+		if matchesChannelURL(ss.cs, c, channelURLID, overrides) {
+			overrides = nil
+		}
 	}
 
-	// Download As overrides replace any earlier ones, and a plain download clears them.
+	// Download As overrides replace any earlier ones, and a plain download keeps them.
 	if status == consts.DLStatusQueued {
 		logger.Pl.I("Queuing download of %d available video(s) for channel %q via web request", len(requestBody.VideoIDs), c.Name)
-		queued, err := ss.dq.Add(c, app.AvailableRequests(requestBody.VideoIDs, requestBody.Auth, true, overrides)...)
+		queued, err := ss.dq.Add(c, app.AvailableRequests(requestBody.VideoIDs, requestBody.Auth, requestBody.Overrides != nil, overrides)...)
 		if err != nil {
 			logger.Pl.E("Encountered errors queuing available videos for channel %q: %v", c.Name, err)
 			if len(queued) == 0 {
@@ -1046,8 +1069,8 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 				return
 			}
 		}
-		if overrides != nil && len(queued) == 0 {
-			http.Error(w, "video is no longer available, it may already be downloading", http.StatusConflict)
+		if requestBody.Overrides != nil && len(queued) == 0 {
+			http.Error(w, "video(s) no longer available, they may already be downloading", http.StatusConflict)
 			return
 		}
 		writeJSON(w, r, http.StatusAccepted, map[string]int{"count": len(queued)})
@@ -1373,6 +1396,11 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 		if err := checkOverridesFit(ss.cs, c, awaiting[i].ChannelURLID, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+
+		// Options no different from the channel URL's aren't overrides, so the video goes back to the channel URL's.
+		if matchesChannelURL(ss.cs, c, awaiting[i].ChannelURLID, overrides) {
+			overrides = nil
 		}
 		if err := ss.vs.SetVideoOverrides(requestBody.VideoIDs, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

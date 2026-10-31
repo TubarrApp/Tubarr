@@ -126,6 +126,9 @@ func runWithProgress(cmd *exec.Cmd, videoID int64) (string, error) {
 		out.WriteString(sc.Text())
 		out.WriteByte('\n')
 	}
+	if err := sc.Err(); err != nil {
+		logger.Pl.E("Metarr output scanner for video with ID %d encountered error: %v", videoID, err)
+	}
 	_, _ = io.Copy(io.Discard, pipe) // Lets Metarr finish if a line was too long to scan.
 	return out.String(), cmd.Wait()
 }

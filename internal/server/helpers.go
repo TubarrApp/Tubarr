@@ -17,6 +17,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
+	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/queue"
@@ -958,6 +959,54 @@ func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		return fmt.Errorf("invalid post-processing options: %w", err)
 	}
 	return nil
+}
+
+// matchesChannelURL reports whether Download As options give the video nothing its channel URL doesn't already, so they
+// aren't overrides. Blank options use the channel URL's, and the op boxes replace its ops.
+func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLID int64, o *models.VideoOverrides) bool {
+	// The channel URL's settings and ops, as Download As shows them.
+	file.UpdateFromConfigFile(cs, c)
+	cu, err := queue.ManualChannelURL(cs, c, channelURLID)
+	if err != nil || cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
+		return false
+	}
+	defaults, err := metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
+	if err != nil {
+		return false
+	}
+
+	// No filename or thumbnail of its own, nor an output directory, which beats move ops even when it's the channel URL's.
+	if o.Filename != "" || o.Thumbnail != "" || o.StripThumbnail || o.OutputDir != "" {
+		return false
+	}
+
+	// The channel URL's ops.
+	saved := metarr.VideoOverrideLines(o)
+	if saved.MetaOps != defaults.MetaOps || saved.FilteredMetaOps != defaults.FilteredMetaOps ||
+		saved.FilenameOps != defaults.FilenameOps || saved.FilteredFilenameOps != defaults.FilteredFilenameOps {
+		return false
+	}
+
+	// Every other option blank or the channel URL's, merged as yt-dlp and Metarr get them.
+	s, m := cu.ChanURLSettings, cu.ChanURLMetarrArgs
+	return cmp.Or(o.VideoDir, s.VideoDir) == s.VideoDir &&
+		cmp.Or(o.JSONDir, s.JSONDir) == s.JSONDir &&
+		cmp.Or(o.YtdlpOutputExt, s.YtdlpOutputExt) == s.YtdlpOutputExt &&
+		cmp.Or(o.MaxFilesize, s.MaxFilesize) == s.MaxFilesize &&
+		cmp.Or(o.ExtraYTDLPVideoArgs, s.ExtraYTDLPVideoArgs) == s.ExtraYTDLPVideoArgs &&
+		(len(o.YTDLPPreferredVideoCodecs) == 0 || slices.Equal(o.YTDLPPreferredVideoCodecs, s.YTDLPPreferredVideoCodecs)) &&
+		(len(o.YTDLPPreferredAudioCodecs) == 0 || slices.Equal(o.YTDLPPreferredAudioCodecs, s.YTDLPPreferredAudioCodecs)) &&
+		cmp.Or(o.OutputExt, m.OutputExt) == m.OutputExt &&
+		cmp.Or(o.RenameStyle, m.RenameStyle) == m.RenameStyle &&
+		cmp.Or(o.MetaPurge, m.MetaPurge) == m.MetaPurge &&
+		cmp.Or(o.MaxCPU, m.MaxCPU) == m.MaxCPU &&
+		cmp.Or(o.MinFreeMem, m.MinFreeMem) == m.MinFreeMem &&
+		cmp.Or(o.TranscodeGPU, m.TranscodeGPU) == m.TranscodeGPU &&
+		cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode) == m.TranscodeGPUNode &&
+		cmp.Or(o.TranscodeQuality, m.TranscodeQuality) == m.TranscodeQuality &&
+		cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs) == m.ExtraFFmpegArgs &&
+		(len(o.TranscodeVideoCodecs) == 0 || slices.Equal(o.TranscodeVideoCodecs, m.TranscodeVideoCodecs)) &&
+		(len(o.TranscodeAudioCodecs) == 0 || slices.Equal(o.TranscodeAudioCodecs, m.TranscodeAudioCodecs))
 }
 
 // splitNonEmptyLines splits a string by newlines and filters out empty lines.

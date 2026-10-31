@@ -104,9 +104,14 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Failed videos wait in the Available list, so only auto-downloading URLs retry them (canceled ones are never retried).
+		// A crawl while the URL doesn't auto download leaves its failed videos to the user, so turning it back on only
+		// downloads new videos.
 		seenURLs := existingURLs
 		if !c.AutoDownloads(cu) {
 			seenURLs = slices.Concat(existingURLs, failedURLs)
+			if err := cs.UseUpCrawlDLRetries(cu.ID); err != nil {
+				logger.Pl.E("Failed to use up crawl retries for channel URL %q: %v", cu.URL, err)
+			}
 		}
 
 		// Fetch new episode URLs
