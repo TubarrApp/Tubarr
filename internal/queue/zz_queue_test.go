@@ -50,13 +50,14 @@ func TestWithYtdlpOverrides(t *testing.T) {
 	cu := &models.ChannelURL{URL: "https://example.com/@cats", ChanURLSettings: &models.Settings{
 		YtdlpOutputExt:            "mp4",
 		MaxFilesize:               "1g",
+		MaxResolution:             "1080",
 		YTDLPPreferredVideoCodecs: []string{"h264"},
 		YTDLPPreferredAudioCodecs: []string{"aac"},
 	}}
-	got := withYtdlpOverrides(cu, &models.VideoOverrides{YtdlpOutputExt: "mkv", YTDLPPreferredVideoCodecs: []string{"av1", "vp9"}})
+	got := withYtdlpOverrides(cu, &models.VideoOverrides{YtdlpOutputExt: "mkv", MaxResolution: "720", YTDLPPreferredVideoCodecs: []string{"av1", "vp9"}})
 
 	s := got.ChanURLSettings
-	if s.YtdlpOutputExt != "mkv" || s.MaxFilesize != "1g" || len(s.YTDLPPreferredVideoCodecs) != 2 || s.YTDLPPreferredAudioCodecs[0] != "aac" {
+	if s.YtdlpOutputExt != "mkv" || s.MaxFilesize != "1g" || s.MaxResolution != "720" || len(s.YTDLPPreferredVideoCodecs) != 2 || s.YTDLPPreferredAudioCodecs[0] != "aac" {
 		t.Errorf("got settings %+v", s)
 	}
 	if got.URL != cu.URL {

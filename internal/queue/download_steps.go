@@ -232,6 +232,7 @@ func withYtdlpOverrides(cu *models.ChannelURL, o *models.VideoOverrides) *models
 	s := *cu.ChanURLSettings
 	s.YtdlpOutputExt = cmp.Or(o.YtdlpOutputExt, s.YtdlpOutputExt)
 	s.MaxFilesize = cmp.Or(o.MaxFilesize, s.MaxFilesize)
+	s.MaxResolution = cmp.Or(o.MaxResolution, s.MaxResolution)
 	s.ExtraYTDLPVideoArgs = cmp.Or(o.ExtraYTDLPVideoArgs, s.ExtraYTDLPVideoArgs)
 	if len(o.YTDLPPreferredVideoCodecs) > 0 {
 		s.YTDLPPreferredVideoCodecs = o.YTDLPPreferredVideoCodecs

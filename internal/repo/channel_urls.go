@@ -522,6 +522,7 @@ func mergeSettings(u, ch *models.Settings) {
 	u.ExternalDownloader = cmp.Or(u.ExternalDownloader, ch.ExternalDownloader)
 	u.ExternalDownloaderArgs = cmp.Or(u.ExternalDownloaderArgs, ch.ExternalDownloaderArgs)
 	u.MaxFilesize = cmp.Or(u.MaxFilesize, ch.MaxFilesize)
+	u.MaxResolution = cmp.Or(u.MaxResolution, ch.MaxResolution)
 	u.Retries = cmp.Or(u.Retries, ch.Retries)
 	u.UseGlobalCookies = inheritBool(u.UseGlobalCookies, ch.UseGlobalCookies)
 	u.YtdlpOutputExt = cmp.Or(u.YtdlpOutputExt, ch.YtdlpOutputExt)

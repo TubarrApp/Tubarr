@@ -85,6 +85,7 @@ func VideoOverrideLines(o *models.VideoOverrides) models.OverrideLines {
 		StripThumbnail:            o.StripThumbnail,
 		YtdlpOutputExt:            o.YtdlpOutputExt,
 		MaxFilesize:               o.MaxFilesize,
+		MaxResolution:             o.MaxResolution,
 		ExtraYTDLPVideoArgs:       o.ExtraYTDLPVideoArgs,
 		YTDLPPreferredVideoCodecs: strings.Join(o.YTDLPPreferredVideoCodecs, "\n"),
 		YTDLPPreferredAudioCodecs: strings.Join(o.YTDLPPreferredAudioCodecs, "\n"),

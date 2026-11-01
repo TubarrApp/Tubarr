@@ -129,7 +129,7 @@ download-as-cancel if Download As closes without starting. -->
         <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">Download options</summary>
         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">How yt-dlp downloads this video. Blank options use the channel URL's. <a href="help.html#ytdlp" target="_blank" class="text-brand-500 hover:underline">Help</a></p>
         <div class="mt-3 grid grid-cols-2 gap-2">
-          <div>
+          <div class="col-span-2">
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Download Extension</label>
             <select x-model="form.ytdlp_output_ext" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
               <option value="" x-text="defaultLabel('ytdlp_output_ext')"></option>
@@ -146,6 +146,10 @@ download-as-cancel if Download As closes without starting. -->
             <input type="text" x-model="form.max_filesize" :placeholder="defaultLabel('max_filesize')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
           <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Max Resolution</label>
+            <input type="text" x-model="form.max_resolution" :placeholder="defaultLabel('max_resolution')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Preferred Video Codecs</label>
             <textarea x-model="form.ytdlp_preferred_video_codecs" :placeholder="defaultLabel('ytdlp_preferred_video_codecs')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line, most wanted first (e.g., av1, vp9, h264)</p>
@@ -158,24 +162,6 @@ download-as-cancel if Download As closes without starting. -->
           <div class="col-span-2">
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
             <input type="text" x-model="form.extra_ytdlp_video_args" :placeholder="defaultLabel('extra_ytdlp_video_args')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-          </div>
-        </div>
-      </details>
-      <details x-ref="login" x-show="mode === 'download'">
-        <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">Login</summary>
-        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Used to log in for this download only, and not saved. Blank uses the channel URL's login, if it has one.</p>
-        <div class="mt-3 grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Username</label>
-            <input type="text" x-model="auth.username" autocomplete="off" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Password</label>
-            <input type="password" x-model="auth.password" autocomplete="new-password" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-          </div>
-          <div class="col-span-2">
-            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Login URL</label>
-            <input type="text" x-model="auth.login_url" placeholder="https://example.com/login" autocomplete="off" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
         </div>
       </details>
@@ -256,6 +242,24 @@ download-as-cancel if Download As closes without starting. -->
           <div class="col-span-2">
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
             <input type="text" x-model="form.metarr.metarr_extra_ffmpeg_args" :placeholder="defaultLabel('metarr_extra_ffmpeg_args')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+        </div>
+      </details>
+      <details x-ref="login" x-show="mode === 'download'">
+        <summary class="cursor-pointer select-none text-sm font-medium text-brand-500">Login</summary>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Used to log in for this download only, and not saved. Blank uses the channel URL's login, if it has one.</p>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Username</label>
+            <input type="text" x-model="auth.username" autocomplete="off" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Password</label>
+            <input type="password" x-model="auth.password" autocomplete="new-password" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Login URL</label>
+            <input type="text" x-model="auth.login_url" placeholder="https://example.com/login" autocomplete="off" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
         </div>
       </details>

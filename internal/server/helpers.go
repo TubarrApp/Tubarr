@@ -235,6 +235,7 @@ type settingsResponse struct {
 	CrawlFreq              int      `json:"crawl_freq,omitempty"`
 	DownloadRetries        int      `json:"download_retries,omitempty"`
 	MaxFilesize            string   `json:"max_filesize,omitempty"`
+	MaxResolution          string   `json:"max_resolution,omitempty"`
 	FromDate               string   `json:"from_date,omitempty"`
 	ToDate                 string   `json:"to_date,omitempty"`
 	FilterFile             string   `json:"filter_file,omitempty"`
@@ -267,6 +268,7 @@ func newSettingsResponse(s *models.Settings) *settingsResponse {
 		CrawlFreq:              max(s.CrawlFreq, 0),
 		DownloadRetries:        max(s.Retries, 0),
 		MaxFilesize:            s.MaxFilesize,
+		MaxResolution:          s.MaxResolution,
 		FromDate:               s.FromDate,
 		ToDate:                 s.ToDate,
 		FilterFile:             s.FilterFile,
@@ -430,6 +432,7 @@ type settingsInput struct {
 	JSONDir                   *string  `json:"json_directory"`
 	VideoDir                  *string  `json:"video_directory"`
 	MaxFilesize               *string  `json:"max_filesize"`
+	MaxResolution             *string  `json:"max_resolution"`
 	YtdlpOutputExt            *string  `json:"ytdlp_output_ext"`
 	FromDate                  *string  `json:"from_date"`
 	ToDate                    *string  `json:"to_date"`
@@ -627,6 +630,7 @@ func (in *settingsInput) input() *models.SettingsInput {
 		ExternalDownloader:        in.ExternalDownloader,
 		ExternalDownloaderArgs:    in.ExternalDownloaderArgs,
 		MaxFilesize:               in.MaxFilesize,
+		MaxResolution:             in.MaxResolution,
 		YTDLPOutputExt:            in.YtdlpOutputExt,
 		FromDate:                  in.FromDate,
 		ToDate:                    in.ToDate,
@@ -767,6 +771,7 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 		ExternalDownloader:        formString(r, jsonkeys.SettingsExternalDownloader),
 		ExternalDownloaderArgs:    formString(r, jsonkeys.SettingsExternalDownloaderArgs),
 		MaxFilesize:               formString(r, jsonkeys.SettingsMaxFilesize),
+		MaxResolution:             formString(r, jsonkeys.SettingsMaxResolution),
 		YTDLPOutputExt:            formString(r, jsonkeys.SettingsYtdlpOutputExt),
 		FromDate:                  formString(r, jsonkeys.SettingsFromDate),
 		ToDate:                    formString(r, jsonkeys.SettingsToDate),
@@ -884,6 +889,9 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 	if o.MaxFilesize, err = validation.ValidateMaxFilesize(l.MaxFilesize); err != nil {
 		return nil, err
 	}
+	if o.MaxResolution, err = sharedvalidation.ValidateMaxResolution(l.MaxResolution); err != nil {
+		return nil, err
+	}
 	o.ExtraYTDLPVideoArgs = strings.TrimSpace(l.ExtraYTDLPVideoArgs)
 	if o.YTDLPPreferredVideoCodecs, err = validation.ValidateYtdlpVideoCodecs(splitNonEmptyLines(l.YTDLPPreferredVideoCodecs)); err != nil {
 		return nil, fmt.Errorf("invalid preferred video codecs: %w", err)
@@ -993,6 +1001,7 @@ func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		cmp.Or(o.JSONDir, s.JSONDir) == s.JSONDir &&
 		cmp.Or(o.YtdlpOutputExt, s.YtdlpOutputExt) == s.YtdlpOutputExt &&
 		cmp.Or(o.MaxFilesize, s.MaxFilesize) == s.MaxFilesize &&
+		cmp.Or(o.MaxResolution, s.MaxResolution) == s.MaxResolution &&
 		cmp.Or(o.ExtraYTDLPVideoArgs, s.ExtraYTDLPVideoArgs) == s.ExtraYTDLPVideoArgs &&
 		(len(o.YTDLPPreferredVideoCodecs) == 0 || slices.Equal(o.YTDLPPreferredVideoCodecs, s.YTDLPPreferredVideoCodecs)) &&
 		(len(o.YTDLPPreferredAudioCodecs) == 0 || slices.Equal(o.YTDLPPreferredAudioCodecs, s.YTDLPPreferredAudioCodecs)) &&

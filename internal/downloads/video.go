@@ -66,6 +66,11 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 		args = append(args, command.MaxFilesize, d.ChannelURL.ChanURLSettings.MaxFilesize)
 	}
 
+	// Max resolution specified, picking within the preferred codecs.
+	if d.ChannelURL.ChanURLSettings.MaxResolution != "" {
+		args = append(args, command.FormatSort, command.FormatSortMaxRes+d.ChannelURL.ChanURLSettings.MaxResolution)
+	}
+
 	// External downloaders and arguments.
 	if d.ChannelURL.ChanURLSettings.ExternalDownloader != "" {
 		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)

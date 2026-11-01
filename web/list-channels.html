@@ -254,6 +254,10 @@
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.max_filesize || 'Not set'"></span>
                             </div>
                             <div>
+                              <span class="text-gray-500 dark:text-gray-400">Max Resolution:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.max_resolution ? `${channel.settings.max_resolution}p` : 'Not set'"></span>
+                            </div>
+                            <div>
                               <span class="text-gray-500 dark:text-gray-400">External Downloader:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.external_downloader || 'Default (yt-dlp built-in)'"></span>
                             </div>

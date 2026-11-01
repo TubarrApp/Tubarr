@@ -68,7 +68,7 @@ func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
 		&f.MoveOpFile, &f.MoveOps, &f.Pause)
 
 	cmd.SetDownloadFlags(c, &f.Retries, &f.UseGlobalCookies, &f.YTDLPOutputExt, &f.FromDate, &f.ToDate,
-		&f.CookiesFromBrowser, &f.MaxFilesize, &f.DLFilterFile, &f.DLFilters,
+		&f.CookiesFromBrowser, &f.MaxFilesize, &f.MaxResolution, &f.DLFilterFile, &f.DLFilters,
 		&f.YTDLPPreferredVideoCodecs, &f.YTDLPPreferredAudioCodecs)
 
 	cmd.SetMetarrFlags(c, &f.MaxCPU, &f.MetarrConcurrency, &f.PurgeOriginalVideo, &f.MetarrExt, &f.ExtraFFmpegArgs, &f.MinFreeMem,
@@ -150,6 +150,9 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	}
 	if cmd.Flags().Changed(keys.MaxFilesize) {
 		in.MaxFilesize = &f.MaxFilesize
+	}
+	if cmd.Flags().Changed(keys.MaxResolution) {
+		in.MaxResolution = &f.MaxResolution
 	}
 	if cmd.Flags().Changed(keys.YtdlpOutputExt) {
 		in.YTDLPOutputExt = &f.YTDLPOutputExt

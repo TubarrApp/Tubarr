@@ -57,6 +57,7 @@ type VideoOverrides struct {
 	// yt-dlp options, blank ones using the channel URL's.
 	YtdlpOutputExt            string   `json:"ytdlp_output_ext,omitempty"`
 	MaxFilesize               string   `json:"max_filesize,omitempty"`
+	MaxResolution             string   `json:"max_resolution,omitempty"`
 	ExtraYTDLPVideoArgs       string   `json:"extra_ytdlp_video_args,omitempty"`
 	YTDLPPreferredVideoCodecs []string `json:"ytdlp_preferred_video_codecs,omitempty"`
 	YTDLPPreferredAudioCodecs []string `json:"ytdlp_preferred_audio_codecs,omitempty"`
@@ -78,6 +79,7 @@ type OverrideLines struct {
 	StripThumbnail            bool   `json:"strip_thumbnail"`
 	YtdlpOutputExt            string `json:"ytdlp_output_ext"`
 	MaxFilesize               string `json:"max_filesize"`
+	MaxResolution             string `json:"max_resolution"`
 	ExtraYTDLPVideoArgs       string `json:"extra_ytdlp_video_args"`
 	YTDLPPreferredVideoCodecs string `json:"ytdlp_preferred_video_codecs"`
 	YTDLPPreferredAudioCodecs string `json:"ytdlp_preferred_audio_codecs"`

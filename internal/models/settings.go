@@ -28,6 +28,7 @@ type Settings struct {
 	ExternalDownloader        string   `json:"external_downloader"`
 	ExternalDownloaderArgs    string   `json:"external_downloader_args"`
 	MaxFilesize               string   `json:"max_filesize"`
+	MaxResolution             string   `json:"max_resolution"`
 	Retries                   int      `json:"download_retries"`
 	UseGlobalCookies          *bool    `json:"use_global_cookies,omitempty"`
 	YtdlpOutputExt            string   `json:"ytdlp_output_ext"`
@@ -261,6 +262,9 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 		return false
 	}
 	if child.MaxFilesize != "" && child.MaxFilesize != parent.MaxFilesize {
+		return false
+	}
+	if child.MaxResolution != "" && child.MaxResolution != parent.MaxResolution {
 		return false
 	}
 	if child.MetaFilterMoveOpFile != "" && child.MetaFilterMoveOpFile != parent.MetaFilterMoveOpFile {
@@ -514,6 +518,9 @@ func SettingsAllZero(s *Settings) bool {
 		return false
 	}
 	if s.MaxFilesize != "" {
+		return false
+	}
+	if s.MaxResolution != "" {
 		return false
 	}
 	if s.Retries != 0 {

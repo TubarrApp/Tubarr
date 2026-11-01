@@ -53,6 +53,7 @@ const (
 	DownloadConcurrency       string = "download-concurrency"
 	YtdlpOutputExt            string = "ytdlp-output-extension"
 	MaxFilesize               string = "max-filesize"
+	MaxResolution             string = "max-resolution"
 	CookiesFromBrowser        string = "cookies-from-browser"
 	DLRetries                 string = "dl-retries"
 	FromDate                  string = "from-date"

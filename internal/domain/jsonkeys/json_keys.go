@@ -19,6 +19,7 @@ const (
 	SettingsJSONDirectory             = "json_directory"
 	SettingsVideoDirectory            = "video_directory"
 	SettingsMaxFilesize               = "max_filesize"
+	SettingsMaxResolution             = "max_resolution"
 	SettingsYtdlpOutputExt            = "ytdlp_output_ext"
 	SettingsFromDate                  = "from_date"
 	SettingsToDate                    = "to_date"

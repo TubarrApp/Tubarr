@@ -16,6 +16,7 @@ func fullSettings() *models.Settings {
 		ExternalDownloader:        "aria2c",
 		ExternalDownloaderArgs:    "-x 4",
 		MaxFilesize:               "1G",
+		MaxResolution:             "1080",
 		Retries:                   3,
 		UseGlobalCookies:          &yes,
 		YtdlpOutputExt:            "mp4",

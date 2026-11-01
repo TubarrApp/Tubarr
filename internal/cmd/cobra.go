@@ -47,7 +47,7 @@ func SetAuthFlags(cmd *cobra.Command, username, password, loginURL *string, auth
 }
 
 // SetDownloadFlags sets flags related to download tasks.
-func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookiesFromBrowser, maxFilesize, dlFilterFile *string, dlFilters, ytdlpPreferredVideoCodecs, ytdlpPreferredAudioCodecs *[]string) {
+func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, ytdlpOutputExt, fromDate, toDate, cookiesFromBrowser, maxFilesize, maxResolution, dlFilterFile *string, dlFilters, ytdlpPreferredVideoCodecs, ytdlpPreferredAudioCodecs *[]string) {
 
 	if fromDate != nil {
 		cmd.Flags().StringVar(fromDate, keys.FromDate, "", "Only grab videos uploaded on or after this date")
@@ -75,6 +75,10 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 
 	if maxFilesize != nil {
 		cmd.Flags().StringVar(maxFilesize, keys.MaxFilesize, "", "Enter your desired yt-dlp max filesize parameter")
+	}
+
+	if maxResolution != nil {
+		cmd.Flags().StringVar(maxResolution, keys.MaxResolution, "", "Download the largest resolution up to this, by the shorter side (e.g. 1080, 720p, 4k)")
 	}
 
 	if dlFilters != nil {

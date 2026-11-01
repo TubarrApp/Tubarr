@@ -109,6 +109,10 @@
                               <input type="text" x-model="urlEntry.custom.max_filesize" :placeholder="urlHint(urlEntry, 'settings', 'max_filesize', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max Resolution</label>
+                              <input type="text" x-model="urlEntry.custom.max_resolution" :placeholder="urlHint(urlEntry, 'settings', 'max_resolution', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                            </div>
+                            <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">External Downloader</label>
                               <select x-model="urlEntry.custom.external_downloader" class="w-full h-11 rounded-lg border pl-4 pr-8 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90">
                                 <option value="" x-text="urlHint(urlEntry, 'settings', 'external_downloader', 'Use channel setting')"></option>
@@ -130,24 +134,24 @@
                             </div>
                           </div>
                           <div>
-                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_video_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-                          </div>
-                          <div>
-                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Meta Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_meta_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-                          </div>
-                          <div>
-                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Crawl Args</label>
-                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_crawl_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_crawl_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
-                          </div>
-                          <div>
                             <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Preferred Video Codecs (one per line, in order of priority) <a href="help.html#ytdlp" target="_blank" title="How these work" class="ml-2 text-brand-500 hover:underline">?</a></label>
                             <textarea x-model="urlEntry.custom.ytdlp_preferred_video_codecs" rows="2" :placeholder="urlHint(urlEntry, 'settings', 'ytdlp_preferred_video_codecs', 'vp9\nav1\nh264')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
                           </div>
                           <div>
                             <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">YT-DLP Preferred Audio Codecs (one per line, in order of priority) <a href="help.html#ytdlp" target="_blank" title="How these work" class="ml-2 text-brand-500 hover:underline">?</a></label>
                             <textarea x-model="urlEntry.custom.ytdlp_preferred_audio_codecs" rows="2" :placeholder="urlHint(urlEntry, 'settings', 'ytdlp_preferred_audio_codecs', 'opus\naac\nvorbis')" class="w-full rounded-lg border px-4 py-2.5 text-sm font-mono dark:bg-gray-900 dark:border-gray-600 dark:text-gray-300"></textarea>
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Crawl Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_crawl_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_crawl_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Meta Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_meta_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_meta_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                          </div>
+                          <div>
+                            <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra YT-DLP Video Args</label>
+                            <input type="text" x-model="urlEntry.custom.extra_ytdlp_video_args" :placeholder="urlHint(urlEntry, 'settings', 'extra_ytdlp_video_args', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                           </div>
                         </div>
 

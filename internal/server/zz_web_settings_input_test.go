@@ -148,6 +148,7 @@ func TestWebSettingsRefused(t *testing.T) {
 		{"video_directory", "/media/{{nope}}"},
 		{"ytdlp_output_ext", "xyz"},
 		{"max_filesize", "lots"},
+		{"max_resolution", "huge"},
 		{"from_date", "someday"},
 		{"to_date", "someday"},
 		{"filters", "nonsense"},

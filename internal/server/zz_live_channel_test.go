@@ -634,6 +634,7 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	set("ytdlp_preferred_audio_codecs", pick("", "opus", "aac\nopus"))
 	set("external_downloader", pick(liveDownloaders()...))
 	set("max_filesize", pick("", "50M"))
+	set("max_resolution", pick("", "720"))
 	switch pickIndex(3) {
 	case 1:
 		sc.moves = []liveMove{{value: "cats", dir: filepath.Join(dir, "cats")}}

@@ -149,6 +149,11 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 			return fmt.Errorf("invalid %s: %w", keys.MaxFilesize, err)
 		}
 	}
+	if v := in.MaxResolution; v != nil {
+		if dst.MaxResolution, err = sharedvalidation.ValidateMaxResolution(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MaxResolution, err)
+		}
+	}
 	if v := in.Retries; v != nil {
 		dst.Retries = max(*v, 0)
 	}

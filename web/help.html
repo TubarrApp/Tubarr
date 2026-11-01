@@ -457,6 +457,12 @@ vp9:av1</code></pre>
                 </li>
                 <li><strong>YT-DLP Output Ext</strong> is the container yt-dlp merges into (<code>mp4</code>, <code>mkv</code>, <code>webm</code> and so on). Metarr's <strong>Output Extension</strong> is separate: what the finished video is remuxed to.</li>
                 <li><strong>Max Filesize</strong> skips larger videos: <code>500m</code>, <code>2g</code>.</li>
+                <li>
+                  <strong>Max Resolution</strong> downloads the largest size up to this, e.g. <code>1080</code>,
+                  <code>720p</code> or <code>4k</code>, or the smallest above it when a video has nothing that small. It
+                  goes by the shorter side, so a vertical 1080×1920 video counts as 1080p. It picks within the
+                  <strong>Preferred Video Codecs</strong>, so a preferred codec only offered above the limit still wins.
+                </li>
                 <li><strong>Extra YT-DLP Video Args</strong> are added to the download command, <strong>Meta Args</strong> to the metadata fetch and <strong>Crawl Args</strong> to channel crawls. A channel URL's own extra args replace the channel's rather than adding to them, and Download As's replace the channel URL's.</li>
                 <li><strong>External Downloader</strong> hands the transfer to aria2c, axel, curl and the like, with its own <strong>Args</strong>.</li>
               </ul>

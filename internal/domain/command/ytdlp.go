@@ -15,6 +15,8 @@ const (
 	ExternalDLer         = "--external-downloader"
 	ExternalDLArgs       = "--external-downloader-args"
 	FilenameSyntax       = "%(title).200B [%(id)s].%(ext)s" // The ID keeps apart same-titled videos. 200 bytes fits the 255 byte name limit.
+	FormatSort           = "-S"
+	FormatSortMaxRes     = "res:" // The largest resolution up to the number after it, by the shorter side.
 	Impersonate          = "--impersonate"
 	UserAgent            = "--user-agent"
 	MaxFilesize          = "--max-filesize"

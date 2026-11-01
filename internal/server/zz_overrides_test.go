@@ -41,6 +41,7 @@ func TestParseOverrideLinesYtdlpOptions(t *testing.T) {
 	o, err := parseOverrideLines(&models.OverrideLines{
 		YtdlpOutputExt:            "mkv",
 		MaxFilesize:               "2G",
+		MaxResolution:             "4K",
 		ExtraYTDLPVideoArgs:       " --no-mtime ",
 		YTDLPPreferredVideoCodecs: "AV1\n\nvp9",
 		YTDLPPreferredAudioCodecs: "opus",
@@ -48,12 +49,12 @@ func TestParseOverrideLinesYtdlpOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if o.YtdlpOutputExt != "mkv" || o.MaxFilesize != "2g" || o.ExtraYTDLPVideoArgs != "--no-mtime" ||
+	if o.YtdlpOutputExt != "mkv" || o.MaxFilesize != "2g" || o.MaxResolution != "2160" || o.ExtraYTDLPVideoArgs != "--no-mtime" ||
 		strings.Join(o.YTDLPPreferredVideoCodecs, ",") != "av1,vp9" || strings.Join(o.YTDLPPreferredAudioCodecs, ",") != "opus" {
 		t.Errorf("got %+v", o)
 	}
 
-	for _, bad := range []models.OverrideLines{{YtdlpOutputExt: "xyz"}, {MaxFilesize: "lots"}, {YTDLPPreferredVideoCodecs: "betamax"}} {
+	for _, bad := range []models.OverrideLines{{YtdlpOutputExt: "xyz"}, {MaxFilesize: "lots"}, {MaxResolution: "huge"}, {YTDLPPreferredVideoCodecs: "betamax"}} {
 		if _, err := parseOverrideLines(&bad, nil); err == nil {
 			t.Errorf("accepted %+v", bad)
 		}

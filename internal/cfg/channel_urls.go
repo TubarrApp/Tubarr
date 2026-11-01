@@ -175,6 +175,8 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 			s.ExternalDownloaderArgs = ""
 		case keys.MaxFilesize:
 			s.MaxFilesize = ""
+		case keys.MaxResolution:
+			s.MaxResolution = ""
 		case keys.YtdlpOutputExt:
 			s.YtdlpOutputExt = ""
 		case keys.FromDate:

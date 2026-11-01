@@ -1730,6 +1730,7 @@ func displaySettingsStruct(s *models.Settings) {
 	fmt.Printf("From Date: %q\n", s.FromDate)
 	fmt.Printf("To Date: %q\n", s.ToDate)
 	fmt.Printf("Max Filesize: %s\n", s.MaxFilesize)
+	fmt.Printf("Max Resolution: %s\n", s.MaxResolution)
 	fmt.Printf("Move Ops: %v\n", s.MetaFilterMoveOps)
 	fmt.Printf("Move Ops File: %s\n", s.MetaFilterMoveOpFile)
 	fmt.Printf("Use Global Cookies: %v\n", useGlobalCookies)

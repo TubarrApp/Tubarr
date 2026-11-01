@@ -35,6 +35,7 @@ type ChannelFlagValues struct {
 	ExternalDownloader        string
 	ExternalDownloaderArgs    string
 	MaxFilesize               string
+	MaxResolution             string
 	YTDLPOutputExt            string
 	FromDate                  string
 	ToDate                    string

@@ -417,6 +417,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		"crawl_freq":                   {"45", "60"},
 		"download_retries":             {"2", "4"},
 		"max_filesize":                 {"100m", "2g"},
+		"max_resolution":               {"1080", "720"},
 		"from_date":                    {"20240101", "20240201"},
 		"to_date":                      {"20241231", "20250131"},
 		"filter_file":                  {file("filters-a.txt", "title:contains:cat:must\n"), file("filters-b.txt", "title:contains:dog:must\n")},

@@ -53,6 +53,11 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 			return fmt.Errorf("invalid max filesize %q in settings: %w", s.MaxFilesize, err)
 		}
 	}
+	if s.MaxResolution != "" {
+		if s.MaxResolution, err = sharedvalidation.ValidateMaxResolution(s.MaxResolution); err != nil {
+			return fmt.Errorf("invalid max resolution in settings: %w", err)
+		}
+	}
 
 	if checkPaths && s.MetaFilterMoveOpFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(s.MetaFilterMoveOpFile, false, sharedtemplates.TubarrTemplateTags); err != nil {

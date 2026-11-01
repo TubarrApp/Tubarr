@@ -39,6 +39,7 @@ type SettingsInput struct {
 	ExternalDownloader        *string   `viper:"external-downloader"`
 	ExternalDownloaderArgs    *string   `viper:"external-downloader-args"`
 	MaxFilesize               *string   `viper:"max-filesize"`
+	MaxResolution             *string   `viper:"max-resolution"`
 	YTDLPOutputExt            *string   `viper:"ytdlp-output-extension"`
 	FromDate                  *string   `viper:"from-date"`
 	ToDate                    *string   `viper:"to-date"`
