@@ -423,9 +423,19 @@ vp9:av1</code></pre>
                   pass. The Post-Processing page shows which pass a video is on.
                 </li>
                 <li>
+                  <code>-b:v</code> in Video Encoder Args is the target bitrate, written with <code>k</code>, <code>M</code>
+                  or <code>G</code>: one for every video, e.g. <code>av1:-b:v 3M</code>, or one per resolution, e.g.
+                  <code>av1:-b:v 720=1.5M,1080=3M,2160=10M</code>. A video gets the bitrate for the largest resolution
+                  at or below its own, going by the shorter side, or the smallest one listed if it's smaller than all of
+                  them. The resolution is the downloaded video's, before any <code>-vf</code> scaling. A target above the
+                  downloaded video's own bitrate is lowered to it, as encoding at more than the source has makes a
+                  bigger file, not a better one.
+                </li>
+                <li>
                   <strong>Extra FFmpeg Args</strong> are added every time FFmpeg runs, even when the video is only copied to
                   update its metadata, e.g. <code>-movflags +faststart</code>. <code>-crf</code>, <code>-pix_fmt</code>,
-                  <code>-vf</code> and <code>-pass</code> aren't allowed there, since they only work when encoding.
+                  <code>-vf</code>, <code>-pass</code> and <code>-b:v</code> aren't allowed there, since they only work
+                  when encoding.
                 </li>
                 <li>
                   <strong>Keep Original Video Files</strong> keeps the downloaded video whenever Metarr writes a new one
