@@ -1750,7 +1750,7 @@ func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("HW Acceleration Node: %s\n", m.TranscodeGPUNode)
 	fmt.Printf("Video Codec: %v\n", m.TranscodeVideoCodecs)
 	fmt.Printf("Audio Codec: %v\n", m.TranscodeAudioCodecs)
-	fmt.Printf("Transcode Quality: %s\n", m.TranscodeQuality)
+	fmt.Printf("Video Encoder Args: %v\n", m.TranscodeVideoArgs)
 	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
 	fmt.Printf("Meta Operations File: %v\n", m.MetaOpsFile)

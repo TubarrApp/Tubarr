@@ -80,7 +80,7 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{
-		OutputExt: "mp4", RenameStyle: "spaces", TranscodeQuality: "23", TranscodeVideoCodecs: []string{"h264:hevc"}, MaxCPU: 50,
+		OutputExt: "mp4", RenameStyle: "spaces", TranscodeVideoArgs: []string{"hevc:-crf 23"}, TranscodeVideoCodecs: []string{"h264:hevc"}, MaxCPU: 50,
 	}}
 	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
 	values := func(key string) []string {
@@ -103,13 +103,15 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 		{metkeys.TranscodeVideoCodecs, []string{"h264:hevc"}, []string{"av1"}},
 		{metkeys.MaxCPU, []string{"50.00"}, []string{"80.00"}},
 		{metkeys.RenameStyle, []string{"spaces"}, []string{"spaces"}},
-		{metkeys.TranscodeQuality, []string{"23"}, []string{"23"}},
+		{metkeys.TranscodeVideoArgs, []string{"hevc:-crf 23"}, []string{"av1:-crf 35"}},
 	} {
 		v.Overrides = nil
 		if got := values(tc.key); !slices.Equal(got, tc.plain) {
 			t.Errorf("%s without overrides: got %q, want %q", tc.key, got, tc.plain)
 		}
-		v.Overrides = &models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputExt: "mkv", TranscodeVideoCodecs: []string{"av1"}, MaxCPU: 80}}
+		v.Overrides = &models.VideoOverrides{MetarrArgs: models.MetarrArgs{
+			OutputExt: "mkv", TranscodeVideoCodecs: []string{"av1"}, TranscodeVideoArgs: []string{"av1:-crf 35"}, MaxCPU: 80,
+		}}
 		if got := values(tc.key); !slices.Equal(got, tc.own) {
 			t.Errorf("%s with overrides: got %q, want %q", tc.key, got, tc.own)
 		}
@@ -195,7 +197,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 	}
 	channelArgs := &models.MetarrArgs{
 		OutputExt: "mp4", RenameStyle: "spaces", MinFreeMem: "1G", ExtraFFmpegArgs: "-x", OutputDir: "/out", MaxCPU: 50,
-		MetaOps: metaOps, TranscodeGPU: "vaapi", TranscodeGPUNode: "/dev/dri/renderD128", TranscodeQuality: "23",
+		MetaOps: metaOps, TranscodeGPU: "vaapi", TranscodeGPUNode: "/dev/dri/renderD128", TranscodeVideoArgs: []string{"hevc:-crf 23"},
 		TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"},
 	}
 	files := []string{metkeys.VideoFile, "/videos/v.mp4", metkeys.MetaFile, "/videos/v.json"}
@@ -220,7 +222,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeGPU, "vaapi",
 			metkeys.TranscodeGPUNode, "/dev/dri/renderD128",
 			metkeys.TranscodeVideoCodecs, "h264:hevc",
-			metkeys.TranscodeQuality, "23",
+			metkeys.TranscodeVideoArgs, "hevc:-crf 23",
 			metkeys.TranscodeAudioCodecs, "aac",
 		})},
 		{"Download As", 2, channelArgs, &models.VideoOverrides{
@@ -236,7 +238,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.ExtraFFmpegArgs, "-x",
 			metkeys.Thumbnail, "/thumb.png",
 			metkeys.TranscodeVideoCodecs, "h264:hevc",
-			metkeys.TranscodeQuality, "23",
+			metkeys.TranscodeVideoArgs, "hevc:-crf 23",
 			metkeys.TranscodeAudioCodecs, "aac",
 			metkeys.Debug, "2",
 		})},

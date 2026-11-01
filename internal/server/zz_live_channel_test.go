@@ -657,7 +657,7 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	set("metarr_concurrency", pick("", "1", "2"))
 	set("metarr_transcode_video_transcode_codecs", pick(liveTranscodes("libx265", "h264:hevc", "libvpx-vp9", "h264:vp9")...))
 	set("metarr_transcode_audio_codecs", pick(liveTranscodes("libmp3lame", "aac:mp3", "libopus", "aac:opus")...))
-	set("metarr_transcode_quality", pick("", "28"))
+	set("metarr_transcode_video_args", pick("", "hevc:-crf 28"))
 	set("metarr_extra_ffmpeg_args", pick("", "-threads 1"))
 	var notifications [][2]string
 	n := pickIndex(4)

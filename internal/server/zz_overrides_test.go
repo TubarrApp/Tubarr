@@ -150,7 +150,7 @@ func TestMatchesChannelURL(t *testing.T) {
 		{"another video directory", models.VideoOverrides{VideoDir: "/elsewhere"}, false},
 		{"preferred video codecs", models.VideoOverrides{YTDLPPreferredVideoCodecs: []string{"av1"}}, false},
 		{"another output extension", models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputExt: "mkv"}}, false},
-		{"a transcode quality", models.VideoOverrides{MetarrArgs: models.MetarrArgs{TranscodeQuality: "23"}}, false},
+		{"video encoder args", models.VideoOverrides{MetarrArgs: models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-crf 35"}}}, false},
 		{"the channel URL's output directory, which beats move ops", models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputDir: "/out"}}, false},
 	}
 	for _, tt := range tests {

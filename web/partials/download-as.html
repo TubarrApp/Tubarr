@@ -239,8 +239,9 @@ download-as-cancel if Download As closes without starting. -->
             <input type="text" x-model="form.metarr.metarr_transcode_gpu_node" :placeholder="defaultLabel('metarr_transcode_gpu_node')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
           </div>
           <div>
-            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
-            <input type="number" min="0" max="51" x-model="form.metarr.metarr_transcode_quality" :placeholder="defaultLabel('metarr_transcode_quality')" class="w-full h-8 rounded border px-2 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Encoder Args</label>
+            <textarea x-model="form.metarr.metarr_transcode_video_args" :placeholder="defaultLabel('metarr_transcode_video_args')" rows="2" class="w-full rounded border px-2 py-1 text-xs dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" style="font-family: monospace;"></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec:args (e.g., hevc:-crf 24)</p>
           </div>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Video Transcode Codecs</label>
@@ -294,7 +295,7 @@ download-as-cancel if Download As closes without starting. -->
       uploading: false,
       metarrKeys: [
         'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
-        'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_quality', 'metarr_transcode_video_transcode_codecs',
+        'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_video_args', 'metarr_transcode_video_transcode_codecs',
         'metarr_transcode_audio_codecs', 'metarr_extra_ffmpeg_args'
       ],
       loading: false,

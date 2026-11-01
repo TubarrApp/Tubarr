@@ -334,7 +334,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		{keys.TranscodeGPUNode, "TranscodeGPUNode", true, gpuNode, ""},
 		{keys.TranscodeCodec, "TranscodeVideoCodecs", true, []string{"h264"}, []string{}},
 		{keys.TranscodeAudioCodec, "TranscodeAudioCodecs", true, []string{"aac"}, []string{}},
-		{keys.TranscodeQuality, "TranscodeQuality", true, "23", ""},
+		{keys.TranscodeVideoArgs, "TranscodeVideoArgs", true, []string{"av1:-crf 35"}, []string{}},
 	}
 
 	must := func(err error) {
@@ -390,7 +390,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		TranscodeGPUNode:        gpuNode,
 		TranscodeVideoCodecs:    []string{"h264"},
 		TranscodeAudioCodecs:    []string{"aac"},
-		TranscodeQuality:        "23",
+		TranscodeVideoArgs:      []string{"av1:-crf 35"},
 		ExtraFFmpegArgs:         "-map 0",
 	}
 	wantM.FilenameOps, err = parsing.ParseFilenameOps(filenameOps)

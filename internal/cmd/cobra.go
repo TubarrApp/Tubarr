@@ -168,7 +168,7 @@ func SetNotifyFlags(cmd *cobra.Command, notification *[]string) {
 }
 
 // SetTranscodeFlags sets flags related to video transcoding.
-func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode, quality *string, videoCodec, audioCodec *[]string) {
+func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode *string, videoArgs, videoCodec, audioCodec *[]string) {
 	if gpu != nil {
 		cmd.Flags().StringVar(gpu, keys.TranscodeGPU, "", "GPU for transcoding.")
 	}
@@ -177,8 +177,8 @@ func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode, quality *string, videoC
 		cmd.Flags().StringVar(gpuNode, keys.TranscodeGPUNode, "", "GPU node path for transcoding (e.g. '/dev/dri/renderD128')")
 	}
 
-	if quality != nil {
-		cmd.Flags().StringVar(quality, keys.TranscodeQuality, "", "Transcode quality from 0 to 51, lower is better (e.g. 23).")
+	if videoArgs != nil {
+		cmd.Flags().StringArrayVar(videoArgs, keys.TranscodeVideoArgs, nil, "FFmpeg arguments used when encoding to a video codec, one codec per flag (e.g. 'av1:-crf 35 -preset 6').")
 	}
 
 	if audioCodec != nil {

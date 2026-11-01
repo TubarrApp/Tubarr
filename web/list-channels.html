@@ -338,8 +338,8 @@
                               <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_transcode_audio_codecs) && channel.metarr.metarr_transcode_audio_codecs.length > 0 ? channel.metarr.metarr_transcode_audio_codecs.join(', ') : (channel.metarr?.metarr_transcode_audio_codecs || 'Copy')"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Transcode Quality (CRF):</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_transcode_quality || 'Not set'"></span>
+                              <span class="text-gray-500 dark:text-gray-400">Video Encoder Args:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_transcode_video_args) && channel.metarr.metarr_transcode_video_args.length > 0 ? channel.metarr.metarr_transcode_video_args.join(', ') : 'Not set'"></span>
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Extra FFmpeg Args:</span>

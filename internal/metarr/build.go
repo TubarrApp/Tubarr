@@ -41,6 +41,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	if len(o.TranscodeAudioCodecs) > 0 {
 		audioCodecs = o.TranscodeAudioCodecs
 	}
+	videoArgs := m.TranscodeVideoArgs
+	if len(o.TranscodeVideoArgs) > 0 {
+		videoArgs = o.TranscodeVideoArgs
+	}
 	gpu, gpuNode := cmp.Or(o.TranscodeGPU, m.TranscodeGPU), cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode)
 	if gpu == validation.GPUNone {
 		gpu, gpuNode = "", ""
@@ -104,14 +108,11 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		args = append(args, metkeys.StripThumbnail)
 	}
 	addEach(metkeys.TranscodeVideoCodecs, videoCodecs)
-	add(metkeys.TranscodeQuality, cmp.Or(o.TranscodeQuality, m.TranscodeQuality))
+	addEach(metkeys.TranscodeVideoArgs, videoArgs)
 	addEach(metkeys.TranscodeAudioCodecs, audioCodecs)
 
 	// Other.
-	// debugLevel := strconv.FormatInt(int64(logging.Level()), 10)
-	// if debugLevel == "" || debugLevel == "0" {
-	// 	debugLevel = configString(keys.DebugLevel)
-	// }
+	// (Send Tubarr's current debug level to Metarr, so it can log more verbosely if needed).
 	if dLevel := logging.Level(); dLevel > 0 {
 		add(metkeys.Debug, strconv.Itoa(dLevel))
 	}

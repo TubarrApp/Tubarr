@@ -17,6 +17,8 @@ func TestParseProgress(t *testing.T) {
 		{"metarr progress: pct=25.0 frame=120 fps=29.9 speed=1.52x eta=95", Progress{Percent: 25, Frame: 120, FPS: 29.9, Speed: "1.52x", ETA: 95}, true},
 		{"metarr progress: pct=-1.0 frame=200 fps=30.0 speed= eta=-1", Progress{Percent: -1, Frame: 200, FPS: 30, ETA: -1}, true},
 		{"metarr progress: pct=10.0 frame=5 fps=1.0 speed=1x", Progress{Percent: 10, Frame: 5, FPS: 1, Speed: "1x", ETA: -1}, true}, // An older Metarr.
+		{"metarr progress: pct=40.0 frame=50 fps=25.0 speed=2x eta=12 pass=2 passes=3",
+			Progress{Percent: 40, Frame: 50, FPS: 25, Speed: "2x", ETA: 12, Pass: 2, Passes: 3}, true},
 		{"final video path: /videos/a.mp4", Progress{}, false},
 	}
 	for _, tt := range tests {

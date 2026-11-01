@@ -13,6 +13,8 @@ type Progress struct {
 	FPS     float64 `json:"fps"`
 	Speed   string  `json:"speed"`
 	ETA     int64   `json:"eta"` // Seconds left, -1 when unknown.
+	Pass    int     `json:"pass"`
+	Passes  int     `json:"passes"` // 0 from a Metarr without multi-pass encoding.
 }
 
 // progressByVideo holds running videos' latest progress, by video ID.
@@ -28,7 +30,7 @@ func VideoProgress(videoID int64) *Progress {
 	return &progress
 }
 
-// parseProgress reads a Metarr progress line, e.g. "metarr progress: pct=25.0 frame=120 fps=30.0 speed=1.52x".
+// parseProgress reads a Metarr progress line, e.g. "metarr progress: pct=25.0 frame=120 fps=30.0 speed=1.52x pass=1 passes=2".
 func parseProgress(line string) (p Progress, ok bool) {
 	rest, ok := strings.CutPrefix(line, "metarr progress: ")
 	if !ok {
@@ -52,6 +54,10 @@ func parseProgress(line string) (p Progress, ok bool) {
 			if n, err := strconv.ParseInt(val, 10, 64); err == nil {
 				p.ETA = n
 			}
+		case "pass":
+			p.Pass, _ = strconv.Atoi(val)
+		case "passes":
+			p.Passes, _ = strconv.Atoi(val)
 		}
 	}
 	return p, true

@@ -151,8 +151,8 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 			switch {
 			case v == nil || v == "" || !slices.Contains(f.urlMetarr, k):
 			case k == "metarr_max_cpu_usage" && v == float64(0):
-			case k == "metarr_transcode_video_transcode_codecs" || k == "metarr_transcode_audio_codecs":
-				metarr[k] = formValue(v) // The page shows Metarr codec lists as text, and sends them so.
+			case k == "metarr_transcode_video_transcode_codecs" || k == "metarr_transcode_audio_codecs" || k == "metarr_transcode_video_args":
+				metarr[k] = formValue(v) // The page shows Metarr codec and encoder arg lists as text, and sends them so.
 			default:
 				metarr[k] = v
 			}

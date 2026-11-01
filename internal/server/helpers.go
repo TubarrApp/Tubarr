@@ -173,7 +173,7 @@ type metarrArgsResponse struct {
 	GPUNode                 string   `json:"metarr_transcode_gpu_node,omitempty"`
 	VideoCodecs             []string `json:"metarr_transcode_video_transcode_codecs,omitempty"`
 	AudioCodecs             []string `json:"metarr_transcode_audio_codecs,omitempty"`
-	TranscodeQuality        string   `json:"metarr_transcode_quality,omitempty"`
+	VideoArgs               []string `json:"metarr_transcode_video_args,omitempty"`
 	ExtraFFmpegArgs         string   `json:"metarr_extra_ffmpeg_args,omitempty"`
 	FilenameOpsFile         string   `json:"metarr_filename_ops_file,omitempty"`
 	FilteredFilenameOpsFile string   `json:"metarr_filtered_filename_ops_file,omitempty"`
@@ -202,7 +202,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		GPUNode:                 m.TranscodeGPUNode,
 		VideoCodecs:             m.TranscodeVideoCodecs,
 		AudioCodecs:             m.TranscodeAudioCodecs,
-		TranscodeQuality:        m.TranscodeQuality,
+		VideoArgs:               m.TranscodeVideoArgs,
 		ExtraFFmpegArgs:         m.ExtraFFmpegArgs,
 		FilenameOpsFile:         m.FilenameOpsFile,
 		FilteredFilenameOpsFile: m.FilteredFilenameOpsFile,
@@ -462,7 +462,7 @@ type metarrArgsInput struct {
 	PurgeOriginalVideo      *bool    `json:"metarr_purge_original_video"`
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
-	TranscodeQuality        *string  `json:"metarr_transcode_quality"`
+	VideoArgs               *string  `json:"metarr_transcode_video_args"` // Newline-separated, as in the main form.
 	MetarrConcurrency       *int     `json:"metarr_concurrency"`
 	MaxCPU                  *float64 `json:"metarr_max_cpu_usage"`
 	FilenameOps             *string  `json:"metarr_filename_ops"`
@@ -666,7 +666,7 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 		FilteredFilenameOps:     linesInput(in.FilteredFilenameOps, splitOpLines),
 		TranscodeGPU:            in.GPU,
 		TranscodeGPUNode:        in.GPUNode,
-		TranscodeQuality:        in.TranscodeQuality,
+		TranscodeVideoArgs:      linesInput(in.VideoArgs, splitNonEmptyLines),
 		TranscodeVideoCodec:     linesInput(in.VideoCodecs, splitNonEmptyLines),
 		TranscodeAudioCodec:     linesInput(in.AudioCodecs, splitNonEmptyLines),
 		MinFreeMem:              in.MinFreeMem,
@@ -829,7 +829,7 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 		FilteredFilenameOps:     linesInput(formString(r, jsonkeys.MetarrFilteredFilenameOps), splitOpLines),
 		TranscodeGPU:            formString(r, jsonkeys.MetarrGPU),
 		TranscodeGPUNode:        formString(r, jsonkeys.MetarrGPUNode),
-		TranscodeQuality:        formString(r, jsonkeys.MetarrTranscodeQuality),
+		TranscodeVideoArgs:      linesInput(formString(r, jsonkeys.MetarrTranscodeVideoArgs), splitNonEmptyLines),
 		TranscodeVideoCodec:     linesInput(formString(r, jsonkeys.MetarrVideoCodecs), splitNonEmptyLines),
 		TranscodeAudioCodec:     linesInput(formString(r, jsonkeys.MetarrAudioCodecs), splitNonEmptyLines),
 		MinFreeMem:              formString(r, jsonkeys.MetarrMinFreeMem),
@@ -1003,10 +1003,10 @@ func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		cmp.Or(o.MinFreeMem, m.MinFreeMem) == m.MinFreeMem &&
 		cmp.Or(o.TranscodeGPU, m.TranscodeGPU) == m.TranscodeGPU &&
 		cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode) == m.TranscodeGPUNode &&
-		cmp.Or(o.TranscodeQuality, m.TranscodeQuality) == m.TranscodeQuality &&
 		cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs) == m.ExtraFFmpegArgs &&
 		(len(o.TranscodeVideoCodecs) == 0 || slices.Equal(o.TranscodeVideoCodecs, m.TranscodeVideoCodecs)) &&
-		(len(o.TranscodeAudioCodecs) == 0 || slices.Equal(o.TranscodeAudioCodecs, m.TranscodeAudioCodecs))
+		(len(o.TranscodeAudioCodecs) == 0 || slices.Equal(o.TranscodeAudioCodecs, m.TranscodeAudioCodecs)) &&
+		(len(o.TranscodeVideoArgs) == 0 || slices.Equal(o.TranscodeVideoArgs, m.TranscodeVideoArgs))
 }
 
 // splitNonEmptyLines splits a string by newlines and filters out empty lines.

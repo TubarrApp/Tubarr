@@ -403,8 +403,30 @@ vp9:av1</code></pre>
               <ul>
                 <li>Video codecs: <code>av1</code>, <code>h264</code>, <code>hevc</code>, <code>mpeg2</code>, <code>vp8</code>, <code>vp9</code>. Audio codecs: <code>aac</code>, <code>ac3</code>, <code>alac</code>, <code>dts</code>, <code>eac3</code>, <code>flac</code>, <code>mp2</code>, <code>mp3</code>, <code>opus</code>, <code>pcm</code>, <code>truehd</code>, <code>vorbis</code>, <code>wav</code>. Common other names work too (<code>h265</code>, <code>x264</code>, <code>libmp3lame</code>).</li>
                 <li><strong>GPU Acceleration</strong> encodes on the graphics card (<code>auto</code>, <code>cuda</code>, <code>qsv</code> or <code>vaapi</code>, with <strong>GPU Node Path</strong> for VA-API, e.g. <code>/dev/dri/renderD128</code>).</li>
-                <li><strong>Transcode Quality (CRF)</strong> is 0 to 51: lower is better quality and larger files.</li>
-                <li><strong>Extra FFmpeg Args</strong> are added to the FFmpeg command, e.g. <code>-vf scale=1280:-2</code> to scale the video to 1280 pixels wide.</li>
+                <li>
+                  <strong>Video Encoder Args</strong> are FFmpeg options used only when Metarr encodes to a codec, one
+                  <code>codec:args</code> line per target codec, e.g. <code>av1:-crf 35 -preset 6</code>. A codec without a
+                  line uses its encoder's defaults. Metarr adjusts three of them to suit GPU encoders too:
+                  <code>-crf</code> sets the quality (lower is better and larger, up to 51 for H.264 and HEVC and 63 for AV1,
+                  VP8 and VP9), <code>-pix_fmt</code> sets the pixel format (e.g. <code>yuv420p10le</code> for 10-bit, or
+                  <code>yuv420p</code> to keep 8-bit for older devices), and <code>-vf</code> sets filters, e.g.
+                  <code>hevc:-vf scale=1280:-2</code> to scale the video to 1280 pixels wide. If the encoder can't take
+                  the pixel format, Metarr uses the same format in the form it does take, or stops with an error naming
+                  the formats it can.
+                </li>
+                <li>
+                  <code>-pass</code> in Video Encoder Args is the number of encoding passes, e.g.
+                  <code>h264:-b:v 3M -pass 2</code>. Extra passes help most when aiming for a set bitrate, and take that
+                  many times as long. H.264, HEVC and MPEG-2 take up to 3 passes, AV1, VP8 and VP9 up to 2, and more are
+                  lowered to that. H.264, HEVC, AV1 and MPEG-2 need a target bitrate (<code>-b:v</code>) instead of
+                  <code>-crf</code> for more than one pass, while VP8 and VP9 can use either. GPU encoders always make one
+                  pass. The Post-Processing page shows which pass a video is on.
+                </li>
+                <li>
+                  <strong>Extra FFmpeg Args</strong> are added every time FFmpeg runs, even when the video is only copied to
+                  update its metadata, e.g. <code>-movflags +faststart</code>. <code>-crf</code>, <code>-pix_fmt</code>,
+                  <code>-vf</code> and <code>-pass</code> aren't allowed there, since they only work when encoding.
+                </li>
                 <li>
                   <strong>Keep Original Video Files</strong> keeps the downloaded video whenever Metarr writes a new one
                   from it, even just to add metadata. It stays where it was downloaded, under its own name, unless the

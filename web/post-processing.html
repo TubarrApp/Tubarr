@@ -394,6 +394,7 @@
           // Describes a transcode's progress besides its percentage, e.g. "frame 1,204 · 29.9 fps · 1.52x".
           progressDetail(p) {
             const parts = [`frame ${p.frame.toLocaleString()}`];
+            if (p.passes > 1) parts.unshift(`Pass ${p.pass} of ${p.passes}`);
             if (p.fps > 0) parts.push(`${p.fps.toFixed(1)} fps`);
             if (p.speed) parts.push(p.speed);
             return parts.join(' · ');

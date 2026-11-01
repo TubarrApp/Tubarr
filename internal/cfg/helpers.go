@@ -75,7 +75,7 @@ func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
 		&f.OutDir, &f.MetaPurge, &f.RenameStyle, &f.MetaOpsFile, &f.FilteredMetaOpsFile, &f.FilenameOpsFile,
 		&f.FilteredFilenameOpsFile, &f.FilenameOps, &f.FilteredFilenameOps, &f.MetaOps, &f.FilteredMetaOps)
 
-	cmd.SetTranscodeFlags(c, &f.TranscodeGPU, &f.TranscodeGPUNode, &f.TranscodeQuality,
+	cmd.SetTranscodeFlags(c, &f.TranscodeGPU, &f.TranscodeGPUNode, &f.TranscodeVideoArgs,
 		&f.TranscodeVideoCodec, &f.TranscodeAudioCodec)
 
 	cmd.SetCustomYDLPArgFlags(c, &f.ExtraYTDLPVideoArgs, &f.ExtraYTDLPMetaArgs, &f.ExtraYTDLPCrawlArgs)
@@ -211,8 +211,8 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	if cmd.Flags().Changed(keys.YTDLPPreferredAudioCodecs) {
 		in.YTDLPPreferredAudioCodecs = &f.YTDLPPreferredAudioCodecs
 	}
-	if cmd.Flags().Changed(keys.TranscodeQuality) {
-		in.TranscodeQuality = &f.TranscodeQuality
+	if cmd.Flags().Changed(keys.TranscodeVideoArgs) {
+		in.TranscodeVideoArgs = &f.TranscodeVideoArgs
 	}
 	if cmd.Flags().Changed(keys.TranscodeCodec) {
 		in.TranscodeVideoCodec = &f.TranscodeVideoCodec

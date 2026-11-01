@@ -45,7 +45,7 @@ const (
 	TranscodeGPUNode    string = "metarr-transcode-gpu-node"
 	TranscodeCodec      string = "metarr-transcode-video-codecs"
 	TranscodeAudioCodec string = "metarr-transcode-audio-codecs"
-	TranscodeQuality    string = "metarr-transcode-quality"
+	TranscodeVideoArgs  string = "metarr-transcode-video-args"
 )
 
 // Downloading.
@@ -124,7 +124,6 @@ const (
 	MMetaPreserve            string = "metarr-meta-preserve"
 	MNoFileOverwrite         string = "metarr-no-file-overwrite"
 	MTranscodeAudioCodec     string = "metarr-transcode-audio-codecs"
-	MTranscodeQuality        string = "metarr-transcode-quality"
 	MTranscodeVideoCodec     string = "metarr-transcode-video-codec"
 	MConcurrency             string = "metarr-concurrency"
 	MOutputDir               string = "metarr-output-directory"

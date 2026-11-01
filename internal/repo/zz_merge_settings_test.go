@@ -62,7 +62,7 @@ func fullMetarrArgs() *models.MetarrArgs {
 		TranscodeGPUNode:        "/dev/dri/renderD128",
 		TranscodeVideoCodecs:    []string{"h264"},
 		TranscodeAudioCodecs:    []string{"aac"},
-		TranscodeQuality:        "23",
+		TranscodeVideoArgs:      []string{"hevc:-crf 23"},
 		ExtraFFmpegArgs:         "-x",
 	}
 }

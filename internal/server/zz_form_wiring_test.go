@@ -448,7 +448,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		"metarr_transcode_gpu_node":               {file("render-a", ""), file("render-b", "")},
 		"metarr_transcode_video_transcode_codecs": {"h264:hevc", "vp9:h264"},
 		"metarr_transcode_audio_codecs":           {"aac:opus", "flac:mp3"},
-		"metarr_transcode_quality":                {"23", "28"},
+		"metarr_transcode_video_args":             {"hevc:-crf 23", "av1:-crf 35 -preset 6\nvp9:-crf 31"},
 		"metarr_extra_ffmpeg_args":                {"-threads 2", "-threads 4"},
 		"metarr_filename_ops":                     {"prefix:[CAT] ", "suffix: [DOG]"},
 		"metarr_filename_ops_file":                {file("filename-ops-a.txt", "prefix:[A] \n"), file("filename-ops-b.txt", "prefix:[B] \n")},

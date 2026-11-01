@@ -248,8 +248,14 @@
                               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec or source:target (e.g., dts:ac3)</p>
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Transcode Quality (CRF)</label>
-                              <input type="number" min="0" max="51" x-model="urlEntry.custom.metarr_transcode_quality" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_transcode_quality', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Video Encoder Args <a href="help.html#transcoding" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                              <textarea
+                                x-model="urlEntry.custom.metarr_transcode_video_args"
+                                :placeholder="urlHint(urlEntry, 'metarr', 'metarr_transcode_video_args', 'Use channel setting (one per line, e.g. av1:-crf 35)')"
+                                rows="2"
+                                class="w-full rounded-lg border px-4 py-2.5 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90 font-mono"
+                              ></textarea>
+                              <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec:args (e.g., hevc:-crf 24 -preset slow)</p>
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Min Free Memory</label>

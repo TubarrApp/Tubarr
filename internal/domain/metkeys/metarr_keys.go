@@ -39,5 +39,5 @@ const (
 	TranscodeGPUNode     = "--transcode-gpu-node"
 	TranscodeVideoCodecs = "--transcode-video-codecs"
 	TranscodeAudioCodecs = "--transcode-audio-codecs"
-	TranscodeQuality     = "--transcode-quality"
+	TranscodeVideoArgs   = "--transcode-video-args"
 )

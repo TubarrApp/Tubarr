@@ -299,6 +299,9 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 		dst.RenameStyle = *v
 	}
 	if v := in.ExtraFFmpegArgs; v != nil {
+		if err := validation.ValidateExtraFFmpegArgs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.MExtraFFmpegArgs, err)
+		}
 		dst.ExtraFFmpegArgs = *v
 	}
 	if v := in.OutDir; v != nil {
@@ -352,9 +355,9 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 			return fmt.Errorf("invalid %s: %w", keys.TranscodeAudioCodec, err)
 		}
 	}
-	if v := in.TranscodeQuality; v != nil {
-		if dst.TranscodeQuality, err = sharedvalidation.ValidateTranscodeQuality(*v); err != nil {
-			return fmt.Errorf("invalid %s: %w", keys.TranscodeQuality, err)
+	if v := in.TranscodeVideoArgs; v != nil {
+		if dst.TranscodeVideoArgs, err = validation.ValidateVideoEncoderArgs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeVideoArgs, err)
 		}
 	}
 	return nil

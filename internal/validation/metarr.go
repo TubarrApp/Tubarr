@@ -5,10 +5,12 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedenums"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
@@ -102,6 +104,31 @@ func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs 
 
 	logger.Pl.D(5, "Got video codec array: %v", dedupPairs)
 	return dedupPairs, nil
+}
+
+// ValidateVideoEncoderArgs validates "codec:args" lines as Metarr will read them, returning them deduplicated as typed.
+func ValidateVideoEncoderArgs(lines []string) (validLines []string, err error) {
+	dedupLines := dedupSlice(lines)
+	if _, err := sharedparsing.ParseVideoEncoderArgs(dedupLines); err != nil {
+		return nil, err
+	}
+	return dedupLines, nil
+}
+
+// ValidateExtraFFmpegArgs refuses extra FFmpeg args holding a blocked option, or one that only works when encoding.
+func ValidateExtraFFmpegArgs(a string) error {
+	args, err := sharedparsing.ShellSplit(a)
+	if err != nil {
+		return err
+	}
+	if blocked, option := sharedconsts.HasBlockedOptions(args, sharedconsts.BlockedFFmpegOptions); blocked {
+		return fmt.Errorf("option %q is not allowed", option)
+	}
+	if option, found := sharedparsing.EncoderOnlyOption(args); found {
+		return fmt.Errorf("%s only works when encoding a video, so it goes in Video Encoder Args (%s) instead, e.g. av1:%s ...",
+			option, keys.TranscodeVideoArgs, option)
+	}
+	return nil
 }
 
 // dedupSlice deduplicates entries in a slice so each entry only appears once.

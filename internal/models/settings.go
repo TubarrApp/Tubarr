@@ -87,7 +87,7 @@ type MetarrArgs struct {
 	TranscodeGPUNode     string   `json:"metarr_transcode_gpu_node"`
 	TranscodeVideoCodecs []string `json:"metarr_transcode_video_codecs"`
 	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs"`
-	TranscodeQuality     string   `json:"metarr_transcode_quality"`
+	TranscodeVideoArgs   []string `json:"metarr_transcode_video_args"`
 	ExtraFFmpegArgs      string   `json:"metarr_extra_ffmpeg_args"`
 }
 
@@ -348,9 +348,6 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 	if child.TranscodeGPUNode != "" && child.TranscodeGPUNode != parent.TranscodeGPUNode {
 		return false
 	}
-	if child.TranscodeQuality != "" && child.TranscodeQuality != parent.TranscodeQuality {
-		return false
-	}
 	if child.ExtraFFmpegArgs != "" && child.ExtraFFmpegArgs != parent.ExtraFFmpegArgs {
 		return false
 	}
@@ -385,6 +382,9 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 		return false
 	}
 	if len(child.TranscodeAudioCodecs) > 0 && !slices.Equal(parent.TranscodeAudioCodecs, child.TranscodeAudioCodecs) {
+		return false
+	}
+	if len(child.TranscodeVideoArgs) > 0 && !slices.Equal(parent.TranscodeVideoArgs, child.TranscodeVideoArgs) {
 		return false
 	}
 	return true
@@ -479,7 +479,7 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 	if len(m.TranscodeAudioCodecs) > 0 {
 		return false
 	}
-	if m.TranscodeQuality != "" {
+	if len(m.TranscodeVideoArgs) > 0 {
 		return false
 	}
 	if m.ExtraFFmpegArgs != "" {
