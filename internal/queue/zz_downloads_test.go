@@ -104,7 +104,7 @@ func TestAddThenStop(t *testing.T) {
 	if status, errMsg := storedStatus(t, db, crawled.ID); status != consts.DLStatusFailed || errMsg != errStopped.Error() {
 		t.Errorf("crawled video stored as %q (%q), want Failed as stopped", status, errMsg)
 	}
-	if pp.Len() != 0 {
+	if !pp.Wait(ctx) {
 		t.Errorf("%d video(s) still held for post-processing", pp.Len())
 	}
 }
