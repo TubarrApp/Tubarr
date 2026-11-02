@@ -60,15 +60,15 @@ func ValidateGPUAcceleration(g string) (gpuType string, err error) {
 		return g, nil
 	}
 
+	// Validate acceleration type.
+	if g, err = sharedvalidation.ValidateGPUAccelType(g); err != nil {
+		return "", err
+	}
+
 	// Verify OS support.
 	if !sharedvalidation.OSSupportsAccelType(g) {
 		logger.Pl.W("OS does not support acceleration of type %q, omitting.", g)
 		return "", nil
-	}
-
-	// Validate acceleration type.
-	if g, err = sharedvalidation.ValidateGPUAccelType(g); err != nil {
-		return "", err
 	}
 
 	return g, nil
@@ -79,7 +79,7 @@ func ValidateAudioTranscodeCodecSlice(pairs []string) (validPairs []string, err 
 	dedupPairs := dedupSlice(pairs)
 
 	// Check the plain codec and pairs as Metarr will read them.
-	_, result, err := sharedvalidation.ParseCodecMappings(dedupPairs, sharedvalidation.ValidateAudioCodec)
+	_, result, err := sharedparsing.ParseCodecMappings(dedupPairs, sharedvalidation.ValidateAudioCodec)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs 
 		// the above signature, only its return value matters.
 		return sharedvalidation.ValidateVideoCodecWithAccel(c, accel)
 	}
-	if _, _, err = sharedvalidation.ParseCodecMappings(dedupPairs, validate); err != nil {
+	if _, _, err = sharedparsing.ParseCodecMappings(dedupPairs, validate); err != nil {
 		return nil, err
 	}
 

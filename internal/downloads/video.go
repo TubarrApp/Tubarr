@@ -306,14 +306,11 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 		}
 
 		// Detect completed filename.
-		if strings.HasPrefix(line, "/") {
-			if _, ok := sharedconsts.AllVidExtensions[filepath.Ext(line)]; ok { // Download succeeded.
+		if path, ok := strings.CutPrefix(line, command.FinalPathPrefix); ok { // Download succeeded.
+			d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
 
-				d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
-
-				filename = line
-				completed = true
-			}
+			filename = path
+			completed = true
 		}
 	}
 

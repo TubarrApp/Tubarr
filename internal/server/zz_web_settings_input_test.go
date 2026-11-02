@@ -125,11 +125,11 @@ func TestWebSettingsNormalized(t *testing.T) {
 		{"download_retries", got.Settings["download_retries"], ""},
 		{"download_concurrency", got.Settings["download_concurrency"], ""},
 		{"metarr_concurrency", got.Metarr["metarr_concurrency"], ""},
-		{"metarr_max_cpu_usage", got.Metarr["metarr_max_cpu_usage"], "101"},
+		{"metarr_max_cpu_usage", got.Metarr["metarr_max_cpu_usage"], "100"}, // Stored as 101, sent as the most the field holds.
 		{"per-URL ytdlp_output_ext", got.URLSettings[u].Settings["ytdlp_output_ext"], "webm"},
 		{"per-URL metarr_output_ext", got.URLSettings[u].Metarr["metarr_output_ext"], "mkv"},
 		{"per-URL crawl_freq", got.URLSettings[u].Settings["crawl_freq"], ""},
-		{"per-URL metarr_max_cpu_usage", got.URLSettings[u].Metarr["metarr_max_cpu_usage"], "101"},
+		{"per-URL metarr_max_cpu_usage", got.URLSettings[u].Metarr["metarr_max_cpu_usage"], "100"},
 	} {
 		if g := formValue(c.read); g != c.want {
 			t.Errorf("%s reads back as %q, want %q", c.what, g, c.want)

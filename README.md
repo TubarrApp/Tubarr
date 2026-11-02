@@ -252,7 +252,7 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 ## Contributing
 
 1. Fork the repo, create a feature branch, and open a PR.
-2. Run `go test ./...` plus linting defined in `.golangci.yaml`.
+2. Run `go test ./...` plus linting defined in `.golangci.yaml`. Tests that download from the internet need yt-dlp, FFmpeg and Metarr, and only run when asked: `TUBARR_LIVE_TESTS=1 go test -timeout 20m ./internal/downloads ./internal/server`.
 3. Document new CLI flags or config keys.
 
 ---

@@ -101,8 +101,8 @@ func setLiveEnv(t *testing.T, key, value string) {
 // the user's own config and logs, and turns off Tubarr's and yt-dlp's bot-avoidance waits.
 func setupLive(t *testing.T) {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("live channel tests run yt-dlp, skipped in short mode")
+	if os.Getenv("TUBARR_LIVE_TESTS") == "" {
+		t.Skip("set TUBARR_LIVE_TESTS=1 to run real channels through yt-dlp and Metarr")
 	}
 	for _, tool := range []string{command.YTDLP, command.DownloaderFFmpeg} {
 		if _, err := exec.LookPath(tool); err != nil {
@@ -375,7 +375,6 @@ func (s *liveSite) serveFile(w http.ResponseWriter, r *http.Request, id string) 
 
 // liveFilter is a title filter.
 type liveFilter struct {
-	feed  string // Only for this feed's videos, if set.
 	value string
 	omits bool
 	any   bool
@@ -388,12 +387,12 @@ var liveFilterSets = [][]liveFilter{
 	{{value: "cats"}},
 	{{value: "dogs", omits: true, any: true}},
 	{{value: "dogs", omits: true, any: true}, {value: "cats", any: true}},
-	{{feed: "b", value: "dogs"}},
-	{{value: "dogs", omits: true}, {feed: "a", value: "cats"}},
+	{{value: "dogs"}},
+	{{value: "dogs", omits: true}, {value: "cats"}},
 }
 
-// filtersText writes filters as the channel pages send them.
-func (s *liveSite) filtersText(filters []liveFilter) string {
+// liveFiltersText writes filters as the channel pages send them.
+func liveFiltersText(filters []liveFilter) string {
 	lines := make([]string, 0, len(filters))
 	for _, f := range filters {
 		op, cond := "contains", "must"
@@ -403,11 +402,7 @@ func (s *liveSite) filtersText(filters []liveFilter) string {
 		if f.any {
 			cond = "any"
 		}
-		line := fmt.Sprintf("title:%s:%s:%s", op, f.value, cond)
-		if f.feed != "" {
-			line = s.feedURL(f.feed) + "|" + line
-		}
-		lines = append(lines, line)
+		lines = append(lines, fmt.Sprintf("title:%s:%s:%s", op, f.value, cond))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -620,7 +615,7 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	set(jsonkeys.SettingsJSONDirectory, pick("", filepath.Join(dir, "json")))
 	set(jsonkeys.SettingsMaxConcurrency, pick("1", "3"))
 	sc.filters = pickIndex(len(liveFilterSets))
-	set("filters", site.filtersText(liveFilterSets[sc.filters]))
+	set("filters", liveFiltersText(liveFilterSets[sc.filters]))
 	if pick("", "from") != "" {
 		form.Set("from_date", "20261002")
 		sc.fromDay = 2
@@ -640,8 +635,7 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 		sc.moves = []liveMove{{value: "cats", dir: filepath.Join(dir, "cats")}}
 		form.Set("move_ops", "title:contains:cats||"+sc.moves[0].dir)
 	case 2:
-		sc.moves = []liveMove{{feed: "b", value: "dogs", dir: filepath.Join(dir, "dogs")}}
-		form.Set("move_ops", site.feedURL("b")+"|title:contains:dogs||"+sc.moves[0].dir)
+		sc.moves = []liveMove{{feed: "b", value: "dogs", dir: filepath.Join(dir, "dogs")}} // Set in the second URL's own settings, below.
 	}
 	outputDir := pick("", filepath.Join(dir, "metarr"), filepath.Join(dir, "metarr", "{{year}}"))
 	set("metarr_output_directory", outputDir)
@@ -682,7 +676,10 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	}
 	if pick("", "filters") != "" {
 		b.filters = []liveFilter{{value: "cats"}}
-		bSettings["filters"] = site.filtersText(b.filters)
+		bSettings["filters"] = liveFiltersText(b.filters)
+	}
+	if len(sc.moves) > 0 && sc.moves[0].feed == "b" {
+		bSettings["move_ops"] = "title:contains:" + sc.moves[0].value + "||" + sc.moves[0].dir
 	}
 	if b.videoDir = pick("", filepath.Join(dir, "videos-b")); b.videoDir != "" {
 		bSettings["video_directory"] = b.videoDir
@@ -765,9 +762,6 @@ func (sc *liveScenario) passes(feed string, v *liveVideo) bool {
 	title := strings.ToLower(v.title)
 	var mustTotal, mustPassed, anyTotal, anyPassed int
 	for _, f := range filters {
-		if f.feed != "" && f.feed != feed {
-			continue
-		}
 		ok := strings.Contains(title, f.value) != f.omits
 		switch {
 		case f.any:
@@ -1306,7 +1300,7 @@ var liveActions = [...]struct {
 	actEditFilters: {"change filters", func(sc *liveScenario, p byte) {
 		before := liveRows(sc.t, sc.id)
 		sc.filters = (sc.filters + 1 + int(p)) % len(liveFilterSets)
-		text := sc.site.filtersText(liveFilterSets[sc.filters])
+		text := liveFiltersText(liveFilterSets[sc.filters])
 		sc.edit(func(form url.Values, _ map[string]map[string]map[string]any) {
 			form.Set("filters", text)
 			if text == "" {

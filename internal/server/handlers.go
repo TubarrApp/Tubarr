@@ -623,6 +623,7 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
+	file.UpdateFromConfigFile(ss.cs, c) // Before the URLs are picked, as a reload replaces them.
 
 	// An optional body picks which URLs to crawl; picked paused URLs are crawled too.
 	var requestBody struct {
@@ -1191,10 +1192,12 @@ func serveThumbnailFile(w http.ResponseWriter, r *http.Request, path string) {
 	}()
 	head := make([]byte, 512)
 	n, _ := io.ReadFull(f, head)
-	if !strings.HasPrefix(http.DetectContentType(head[:n]), "image/") {
+	contentType := http.DetectContentType(head[:n])
+	if !strings.HasPrefix(contentType, "image/") {
 		http.NotFound(w, r)
 		return
 	}
+	w.Header().Set("Content-Type", contentType) // Cached thumbnails have no extension to tell it from.
 	info, err := f.Stat()
 	if err != nil {
 		http.NotFound(w, r)
@@ -2011,7 +2014,7 @@ func (ss *serverStore) handleGetScrapeConfigContent(w http.ResponseWriter, r *ht
 	// Open file.
 	f, err := sharedfiles.OpenRegularInRoot(path)
 	if err != nil {
-		writeJSON(w, r, http.StatusBadRequest, err)
+		http.Error(w, fmt.Sprintf("failed to open scrape config file: %v", err), http.StatusBadRequest)
 		return
 	}
 	defer func() {

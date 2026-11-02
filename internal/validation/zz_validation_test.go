@@ -292,6 +292,9 @@ func TestValidateMaxFilesize(t *testing.T) {
 		// KB
 		{"500k", "500k", true},
 		{"1000KB", "1000k", true},
+		// Decimals, as yt-dlp takes.
+		{"44.6M", "44.6m", true},
+		{"1.5gb", "1.5g", true},
 		// Bytes
 		{"1B", "1", true},
 		{"b", "", false},
@@ -300,6 +303,11 @@ func TestValidateMaxFilesize(t *testing.T) {
 		{"", "", true},
 		{"1xb", "", false},
 		{"abc", "", false},
+		{"-5m", "", false}, // yt-dlp would refuse it, failing every download.
+		{"1.", "", false},
+		{".5g", "", false},
+		{"1e5", "", false},
+		{"inf", "", false},
 	}
 
 	for _, tc := range tests {
@@ -583,8 +591,9 @@ func TestValidateFilteredMetaOps_Valid(t *testing.T) {
 	}
 	metaOps := []models.MetaOps{
 		{
-			Field:  "title",
-			OpType: sharedconsts.OpReplace,
+			Field:        "title",
+			OpType:       sharedconsts.OpReplace,
+			OpFindString: "foo",
 		},
 	}
 
@@ -611,8 +620,9 @@ func TestValidateFilteredMetaOps_InvalidFilters(t *testing.T) {
 	}
 	metaOps := []models.MetaOps{
 		{
-			Field:  "title",
-			OpType: sharedconsts.OpReplace,
+			Field:        "title",
+			OpType:       sharedconsts.OpReplace,
+			OpFindString: "foo",
 		},
 	}
 
@@ -635,8 +645,9 @@ func TestValidateFilteredMetaOps_InvalidFilters(t *testing.T) {
 func TestValidateFilteredMetaOps_NoFilters(t *testing.T) {
 	metaOps := []models.MetaOps{
 		{
-			Field:  "title",
-			OpType: sharedconsts.OpReplace,
+			Field:        "title",
+			OpType:       sharedconsts.OpReplace,
+			OpFindString: "foo",
 		},
 	}
 
@@ -699,7 +710,8 @@ func TestValidateFilteredFilenameOps_Valid(t *testing.T) {
 	}
 	filenameOps := []models.FilenameOps{
 		{
-			OpType: sharedconsts.OpReplace,
+			OpType:       sharedconsts.OpReplace,
+			OpFindString: "foo",
 		},
 	}
 
@@ -725,7 +737,8 @@ func TestValidateFilteredFilenameOps_InvalidFilters(t *testing.T) {
 	}
 	filenameOps := []models.FilenameOps{
 		{
-			OpType: sharedconsts.OpReplace,
+			OpType:       sharedconsts.OpReplace,
+			OpFindString: "foo",
 		},
 	}
 
@@ -748,7 +761,8 @@ func TestValidateFilteredFilenameOps_InvalidFilters(t *testing.T) {
 func TestValidateFilteredFilenameOps_NoFilters(t *testing.T) {
 	filenameOps := []models.FilenameOps{
 		{
-			OpType: sharedconsts.OpReplace,
+			OpType:       sharedconsts.OpReplace,
+			OpFindString: "foo",
 		},
 	}
 
@@ -927,6 +941,12 @@ func TestValidateToFromDate_InvalidYear(t *testing.T) {
 }
 
 func TestValidateGPU(t *testing.T) {
+	// An alias is checked for OS support as what it stands for, so "amd" as "amf".
+	amdGPU := ""
+	if sharedvalidation.OSSupportsAccelType(sharedconsts.AccelTypeAMF) {
+		amdGPU = sharedconsts.AccelTypeAMF
+	}
+
 	tests := []struct {
 		gpu       string
 		expectGPU string
@@ -937,6 +957,7 @@ func TestValidateGPU(t *testing.T) {
 		{"auto", "auto", true, true},
 		{"", "", true, true},
 		{"nvidia", "cuda", true, true},
+		{"amd", amdGPU, true, true},
 
 		// Fail.
 		{"fake", "", true, false},

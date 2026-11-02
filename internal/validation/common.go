@@ -160,17 +160,8 @@ func ValidateMaxFilesize(input string) (string, error) {
 	s := strings.ToLower(strings.TrimSpace(input))
 	s = strings.TrimSuffix(s, "b")
 
-	// Handle K, M, G suffixes
-	if strings.HasSuffix(s, "k") || strings.HasSuffix(s, "m") || strings.HasSuffix(s, "g") {
-		n := s[:len(s)-1]
-		if _, err := strconv.Atoi(n); err != nil {
-			return "", fmt.Errorf("invalid size number: %s", s)
-		}
-		return s, nil
-	}
-
-	// Check raw integer is valid
-	if _, err := strconv.Atoi(s); err == nil {
+	// A number, as yt-dlp reads it, with any K, M or G suffix.
+	if regex.MaxFilesizeCompile().MatchString(s) {
 		return s, nil
 	}
 
@@ -232,6 +223,11 @@ func ValidateToFromDate(d string) (string, error) {
 	matches := re.FindStringSubmatch(d)
 	if matches == nil {
 		return "", fmt.Errorf("invalid date format %q: expected 'Ymd' format", d)
+	}
+
+	// A number marked as a day, with no month given (e.g. "2024y5d"), is the day.
+	if strings.HasSuffix(d, "d") && !strings.Contains(d, "m") && matches[3] == "" {
+		matches[2], matches[3] = "", matches[2]
 	}
 
 	// Default values.
@@ -312,7 +308,7 @@ func ValidateYtdlpVideoCodecs(codecs []string) ([]string, error) {
 	for i := range codecs { // Do not use _, c :=
 		codecs[i] = strings.ToLower(strings.TrimSpace(codecs[i]))
 		if _, ok := sharedconsts.ValidVideoCodecs[codecs[i]]; !ok {
-			return nil, fmt.Errorf("invalid audio codec preference %q", codecs[i])
+			return nil, fmt.Errorf("invalid video codec preference %q", codecs[i])
 		}
 	}
 

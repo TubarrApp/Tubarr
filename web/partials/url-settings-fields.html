@@ -267,7 +267,7 @@
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Max CPU Usage (%)</label>
-                              <input type="number" x-model.number="urlEntry.custom.metarr_max_cpu_usage" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_max_cpu_usage', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
+                              <input type="number" step="any" x-model.number="urlEntry.custom.metarr_max_cpu_usage" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_max_cpu_usage', 'Use channel setting')" class="w-full h-11 rounded-lg border px-4 text-sm dark:bg-gray-900 dark:border-gray-600 dark:text-white/90" />
                             </div>
                             <div class="md:col-span-2">
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>

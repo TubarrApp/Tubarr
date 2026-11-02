@@ -834,6 +834,13 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 		return false, nil // Already queued or downloading, not a crawl retry, or in another channel.
 	}
 
+	// A video chosen again is no longer ignored, so it returns to Available if this download fails.
+	//nolint:gosec // SQL identifiers are trusted constants.
+	ignoredQuery := fmt.Sprintf("UPDATE %s SET %s = 0 WHERE %s = ?", consts.DBVideos, consts.QVidIgnored, consts.QVidID)
+	if _, err := tx.Exec(ignoredQuery, v.ID); err != nil {
+		return false, fmt.Errorf("failed to clear ignored for video %d: %w", v.ID, err)
+	}
+
 	//nolint:gosec // SQL identifiers are trusted constants.
 	selectQuery := fmt.Sprintf(
 		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
@@ -1140,18 +1147,19 @@ func (vs *VideoStore) recoverInterruptedPending(tx *sql.Tx) (pending int64, err 
 	return pending, nil
 }
 
-// recoverInterruptedFailed marks unfinished videos still Queued, Downloading or with a finished download as Failed.
+// recoverInterruptedFailed marks as Failed every video still Queued or Downloading, and unfinished videos with a finished download.
 //
 // Run after recoverInterruptedPending, so the finished downloads left are the ones with no stored file.
 func (vs *VideoStore) recoverInterruptedFailed(tx *sql.Tx) (failed int64, err error) {
 	//nolint:gosec // SQL identifiers are trusted constants.
 	failedQuery := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = ?, %s = CURRENT_TIMESTAMP WHERE %s IN (?, ?, ?) "+
-			"AND %s IN (SELECT %s FROM %s WHERE %s = 0 AND %s = 0)",
+		"UPDATE %s SET %s = ?, %s = ?, %s = CURRENT_TIMESTAMP WHERE %s IN (?, ?) "+
+			"OR (%s = ? AND %s IN (SELECT %s FROM %s WHERE %s = 0 AND %s = 0))",
 		consts.DBDownloads,
 		consts.QDLStatus,
 		consts.QDLError,
 		consts.QDLUpdatedAt,
+		consts.QDLStatus,
 		consts.QDLStatus,
 		consts.QDLVidID,
 		consts.QVidID,

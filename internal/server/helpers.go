@@ -125,13 +125,19 @@ func newConfigFileResponse(path string) *configFileResponse {
 		Settings:    append(parsing.GivenKeys(&input.SettingsInput), parsing.GivenKeys(&input.MetarrArgsInput)...),
 		URLSettings: map[string][]string{},
 	}
+	if input.Profile != nil {
+		resp.Settings = append(resp.Settings, keys.Profile)
+	}
 	for u, override := range input.URLSettings {
 		var given []string
 		if override.Name != nil {
 			given = append(given, keys.ChannelURLName)
 		}
+		if override.Profile != nil {
+			given = append(given, keys.Profile)
+		}
 		if override.Settings != nil {
-			given = parsing.GivenKeys(override.Settings)
+			given = append(given, parsing.GivenKeys(override.Settings)...)
 		}
 		if override.Metarr != nil {
 			given = append(given, parsing.GivenKeys(override.Metarr)...)
@@ -212,7 +218,8 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		FilenameOps:             strings.Join(sharedparsing.FormatFilenameOps(m.FilenameOps), "\n"),
 	}
 	if m.MaxCPU > 0 {
-		r.MaxCPU = &m.MaxCPU
+		maxCPU := min(m.MaxCPU, 100) // Stored as 101 to turn the limit off, which the form's 0-100 field can't hold.
+		r.MaxCPU = &maxCPU
 	}
 	filteredMeta := make([]string, 0, len(m.FilteredMetaOps))
 	for i := range m.FilteredMetaOps {

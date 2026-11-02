@@ -14,6 +14,7 @@ const (
 	wgetDotStr       = `^\s*\d+[KMGT]\s*(\d{1,3})%`
 	dlPercentStr     = `\[download\]\s+(\d+\.?\d*)%`
 	yearFragmentsStr = `^(\d{4})?y?(\d{1,2})?m?(\d{1,2})?d?$`
+	maxFilesizeStr   = `^\d+(\.\d+)?[kmg]?$`
 )
 
 // Regex expressions, compiled once.
@@ -25,6 +26,7 @@ var (
 	onceDLPercentage  sync.Once
 	onceWgetDot       sync.Once
 	onceYearFragments sync.Once
+	onceMaxFilesize   sync.Once
 
 	AriaItemCount *regexp.Regexp
 	AriaProgress  *regexp.Regexp
@@ -33,6 +35,7 @@ var (
 	DLPercentage  *regexp.Regexp
 	WgetDot       *regexp.Regexp
 	YearFragments *regexp.Regexp
+	MaxFilesize   *regexp.Regexp
 )
 
 // AriaItemCountCompile compiles regex for Aria2 item counts.
@@ -89,4 +92,12 @@ func YearFragmentsCompile() *regexp.Regexp {
 		YearFragments = regexp.MustCompile(yearFragmentsStr)
 	})
 	return YearFragments
+}
+
+// MaxFilesizeCompile compiles regex for checking user inputted max filesizes.
+func MaxFilesizeCompile() *regexp.Regexp {
+	onceMaxFilesize.Do(func() {
+		MaxFilesize = regexp.MustCompile(maxFilesizeStr)
+	})
+	return MaxFilesize
 }

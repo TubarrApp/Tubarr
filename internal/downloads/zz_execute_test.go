@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
@@ -143,7 +144,7 @@ func TestExecuteVideoSucceedsFirstTry(t *testing.T) {
 	if err := os.WriteFile(videoPath, []byte("not really a video"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	runs := fakeYTDLP(t, "echo '"+videoPath+"'")
+	runs := fakeYTDLP(t, "echo '"+command.FinalPathPrefix+videoPath+"'")
 	vd, _ := newTestDownloads(t.Context(), t, "https://success.example/v", 3)
 
 	if err := vd.Execute(); err != nil {
@@ -349,7 +350,7 @@ func TestExecuteVideoDownloadTrailingOutput(t *testing.T) {
 				ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 				defer cancel()
 
-				script := fmt.Sprintf(`echo %q; seq %d; seq %d >&2`, videoPath, trailing, trailing)
+				script := fmt.Sprintf(`echo %q; seq %d; seq %d >&2`, command.FinalPathPrefix+videoPath, trailing, trailing)
 				d := &VideoDownload{
 					Video:      &models.Video{ID: int64(900000 + trailing + i), URL: "https://a.example/v"},
 					Channel:    &models.Channel{},

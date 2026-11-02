@@ -105,6 +105,9 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 		if endIdx == -1 {
 			return "", errors.New("missing closing delimiter")
 		}
+		if endIdx < startIdx {
+			return "", fmt.Errorf("closing delimiter comes before the opening delimiter in %q", dir)
+		}
 
 		// String up to template open
 		b.WriteString(remaining[:startIdx])

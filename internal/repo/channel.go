@@ -421,7 +421,7 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return nil
 	}
 
-	logger.Pl.I("Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
+	logger.Pl.D(1, "Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
 	if _, _, err := sharedvalidation.ValidateFile(cfgFile, false, sharedtemplates.NoTemplateTags); err != nil {
 		return err
 	}
@@ -694,6 +694,19 @@ func checkDownloadDirs(old, s *models.Settings) error {
 			continue
 		}
 		if err := validation.CheckDestination(dir); err != nil {
+			return err
+		}
+	}
+
+	// Move op directories aren't checked when parsed, as video and JSON directories are.
+	if s == nil {
+		return nil
+	}
+	for _, op := range s.MetaFilterMoveOps {
+		if slices.Contains(existing, op.OutputDir) {
+			continue
+		}
+		if err := validation.CheckDirectory(op.OutputDir, sharedtemplates.MoveOpTemplateTags); err != nil {
 			return err
 		}
 	}

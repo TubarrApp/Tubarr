@@ -214,7 +214,8 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 
 	// Write metadata to file, named like yt-dlp's downloads: a hash of the URL keeps apart videos with the same title.
 	sum := sha256.Sum256([]byte(v.URL))
-	filename := fmt.Sprintf("%s [%s].json", sanitizeFilename(v.Title), hex.EncodeToString(sum[:4]))
+	name := sharedparsing.SanitizePathComponent(sanitizeFilename(v.Title), 200) // Cut to 200 bytes, as yt-dlp's are.
+	filename := fmt.Sprintf("%s [%s].json", name, hex.EncodeToString(sum[:4]))
 	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v); err != nil {
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}

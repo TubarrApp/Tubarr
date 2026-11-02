@@ -93,9 +93,9 @@ download-as-cancel if Download As closes without starting. -->
             class="w-16 shrink-0 rounded border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
             x-text="uploading ? '…' : 'Upload'"
           ></button>
-          <input x-ref="thumbFile" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="uploadThumbnail($event)" />
+          <input x-ref="thumbFile" type="file" accept="image/jpeg,image/png,image/gif" class="hidden" @change="uploadThumbnail($event)" />
         </div>
-        <p x-show="thumbChoice === 'custom'" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload a JPEG, PNG or WebP image (up to 10 MB), or give a path on the server or a URL.</p>
+        <p x-show="thumbChoice === 'custom'" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload a JPEG, PNG or GIF image (up to 10 MB), or give a path on the server or a URL.</p>
       </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         The ops below are <span x-text="multiple ? `their channel URL's` : `this video's channel URL's (or its last edits)`"></span>, one per line. Edits apply to <span x-text="multiple ? 'these videos' : 'this video'"></span> only, and are kept for later post-processing runs. Filtered ops still apply only if all their filters match the video's metadata. Load adds an ops file's ops to its box.

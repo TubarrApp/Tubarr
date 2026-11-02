@@ -451,40 +451,6 @@ func (cs *ChannelStore) DeleteChannelURL(channelURLID int64) error {
 	return nil
 }
 
-// DeleteChannelURLAuth strips a Channel URL of authentication details when decryption key is empty.
-func (cs *ChannelStore) DeleteChannelURLAuth(cu *models.ChannelURL) error {
-	cuIDStr := strconv.FormatInt(cu.ID, 10)
-	if !cs.channelURLExists(consts.QChanURLChannelID, cuIDStr) {
-		return fmt.Errorf("channel URL with ID %d does not exist in the database", cu.ID)
-	}
-
-	cu.Username = ""
-	cu.Password = ""
-	cu.EncryptedPassword = ""
-	cu.LoginURL = ""
-
-	//nolint:gosec // SQL identifiers are trusted constants.
-	query := fmt.Sprintf(
-		"UPDATE %s SET "+
-			"%s = ?, "+
-			"%s = ?, "+
-			"%s = ? "+
-			"WHERE %s = ?",
-		consts.DBChannelURLs,
-		consts.QChanURLUsername,
-		consts.QChanURLPassword,
-		consts.QChanURLLoginURL,
-		consts.QChanURLID,
-	)
-
-	if _, err := cs.q.Exec(query, "", "", "", cu.ID); err != nil {
-		return fmt.Errorf("failed to delete auth details for channel URL ID %d: %w", cu.ID, err)
-	}
-
-	logger.Pl.S("Deleted authentication details for channel URL ID %d (%s)", cu.ID, cu.URL)
-	return nil
-}
-
 // ******************************** Private ***************************************************************************************
 
 // channelURLExists returns true if the channel URL exists in the database.

@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/blocking"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/state"
 	"tubarr/internal/times"
@@ -73,12 +74,6 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 		}
 		delete(reported, c.ID)
 
-		// Skip paused channels
-		if c.ChanSettings.Paused {
-			logger.Pl.D(3, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
-			continue
-		}
-
 		// Add jitter
 		var jitter time.Duration
 		if !abstractions.IsSet(keys.SkipAllWaits) {
@@ -88,34 +83,47 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 		// Crawl the URLs due, each on its own crawl frequency or the channel's.
 		due, next := c.DueURLs(now, jitter, true)
 		logger.Pl.D(4, "channel %q - %d URL(s) due, next in %s", c.Name, len(due), next.Round(time.Second))
-
-		if len(due) > 0 {
-			ch := *c
-			ch.URLModels = due
-
-			// Crawl goroutine
-			go func(ch *models.Channel) {
-				crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.ID)
-				if !ok {
-					return
-				}
-				defer unlock()
-
-				release, err := app.AcquireCrawlSlot(crawlCtx, ch.Name)
-				if err != nil {
-					logger.Pl.D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
-					return
-				}
-				defer release()
-
-				logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
-				if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ss.dq, ch); err != nil {
-					logger.Pl.E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
-				} else if performedCrawls {
-					logger.Pl.S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
-				}
-			}(&ch)
+		if len(due) == 0 {
+			continue
 		}
+
+		// The config file may change what's due, or pause the channel.
+		file.UpdateFromConfigFile(ss.s.ChannelStore(), c)
+
+		// Skip paused channels
+		if c.ChanSettings.Paused {
+			logger.Pl.D(3, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
+			continue
+		}
+		if due, _ = c.DueURLs(now, jitter, true); len(due) == 0 {
+			continue
+		}
+
+		ch := *c
+		ch.URLModels = due
+
+		// Crawl goroutine
+		go func(ch *models.Channel) {
+			crawlCtx, unlock, ok := state.TryLockCrawl(ctx, ch.ID)
+			if !ok {
+				return
+			}
+			defer unlock()
+
+			release, err := app.AcquireCrawlSlot(crawlCtx, ch.Name)
+			if err != nil {
+				logger.Pl.D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
+				return
+			}
+			defer release()
+
+			logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
+			if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ss.dq, ch); err != nil {
+				logger.Pl.E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
+			} else if performedCrawls {
+				logger.Pl.S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
+			}
+		}(&ch)
 	}
 }
 

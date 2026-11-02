@@ -41,6 +41,48 @@ func TestConfigFileResponse(t *testing.T) {
 	}
 }
 
+// TestConfigFileResponseListsNameAndProfile tests a name and profile the file sets are listed with its other settings.
+func TestConfigFileResponseListsNameAndProfile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "channel.yaml")
+	body := "channel-name: chan\nprofile: Shared\ncrawl-freq: 30\n" +
+		"url-settings:\n" +
+		"  'https://example.com/@a':\n    name: Cats\n    profile: Shared\n    settings:\n      auto-download: true\n    metarr:\n      metarr-output-ext: mkv\n" +
+		"  'https://example.com/@b':\n    name: Dogs\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := newConfigFileResponse(path)
+	if got.Error != "" {
+		t.Fatal(got.Error)
+	}
+	if want := []string{"crawl-freq", "profile"}; !slices.Equal(got.Settings, want) {
+		t.Errorf("settings %v, want %v", got.Settings, want)
+	}
+	if want := []string{"name", "profile", "auto-download", "metarr-output-ext"}; !slices.Equal(got.URLSettings["https://example.com/@a"], want) {
+		t.Errorf("URL settings %v, want %v", got.URLSettings["https://example.com/@a"], want)
+	}
+	if want := []string{"name"}; !slices.Equal(got.URLSettings["https://example.com/@b"], want) {
+		t.Errorf("URL settings %v, want %v", got.URLSettings["https://example.com/@b"], want)
+	}
+}
+
+// TestScrapeConfigContentOpenError tests the rules editor is given a readable error for a file it can't open.
+func TestScrapeConfigContentOpenError(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	viper.Set(keys.ScrapeConfigFile, filepath.Join(t.TempDir(), "missing.toml"))
+	t.Cleanup(func() { viper.Set(keys.ScrapeConfigFile, "") })
+
+	w := httptest.NewRecorder()
+	(&serverStore{}).handleGetScrapeConfigContent(w, httptest.NewRequest(http.MethodGet, "/", nil))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "failed to open scrape config file") || strings.Contains(body, `"Op"`) {
+		t.Errorf("body = %q, want a readable error", body)
+	}
+}
+
 // TestScrapeConfigContentEndpoints tests loading and saving the scrape config file through the web UI's editor endpoints.
 func TestScrapeConfigContentEndpoints(t *testing.T) {
 	logger.Pl.Console = io.Discard

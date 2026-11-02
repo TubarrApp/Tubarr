@@ -3,6 +3,7 @@ package downloads
 import (
 	"bufio"
 	"context"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -18,8 +19,8 @@ const (
 
 // TestLiveDownloadProgress downloads a real file through each available downloader and checks progress is parsed.
 func TestLiveDownloadProgress(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping live download in short mode")
+	if os.Getenv("TUBARR_LIVE_TESTS") == "" {
+		t.Skip("set TUBARR_LIVE_TESTS=1 to download from the internet through each downloader")
 	}
 	if _, err := exec.LookPath(command.YTDLP); err != nil {
 		t.Skip("yt-dlp not installed")

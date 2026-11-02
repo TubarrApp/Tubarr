@@ -4,9 +4,12 @@ package command
 // DownloadDestinationPrefix starts the yt-dlp output line naming each file it downloads to.
 const DownloadDestinationPrefix = "[download] Destination: "
 
+// FinalPathPrefix starts the yt-dlp output line naming a video's finished file.
+const FinalPathPrefix = "[tubarr-file] "
+
 // General yt-dlp commands.
 const (
-	AfterMove            = "after_move:%(filepath)s"
+	AfterMove            = "after_move:" + FinalPathPrefix + "%(filepath)s"
 	CookiesFromBrowser   = "--cookies-from-browser"
 	AddHeader            = "--add-header" // Accepted shortening of AddHeaders.
 	AddHeaders           = "--add-headers"

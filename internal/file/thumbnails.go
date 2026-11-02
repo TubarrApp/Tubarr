@@ -20,7 +20,7 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-// ErrThumbnailType is returned for an uploaded thumbnail that isn't a JPEG, PNG, or WebP image.
+// ErrThumbnailType is returned for an uploaded thumbnail that isn't a JPEG, PNG, or GIF image.
 var ErrThumbnailType = errors.New("thumbnails must be JPEG, PNG, or GIF images")
 
 // thumbnailExts maps the image types accepted for uploaded thumbnails to their file extensions.
