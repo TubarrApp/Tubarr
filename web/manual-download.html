@@ -34,7 +34,7 @@
         <!-- include:header title="Manual Download" -->
 
         <!-- ===== Main Content Start ===== -->
-        <main x-data="manualDownloadData()" x-init="init()" @download-as-done.window="downloadAsDone()" @download-as-cancel.window="downloadAsCancelled($event.detail)">
+        <main x-data="manualDownloadData()" @download-as-done.window="downloadAsDone()" @download-as-cancel.window="downloadAsCancelled($event.detail)">
           <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
             <div class="mb-6">
               <p class="text-sm text-gray-500 dark:text-gray-400">

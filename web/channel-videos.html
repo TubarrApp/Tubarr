@@ -46,7 +46,6 @@
             <!-- Videos Container -->
             <div
               x-data="videosData()"
-              x-init="init()"
               @edit-metarr-done.window="startedMetarr.push($event.detail.id); loadActivity(); setTimeout(() => loadVideos(), 3000)"
             >
               <!-- Loading State -->

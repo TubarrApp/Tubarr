@@ -52,7 +52,7 @@
               </p>
             </div>
 
-            <div x-data="availableData()" x-init="init()" @download-as-done.window="downloadAsDone($event.detail)">
+            <div x-data="availableData()" @download-as-done.window="downloadAsDone($event.detail)">
               <!-- Loading State -->
               <div x-show="loading" class="text-center py-12">
                 <div class="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
