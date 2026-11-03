@@ -182,15 +182,15 @@
               </div>
 
               <!-- Error State -->
-              <div x-show="error" class="rounded-2xl border border-red-200 bg-red-50 px-5 py-7 dark:border-red-800 dark:bg-red-900/20">
-                <p class="text-red-600 dark:text-red-400" x-text="error"></p>
+              <div x-show="error" class="p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500">
+                <p x-text="error"></p>
               </div>
 
               <!-- Stats Summary Card -->
               <div x-show="!loading && !error && channels.length > 0" class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
                 <div class="flex items-center justify-between">
                   <div>
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Overview</h3>
+                    <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Overview</h3>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                       Tracking <span class="font-semibold text-brand-500 dark:text-brand-400" x-text="channels.length"></span> channel<span x-show="channels.length !== 1">s</span>
                     </p>
@@ -214,9 +214,9 @@
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                 </svg>
-                <h3 class="mt-4 text-lg font-semibold text-gray-800 dark:text-white/90">No channels yet</h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Get started by adding your first channel</p>
-                <a href="add-channel.html" class="mt-4 inline-flex items-center px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600">
+                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No channels yet</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by adding your first channel</p>
+                <a href="add-channel.html" class="mt-4 inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50">
                   Add Channel
                 </a>
                 <br>
@@ -225,7 +225,7 @@
 
               <!-- Crawl Dialog -->
               <div x-show="crawlDialog" x-cloak @keydown.escape.window="crawlDialog = null" class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4">
-                <div @click.outside="crawlDialog = null" class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                <div @click.outside="crawlDialog = null" class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-700 dark:bg-gray-900">
                   <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
                     Crawl <span x-text="crawlDialog?.name"></span>
                   </h3>
@@ -246,7 +246,7 @@
                   </div>
                   <div class="mt-6 flex justify-end gap-3">
                     <button type="button" @click="crawlDialog = null" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">Cancel</button>
-                    <button type="button" @click="crawlChannel(crawlDialog.id, crawlSelectedURLs); crawlDialog = null" :disabled="crawlSelectedURLs.length === 0" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed">Crawl</button>
+                    <button type="button" @click="crawlChannel(crawlDialog.id, crawlSelectedURLs); crawlDialog = null" :disabled="crawlSelectedURLs.length === 0" class="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed">Crawl</button>
                   </div>
                 </div>
               </div>
@@ -281,7 +281,7 @@
                           >
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
-                          <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
+                          <h3 class="text-base font-semibold text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
                           <span
                             x-show="channel.new_video_notification"
                             class="notification-dot"
@@ -301,7 +301,7 @@
                         @click="hasJob(channel) ? stopQueue(channel) : openCrawlDialog(channel)"
                         :disabled="crawling === channel.id || isStopping(channel)"
                         :title="hasJob(channel) ? 'Start nothing new for this channel, letting in-progress downloads and transcodes finish' : ''"
-                        :class="hasJob(channel) ? 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500' : 'bg-brand-600 hover:bg-brand-700 text-white'"
+                        :class="hasJob(channel) ? 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500' : 'bg-brand-500 hover:bg-brand-600 text-white'"
                         class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg x-show="crawling !== channel.id && !hasJob(channel)" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,7 +335,7 @@
                       <button
                         @click="ignoreCrawlChannel(channel.id)"
                         :disabled="ignoring === channel.id || hasJob(channel)"
-                        class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-warning-500 hover:bg-warning-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg x-show="ignoring !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -473,7 +473,7 @@
                           </button>
                           <button
                             @click="deleteChannel(channel.id, channel.name); actionsMenuOpen = null"
-                            class="delete-button-hover flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400"
+                            class="delete-button-hover flex w-full items-center gap-2 px-4 py-2 text-sm text-error-600 dark:text-error-500"
                           >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -811,12 +811,6 @@
           actionsMenuOpen: null,
           blockedDomainContextsCount: 0,
           blockedDomainNames: [],
-          crawlConcurrency: 0,
-          savingCrawl: false,
-          crawlSaved: false,
-          globalDownloadLimit: 0,
-          savingLimit: false,
-          limitSaved: false,
           availableVideos: {}, // Channel ID -> videos waiting to be chosen, newest first.
 
           async loadAvailableVideos() {
@@ -952,11 +946,9 @@
                 this.activityTimer = setInterval(() => this.loadActivity(), 3000);
               }
 
-              // Load blocked domains count and global settings
+              // Load available videos and the blocked domains count
               this.loadAvailableVideos();
               this.loadBlockedDomainsCount();
-              this.loadCrawlConcurrency();
-              this.loadGlobalDownloadLimit();
 
               this.loading = false;
             } catch (err) {
@@ -1013,76 +1005,6 @@
             await this.loadBlockedDomainsCount();
             if (failed.length > 0) {
               alert(`Failed to unblock: ${failed.join(', ')}`);
-            }
-          },
-
-          async loadCrawlConcurrency() {
-            try {
-              const response = await fetch('/api/v1/settings/crawl-concurrency');
-              if (!response.ok) {
-                console.error('Failed to fetch crawl concurrency');
-                return;
-              }
-              const data = await response.json();
-              this.crawlConcurrency = data.limit || 0;
-            } catch (err) {
-              console.error('Error loading crawl concurrency:', err);
-            }
-          },
-
-          async updateCrawlConcurrency() {
-            this.savingCrawl = true;
-            this.crawlSaved = false;
-            try {
-              const response = await fetch('/api/v1/settings/crawl-concurrency', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ limit: this.crawlConcurrency })
-              });
-              if (!response.ok) {
-                throw new Error('Failed to update');
-              }
-              this.crawlSaved = true;
-              setTimeout(() => { this.crawlSaved = false; }, 2000);
-            } catch (err) {
-              console.error('Error updating crawl concurrency:', err);
-            } finally {
-              this.savingCrawl = false;
-            }
-          },
-
-          async loadGlobalDownloadLimit() {
-            try {
-              const response = await fetch('/api/v1/settings/global-download-concurrency');
-              if (!response.ok) {
-                console.error('Failed to fetch global download limit');
-                return;
-              }
-              const data = await response.json();
-              this.globalDownloadLimit = data.limit || 0;
-            } catch (err) {
-              console.error('Error loading global download limit:', err);
-            }
-          },
-
-          async updateGlobalDownloadLimit() {
-            this.savingLimit = true;
-            this.limitSaved = false;
-            try {
-              const response = await fetch('/api/v1/settings/global-download-concurrency', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ limit: this.globalDownloadLimit })
-              });
-              if (!response.ok) {
-                throw new Error('Failed to update');
-              }
-              this.limitSaved = true;
-              setTimeout(() => { this.limitSaved = false; }, 2000);
-            } catch (err) {
-              console.error('Error updating global download limit:', err);
-            } finally {
-              this.savingLimit = false;
             }
           },
 

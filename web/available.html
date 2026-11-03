@@ -45,7 +45,7 @@
 
         <!-- ===== Main Content Start ===== -->
         <main class="h-full">
-          <div class="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
             <div class="mb-6">
               <p class="text-sm text-gray-500 dark:text-gray-400">
                 New videos from channels and URLs which don't download automatically. Choose which to download.
@@ -60,8 +60,8 @@
               </div>
 
               <!-- Error State -->
-              <div x-show="error" class="rounded-2xl border border-red-200 bg-red-50 px-5 py-7 dark:border-red-800 dark:bg-red-900/20">
-                <p class="text-red-600 dark:text-red-400" x-text="error"></p>
+              <div x-show="error" class="p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500">
+                <p x-text="error"></p>
               </div>
 
               <!-- Empty State -->
@@ -146,7 +146,7 @@
                       @click="act('restore')"
                       :disabled="selectedCount === 0 || working"
                       title="Move the selected videos back to Available, to download them past the download filters."
-                      class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Restore<span x-show="selectedCount > 0" x-text="` (${selectedCount})`"></span>
                     </button>
@@ -172,7 +172,7 @@
                       x-show="!ignoredView"
                       @click="act('download')"
                       :disabled="selectedCount === 0 || working"
-                      class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Download<span x-show="selectedCount > 0" x-text="` (${selectedCount})`"></span>
                     </button>

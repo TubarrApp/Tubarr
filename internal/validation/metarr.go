@@ -125,7 +125,7 @@ func ValidateExtraFFmpegArgs(a string) error {
 		return fmt.Errorf("option %q is not allowed", option)
 	}
 	if option, found := sharedparsing.EncoderOnlyOption(args); found {
-		return fmt.Errorf("%s only works when encoding a video, so it goes in Video Encoder Args (%s) instead, e.g. av1:%s ...",
+		return fmt.Errorf("%s only works when encoding a video, so it goes in Video Encoder Args (%s) instead, e.g. av1:%s",
 			option, keys.TranscodeVideoArgs, option)
 	}
 	return nil

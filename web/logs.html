@@ -41,15 +41,15 @@
         <!-- include:header title="Logs" -->
 
         <!-- ===== Main Content Start ===== -->
-        <main class="p-4 md:p-6 2xl:p-10">
-          <div class="mx-auto max-w-7xl">
+        <main>
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
             <!-- Log Viewer Start -->
             <div
               x-data="logViewer()"
               class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
             >
               <div class="border-b border-gray-200 p-5 sm:px-6 dark:border-gray-700">
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="activeTab === 'metarr' ? 'Metarr (Post-processor) Logs' : 'Tubarr Logs'">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white/90" x-text="activeTab === 'metarr' ? 'Metarr (Post-processor) Logs' : 'Tubarr Logs'">
                   Tubarr Logs
                 </h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -60,18 +60,18 @@
               <div class="p-5 sm:p-6">
                 <!-- Tab Navigation -->
                 <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
-                  <nav class="-mb-px flex space-x-4" aria-label="Tabs">
+                  <nav class="flex flex-wrap" aria-label="Tabs">
                     <button
                       @click="switchTab('tubarr')"
                       :class="activeTab === 'tubarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                      class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
+                      class="py-2 px-4 border-b-2 font-medium text-sm"
                     >
                       Tubarr
                     </button>
                     <button
                       @click="switchTab('metarr')"
                       :class="activeTab === 'metarr' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                      class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors"
+                      class="py-2 px-4 border-b-2 font-medium text-sm"
                     >
                       Metarr <span class="font-normal text-gray-400 dark:text-gray-500">(Post-processor)</span>
                     </button>
@@ -79,15 +79,15 @@
                 </div>
 
                 <!-- Error Display -->
-                <div x-show="error" x-text="error" class="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+                <div x-show="error" x-text="error" class="mb-4 p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500"></div>
 
                 <!-- Controls -->
                 <div class="mb-4 flex flex-wrap gap-3 items-center justify-between">
                   <div class="flex flex-wrap gap-2 items-center">
                     <button
                       @click="toggleAutoRefresh()"
-                      :class="autoRefresh ? 'bg-brand-500 hover:bg-brand-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'"
-                      class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors"
+                      :class="autoRefresh ? 'border-transparent bg-brand-500 hover:bg-brand-600 text-white' : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 dark:text-gray-300'"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium border rounded-lg"
                     >
                       <svg class="w-4 h-4 mr-2" :class="autoRefresh ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -98,7 +98,7 @@
                     <button
                       @click="fetchLogs()"
                       :disabled="loading"
-                      class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
                     >
                       <svg class="w-4 h-4 mr-2" :class="loading ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -111,7 +111,7 @@
                       <select
                         id="logType"
                         x-model="typeFilter"
-                        class="pl-3 pr-8 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                        class="pl-3 pr-8 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
                       >
                         <option value="">All</option>
                         <option value="error">Errors</option>
@@ -128,7 +128,7 @@
                         id="logLevel"
                         x-model="logLevel"
                         @change="setLogLevel()"
-                        class="pl-3 pr-8 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                        class="pl-3 pr-8 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
                         style="min-width: 3.5rem;"
                       >
                         <option value="0">0</option>
@@ -150,7 +150,7 @@
                 <div
                   x-ref="logContainer"
                   @scroll="handleScroll()"
-                  class="bg-gray-950 rounded-lg p-4 font-mono text-xs overflow-y-auto"
+                  class="bg-gray-950 rounded-lg p-4 font-mono text-sm overflow-y-auto"
                   style="height: calc(100vh - 400px); min-height: 400px;"
                 >
                   <template x-if="shownLogs.length === 0">

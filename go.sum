@@ -2,6 +2,14 @@ github.com/PuerkitoBio/goquery v1.11.0 h1:jZ7pwMQXIITcUXNH83LLk+txlaEy6NVOfTuP43
 github.com/PuerkitoBio/goquery v1.11.0/go.mod h1:wQHgxUOU3JGuj3oD/QFfxUdlzW6xPHfqyHre6VMY4DQ=
 github.com/TubarrApp/gocommon v0.0.0-20261102051505-ee134306dd4b h1:4DfO8Ey3C/j6XAMuFs1NjC2AYBJUEsIEFeEvlysiFCk=
 github.com/TubarrApp/gocommon v0.0.0-20261102051505-ee134306dd4b/go.mod h1:3lTY71PUj3MqDfxvlkQIaLxH1wXYdl/k9oAJgTzA834=
+github.com/TubarrApp/gocommon v0.0.0-20261103003432-d4d54c80af9a h1:GwFEpvhWJIxsh9QH2l3zmNqXZ0P4xwAMCZc14ts1hu8=
+github.com/TubarrApp/gocommon v0.0.0-20261103003432-d4d54c80af9a/go.mod h1:3lTY71PUj3MqDfxvlkQIaLxH1wXYdl/k9oAJgTzA834=
+github.com/TubarrApp/gocommon v0.0.0-20261103004612-18d773854c78 h1:lA5/9ogVlFBIz78U0hY1iQnn/Yn6AZHo7eTB8Jn4/EI=
+github.com/TubarrApp/gocommon v0.0.0-20261103004612-18d773854c78/go.mod h1:3lTY71PUj3MqDfxvlkQIaLxH1wXYdl/k9oAJgTzA834=
+github.com/TubarrApp/gocommon v0.0.0-20261103011529-48a1464e6fb3 h1:XiwN1Ij5FUPK6Vw4KktIadAPU/HDn2n7z6RGv9h4I6M=
+github.com/TubarrApp/gocommon v0.0.0-20261103011529-48a1464e6fb3/go.mod h1:3lTY71PUj3MqDfxvlkQIaLxH1wXYdl/k9oAJgTzA834=
+github.com/TubarrApp/gocommon v0.0.0-20261103012037-f040aeb41492 h1:Z6y2Mb7Nxx5rkU4jfELd/vW6RMMQGAZThv2mV4GYjPQ=
+github.com/TubarrApp/gocommon v0.0.0-20261103012037-f040aeb41492/go.mod h1:3lTY71PUj3MqDfxvlkQIaLxH1wXYdl/k9oAJgTzA834=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a h1:AeXPUzhU0yhID/v5JJEIkjaE85ASe+Vh4Kuv1RSLL+4=
 github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a/go.mod h1:ukJBuruT9b24pdgZwWDvOaCYHeS03B7oQPCUWh25bwM=
 github.com/Velocidex/ordereddict v0.0.0-20220107075049-3dbe58412844/go.mod h1:Y5Tfx5SKGOzkulpqfonrdILSPIuNg+GqKE/DhVJgnpg=

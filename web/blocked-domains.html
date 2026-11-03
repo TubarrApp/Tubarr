@@ -42,8 +42,8 @@
         <!-- include:header title="Blocked Domains" -->
 
         <!-- ===== Main Content Start ===== -->
-        <main class="p-4 md:p-6 2xl:p-10">
-          <div class="mx-auto max-w-7xl">
+        <main>
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
 
             <!-- Blocked Domains Content Start -->
             <div
@@ -99,7 +99,7 @@
                 </div>
 
                 <!-- Selection Bar -->
-                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-gray-50 px-4 py-4 dark:border-gray-800 dark:bg-gray-800">
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-800">
                   <div class="flex flex-wrap items-center gap-4 text-sm">
                     <span class="font-medium text-gray-900 dark:text-white">
                       <span x-text="selectedCount"></span> of <span x-text="filteredDomains.length"></span> selected
@@ -121,34 +121,34 @@
                   <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
                       <tr>
-                        <th scope="col" class="w-10 px-4 py-3.5"></th>
+                        <th scope="col" class="w-10 px-4 py-2.5"></th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
+                          class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Domain
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
+                          class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Context
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
+                          class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Blocked At
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
+                          class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Time Remaining
                         </th>
                         <th
                           scope="col"
-                          class="px-4 py-3.5 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
+                          class="px-4 py-2.5 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200"
                         >
                           Actions
                         </th>
@@ -157,7 +157,7 @@
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                       <template x-for="(domain, i) in filteredDomains" :key="rowKey(domain)">
                         <tr @click="toggle(domain, i, $event)" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td class="w-10 px-4 py-4">
+                          <td class="w-10 px-4 py-3">
                             <input
                               type="checkbox"
                               :checked="!!selected[rowKey(domain)]"
@@ -165,41 +165,36 @@
                               class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                             />
                           </td>
-                          <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                             <span x-text="domain.domain"></span>
                           </td>
-                          <td class="px-4 py-4 whitespace-nowrap text-sm">
+                          <td class="px-4 py-3 whitespace-nowrap text-sm">
                             <span
                               x-show="domain.context === 'unauth'"
-                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30"
-                              x-bind:style="$root.classList.contains('dark') ? 'color: #e4e7ec;' : 'color: #e4e7ec;'"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500"
                               x-text="domain.contextLabel"
                             ></span>
                             <span
                               x-show="domain.context === 'cookie'"
-                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30"
-                              x-bind:style="$root.classList.contains('dark') ? 'color: #fcd34d;' : 'color: #92400e;'"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500"
                               x-text="domain.contextLabel"
                             ></span>
                             <span
                               x-show="domain.context === 'auth'"
-                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30"
-                              x-bind:style="$root.classList.contains('dark') ? 'color: #4ade80;' : 'color: #166534;'"
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500"
                               x-text="domain.contextLabel"
                             ></span>
                           </td>
-                          <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             <span x-text="domain.blockedAtFormatted"></span>
                           </td>
-                          <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             <span x-text="domain.timeRemaining"></span>
                           </td>
-                          <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                             <button
                               @click.stop="unblockDomain(domain.domain, domain.context)"
-                              x-bind:style="'color: #ef4444;'"
-                              @mouseover="$event.target.style.color = '#f87171'"
-                              @mouseout="$event.target.style.color = '#ef4444'"
+                              class="text-error-600 hover:underline dark:text-error-500"
                             >
                               Unblock
                             </button>

@@ -41,7 +41,7 @@
 
         <!-- ===== Main Content Start ===== -->
         <main class="h-full">
-          <div class="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
 
             <!-- Videos Container -->
             <div
@@ -56,13 +56,13 @@
               </div>
 
               <!-- Error State -->
-              <div x-show="error" class="rounded-2xl border border-red-200 bg-red-50 px-5 py-7 dark:border-red-800 dark:bg-red-900/20">
-                <p class="text-red-600 dark:text-red-400" x-text="error"></p>
+              <div x-show="error" class="p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500">
+                <p x-text="error"></p>
               </div>
 
               <!-- Delete Confirmation -->
               <div x-show="deleteDialog" x-cloak @keydown.escape.window="deleteDialog = false" class="fixed inset-0 z-99999 flex items-center justify-center bg-gray-900/50 p-4">
-                <div @click.outside="deleteDialog = false" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg dark:bg-gray-900">
+                <div @click.outside="deleteDialog = false" class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-lg dark:border-gray-700 dark:bg-gray-900">
                   <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
                     Delete <span x-text="selectedVideos.length"></span> video<span x-show="selectedVideos.length !== 1">s</span>?
                   </h3>
@@ -83,7 +83,7 @@
                 <!-- Channel Info Header -->
                 <div class="flex items-center justify-between gap-4 border-b border-gray-200 px-6 py-5 dark:border-gray-800">
                   <div>
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white" x-text="channelName"></h2>
+                    <h2 class="text-base font-semibold text-gray-800 dark:text-white/90" x-text="channelName"></h2>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                       Total: <span x-text="videos.length"></span> video<span x-show="videos.length !== 1">s</span>
                     </p>
@@ -93,7 +93,7 @@
                     @click="runMetarrAll()"
                     :disabled="awaitingMetarr.length === 0 || runningMetarr"
                     title="Tag, rename, transcode and move (with Metarr) all downloaded videos not yet post-processed"
-                    class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Post-Process pending (<span x-text="awaitingMetarr.length"></span>)
                   </button>
@@ -172,7 +172,7 @@
                       <button
                         @click="runMetarrSelected()"
                         :disabled="runningMetarr || selectedAwaitingMetarr.length === 0"
-                        class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Post-Process Selected
                       </button>
@@ -191,29 +191,29 @@
                 <!-- Videos Table -->
                 <div class="overflow-x-auto">
                   <table class="w-full">
-                    <thead>
-                      <tr class="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800">
-                        <th class="px-6 py-4 text-left">
+                    <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
+                      <tr>
+                        <th class="w-10 px-4 py-2.5">
                           <input
                             type="checkbox"
                             @change="toggleSelectAll($event.target.checked)"
                             :checked="selectedVideos.length === totalVideos && totalVideos > 0"
-                            class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                            class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                           />
                         </th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-300">
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">
                           Thumbnail
                         </th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-300">
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">
                           Title
                         </th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-300">
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">
                           Upload Date
                         </th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-300">
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">
                           Status
                         </th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-300">
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">
                           Actions
                         </th>
                       </tr>
@@ -221,16 +221,16 @@
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
                       <template x-for="video in paginatedVideos" :key="video.url">
                         <tr class="hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                          <td class="px-6 py-4">
+                          <td class="px-4 py-3">
                             <input
                               type="checkbox"
                               :value="video.url"
                               @click="handleCheckboxClick(video.url, $event)"
                               :checked="selectedVideos.includes(video.url)"
-                              class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                              class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                             />
                           </td>
-                          <td class="px-6 py-4">
+                          <td class="px-4 py-3">
                             <div class="relative w-32 aspect-video overflow-hidden bg-gray-200 dark:bg-gray-700 rounded">
                               <div class="flex h-full w-full items-center justify-center">
                                 <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,7 +254,7 @@
                               ></span>
                             </div>
                           </td>
-                          <td class="px-6 py-4">
+                          <td class="px-4 py-3">
                             <div class="max-w-md">
                               <p class="text-sm font-medium text-gray-900 dark:text-white line-clamp-2" x-text="video.title"></p>
                               <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400" :title="video.channel_url" x-text="shortURL(video.channel_url)"></p>
@@ -274,17 +274,17 @@
                               ></p>
                             </div>
                           </td>
-                          <td class="px-6 py-4">
+                          <td class="px-4 py-3">
                             <span class="text-sm text-gray-600 dark:text-gray-400" x-text="formatDate(video.upload_date)"></span>
                           </td>
-                          <td class="px-6 py-4">
+                          <td class="px-4 py-3">
                             <template x-if="processing(video)">
                               <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">
                                 Post-processing
                               </span>
                             </template>
                             <template x-if="video.finished && !needsMetarr(video) && !processing(video)">
-                              <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                              <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">
                                 Finished
                               </span>
                             </template>
@@ -303,12 +303,12 @@
                               </span>
                             </template>
                             <template x-if="!video.finished && !video.ignored && !processing(video)">
-                              <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+                              <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">
                                 Queued
                               </span>
                             </template>
                           </td>
-                          <td class="px-6 py-4 whitespace-nowrap">
+                          <td class="px-4 py-3 whitespace-nowrap">
                             <button
                               x-show="metarrDone(video)"
                               @click="$dispatch('edit-metarr', { ...video, channel_id: channelId, rerun: true })"

@@ -53,7 +53,7 @@
             </div>
 
             <!-- Error Message -->
-            <div x-show="error" class="mb-6 rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-400">
+            <div x-show="error" class="mb-6 p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500">
               <p x-text="error"></p>
             </div>
 
@@ -62,7 +62,7 @@
               <div class="h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"></div>
             </div>
 
-            <div x-show="!loading && !error" class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
+            <div x-show="!loading && !error" class="rounded-2xl border border-gray-200 bg-white overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
               <!-- No Downloads Message -->
               <div x-show="downloads.length === 0" class="p-8 text-center">
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,7 +170,7 @@
                           <td class="px-4 py-3 status-col">
                             <span x-show="isDownloading(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500">Downloading</span>
                             <span x-show="isQueued(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Queued</span>
-                            <span x-show="isFiltered(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">Filtered out</span>
+                            <span x-show="isFiltered(download)" class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400">Filtered out</span>
                             <p x-show="download.download_status.stage" class="mt-1 text-xs text-gray-500 dark:text-gray-400" x-text="download.download_status.stage"></p>
                             <p x-show="download.download_status.error" class="mt-1 text-xs text-error-600 dark:text-error-500 break-words" x-text="download.download_status.error"></p>
                           </td>
@@ -196,7 +196,7 @@
                               x-show="!isFiltered(download)"
                               @click.stop="cancel([download])"
                               :disabled="working"
-                              class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
+                              class="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-error-600 hover:text-error-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:text-error-500 dark:hover:text-error-500 dark:hover:bg-gray-700"
                             >
                               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>

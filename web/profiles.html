@@ -51,7 +51,7 @@
               class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
             >
               <div class="px-5 py-4 sm:px-6 sm:py-5 border-b border-gray-200 dark:border-gray-800">
-                <h3 class="text-base font-medium text-gray-800 dark:text-white/90" x-text="editing && editing.id ? 'Edit Profile' : 'New Profile'"></h3>
+                <h3 class="text-base font-semibold text-gray-800 dark:text-white/90" x-text="editing && editing.id ? 'Edit Profile' : 'New Profile'"></h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   Fields left blank aren't set by this profile, so channels using it keep their own setting or the default.
                 </p>
@@ -59,14 +59,14 @@
 
               <form @submit.prevent="save()" class="p-5 sm:p-6 space-y-6">
                 <!-- Error Display -->
-                <div x-show="editError" x-text="editError" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+                <div x-show="editError" x-text="editError" class="p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500"></div>
 
                 <!-- Saved settings failing validation, which stop the profile being used until saved valid -->
-                <div x-show="editing && editing.load_error" x-text="editing && editing.load_error" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+                <div x-show="editing && editing.load_error" x-text="editing && editing.load_error" class="p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500"></div>
 
                 <div>
                   <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Profile Name <span class="text-red-500">*</span>
+                    Profile Name <span class="text-error-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -116,7 +116,7 @@
                   <button
                     type="button"
                     @click="editing = null"
-                    class="inline-flex items-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                    class="inline-flex items-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
                   >
                     Cancel
                   </button>
@@ -136,7 +136,7 @@
             <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
               <div class="px-5 py-4 sm:px-6 sm:py-5 border-b border-gray-200 dark:border-gray-800 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 class="text-base font-medium text-gray-800 dark:text-white/90">
+                  <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">
                     Profiles
                   </h3>
                   <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -155,10 +155,10 @@
 
               <div class="p-5 sm:p-6 space-y-4">
                 <!-- Error Display -->
-                <div x-show="error" x-text="error" class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"></div>
+                <div x-show="error" x-text="error" class="p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500"></div>
 
                 <!-- Success Display -->
-                <div x-show="success" x-text="success" class="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"></div>
+                <div x-show="success" x-text="success" class="p-4 bg-success-50 border border-success-300 text-success-700 rounded-lg dark:bg-success-500/15 dark:border-success-500/30 dark:text-success-500"></div>
 
                 <!-- Loading Display -->
                 <div x-show="loading" class="p-8 text-center">
@@ -174,7 +174,7 @@
                     <li class="py-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div class="text-sm">
                         <p class="font-medium text-gray-800 dark:text-white/90" x-text="p.name"></p>
-                        <p x-show="p.load_error" class="mt-1 text-xs text-error-600" x-text="p.load_error"></p>
+                        <p x-show="p.load_error" class="mt-1 text-xs text-error-600 dark:text-error-500" x-text="p.load_error"></p>
                         <p x-show="p.used_by.length === 0" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Not used by any channel</p>
                         <ul x-show="p.used_by.length > 0" class="mt-1 space-y-1 text-xs text-gray-500 dark:text-gray-400">
                           <template x-for="u in p.used_by" :key="u.channel_id + '|' + (u.url || '')">
@@ -189,7 +189,7 @@
                         <button
                           type="button"
                           @click="startEdit(p)"
-                          class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
+                          class="px-4 py-2 text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 rounded-lg focus:ring-3 focus:ring-brand-500/50"
                         >
                           Edit
                         </button>
@@ -198,7 +198,7 @@
                           @click="remove(p)"
                           :disabled="p.used_by.length > 0"
                           :title="p.used_by.length > 0 ? 'Choose another profile for the channels and URLs using it first' : ''"
-                          class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          class="px-4 py-2 text-sm font-medium text-white bg-error-500 hover:bg-error-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Delete
                         </button>

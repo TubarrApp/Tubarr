@@ -24,7 +24,7 @@
       .help ol { list-style: decimal; }
       .help li { margin: 4px 0; }
       .help a { color: #f97066; text-decoration: underline; }
-      .help code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #1d2939; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: pre-wrap; }
+      .help code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #1d2939; color: #fff; padding: 1px 5px; border-radius: 4px; white-space: pre-wrap; }
       .help pre { background: #1d2939; border: 1px solid #344054; border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 12px 0; }
       .help pre code { background: none; padding: 0; white-space: pre; }
       .help table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
@@ -64,7 +64,7 @@
         <!-- include:header title="Help" -->
 
         <!-- ===== Main Content Start ===== -->
-        <main class="p-4 md:p-6 2xl:p-10">
+        <main class="p-4 mx-auto w-full max-w-(--breakpoint-2xl) md:p-6">
           <div class="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 dark:border-gray-800 dark:bg-white/[0.03]">
             <div class="help">
               <p>
@@ -409,7 +409,7 @@ vp9:av1</code></pre>
                   <code>codec:args</code> line per target codec, e.g. <code>av1:-crf 35 -preset 6</code>. A codec without a
                   line uses its encoder's defaults. Metarr adjusts three of them to suit GPU encoders too:
                   <code>-crf</code> sets the quality (lower is better and larger, up to 51 for H.264 and HEVC and 63 for AV1,
-                  VP8 and VP9), <code>-pix_fmt</code> sets the pixel format (e.g. <code>yuv420p10le</code> for 10-bit, or
+                  VP8 and VP9, with VP8 starting at 4), <code>-pix_fmt</code> sets the pixel format (e.g. <code>yuv420p10le</code> for 10-bit, or
                   <code>yuv420p</code> to keep 8-bit for older devices), and <code>-vf</code> sets filters, e.g.
                   <code>hevc:-vf scale=1280:-2</code> to scale the video to 1280 pixels wide. If the encoder can't take
                   the pixel format, Metarr uses the same format in the form it does take, or stops with an error naming
@@ -430,13 +430,24 @@ vp9:av1</code></pre>
                   at or below its own, going by the shorter side, or the smallest one listed if it's smaller than all of
                   them. The resolution is the downloaded video's, before any <code>-vf</code> scaling. A target above the
                   downloaded video's own bitrate is lowered to it, as encoding at more than the source has makes a
-                  bigger file, not a better one.
+                  bigger file, not a better one. The lowest target is <code>1k</code>, and <code>0</code> means none.
+                </li>
+                <li>
+                  H.264, HEVC and AV1 aim for a quality or a bitrate, not both, so give them <code>-crf</code> or
+                  <code>-b:v</code>, and Tubarr refuses a line with both: H.264 and HEVC would ignore the bitrate, and AV1
+                  wouldn't start. VP8 and VP9 can use both, aiming for the quality without going over the bitrate.
                 </li>
                 <li>
                   <strong>Extra FFmpeg Args</strong> are added every time FFmpeg runs, even when the video is only copied to
-                  update its metadata, e.g. <code>-movflags +faststart</code>. <code>-crf</code>, <code>-pix_fmt</code>,
-                  <code>-vf</code>, <code>-pass</code> and <code>-b:v</code> aren't allowed there, since they only work
-                  when encoding.
+                  update its metadata, e.g. <code>-movflags +faststart</code>. Some options aren't allowed there:
+                  <ul>
+                    <li><code>-crf</code>, <code>-pix_fmt</code>, <code>-vf</code>, <code>-pass</code> and <code>-b:v</code> only work when encoding, so they go in Video Encoder Args.</li>
+                    <li>Codec options (<code>-c</code>, <code>-c:v</code>, <code>-c:a</code> and the like) would replace the codecs set in Video Transcode Codecs and Audio Transcode Codecs, skipping the check that the output container can hold them. Choose codecs there instead.</li>
+                    <li><code>-vn</code> would leave a file with no video.</li>
+                    <li><code>-f</code> would write a different format from what the file's extension says.</li>
+                    <li><code>-filter_complex</code> and <code>-lavfi</code> can leave FFmpeg running forever.</li>
+                    <li><code>-shortest</code> stops at the shortest stream, and a thumbnail is a single frame, so it can leave a file with no video or audio.</li>
+                  </ul>
                 </li>
                 <li>
                   <strong>Keep Original Video Files</strong> keeps the downloaded video whenever Metarr writes a new one

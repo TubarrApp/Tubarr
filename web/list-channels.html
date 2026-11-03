@@ -42,7 +42,7 @@
 
         <!-- ===== Main Content Start ===== -->
         <main class="h-full">
-          <div class="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
 
             <!-- Channels List Start -->
             <div x-data="channelsList()" x-init="loadChannels()">
@@ -52,8 +52,8 @@
               </div>
 
               <!-- Error State -->
-              <div x-show="error" class="mb-4 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
-                <p class="text-sm text-red-800 dark:text-red-400" x-text="error"></p>
+              <div x-show="error" class="mb-4 p-4 bg-error-50 border border-error-300 text-error-700 rounded-lg dark:bg-error-500/15 dark:border-error-500/30 dark:text-error-500">
+                <p x-text="error"></p>
               </div>
 
               <!-- Empty State -->
@@ -64,7 +64,7 @@
                 <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No channels</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new channel.</p>
                 <div class="mt-6">
-                  <a href="add-channel.html" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500">
+                  <a href="add-channel.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50">
                     Add Channel
                   </a>
                 </div>
@@ -101,7 +101,7 @@
                           >
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                           </svg>
-                          <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="channel.name"></h3>
+                          <h3 class="text-base font-semibold text-gray-800 dark:text-white/90" x-text="channel.name"></h3>
                         </div>
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                           <span x-text="channel.url_models?.filter(u => u.url !== 'manual-downloads').length || 0"></span> URL<span x-show="channel.url_models?.filter(u => u.url !== 'manual-downloads').length !== 1">s</span>
@@ -168,7 +168,7 @@
                                     </svg>
                                     <span x-text="urlModel.url"></span>
                                     <template x-if="urlModel.username">
-                                      <span class="ml-2 text-xs text-green-600 dark:text-green-400">(authenticated)</span>
+                                      <span class="ml-2 text-xs text-success-600 dark:text-success-500">(authenticated)</span>
                                     </template>
                                   </li>
                                 </template>
@@ -224,7 +224,7 @@
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filters:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.filters ? channel.settings.filters.split('\n').filter(l => l.trim()).length + ' filter(s)' : 'Not set'"></span>
+                              <span :class="channel.settings?.filters ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.settings?.filters || 'Not set'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Filter File:</span>
@@ -263,27 +263,27 @@
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">External Downloader Args:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.external_downloader_args || 'Not set'"></span>
+                              <span :class="channel.settings?.external_downloader_args ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="channel.settings?.external_downloader_args || 'Not set'"></span>
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Extra YT-DLP Video Args:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.extra_ytdlp_video_args || 'Not set'"></span>
+                              <span :class="channel.settings?.extra_ytdlp_video_args ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="channel.settings?.extra_ytdlp_video_args || 'Not set'"></span>
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Extra YT-DLP Meta Args:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.extra_ytdlp_meta_args || 'Not set'"></span>
+                              <span :class="channel.settings?.extra_ytdlp_meta_args ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="channel.settings?.extra_ytdlp_meta_args || 'Not set'"></span>
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Extra YT-DLP Crawl Args:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.settings?.extra_ytdlp_crawl_args || 'Not set'"></span>
+                              <span :class="channel.settings?.extra_ytdlp_crawl_args ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="channel.settings?.extra_ytdlp_crawl_args || 'Not set'"></span>
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">YT-DLP Preferred Video Codecs:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="formatPreferredCodecs(channel.settings?.ytdlp_preferred_video_codecs)"></span>
+                              <span :class="channel.settings?.ytdlp_preferred_video_codecs?.length ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="formatPreferredCodecs(channel.settings?.ytdlp_preferred_video_codecs)"></span>
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">YT-DLP Preferred Audio Codecs:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="formatPreferredCodecs(channel.settings?.ytdlp_preferred_audio_codecs)"></span>
+                              <span :class="channel.settings?.ytdlp_preferred_audio_codecs?.length ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="formatPreferredCodecs(channel.settings?.ytdlp_preferred_audio_codecs)"></span>
                             </div>
                           </div>
                         </div>
@@ -292,9 +292,14 @@
                         <div x-show="channel.metarr || channel.settings?.move_ops || channel.settings?.move_ops_file">
                           <h4 class="text-sm font-semibold text-brand-600 dark:text-brand-400 mb-3 uppercase tracking-wide">Post-processing</h4>
                           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                            <h5 class="col-span-full text-sm font-semibold text-gray-800 dark:text-white/90">Files and Directories</h5>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Output Directory:</span>
                               <span class="ml-2 text-gray-900 dark:text-white break-all" x-text="channel.metarr?.metarr_output_directory || 'Not configured'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Output Extension:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_output_ext || 'Same as input'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Move Ops File:</span>
@@ -302,16 +307,74 @@
                             </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Move Operations:</span>
-                              <span :class="channel.settings?.move_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.settings?.move_ops ? formatFilteredOps(channel.settings.move_ops) : 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Output Extension:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_output_ext || 'Same as input'"></span>
+                              <span :class="channel.settings?.move_ops ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.settings?.move_ops ? formatFilteredOps(channel.settings.move_ops) : 'Not set'"></span>
                             </div>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Rename Style:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_rename_style || 'Skip'"></span>
                             </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filename Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filename_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filename Operations:</span>
+                              <span :class="channel.metarr?.metarr_filename_ops ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.metarr?.metarr_filename_ops || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Filename Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filtered_filename_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Filename Operations:</span>
+                              <span :class="channel.metarr?.metarr_filtered_filename_ops ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.metarr?.metarr_filtered_filename_ops ? formatFilteredOps(channel.metarr.metarr_filtered_filename_ops, true) : 'Not set'"></span>
+                            </div>
+
+                            <h5 class="col-span-full mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">Metadata</h5>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Meta Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_meta_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Meta Operations:</span>
+                              <span :class="channel.metarr?.metarr_meta_ops ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.metarr?.metarr_meta_ops || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Ops File:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filtered_meta_ops_file || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Operations:</span>
+                              <span :class="channel.metarr?.metarr_filtered_meta_ops ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.metarr?.metarr_filtered_meta_ops ? formatFilteredOps(channel.metarr.metarr_filtered_meta_ops, true) : 'Not set'"></span>
+                            </div>
+
+                            <h5 class="col-span-full mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">Encoding</h5>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">GPU Acceleration:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_gpu || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">GPU Node Path:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_transcode_gpu_node || 'Not set'"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Video Codecs:</span>
+                              <span :class="channel.metarr?.metarr_transcode_video_transcode_codecs?.length ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="Array.isArray(channel.metarr?.metarr_transcode_video_transcode_codecs) && channel.metarr.metarr_transcode_video_transcode_codecs.length > 0 ? channel.metarr.metarr_transcode_video_transcode_codecs.join(', ') : (channel.metarr?.metarr_transcode_video_transcode_codecs || 'Copy')"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Audio Codecs:</span>
+                              <span :class="channel.metarr?.metarr_transcode_audio_codecs?.length ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="Array.isArray(channel.metarr?.metarr_transcode_audio_codecs) && channel.metarr.metarr_transcode_audio_codecs.length > 0 ? channel.metarr.metarr_transcode_audio_codecs.join(', ') : (channel.metarr?.metarr_transcode_audio_codecs || 'Copy')"></span>
+                            </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Video Encoder Args:</span>
+                              <span :class="channel.metarr?.metarr_transcode_video_args?.length ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="Array.isArray(channel.metarr?.metarr_transcode_video_args) && channel.metarr.metarr_transcode_video_args.length > 0 ? channel.metarr.metarr_transcode_video_args.join(', ') : 'Not set'"></span>
+                            </div>
+                            <div class="md:col-span-2">
+                              <span class="text-gray-500 dark:text-gray-400">Extra FFmpeg Args:</span>
+                              <span :class="channel.metarr?.metarr_extra_ffmpeg_args ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="channel.metarr?.metarr_extra_ffmpeg_args || 'Not set'"></span>
+                            </div>
+
+                            <h5 class="col-span-full mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">Resource Usage</h5>
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Concurrency:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_concurrency || 'Global'"></span>
@@ -324,62 +387,6 @@
                             <div>
                               <span class="text-gray-500 dark:text-gray-400">Min Free Memory:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_min_free_mem || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">GPU Acceleration:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_gpu || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">GPU Node Path:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_transcode_gpu_node || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Video Codecs:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_transcode_video_transcode_codecs) && channel.metarr.metarr_transcode_video_transcode_codecs.length > 0 ? channel.metarr.metarr_transcode_video_transcode_codecs.join(', ') : (channel.metarr?.metarr_transcode_video_transcode_codecs || 'Copy')"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Audio Codecs:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_transcode_audio_codecs) && channel.metarr.metarr_transcode_audio_codecs.length > 0 ? channel.metarr.metarr_transcode_audio_codecs.join(', ') : (channel.metarr?.metarr_transcode_audio_codecs || 'Copy')"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Video Encoder Args:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-sm" x-text="Array.isArray(channel.metarr?.metarr_transcode_video_args) && channel.metarr.metarr_transcode_video_args.length > 0 ? channel.metarr.metarr_transcode_video_args.join(', ') : 'Not set'"></span>
-                            </div>
-                            <div class="md:col-span-2">
-                              <span class="text-gray-500 dark:text-gray-400">Extra FFmpeg Args:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_extra_ffmpeg_args || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Meta Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_meta_ops || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filename Operations:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-line;" x-text="channel.metarr?.metarr_filename_ops || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Meta Ops File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_meta_ops_file || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filename Ops File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filename_ops_file || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Ops File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filtered_meta_ops_file || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Operations:</span>
-                              <span :class="channel.metarr?.metarr_filtered_meta_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_meta_ops ? formatFilteredOps(channel.metarr.metarr_filtered_meta_ops, true) : 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filtered Filename Ops File:</span>
-                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filtered_filename_ops_file || 'Not set'"></span>
-                            </div>
-                            <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filtered Filename Operations:</span>
-                              <span :class="channel.metarr?.metarr_filtered_filename_ops ? 'block mt-1 break-words' : 'ml-2'" class="text-gray-900 dark:text-white font-mono text-xs" style="white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;" x-text="channel.metarr?.metarr_filtered_filename_ops ? formatFilteredOps(channel.metarr.metarr_filtered_filename_ops, true) : 'Not set'"></span>
                             </div>
                           </div>
                         </div>
@@ -409,13 +416,13 @@
                         <div class="flex gap-2 pt-2">
                           <button
                             @click.stop="editChannel(channel.id)"
-                            class="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
+                            class="px-4 py-2 text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 rounded-lg focus:ring-3 focus:ring-brand-500/50"
                           >
                             Edit
                           </button>
                           <button
                             @click.stop="deleteChannel(channel.id, channel.name)"
-                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            class="px-4 py-2 text-sm font-medium text-white bg-error-500 hover:bg-error-600 rounded-lg"
                           >
                             Delete
                           </button>

@@ -108,7 +108,7 @@ flaresolverr = true</code></pre>
         <dt><code>flaresolverr</code><span class="opt">optional</span></dt>
         <dd>
           Set it to <code>true</code> to get past Cloudflare challenges using the FlareSolverr instance set on the
-          settings page. Tubarr asks FlareSolverr to solve the challenge once, then uses its cookies and user agent
+          Site Rules page. Tubarr asks FlareSolverr to solve the challenge once, then uses its cookies and user agent
           while impersonating Chrome, for its own requests and for yt-dlp (which needs curl_cffi installed for
           <code>--impersonate</code>). If Cloudflare challenges again, Tubarr asks FlareSolverr for a fresh solve and
           retries once. It takes priority over <code>impersonate</code>. If FlareSolverr isn't set up or can't be

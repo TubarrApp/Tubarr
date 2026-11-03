@@ -41,26 +41,12 @@
         <!-- include:header title="Settings" -->
 
         <!-- ===== Main Content Start ===== -->
-        <main class="p-4 md:p-6 2xl:p-10">
-          <div class="mx-auto max-w-7xl space-y-6">
+        <main>
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 space-y-6">
 
             <!-- Web Interface Access Card -->
             <div x-data="accessSettings()" x-init="init()" class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Web Interface Access</h3>
-
-              <!-- Login mode -->
-              <div class="py-3 border-b border-gray-100 dark:border-gray-800">
-                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Login Mode</p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Who has to log in. Saved with Save access settings below. A forgotten password can be reset with <code>tubarr auth reset</code>, or TUBARR_WEB_PASSWORD.</p>
-                <select x-model="access.auth_mode" :disabled="authModeFromEnv"
-                  class="h-9 max-w-full rounded-lg border border-gray-300 bg-transparent pl-3 pr-10 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                  <option value="required">Required for everyone</option>
-                  <option value="local">Required, except from localhost</option>
-                  <option value="none">Off (a reverse proxy handles login)</option>
-                </select>
-                <p x-show="authModeFromEnv" class="mt-2 text-xs text-warning-600 dark:text-warning-500">Set by TUBARR_WEB_AUTH (or --web-auth), so it can't be changed here.</p>
-                <p x-show="access.auth_mode === 'none'" class="mt-2 text-xs text-warning-600 dark:text-warning-500">Anyone who can reach Tubarr can control it, so only use this behind a reverse proxy with its own login.</p>
-              </div>
 
               <!-- Login -->
               <div class="py-3 border-b border-gray-100 dark:border-gray-800">
@@ -69,12 +55,12 @@
                 <p x-show="loginFromEnv" class="text-xs text-warning-600 dark:text-warning-500 mb-3">This login is set by TUBARR_WEB_PASSWORD, so a change made here is replaced when Tubarr restarts.</p>
                 <div class="flex flex-wrap items-center gap-3">
                   <input type="text" x-model="newUsername" placeholder="Username" autocomplete="username"
-                    class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
+                    class="h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                   <input type="password" x-model="currentPassword" placeholder="Current password" autocomplete="current-password"
-                    class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
+                    class="h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                   <input type="password" x-model="newPassword" placeholder="New password" autocomplete="new-password"
-                    class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
-                  <button @click="changeLogin()" class="h-9 px-4 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors">Change login</button>
+                    class="h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                  <button @click="changeLogin()" class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50">Change login</button>
                   <span x-show="loginMessage" x-text="loginMessage" class="text-sm text-gray-500 dark:text-gray-400"></span>
                 </div>
               </div>
@@ -84,10 +70,40 @@
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">API Key</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Scripts can send this in an <code>X-Api-Key</code> header instead of logging in.</p>
                 <div class="flex flex-wrap items-center gap-3">
-                  <code class="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm text-gray-800 dark:text-white/90" x-text="showKey ? apiKey : '••••••••••••••••'"></code>
-                  <button @click="showKey = !showKey" class="text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400" x-text="showKey ? 'Hide' : 'Show'"></button>
-                  <button @click="regenerateKey()" class="text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400">Regenerate</button>
+                  <code class="px-4 py-3 overflow-hidden break-all bg-gray-100 dark:bg-gray-800 rounded-lg text-sm text-gray-800 dark:text-white/90">
+                    <span :class="!showKey && 'blur select-none'" x-text="apiKey"></span>
+                  </code>
+                  <button @click="showKey = !showKey" :title="showKey ? 'Hide API key' : 'Show API key'"
+                    class="inline-flex items-center justify-center h-11 w-11 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700">
+                    <svg x-show="!showKey" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                      <path d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                      <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                    <svg x-show="showKey" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                      <path d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
+                  </button>
+                  <button @click="regenerateKey()" title="Regenerate API key"
+                    class="inline-flex items-center justify-center h-11 w-11 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                      <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                  </button>
                 </div>
+              </div>
+
+              <!-- Login mode -->
+              <div class="py-3 border-b border-gray-100 dark:border-gray-800">
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Login Mode</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Who has to log in. Saved with Save access settings below. A forgotten password can be reset with <code>tubarr auth reset</code>, or TUBARR_WEB_PASSWORD.</p>
+                <select x-model="access.auth_mode" :disabled="authModeFromEnv"
+                  class="h-11 max-w-full rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                  <option value="required">Required for everyone</option>
+                  <option value="local">Required, except from localhost</option>
+                  <option value="none">Off (a reverse proxy handles login)</option>
+                </select>
+                <p x-show="authModeFromEnv" class="mt-2 text-xs text-warning-600 dark:text-warning-500">Set by TUBARR_WEB_AUTH (or --web-auth), so it can't be changed here.</p>
+                <p x-show="access.auth_mode === 'none'" class="mt-2 text-xs text-warning-600 dark:text-warning-500">Anyone who can reach Tubarr can control it, so only use this behind a reverse proxy with its own login.</p>
               </div>
 
               <!-- Trusted addresses -->
@@ -102,33 +118,101 @@
                   If the proxy runs on the same machine as Tubarr, it must pass on each visitor's address (the X-Forwarded-For header). Otherwise every visitor looks like localhost, and with "Required, except from localhost" nobody has to log in.
                 </p>
                 <textarea x-model="skipLoginText" rows="3" placeholder="192.168.1.0/24"
-                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 font-mono focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"></textarea>
 
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Allowed Hostnames</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
                   Names this server is reached by without a login, besides localhost, IP addresses and its own hostname (e.g. tubarr.home). Others are refused, so other websites can't reach Tubarr through your browser.
                 </p>
                 <textarea x-model="allowedHostsText" rows="2" placeholder="tubarr.home"
-                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 font-mono focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"></textarea>
 
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Trusted Proxies</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
                   Reverse proxies whose X-Forwarded-For header gives the real client address. Leave empty without a reverse proxy.
                 </p>
                 <textarea x-model="trustedProxiesText" rows="2" placeholder="10.0.0.2"
-                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 font-mono focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"></textarea>
 
                 <div class="flex items-center gap-3 mt-4">
-                  <button @click="saveAccess()" class="h-9 px-4 bg-brand-500 text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors">Save access settings</button>
+                  <button @click="saveAccess()" class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50">Save access settings</button>
                   <span x-show="accessMessage" x-text="accessMessage" class="text-sm text-gray-500 dark:text-gray-400"></span>
                 </div>
               </div>
             </div>
 
+            <!-- HTTPS Certificate Card -->
+            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">HTTPS</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Serves the web interface over HTTPS instead of HTTP, applied when Tubarr restarts. Uses a self-signed certificate unless a certificate is set below,
+                so browsers show a warning the first time.
+                <br>
+                <br>
+                <span x-show="!tlsHTTPS">HTTPS is currently off.</span>
+                <span x-show="tlsHTTPS && tlsActive === 'self-signed'">Serving the self-signed certificate.</span>
+                <span x-show="tlsHTTPS && tlsActive === 'custom'">Serving the certificate below.</span>
+                <span x-show="tlsEnabled !== tlsHTTPS" class="font-medium text-warning-600 dark:text-warning-500">Restart Tubarr to apply the change.</span>
+              </p>
+
+              <label class="flex items-center gap-2 mb-1 text-sm text-gray-700 dark:text-gray-300" :class="tlsLocked && 'opacity-50 cursor-not-allowed'">
+                <input type="checkbox" x-model="tlsEnabled" :disabled="tlsLocked" :class="tlsLocked && 'cursor-not-allowed'" @change="saveHTTPSEnabled()" />
+                Use HTTPS
+                <span x-show="httpsSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+              </label>
+              <p x-show="tlsLocked" class="text-xs mb-1 text-gray-500 dark:text-gray-400">Set by <code>--web-https</code> or <code>TUBARR_WEB_HTTPS</code>, change it there.</p>
+              <p x-show="httpsError" x-text="httpsError" class="mb-1 text-xs text-error-600 dark:text-error-500"></p>
+
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Certificate</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                Path to a PEM certificate on the Tubarr machine, either with the key in the same file or with a separate key file. Changes apply to new connections without a restart.
+              </p>
+
+              <p x-show="tlsCertLocked" class="text-xs mb-3 text-gray-500 dark:text-gray-400">Set by <code>--web-tls-cert</code> or <code>TUBARR_WEB_TLS_CERT</code>, change it there.</p>
+              <div class="flex flex-col gap-3 py-3">
+                <input
+                  type="text"
+                  x-model="tlsCert"
+                  :disabled="tlsCertLocked"
+                  :class="tlsCertLocked && 'opacity-50 cursor-not-allowed'"
+                  placeholder="/path/to/certificate.pem"
+                  class="h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                  @keydown.enter="saveTLS()"
+                />
+                <input
+                  type="text"
+                  x-model="tlsKey"
+                  :disabled="tlsCertLocked"
+                  :class="tlsCertLocked && 'opacity-50 cursor-not-allowed'"
+                  placeholder="/path/to/private-key.pem (leave empty if combined with the certificate)"
+                  class="h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                  @keydown.enter="saveTLS()"
+                />
+                <div x-show="!tlsCertLocked" class="flex flex-wrap items-center gap-3">
+                  <button
+                    @click="saveTLS()"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    @click="tlsCert = ''; tlsKey = ''; saveTLS()"
+                    title="Clear the saved paths and use the self-signed certificate"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
+                  >
+                    Clear
+                  </button>
+                  <span x-show="tlsSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                </div>
+              </div>
+              <p x-show="tlsMessage" x-text="tlsMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
+              <p x-show="tlsError" x-text="tlsError" class="mt-1 text-xs text-error-600 dark:text-error-500"></p>
+            </div>
+
             <!-- Global Concurrency Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Concurrency</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">0 = unlimited for all settings<br><br>A channel with download concurrency 0 downloads one video at a time. Post-processing for a channel or channel URL left at 0 is limited only by this.</p>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">0 = unlimited for all settings<br><br>A channel with download concurrency 0 downloads one video at a time. Post-processing for a channel or channel URL left at 0 is limited only by this.</p>
 
               <!-- Crawl Concurrency -->
               <div class="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-800">
@@ -141,7 +225,7 @@
                     type="number"
                     x-model.number="crawlConcurrency"
                     min="0"
-                    class="w-20 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="w-20 h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-center text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     @change="updateCrawlConcurrency()"
                   />
                   <span x-show="savingCrawl" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
@@ -160,7 +244,7 @@
                     type="number"
                     x-model.number="globalDownloadLimit"
                     min="0"
-                    class="w-20 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="w-20 h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-center text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     @change="updateGlobalDownloadLimit()"
                   />
                   <span x-show="savingLimit" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
@@ -179,7 +263,7 @@
                     type="number"
                     x-model.number="postProcessConcurrency"
                     min="0"
-                    class="w-20 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="w-20 h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-center text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     @change="updatePostProcessConcurrency()"
                   />
                   <span x-show="savingPostProcess" class="text-sm text-gray-500 dark:text-gray-400">Saving...</span>
@@ -193,7 +277,7 @@
               <div class="border-b border-gray-200 p-5 sm:px-6 dark:border-gray-700 flex items-center justify-between">
                 <div>
                   <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Domain Limits</h3>
-                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Limit concurrent downloads and crawls per hostname (e.g. youtube.com). 0 or blank = unlimited. Adding an existing hostname replaces its limits.</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Limit concurrent downloads and crawls per hostname (e.g. youtube.com). 0 or blank = unlimited. Adding an existing hostname replaces its limits.</p>
                 </div>
               </div>
 
@@ -205,7 +289,7 @@
                     x-ref="newHostname"
                     x-model="newHostname"
                     placeholder="youtube.com"
-                    class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="flex-1 h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     style="min-width: 12rem;"
                     @keydown.enter="addDomainLimit()"
                   />
@@ -216,7 +300,7 @@
                       min="0"
                       placeholder="Download"
                       title="Concurrent downloads"
-                      class="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      class="h-11 rounded-lg border border-gray-300 bg-transparent px-2 py-2.5 text-center text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                       style="width: 7rem;"
                       @keydown.enter="addDomainLimit()"
                     />
@@ -226,14 +310,14 @@
                       min="0"
                       placeholder="Crawl"
                       title="Concurrent crawls"
-                      class="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-center text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      class="h-11 rounded-lg border border-gray-300 bg-transparent px-2 py-2.5 text-center text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                       style="width: 7rem;"
                       @keydown.enter="addDomainLimit()"
                     />
                     <button
                       @click="addDomainLimit()"
                       :disabled="!newHostname || !(newDownloadLimit > 0 || newCrawlLimit > 0)"
-                      class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                      class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
                     >
                       <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -242,7 +326,7 @@
                     </button>
                   </div>
                 </div>
-                <p x-show="addError" x-text="addError" class="text-xs" style="color: #ef4444;"></p>
+                <p x-show="addError" x-text="addError" class="text-xs text-error-600 dark:text-error-500"></p>
 
                 <!-- Loading -->
                 <div x-show="loadingLimits" class="text-center py-8">
@@ -277,11 +361,11 @@
                   <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800">
                       <tr>
-                        <th class="w-10 px-4 py-3"></th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Hostname</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Concurrent Downloads</th>
-                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Concurrent Crawls</th>
-                        <th class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
+                        <th class="w-10 px-4 py-2.5"></th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Hostname</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Concurrent Downloads</th>
+                        <th class="px-4 py-2.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Concurrent Crawls</th>
+                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider dark:text-gray-200">Actions</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
@@ -303,9 +387,7 @@
                               <button @click.stop="editDomainLimit(hostname)" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Edit</button>
                               <button
                                 @click.stop="removeDomainLimit(hostname)"
-                                x-bind:style="'color: #ef4444;'"
-                                @mouseover="$event.target.style.color = '#f87171'"
-                                @mouseout="$event.target.style.color = '#ef4444'"
+                                class="text-error-600 hover:underline dark:text-error-500"
                               >
                                 Remove
                               </button>
@@ -317,121 +399,6 @@
                   </table>
                 </div>
               </div>
-            </div>
-
-            <!-- FlareSolverr Card -->
-            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">FlareSolverr</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">URL of a <a href="https://github.com/FlareSolverr/FlareSolverr" target="_blank" rel="noopener" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">FlareSolverr</a> instance, used to get past Cloudflare challenges. Only sites with <code>flaresolverr = true</code> on the <a href="site-rules.html" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">Site Rules</a> page use it.
-                <br>
-                <br>
-                Ensure <code>curl_cffi</code> is installed on the machine and available to yt-dlp.
-              </p>
-
-              <div class="flex flex-wrap items-center gap-3 py-3">
-                <input
-                  type="text"
-                  x-model="flareSolverrURL"
-                  placeholder="http://localhost:8191"
-                  class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  style="min-width: 12rem;"
-                  @keydown.enter="saveFlareSolverrURL()"
-                />
-                <div class="flex flex-wrap items-center gap-3">
-                  <button
-                    @click="saveFlareSolverrURL()"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                  >
-                    Save
-                  </button>
-                  <button
-                    @click="flareSolverrURL = ''; saveFlareSolverrURL()"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    @click="testFlareSolverr()"
-                    :disabled="!flareSolverrURL || testingFlareSolverr"
-                    title="Solve https://example.com through FlareSolverr to check it works"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                  >
-                    <span x-show="!testingFlareSolverr">Test</span>
-                    <span x-show="testingFlareSolverr">Testing...</span>
-                  </button>
-                  <span x-show="flareSolverrSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
-                </div>
-              </div>
-              <p x-show="flareSolverrMessage" x-text="flareSolverrMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
-              <p x-show="flareSolverrError" x-text="flareSolverrError" class="text-xs mt-1" style="color: #ef4444;"></p>
-            </div>
-
-            <!-- HTTPS Certificate Card -->
-            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
-              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">HTTPS</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                Serves the web interface over HTTPS instead of HTTP, applied when Tubarr restarts. Uses a self-signed certificate unless a certificate is set below,
-                so browsers show a warning the first time.
-                <br>
-                <br>
-                <span x-show="!tlsHTTPS">HTTPS is currently off.</span>
-                <span x-show="tlsHTTPS && tlsActive === 'self-signed'">Serving the self-signed certificate.</span>
-                <span x-show="tlsHTTPS && tlsActive === 'custom'">Serving the certificate below.</span>
-                <span x-show="tlsEnabled !== tlsHTTPS" class="font-medium text-warning-600 dark:text-warning-500">Restart Tubarr to apply the change.</span>
-              </p>
-
-              <label class="flex items-center gap-2 mb-1 text-sm text-gray-700 dark:text-gray-300" :class="tlsLocked && 'opacity-50 cursor-not-allowed'">
-                <input type="checkbox" x-model="tlsEnabled" :disabled="tlsLocked" :class="tlsLocked && 'cursor-not-allowed'" @change="saveHTTPSEnabled()" />
-                Use HTTPS
-                <span x-show="httpsSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
-              </label>
-              <p x-show="tlsLocked" class="text-xs mb-1 text-gray-500 dark:text-gray-400">Set by <code>--web-https</code> or <code>TUBARR_WEB_HTTPS</code>, change it there.</p>
-              <p x-show="httpsError" x-text="httpsError" class="text-xs mb-1" style="color: #ef4444;"></p>
-
-              <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Certificate</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
-                Path to a PEM certificate on the Tubarr machine, either with the key in the same file or with a separate key file. Changes apply to new connections without a restart.
-              </p>
-
-              <p x-show="tlsCertLocked" class="text-xs mb-3 text-gray-500 dark:text-gray-400">Set by <code>--web-tls-cert</code> or <code>TUBARR_WEB_TLS_CERT</code>, change it there.</p>
-              <div class="flex flex-col gap-3 py-3">
-                <input
-                  type="text"
-                  x-model="tlsCert"
-                  :disabled="tlsCertLocked"
-                  :class="tlsCertLocked && 'opacity-50 cursor-not-allowed'"
-                  placeholder="/path/to/certificate.pem"
-                  class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  @keydown.enter="saveTLS()"
-                />
-                <input
-                  type="text"
-                  x-model="tlsKey"
-                  :disabled="tlsCertLocked"
-                  :class="tlsCertLocked && 'opacity-50 cursor-not-allowed'"
-                  placeholder="/path/to/private-key.pem (leave empty if combined with the certificate)"
-                  class="h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                  @keydown.enter="saveTLS()"
-                />
-                <div x-show="!tlsCertLocked" class="flex flex-wrap items-center gap-3">
-                  <button
-                    @click="saveTLS()"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
-                  >
-                    Save
-                  </button>
-                  <button
-                    @click="tlsCert = ''; tlsKey = ''; saveTLS()"
-                    title="Clear the saved paths and use the self-signed certificate"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
-                  >
-                    Clear
-                  </button>
-                  <span x-show="tlsSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
-                </div>
-              </div>
-              <p x-show="tlsMessage" x-text="tlsMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
-              <p x-show="tlsError" x-text="tlsError" class="text-xs mt-1" style="color: #ef4444;"></p>
             </div>
 
           </div>
@@ -566,13 +533,6 @@
           lastClickedLimit: null,
           removingLimits: false,
 
-          // FlareSolverr
-          flareSolverrURL: '',
-          flareSolverrSaved: false,
-          flareSolverrMessage: '',
-          flareSolverrError: '',
-          testingFlareSolverr: false,
-
           // HTTPS certificate
           tlsHTTPS: false,
           tlsEnabled: false,
@@ -592,7 +552,6 @@
             this.loadGlobalDownloadLimit();
             this.loadPostProcessConcurrency();
             this.loadDomainLimits();
-            this.loadFlareSolverrURL();
             this.loadTLS();
           },
 
@@ -812,39 +771,6 @@
             }
           },
 
-          async loadFlareSolverrURL() {
-            try {
-              const response = await fetch('/api/v1/settings/flaresolverr-url');
-              if (!response.ok) return;
-              const data = await response.json();
-              this.flareSolverrURL = data.url ?? '';
-            } catch (err) {
-              console.error('Error loading FlareSolverr URL:', err);
-            }
-          },
-
-          async saveFlareSolverrURL() {
-            this.flareSolverrSaved = false;
-            this.flareSolverrMessage = '';
-            this.flareSolverrError = '';
-            try {
-              const response = await fetch('/api/v1/settings/flaresolverr-url', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ url: this.flareSolverrURL })
-              });
-              if (!response.ok) {
-                this.flareSolverrError = await response.text() || 'Failed to update FlareSolverr URL';
-                return;
-              }
-              this.flareSolverrSaved = true;
-              setTimeout(() => { this.flareSolverrSaved = false; }, 2000);
-            } catch (err) {
-              this.flareSolverrError = 'Failed to update FlareSolverr URL';
-              console.error('Error saving FlareSolverr URL:', err);
-            }
-          },
-
           async loadTLS() {
             try {
               const response = await fetch('/api/v1/settings/tls');
@@ -907,30 +833,6 @@
             } catch (err) {
               this.tlsError = 'Failed to update certificate';
               console.error('Error saving HTTPS certificate:', err);
-            }
-          },
-
-          async testFlareSolverr() {
-            this.testingFlareSolverr = true;
-            this.flareSolverrMessage = '';
-            this.flareSolverrError = '';
-            try {
-              const response = await fetch('/api/v1/settings/flaresolverr-url/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ url: this.flareSolverrURL })
-              });
-              if (!response.ok) {
-                this.flareSolverrError = await response.text() || 'FlareSolverr test failed';
-                return;
-              }
-              const data = await response.json();
-              this.flareSolverrMessage = `FlareSolverr loaded https://example.com (HTTP ${data.status}) in ${data.seconds.toFixed(1)}s, returning ${data.cookies} cookie(s) and user agent: ${data.user_agent}`;
-            } catch (err) {
-              this.flareSolverrError = 'FlareSolverr test failed';
-              console.error('Error testing FlareSolverr:', err);
-            } finally {
-              this.testingFlareSolverr = false;
             }
           }
         };

@@ -41,18 +41,18 @@
         <!-- include:header title="Site Rules" -->
 
         <!-- ===== Main Content Start ===== -->
-        <main class="p-4 md:p-6 2xl:p-10">
-          <div class="mx-auto max-w-7xl space-y-6">
+        <main>
+          <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 space-y-6">
 
             <!-- Rules File Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Rules File</h3>
-              <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Path to a config file (YAML/TOML/JSON) defining custom scraping selectors for additional sites. Applies to all channels. Clear the path to go back to built-in defaults only.
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Path to a config file (YAML/TOML/JSON) defining custom scraping selectors for additional sites. Applies to all channels. Clear the path to go back to built-in defaults only.
                 <br>
                 <br>
-                Example File: <a href="/src/files/example-scrape-rules.toml" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">example-scrape-rules.toml</a>
+                Example File: <a href="/src/files/example-scrape-rules.toml" class="font-medium text-brand-500 hover:text-brand-600">example-scrape-rules.toml</a>
                 &nbsp;|&nbsp;
-                Documentation: <a href="/src/files/site-rules-documentation.html" class="text-gray-400 hover:text-gray-600 font-medium" style="text-decoration: underline;">site-rules-documentation.html</a>
+                Documentation: <a href="/src/files/site-rules-documentation.html" class="font-medium text-brand-500 hover:text-brand-600">site-rules-documentation.html</a>
                 <br>
                 <br>
                 <strong>Recognized 'string' fields:</strong><br>title, description, thumbnail, direct_video_url
@@ -75,20 +75,20 @@
                   type="text"
                   x-model="scrapeConfigPath"
                   placeholder="/path/to/scrape-sites.yaml"
-                  class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  class="flex-1 h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                   style="min-width: 12rem;"
                   @keydown.enter="saveScrapeConfigPath()"
                 />
                 <div class="flex flex-wrap items-center gap-3">
                   <button
                     @click="saveScrapeConfigPath()"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
                   >
                     Save
                   </button>
                   <button
                     @click="scrapeConfigPath = ''; saveScrapeConfigPath()"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
                   >
                     Clear
                   </button>
@@ -96,7 +96,7 @@
                     @click="reloadScrapeConfig()"
                     :disabled="reloadingConfig"
                     title="Re-read the scrape config file from disk, in case it was edited since Tubarr started"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
                   >
                     <span x-show="!reloadingConfig">Refresh</span>
                     <span x-show="reloadingConfig">Refreshing...</span>
@@ -105,20 +105,20 @@
                   <span x-show="scrapeConfigSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
                 </div>
               </div>
-              <p x-show="scrapeConfigError" x-text="scrapeConfigError" class="text-xs mt-2" style="color: #ef4444;"></p>
+              <p x-show="scrapeConfigError" x-text="scrapeConfigError" class="mt-2 text-xs text-error-600 dark:text-error-500"></p>
             </div>
 
             <!-- Edit Rules File Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Edit Rules File</h3>
-              <p x-show="editorPath" class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              <p x-show="editorPath" class="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Editing <code x-text="editorPath"></code>.
               </p>
-              <p x-show="!editorPath && !loadingEditor" class="text-xs text-gray-500 dark:text-gray-400">
+              <p x-show="!editorPath && !loadingEditor" class="text-sm text-gray-500 dark:text-gray-400">
                 Set a rules file path above to edit it here.
               </p>
 
-              <div x-show="editorPath" class="space-y-3">
+              <div x-show="editorPath" class="pb-3 space-y-3">
                 <textarea
                   x-model="editorContent"
                   @input="editorDirty = true"
@@ -127,14 +127,14 @@
                   @keydown.meta.s.prevent="saveRulesFile()"
                   rows="24"
                   spellcheck="false"
-                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 font-mono text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                 ></textarea>
                 <div class="flex items-center gap-3">
                   <button
                     @click="saveRulesFile()"
                     :disabled="!editorDirty || savingEditor"
                     title="Check and save the rules file (Ctrl+S)"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50 disabled:opacity-50"
                   >
                     <span x-show="!savingEditor">Save</span>
                     <span x-show="savingEditor">Saving...</span>
@@ -143,7 +143,7 @@
                     @click="loadRulesFile()"
                     :disabled="!editorDirty || savingEditor"
                     title="Discard unsaved changes and reload the file from disk"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 disabled:opacity-50"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700 disabled:opacity-50"
                   >
                     Discard Changes
                   </button>
@@ -151,7 +151,7 @@
                   <span x-show="editorSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
                 </div>
               </div>
-              <p x-show="editorError" x-text="editorError" class="text-xs mt-2 whitespace-pre-wrap" style="color: #ef4444;"></p>
+              <p x-show="editorError" x-text="editorError" class="mt-2 text-xs whitespace-pre-wrap text-error-600 dark:text-error-500"></p>
             </div>
 
             <!-- Registered Site Scrapers Card -->
@@ -165,10 +165,10 @@
                 <div x-show="!loadingSites && scrapeSites.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
                   No sites registered (built-in rules are currently disabled and no config file is set).
                 </div>
-                <div x-show="scrapeSites.length > 0" class="space-y-3">
+                <div x-show="scrapeSites.length > 0" class="pb-3 space-y-3">
                   <select
                     x-model="selectedSite"
-                    class="w-full h-9 rounded-lg border border-gray-300 bg-transparent pl-3 pr-8 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                   >
                     <template x-for="site in scrapeSites" :key="site.domain">
                       <option :value="site.domain" x-text="site.domain"></option>
@@ -181,14 +181,14 @@
                     User agent: <span x-text="selectedSiteUserAgent" class="font-mono text-gray-700 dark:text-gray-300"></span>
                   </p>
                   <p x-show="selectedSiteFlareSolverr" class="text-xs text-gray-500 dark:text-gray-400">
-                    Uses FlareSolverr<span x-show="selectedSiteFlareSolverrTimeout" x-text="' (' + selectedSiteFlareSolverrTimeout + 's time limit)'"></span><span x-show="!flareSolverrURL" style="color: #ef4444;"> (no FlareSolverr URL is set)</span>
+                    Uses FlareSolverr<span x-show="selectedSiteFlareSolverrTimeout" x-text="' (' + selectedSiteFlareSolverrTimeout + 's time limit)'"></span><span x-show="!savedFlareSolverrURL" class="text-error-600 dark:text-error-500"> (no FlareSolverr URL is set)</span>
                   </p>
-                  <div class="w-full max-h-64 overflow-auto rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 space-y-3 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                  <div class="w-full max-h-[598px] overflow-auto rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pb-5 text-sm text-gray-800 space-y-3 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
                     <template x-for="section in selectedSiteSections" :key="section.title">
                       <div>
                         <strong class="block mb-4" x-text="section.title"></strong>
                         <template x-for="(line, i) in section.lines" :key="i">
-                          <div class="pl-4 whitespace-pre-wrap break-all" x-text="line"></div>
+                          <div class="pl-4 font-mono whitespace-pre-wrap break-all" x-text="line"></div>
                         </template>
                       </div>
                     </template>
@@ -197,12 +197,59 @@
               </div>
             </div>
 
+            <!-- FlareSolverr Card -->
+            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">FlareSolverr</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">URL of a <a href="https://github.com/FlareSolverr/FlareSolverr" target="_blank" rel="noopener" class="font-medium text-brand-500 hover:text-brand-600">FlareSolverr</a> instance, used to get past Cloudflare challenges. Only sites with <code>flaresolverr = true</code> in their rules use it.
+                <br>
+                <br>
+                Ensure <code>curl_cffi</code> is installed on the machine and available to yt-dlp.
+              </p>
+
+              <div class="flex flex-wrap items-center gap-3 py-3">
+                <input
+                  type="text"
+                  x-model="flareSolverrURL"
+                  placeholder="http://localhost:8191"
+                  class="flex-1 h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                  style="min-width: 12rem;"
+                  @keydown.enter="saveFlareSolverrURL()"
+                />
+                <div class="flex flex-wrap items-center gap-3">
+                  <button
+                    @click="saveFlareSolverrURL()"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    @click="flareSolverrURL = ''; saveFlareSolverrURL()"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    @click="testFlareSolverr()"
+                    :disabled="!flareSolverrURL || testingFlareSolverr"
+                    title="Solve https://example.com through FlareSolverr to check it works"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
+                  >
+                    <span x-show="!testingFlareSolverr">Test</span>
+                    <span x-show="testingFlareSolverr">Testing...</span>
+                  </button>
+                  <span x-show="flareSolverrSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+                </div>
+              </div>
+              <p x-show="flareSolverrMessage" x-text="flareSolverrMessage" class="text-xs mt-1 text-gray-500 dark:text-gray-400"></p>
+              <p x-show="flareSolverrError" x-text="flareSolverrError" class="mt-1 text-xs text-error-600 dark:text-error-500"></p>
+            </div>
+
             <!-- Test a URL Card -->
             <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
               <!-- Test Scraper -->
               <div class="space-y-3">
                 <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Test a URL</h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
                   <strong>Note:</strong> Tests could fail to retrieve results if the content is behind a login or if the site has anti-bot measures.
                 </p>
 
@@ -213,14 +260,14 @@
                     type="text"
                     x-model="testUrl"
                     placeholder="https://example.com/video/123"
-                    class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="flex-1 h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     style="min-width: 12rem;"
                     @keydown.enter="testScrapeUrl()"
                   />
                   <button
                     @click="testScrapeUrl()"
                     :disabled="!testUrl || testingUrl || testingCrawl"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
                   >
                     <span x-show="!testingUrl">Test</span>
                     <span x-show="testingUrl">Testing...</span>
@@ -234,14 +281,14 @@
                     type="text"
                     x-model="testCrawlUrl"
                     placeholder="https://example.com/c/channel"
-                    class="flex-1 h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="flex-1 h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     style="min-width: 12rem;"
                     @keydown.enter="testCrawlChannelUrl()"
                   />
                   <button
                     @click="testCrawlChannelUrl()"
                     :disabled="!testCrawlUrl || testingUrl || testingCrawl"
-                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                    class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
                   >
                     <span x-show="!testingCrawl">Test</span>
                     <span x-show="testingCrawl">Testing...</span>
@@ -252,7 +299,7 @@
                   rows="10"
                   x-model="testResult"
                   placeholder="Results will appear here..."
-                  class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 font-mono text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                 ></textarea>
               </div>
             </div>
@@ -274,8 +321,13 @@
           sidebarToggle: false,
           scrollTop: false,
 
-          // FlareSolverr URL, to warn about sites set to use it when none is set.
+          // FlareSolverr
           flareSolverrURL: '',
+          savedFlareSolverrURL: '', // To warn about sites set to use it when none is saved.
+          flareSolverrSaved: false,
+          flareSolverrMessage: '',
+          flareSolverrError: '',
+          testingFlareSolverr: false,
 
           // Custom scrape sites
           scrapeConfigPath: '',
@@ -375,8 +427,57 @@
               if (!response.ok) return;
               const data = await response.json();
               this.flareSolverrURL = data.url ?? '';
+              this.savedFlareSolverrURL = this.flareSolverrURL;
             } catch (err) {
               console.error('Error loading FlareSolverr URL:', err);
+            }
+          },
+
+          async saveFlareSolverrURL() {
+            this.flareSolverrSaved = false;
+            this.flareSolverrMessage = '';
+            this.flareSolverrError = '';
+            try {
+              const response = await fetch('/api/v1/settings/flaresolverr-url', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ url: this.flareSolverrURL })
+              });
+              if (!response.ok) {
+                this.flareSolverrError = await response.text() || 'Failed to update FlareSolverr URL';
+                return;
+              }
+              const data = await response.json();
+              this.savedFlareSolverrURL = data.url ?? '';
+              this.flareSolverrSaved = true;
+              setTimeout(() => { this.flareSolverrSaved = false; }, 2000);
+            } catch (err) {
+              this.flareSolverrError = 'Failed to update FlareSolverr URL';
+              console.error('Error saving FlareSolverr URL:', err);
+            }
+          },
+
+          async testFlareSolverr() {
+            this.testingFlareSolverr = true;
+            this.flareSolverrMessage = '';
+            this.flareSolverrError = '';
+            try {
+              const response = await fetch('/api/v1/settings/flaresolverr-url/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ url: this.flareSolverrURL })
+              });
+              if (!response.ok) {
+                this.flareSolverrError = await response.text() || 'FlareSolverr test failed';
+                return;
+              }
+              const data = await response.json();
+              this.flareSolverrMessage = `FlareSolverr loaded https://example.com (HTTP ${data.status}) in ${data.seconds.toFixed(1)}s, returning ${data.cookies} cookie(s) and user agent: ${data.user_agent}`;
+            } catch (err) {
+              this.flareSolverrError = 'FlareSolverr test failed';
+              console.error('Error testing FlareSolverr:', err);
+            } finally {
+              this.testingFlareSolverr = false;
             }
           },
 
