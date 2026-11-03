@@ -397,6 +397,7 @@
               metarr_output_directory: '',
               metarr_purge_metafile: '',
               metarr_purge_original_video: '',
+              metarr_write_nfo: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: '',
@@ -584,7 +585,7 @@
                           urlEntry.custom[key] = value.join('\n');
                         } else if (key === 'metarr_max_cpu_usage' && value === 0) {
                           urlEntry.custom[key] = null;
-                        } else if (key === 'metarr_purge_original_video') {
+                        } else if (key === 'metarr_purge_original_video' || key === 'metarr_write_nfo') {
                           urlEntry.custom[key] = String(value);
                         } else {
                           urlEntry.custom[key] = value;
@@ -629,7 +630,7 @@
                     this.formData.metarr[key] = value.join('\n');
                   } else if (key === 'metarr_max_cpu_usage' && value === 0) {
                     this.formData.metarr[key] = '';
-                  } else if (key === 'metarr_purge_original_video') {
+                  } else if (key === 'metarr_purge_original_video' || key === 'metarr_write_nfo') {
                     this.formData.metarr[key] = String(value);
                   } else {
                     this.formData.metarr[key] = value;
@@ -669,6 +670,7 @@
               metarr_output_directory: '',
               metarr_purge_metafile: '',
               metarr_purge_original_video: '',
+              metarr_write_nfo: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: null,
@@ -963,6 +965,12 @@
                 const purgeOriginalValue = normalizeBool(urlEntry.custom.metarr_purge_original_video);
                 if (typeof purgeOriginalValue === 'boolean') {
                   metarr.metarr_purge_original_video = purgeOriginalValue;
+                }
+
+                // Process Write NFO Files from its dropdown (empty inherits from the channel)
+                const writeNFOValue = normalizeBool(urlEntry.custom.metarr_write_nfo);
+                if (typeof writeNFOValue === 'boolean') {
+                  metarr.metarr_write_nfo = writeNFOValue;
                 }
               }
 

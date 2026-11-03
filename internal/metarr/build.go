@@ -99,6 +99,11 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 		args = append(args, metkeys.PurgeOriginalVideo)
 	}
 
+	// Metarr writes no NFO file unless told to. An explicit No in 'Download As' beats the channel URL's Yes.
+	if writeNFO := cmp.Or(o.WriteNFO, m.WriteNFO); writeNFO != nil && *writeNFO {
+		args = append(args, metkeys.WriteNFO)
+	}
+
 	// Transcoding.
 	add(metkeys.ExtraFFmpegArgs, cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs))
 	add(metkeys.TranscodeGPU, gpu)

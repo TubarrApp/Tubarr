@@ -60,18 +60,6 @@ func (s *Store) TubarrSettingsStore() contracts.TubarrSettingsStore {
 
 // ******************************** Private ***************************************************************************************
 
-// marshalVideoMetadataJSON marshals all JSON elements for a channel URL/video model.
-func marshalVideoMetadataJSON(v *models.Video) (metadata []byte, err error) {
-	if v.MetadataMap != nil {
-		metadata, err = json.Marshal(v.MetadataMap)
-		if err != nil {
-			return nil, fmt.Errorf("metadata marshal failed for video with URL %q: %w", v.URL, err)
-		}
-	}
-
-	return metadata, nil
-}
-
 // makeSettingsMetarrArgsCopy makes a copy of the current Settings and MetarrArgs for comparison.
 func makeSettingsMetarrArgsCopy(settings *models.Settings, metarrArgs *models.MetarrArgs, objectName string) (settingsCopy, metarrArgsCopy []byte) {
 	var err error

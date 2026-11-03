@@ -355,6 +355,10 @@
                               <span class="text-gray-500 dark:text-gray-400">Delete Metadata Files:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="({ json: 'JSON', nfo: 'NFO', all: 'All' })[channel.metarr?.metarr_purge_metafile] || 'Keep'"></span>
                             </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Write NFO Files:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_write_nfo ? 'Yes' : 'No'"></span>
+                            </div>
 
                             <h5 class="col-span-full mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">Encoding</h5>
                             <div>

@@ -456,7 +456,7 @@
                 throw new Error('Failed to fetch videos');
               }
 
-              this.videos = await videosResponse.json() || [];
+              this.videos = Object.freeze(await videosResponse.json() || []); // Frozen so Alpine doesn't track every video, as the list is only ever replaced.
               this.startedMetarr = [];
               this.loading = false;
 
@@ -752,7 +752,7 @@
               }
 
               // Remove deleted videos from local array
-              this.videos = this.videos.filter(v => !this.selectedVideos.includes(v.url));
+              this.videos = Object.freeze(this.videos.filter(v => !this.selectedVideos.includes(v.url)));
               this.selectedVideos = [];
 
               // Adjust current page if needed

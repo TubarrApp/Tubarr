@@ -202,6 +202,14 @@ download-as-cancel if Download As closes without starting. -->
               <option value="all">All</option>
             </select>
           </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Write NFO Files</label>
+            <select x-model="form.metarr.metarr_write_nfo" class="w-full h-8 rounded border pl-2 pr-8 text-xs dark:bg-gray-900 dark:border-gray-700 dark:text-white/90">
+              <option value="" x-text="boolDefaultLabel('metarr_write_nfo')"></option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
           <h4 class="col-span-full mt-2 text-xs font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide">Encoding</h4>
           <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">GPU Acceleration</label>
@@ -301,7 +309,7 @@ download-as-cancel if Download As closes without starting. -->
       auth: { username: '', password: '', login_url: '' }, // Login for this download only, never saved.
       uploading: false,
       metarrKeys: [
-        'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
+        'metarr_purge_metafile', 'metarr_write_nfo', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
         'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_video_args', 'metarr_transcode_video_transcode_codecs',
         'metarr_transcode_audio_codecs', 'metarr_extra_ffmpeg_args'
       ],
@@ -380,12 +388,13 @@ download-as-cancel if Download As closes without starting. -->
         return { ...this.defaults, filename: '', video_dir: '', json_dir: '', output_dir: '', thumbnail: '', strip_thumbnail: false, metarr: {} };
       },
 
-      // The dialog's set Metarr args from saved ones, with codec lists one per line.
+      // The dialog's set Metarr args from saved ones, with codec lists one per line and choices as strings.
       metarrForm(saved) {
         const form = {};
         for (const key of this.metarrKeys) {
           const v = saved?.[key];
-          if (v) form[key] = Array.isArray(v) ? v.join('\n') : v;
+          if (typeof v === 'boolean') form[key] = String(v);
+          else if (v) form[key] = Array.isArray(v) ? v.join('\n') : v;
         }
         return form;
       },
@@ -395,6 +404,11 @@ download-as-cancel if Download As closes without starting. -->
         const v = this.metarrDefaults[key] ?? this.ytdlpDefaults[key];
         const shown = Array.isArray(v) ? v.join(', ') : v;
         return shown ? `Default (${shown})` : 'Default';
+      },
+
+      // A blank Yes/No option's label: the channel URL's choice, which is No if it has none.
+      boolDefaultLabel(key) {
+        return `Default (${this.metarrDefaults[key] ? 'Yes' : 'No'})`;
       },
 
       revert() {
@@ -461,6 +475,7 @@ download-as-cancel if Download As closes without starting. -->
         if (this.thumbChoice !== 'custom') overrides.thumbnail = '';
         // Blank args are left out, so they use the channel URL's.
         const metarr = Object.fromEntries(Object.entries(metarrForm).filter(([, v]) => v !== '' && v != null));
+        if ('metarr_write_nfo' in metarr) metarr.metarr_write_nfo = metarr.metarr_write_nfo === 'true';
         // The login is sent if any of its fields is filled in, else the channel URL's is used.
         const auth = { username: this.auth.username.trim(), password: this.auth.password, login_url: this.auth.login_url.trim() };
         const login = auth.username || auth.password || auth.login_url ? auth : undefined;

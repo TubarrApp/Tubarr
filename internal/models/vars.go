@@ -76,6 +76,7 @@ type MetarrArgsInput struct {
 	MetarrExt          *string `viper:"metarr-output-ext"`
 	RenameStyle        *string `viper:"metarr-rename-style"`
 	PurgeOriginalVideo *bool   `viper:"metarr-purge-original-video"`
+	WriteNFO           *bool   `viper:"metarr-write-nfo"`
 
 	// Op files.
 	MetaOpsFile             *string `viper:"metarr-meta-ops-file"`

@@ -154,6 +154,7 @@ func TestMatchesChannelURL(t *testing.T) {
 		{"video encoder args", models.VideoOverrides{MetarrArgs: models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-crf 35"}}}, false},
 		{"the channel URL's output directory, which beats move ops", models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputDir: "/out"}}, false},
 	}
+	yes, no := true, false
 	for _, tt := range tests {
 		o := tt.o
 		o.MetaOps = sent.MetaOps
@@ -164,6 +165,30 @@ func TestMatchesChannelURL(t *testing.T) {
 			t.Errorf("%s: got match %t, want %t", tt.name, got, tt.matches)
 		}
 	}
+
+	// A Write NFO Files choice is an override only if it differs from what the channel URL does, unset meaning No.
+	for _, tt := range []struct {
+		name     string
+		url, got *bool
+		matches  bool
+	}{
+		{"unset on both", nil, nil, true},
+		{"Yes over unset", nil, &yes, false},
+		{"No over unset", nil, &no, true},
+		{"unset over Yes", &yes, nil, true},
+		{"Yes over Yes", &yes, &yes, true},
+		{"No over Yes", &yes, &no, false},
+		{"Yes over No", &no, &yes, false},
+		{"No over No", &no, &no, true},
+	} {
+		cu.ChanURLMetarrArgs.WriteNFO = tt.url
+		o := *sent
+		o.WriteNFO = tt.got
+		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+			t.Errorf("Write NFO Files, %s: got match %t, want %t", tt.name, got, tt.matches)
+		}
+	}
+	cu.ChanURLMetarrArgs.WriteNFO = nil
 
 	// The op boxes replace the channel URL's ops, so emptying or adding to them makes overrides.
 	moreOps, err := parsing.ParseMetaOps([]string{"title:prefix:[Cats] ", "album:set:Pets"})

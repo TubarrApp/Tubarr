@@ -128,6 +128,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 
 	// Middleware
 	r.Use(middleware.RequestID)
+	r.Use(middleware.Compress(5))                                   // Pages, scripts and video lists, which can be megabytes. Images are left as they are.
 	r.Use(skipLogging(middleware.Logger, healthPath, activityPath)) // Polled often, keep out of logs.
 	r.Use(middleware.Recoverer)
 	r.Use(http.NewCrossOriginProtection().Handler) // Blocks other websites' pages from sending changes (CSRF).

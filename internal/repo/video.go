@@ -206,15 +206,6 @@ func (vs *VideoStore) UpdateVideoPaths(videoID int64, oldVideo, oldJSON, newVide
 
 // UpdateVideo updates the status of the video in the database.
 func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
-	metadataJSON, err := marshalVideoMetadataJSON(v)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON for video with URL %q: %w", v.URL, err)
-	}
-	var metadataArg any // NULL without loaded metadata, keeping the stored metadata.
-	if metadataJSON != nil {
-		metadataArg = metadataJSON
-	}
-
 	tx, err := vs.DB.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -225,7 +216,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	//nolint:gosec // SQL identifiers are trusted constants.
 	videoQuery := fmt.Sprintf(
 		"UPDATE %s SET %s = COALESCE(NULLIF(?, ''), %s), %s = COALESCE(NULLIF(?, ''), %s), "+
-			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = COALESCE(NULLIF(?, 0), %s), %s = COALESCE(NULLIF(?, 0), %s), %s = COALESCE(?, %s), %s = ?, "+
+			"%s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = ?, %s = COALESCE(NULLIF(?, 0), %s), %s = COALESCE(NULLIF(?, 0), %s), %s = ?, "+
 			"%s = COALESCE(NULLIF(?, ''), %s), %s = CASE WHEN ? = '' THEN %s ELSE ? END "+
 			"WHERE %s = ? AND %s = ?",
 		consts.DBVideos,
@@ -239,7 +230,6 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		consts.QVidUploadDate,
 		consts.QVidFilesize, consts.QVidFilesize, // Keep the stored size when this run didn't read one.
 		consts.QVidDuration, consts.QVidDuration, // Keep the stored duration when this run didn't find one.
-		consts.QVidMetadata, consts.QVidMetadata,
 		consts.QVidUpdatedAt,
 		consts.QVidMetarrStatus, consts.QVidMetarrStatus,
 		consts.QVidMetarrError, consts.QVidMetarrError,
@@ -259,7 +249,6 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		v.UploadDate,
 		v.Filesize,
 		v.Duration,
-		metadataArg,
 		time.Now(),
 		v.MetarrStatus,
 		v.MetarrStatus, v.MetarrError,
@@ -1217,15 +1206,10 @@ func videoExists(q querier, videoURL string, channelID int64) (int64, bool) {
 
 // insertVideo adds v as a new row, returning its ID.
 func insertVideo(q querier, v *models.Video, channelID, channelURLID int64, now time.Time) (int64, error) {
-	metadataJSON, err := marshalVideoMetadataJSON(v)
-	if err != nil {
-		return 0, err
-	}
-
 	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidChanURLID,
@@ -1237,7 +1221,6 @@ func insertVideo(q querier, v *models.Video, channelID, channelURLID int64, now 
 		consts.QVidFinished,
 		consts.QVidIgnored,
 		consts.QVidUploadDate,
-		consts.QVidMetadata,
 		consts.QVidCreatedAt,
 		consts.QVidUpdatedAt,
 	)
@@ -1254,7 +1237,6 @@ func insertVideo(q querier, v *models.Video, channelID, channelURLID int64, now 
 		v.Finished,
 		v.Ignored,
 		v.UploadDate,
-		metadataJSON,
 		now,
 		now,
 	)

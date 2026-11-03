@@ -221,6 +221,8 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 			m.MetaPurge = ""
 		case keys.MPurgeOriginalVideo:
 			m.PurgeOriginalVideo = nil
+		case keys.MWriteNFO:
+			m.WriteNFO = nil
 		case keys.MOutputExt:
 			m.OutputExt = ""
 		case keys.MRenameStyle:

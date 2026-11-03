@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -365,7 +366,7 @@ func (cs *ChannelStore) DeleteVideosByURLs(channelID int64, urls []string, delet
 	return nil
 }
 
-// videoFilePaths returns the saved video and metadata file paths of a channel's videos.
+// videoFilePaths returns the saved video and metadata file paths of a channel's videos, and the NFO file beside each video.
 func (cs *ChannelStore) videoFilePaths(channelID int64, urls []string) ([]string, error) {
 	args := make([]any, 0, len(urls)+1)
 	args = append(args, channelID)
@@ -404,6 +405,10 @@ func (cs *ChannelStore) videoFilePaths(channelID int64, urls []string) ([]string
 			if p != "" {
 				paths = append(paths, p)
 			}
+		}
+		// Metarr's NFO file isn't saved, but is named for the video.
+		if videoPath.String != "" {
+			paths = append(paths, strings.TrimSuffix(videoPath.String, filepath.Ext(videoPath.String))+sharedconsts.MExtNFO)
 		}
 	}
 	return paths, rows.Err()

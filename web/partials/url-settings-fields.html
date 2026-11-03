@@ -247,6 +247,14 @@
                                 <option value="all">All</option>
                               </select>
                             </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Write NFO Files</label>
+                              <select x-model="urlEntry.custom.metarr_write_nfo" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                                <option value="" x-text="urlBoolHint(urlEntry, 'metarr_write_nfo', 'Yes', 'No')"></option>
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
+                              </select>
+                            </div>
                             <h4 class="col-span-full mt-4 text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide">Encoding</h4>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">GPU Acceleration</label>

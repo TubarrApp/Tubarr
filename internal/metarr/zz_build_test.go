@@ -202,6 +202,8 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 	}
 	files := []string{metkeys.VideoFile, "/videos/v.mp4", metkeys.MetaFile, "/videos/v.json"}
 	no := false
+	yes := true
+	nfoFiles := slices.Concat(files, []string{metkeys.WriteNFO})
 
 	for _, tc := range []struct {
 		name      string
@@ -247,6 +249,13 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.StripThumbnail,
 		})},
 		{"original kept", 0, &models.MetarrArgs{PurgeOriginalVideo: &no}, nil, files},
+		{"NFO unset", 0, &models.MetarrArgs{PurgeOriginalVideo: &no}, nil, files},
+		{"NFO yes", 0, &models.MetarrArgs{PurgeOriginalVideo: &no, WriteNFO: &yes}, nil, nfoFiles},
+		{"NFO no", 0, &models.MetarrArgs{PurgeOriginalVideo: &no, WriteNFO: &no}, nil, files},
+		{"NFO yes, unset in Download As", 0, &models.MetarrArgs{PurgeOriginalVideo: &no, WriteNFO: &yes}, &models.VideoOverrides{}, nfoFiles},
+		{"NFO yes, no in Download As", 0, &models.MetarrArgs{PurgeOriginalVideo: &no, WriteNFO: &yes}, &models.VideoOverrides{MetarrArgs: models.MetarrArgs{WriteNFO: &no}}, files},
+		{"NFO no, yes in Download As", 0, &models.MetarrArgs{PurgeOriginalVideo: &no, WriteNFO: &no}, &models.VideoOverrides{MetarrArgs: models.MetarrArgs{WriteNFO: &yes}}, nfoFiles},
+		{"NFO unset, yes in Download As", 0, &models.MetarrArgs{PurgeOriginalVideo: &no}, &models.VideoOverrides{MetarrArgs: models.MetarrArgs{WriteNFO: &yes}}, nfoFiles},
 	} {
 		logging.SetLevel(tc.level)
 		c := &models.Channel{ID: 1, Name: "Cats"}

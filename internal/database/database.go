@@ -150,6 +150,12 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	// Older versions saved each download's whole metadata here, often megabytes. Nothing read it, but queries had to read past it.
+	droppedMetadata, err := dropColumnIfPresent(tx, "videos", "metadata")
+	if err != nil {
+		return err
+	}
+
 	if err := initDownloadsTable(tx); err != nil {
 		return err
 	}
@@ -182,5 +188,21 @@ func (d *Database) initTables() error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	if droppedMetadata {
+		d.reclaimSpace()
+	}
 	return nil
+}
+
+// reclaimSpace shrinks the database file after a large removal. If it fails the database still works, just larger.
+func (d *Database) reclaimSpace() {
+	if _, err := d.DB.Exec("VACUUM"); err != nil {
+		logger.Pl.W("Failed to shrink the database: %v", err)
+		return
+	}
+
+	// The file only shrinks once the vacuumed copy is moved out of the write-ahead log.
+	if _, err := d.DB.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		logger.Pl.W("Failed to shrink the database: %v", err)
+	}
 }

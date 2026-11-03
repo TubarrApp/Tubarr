@@ -118,6 +118,7 @@ const (
 	MFilteredMetaOpsFile     string = "metarr-filtered-meta-ops-file"
 	MMetaPurge               string = "metarr-purge-metafile"
 	MPurgeOriginalVideo      string = "metarr-purge-original-video"
+	MWriteNFO                string = "metarr-write-nfo"
 	MRenameStyle             string = "metarr-rename-style"
 	MMaxCPU                  string = "metarr-max-cpu"
 	MMinFreeMem              string = "metarr-min-free-mem"

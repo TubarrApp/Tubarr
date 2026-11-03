@@ -61,6 +61,18 @@ func TestChildMatchParentEachField(t *testing.T) {
 	}
 }
 
+// TestMetarrArgsAllZeroEachField tests that any one Metarr arg set makes MetarrArgs non-zero.
+func TestMetarrArgsAllZeroEachField(t *testing.T) {
+	typ := reflect.TypeFor[MetarrArgs]()
+	for i := range typ.NumField() {
+		m := reflect.New(typ)
+		setNonZero(m.Elem().Field(i), 1)
+		if MetarrArgsAllZero(m.Interface().(*MetarrArgs)) {
+			t.Errorf("MetarrArgs.%s set still counts as all zero", typ.Field(i).Name)
+		}
+	}
+}
+
 // TestSettingsAllZeroCodecs tests that preferred codecs alone make Settings non-zero.
 func TestSettingsAllZeroCodecs(t *testing.T) {
 	if SettingsAllZero(&Settings{YTDLPPreferredVideoCodecs: []string{"av1"}}) {

@@ -614,6 +614,23 @@
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Metadata files Metarr deletes once it has processed a video.</p>
                       </div>
 
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Write NFO Files
+                        </label>
+                        <select
+                          x-model="formData.metarr.metarr_write_nfo"
+                          class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                          <option value="" x-text="boolHint('metarr_write_nfo', 'Yes', 'No')"></option>
+                          <option value="true">Yes</option>
+                          <template x-if="page !== 'profiles'">
+                            <option value="false">No</option>
+                          </template>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Writes a Kodi/Jellyfin-style .nfo file next to the finished video, named to match it.</p>
+                      </div>
+
                       <h4 class="col-span-full mt-4 text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide">Encoding</h4>
 
                       <div>

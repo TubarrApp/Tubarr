@@ -366,7 +366,7 @@
               if (!response.ok) {
                 throw new Error(await response.text() || 'Failed to fetch available videos');
               }
-              this.videos = await response.json() || [];
+              this.videos = Object.freeze(await response.json() || []); // Frozen so Alpine doesn't track every video, as the list is only ever replaced.
               this.error = null;
             } catch (err) {
               this.error = err.message;

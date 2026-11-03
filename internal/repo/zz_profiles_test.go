@@ -86,6 +86,57 @@ func TestProfileSettingsPrecedence(t *testing.T) {
 	}
 }
 
+// TestWriteNFOPrecedence tests that the nearest choice wins, whether Yes or No: a URL's own, its profile's, its channel's,
+// then the channel's profile's. Unset choices use the next one along.
+func TestWriteNFOPrecedence(t *testing.T) {
+	cs := newTestChannelStore(t)
+	yes, no := true, false
+	profileYes := addTestProfile(t, cs, "writes NFO", &models.Settings{}, &models.MetarrArgs{WriteNFO: &yes})
+	const none int64 = 0
+
+	for i, tc := range []struct {
+		name                    string
+		chanProfile, urlProfile int64
+		chanOwn, urlOwn         *bool
+		wantChan, wantURL       *bool
+	}{
+		{"all unset", none, none, nil, nil, nil, nil},
+		{"channel's profile", profileYes.ID, none, nil, nil, &yes, &yes},
+		{"channel's No beats its profile's Yes", profileYes.ID, none, &no, nil, &no, &no},
+		{"URL's profile beats the channel's No", none, profileYes.ID, &no, nil, &no, &yes},
+		{"URL's No beats its profile's Yes", none, profileYes.ID, nil, &no, nil, &no},
+		{"URL's No beats the channel's Yes", none, none, &yes, &no, &yes, &no},
+		{"URL's Yes beats the channel's No", none, none, &no, &yes, &no, &yes},
+	} {
+		c := testChannel(t, "nfo"+strconv.Itoa(i), "https://example.com/@nfo"+strconv.Itoa(i))
+		c.ProfileID = tc.chanProfile
+		c.ChanMetarrArgs.WriteNFO = tc.chanOwn
+		c.URLModels[0].ProfileID = tc.urlProfile
+		c.URLModels[0].ChanURLMetarrArgs = &models.MetarrArgs{WriteNFO: tc.urlOwn}
+		if err := cs.AddChannelWithDetails(c, nil, nil); err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		loaded, _, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(c.ID, 10), true)
+		if err != nil || loaded.LoadErr != nil {
+			t.Fatalf("%s: GetChannelModel = %v, LoadErr %v", tc.name, err, loaded.LoadErr)
+		}
+		if got := loaded.ChanMetarrArgs.WriteNFO; !reflect.DeepEqual(got, tc.wantChan) {
+			t.Errorf("%s: channel got %v, want %v", tc.name, showBool(got), showBool(tc.wantChan))
+		}
+		if got := loaded.URLModels[0].ChanURLMetarrArgs.WriteNFO; !reflect.DeepEqual(got, tc.wantURL) {
+			t.Errorf("%s: URL got %v, want %v", tc.name, showBool(got), showBool(tc.wantURL))
+		}
+	}
+}
+
+// showBool returns an optional choice as text.
+func showBool(b *bool) string {
+	if b == nil {
+		return "unset"
+	}
+	return strconv.FormatBool(*b)
+}
+
 // TestProfileOpsAdded tests that a profile's ops are added to those of the channel or URL using it, as a URL's are to
 // its channel's: the nearer op wins where both set the same thing, and the nearer move ops are checked first.
 func TestProfileOpsAdded(t *testing.T) {

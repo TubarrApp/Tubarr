@@ -32,7 +32,7 @@ const (
 var perURLFixedKeys = []string{"paused", "use_global_cookies", "auto_download"}
 
 // perURLMetarrBools are the per-URL Metarr choices the channel pages send as booleans, with the custom settings.
-var perURLMetarrBools = []string{"metarr_purge_original_video"}
+var perURLMetarrBools = []string{"metarr_purge_original_video", "metarr_write_nfo"}
 
 // ---- Page parsing ----
 
@@ -461,6 +461,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		"metarr_filtered_meta_ops_file":           {file("filtered-meta-ops-a.txt", "title:contains:a||artist:set:A\n"), file("filtered-meta-ops-b.txt", "title:contains:b||artist:set:B\n")},
 		"metarr_purge_metafile":                   {"json", "all"},
 		"metarr_purge_original_video":             {"false", "true"},
+		"metarr_write_nfo":                        {"true", "false"},
 	}
 }
 
@@ -1124,14 +1125,22 @@ func pageRequests() []pageRequest {
 				}
 			}
 			kept := addFinished("https://example.com/v/wiring-keep")
+			keptNFO := wiringFile(t, "wiring-keep.nfo", "nfo")
 			deleteVideo("https://example.com/v/wiring-keep", false)
 			if _, err := os.Stat(kept); err != nil {
 				t.Errorf("deleting a video without delete_files removed its file: %v", err)
 			}
+			if _, err := os.Stat(keptNFO); err != nil {
+				t.Errorf("deleting a video without delete_files removed its NFO file: %v", err)
+			}
 			removed := addFinished("https://example.com/v/wiring-remove")
+			removedNFO := wiringFile(t, "wiring-remove.nfo", "nfo")
 			deleteVideo("https://example.com/v/wiring-remove", true)
 			if _, err := os.Stat(removed); !os.IsNotExist(err) {
 				t.Errorf("deleting a video with delete_files kept its file (stat error: %v)", err)
+			}
+			if _, err := os.Stat(removedNFO); !os.IsNotExist(err) {
+				t.Errorf("deleting a video with delete_files kept its NFO file (stat error: %v)", err)
 			}
 		}},
 		{path: "/api/v1/channels/{}/download-urls", keys: []string{"videos", "url", "channel_url_id", "auth"}, replay: func(t *testing.T) {

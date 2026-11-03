@@ -59,6 +59,7 @@ type ChannelFlagValues struct {
 	MinFreeMem         string
 	MetaPurge          string
 	PurgeOriginalVideo bool
+	WriteNFO           bool
 
 	// Transcoding settings
 	TranscodeGPU        string

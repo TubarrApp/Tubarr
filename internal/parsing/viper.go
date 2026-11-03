@@ -324,6 +324,10 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 		b := *v
 		dst.PurgeOriginalVideo = &b
 	}
+	if v := in.WriteNFO; v != nil {
+		b := *v
+		dst.WriteNFO = &b
+	}
 	if v := in.MetarrConcurrency; v != nil {
 		dst.MetarrConcurrency = max(*v, 0)
 	}

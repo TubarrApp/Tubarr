@@ -524,6 +524,7 @@ func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	u.MetaOpsFile = cmp.Or(u.MetaOpsFile, ch.MetaOpsFile)
 	u.FilteredMetaOps = slices.Concat(ch.FilteredMetaOps, u.FilteredMetaOps)
 	u.FilteredMetaOpsFile = cmp.Or(u.FilteredMetaOpsFile, ch.FilteredMetaOpsFile)
+	u.WriteNFO = inheritBool(u.WriteNFO, ch.WriteNFO)
 	u.OutputDir = cmp.Or(u.OutputDir, ch.OutputDir)
 	u.MetaPurge = cmp.Or(u.MetaPurge, ch.MetaPurge)
 	u.MetarrConcurrency = cmp.Or(u.MetarrConcurrency, ch.MetarrConcurrency)

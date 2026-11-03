@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"tubarr/internal/domain/logger"
 )
 
 //go:embed sql/*.sql
@@ -82,6 +83,20 @@ func addColumnIfMissing(tx *sql.Tx, table, column, definition string) error {
 		return fmt.Errorf("failed to add column %s to table %s: %w", column, table, err)
 	}
 	return nil
+}
+
+// dropColumnIfPresent removes a column from an existing table (for databases created by older versions), returning
+// whether it did.
+func dropColumnIfPresent(tx *sql.Tx, table, column string) (dropped bool, err error) {
+	has, err := hasColumn(tx, table, column)
+	if err != nil || !has {
+		return false, err
+	}
+	logger.Pl.I("Removing column %s from table %s, once only. This can take minutes on a large database...", column, table)
+	if _, err := tx.Exec(fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, column)); err != nil {
+		return false, fmt.Errorf("failed to drop column %s from table %s: %w", column, table, err)
+	}
+	return true, nil
 }
 
 // hasColumn reports whether a table has a column.

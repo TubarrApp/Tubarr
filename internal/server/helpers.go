@@ -170,6 +170,7 @@ type metarrArgsResponse struct {
 	OutputDir               string   `json:"metarr_output_directory,omitempty"`
 	MetaPurge               string   `json:"metarr_purge_metafile,omitempty"`
 	PurgeOriginalVideo      *bool    `json:"metarr_purge_original_video,omitempty"`
+	WriteNFO                *bool    `json:"metarr_write_nfo,omitempty"`
 	OutputExt               string   `json:"metarr_output_ext,omitempty"`
 	RenameStyle             string   `json:"metarr_rename_style,omitempty"`
 	MetarrConcurrency       int      `json:"metarr_concurrency,omitempty"`
@@ -200,6 +201,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		OutputDir:               m.OutputDir,
 		MetaPurge:               m.MetaPurge,
 		PurgeOriginalVideo:      m.PurgeOriginalVideo,
+		WriteNFO:                m.WriteNFO,
 		OutputExt:               m.OutputExt,
 		RenameStyle:             m.RenameStyle,
 		MetarrConcurrency:       max(m.MetarrConcurrency, 0),
@@ -470,6 +472,7 @@ type metarrArgsInput struct {
 	OutputDir               *string  `json:"metarr_output_directory"`
 	MetaPurge               *string  `json:"metarr_purge_metafile"`
 	PurgeOriginalVideo      *bool    `json:"metarr_purge_original_video"`
+	WriteNFO                *bool    `json:"metarr_write_nfo"`
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
 	VideoArgs               *string  `json:"metarr_transcode_video_args"` // Newline-separated, as in the main form.
@@ -665,6 +668,7 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 		OutDir:                  in.OutputDir,
 		MetaPurge:               in.MetaPurge,
 		PurgeOriginalVideo:      in.PurgeOriginalVideo,
+		WriteNFO:                in.WriteNFO,
 		MetarrExt:               in.OutputExt,
 		RenameStyle:             in.RenameStyle,
 		MetaOpsFile:             in.MetaOpsFile,
@@ -854,6 +858,11 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 		purgeOriginalVideo := v == "true"
 		in.PurgeOriginalVideo = &purgeOriginalVideo
 	}
+	// Left unset, this uses the profile's setting, else writes no NFO file.
+	if v := r.FormValue(jsonkeys.MetarrWriteNFO); v != "" {
+		writeNFO := v == "true"
+		in.WriteNFO = &writeNFO
+	}
 
 	m := &models.MetarrArgs{}
 	if err := parsing.ApplyMetarrArgsInput(m, in); err != nil {
@@ -1004,6 +1013,7 @@ func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLI
 
 	// Every other option blank or the channel URL's, merged as yt-dlp and Metarr get them.
 	s, m := cu.ChanURLSettings, cu.ChanURLMetarrArgs
+	writesNFO := m.WriteNFO != nil && *m.WriteNFO
 	return cmp.Or(o.VideoDir, s.VideoDir) == s.VideoDir &&
 		cmp.Or(o.JSONDir, s.JSONDir) == s.JSONDir &&
 		cmp.Or(o.YtdlpOutputExt, s.YtdlpOutputExt) == s.YtdlpOutputExt &&
@@ -1015,6 +1025,7 @@ func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		cmp.Or(o.OutputExt, m.OutputExt) == m.OutputExt &&
 		cmp.Or(o.RenameStyle, m.RenameStyle) == m.RenameStyle &&
 		cmp.Or(o.MetaPurge, m.MetaPurge) == m.MetaPurge &&
+		(o.WriteNFO == nil || *o.WriteNFO == writesNFO) &&
 		cmp.Or(o.MaxCPU, m.MaxCPU) == m.MaxCPU &&
 		cmp.Or(o.MinFreeMem, m.MinFreeMem) == m.MinFreeMem &&
 		cmp.Or(o.TranscodeGPU, m.TranscodeGPU) == m.TranscodeGPU &&

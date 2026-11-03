@@ -25,14 +25,6 @@ Tubarr is a Go-powered companion to Metarr that keeps long-form video libraries 
 
 ---
 
-## Container Note
-
-The Tubarr container image is a little over a gigabyte, making it larger than images of similar applications like Sonarr. This is because of two factors:
-
-1) Tubarr runs yt-dlp under the hood, which means Python and the Deno runtime must be included.
-
-2) Tubarr runs transcoding operations (through Metarr), with support for various types of hardware acceleration and codecs. This requires the inclusion of a very fully-featured FFmpeg build and a large number of media codecs and drivers to reliably work on different machines. Most of the image size comes from this!
-
 ### Resources:
 
 It is recommended you do not impose heavy resource limitations on the container itself. Tubarr/Metarr run heavy transcoding operations via FFmpeg so it is normal for CPU and RAM usage to spike during this process. Cutting the resources can dramatically slow down the speed of these operations.

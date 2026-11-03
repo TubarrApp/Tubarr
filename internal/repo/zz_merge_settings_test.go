@@ -54,6 +54,7 @@ func fullMetarrArgs() *models.MetarrArgs {
 		MetaOpsFile:             "/meta-ops",
 		FilteredMetaOps:         []models.FilteredMetaOps{{Filters: []models.Filters{cat}, MetaOps: []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "C"}}}},
 		FilteredMetaOpsFile:     "/filtered-meta-ops",
+		WriteNFO:                &yes,
 		OutputDir:               "/out",
 		MetaPurge:               "all",
 		MetarrConcurrency:       2,

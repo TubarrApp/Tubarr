@@ -20,8 +20,9 @@ const (
 
 // Metadata operations.
 const (
-	MetaOps = "--meta-ops"
-	MetaOW  = "--meta-overwrite"
+	MetaOps  = "--meta-ops"
+	MetaOW   = "--meta-overwrite"
+	WriteNFO = "--write-nfo"
 )
 
 // JSON/Video files and directories.

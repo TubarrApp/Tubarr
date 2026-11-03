@@ -99,7 +99,7 @@ func SetDownloadFlags(cmd *cobra.Command, retries *int, useGlobalCookies *bool, 
 }
 
 // SetMetarrFlags sets flags for interaction with the Metarr software.
-func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, purgeOriginalVideo *bool,
+func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int, purgeOriginalVideo, writeNFO *bool,
 	outputExt, extraFFmpegargs, minFreeMem, outDir, metaPurge, renameStyle, metaOpsFile,
 	filteredMetaOpsFile, filenameOpsFile, filteredFilenameOpsFile *string,
 	filenameOps, filteredFilenameOps, metaOps, filteredMetaOps *[]string) {
@@ -115,6 +115,9 @@ func SetMetarrFlags(cmd *cobra.Command, maxCPU *float64, metarrConcurrency *int,
 	// Booleans
 	if purgeOriginalVideo != nil {
 		cmd.Flags().BoolVar(purgeOriginalVideo, keys.MPurgeOriginalVideo, false, "Delete the original video once Metarr writes a new one from it (the default, false keeps it)")
+	}
+	if writeNFO != nil {
+		cmd.Flags().BoolVar(writeNFO, keys.MWriteNFO, false, "Write a sidecar .nfo file (Kodi/Jellyfin format) next to each finished video, named to match it")
 	}
 
 	// String

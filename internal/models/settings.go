@@ -73,6 +73,7 @@ type MetarrArgs struct {
 	MetaOpsFile         string            `json:"metarr_meta_ops_file"`
 	FilteredMetaOps     []FilteredMetaOps `json:"metarr_filtered_meta_ops"`
 	FilteredMetaOpsFile string            `json:"metarr_filtered_meta_ops_file"`
+	WriteNFO            *bool             `json:"metarr_write_nfo,omitempty"`
 
 	// Metarr output directories, and metadata files to delete after processing (all, json or nfo).
 	OutputDir string `json:"metarr_output_directory"`
@@ -360,6 +361,9 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 	if child.PurgeOriginalVideo != nil && (parent.PurgeOriginalVideo == nil || *parent.PurgeOriginalVideo != *child.PurgeOriginalVideo) {
 		return false
 	}
+	if child.WriteNFO != nil && (parent.WriteNFO == nil || *parent.WriteNFO != *child.WriteNFO) {
+		return false
+	}
 
 	// Numeric comparisons
 	if child.MetarrConcurrency != 0 && child.MetarrConcurrency != parent.MetarrConcurrency {
@@ -448,6 +452,9 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 		return false
 	}
 	if m.FilteredMetaOpsFile != "" {
+		return false
+	}
+	if m.WriteNFO != nil {
 		return false
 	}
 
