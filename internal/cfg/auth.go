@@ -4,10 +4,10 @@ import (
 	"errors"
 	"os"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/server/serverauth"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/spf13/cobra"
 )
 
@@ -39,8 +39,8 @@ func resetLoginCmd(ss contracts.TubarrSettingsStore) *cobra.Command {
 				return err
 			}
 			logger.Pl.S("Web interface login removed: the next visit to the web interface will ask for a new one")
-			if os.Getenv(consts.EnvWebPassword) != "" {
-				logger.Pl.W("%s is set, so the login is set again from it when Tubarr next starts", consts.EnvWebPassword)
+			if os.Getenv(sharedconsts.EnvTubarrWebPassword) != "" {
+				logger.Pl.W("%s is set, so the login is set again from it when Tubarr next starts", sharedconsts.EnvTubarrWebPassword)
 			}
 			return nil
 		},

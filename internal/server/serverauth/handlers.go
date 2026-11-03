@@ -10,6 +10,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -161,7 +162,7 @@ func (m *Manager) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		consts.AuthUsername:      username,
 		consts.AuthAPIKey:        apiKey,
 		consts.AuthLoginRequired: s.AuthMode != ModeNone,
-		consts.AuthLoginFromEnv:  os.Getenv(consts.EnvWebPassword) != "", // Set again at each start.
+		consts.AuthLoginFromEnv:  os.Getenv(sharedconsts.EnvTubarrWebPassword) != "", // Set again at each start.
 		consts.AuthModeFromEnv:   m.envMode != "",
 		consts.AuthAccess:        s,
 	})
@@ -175,7 +176,7 @@ func (m *Manager) handleSetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if m.envMode != "" && s.AuthMode != m.envMode {
-		http.Error(w, fmt.Sprintf("the login mode is set by --%s (%s), so it can't be changed here", keys.WebAuth, consts.EnvWebAuth), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("the login mode is set by --%s (%s), so it can't be changed here", keys.WebAuth, sharedconsts.EnvTubarrWebAuth), http.StatusBadRequest)
 		return
 	}
 	// Turning the login on before one exists would let whoever reached the page first create it.

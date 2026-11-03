@@ -28,22 +28,19 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	metaOps = parsing.FillChannelTags(metaOps, c, cu)
 	filenameOps = parsing.FillChannelTags(filenameOps, c, cu)
 
-	// 'Download As' args, blank ones using the channel URL's.
+	// 'Download As' args, blank ones using the channel URL's, except these boxes, which replace its as ops do.
 	var o models.MetarrArgs
+	m := cu.ChanURLMetarrArgs
+	videoCodecs := m.TranscodeVideoCodecs
+	audioCodecs := m.TranscodeAudioCodecs
+	videoArgs := m.TranscodeVideoArgs
+	extraArgs := m.ExtraFFmpegArgs
 	if v.Overrides != nil {
 		o = v.Overrides.MetarrArgs
-	}
-	m := cu.ChanURLMetarrArgs
-	videoCodecs, audioCodecs := m.TranscodeVideoCodecs, m.TranscodeAudioCodecs
-	if len(o.TranscodeVideoCodecs) > 0 {
 		videoCodecs = o.TranscodeVideoCodecs
-	}
-	if len(o.TranscodeAudioCodecs) > 0 {
 		audioCodecs = o.TranscodeAudioCodecs
-	}
-	videoArgs := m.TranscodeVideoArgs
-	if len(o.TranscodeVideoArgs) > 0 {
 		videoArgs = o.TranscodeVideoArgs
+		extraArgs = o.ExtraFFmpegArgs
 	}
 	gpu, gpuNode := cmp.Or(o.TranscodeGPU, m.TranscodeGPU), cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode)
 	if gpu == validation.GPUNone {
@@ -94,8 +91,8 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	add(metkeys.Ext, ext)
 	add(metkeys.RenameStyle, cmp.Or(o.RenameStyle, m.RenameStyle))
 
-	// Metarr keeps the original video unless told otherwise, and Tubarr deletes it unless the channel keeps it.
-	if m.PurgeOriginalVideo == nil || *m.PurgeOriginalVideo {
+	// Metarr keeps the original video unless told otherwise, and Tubarr deletes it unless 'Download As' or the channel keeps it.
+	if purge := cmp.Or(o.PurgeOriginalVideo, m.PurgeOriginalVideo); purge == nil || *purge {
 		args = append(args, metkeys.PurgeOriginalVideo)
 	}
 
@@ -105,7 +102,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Transcoding.
-	add(metkeys.ExtraFFmpegArgs, cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs))
+	add(metkeys.ExtraFFmpegArgs, extraArgs)
 	add(metkeys.TranscodeGPU, gpu)
 	add(metkeys.TranscodeGPUNode, gpuNode)
 	add(metkeys.Thumbnail, thumbnail)

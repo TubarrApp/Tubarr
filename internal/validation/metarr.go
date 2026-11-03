@@ -3,6 +3,7 @@ package validation
 import (
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"tubarr/internal/domain/keys"
@@ -121,8 +122,10 @@ func ValidateExtraFFmpegArgs(a string) error {
 	if err != nil {
 		return err
 	}
-	if blocked, option := sharedconsts.HasBlockedOptions(args, sharedconsts.BlockedFFmpegOptions); blocked {
-		return fmt.Errorf("option %q is not allowed", option)
+	if allowInsecureStr, allowInsecure := os.LookupEnv(sharedconsts.EnvAllowInsecureArguments); !allowInsecure || (allowInsecureStr == "" || (allowInsecureStr != "1" && allowInsecureStr != "true")) {
+		if blocked, option := sharedconsts.HasBlockedOptions(args, sharedconsts.BlockedFFmpegOptions); blocked {
+			return fmt.Errorf("option %q is not allowed", option)
+		}
 	}
 	if option, found := sharedparsing.EncoderOnlyOption(args); found {
 		return fmt.Errorf("%s only works when encoding a video, so it goes in Video Encoder Args (%s) instead, e.g. av1:%s",

@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
@@ -22,6 +21,8 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // runningFiles holds a map of files already being processed by Metarr.
@@ -59,8 +60,8 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 	}
 	if vars.MetarrLogToken != "" {
 		cmd.Env = append(cmd.Environ(),
-			consts.EnvLogToken+"="+vars.MetarrLogToken,
-			consts.EnvLogURL+"="+vars.MetarrLogURL)
+			sharedconsts.EnvTubarrLogToken+"="+vars.MetarrLogToken,
+			sharedconsts.EnvTubarrLogURL+"="+vars.MetarrLogURL)
 	}
 
 	if err := runMetarr(cmd, v); err != nil {

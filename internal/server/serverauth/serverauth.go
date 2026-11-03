@@ -21,10 +21,10 @@ import (
 	"sync"
 	"time"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -80,7 +80,7 @@ type accessConfig struct {
 func New(db *sql.DB, settings contracts.TubarrSettingsStore, envMode string) (*Manager, error) {
 	envMode = strings.ToLower(strings.TrimSpace(envMode))
 	if envMode != "" && !validMode(envMode) {
-		return nil, fmt.Errorf("invalid --%s (%s) %q: must be %q, %q or %q", keys.WebAuth, consts.EnvWebAuth, envMode, ModeRequired, ModeLocal, ModeNone)
+		return nil, fmt.Errorf("invalid --%s (%s) %q: must be %q, %q or %q", keys.WebAuth, sharedconsts.EnvTubarrWebAuth, envMode, ModeRequired, ModeLocal, ModeNone)
 	}
 	token, err := RandomToken()
 	if err != nil {
@@ -133,7 +133,7 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 		case !m.loginRequired() || m.skipsLoginFor(r):
 			// No login, so the host must be checked: another site's page could otherwise reach Tubarr by DNS rebinding.
 			if !m.hostAllowed(r.Host) {
-				http.Error(w, fmt.Sprintf("host %q is not allowed: add it under Settings > Web Interface Access or to %s, or use the server's IP address", r.Host, consts.EnvWebAllowedHosts), http.StatusForbidden)
+				http.Error(w, fmt.Sprintf("host %q is not allowed: add it under Settings > Web Interface Access or to %s, or use the server's IP address", r.Host, sharedconsts.EnvTubarrWebAllowedHosts), http.StatusForbidden)
 				return
 			}
 		case r.Header.Get(apiKeyHeader) != "":
@@ -351,7 +351,7 @@ func (m *Manager) setAccessConfig(mode string, skipLogin, allowedHosts, trustedP
 		return fmt.Errorf("trusted proxies: %w", err)
 	}
 	hosts := make(map[string]struct{}, len(allowedHosts))
-	for _, h := range slices.Concat(allowedHosts, strings.Split(os.Getenv(consts.EnvWebAllowedHosts), ",")) {
+	for _, h := range slices.Concat(allowedHosts, strings.Split(os.Getenv(sharedconsts.EnvTubarrWebAllowedHosts), ",")) {
 		if h = strings.ToLower(strings.TrimSpace(h)); h != "" {
 			hosts[h] = struct{}{}
 		}
@@ -389,18 +389,18 @@ func (m *Manager) setStringList(key string, list []string) error {
 
 // applyEnvLogin sets the login from the environment if a password is given there, with the saved username by default.
 func (m *Manager) applyEnvLogin() error {
-	password := os.Getenv(consts.EnvWebPassword)
+	password := os.Getenv(sharedconsts.EnvTubarrWebPassword)
 	if password == "" {
 		return nil
 	}
-	username := os.Getenv(consts.EnvWebUsername)
+	username := os.Getenv(sharedconsts.EnvTubarrWebUsername)
 	if username == "" {
 		current, _, err := m.settings.GetSetting(keys.WebUsername)
 		if err != nil {
 			return err
 		}
 		if current == "" {
-			return fmt.Errorf("%s also needs %s when no login has been set up yet", consts.EnvWebPassword, consts.EnvWebUsername)
+			return fmt.Errorf("%s also needs %s when no login has been set up yet", sharedconsts.EnvTubarrWebPassword, sharedconsts.EnvTubarrWebUsername)
 		}
 		username = current
 	}
@@ -408,9 +408,9 @@ func (m *Manager) applyEnvLogin() error {
 		return nil // The stored login already matches, so sessions are kept.
 	}
 	if err := m.setLogin(username, password); err != nil {
-		return fmt.Errorf("failed to set web login from %s: %w", consts.EnvWebPassword, err)
+		return fmt.Errorf("failed to set web login from %s: %w", sharedconsts.EnvTubarrWebPassword, err)
 	}
-	logger.Pl.I("Web interface login for %q set from %s", username, consts.EnvWebPassword)
+	logger.Pl.I("Web interface login for %q set from %s", username, sharedconsts.EnvTubarrWebPassword)
 	return nil
 }
 

@@ -152,6 +152,17 @@ func TestDownloadAsMetarrFields(t *testing.T) {
 	}
 	reportDiff(t, "download-as.html", "fields", boundNames, "metarrKeys", reloaded)
 
+	// The boxes filled with the channel URL's must be fields the dialog reloads.
+	boxes := regexp.MustCompile(`metarrBoxes: \[([^\]]*)\]`).FindStringSubmatch(src)
+	if boxes == nil {
+		t.Fatal("download-as.html has no metarrBoxes")
+	}
+	for _, s := range regexp.MustCompile(`'(\w+)'`).FindAllStringSubmatch(boxes[1], -1) {
+		if !slices.Contains(reloaded, s[1]) {
+			t.Errorf("download-as.html: metarrBoxes has %q, which isn't in metarrKeys", s[1])
+		}
+	}
+
 	kinds := fieldKinds(metarrArgsInput{})
 	for _, k := range boundNames {
 		kind, ok := kinds[k]

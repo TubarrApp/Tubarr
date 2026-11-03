@@ -101,6 +101,7 @@ podman run -d \
 | `TUBARR_WEB_TLS_KEY` | | Path to the PEM private key, if not combined with the certificate |
 | `TUBARR_WEB_USERNAME` / `TUBARR_WEB_PASSWORD` | | Sets the web login at every start while set, e.g. to reset a forgotten password. The password alone keeps the saved username, but both are needed when no login exists yet |
 | `TUBARR_WEB_ALLOWED_HOSTS` | | Comma-separated hostnames allowed alongside those under **Settings > Web Interface Access**, e.g. a reverse proxy's when the login is off |
+| `ALLOW_INSECURE_ARGUMENTS` | | `1` or `true` turns off the blocklist on extra yt-dlp arguments, Extra FFmpeg Args and Video Encoder Args. **Insecure:** anyone who can edit these settings can run commands in the container through options like yt-dlp's `--exec` |
 
 ## Port Mapping
 

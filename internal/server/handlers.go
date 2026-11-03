@@ -1899,7 +1899,7 @@ func (ss *serverStore) handleGetTLS(w http.ResponseWriter, r *http.Request) {
 // handleSetTLS updates (or, given an empty certificate path, clears) the custom HTTPS certificate.
 func (ss *serverStore) handleSetTLS(w http.ResponseWriter, r *http.Request) {
 	if _, _, locked := tlsPaths(nil); locked {
-		http.Error(w, "certificate is set by --"+keys.WebTLSCert+" or "+consts.EnvWebTLSCert+", change it there", http.StatusConflict)
+		http.Error(w, "certificate is set by --"+keys.WebTLSCert+" or "+sharedconsts.EnvTubarrWebTLSCert+", change it there", http.StatusConflict)
 		return
 	}
 	certPath := strings.TrimSpace(r.FormValue("cert"))
@@ -1935,7 +1935,7 @@ func (ss *serverStore) handleSetTLS(w http.ResponseWriter, r *http.Request) {
 // handleSetHTTPSEnabled saves whether to serve HTTPS, applied when Tubarr restarts.
 func (ss *serverStore) handleSetHTTPSEnabled(w http.ResponseWriter, r *http.Request) {
 	if _, locked := httpsSetting(nil); locked {
-		http.Error(w, "HTTPS is set by --"+keys.WebHTTPS+" or "+consts.EnvWebHTTPS+", change it there", http.StatusConflict)
+		http.Error(w, "HTTPS is set by --"+keys.WebHTTPS+" or "+sharedconsts.EnvTubarrWebHTTPS+", change it there", http.StatusConflict)
 		return
 	}
 	enabled, err := strconv.ParseBool(r.FormValue("enabled"))

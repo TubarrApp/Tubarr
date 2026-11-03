@@ -19,6 +19,8 @@ import (
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/models"
 	"tubarr/internal/repo"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // The web pages name every field and request key in plain HTML and JavaScript, separately from the handlers. These
@@ -1307,8 +1309,8 @@ func pageRequests() []pageRequest {
 			}
 		}},
 		{path: "/api/v1/settings/tls", keys: []string{"cert", "key"}, replay: func(t *testing.T) {
-			if os.Getenv(consts.EnvWebTLSCert) != "" {
-				t.Skip("certificate set by " + consts.EnvWebTLSCert)
+			if os.Getenv(sharedconsts.EnvTubarrWebTLSCert) != "" {
+				t.Skip("certificate set by " + sharedconsts.EnvTubarrWebTLSCert)
 			}
 			pem, err := generateSelfSigned("localhost")
 			if err != nil {
@@ -1328,8 +1330,8 @@ func pageRequests() []pageRequest {
 			}
 		}},
 		{path: "/api/v1/settings/tls/enabled", keys: []string{"enabled"}, replay: func(t *testing.T) {
-			if os.Getenv(consts.EnvWebHTTPS) != "" {
-				t.Skip("HTTPS set by " + consts.EnvWebHTTPS)
+			if os.Getenv(sharedconsts.EnvTubarrWebHTTPS) != "" {
+				t.Skip("HTTPS set by " + sharedconsts.EnvTubarrWebHTTPS)
 			}
 			if w := sendForm(t, put, "/api/v1/settings/tls/enabled", url.Values{"enabled": {"true"}}); w.Code != http.StatusOK {
 				t.Fatalf("turning HTTPS on = %d %s", w.Code, w.Body.String())

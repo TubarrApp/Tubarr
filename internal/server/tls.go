@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
@@ -40,7 +39,7 @@ func httpsSetting(tss contracts.TubarrSettingsStore) (on, locked bool) {
 	if viper.IsSet(keys.WebHTTPS) {
 		return viper.GetBool(keys.WebHTTPS), true
 	}
-	if env := strings.TrimSpace(os.Getenv(consts.EnvWebHTTPS)); env != "" {
+	if env := strings.TrimSpace(os.Getenv(sharedconsts.EnvTubarrWebHTTPS)); env != "" {
 		on, _ = strconv.ParseBool(env)
 		return on, true
 	}
@@ -61,8 +60,8 @@ func tlsPaths(tss contracts.TubarrSettingsStore) (certPath, keyPath string, lock
 	if certPath = strings.TrimSpace(viper.GetString(keys.WebTLSCert)); certPath != "" {
 		return certPath, strings.TrimSpace(viper.GetString(keys.WebTLSKey)), true
 	}
-	if certPath = strings.TrimSpace(os.Getenv(consts.EnvWebTLSCert)); certPath != "" {
-		return certPath, strings.TrimSpace(os.Getenv(consts.EnvWebTLSKey)), true
+	if certPath = strings.TrimSpace(os.Getenv(sharedconsts.EnvTubarrWebTLSCert)); certPath != "" {
+		return certPath, strings.TrimSpace(os.Getenv(sharedconsts.EnvTubarrWebTLSKey)), true
 	}
 	if tss == nil {
 		return "", "", false

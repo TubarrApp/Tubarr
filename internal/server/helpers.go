@@ -972,16 +972,6 @@ func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		m.OutputExt = cmp.Or(m.OutputExt, u.OutputExt)
 		m.TranscodeGPU = cmp.Or(m.TranscodeGPU, u.TranscodeGPU)
 		m.TranscodeGPUNode = cmp.Or(m.TranscodeGPUNode, u.TranscodeGPUNode)
-		if len(m.TranscodeVideoCodecs) == 0 {
-			m.TranscodeVideoCodecs = u.TranscodeVideoCodecs
-		}
-		if len(m.TranscodeAudioCodecs) == 0 {
-			m.TranscodeAudioCodecs = u.TranscodeAudioCodecs
-		}
-		if len(m.TranscodeVideoArgs) == 0 {
-			m.TranscodeVideoArgs = u.TranscodeVideoArgs
-		}
-		m.ExtraFFmpegArgs = cmp.Or(m.ExtraFFmpegArgs, u.ExtraFFmpegArgs)
 	}
 	if err := validation.ValidateMetarrArgsCombination(&m); err != nil {
 		return fmt.Errorf("invalid post-processing options: %w", err)
@@ -993,7 +983,7 @@ func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLI
 }
 
 // matchesChannelURL reports whether Download As options give the video nothing its channel URL doesn't already, so they
-// aren't overrides. Blank options use the channel URL's, and the op boxes replace its ops.
+// aren't overrides. Blank options use the channel URL's, and the op and transcode boxes replace its.
 func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLID int64, o *models.VideoOverrides) bool {
 	// The channel URL's settings and ops, as Download As shows them.
 	file.UpdateFromConfigFile(cs, c)
@@ -1021,6 +1011,7 @@ func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLI
 	// Every other option blank or the channel URL's, merged as yt-dlp and Metarr get them.
 	s, m := cu.ChanURLSettings, cu.ChanURLMetarrArgs
 	writesNFO := m.WriteNFO != nil && *m.WriteNFO
+	purgesOriginal := m.PurgeOriginalVideo == nil || *m.PurgeOriginalVideo
 	return cmp.Or(o.VideoDir, s.VideoDir) == s.VideoDir &&
 		cmp.Or(o.JSONDir, s.JSONDir) == s.JSONDir &&
 		cmp.Or(o.YtdlpOutputExt, s.YtdlpOutputExt) == s.YtdlpOutputExt &&
@@ -1033,14 +1024,15 @@ func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		cmp.Or(o.RenameStyle, m.RenameStyle) == m.RenameStyle &&
 		cmp.Or(o.MetaPurge, m.MetaPurge) == m.MetaPurge &&
 		(o.WriteNFO == nil || *o.WriteNFO == writesNFO) &&
+		(o.PurgeOriginalVideo == nil || *o.PurgeOriginalVideo == purgesOriginal) &&
 		cmp.Or(o.MaxCPU, m.MaxCPU) == m.MaxCPU &&
 		cmp.Or(o.MinFreeMem, m.MinFreeMem) == m.MinFreeMem &&
 		cmp.Or(o.TranscodeGPU, m.TranscodeGPU) == m.TranscodeGPU &&
 		cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode) == m.TranscodeGPUNode &&
-		cmp.Or(o.ExtraFFmpegArgs, m.ExtraFFmpegArgs) == m.ExtraFFmpegArgs &&
-		(len(o.TranscodeVideoCodecs) == 0 || slices.Equal(o.TranscodeVideoCodecs, m.TranscodeVideoCodecs)) &&
-		(len(o.TranscodeAudioCodecs) == 0 || slices.Equal(o.TranscodeAudioCodecs, m.TranscodeAudioCodecs)) &&
-		(len(o.TranscodeVideoArgs) == 0 || slices.Equal(o.TranscodeVideoArgs, m.TranscodeVideoArgs))
+		o.ExtraFFmpegArgs == m.ExtraFFmpegArgs &&
+		slices.Equal(o.TranscodeVideoCodecs, m.TranscodeVideoCodecs) &&
+		slices.Equal(o.TranscodeAudioCodecs, m.TranscodeAudioCodecs) &&
+		slices.Equal(o.TranscodeVideoArgs, m.TranscodeVideoArgs)
 }
 
 // splitNonEmptyLines splits a string by newlines and filters out empty lines.

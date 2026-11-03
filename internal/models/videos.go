@@ -62,7 +62,8 @@ type VideoOverrides struct {
 	YTDLPPreferredVideoCodecs []string `json:"ytdlp_preferred_video_codecs,omitempty"`
 	YTDLPPreferredAudioCodecs []string `json:"ytdlp_preferred_audio_codecs,omitempty"`
 
-	MetarrArgs // Ops replace the channel URL's. Other blank fields use the channel URL's.
+	// Ops, transcode codecs, encoder args and extra FFmpeg args replace the channel URL's. Other blank fields use the channel URL's.
+	MetarrArgs
 }
 
 // OverrideLines holds a video's overrides as edited in the Download As dialog, with ops and codecs newline-separated.

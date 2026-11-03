@@ -6,6 +6,14 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
+// ViperValidConfigExts lists Viper supported config extensions.
+var ViperValidConfigExts = map[string]struct{}{
+	".yaml": {},
+	".yml":  {},
+	".toml": {},
+	".json": {},
+}
+
 // BotActivitySentinel is a sentinel included by the dev in errors for functions to find when
 // an error has determined that a domain has blocked crawling due to detecting bot activity.
 const BotActivitySentinel = "detected bot activity"

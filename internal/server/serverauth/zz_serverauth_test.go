@@ -10,12 +10,12 @@ import (
 	"strings"
 	"testing"
 	"tubarr/internal/database"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/repo"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -349,12 +349,12 @@ func TestEnvLogin(t *testing.T) {
 		return m
 	}
 
-	t.Setenv(consts.EnvWebPassword, "env password")
-	if _, err := New(db, settings, ""); err == nil || !strings.Contains(err.Error(), consts.EnvWebUsername) {
-		t.Fatalf("password alone with no login = %v, want an error naming %s", err, consts.EnvWebUsername)
+	t.Setenv(sharedconsts.EnvTubarrWebPassword, "env password")
+	if _, err := New(db, settings, ""); err == nil || !strings.Contains(err.Error(), sharedconsts.EnvTubarrWebUsername) {
+		t.Fatalf("password alone with no login = %v, want an error naming %s", err, sharedconsts.EnvTubarrWebUsername)
 	}
 
-	t.Setenv(consts.EnvWebUsername, "envuser")
+	t.Setenv(sharedconsts.EnvTubarrWebUsername, "envuser")
 	m := start()
 	if ok, _ := m.checkLogin("envuser", "env password"); !ok {
 		t.Fatal("environment login wasn't set")
@@ -369,8 +369,8 @@ func TestEnvLogin(t *testing.T) {
 		t.Error("restarting with the same environment login ended the session")
 	}
 
-	t.Setenv(consts.EnvWebUsername, "")
-	t.Setenv(consts.EnvWebPassword, "new env password")
+	t.Setenv(sharedconsts.EnvTubarrWebUsername, "")
+	t.Setenv(sharedconsts.EnvTubarrWebPassword, "new env password")
 	m = start()
 	if ok, _ := m.checkLogin("envuser", "new env password"); !ok {
 		t.Error("password alone didn't reset the saved login's password")

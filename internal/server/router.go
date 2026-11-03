@@ -19,13 +19,13 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/queue"
 	"tubarr/internal/server/serverauth"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/spf13/viper"
@@ -57,7 +57,7 @@ const (
 func listenAddress() string {
 	addr := cmp.Or(
 		strings.TrimSpace(viper.GetString(keys.WebAddress)),
-		strings.TrimSpace(os.Getenv(consts.EnvWebAddress)),
+		strings.TrimSpace(os.Getenv(sharedconsts.EnvTubarrWebAddress)),
 		defaultTubarrUIAddress)
 
 	return withDefaultPort(addr)
@@ -249,7 +249,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 // StartServer starts the HTTP server on the specified port with graceful shutdown.
 func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, store contracts.Store, dq *queue.DownloadQueue, pp *queue.PostProcessingQueue, d *sql.DB) error {
 	// The --web-auth flag or TUBARR_WEB_AUTH override the login mode saved on the Settings page.
-	access, err := serverauth.New(d, store.TubarrSettingsStore(), cmp.Or(viper.GetString(keys.WebAuth), os.Getenv(consts.EnvWebAuth)))
+	access, err := serverauth.New(d, store.TubarrSettingsStore(), cmp.Or(viper.GetString(keys.WebAuth), os.Getenv(sharedconsts.EnvTubarrWebAuth)))
 	if err != nil {
 		return fmt.Errorf("failed to set up web interface access: %w", err)
 	}

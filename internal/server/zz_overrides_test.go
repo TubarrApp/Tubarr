@@ -61,7 +61,25 @@ func TestParseOverrideLinesYtdlpOptions(t *testing.T) {
 	}
 }
 
-// TestCheckOverridesFit tests that Download As options are checked together with the channel URL's they leave blank.
+// TestParseOverrideLinesTurnOffOptions tests the dialog's choices that turn off a channel URL's setting are accepted, as
+// its body decodes.
+func TestParseOverrideLinesTurnOffOptions(t *testing.T) {
+	var input metarrArgsInput
+	body := `{"metarr_output_ext":"same","metarr_rename_style":"skip","metarr_purge_metafile":"keep","metarr_purge_original_video":false}`
+	if err := json.Unmarshal([]byte(body), &input); err != nil {
+		t.Fatal(err)
+	}
+	o, err := parseOverrideLines(&models.OverrideLines{}, &input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.OutputExt != "same" || o.RenameStyle != "skip" || o.MetaPurge != "keep" || o.PurgeOriginalVideo == nil || *o.PurgeOriginalVideo {
+		t.Errorf("got %+v", o.MetarrArgs)
+	}
+}
+
+// TestCheckOverridesFit tests that Download As options are checked together with the channel URL's they leave blank, and
+// that its transcode boxes replace the channel URL's.
 func TestCheckOverridesFit(t *testing.T) {
 	c := &models.Channel{URLModels: []*models.ChannelURL{
 		{ID: 1, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeVideoCodecs: []string{"h264"}}},
@@ -75,7 +93,8 @@ func TestCheckOverridesFit(t *testing.T) {
 		o     models.MetarrArgs
 		fits  bool
 	}{
-		{"webm over the URL's h264", 1, models.MetarrArgs{OutputExt: "webm"}, false},
+		{"webm over the URL's h264", 1, models.MetarrArgs{OutputExt: "webm", TranscodeVideoCodecs: []string{"h264"}}, false},
+		{"webm with the URL's h264 removed", 1, models.MetarrArgs{OutputExt: "webm"}, true},
 		{"webm replacing the URL's h264 with vp9", 1, models.MetarrArgs{OutputExt: "webm", TranscodeVideoCodecs: []string{"vp9"}}, true},
 		{"h264 under the URL's webm", 2, models.MetarrArgs{TranscodeVideoCodecs: []string{"h264"}}, false},
 		{"mp4 replacing the URL's webm", 2, models.MetarrArgs{OutputExt: "mp4", TranscodeVideoCodecs: []string{"h264"}}, true},
@@ -83,10 +102,11 @@ func TestCheckOverridesFit(t *testing.T) {
 		{"a copy line", 1, models.MetarrArgs{TranscodeVideoArgs: []string{"copy:-crf 20"}}, false},
 		{"an NVENC preset with no GPU", 1, models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}}, false},
 		{"an NVENC preset under the URL's GPU", 5, models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}}, true},
-		{"the URL's NVENC preset with its GPU", 5, models.MetarrArgs{OutputExt: "mp4"}, true},
-		{"the URL's NVENC preset with the GPU turned off", 5, models.MetarrArgs{TranscodeGPU: "none"}, false},
-		{"copied audio under the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}}, false},
-		{"another audio codec under the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"ac3"}}, true},
+		{"the URL's NVENC preset with the GPU turned off", 5, models.MetarrArgs{TranscodeGPU: "none", TranscodeVideoArgs: []string{"av1:-preset p5"}}, false},
+		{"the URL's NVENC preset removed with the GPU turned off", 5, models.MetarrArgs{TranscodeGPU: "none"}, true},
+		{"copied audio with the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}, ExtraFFmpegArgs: "-af volume=0.5"}, false},
+		{"copied audio with the URL's audio filter removed", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}}, true},
+		{"another audio codec with the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"ac3"}, ExtraFFmpegArgs: "-af volume=0.5"}, true},
 	}
 	for _, tt := range tests {
 		err := checkOverridesFit(&repo.ChannelStore{}, c, tt.urlID, &models.VideoOverrides{MetarrArgs: tt.o})
@@ -199,6 +219,31 @@ func TestMatchesChannelURL(t *testing.T) {
 	}
 	cu.ChanURLMetarrArgs.WriteNFO = nil
 
+	// A Keep Original Video Files choice is an override only if it differs from what the channel URL does, unset meaning
+	// the original is deleted.
+	for _, tt := range []struct {
+		name     string
+		url, got *bool
+		matches  bool
+	}{
+		{"unset on both", nil, nil, true},
+		{"kept over unset", nil, &no, false},
+		{"deleted over unset", nil, &yes, true},
+		{"unset over kept", &no, nil, true},
+		{"kept over kept", &no, &no, true},
+		{"deleted over kept", &no, &yes, false},
+		{"kept over deleted", &yes, &no, false},
+		{"deleted over deleted", &yes, &yes, true},
+	} {
+		cu.ChanURLMetarrArgs.PurgeOriginalVideo = tt.url
+		o := *sent
+		o.PurgeOriginalVideo = tt.got
+		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+			t.Errorf("Keep Original Video Files, %s: got match %t, want %t", tt.name, got, tt.matches)
+		}
+	}
+	cu.ChanURLMetarrArgs.PurgeOriginalVideo = nil
+
 	// The op boxes replace the channel URL's ops, so emptying or adding to them makes overrides.
 	moreOps, err := parsing.ParseMetaOps([]string{"title:prefix:[Cats] ", "album:set:Pets"})
 	if err != nil {
@@ -209,6 +254,40 @@ func TestMatchesChannelURL(t *testing.T) {
 		o.MetaOps = ops
 		if matchesChannelURL(cs, c, cu.ID, &o) {
 			t.Errorf("meta ops %s matched the channel URL's", name)
+		}
+	}
+
+	// The transcode boxes replace the channel URL's too, so they only match when sent back as loaded.
+	videoCodecs := []string{"h264:av1"}
+	audioCodecs := []string{"aac"}
+	videoArgs := []string{"av1:-pix_fmt yuv420p10le"}
+	extraArgs := "-map_metadata 0"
+	cu.ChanURLMetarrArgs.TranscodeVideoCodecs = videoCodecs
+	cu.ChanURLMetarrArgs.TranscodeAudioCodecs = audioCodecs
+	cu.ChanURLMetarrArgs.TranscodeVideoArgs = videoArgs
+	cu.ChanURLMetarrArgs.ExtraFFmpegArgs = extraArgs
+	for _, tt := range []struct {
+		name    string
+		video   []string
+		audio   []string
+		args    []string
+		extra   string
+		matches bool
+	}{
+		{"sent back as loaded", videoCodecs, audioCodecs, videoArgs, extraArgs, true},
+		{"video codecs emptied", nil, audioCodecs, videoArgs, extraArgs, false},
+		{"audio codecs emptied", videoCodecs, nil, videoArgs, extraArgs, false},
+		{"encoder args emptied", videoCodecs, audioCodecs, nil, extraArgs, false},
+		{"extra args emptied", videoCodecs, audioCodecs, videoArgs, "", false},
+		{"encoder args edited", videoCodecs, audioCodecs, []string{"av1:-crf 40"}, extraArgs, false},
+	} {
+		o := *sent
+		o.TranscodeVideoCodecs = tt.video
+		o.TranscodeAudioCodecs = tt.audio
+		o.TranscodeVideoArgs = tt.args
+		o.ExtraFFmpegArgs = tt.extra
+		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+			t.Errorf("transcode boxes, %s: got match %t, want %t", tt.name, got, tt.matches)
 		}
 	}
 }

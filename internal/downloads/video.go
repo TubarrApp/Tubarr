@@ -130,8 +130,12 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 		}
 
 		// Refuse extra yt-dlp arguments containing disallowed options.
-		if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
-			logger.Pl.W("Refusing extra YT-DLP arguments for video URL %q: Option %q is not allowed for YT-DLP.", d.Video.URL, blockedKey)
+		if allowInsecureStr, allowInsecure := os.LookupEnv(sharedconsts.EnvAllowInsecureArguments); !allowInsecure || (allowInsecureStr == "" || (allowInsecureStr != "1" && allowInsecureStr != "true")) {
+			if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
+				logger.Pl.W("Refusing extra YT-DLP arguments for video URL %q: Option %q is not allowed for YT-DLP.", d.Video.URL, blockedKey)
+			} else {
+				args = append(args, extraArgs...)
+			}
 		} else {
 			args = append(args, extraArgs...)
 		}

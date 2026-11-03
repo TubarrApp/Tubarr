@@ -9,7 +9,6 @@ import (
 	"strings"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
@@ -140,11 +139,11 @@ func InitCommands(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 
 	// Web interface flags (always registered, flags aren't parsed until Execute).
 	rootCmd.PersistentFlags().Bool(keys.RunWebInterface, false, "Run Tubarr as a web interface")
-	rootCmd.PersistentFlags().String(keys.WebAddress, "", "Address for the web interface to listen on (default 127.0.0.1:8827, or :8827 in Docker; env "+consts.EnvWebAddress+")")
-	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login, overriding the Settings page: 'required', 'local' (no login from localhost) or 'none', e.g. behind a reverse proxy with its own login (env "+consts.EnvWebAuth+")")
-	rootCmd.PersistentFlags().Bool(keys.WebHTTPS, false, "Serve the web interface over HTTPS, overriding the Settings page (env "+consts.EnvWebHTTPS+")")
-	rootCmd.PersistentFlags().String(keys.WebTLSCert, "", "HTTPS certificate path, PEM with or without the key, overriding the Settings page (env "+consts.EnvWebTLSCert+")")
-	rootCmd.PersistentFlags().String(keys.WebTLSKey, "", "HTTPS private key path, if not in the --"+keys.WebTLSCert+" file (env "+consts.EnvWebTLSKey+")")
+	rootCmd.PersistentFlags().String(keys.WebAddress, "", "Address for the web interface to listen on (default 127.0.0.1:8827, or :8827 in Docker; env "+sharedconsts.EnvTubarrWebAddress+")")
+	rootCmd.PersistentFlags().String(keys.WebAuth, "", "Web interface login, overriding the Settings page: 'required', 'local' (no login from localhost) or 'none', e.g. behind a reverse proxy with its own login (env "+sharedconsts.EnvTubarrWebAuth+")")
+	rootCmd.PersistentFlags().Bool(keys.WebHTTPS, false, "Serve the web interface over HTTPS, overriding the Settings page (env "+sharedconsts.EnvTubarrWebHTTPS+")")
+	rootCmd.PersistentFlags().String(keys.WebTLSCert, "", "HTTPS certificate path, PEM with or without the key, overriding the Settings page (env "+sharedconsts.EnvTubarrWebTLSCert+")")
+	rootCmd.PersistentFlags().String(keys.WebTLSKey, "", "HTTPS private key path, if not in the --"+keys.WebTLSCert+" file (env "+sharedconsts.EnvTubarrWebTLSKey+")")
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err
 	}
