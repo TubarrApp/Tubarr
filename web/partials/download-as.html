@@ -123,6 +123,8 @@ download-as-cancel if Download As closes without starting. -->
             </button>
           </div>
           <textarea x-model="form[box.key]" rows="3" :placeholder="box.placeholder" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-700 dark:text-white/90"></textarea>
+          <p x-show="box.key === 'filename_ops' && filenameReplacesSetOp" class="mt-1 text-xs text-warning-600 dark:text-warning-500">The Filename above replaces the set op here, so the op won't run. Clear Filename to use it.</p>
+          <p x-show="box.key === 'filtered_filename_ops' && filenameMayReplaceFilteredSetOp" class="mt-1 text-xs text-warning-600 dark:text-warning-500">The Filename above replaces any set op here whose filters match, so that op won't run. Clear Filename to use it.</p>
         </div>
       </template>
       <details x-show="mode === 'download'">
@@ -337,6 +339,16 @@ download-as-cancel if Download As closes without starting. -->
       // Several videos share the options, so they get no filename or custom thumbnail.
       get multiple() {
         return this.videos.length > 1;
+      },
+
+      // A filled-in filename replaces any set op in the filename ops.
+      get filenameReplacesSetOp() {
+        return this.form.filename?.trim() && (this.form.filename_ops || '').split('\n').some(l => l.trimStart().toLowerCase().startsWith('set:'));
+      },
+
+      // It also replaces a filtered set op whose filters match, which can't be known until the video's metadata is read.
+      get filenameMayReplaceFilteredSetOp() {
+        return this.form.filename?.trim() && /[^\\](\|\||&&) *set:/i.test(this.form.filtered_filename_ops || '');
       },
 
       // Opens for a video, filled with its earlier edits, else its channel URL's ops. Several videos open with the ops.
