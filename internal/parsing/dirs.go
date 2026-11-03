@@ -179,8 +179,8 @@ func (dp *DirectoryParser) replaceTemplateTags(tag string) (string, error) {
 
 	// Metarr tags are left for Metarr to fill.
 	if _, ok := sharedtemplates.MetarrTemplateTags[name]; ok {
-		if _, err := exec.LookPath("metarr"); err != nil {
-			return "", fmt.Errorf("templating: tag %q detected as metarr tag but metarr $PATH not valid: %w", tag, err)
+		if _, err := exec.LookPath(sharedconsts.ProgramMetarr); err != nil {
+			return "", fmt.Errorf("templating: tag %q detected as Metarr tag but Metarr $PATH not valid: %w", tag, err)
 		}
 		if directive != "" {
 			name += ":" + directive

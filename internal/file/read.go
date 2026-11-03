@@ -186,5 +186,11 @@ func LoadMetarrLogs() [][]byte {
 		lines = lines[len(lines)-vars.MaxMetarrLogs:]
 	}
 
+	// Check scanner errors.
+	if scanner.Err() != nil {
+		logger.Pl.E("Failed to read Metarr log file at %q: %v", paths.MetarrLogFilePath, scanner.Err().Error())
+		return nil
+	}
+
 	return lines
 }

@@ -66,6 +66,8 @@ func TestCheckOverridesFit(t *testing.T) {
 	c := &models.Channel{URLModels: []*models.ChannelURL{
 		{ID: 1, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeVideoCodecs: []string{"h264"}}},
 		{ID: 2, ChanURLMetarrArgs: &models.MetarrArgs{OutputExt: "webm"}},
+		{ID: 4, ChanURLMetarrArgs: &models.MetarrArgs{ExtraFFmpegArgs: "-af volume=0.5", TranscodeAudioCodecs: []string{"aac"}}},
+		{ID: 5, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeGPU: "cuda", TranscodeVideoArgs: []string{"av1:-preset p5"}}},
 	}}
 	tests := []struct {
 		name  string
@@ -78,6 +80,13 @@ func TestCheckOverridesFit(t *testing.T) {
 		{"h264 under the URL's webm", 2, models.MetarrArgs{TranscodeVideoCodecs: []string{"h264"}}, false},
 		{"mp4 replacing the URL's webm", 2, models.MetarrArgs{OutputExt: "mp4", TranscodeVideoCodecs: []string{"h264"}}, true},
 		{"unknown URL", 3, models.MetarrArgs{OutputExt: "webm"}, true},
+		{"a copy line", 1, models.MetarrArgs{TranscodeVideoArgs: []string{"copy:-crf 20"}}, false},
+		{"an NVENC preset with no GPU", 1, models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}}, false},
+		{"an NVENC preset under the URL's GPU", 5, models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}}, true},
+		{"the URL's NVENC preset with its GPU", 5, models.MetarrArgs{OutputExt: "mp4"}, true},
+		{"the URL's NVENC preset with the GPU turned off", 5, models.MetarrArgs{TranscodeGPU: "none"}, false},
+		{"copied audio under the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}}, false},
+		{"another audio codec under the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"ac3"}}, true},
 	}
 	for _, tt := range tests {
 		err := checkOverridesFit(&repo.ChannelStore{}, c, tt.urlID, &models.VideoOverrides{MetarrArgs: tt.o})

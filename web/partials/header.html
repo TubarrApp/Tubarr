@@ -21,8 +21,11 @@
     return `${Math.round(bits)} bps`;
   };
 
+  // thumbChanged holds when this page last changed each video's thumbnail, by ID, so the browser loads the new image.
+  window.thumbChanged = {};
+
   // videoThumb returns Tubarr's address for a video's thumbnail (Download As, else crawled), or null if it has none.
-  window.videoThumb = (v) => (v.custom_thumbnail || safeURL(v.thumbnail_url) ? `${window.location.origin}/api/v1/videos/${v.id}/thumbnail` : null);
+  window.videoThumb = (v) => (v.custom_thumbnail || safeURL(v.thumbnail_url) ? `${window.location.origin}/api/v1/videos/${v.id}/thumbnail${window.thumbChanged[v.id] ? `?t=${window.thumbChanged[v.id]}` : ''}` : null);
 
   // Send the page to the login screen when an API call finds the session has ended.
   (() => {

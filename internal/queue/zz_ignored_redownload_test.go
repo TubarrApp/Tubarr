@@ -12,6 +12,7 @@ import (
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 const filteredVideoURL = "https://example.com/v/filtered-out"
@@ -78,7 +79,7 @@ func TestFilteredVideoMetadataFails(t *testing.T) {
 
 	// yt-dlp fails.
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "yt-dlp"), []byte("#!/bin/sh\necho 'ERROR: the site is down' >&2\nexit 1\n"), 0o700); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, sharedconsts.ProgramYTDLP), []byte("#!/bin/sh\necho 'ERROR: the site is down' >&2\nexit 1\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))

@@ -53,6 +53,9 @@ func (cs *ChannelStore) AddProfile(p *models.Profile) error {
 	if err := validation.ValidateMetarrArgsCombination(p.ProfileMetarrArgs); err != nil {
 		return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidProfile, err)
 	}
+	if err := validation.ValidateEncoderArgLines(p.ProfileMetarrArgs.TranscodeVideoArgs); err != nil {
+		return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidProfile, err)
+	}
 	settingsJSON, metarrJSON, err := marshalProfile(p)
 	if err != nil {
 		return err
@@ -111,6 +114,9 @@ func (cs *ChannelStore) updateProfile(p *models.Profile) error {
 		return fmt.Errorf("%w: invalid Metarr settings: %w", contracts.ErrInvalidProfile, err)
 	}
 	if err := validation.ValidateMetarrArgsCombination(p.ProfileMetarrArgs); err != nil {
+		return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidProfile, err)
+	}
+	if err := validation.ValidateEncoderArgLines(p.ProfileMetarrArgs.TranscodeVideoArgs); err != nil {
 		return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidProfile, err)
 	}
 	if err := checkFiles(settingsFiles(old.ProfileSettings, old.ProfileMetarrArgs), settingsFiles(p.ProfileSettings, p.ProfileMetarrArgs)); err != nil {

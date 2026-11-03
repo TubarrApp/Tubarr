@@ -16,6 +16,7 @@ import (
 	"tubarr/internal/state"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // crawlConfigChannel adds a due channel reading a config file, with a fake yt-dlp finding no videos, returning its ID and
@@ -28,7 +29,7 @@ func crawlConfigChannel(t *testing.T, name string) (id int64, runs, cfg string) 
 	bin := t.TempDir()
 	runs = filepath.Join(bin, "runs")
 	script := "#!/bin/sh\necho run >> '" + runs + "'\necho '{\"entries\":[]}'\n"
-	if err := os.WriteFile(filepath.Join(bin, "yt-dlp"), []byte(script), 0o700); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, sharedconsts.ProgramYTDLP), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))

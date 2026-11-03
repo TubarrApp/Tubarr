@@ -353,9 +353,9 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 
 		// Add -J and URL to finalize command
 		args = append(args, command.OutputJSON, command.EndOfOptions, channelURL)
-		cmd := exec.CommandContext(ctx, command.YTDLP, args...)
+		cmd := exec.CommandContext(ctx, sharedconsts.ProgramYTDLP, args...)
 
-		logger.Pl.I("Executing YTDLP playlist fetch command for channel %q URL %q:\n\n%s\n", channelName, channelURL, cmd.String())
+		logger.Pl.I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", channelName, channelURL, cmd.String())
 
 		var err error
 		if j, err = cmd.Output(); err == nil {
@@ -376,7 +376,7 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 		}
 	}
 
-	logger.Pl.D(5, "Retrieved command output from YTDLP for channel %q:\n\n%s", channelURL, string(j))
+	logger.Pl.D(5, "Retrieved command output from yt-dlp for channel %q:\n\n%s", channelURL, string(j))
 
 	var result ytDlpEntry
 	if err := json.Unmarshal(j, &result); err != nil {

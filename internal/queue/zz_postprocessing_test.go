@@ -13,6 +13,8 @@ import (
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/models"
 	"tubarr/internal/repo"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // queueVideo puts a video in the queue as a Metarr run would, returning a function reporting whether it was canceled.
@@ -207,7 +209,7 @@ func TestRunMetarrLeavesPendingForMissingOpsFile(t *testing.T) {
 	bin, dir := t.TempDir(), t.TempDir()
 	ran := filepath.Join(dir, "metarr-ran")
 	script := fmt.Sprintf("#!/bin/sh\n[ \"$1\" = --help ] && exit 0\ntouch %q\n", ran)
-	if err := os.WriteFile(filepath.Join(bin, "metarr"), []byte(script), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, sharedconsts.ProgramMetarr), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))

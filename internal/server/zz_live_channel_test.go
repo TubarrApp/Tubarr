@@ -35,6 +35,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // liveTimeout is how long one user action, with its downloads and Metarr runs, may take.
@@ -104,7 +105,7 @@ func setupLive(t *testing.T) {
 	if os.Getenv("TUBARR_LIVE_TESTS") == "" {
 		t.Skip("set TUBARR_LIVE_TESTS=1 to run real channels through yt-dlp and Metarr")
 	}
-	for _, tool := range []string{command.YTDLP, command.DownloaderFFmpeg} {
+	for _, tool := range []string{sharedconsts.ProgramYTDLP, command.DownloaderFFmpeg} {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("%s isn't installed: %v", tool, err)
 		}
@@ -578,7 +579,7 @@ func newLiveScenario(t *testing.T, choices []byte, title string) *liveScenario {
 	dir := t.TempDir()
 	site := newLiveSite(t, liveTail(title))
 	setLiveEnv(t, "TUBARR_LOG_URL", site.srv.URL+"/metarr-logs") // Not a running Tubarr's.
-	_, metarrErr := exec.LookPath("metarr")
+	_, metarrErr := exec.LookPath(sharedconsts.ProgramMetarr)
 	sc := &liveScenario{t: t, site: site, dir: dir, name: fmt.Sprintf("Live %d", liveChannelCount.Add(1)), metarr: metarrErr == nil,
 		step: "adding the channel", notify: map[string]bool{}, urls: map[string]*liveURL{}, orphans: map[string]bool{},
 		overrides: map[string]*liveOverrides{}, notified: map[string]int{}, maybe: map[string]int{}}

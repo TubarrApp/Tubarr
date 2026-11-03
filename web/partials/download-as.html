@@ -96,6 +96,8 @@ download-as-cancel if Download As closes without starting. -->
           <input x-ref="thumbFile" type="file" accept="image/jpeg,image/png,image/gif" class="hidden" @change="uploadThumbnail($event)" />
         </div>
         <p x-show="thumbChoice === 'custom'" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Upload a JPEG, PNG or GIF image (up to 10 MB), or give a path on the server or a URL.</p>
+        <p x-show="thumbChoice === 'custom' && thumbUploaded" class="mt-1 text-xs text-success-600 dark:text-success-500" x-text="thumbUploaded"></p>
+        <p x-show="thumbChoice === 'custom' && thumbError" class="mt-1 text-xs text-error-600 dark:text-error-500" x-text="thumbError"></p>
       </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
         The ops below are <span x-text="multiple ? `their channel URL's` : `this video's channel URL's (or its last edits)`"></span>, one per line. Edits apply to <span x-text="multiple ? 'these videos' : 'this video'"></span> only, and are kept for later post-processing runs. Filtered ops still apply only if all their filters match the video's metadata. Load adds an ops file's ops to its box.
@@ -106,6 +108,7 @@ download-as-cancel if Download As closes without starting. -->
             <span x-text="box.label"></span>
             <a :href="`help.html#${box.help}`" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
           </label>
+          <p x-show="opsFileErrors[box.key]" class="mb-1 text-xs text-error-600 dark:text-error-500" x-text="opsFileErrors[box.key]"></p>
           <div class="mb-1 flex gap-2">
             <input
               type="text"
@@ -307,9 +310,12 @@ download-as-cancel if Download As closes without starting. -->
       metarrDefaults: {}, // The channel URL's other Metarr args.
       ytdlpDefaults: {}, // The channel URL's settings, for its yt-dlp options.
       opsFiles: {}, // Ops file paths typed in, by box.
+      opsFileErrors: {}, // Why their Load failed, by box.
       thumbChoice: 'default', // 'default', 'custom' (form.thumbnail) or 'none' (stripped).
       auth: { username: '', password: '', login_url: '' }, // Login for this download only, never saved.
       uploading: false,
+      thumbUploaded: null, // The last upload's result, shown under the thumbnail box.
+      thumbError: null,
       metarrKeys: [
         'metarr_purge_metafile', 'metarr_write_nfo', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
         'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_video_args', 'metarr_transcode_video_transcode_codecs',
@@ -361,11 +367,14 @@ download-as-cancel if Download As closes without starting. -->
         this.metarrDefaults = {};
         this.ytdlpDefaults = {};
         this.opsFiles = {};
+        this.opsFileErrors = {};
         this.form = { metarr: {} };
         // A login passed in (from Manual Downloads) is shown, ready to send.
         this.auth = { username: '', password: '', login_url: '', ...video.auth };
         if (video.auth) this.$refs.login.open = true;
         this.error = null;
+        this.thumbUploaded = null;
+        this.thumbError = null;
         this.loaded = false;
         this.loading = true;
         try {
@@ -426,6 +435,9 @@ download-as-cancel if Download As closes without starting. -->
       revert() {
         this.form = this.defaultForm();
         this.thumbChoice = 'default';
+        this.thumbUploaded = null;
+        this.thumbError = null;
+        this.opsFileErrors = {};
       },
 
       // Uploads the chosen image as the video's thumbnail, putting its saved path in the thumbnail box.
@@ -434,17 +446,23 @@ download-as-cancel if Download As closes without starting. -->
         event.target.value = '';
         if (!image) return;
         this.uploading = true;
-        this.error = null;
+        this.thumbUploaded = null;
+        this.thumbError = null;
         try {
           const body = new FormData();
           body.append('thumbnail', image);
           const response = await fetch(`/api/v1/videos/${this.video.id}/thumbnail`, { method: 'POST', body });
+          // Only a proxy in front of Tubarr answers this, with a whole HTML page.
+          if (response.status === 413) {
+            throw new Error(`this ${(image.size / (1 << 20)).toFixed(1)} MB image is over the upload limit of a reverse proxy in front of Tubarr (nginx allows 1 MB unless client_max_body_size is raised).`);
+          }
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }
           this.form.thumbnail = (await response.json()).path;
+          this.thumbUploaded = `Uploaded ${image.name}.`;
         } catch (err) {
-          this.error = `Couldn't upload the thumbnail: ${err.message}`;
+          this.thumbError = `Couldn't upload the thumbnail: ${err.message}`;
         } finally {
           this.uploading = false;
         }
@@ -453,7 +471,7 @@ download-as-cancel if Download As closes without starting. -->
       // Adds the ops in a file which apply to the video's channel URL to a box, leaving out lines it already has.
       async loadOpsFile(key) {
         const video = this.video;
-        this.error = null;
+        this.opsFileErrors[key] = null;
         try {
           const params = new URLSearchParams({ box: key, path: this.opsFiles[key].trim() });
           const response = await fetch(`/api/v1/channels/${video.channel_id}/override-ops/${video.channel_url_id}/file?${params}`);
@@ -466,7 +484,7 @@ download-as-cancel if Download As closes without starting. -->
           const added = (lines || []).filter(l => !have.includes(l));
           this.form[key] = [current.trimEnd(), ...added].filter(Boolean).join('\n');
         } catch (err) {
-          this.error = `Couldn't load the ops file: ${err.message}`;
+          this.opsFileErrors[key] = `Couldn't load the ops file: ${err.message}`;
         }
       },
 
@@ -506,6 +524,7 @@ download-as-cancel if Download As closes without starting. -->
         } finally {
           this.working = false;
         }
+        for (const v of this.videos) window.thumbChanged[v.id] = Date.now();
         this.video = null;
         this.$dispatch(this.mode === 'metarr' ? 'edit-metarr-done' : 'download-as-done', opened);
       }

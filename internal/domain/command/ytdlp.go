@@ -30,7 +30,6 @@ const (
 	ProgressNewline      = "--newline"
 	ProgressTemplate     = "--progress-template"
 	RestrictFilenames    = "--restrict-filenames"
-	YTDLP                = "yt-dlp"
 	YtDLPOutputExtension = "--merge-output-format"
 )
 

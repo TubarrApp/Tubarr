@@ -5,12 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 	"tubarr/internal/models"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // TestParseTemplateDateDirectives tests Metarr date tags with directives are left for Metarr, and bad ones rejected.
 func TestParseTemplateDateDirectives(t *testing.T) {
 	bin := t.TempDir() // Metarr tags need a metarr executable on $PATH.
-	if err := os.WriteFile(filepath.Join(bin, "metarr"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, sharedconsts.ProgramMetarr), []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin)

@@ -10,6 +10,8 @@ import (
 	"tubarr/internal/domain/command"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/models"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 const (
@@ -22,7 +24,7 @@ func TestLiveDownloadProgress(t *testing.T) {
 	if os.Getenv("TUBARR_LIVE_TESTS") == "" {
 		t.Skip("set TUBARR_LIVE_TESTS=1 to download from the internet through each downloader")
 	}
-	if _, err := exec.LookPath(command.YTDLP); err != nil {
+	if _, err := exec.LookPath(sharedconsts.ProgramYTDLP); err != nil {
 		t.Skip("yt-dlp not installed")
 	}
 

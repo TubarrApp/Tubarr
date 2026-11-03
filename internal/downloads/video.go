@@ -161,7 +161,7 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	}
 
 	// Combine command...
-	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
+	cmd := exec.CommandContext(d.Context, sharedconsts.ProgramYTDLP, args...)
 	useProcessGroup(cmd)
 	return cmd, nil
 }

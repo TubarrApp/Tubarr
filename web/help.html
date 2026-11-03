@@ -388,6 +388,8 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                   <tr><th>Line</th><th>Means</th></tr>
                   <tr><td><code>hevc</code></td><td>Convert every video codec to HEVC (HEVC itself is copied).</td></tr>
                   <tr><td><code>h264:hevc</code></td><td>Convert only H.264 to HEVC.</td></tr>
+                  <tr><td><code>hevc:hevc</code></td><td>Encode HEVC video again as HEVC, every time it's processed.</td></tr>
+                  <tr><td><code>hevc:copy</code></td><td>Never encode HEVC video, whatever its Video Encoder Args say.</td></tr>
                   <tr><td><code>dts:ac3</code></td><td>Convert only DTS audio to AC-3.</td></tr>
                 </table>
               </div>
@@ -414,6 +416,14 @@ vp9:av1</code></pre>
                   <code>hevc:-vf scale=1280:-2</code> to scale the video to 1280 pixels wide. If the encoder can't take
                   the pixel format, Metarr uses the same format in the form it does take, or stops with an error naming
                   the formats it can.
+                </li>
+                <li>
+                  A video already in a codec is kept as it is, so that codec's args don't run on it, with two exceptions.
+                  A line such as <code>hevc:hevc</code> encodes it again every time it's processed. A <code>-pix_fmt</code>
+                  it isn't in encodes it once, e.g. <code>hevc:-pix_fmt yuv420p10le</code> with an 8-bit HEVC video, unless
+                  <code>hevc:copy</code> or a plain <code>copy</code> is set. Other args, such as <code>-crf</code>, can't be
+                  checked on a finished video, so they never start an encode, and a <code>-vf</code> left out this way logs
+                  a warning. Audio already in a codec is always copied.
                 </li>
                 <li>
                   <code>-pass</code> in Video Encoder Args is the number of encoding passes, e.g.

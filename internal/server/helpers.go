@@ -978,8 +978,15 @@ func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		if len(m.TranscodeAudioCodecs) == 0 {
 			m.TranscodeAudioCodecs = u.TranscodeAudioCodecs
 		}
+		if len(m.TranscodeVideoArgs) == 0 {
+			m.TranscodeVideoArgs = u.TranscodeVideoArgs
+		}
+		m.ExtraFFmpegArgs = cmp.Or(m.ExtraFFmpegArgs, u.ExtraFFmpegArgs)
 	}
 	if err := validation.ValidateMetarrArgsCombination(&m); err != nil {
+		return fmt.Errorf("invalid post-processing options: %w", err)
+	}
+	if err := validation.ValidateMetarrEncoderArgs(&m); err != nil {
 		return fmt.Errorf("invalid post-processing options: %w", err)
 	}
 	return nil

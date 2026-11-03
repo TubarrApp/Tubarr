@@ -7,15 +7,17 @@ import (
 	"tubarr/internal/metadata"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // CheckInstalled returns an error if Metarr is not in $PATH or cannot be executed.
 func CheckInstalled(ctx context.Context) error {
-	if _, err := exec.LookPath("metarr"); err != nil {
+	if _, err := exec.LookPath(sharedconsts.ProgramMetarr); err != nil {
 		return err
 	}
-	if err := exec.CommandContext(ctx, "metarr", "--help").Run(); err != nil {
-		return fmt.Errorf("found 'metarr' in $PATH but failed to execute: %w", err)
+	if err := exec.CommandContext(ctx, sharedconsts.ProgramMetarr, "--help").Run(); err != nil {
+		return fmt.Errorf("found '%s' in $PATH but failed to execute: %w", sharedconsts.ProgramMetarr, err)
 	}
 	return nil
 }

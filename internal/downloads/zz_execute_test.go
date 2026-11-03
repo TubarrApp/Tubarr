@@ -19,6 +19,7 @@ import (
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/logging"
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -69,7 +70,7 @@ func fakeYTDLP(t *testing.T, body string) (runs string) {
 	dir := t.TempDir()
 	runs = filepath.Join(dir, "runs")
 	script := "#!/bin/sh\necho run >> '" + runs + "'\n" + body + "\n"
-	if err := os.WriteFile(filepath.Join(dir, "yt-dlp"), []byte(script), 0o700); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, sharedconsts.ProgramYTDLP), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))

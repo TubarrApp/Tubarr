@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 	"tubarr/internal/domain/consts"
+
+	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
 // TestYTDLPProgressParser tests parsing of Tubarr's yt-dlp progress template lines.
@@ -51,11 +53,11 @@ func TestExternalProgressParsers(t *testing.T) {
 		{"curl", "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current", 0, false},
 		{"curl", "                                 Dload  Upload   Total   Spent    Left  Speed", 0, false},
 		{"curl", "#########################                                     41.7%", 41.7, true},
-		{"ffmpeg", "out_time_us=3934000", 39.34, true},
-		{"ffmpeg", "out_time_us=N/A", 0, false},
-		{"ffmpeg", "progress=end", 100, true},
-		{"ffmpeg", "progress=continue", 0, false},
-		{"ffmpeg", "frame=119", 0, false},
+		{sharedconsts.ProgramFFmpeg, "out_time_us=3934000", 39.34, true},
+		{sharedconsts.ProgramFFmpeg, "out_time_us=N/A", 0, false},
+		{sharedconsts.ProgramFFmpeg, "progress=end", 100, true},
+		{sharedconsts.ProgramFFmpeg, "progress=continue", 0, false},
+		{sharedconsts.ProgramFFmpeg, "frame=119", 0, false},
 		{"wget", "   384K 14% 1.14M 3s", 14, true},
 		{"wget", "  4992K100%  178M=4.9s2026-10-15 22:43:56 URL:https://a.example/v.webm [5243523/5243523] -> \"v.webm.part\" [1]", 100, true},
 		{"wget", "     0K  7% 1.32M 4s", 7, true},
@@ -72,7 +74,7 @@ func TestExternalProgressParsers(t *testing.T) {
 	}
 
 	// ffmpeg needs a duration to give a percentage.
-	if _, _, ok := NewProgressParser("ffmpeg", 0).Parse("out_time_us=3934000"); ok {
+	if _, _, ok := NewProgressParser(sharedconsts.ProgramFFmpeg, 0).Parse("out_time_us=3934000"); ok {
 		t.Error("ffmpeg without duration: parsed progress, want none")
 	}
 }
@@ -82,8 +84,8 @@ func TestName(t *testing.T) {
 	tests := map[string]string{
 		"aria2c":              "aria2c",
 		"/usr/bin/aria2c":     "aria2c",
-		"m3u8:ffmpeg":         "ffmpeg",
-		"dash:/opt/ff/ffmpeg": "ffmpeg",
+		"m3u8:ffmpeg":         sharedconsts.ProgramFFmpeg,
+		"dash:/opt/ff/ffmpeg": sharedconsts.ProgramFFmpeg,
 		`C:\tools\curl.exe`:   "curl",
 		"http":                "httpie",
 		"Wget":                "wget",

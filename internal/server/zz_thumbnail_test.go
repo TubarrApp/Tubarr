@@ -118,29 +118,33 @@ func TestThumbnailUpload(t *testing.T) {
 		return got.Path
 	}
 
-	// Valid PNG, GIF and JPEG uploads must succeed.
+	// Valid PNG, GIF and JPEG uploads must succeed, each in a new file named for the video.
+	checkSaved := func(path, ext string) {
+		t.Helper()
+		if filepath.Dir(path) != paths.UploadedThumbnailDir || !strings.HasPrefix(filepath.Base(path), fmt.Sprintf("%d_", videoID)) || filepath.Ext(path) != ext {
+			t.Errorf("%s image saved to %q", ext, path)
+		}
+	}
 	pngData := encodeImage(t, sharedconsts.ITypePNG, 2, 2)
 	pngPath := savedPath(upload(videoID, "cover.png", pngData))
-	if pngPath != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.png", videoID)) {
-		t.Errorf("PNG saved to %q", pngPath)
-	}
+	checkSaved(pngPath, ".png")
 
 	gifData := encodeImage(t, sharedconsts.ITypeGIF, 2, 2)
 	gifPath := savedPath(upload(videoID, "cover.gif", gifData))
-	if _, err := os.Stat(pngPath); !os.IsNotExist(err) {
-		t.Errorf("earlier PNG %q kept after a GIF replaced it", pngPath)
-	}
-	if gifPath != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.gif", videoID)) {
-		t.Errorf("GIF saved to %q", gifPath)
-	}
+	checkSaved(gifPath, ".gif")
 
 	jpgData := encodeImage(t, sharedconsts.ITypeJPG, 2, 2)
 	jpg := savedPath(upload(videoID, "cover.jpg", jpgData))
-	if _, err := os.Stat(gifPath); !os.IsNotExist(err) {
-		t.Errorf("earlier GIF %q kept after a JPEG replaced it", gifPath)
+	checkSaved(jpg, ".jpg")
+
+	// Earlier uploads stay, as a saved thumbnail must survive a dialog cancelled after an upload, of any type.
+	for _, earlier := range []string{pngPath, gifPath} {
+		if _, err := os.Stat(earlier); err != nil {
+			t.Errorf("earlier upload removed by a later one: %v", err)
+		}
 	}
-	if jpg != filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d.jpg", videoID)) {
-		t.Errorf("JPEG saved to %q", jpg)
+	if again := savedPath(upload(videoID, "cover.png", pngData)); again == pngPath {
+		t.Errorf("second PNG overwrote the first at %q", pngPath)
 	}
 
 	// Invalid image data must fail.
@@ -229,8 +233,10 @@ func TestThumbnailUpload(t *testing.T) {
 	if _, err := os.Stat(jpg); err != nil {
 		t.Errorf("thumbnail in use was removed: %v", err)
 	}
-	if _, err := os.Stat(orphan); !os.IsNotExist(err) {
-		t.Error("unused thumbnail was kept")
+	for _, unused := range []string{orphan, pngPath, gifPath} {
+		if _, err := os.Stat(unused); !os.IsNotExist(err) {
+			t.Errorf("unused thumbnail %q was kept", unused)
+		}
 	}
 
 	// The thumbnail is served for the pages, which are told the video has one, and a stripped one isn't shown.

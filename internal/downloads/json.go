@@ -98,7 +98,7 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 	args = append(args, command.EndOfOptions, d.Video.URL)
 
 	// Build command with context.
-	cmd := exec.CommandContext(d.Context, command.YTDLP, args...)
+	cmd := exec.CommandContext(d.Context, sharedconsts.ProgramYTDLP, args...)
 	useProcessGroup(cmd)
 	return cmd, nil
 }

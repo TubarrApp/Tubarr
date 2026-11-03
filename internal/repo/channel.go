@@ -103,8 +103,14 @@ func (cs *ChannelStore) checkTouchedChannels() error {
 		if err := validation.ValidateMetarrArgsCombination(c.ChanMetarrArgs); err != nil {
 			return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidChannel, err)
 		}
+		if err := validation.ValidateMetarrEncoderArgs(c.ChanMetarrArgs); err != nil {
+			return fmt.Errorf("%w: Metarr settings: %w", contracts.ErrInvalidChannel, err)
+		}
 		for _, cu := range c.URLModels {
 			if err := validation.ValidateMetarrArgsCombination(cu.ChanURLMetarrArgs); err != nil {
+				return fmt.Errorf("%w: Metarr settings for URL %q: %w", contracts.ErrInvalidChannel, cu.URL, err)
+			}
+			if err := validation.ValidateMetarrEncoderArgs(cu.ChanURLMetarrArgs); err != nil {
 				return fmt.Errorf("%w: Metarr settings for URL %q: %w", contracts.ErrInvalidChannel, cu.URL, err)
 			}
 		}

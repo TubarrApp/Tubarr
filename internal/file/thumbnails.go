@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 	"tubarr/internal/domain/logger"
@@ -30,7 +29,8 @@ var thumbnailExts = map[string]string{
 	"image/gif":  ".gif",
 }
 
-// SaveThumbnail stores an uploaded image as a video's thumbnail, replacing any earlier one, and returns its path.
+// SaveThumbnail stores an uploaded image in a new file and returns its path. Earlier ones stay, as the upload's dialog may
+// be cancelled, until RemoveUnusedThumbnails.
 func SaveThumbnail(videoID int64, data []byte) (string, error) {
 	ext, ok := thumbnailExts[http.DetectContentType(data)]
 	if !ok {
@@ -39,15 +39,7 @@ func SaveThumbnail(videoID int64, data []byte) (string, error) {
 	if err := os.MkdirAll(paths.UploadedThumbnailDir, sharedconsts.PermsHomeProgDir); err != nil {
 		return "", fmt.Errorf("failed to make thumbnail directory: %w", err)
 	}
-	base := strconv.FormatInt(videoID, 10)
-	for _, e := range thumbnailExts {
-		if e != ext {
-			if err := os.Remove(filepath.Join(paths.UploadedThumbnailDir, base+e)); err != nil && !errors.Is(err, os.ErrNotExist) {
-				logger.Pl.W("Failed to remove video %d's earlier thumbnail: %v", videoID, err)
-			}
-		}
-	}
-	path := filepath.Join(paths.UploadedThumbnailDir, base+ext)
+	path := filepath.Join(paths.UploadedThumbnailDir, fmt.Sprintf("%d_%d%s", videoID, time.Now().UnixNano(), ext))
 	if err := os.WriteFile(path, data, sharedconsts.PermsPrivateFile); err != nil {
 		return "", fmt.Errorf("failed to save thumbnail: %w", err)
 	}
