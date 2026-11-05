@@ -239,6 +239,66 @@ func TestDomainLimiterSetCountsHolders(t *testing.T) {
 	})
 }
 
+// TestGlobalLimitsWakeWaiters tests that raising or removing a global limit gives waiting callers a slot straight away.
+func TestGlobalLimitsWakeWaiters(t *testing.T) {
+	for name, global := range map[string]struct {
+		init func(int)
+		sem  *Semaphore
+	}{
+		"downloads":       {InitGlobalDownloadLimit, GlobalDownloads},
+		"crawls":          {InitGlobalCrawlLimit, GlobalCrawls},
+		"post-processing": {InitGlobalPostProcessLimit, GlobalPostProcessing},
+	} {
+		for change, newLimit := range map[string]int{"raised": 2, "removed": 0} {
+			t.Run(name+" "+change, func(t *testing.T) {
+				global.init(1)
+				t.Cleanup(func() { global.init(0) })
+				if err := AcquireSlot(context.Background(), global.sem, name, "holder"); err != nil {
+					t.Fatal(err)
+				}
+				defer global.sem.Release()
+
+				got := make(chan error, 1)
+				go func() {
+					err := AcquireSlot(context.Background(), global.sem, name, "waiter")
+					if err == nil {
+						global.sem.Release()
+					}
+					got <- err
+				}()
+				waitForWaiters(t, global.sem, 1)
+
+				global.init(newLimit)
+				select {
+				case err := <-got:
+					if err != nil {
+						t.Fatalf("waiter got error %v", err)
+					}
+				case <-time.After(5 * time.Second):
+					t.Fatal("waiter never got a slot after the limit changed")
+				}
+			})
+		}
+	}
+}
+
+// TestAcquireSlotCanceled tests that a canceled wait returns the context's error and takes no slot.
+func TestAcquireSlotCanceled(t *testing.T) {
+	sem := NewSemaphore(1)
+	if err := AcquireSlot(context.Background(), sem, "test", "holder"); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if err := AcquireSlot(ctx, sem, "test", "waiter"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("canceled wait returned %v, want context.DeadlineExceeded", err)
+	}
+	sem.Release()
+	if !sem.TryAcquire() {
+		t.Fatal("slot not free after the holder released and the waiter gave up")
+	}
+}
+
 // TestDomainLimiterUnparseableURL tests that a URL with no usable hostname is never held up.
 func TestDomainLimiterUnparseableURL(t *testing.T) {
 	l := newTestLimiter()

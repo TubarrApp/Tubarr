@@ -15,7 +15,6 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
-	"tubarr/internal/limits"
 	"tubarr/internal/metadata"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -27,27 +26,6 @@ import (
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
-
-// crawlSems holds the scheduled crawl semaphores, keyed by limit so a changed setting takes effect for new crawls.
-var crawlSems sync.Map
-
-// AcquireCrawlSlot waits for a scheduled crawl slot under the crawl concurrency setting (0 = unlimited), or ctx to end.
-//
-// Returns a function releasing the slot.
-func AcquireCrawlSlot(ctx context.Context, channelName string) (release func(), err error) {
-	n := abstractions.GetInt(keys.CrawlConcurrency)
-	if n <= 0 {
-		return func() {}, nil
-	}
-
-	// One semaphore per limit, shared by every crawl under that limit.
-	v, _ := crawlSems.LoadOrStore(n, make(chan struct{}, n))
-	sem := v.(chan struct{})
-	if err := limits.AcquireSlot(ctx, sem, "crawl", channelName); err != nil {
-		return nil, err
-	}
-	return func() { <-sem }, nil
-}
 
 // CheckChannels checks channels and whether they are due for a crawl.
 func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQueue) error {

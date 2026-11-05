@@ -17,8 +17,32 @@ var (
 	DomainCrawls    = &DomainLimiter{kind: "crawl", sems: make(map[string]*Semaphore)}
 )
 
-// GlobalPostProcessing limits Metarr runs across all channels.
-var GlobalPostProcessing = NewSemaphore(0)
+// Global limits across all channels.
+var (
+	GlobalDownloads      = NewSemaphore(0)
+	GlobalCrawls         = NewSemaphore(0)
+	GlobalPostProcessing = NewSemaphore(0)
+)
+
+// InitGlobalDownloadLimit sets the download concurrency limit across all channels (0 = unlimited).
+func InitGlobalDownloadLimit(limit int) {
+	GlobalDownloads.SetLimit(limit)
+	if limit > 0 {
+		logger.Pl.I("Global download concurrency limit set to %d", limit)
+	} else {
+		logger.Pl.I("Global download concurrency limit disabled (unlimited)")
+	}
+}
+
+// InitGlobalCrawlLimit sets the scheduled crawl concurrency limit across all channels (0 = unlimited).
+func InitGlobalCrawlLimit(limit int) {
+	GlobalCrawls.SetLimit(limit)
+	if limit > 0 {
+		logger.Pl.I("Global crawl concurrency limit set to %d", limit)
+	} else {
+		logger.Pl.I("Global crawl concurrency limit disabled (unlimited)")
+	}
+}
 
 // InitGlobalPostProcessLimit sets the Metarr concurrency limit across all channels (0 = unlimited).
 func InitGlobalPostProcessLimit(limit int) {
@@ -67,17 +91,10 @@ func (l *DomainLimiter) Acquire(ctx context.Context, rawURL string) (*Semaphore,
 	hostname := Hostname(rawURL)
 	sem := l.semaphore(hostname)
 
-	// Try to acquire a slot immediately without waiting.
-	if sem.TryAcquire() {
-		return sem, nil
-	}
-
-	// No slots were available:
-	logger.Pl.I("Waiting for a free %s %s slot for %q...", hostname, l.kind, rawURL)
-	if err := sem.Acquire(ctx); err != nil {
+	// Grab a semaphore slot.
+	if err := AcquireSlot(ctx, sem, hostname+" "+l.kind, rawURL); err != nil {
 		return nil, err
 	}
-	logger.Pl.D(1, "Got a %s %s slot for %q", hostname, l.kind, rawURL)
 	return sem, nil
 }
 
@@ -94,31 +111,19 @@ func (l *DomainLimiter) semaphore(hostname string) *Semaphore {
 }
 
 // AcquireSlot takes a slot on sem, logging if it has to wait for one.
-func AcquireSlot(ctx context.Context, sem chan struct{}, limitDesc, target string) error {
+func AcquireSlot(ctx context.Context, sem *Semaphore, limitDesc, target string) error {
 	// Try to acquire a slot immediately without waiting.
-	select {
-	case sem <- struct{}{}:
+	if sem.TryAcquire() {
 		return nil
-	default:
-		// Continue below.
 	}
 
 	// No slots were available:
-	logger.Pl.I("Waiting for a free %s slot for %q (all %d in use)...", limitDesc, target, cap(sem))
-	select {
-	case sem <- struct{}{}: // Slot got released, can continue.
-		logger.Pl.D(1, "Got a %s slot for %q", limitDesc, target)
-		return nil
-	case <-ctx.Done(): // Context was cancelled or its deadline expired, so abort.
-		return ctx.Err()
+	logger.Pl.I("Waiting for a free %s slot for %q...", limitDesc, target)
+	if err := sem.Acquire(ctx); err != nil {
+		return err
 	}
-}
-
-// Release releases a slot taken on sem (no-op if nil).
-func Release(sem chan struct{}) {
-	if sem != nil {
-		<-sem
-	}
+	logger.Pl.D(1, "Got a %s slot for %q", limitDesc, target)
+	return nil
 }
 
 // Hostname returns the eTLD+1 hostname of a URL (e.g. "youtube.com").

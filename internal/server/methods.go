@@ -11,6 +11,7 @@ import (
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
 	"tubarr/internal/state"
 	"tubarr/internal/times"
@@ -110,12 +111,11 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 			}
 			defer unlock()
 
-			release, err := app.AcquireCrawlSlot(crawlCtx, ch.Name)
-			if err != nil {
+			if err := limits.AcquireSlot(crawlCtx, limits.GlobalCrawls, "crawl", ch.Name); err != nil {
 				logger.Pl.D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
 				return
 			}
-			defer release()
+			defer limits.GlobalCrawls.Release()
 
 			logger.Pl.D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
 			if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ss.dq, ch); err != nil {

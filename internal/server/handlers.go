@@ -1719,11 +1719,12 @@ func (ss *serverStore) handleSetCrawlConcurrency(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Persist to DB and update viper (takes effect on next crawl cycle).
+	// Persist to DB, update viper and apply to scheduled crawls, including those waiting for a slot.
 	if err := ss.tss.SetSetting(keys.CrawlConcurrency, limitStr); err != nil {
 		logger.Pl.W("Failed to persist crawl concurrency to DB: %v", err)
 	}
 	viper.Set(keys.CrawlConcurrency, limit)
+	limits.InitGlobalCrawlLimit(limit)
 	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Crawl concurrency updated", "limit": limit})
 }
 
@@ -1746,7 +1747,7 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 		logger.Pl.W("Failed to persist global download concurrency to DB: %v", err)
 	}
 	viper.Set(keys.GlobalDownloadConcurrency, limit)
-	downloads.InitGlobalDownloadLimit(limit)
+	limits.InitGlobalDownloadLimit(limit)
 	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Global download concurrency updated", "limit": limit})
 }
 

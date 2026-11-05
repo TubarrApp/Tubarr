@@ -10,17 +10,11 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
-	"tubarr/internal/limits"
 	"tubarr/internal/models"
 )
 
 // ErrCanceledByUser is the cause of a download context canceled from the web UI or API, as opposed to by shutdown.
 var ErrCanceledByUser = errors.New("download canceled by user")
-
-// globalDownloadSem limits concurrent video downloads across all channels.
-// nil means no global limit (unlimited concurrent downloads).
-var globalDownloadSem chan struct{}
-var globalDownloadSemMu sync.RWMutex
 
 // Tracker is told a download's status whenever it changes.
 type Tracker interface {
@@ -97,39 +91,6 @@ func (d *JSONDownload) cleanup() {
 		stopProcess(d.cmd.Process, "JSON")
 		d.cmd = nil
 	}
-}
-
-// InitGlobalDownloadLimit sets up the global download concurrency limiter.
-// A limit of 0 means no limit (unlimited concurrent downloads).
-// Note: Changes take effect for new downloads. In-progress downloads retain their slots.
-func InitGlobalDownloadLimit(limit int) {
-	globalDownloadSemMu.Lock()
-	defer globalDownloadSemMu.Unlock()
-
-	if limit > 0 {
-		globalDownloadSem = make(chan struct{}, limit)
-		logger.Pl.I("Global download concurrency limit set to %d", limit)
-	} else {
-		globalDownloadSem = nil
-		logger.Pl.I("Global download concurrency limit disabled (unlimited)")
-	}
-}
-
-// AcquireGlobalDownloadSlot blocks until a download slot is available, or ctx is done.
-// Returns the semaphore channel that was used (for proper release later).
-// Returns immediately if no global limit is configured (limit=0).
-func AcquireGlobalDownloadSlot(ctx context.Context, videoURL string) (chan struct{}, error) {
-	globalDownloadSemMu.RLock()
-	sem := globalDownloadSem
-	globalDownloadSemMu.RUnlock()
-
-	if sem == nil {
-		return nil, nil
-	}
-	if err := limits.AcquireSlot(ctx, sem, "global download", videoURL); err != nil {
-		return nil, err
-	}
-	return sem, nil
 }
 
 // isProcessNotExist checks if an error indicates a process doesn't exist.

@@ -105,11 +105,10 @@ func (q *DownloadQueue) process(d *download) error {
 		return err
 	}
 	defer domainSem.Release()
-	globalSem, err := downloads.AcquireGlobalDownloadSlot(d.startCtx, v.URL)
-	if err != nil {
+	if err := limits.AcquireSlot(d.startCtx, limits.GlobalDownloads, "global download", v.URL); err != nil {
 		return err
 	}
-	defer limits.Release(globalSem)
+	defer limits.GlobalDownloads.Release()
 
 	// Process video download phase, which Stop no longer reaches.
 	if !q.startDownloading(d) {

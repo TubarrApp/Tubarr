@@ -13,7 +13,6 @@ import (
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/domain/vars"
-	"tubarr/internal/downloads"
 	"tubarr/internal/limits"
 	"tubarr/internal/parsing"
 	"tubarr/internal/queue"
@@ -89,8 +88,9 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		// Initialize global download concurrency limit (0 = unlimited).
-		downloads.InitGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
+		// Initialize global concurrency limits (0 = unlimited).
+		limits.InitGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
+		limits.InitGlobalCrawlLimit(viper.GetInt(keys.CrawlConcurrency))
 		limits.InitGlobalPostProcessLimit(viper.GetInt(keys.PostProcessConcurrency))
 
 		// Setup benchmarking if flag is set. A failure only skips benchmarking.
