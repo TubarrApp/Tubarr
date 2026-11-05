@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 )
 
@@ -385,6 +386,9 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		}
 		if cu.ChanURLMetarrArgs == nil {
 			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
+		}
+		if mergeWithParent {
+			parsing.FillChannelURLOutputDirectory(cu, c)
 		}
 	}
 	return urlModels, nil

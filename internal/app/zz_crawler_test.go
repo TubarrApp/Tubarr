@@ -61,6 +61,7 @@ func TestCheckManualVideos(t *testing.T) {
 func TestFilterSkipsUnavailableDestinations(t *testing.T) {
 	dir := t.TempDir()
 	missing := filepath.Join(dir, "unmounted", "videos")
+	missingOutput := filepath.Join(t.TempDir(), "unmounted", "output")
 	c := &models.Channel{
 		Name:           "Test",
 		ChanSettings:   &models.Settings{VideoDir: dir},
@@ -68,7 +69,7 @@ func TestFilterSkipsUnavailableDestinations(t *testing.T) {
 		URLModels: []*models.ChannelURL{
 			{URL: "https://ok.example/@a"},
 			{URL: "https://missing.example/@b", ChanURLSettings: &models.Settings{VideoDir: missing}},
-			{URL: "https://metarr.example/@c", ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: missing}},
+			{URL: "https://metarr.example/@c", ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: missingOutput}},
 			{URL: "https://templated.example/@d", ChanURLSettings: &models.Settings{VideoDir: filepath.Join(dir, "{{channel_name}}")}},
 		},
 	}

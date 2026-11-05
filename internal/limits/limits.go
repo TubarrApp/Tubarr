@@ -13,8 +13,8 @@ import (
 
 // Per-domain limiters for video downloads and channel crawls.
 var (
-	DomainDownloads = &DomainLimiter{kind: "download", sems: make(map[string]chan struct{})}
-	DomainCrawls    = &DomainLimiter{kind: "crawl", sems: make(map[string]chan struct{})}
+	DomainDownloads = &DomainLimiter{kind: "download", sems: make(map[string]*Semaphore)}
+	DomainCrawls    = &DomainLimiter{kind: "crawl", sems: make(map[string]*Semaphore)}
 )
 
 // GlobalPostProcessing limits Metarr runs across all channels.
@@ -30,63 +30,67 @@ func InitGlobalPostProcessLimit(limit int) {
 	}
 }
 
-// DomainLimiter limits concurrent operations per domain. A domain with no entry is unlimited.
+// DomainLimiter limits concurrent operations per domain. A domain with no limit is unlimited.
 type DomainLimiter struct {
 	kind string // The type of thing being limited (e.g. downloads, or crawls)
-	mu   sync.RWMutex
-	sems map[string]chan struct{}
+	mu   sync.Mutex
+	sems map[string]*Semaphore
 }
 
-// Init replaces all domain limits from a map.
+// Init replaces all domain limits from a map, at startup before anything takes a slot.
 func (l *DomainLimiter) Init(limits map[string]int) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.sems = make(map[string]chan struct{})
+	l.sems = make(map[string]*Semaphore)
 	for hostname, limit := range limits {
 		if limit > 0 {
-			l.sems[NormalizeDomain(hostname)] = make(chan struct{}, limit)
+			l.sems[NormalizeDomain(hostname)] = NewSemaphore(limit)
 		}
 	}
 	logger.Pl.I("Initialized %d domain %s limit(s)", len(l.sems), l.kind)
 }
 
-// Set updates the limit for one domain at runtime (0 removes it). Holders of the old semaphore release cleanly.
+// Set updates the limit for one domain at runtime (0 removes it). Waiters get slots the new limit frees straight away.
 func (l *DomainLimiter) Set(hostname string, limit int) {
 	hostname = NormalizeDomain(hostname)
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.semaphore(hostname).SetLimit(limit)
 	if limit > 0 {
-		l.sems[hostname] = make(chan struct{}, limit)
 		logger.Pl.I("Domain %s limit for %q set to %d", l.kind, hostname, limit)
 	} else {
-		delete(l.sems, hostname)
 		logger.Pl.I("Domain %s limit for %q removed (unlimited)", l.kind, hostname)
 	}
 }
 
-// Acquire blocks until a slot is free for rawURL's domain, or ctx is done. Pass the returned semaphore to Release.
-func (l *DomainLimiter) Acquire(ctx context.Context, rawURL string) (chan struct{}, error) {
-	// Grab the URL's hostname for map lookup.
+// Acquire blocks until a slot is free for rawURL's domain, or ctx is done. Call Release on the returned semaphore.
+func (l *DomainLimiter) Acquire(ctx context.Context, rawURL string) (*Semaphore, error) {
+	// Each hostname can have a different concurrency limit.
 	hostname := Hostname(rawURL)
-	if hostname == "" {
-		return nil, nil
+	sem := l.semaphore(hostname)
+
+	// Try to acquire a slot immediately without waiting.
+	if sem.TryAcquire() {
+		return sem, nil
 	}
 
-	// Acquire sem from hostname (each hostname can have a different concurrency limit).
-	l.mu.RLock()
-	sem := l.sems[hostname]
-	l.mu.RUnlock()
-
-	// No semaphore exists for this hostname.
-	if sem == nil {
-		return nil, nil
-	}
-
-	// Grab a semaphore slot.
-	if err := AcquireSlot(ctx, sem, hostname+" "+l.kind, rawURL); err != nil {
+	// No slots were available:
+	logger.Pl.I("Waiting for a free %s %s slot for %q...", hostname, l.kind, rawURL)
+	if err := sem.Acquire(ctx); err != nil {
 		return nil, err
 	}
+	logger.Pl.D(1, "Got a %s %s slot for %q", hostname, l.kind, rawURL)
 	return sem, nil
+}
+
+// semaphore returns hostname's semaphore, adding an unlimited one so slots are counted if a limit is set later.
+func (l *DomainLimiter) semaphore(hostname string) *Semaphore {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	sem, exists := l.sems[hostname]
+	if !exists {
+		sem = NewSemaphore(0)
+		l.sems[hostname] = sem
+	}
+	return sem
 }
 
 // AcquireSlot takes a slot on sem, logging if it has to wait for one.

@@ -166,6 +166,12 @@ func TestParseMetarrOutputDirOverride(t *testing.T) {
 	if got := parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); got != "/chosen/Cats" {
 		t.Errorf("got %q, want /chosen/Cats", got)
 	}
+
+	// Output directory tags fill from the channel URL's directory.
+	v.Overrides.OutputDir = "{{channel_url_output_directory}}/{{channel_name}}"
+	if got := parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); got != "/out/Cats" {
+		t.Errorf("got %q, want /out/Cats", got)
+	}
 }
 
 // TestOverrideFilenameOps tests a chosen filename replaces every other set op, and only matched filtered ops are added.

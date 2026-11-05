@@ -201,7 +201,7 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 		}
 	}
 	if checkPaths && m.OutputDir != "" {
-		if err := CheckDirectory(m.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
+		if err := CheckDirectory(m.OutputDir, sharedtemplates.OutputDirectoryTemplateTags); err != nil {
 			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
 		}
 		if err := CheckDestination(m.OutputDir); err != nil {

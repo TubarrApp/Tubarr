@@ -19,6 +19,7 @@ import (
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/enums"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -1336,7 +1337,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			if err := parsing.ApplySettingsInput(&s, &input.SettingsInput); err != nil {
 				return err
 			}
-			if err := parsing.ApplyMetarrArgsInput(&m, &input.MetarrArgsInput); err != nil {
+			if err := parsing.ApplyMetarrArgsInput(&m, &input.MetarrArgsInput, enums.ChannelLevel); err != nil {
 				return err
 			}
 			profileID := c.ProfileID

@@ -96,7 +96,7 @@ func (q *DownloadQueue) process(d *download) error {
 	}
 
 	// Check move operations.
-	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, d.dirParser)
+	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, d.c, d.dirParser)
 
 	// Wait for a download slot for its domain, then a global one.
 	d.SetStatus(v, consts.DLStatusQueued, 0, "Waiting for download slot", nil)
@@ -104,7 +104,7 @@ func (q *DownloadQueue) process(d *download) error {
 	if err != nil {
 		return err
 	}
-	defer limits.Release(domainSem)
+	defer domainSem.Release()
 	globalSem, err := downloads.AcquireGlobalDownloadSlot(d.startCtx, v.URL)
 	if err != nil {
 		return err

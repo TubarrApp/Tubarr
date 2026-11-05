@@ -22,28 +22,11 @@ func TestMain(m *testing.M) {
 
 // newTestLimiter returns an empty limiter, isolated from the package globals.
 func newTestLimiter() *DomainLimiter {
-	return &DomainLimiter{kind: "test", sems: make(map[string]chan struct{})}
+	return &DomainLimiter{kind: "test", sems: make(map[string]*Semaphore)}
 }
 
-// holdTracker counts holders per semaphore, failing if any exceeds its capacity.
-type holdTracker struct {
-	counts sync.Map // map[chan struct{}]*atomic.Int32.
-}
-
-func (h *holdTracker) enter(t *testing.T, sem chan struct{}) {
-	v, _ := h.counts.LoadOrStore(sem, new(atomic.Int32))
-	if n := v.(*atomic.Int32).Add(1); int(n) > cap(sem) {
-		t.Errorf("%d holders on a semaphore with capacity %d", n, cap(sem))
-	}
-}
-
-func (h *holdTracker) leave(sem chan struct{}) {
-	v, _ := h.counts.Load(sem)
-	v.(*atomic.Int32).Add(-1)
-}
-
-// FuzzDomainLimiter tests that concurrent acquires never exceed a domain's limit, even while the limit changes, and that
-// every acquire completes without deadlocking.
+// FuzzDomainLimiter tests that concurrent acquires never exceed an unchanging limit, and that every acquire completes
+// without deadlocking, even while the limit changes.
 func FuzzDomainLimiter(f *testing.F) {
 	f.Add("https://www.youtube.com/@chan", "youtube.com", uint8(1), uint8(8), []byte{0, 1, 2, 3})
 	f.Add("https://rumble.com/c/x", "RUMBLE.com", uint8(3), uint8(16), []byte{5, 0, 0, 9})
@@ -58,8 +41,14 @@ func FuzzDomainLimiter(f *testing.F) {
 			changes = changes[:8]
 		}
 
+		// Holders over a lowered limit keep their slots, so only an unchanging limit on the URL's domain is a hard cap.
+		fixedLimit := 0
+		if len(changes) == 0 && Hostname(rawURL) == NormalizeDomain(hostname) {
+			fixedLimit = int(limit % 5)
+		}
+
 		var (
-			tracker holdTracker
+			running atomic.Int32
 			wg      sync.WaitGroup
 		)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -84,26 +73,27 @@ func FuzzDomainLimiter(f *testing.F) {
 						t.Errorf("acquire failed (deadlock?): %v", err)
 						return
 					}
-					if sem == nil {
-						continue
+					if n := running.Add(1); fixedLimit > 0 && int(n) > fixedLimit {
+						t.Errorf("%d holders with a limit of %d", n, fixedLimit)
 					}
-					tracker.enter(t, sem)
 					time.Sleep(time.Microsecond)
-					tracker.leave(sem)
-					Release(sem)
+					running.Add(-1)
+					sem.Release()
 				}
 			})
 		}
 		wg.Wait()
 
-		// Every slot is released, including on semaphores replaced mid-flight.
-		l.mu.RLock()
+		// Every slot is released.
+		l.mu.Lock()
 		for h, sem := range l.sems {
-			if len(sem) != 0 {
-				t.Errorf("domain %q has %d slots still held after all releases", h, len(sem))
+			sem.mu.Lock()
+			if sem.held != 0 {
+				t.Errorf("domain %q has %d slots still held after all releases", h, sem.held)
 			}
+			sem.mu.Unlock()
 		}
-		l.mu.RUnlock()
+		l.mu.Unlock()
 
 		// Lookups use the same hostname form the limits are stored under.
 		if h := Hostname(rawURL); h != strings.ToLower(h) {
@@ -118,8 +108,8 @@ func TestDomainLimiterEnforcesLimit(t *testing.T) {
 	l.Set("Example.com", 1)
 
 	sem, err := l.Acquire(context.Background(), "https://www.example.com/a")
-	if err != nil || sem == nil {
-		t.Fatalf("first acquire = (%v, %v), want a slot", sem, err)
+	if err != nil {
+		t.Fatalf("first acquire returned %v, want a slot", err)
 	}
 
 	// Full: a second acquire waits until its context ends.
@@ -130,18 +120,19 @@ func TestDomainLimiterEnforcesLimit(t *testing.T) {
 	}
 
 	// Other domains are unlimited.
-	if other, err := l.Acquire(context.Background(), "https://other.org/"); other != nil || err != nil {
-		t.Fatalf("acquire on an unlimited domain = (%v, %v), want (nil, nil)", other, err)
-	}
+	acquireShort(t, l, "https://other.org/")
+	acquireShort(t, l, "https://other.org/")
 
 	// Releasing unblocks a waiter.
 	got := make(chan error, 1)
 	go func() {
 		s, err := l.Acquire(context.Background(), "https://example.com/c")
-		Release(s)
+		if err == nil {
+			s.Release()
+		}
 		got <- err
 	}()
-	Release(sem)
+	sem.Release()
 	select {
 	case err := <-got:
 		if err != nil {
@@ -153,9 +144,107 @@ func TestDomainLimiterEnforcesLimit(t *testing.T) {
 
 	// Removing the limit makes the domain unlimited.
 	l.Set("example.com", 0)
-	if s, err := l.Acquire(context.Background(), "https://example.com/d"); s != nil || err != nil {
-		t.Fatalf("acquire after removing limit = (%v, %v), want (nil, nil)", s, err)
+	acquireShort(t, l, "https://example.com/d")
+	acquireShort(t, l, "https://example.com/e")
+}
+
+// acquireShort takes a slot that must be free right now, failing rather than waiting for one.
+func acquireShort(t *testing.T, l *DomainLimiter, rawURL string) *Semaphore {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	sem, err := l.Acquire(ctx, rawURL)
+	if err != nil {
+		t.Fatalf("acquire %q returned %v, want a slot", rawURL, err)
 	}
+	return sem
+}
+
+// assertFull fails if rawURL's domain gives out a slot.
+func assertFull(t *testing.T, l *DomainLimiter, rawURL string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if _, err := l.Acquire(ctx, rawURL); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("acquire on a full domain returned %v, want context.DeadlineExceeded", err)
+	}
+}
+
+// TestDomainLimiterSetWakesWaiters tests that a raised or removed limit gives waiting callers a slot straight away.
+func TestDomainLimiterSetWakesWaiters(t *testing.T) {
+	for name, newLimit := range map[string]int{"raised": 2, "removed": 0} {
+		t.Run(name, func(t *testing.T) {
+			l := newTestLimiter()
+			l.Set("example.com", 1)
+			holder := acquireShort(t, l, "https://example.com/a")
+			defer holder.Release()
+
+			got := make(chan error, 1)
+			go func() {
+				s, err := l.Acquire(context.Background(), "https://example.com/b")
+				if err == nil {
+					s.Release()
+				}
+				got <- err
+			}()
+			waitForWaiters(t, holder, 1)
+
+			// The first download still holds its slot, so only the new limit can let the waiter in.
+			l.Set("example.com", newLimit)
+			select {
+			case err := <-got:
+				if err != nil {
+					t.Fatalf("waiter got error %v", err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("waiter never got a slot after the limit changed")
+			}
+		})
+	}
+}
+
+// TestDomainLimiterSetCountsHolders tests that changing or re-saving a limit never hands out extra slots.
+func TestDomainLimiterSetCountsHolders(t *testing.T) {
+	const rawURL = "https://example.com/a"
+
+	t.Run("same limit saved again", func(t *testing.T) {
+		l := newTestLimiter()
+		l.Set("example.com", 1)
+		holder := acquireShort(t, l, rawURL)
+		defer holder.Release()
+		l.Set("example.com", 1)
+		assertFull(t, l, rawURL)
+	})
+
+	t.Run("lowered limit", func(t *testing.T) {
+		l := newTestLimiter()
+		l.Set("example.com", 3)
+		held := []*Semaphore{acquireShort(t, l, rawURL), acquireShort(t, l, rawURL), acquireShort(t, l, rawURL)}
+		l.Set("example.com", 1)
+
+		// No new slots until the holders are under the new limit.
+		held[0].Release()
+		held[1].Release()
+		assertFull(t, l, rawURL)
+		held[2].Release()
+		acquireShort(t, l, rawURL).Release()
+	})
+
+	t.Run("first limit on a busy domain", func(t *testing.T) {
+		l := newTestLimiter()
+		holder := acquireShort(t, l, rawURL)
+		defer holder.Release()
+		l.Set("example.com", 1)
+		assertFull(t, l, rawURL)
+	})
+}
+
+// TestDomainLimiterUnparseableURL tests that a URL with no usable hostname is never held up.
+func TestDomainLimiterUnparseableURL(t *testing.T) {
+	l := newTestLimiter()
+	l.Set("example.com", 1)
+	defer acquireShort(t, l, "%zz").Release()
+	defer acquireShort(t, l, "%zz").Release()
 }
 
 // TestDomainLimiterConcurrentStress hammers every limiter method at once, for running under -race.
@@ -164,10 +253,7 @@ func TestDomainLimiterConcurrentStress(t *testing.T) {
 	hosts := []string{"youtube.com", "rumble.com", "example.co.uk"}
 	urls := []string{"https://www.youtube.com/@a", "https://rumble.com/c/b", "https://x.example.co.uk/v", "https://free.org/"}
 
-	var (
-		tracker holdTracker
-		wg      sync.WaitGroup
-	)
+	var wg sync.WaitGroup
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -191,11 +277,7 @@ func TestDomainLimiterConcurrentStress(t *testing.T) {
 					t.Errorf("acquire failed (deadlock?): %v", err)
 					return
 				}
-				if sem != nil {
-					tracker.enter(t, sem)
-					tracker.leave(sem)
-				}
-				Release(sem)
+				sem.Release()
 			}
 		})
 	}

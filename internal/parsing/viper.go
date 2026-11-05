@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/auth"
+	"tubarr/internal/domain/enums"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -73,7 +74,7 @@ func BuildChannelFromInput(input models.ChannelInput) (
 	if err := ApplySettingsInput(c.ChanSettings, &input.SettingsInput); err != nil {
 		return nil, nil, err
 	}
-	if err := ApplyMetarrArgsInput(c.ChanMetarrArgs, &input.MetarrArgsInput); err != nil {
+	if err := ApplyMetarrArgsInput(c.ChanMetarrArgs, &input.MetarrArgsInput, enums.ChannelLevel); err != nil {
 		return nil, nil, err
 	}
 
@@ -115,7 +116,7 @@ func BuildChannelFromInput(input models.ChannelInput) (
 			}
 			if override.Metarr != nil {
 				cu.ChanURLMetarrArgs = &models.MetarrArgs{}
-				if err := ApplyMetarrArgsInput(cu.ChanURLMetarrArgs, override.Metarr); err != nil {
+				if err := ApplyMetarrArgsInput(cu.ChanURLMetarrArgs, override.Metarr, enums.ChannelURLLevel); err != nil {
 					return nil, nil, fmt.Errorf("per-URL metarr error for %s: %w", u, err)
 				}
 			}
@@ -244,7 +245,7 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 //
 // The GPU node and video codecs are checked against the GPU dst ends up with. Files and folders needn't exist: saving
 // checks those it adds or changes.
-func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (err error) {
+func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput, level enums.SettingsLevel) (err error) {
 	if v := in.MetarrExt; v != nil {
 		if *v != "" && *v != sharedconsts.ExtSame {
 			if _, err := sharedvalidation.ValidateFFmpegOutputExt(*v); err != nil {
@@ -310,7 +311,11 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput) (e
 		dst.ExtraFFmpegArgs = *v
 	}
 	if v := in.OutDir; v != nil {
-		if err := validation.CheckDirectory(*v, sharedtemplates.AllTemplatesMap); err != nil {
+		tags := sharedtemplates.ChannelOutputDirectoryTemplateTags
+		if level == enums.ChannelURLLevel {
+			tags = sharedtemplates.OutputDirectoryTemplateTags
+		}
+		if err := validation.CheckDirectory(*v, tags); err != nil {
 			return fmt.Errorf("invalid %s: %w", keys.MOutputDir, err)
 		}
 		dst.OutputDir = *v

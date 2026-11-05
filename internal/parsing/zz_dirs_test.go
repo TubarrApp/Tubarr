@@ -75,24 +75,81 @@ func TestParseTemplateChannelURLName(t *testing.T) {
 	}
 }
 
-// TestFillOutputDirectory tests only {{output_directory}} is swapped, in any case or spacing, leaving other tags.
+// TestFillOutputDirectory tests both output directory tags are swapped, in any case or spacing, leaving other tags.
 func TestFillOutputDirectory(t *testing.T) {
-	const out = "/media/{{channel_name}}"
-	tests := []struct {
-		dir, want string
-		hasTag    bool
-	}{
-		{"{{output_directory}}/Destiny", "/media/{{channel_name}}/Destiny", true},
-		{"{{output_directory}}/Destiny/", "/media/{{channel_name}}/Destiny/", true},
-		{"{{output_directory}}Destiny", "/media/{{channel_name}}Destiny", true},
-		{"{{ Output_Directory }}/{{year}}", "/media/{{channel_name}}/{{year}}", true},
-		{"/other/{{channel_name}}/Destiny", "/other/{{channel_name}}/Destiny", false},
-		{"/plain/dir", "/plain/dir", false},
-		{"/broken/{{output_directory", "/broken/{{output_directory", false},
+	c := &models.Channel{ChanSettings: &models.Settings{VideoDir: "/channel-video"}, ChanMetarrArgs: &models.MetarrArgs{OutputDir: "/channel"}}
+	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{VideoDir: "/url-video"}, ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: "/media/{{channel_name}}"}}
+	tests := []struct{ dir, want string }{
+		{"{{channel_url_output_directory}}/Destiny", "/media/{{channel_name}}/Destiny"},
+		{"{{channel_url_output_directory}}/Destiny/", "/media/{{channel_name}}/Destiny/"},
+		{"{{channel_url_output_directory}}Destiny", "/media/{{channel_name}}Destiny"},
+		{"{{ Channel_URL_Output_Directory }}/{{year}}", "/media/{{channel_name}}/{{year}}"},
+		{"{{channel_output_directory}}/Destiny", "/channel/Destiny"},
+		{"{{ Channel_Output_Directory }}/{{year}}", "/channel/{{year}}"},
+		{"/other/{{channel_name}}/Destiny", "/other/{{channel_name}}/Destiny"},
+		{"/plain/dir", "/plain/dir"},
+		{"/broken/{{channel_url_output_directory", "/broken/{{channel_url_output_directory"},
 	}
 	for _, tt := range tests {
-		if got, hasTag := FillOutputDirectory(tt.dir, out); got != tt.want || hasTag != tt.hasTag {
-			t.Errorf("FillOutputDirectory(%q) = %q, %v; want %q, %v", tt.dir, got, hasTag, tt.want, tt.hasTag)
+		if got, allFilled := FillOutputDirectoryTags(tt.dir, cu, c); got != tt.want || !allFilled {
+			t.Errorf("FillOutputDirectoryTags(%q) = %q, %v; want %q, true", tt.dir, got, allFilled, tt.want)
+		}
+	}
+}
+
+// TestFillOutputDirectoryFallback tests each tag uses the video directory without an output directory, and stays in place without either.
+func TestFillOutputDirectoryFallback(t *testing.T) {
+	const dir = "{{channel_output_directory}}/a/{{channel_url_output_directory}}/b"
+
+	c := &models.Channel{ChanSettings: &models.Settings{VideoDir: "/channel-video"}, ChanMetarrArgs: &models.MetarrArgs{}}
+	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{VideoDir: "/url-video"}, ChanURLMetarrArgs: &models.MetarrArgs{}}
+	if got, allFilled := FillOutputDirectoryTags(dir, cu, c); got != "/channel-video/a//url-video/b" || !allFilled {
+		t.Errorf("video directories: got %q, %v", got, allFilled)
+	}
+
+	if got, allFilled := FillOutputDirectoryTags(dir, &models.ChannelURL{}, &models.Channel{}); got != dir || allFilled {
+		t.Errorf("no directories: got %q, %v; want the tags left in place and false", got, allFilled)
+	}
+	if got, allFilled := FillOutputDirectoryTags(dir, nil, nil); got != dir || allFilled {
+		t.Errorf("nil models: got %q, %v; want the tags left in place and false", got, allFilled)
+	}
+}
+
+// TestFillChannelOutputDirectory tests a channel's Metarr output directory fills the channel's tag from its video directory.
+func TestFillChannelOutputDirectory(t *testing.T) {
+	c := &models.Channel{
+		ChanSettings:   &models.Settings{VideoDir: "/video"},
+		ChanMetarrArgs: &models.MetarrArgs{OutputDir: "{{channel_output_directory}}/Processed"},
+	}
+	FillChannelOutputDirectory(c)
+	if c.ChanMetarrArgs.OutputDir != "/video/Processed" {
+		t.Errorf("got output directory %q", c.ChanMetarrArgs.OutputDir)
+	}
+}
+
+// TestFillChannelURLOutputDirectory tests a channel URL's Metarr output directory fills from the channel's output directory and its own video directory.
+func TestFillChannelURLOutputDirectory(t *testing.T) {
+	c := &models.Channel{ChanSettings: &models.Settings{VideoDir: "/channel-video"}, ChanMetarrArgs: &models.MetarrArgs{OutputDir: "/channel"}}
+	tests := []struct{ dir, want string }{
+		{"{{channel_output_directory}}/Shorts", "/channel/Shorts"},
+		{"{{channel_url_output_directory}}/Shorts", "/url-video/Shorts"},
+		{"/plain", "/plain"},
+	}
+	for _, tt := range tests {
+		cu := &models.ChannelURL{ChanURLSettings: &models.Settings{VideoDir: "/url-video"}, ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: tt.dir}}
+		FillChannelURLOutputDirectory(cu, c)
+		if cu.ChanURLMetarrArgs.OutputDir != tt.want {
+			t.Errorf("%q: got %q, want %q", tt.dir, cu.ChanURLMetarrArgs.OutputDir, tt.want)
+		}
+	}
+}
+
+// TestParseDirectoryUnfilledOutputTag tests an output directory tag left with no directory to fill from is an error.
+func TestParseDirectoryUnfilledOutputTag(t *testing.T) {
+	dp := NewDirectoryParser(&models.Channel{Name: "Cats"}, &models.ChannelURL{URL: "https://example.com/@cats"}, TubarrTags)
+	for _, dir := range []string{"{{channel_output_directory}}/Shorts", "{{channel_url_output_directory}}/Shorts"} {
+		if got, err := dp.ParseDirectory(dir, "test"); err == nil {
+			t.Errorf("ParseDirectory(%q) = %q, want an error", dir, got)
 		}
 	}
 }

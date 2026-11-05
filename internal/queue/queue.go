@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 	"tubarr/internal/blocking"
@@ -176,35 +178,66 @@ func DomainBlocked(cu *models.ChannelURL) error {
 // CheckDestinations returns an error if any of a channel URL's download destinations (or a video's overrides) isn't available.
 func CheckDestinations(c *models.Channel, cu *models.ChannelURL, o *models.VideoOverrides) error {
 	s := cmp.Or(cu.ChanURLSettings, c.ChanSettings)
-	var dirs []string
+	var outputDirs []string
 	if s != nil {
 		videoDir, jsonDir := s.VideoDir, s.JSONDir
 		if o != nil {
 			videoDir, jsonDir = cmp.Or(o.VideoDir, videoDir), cmp.Or(o.JSONDir, jsonDir)
 		}
-		dirs = append(dirs, videoDir, jsonDir)
+		for _, dir := range []string{videoDir, jsonDir} {
+			if err := validation.CheckDestination(dir); err != nil {
+				return err
+			}
+		}
 	}
 	// Metarr's output directory, in the order metarr.parseMetarrOutputDir picks it.
 	switch {
 	case o != nil && o.OutputDir != "":
-		dirs = append(dirs, o.OutputDir)
+		outputDirs = append(outputDirs, o.OutputDir)
 	default:
 		if s != nil {
 			for _, op := range s.MetaFilterMoveOps {
-				// An op inside {{output_directory}} is covered by the output directory's own check.
-				if _, hasTag := parsing.FillOutputDirectory(op.OutputDir, ""); !hasTag {
-					dirs = append(dirs, op.OutputDir)
-				}
+				outputDirs = append(outputDirs, op.OutputDir)
 			}
 		}
 		if m := cmp.Or(cu.ChanURLMetarrArgs, c.ChanMetarrArgs); m != nil {
-			dirs = append(dirs, m.OutputDir)
+			outputDirs = append(outputDirs, m.OutputDir)
 		}
 	}
-	for _, dir := range dirs {
-		if err := validation.CheckDestination(dir); err != nil {
+
+	// Metarr creates a folder inside a video or output directory when needed, so only that directory has to be available.
+	parents := videoAndOutputDirs(c, cu)
+	for _, dir := range outputDirs {
+		filled, _ := parsing.FillOutputDirectoryTags(dir, cu, c)
+		if err := validation.CheckDestination(outermostParent(filled, parents)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// videoAndOutputDirs returns the channel's and channel URL's video and Metarr output directories.
+func videoAndOutputDirs(c *models.Channel, cu *models.ChannelURL) []string {
+	var dirs []string
+	for _, s := range []*models.Settings{c.ChanSettings, cu.ChanURLSettings} {
+		if s != nil {
+			dirs = append(dirs, s.VideoDir)
+		}
+	}
+	for _, m := range []*models.MetarrArgs{c.ChanMetarrArgs, cu.ChanURLMetarrArgs} {
+		if m != nil {
+			dirs = append(dirs, m.OutputDir)
+		}
+	}
+	return dirs
+}
+
+// outermostParent returns the shortest of parents that contains dir, or dir if none do.
+func outermostParent(dir string, parents []string) string {
+	for _, parent := range parents {
+		if parent != "" && strings.HasPrefix(filepath.Clean(dir), filepath.Clean(parent)+string(filepath.Separator)) {
+			dir = parent
+		}
+	}
+	return dir
 }

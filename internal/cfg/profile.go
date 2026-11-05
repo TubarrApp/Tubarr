@@ -7,6 +7,7 @@ import (
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/enums"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -171,7 +172,7 @@ func applyProfileFlags(cmd *cobra.Command, f *models.ChannelFlagValues, p *model
 	if err := parsing.ApplySettingsInput(p.ProfileSettings, &input.SettingsInput); err != nil {
 		return err
 	}
-	return parsing.ApplyMetarrArgsInput(p.ProfileMetarrArgs, &input.MetarrArgsInput)
+	return parsing.ApplyMetarrArgsInput(p.ProfileMetarrArgs, &input.MetarrArgsInput, enums.ChannelLevel)
 }
 
 // lookupProfile returns the profile with the given name.

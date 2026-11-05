@@ -86,7 +86,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 		crawledAny = true
 
-		// Hold a domain crawl slot (no-op if the domain has no crawl limit).
+		// Hold a domain crawl slot (never waits if the domain has no crawl limit).
 		crawlSem, err := limits.DomainCrawls.Acquire(ctx, cu.URL)
 		if err != nil {
 			return nil, err
@@ -95,7 +95,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		// Get access details once per ChannelURL - delegated to CookieManager
 		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
 		if err != nil {
-			limits.Release(crawlSem)
+			crawlSem.Release()
 			if ctx.Err() != nil {
 				return nil, err
 			}
@@ -117,7 +117,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 		// Fetch new episode URLs
 		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu, seenURLs)
-		limits.Release(crawlSem)
+		crawlSem.Release()
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, err

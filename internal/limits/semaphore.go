@@ -29,6 +29,17 @@ func (s *Semaphore) SetLimit(l int) {
 	s.grant()
 }
 
+// TryAcquire takes a slot if one is free and nobody is waiting, without blocking.
+func (s *Semaphore) TryAcquire() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.waiting.Len() == 0 && s.free() {
+		s.held++
+		return true
+	}
+	return false
+}
+
 // Acquire blocks until it's given a slot, or ctx is done.
 func (s *Semaphore) Acquire(ctx context.Context) error {
 	s.mu.Lock()

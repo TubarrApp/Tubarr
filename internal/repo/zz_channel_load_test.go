@@ -11,6 +11,67 @@ import (
 	"tubarr/internal/models"
 )
 
+// TestOutputDirectoryTagsFilledOnLoad tests merged loads fill the tags once, including inherited ones and manual downloads, while saved settings keep them.
+func TestOutputDirectoryTagsFilledOnLoad(t *testing.T) {
+	const (
+		inherits = "https://example.com/@inherits"
+		shorts   = "https://example.com/@shorts"
+		own      = "https://example.com/@own"
+	)
+	cs := newTestChannelStore(t)
+	c := testChannel(t, "Tags", inherits, shorts, own)
+	videoDir := c.ChanSettings.VideoDir
+	ownVideoDir := t.TempDir()
+	c.ChanMetarrArgs.OutputDir = "{{channel_output_directory}}/Processed"
+	c.URLModels[1].ChanURLMetarrArgs = &models.MetarrArgs{OutputDir: "{{channel_output_directory}}/Shorts"}
+	c.URLModels[2].ChanURLSettings = &models.Settings{VideoDir: ownVideoDir}
+	c.URLModels[2].ChanURLMetarrArgs = &models.MetarrArgs{OutputDir: "{{channel_url_output_directory}}/Processed"}
+	id, err := cs.AddChannel(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cs.AddChannelURL(id, &models.ChannelURL{URL: consts.ManualDownloadsCol}, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// The directories jobs use.
+	merged, found, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(id, 10), true)
+	if err != nil || !found {
+		t.Fatalf("merged load: found %t, %v", found, err)
+	}
+	if got := merged.ChanMetarrArgs.OutputDir; got != filepath.Join(videoDir, "Processed") {
+		t.Errorf("channel output directory = %q", got)
+	}
+	want := map[string]string{
+		inherits:                  filepath.Join(videoDir, "Processed"),
+		shorts:                    filepath.Join(videoDir, "Processed", "Shorts"),
+		own:                       filepath.Join(ownVideoDir, "Processed"),
+		consts.ManualDownloadsCol: filepath.Join(videoDir, "Processed"),
+	}
+	if len(merged.URLModels) != len(want) {
+		t.Fatalf("got %d channel URLs, want %d", len(merged.URLModels), len(want))
+	}
+	for _, cu := range merged.URLModels {
+		if got := cu.ChanURLMetarrArgs.OutputDir; got != want[cu.URL] {
+			t.Errorf("%s: got %q, want %q", cu.URL, got, want[cu.URL])
+		}
+	}
+
+	// The directories saves and the edit forms use.
+	saved, found, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(id, 10), false)
+	if err != nil || !found {
+		t.Fatalf("saved load: found %t, %v", found, err)
+	}
+	if got := saved.ChanMetarrArgs.OutputDir; got != "{{channel_output_directory}}/Processed" {
+		t.Errorf("saved channel output directory = %q", got)
+	}
+	for _, cu := range saved.URLModels {
+		if cu.URL == shorts && cu.ChanURLMetarrArgs.OutputDir != "{{channel_output_directory}}/Shorts" {
+			t.Errorf("saved channel URL output directory = %q", cu.ChanURLMetarrArgs.OutputDir)
+		}
+	}
+}
+
 // TestInvalidChannelLoadsWithError tests that a channel whose saved settings fail validation loads with its LoadErr,
 // without stopping other channels loading.
 func TestInvalidChannelLoadsWithError(t *testing.T) {

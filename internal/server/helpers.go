@@ -13,6 +13,7 @@ import (
 	"time"
 	"tubarr/internal/auth"
 	"tubarr/internal/contracts"
+	"tubarr/internal/domain/enums"
 	"tubarr/internal/domain/jsonkeys"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
@@ -739,7 +740,7 @@ func blankWhitespaceValues(r *http.Request) {
 // parseMetarrArgsInput validates MetarrArgs from the frontend (a URL's, or a video's in Download As).
 func parseMetarrArgsInput(in *metarrArgsInput) (*models.MetarrArgs, error) {
 	m := &models.MetarrArgs{}
-	if err := parsing.ApplyMetarrArgsInput(m, in.input()); err != nil {
+	if err := parsing.ApplyMetarrArgsInput(m, in.input(), enums.ChannelURLLevel); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -865,7 +866,7 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 	}
 
 	m := &models.MetarrArgs{}
-	if err := parsing.ApplyMetarrArgsInput(m, in); err != nil {
+	if err := parsing.ApplyMetarrArgsInput(m, in, enums.ChannelLevel); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -937,7 +938,7 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 	if err := validation.CheckDestination(o.JSONDir); err != nil {
 		return nil, fmt.Errorf("invalid JSON directory %q: %w", o.JSONDir, err)
 	}
-	if err := validation.CheckDirectory(o.OutputDir, sharedtemplates.AllTemplatesMap); err != nil {
+	if err := validation.CheckDirectory(o.OutputDir, sharedtemplates.OutputDirectoryTemplateTags); err != nil {
 		return nil, fmt.Errorf("invalid output directory %q: %w", o.OutputDir, err)
 	}
 	if err := validation.CheckDestination(o.OutputDir); err != nil {

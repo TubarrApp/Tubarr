@@ -190,7 +190,43 @@ func TestProfileOpsAdded(t *testing.T) {
 	check("URL filename ops", cu.ChanURLMetarrArgs.FilenameOps, []models.FilenameOps{profilePrefix, channelSuffix})
 }
 
-// TestChannelVideoDirFromProfile tests that a channel can use its profile's video directory, but must have one.
+// TestProfileOutputDirectoryTag tests a profile's output directory tag fills from the video directory on a channel, and the channel's output directory on a URL.
+func TestProfileOutputDirectoryTag(t *testing.T) {
+	cs := newTestChannelStore(t)
+	p := addTestProfile(t, cs, "shorts", nil, &models.MetarrArgs{OutputDir: "{{channel_output_directory}}/Shorts"})
+
+	// On a channel, whose URLs inherit it already filled.
+	onChannel := testChannel(t, "on channel", "https://example.com/@a")
+	onChannel.ProfileID = p.ID
+	if err := cs.AddChannelWithDetails(onChannel, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	loaded, _, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(onChannel.ID, 10), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(onChannel.ChanSettings.VideoDir, "Shorts")
+	if got := loaded.URLModels[0].ChanURLMetarrArgs.OutputDir; got != want {
+		t.Errorf("profile on a channel: got %q, want %q", got, want)
+	}
+
+	// On a channel URL.
+	onURL := testChannel(t, "on url", "https://example.com/@b")
+	onURL.ChanMetarrArgs.OutputDir = t.TempDir()
+	onURL.URLModels[0].ProfileID = p.ID
+	if err := cs.AddChannelWithDetails(onURL, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, _, err = cs.GetChannelModel(consts.QChanID, strconv.FormatInt(onURL.ID, 10), true); err != nil {
+		t.Fatal(err)
+	}
+	want = filepath.Join(onURL.ChanMetarrArgs.OutputDir, "Shorts")
+	if got := loaded.URLModels[0].ChanURLMetarrArgs.OutputDir; got != want {
+		t.Errorf("profile on a channel URL: got %q, want %q", got, want)
+	}
+}
+
+// TestChannelVideoDirFromProfiletests that a channel can use its profile's video directory, but must have one.
 func TestChannelVideoDirFromProfile(t *testing.T) {
 	cs := newTestChannelStore(t)
 	withDir := addTestProfile(t, cs, "with folder", &models.Settings{VideoDir: filepath.Join(t.TempDir(), "{{channel_name}}")}, nil)

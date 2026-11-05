@@ -17,6 +17,7 @@ import (
 	"tubarr/internal/auth"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/enums"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
 	"tubarr/internal/domain/vars"
@@ -717,7 +718,7 @@ func checkDownloadDirs(old, s *models.Settings) error {
 		if slices.Contains(existing, op.OutputDir) {
 			continue
 		}
-		if err := validation.CheckDirectory(op.OutputDir, sharedtemplates.MoveOpTemplateTags); err != nil {
+		if err := validation.CheckDirectory(op.OutputDir, sharedtemplates.OutputDirectoryTemplateTags); err != nil {
 			return err
 		}
 	}
@@ -1107,6 +1108,7 @@ func (cs *ChannelStore) loadChannelDetails(c *models.Channel, settingsJSON, meta
 			mergeMetarrArgs(c.ChanMetarrArgs, c.Profile.ProfileMetarrArgs)
 		}
 		c.ChanSettings.JSONDir = cmp.Or(c.ChanSettings.JSONDir, c.ChanSettings.VideoDir) // Without a JSON directory, metadata is saved with the videos.
+		parsing.FillChannelOutputDirectory(c)
 	}
 
 	urlModels, err := cs.GetChannelURLModels(c, mergeURLsWithParent)
@@ -1812,7 +1814,7 @@ func applyConfigChannel(c *models.Channel, cfgFile string, input *models.Channel
 	if err := validation.ValidateSettingsModel(c.ChanSettings, false); err != nil {
 		return fmt.Errorf("invalid settings in config file %q: %w", cfgFile, err)
 	}
-	if err := parsing.ApplyMetarrArgsInput(c.ChanMetarrArgs, &input.MetarrArgsInput); err != nil {
+	if err := parsing.ApplyMetarrArgsInput(c.ChanMetarrArgs, &input.MetarrArgsInput, enums.ChannelLevel); err != nil {
 		return fmt.Errorf("invalid metarr config in config file %q: %w", cfgFile, err)
 	}
 	if err := validation.ValidateMetarrArgsModel(c.ChanMetarrArgs, false); err != nil {
@@ -1846,7 +1848,7 @@ func (cs *ChannelStore) applyConfigURLSettings(c *models.Channel, cfgFile string
 			}
 		}
 		if override.Metarr != nil {
-			if err := parsing.ApplyMetarrArgsInput(m, override.Metarr); err != nil {
+			if err := parsing.ApplyMetarrArgsInput(m, override.Metarr, enums.ChannelURLLevel); err != nil {
 				return nil, fmt.Errorf("invalid metarr config for URL %q in config file %q: %w", cu.URL, cfgFile, err)
 			}
 		}

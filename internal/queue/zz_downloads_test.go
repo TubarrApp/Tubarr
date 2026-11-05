@@ -275,3 +275,51 @@ func TestOverrideDir(t *testing.T) {
 		t.Error("missing destination: got no error")
 	}
 }
+
+// TestCheckDestinationsOutputDirectoryTags tests an output folder inside a video or output directory needn't exist yet, but that directory must.
+func TestCheckDestinationsOutputDirectoryTags(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(t.TempDir(), "unmounted")
+
+	tests := []struct {
+		name          string
+		channelOutput string
+		urlOutput     string
+		moveOp        string
+		wantErr       bool
+	}{
+		{"new folder inside the channel's output directory", dir, filepath.Join(dir, "Shorts"), "", false},
+		{"new folder inside a missing output directory", missing, filepath.Join(missing, "Shorts"), "", true},
+		{"move op inside the channel URL's output directory", "", dir, "{{channel_url_output_directory}}/Shorts", false},
+		{"move op inside the channel's output directory", dir, "", "{{channel_output_directory}}/Shorts", false},
+		{"move op inside a missing channel output directory", missing, dir, "{{channel_output_directory}}/Shorts", true},
+		{"channel URL elsewhere from a missing channel output directory", missing, dir, "", false},
+		{"missing folder outside every directory", "", filepath.Join(missing, "Shorts"), "", true},
+	}
+	for _, tt := range tests {
+		c := &models.Channel{ChanSettings: &models.Settings{VideoDir: dir}, ChanMetarrArgs: &models.MetarrArgs{OutputDir: tt.channelOutput}}
+		s := &models.Settings{VideoDir: dir}
+		if tt.moveOp != "" {
+			s.MetaFilterMoveOps = []models.MetaFilterMoveOps{{OutputDir: tt.moveOp}}
+		}
+		cu := &models.ChannelURL{ChanURLSettings: s, ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: tt.urlOutput}}
+		if err := CheckDestinations(c, cu, nil); (err != nil) != tt.wantErr {
+			t.Errorf("%s: got %v, want an error: %t", tt.name, err, tt.wantErr)
+		}
+	}
+
+	// A video directory must exist, even inside another directory, as nothing creates it for Tubarr.
+	inside := &models.ChannelURL{ChanURLSettings: &models.Settings{VideoDir: filepath.Join(dir, "missing")}, ChanURLMetarrArgs: &models.MetarrArgs{}}
+	if err := CheckDestinations(&models.Channel{ChanSettings: &models.Settings{VideoDir: dir}, ChanMetarrArgs: &models.MetarrArgs{}}, inside, nil); err == nil {
+		t.Error("missing video directory inside the channel's: got no error")
+	}
+
+	// A Download As directory using a tag is checked the same way.
+	c := &models.Channel{ChanSettings: &models.Settings{VideoDir: dir}, ChanMetarrArgs: &models.MetarrArgs{OutputDir: missing}}
+	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{VideoDir: dir}, ChanURLMetarrArgs: &models.MetarrArgs{}}
+	o := &models.VideoOverrides{}
+	o.OutputDir = "{{channel_output_directory}}/Once"
+	if err := CheckDestinations(c, cu, o); err == nil {
+		t.Error("Download As directory inside a missing channel output directory: got no error")
+	}
+}

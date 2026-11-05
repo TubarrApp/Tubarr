@@ -196,7 +196,46 @@ func TestHandleMoveOps(t *testing.T) {
 			t.Fatalf("%s: %v", tt.name, err)
 		}
 		cu := &models.ChannelURL{URL: "https://tubesite.com/@cats", ChanURLSettings: &models.Settings{MetaFilterMoveOps: ops}}
-		if got := HandleMoveOps(video, cu, nil); got != tt.want {
+		if got := HandleMoveOps(video, cu, nil, nil); got != tt.want {
+			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+// TestHandleMoveOpsOutputDirectoryTags tests both tags fill from the output directory, else the video directory, and an op with neither is skipped.
+func TestHandleMoveOpsOutputDirectoryTags(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	video := &models.Video{MetadataMap: map[string]any{"title": "Two Cats Playing"}}
+
+	withOutput := &models.Channel{ChanSettings: &models.Settings{VideoDir: "/channel-video"}, ChanMetarrArgs: &models.MetarrArgs{OutputDir: "/channel"}}
+	videoOnly := &models.Channel{ChanSettings: &models.Settings{VideoDir: "/channel-video"}, ChanMetarrArgs: &models.MetarrArgs{}}
+	noDirs := &models.Channel{}
+
+	tests := []struct {
+		name      string
+		dir       string
+		c         *models.Channel
+		urlOutput string
+		want      string
+	}{
+		{"channel output directory", "{{channel_output_directory}}/Shorts", withOutput, "", "/channel/Shorts"},
+		{"channel video directory", "{{channel_output_directory}}/Shorts", videoOnly, "", "/channel-video/Shorts"},
+		{"channel tag with a URL output directory", "{{channel_output_directory}}/Shorts", withOutput, "/url", "/channel/Shorts"},
+		{"URL output directory", "{{channel_url_output_directory}}/Shorts", withOutput, "/url", "/url/Shorts"},
+		{"URL video directory", "{{channel_url_output_directory}}/Shorts", withOutput, "", "/url-video/Shorts"},
+		{"no channel directory", "{{channel_output_directory}}/Shorts", noDirs, "", ""},
+	}
+	for _, tt := range tests {
+		ops, err := parsing.ParseMetaFilterMoveOps([]string{"title:contains:cats||" + tt.dir})
+		if err != nil {
+			t.Fatalf("%s: %v", tt.name, err)
+		}
+		cu := &models.ChannelURL{
+			URL:               "https://tubesite.com/@cats",
+			ChanURLSettings:   &models.Settings{VideoDir: "/url-video", MetaFilterMoveOps: ops},
+			ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: tt.urlOutput},
+		}
+		if got := HandleMoveOps(video, cu, tt.c, nil); got != tt.want {
 			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
 		}
 	}

@@ -65,7 +65,7 @@ func (dp *DirectoryParser) ParseDirectory(dir string, fileType string) (parsedDi
 		}
 	}
 
-	// Abs also cleans, collapsing a "//" left by {{output_directory}}'s trailing slash.
+	// Abs also cleans, collapsing a "//" left by {{channel_url_output_directory}}'s trailing slash.
 	if parsed, err = filepath.Abs(parsed); err != nil {
 		return parsed, err
 	}
@@ -137,9 +137,54 @@ func (dp *DirectoryParser) parseTemplate(dir string) (string, error) {
 	return b.String(), nil
 }
 
-// FillOutputDirectory replaces each {{output_directory}} tag in a move op's dir with outputDir, reporting whether it had one.
-func FillOutputDirectory(dir, outputDir string) (filled string, hasTag bool) {
+// FillChannelOutputDirectory fills {{channel_output_directory}} in a merged channel's Metarr output directory from its video directory.
+func FillChannelOutputDirectory(c *models.Channel) {
+	s := c.ChanSettings
+	m := c.ChanMetarrArgs
+	if s == nil || m == nil {
+		return
+	}
+	m.OutputDir, _ = replaceOutputDirectoryTags(m.OutputDir, s.VideoDir, "")
+}
+
+// FillChannelURLOutputDirectory fills the output directory tags in a merged channel URL's Metarr output directory.
+func FillChannelURLOutputDirectory(cu *models.ChannelURL, c *models.Channel) {
+	s := cu.ChanURLSettings
+	m := cu.ChanURLMetarrArgs
+	if s == nil || m == nil {
+		return
+	}
+	m.OutputDir, _ = replaceOutputDirectoryTags(m.OutputDir, outputOrVideoDir(c.ChanMetarrArgs, c.ChanSettings), s.VideoDir)
+}
+
+// FillOutputDirectoryTags fills a move op or Download As directory, reporting whether every output directory tag in it had a directory to fill from.
+func FillOutputDirectoryTags(dir string, cu *models.ChannelURL, c *models.Channel) (filled string, allFilled bool) {
+	var channelDir, channelURLDir string
+	if c != nil {
+		channelDir = outputOrVideoDir(c.ChanMetarrArgs, c.ChanSettings)
+	}
+	if cu != nil {
+		channelURLDir = outputOrVideoDir(cu.ChanURLMetarrArgs, cu.ChanURLSettings)
+	}
+	return replaceOutputDirectoryTags(dir, channelDir, channelURLDir)
+}
+
+// outputOrVideoDir returns the Metarr output directory if there is one, else the video directory.
+func outputOrVideoDir(m *models.MetarrArgs, s *models.Settings) string {
+	var outputDir, videoDir string
+	if m != nil {
+		outputDir = m.OutputDir
+	}
+	if s != nil {
+		videoDir = s.VideoDir
+	}
+	return cmp.Or(outputDir, videoDir)
+}
+
+// replaceOutputDirectoryTags swaps each output directory tag in dir for its directory, reporting false if any had none and stayed in place.
+func replaceOutputDirectoryTags(dir, channelDir, channelURLDir string) (filled string, allFilled bool) {
 	var b strings.Builder
+	allFilled = true
 
 	for {
 		before, remaining, found := strings.Cut(dir, openTemplate)
@@ -155,19 +200,26 @@ func FillOutputDirectory(dir, outputDir string) (filled string, hasTag bool) {
 			break
 		}
 
-		if name, _ := sharedtemplates.ParseTag(tag); name == sharedtemplates.OutputDirectory {
-			b.WriteString(outputDir)
-			hasTag = true
-		} else {
+		name, _ := sharedtemplates.ParseTag(tag)
+		switch {
+		case name == sharedtemplates.ChannelOutputDirectory && channelDir != "":
+			b.WriteString(channelDir)
+
+		case name == sharedtemplates.ChannelURLOutputDirectory && channelURLDir != "":
+			b.WriteString(channelURLDir)
+
+		default:
+			if name == sharedtemplates.ChannelOutputDirectory || name == sharedtemplates.ChannelURLOutputDirectory {
+				allFilled = false
+			}
 			b.WriteString(openTemplate)
 			b.WriteString(tag)
 			b.WriteString(closeTemplate)
 		}
-
 		dir = after
 	}
 
-	return b.String(), hasTag
+	return b.String(), allFilled
 }
 
 // replaceTemplateTags makes template replacements in the directory string.
@@ -228,6 +280,10 @@ func channelTagValue(name string, c *models.Channel, cu *models.ChannelURL) (str
 			return "", errors.New("templating: channel URL empty")
 		}
 		value = cmp.Or(cu.Name, sharedparsing.StripURLScheme(cu.URL))
+
+	// Only left in place when there's no directory to fill it from.
+	case sharedtemplates.ChannelOutputDirectory, sharedtemplates.ChannelURLOutputDirectory:
+		return "", fmt.Errorf("templating: no directory to fill %q from", name)
 
 	default:
 		return "", fmt.Errorf("tag %q detected as invalid", name)

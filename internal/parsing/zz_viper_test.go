@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"tubarr/internal/domain/enums"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 
@@ -115,8 +116,44 @@ func TestApplySameAndKeep(t *testing.T) {
 
 	// Metarr's extension and metadata files.
 	var m models.MetarrArgs
-	if err := ApplyMetarrArgsInput(&m, &models.MetarrArgsInput{MetarrExt: &same, MetaPurge: &keep}); err != nil || m.OutputExt != same || m.MetaPurge != keep {
+	if err := ApplyMetarrArgsInput(&m, &models.MetarrArgsInput{MetarrExt: &same, MetaPurge: &keep}, enums.ChannelLevel); err != nil || m.OutputExt != same || m.MetaPurge != keep {
 		t.Errorf("Metarr args: got output extension %q and purge %q, %v; want %q and %q", m.OutputExt, m.MetaPurge, err, same, keep)
+	}
+}
+
+// TestApplyOutputDirectoryTags tests which directories accept the output directory tags on a channel and on a channel URL.
+func TestApplyOutputDirectoryTags(t *testing.T) {
+	channelTag := "{{channel_output_directory}}/Shorts"
+	urlTag := "{{channel_url_output_directory}}/Shorts"
+
+	// Video and JSON directories accept neither tag.
+	for _, dir := range []*string{&channelTag, &urlTag} {
+		var s models.Settings
+		if err := ApplySettingsInput(&s, &models.SettingsInput{VideoDir: dir}); err == nil {
+			t.Errorf("video directory %q was accepted", *dir)
+		}
+		if err := ApplySettingsInput(&s, &models.SettingsInput{JSONDir: dir}); err == nil {
+			t.Errorf("JSON directory %q was accepted", *dir)
+		}
+	}
+
+	// Metarr output directories accept both on a channel URL, and only the channel's on a channel.
+	tests := []struct {
+		name  string
+		dir   *string
+		level enums.SettingsLevel
+		want  bool
+	}{
+		{"channel tag on a channel", &channelTag, enums.ChannelLevel, true},
+		{"channel URL tag on a channel", &urlTag, enums.ChannelLevel, false},
+		{"channel tag on a channel URL", &channelTag, enums.ChannelURLLevel, true},
+		{"channel URL tag on a channel URL", &urlTag, enums.ChannelURLLevel, true},
+	}
+	for _, tt := range tests {
+		var m models.MetarrArgs
+		if err := ApplyMetarrArgsInput(&m, &models.MetarrArgsInput{OutDir: tt.dir}, tt.level); (err == nil) != tt.want {
+			t.Errorf("%s: got %v, want accepted: %t", tt.name, err, tt.want)
+		}
 	}
 }
 

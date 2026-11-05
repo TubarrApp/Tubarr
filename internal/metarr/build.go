@@ -138,7 +138,8 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *par
 	switch {
 	// Download As output directory, chosen for this video.
 	case v.Overrides != nil && v.Overrides.OutputDir != "":
-		dir, name = v.Overrides.OutputDir, "'Download As...' output directory"
+		dir, _ = parsing.FillOutputDirectoryTags(v.Overrides.OutputDir, cu, dirParser.C)
+		name = "'Download As...' output directory"
 	// #1 Priority: Move operation filter output directory.
 	case v.MoveOpOutputDir != "":
 		dir = v.MoveOpOutputDir

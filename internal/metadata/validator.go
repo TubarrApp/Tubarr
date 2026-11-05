@@ -18,7 +18,6 @@ import (
 	"github.com/TubarrApp/gocommon/sharedfilters"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtags"
-	"github.com/TubarrApp/gocommon/sharedtemplates"
 )
 
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
@@ -259,14 +258,9 @@ func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.
 }
 
 // HandleMoveOps checks if Metarr should use an output directory based on existent metadata.
-func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {
+func HandleMoveOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
 	// Copy of the database move ops, plus file-based move ops.
 	allMoveOps := slices.Concat(cu.ChanURLSettings.MetaFilterMoveOps, loadMoveOpsFromFile(cu, dirParser))
-
-	var metarrOutputDir string
-	if cu.ChanURLMetarrArgs != nil {
-		metarrOutputDir = cu.ChanURLMetarrArgs.OutputDir
-	}
 
 	// Check each move operation against video metadata.
 	for _, op := range allMoveOps {
@@ -280,10 +274,10 @@ func HandleMoveOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 			continue
 		}
 
-		// Fill {{output_directory}} from the channel URL's Metarr output directory, skipping the op if it has none.
-		outputDir, hasTag := parsing.FillOutputDirectory(op.OutputDir, metarrOutputDir)
-		if hasTag && metarrOutputDir == "" {
-			logger.Pl.W("Skipping move op %q: it uses {{%s}}, but no Metarr output directory is set", filters, sharedtemplates.OutputDirectory)
+		// Fill the output directory tags, skipping the op if one has no directory to fill from.
+		outputDir, allFilled := parsing.FillOutputDirectoryTags(op.OutputDir, cu, c)
+		if !allFilled {
+			logger.Pl.W("Skipping move op %q: %q uses an output directory tag with no directory to fill it from", filters, op.OutputDir)
 			continue
 		}
 		logger.Pl.I("Move op matched: %q. Output directory retrieved as %q", filters, outputDir)

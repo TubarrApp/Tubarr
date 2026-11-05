@@ -359,10 +359,11 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                 that matches wins, and a channel URL's own move ops are checked before the channel's.
               </p>
               <p>
-                In a move op, <code>{{output_directory}}</code> is the Metarr <strong>Output Directory</strong>, e.g.
-                <code>title:contains:podcast||{{output_directory}}/Podcasts</code> puts podcasts in a folder inside it,
-                so changing the output directory moves them too. A move op using it is skipped when no output directory
-                is set.
+                In a move op, <code>{{channel_url_output_directory}}</code> is the channel URL's Metarr
+                <strong>Output Directory</strong>, or its video directory if it has none, e.g.
+                <code>title:contains:podcast||{{channel_url_output_directory}}/Podcasts</code> puts podcasts in a folder inside it,
+                so changing the output directory moves them too. <code>{{channel_output_directory}}</code> does the same
+                with the channel's directories.
               </p>
               <p>Where a finished video goes, first match first:</p>
               <ol>
@@ -374,7 +375,8 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
               <p>
                 Tubarr never creates download folders: a video or JSON directory must already exist, so an unmounted
                 drive isn't filled by mistake. A directory using <a href="#templates">template tags</a> needs its fixed
-                part to exist.
+                part to exist. Metarr creates its own output folders, so when downloading, an Output Directory or move op
+                folder inside a video or Output Directory only needs that directory to exist.
               </p>
 
               <!-- ===== Transcoding ===== -->
@@ -507,7 +509,6 @@ vp9:av1</code></pre>
                   <tr><th>Where</th><th>Tags</th></tr>
                   <tr><td>Video and JSON directories</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code>, <code>{{channel_url_name}}</code></td></tr>
                   <tr><td>Metarr output directory, move ops</td><td>Those, plus <code>{{video_title}}</code>, <code>{{video_url}}</code>, <code>{{year}}</code>, <code>{{month}}</code>, <code>{{day}}</code>, <code>{{author}}</code>, <code>{{director}}</code>, <code>{{domain}}</code></td></tr>
-                  <tr><td>Move ops only</td><td><code>{{output_directory}}</code></td></tr>
                   <tr><td>Op values</td><td><code>{{channel_name}}</code>, <code>{{channel_id}}</code>, <code>{{channel_url}}</code>, <code>{{channel_url_name}}</code>, plus any metadata field: <code>{{uploader}}</code>, <code>{{fulltitle}}</code>, <code>{{id}}</code>…</td></tr>
                 </table>
               </div>
@@ -520,6 +521,23 @@ vp9:av1</code></pre>
                 <code>{{channel_url_name}}</code> is the name given to a channel URL on its channel's page, or the URL
                 itself if it has none, e.g. <code>/media/{{channel_name}}/{{channel_url_name}}</code> to keep each URL's
                 videos in their own folder.
+              </p>
+              <p>
+                Two more tags build a Metarr output directory on another one, e.g.
+                <code>{{channel_output_directory}}/Shorts</code> as a channel URL's Output Directory. Video and JSON
+                directories can't use them, as they can hold tags like <code>{{year}}</code> that aren't known until after
+                the download. What they fill with depends on where they're used:
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Where</th><th><code>{{channel_output_directory}}</code></th><th><code>{{channel_url_output_directory}}</code></th></tr>
+                  <tr><td>Channel Output Directory</td><td>The channel's video directory</td><td>Not allowed</td></tr>
+                  <tr><td>Channel URL Output Directory</td><td>The channel's Output Directory, else its video directory</td><td>The URL's video directory</td></tr>
+                  <tr><td>Move ops, Post-Process Directory in Download As and Edit &amp; Re-Process</td><td>The channel's Output Directory, else its video directory</td><td>The URL's Output Directory, else its video directory</td></tr>
+                </table>
+              </div>
+              <p>
+                A profile's Output Directory can only use <code>{{channel_output_directory}}</code>.
               </p>
 
               <!-- ===== Precedence ===== -->
