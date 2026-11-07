@@ -46,7 +46,7 @@
             <!-- Videos Container -->
             <div
               x-data="videosData()"
-              @edit-metarr-done.window="startedMetarr.push($event.detail.id); loadActivity(); setTimeout(() => loadVideos(), 3000)"
+              @edit-metarr-done.window="startedMetarr.push(...[].concat($event.detail).map(v => v.id)); loadActivity(); setTimeout(() => loadVideos(), 3000)"
             >
               <!-- Loading State -->
               <div x-show="loading" class="text-center py-12">
@@ -157,16 +157,32 @@
 
                 <!-- Bulk Actions Bar -->
                 <div x-show="selectedVideos.length > 0" class="border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-gray-800">
-                  <div class="flex items-center justify-between">
+                  <div class="flex flex-wrap items-center justify-between gap-4">
                     <p class="text-sm font-medium text-gray-900 dark:text-white">
                       <span x-text="selectedVideos.length"></span> video<span x-show="selectedVideos.length !== 1">s</span> selected
                     </p>
-                    <div class="flex gap-3">
+                    <div class="flex flex-wrap gap-3">
                       <button
                         @click="clearSelection()"
                         class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
                       >
                         Clear Selection
+                      </button>
+                      <button
+                        @click="$dispatch('edit-metarr', reprocessVideos.map(v => ({ ...v, channel_id: channelId, rerun: true })))"
+                        :disabled="runningMetarr || reprocessVideos.length === 0"
+                        :title="selectedReprocessable.length > 0 && reprocessVideos.length === 0 ? oneURLHint : 'Edit the directory and ops of the selected post-processed videos together, then post-process their finished files again with Metarr.'"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                      >
+                        Edit &amp; Re-Process Selected
+                      </button>
+                      <button
+                        @click="$dispatch('edit-metarr', postProcessVideos.map(v => ({ ...v, channel_id: channelId })))"
+                        :disabled="runningMetarr || postProcessVideos.length === 0"
+                        :title="selectedPostProcessable.length > 0 && postProcessVideos.length === 0 ? oneURLHint : 'Edit the directory and ops of the selected videos not yet post-processed together, then post-process them with Metarr.'"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                      >
+                        Edit &amp; Post-Process Selected
                       </button>
                       <button
                         @click="runMetarrSelected()"
@@ -426,6 +442,7 @@
           sortOrder: 'newest',
           missingFileHint: "The video file isn't at its saved path any more (moved or renamed?), so it can't be processed.",
           processingHint: 'Already post-processing. Stop it on the Post-processing page to run it again.',
+          oneURLHint: 'Videos edited together get the same options, so select videos from just one channel URL.',
 
           init() {
             // Get channel ID from URL params
@@ -607,6 +624,29 @@
 
           get selectedAwaitingMetarr() {
             return this.awaitingMetarr.filter(v => this.selectedVideos.includes(v.url));
+          },
+
+          // The selected videos Edit & Re-Process can run on.
+          get selectedReprocessable() {
+            return this.videos.filter(v => this.selectedVideos.includes(v.url) && this.metarrDone(v) && v.json_path && v.video_path && !this.processing(v));
+          },
+
+          // The selected videos Edit & Post-Process can run on.
+          get selectedPostProcessable() {
+            return this.selectedAwaitingMetarr.filter(v => v.video_path);
+          },
+
+          get reprocessVideos() {
+            return this.fromOneURL(this.selectedReprocessable);
+          },
+
+          get postProcessVideos() {
+            return this.fromOneURL(this.selectedPostProcessable);
+          },
+
+          // The videos if they're all from one channel URL, as the edit dialog gives them the same options, else none.
+          fromOneURL(videos) {
+            return videos.every(v => v.channel_url_id === videos[0].channel_url_id) ? videos : [];
           },
 
           async runMetarrAll() {

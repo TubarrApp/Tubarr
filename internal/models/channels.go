@@ -17,7 +17,9 @@ type Channel struct {
 	ChanMetarrArgs       *MetarrArgs `db:"metarr"`
 	ProfileID            int64       `db:"profile_id"`
 	Profile              *Profile
+	Levels               []SettingsLevel // Its profile's then its own, for its URLs' levels. Set when loaded merged with its profile.
 	UpdatedFromConfig    bool
+	LoadedAt             time.Time // Taken just before it was read from the database, so a later time means newer settings.
 	LastScan             time.Time `db:"last_scan"`
 	CreatedAt            time.Time `db:"created_at"`
 	UpdatedAt            time.Time `db:"updated_at"`

@@ -155,17 +155,35 @@ func listProfilesCmd(cs contracts.ChannelStore) *cobra.Command {
 
 // ******************************** Private ********************************
 
-// setProfileFlags registers the flags for a profile's settings: a channel's, bar pausing.
+// replaceInheritedFlags are the flags replacing a list a channel or URL inherits, which profiles don't.
+var replaceInheritedFlags = []string{
+	keys.FilterOpsReplaceInherited,
+	keys.MoveOpsReplaceInherited,
+	keys.MMetaOpsReplaceInherited,
+	keys.MFilteredMetaOpsReplaceInherited,
+	keys.MFilenameOpsReplaceInherited,
+	keys.MFilteredFilenameOpsReplaceInherited,
+}
+
+// setProfileFlags registers the flags for a profile's settings: a channel's, bar pausing and replacing inherited lists.
 func setProfileFlags(c *cobra.Command, f *models.ChannelFlagValues) {
 	cmd.SetFileDirFlags(c, nil, &f.JSONDir, &f.VideoDir)
 	setChannelSettingsFlags(c, f)
 	_ = c.Flags().MarkHidden(keys.Pause) // Channels and URLs pause, not profiles.
+	for _, name := range replaceInheritedFlags {
+		_ = c.Flags().MarkHidden(name)
+	}
 }
 
 // applyProfileFlags applies the settings flags given to a profile.
 func applyProfileFlags(cmd *cobra.Command, f *models.ChannelFlagValues, p *models.Profile) error {
 	if cmd.Flags().Changed(keys.Pause) {
 		return fmt.Errorf("--%s pauses channels and channel URLs, not profiles", keys.Pause)
+	}
+	for _, name := range replaceInheritedFlags {
+		if cmd.Flags().Changed(name) {
+			return fmt.Errorf("--%s is for channels and channel URLs, as profiles inherit nothing", name)
+		}
 	}
 	var input models.ChannelInput
 	mergeFlagsIntoInput(cmd, f, &input)

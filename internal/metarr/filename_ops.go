@@ -1,6 +1,7 @@
 package metarr
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"tubarr/internal/domain/logger"
@@ -12,25 +13,31 @@ import (
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
-// loadAndMergeFilenameOps loads and merges filename ops: file ops override DB ops, then apply filtering
+// loadAndMergeFilenameOps returns a video's filename ops: its channel URL's from every level, then its matched filtered
+// ones.
 func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
-	// Load file ops (highest priority). An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
-	fileFilenameOps, err := LoadFilenameOpsFromFile(cu, dirParser)
+	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
+	ops, err := channelURLFilenameOps(cu, dirParser)
 	if err != nil {
 		logger.Pl.E("Filename ops file for %q can't be used: %v", cu.URL, err)
 	}
+	return getDedupedFilenameOpStrings(applyFilteredFilenameOps(ops, v.FilteredFilenameOps, v.URL, c.Name))
+}
 
-	// Ops from file override DB ops with same key
-	nonConflictingDBOps := models.FilterConflictingFilenameOps(fileFilenameOps, cu.ChanURLMetarrArgs.FilenameOps)
-
-	// Combine
-	fileAndDBOps := slices.Concat(fileFilenameOps, nonConflictingDBOps)
-
-	// Merge with filtered filename ops (per-video, stored in Video struct)
-	mergedOps := applyFilteredFilenameOps(fileAndDBOps, v.FilteredFilenameOps, v.URL, c.Name)
-
-	// Convert to slice and deduplicate
-	return getDedupedFilenameOpStrings(mergedOps)
+// channelURLFilenameOps returns a channel URL's filename ops from every level, with each level's ops file. Returns the
+// errors of files it can't use, whose ops are left out.
+func channelURLFilenameOps(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.FilenameOps, error) {
+	fileOps := make([][]models.FilenameOps, len(cu.Levels))
+	var errs []error
+	for i, l := range cu.Levels {
+		if l.MetarrArgs == nil {
+			continue
+		}
+		var err error
+		fileOps[i], err = LoadFilenameOpsFromFile(l.MetarrArgs.FilenameOpsFile, dp)
+		errs = append(errs, err)
+	}
+	return models.StackFilenameOps(cu.Levels, fileOps), errors.Join(errs...)
 }
 
 // overrideFilenameOps returns the video's Download As filename ops, with its matched filtered filename ops and any
@@ -44,18 +51,18 @@ func overrideFilenameOps(v *models.Video, c *models.Channel) []string {
 	return getDedupedFilenameOpStrings(ops)
 }
 
-// LoadFilenameOpsFromFile loads in file operations from the given file.
+// LoadFilenameOpsFromFile loads in filename operations from the file at path, if set.
 //
 // File ops take precedence and will replace any matching DB ops. Returns an error if the file is set but can't be read
 // or parsed.
-func LoadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.FilenameOps, error) {
-	if cu.ChanURLMetarrArgs.FilenameOpsFile == "" {
+func LoadFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.FilenameOps, error) {
+	if path == "" {
 		return nil, nil
 	}
 
-	filenameOpsFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.FilenameOpsFile, "filename ops")
+	filenameOpsFile, err := dp.ParseDirectory(path, "filename ops")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse filename ops file path %q: %w", cu.ChanURLMetarrArgs.FilenameOpsFile, err)
+		return nil, fmt.Errorf("failed to parse filename ops file path %q: %w", path, err)
 	}
 
 	logger.Pl.I("Adding filename ops from file %q...", filenameOpsFile)
@@ -74,25 +81,14 @@ func LoadFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser)
 	return parsedOps, nil
 }
 
-// applyFilteredFilenameOps applies filtering rules to filename ops
+// applyFilteredFilenameOps adds the matched filtered filename ops to ops, each beating any of ops it conflicts with.
 func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.FilteredFilenameOps, videoURL, channelName string) []models.FilenameOps {
 	matchedFilteredOps := extractMatchedFilteredFilenameOps(filteredOps)
-	matchedFilteredKeys := buildFilenameOpKeySet(matchedFilteredOps, true)
-
-	// Keep only ops that aren't being replaced by MATCHED filtered ops
-	result := make([]models.FilenameOps, 0, len(ops))
-	for _, op := range ops {
-		key := sharedparsing.FormatFilenameOp(op)
-		if !matchedFilteredKeys[key] {
-			logger.Pl.D(2, "Added filename operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
-			result = append(result, op)
-		}
+	result := models.FilterConflictingFilenameOps(matchedFilteredOps, ops)
+	for _, op := range result {
+		logger.Pl.D(2, "Added filename operation %q for video URL %q (Channel: %q)", sharedparsing.FormatFilenameOp(op), videoURL, channelName)
 	}
-
-	// Add the matched filtered ops
-	result = append(result, matchedFilteredOps...)
-
-	return result
+	return append(result, matchedFilteredOps...)
 }
 
 // extractMatchedFilteredFilenameOps gets only the filtered ops where filters matched
@@ -104,18 +100,6 @@ func extractMatchedFilteredFilenameOps(filteredOps []models.FilteredFilenameOps)
 		}
 	}
 	return result
-}
-
-// buildFilenameOpKeySet creates a set of keys from filename ops
-func buildFilenameOpKeySet(ops []models.FilenameOps, includeNonConflicting bool) map[string]bool {
-	filenameOpsKeys := make(map[string]bool, len(ops))
-	for _, op := range ops {
-		_, conflicts := models.ConflictingFilenameOps[op.OpType]
-		if includeNonConflicting || !conflicts {
-			filenameOpsKeys[sharedparsing.FormatFilenameOp(op)] = true
-		}
-	}
-	return filenameOpsKeys
 }
 
 // getDedupedFilenameOpStrings converts ops to deduplicated string slice.

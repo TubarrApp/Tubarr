@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
 	"github.com/go-chi/chi/v5"
@@ -106,6 +107,13 @@ func (ss *serverStore) handleUpdateProfile(w http.ResponseWriter, r *http.Reques
 	if err := ss.cs.UpdateProfile(p); err != nil {
 		http.Error(w, err.Error(), channelErrStatus(err))
 		return
+	}
+
+	// Apply its new limits to the queued videos of channels using it, waiting ones included.
+	if channels, _, err := ss.cs.GetAllChannels(true); err != nil {
+		logger.Pl.W("Failed to reload channels to apply profile %q's new limits to queued videos: %v", p.Name, err)
+	} else {
+		ss.setQueueLimits(channels...)
 	}
 	writeText(w, http.StatusOK, fmt.Sprintf("Profile %q updated successfully", p.Name))
 }

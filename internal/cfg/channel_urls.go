@@ -200,6 +200,10 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 			s.MetaFilterMoveOps = nil
 		case keys.MoveOpsFile:
 			s.MetaFilterMoveOpFile = ""
+		case keys.FilterOpsReplaceInherited:
+			s.FiltersReplaceInherited = false
+		case keys.MoveOpsReplaceInherited:
+			s.MoveOpsReplaceInherited = false
 		case keys.ExtraYTDLPVideoArgs:
 			s.ExtraYTDLPVideoArgs = ""
 		case keys.ExtraYTDLPMetaArgs:
@@ -244,6 +248,14 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 			m.FilteredMetaOps = nil
 		case keys.MFilteredFilenameOps:
 			m.FilteredFilenameOps = nil
+		case keys.MMetaOpsReplaceInherited:
+			m.MetaOpsReplaceInherited = false
+		case keys.MFilteredMetaOpsReplaceInherited:
+			m.FilteredMetaOpsReplaceInherited = false
+		case keys.MFilenameOpsReplaceInherited:
+			m.FilenameOpsReplaceInherited = false
+		case keys.MFilteredFilenameOpsReplaceInherited:
+			m.FilteredFilenameOpsReplaceInherited = false
 		case keys.TranscodeGPU:
 			m.TranscodeGPU = ""
 		case keys.TranscodeGPUNode:

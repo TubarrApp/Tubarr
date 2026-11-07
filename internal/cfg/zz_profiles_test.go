@@ -125,13 +125,18 @@ func TestUpdateURLSettingsProfile(t *testing.T) {
 	}
 }
 
-// TestProfileCommands tests renaming a profile, and that profiles can't be paused.
+// TestProfileCommands tests renaming a profile, and that profiles can't be paused or replace inherited lists.
 func TestProfileCommands(t *testing.T) {
 	cs := newSettingsTestStore(t)
 	addCLIProfile(t, cs, "music", nil, nil)
 
 	if err := runSettingsCmd(addProfileCmd(cs), keys.ProfileName, "paused", []settingsKey{{key: keys.Pause, val: true}}); err == nil {
 		t.Error("added a paused profile")
+	}
+	for _, name := range replaceInheritedFlags {
+		if err := runSettingsCmd(editProfileCmd(cs), keys.ProfileName, "music", []settingsKey{{key: name, val: true}}); err == nil {
+			t.Errorf("--%s accepted for a profile", name)
+		}
 	}
 	if err := runSettingsCmd(editProfileCmd(cs), keys.ProfileName, "music", []settingsKey{{key: keys.ChangeNameTo, val: "songs"}}); err != nil {
 		t.Fatal(err)

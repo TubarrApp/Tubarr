@@ -336,19 +336,19 @@
 
                             <h5 class="col-span-full mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">Metadata</h5>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Meta Ops File:</span>
+                              <span class="text-gray-500 dark:text-gray-400">Metadata Ops File:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_meta_ops_file || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Meta Operations:</span>
+                              <span class="text-gray-500 dark:text-gray-400">Metadata Operations:</span>
                               <span :class="channel.metarr?.metarr_meta_ops ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.metarr?.metarr_meta_ops || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Ops File:</span>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Metadata Ops File:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_filtered_meta_ops_file || 'Not set'"></span>
                             </div>
                             <div>
-                              <span class="text-gray-500 dark:text-gray-400">Filtered Meta Operations:</span>
+                              <span class="text-gray-500 dark:text-gray-400">Filtered Metadata Operations:</span>
                               <span :class="channel.metarr?.metarr_filtered_meta_ops ? 'block mt-1 break-words font-mono' : 'ml-2'" class="text-gray-900 dark:text-white text-sm" style="white-space: pre-wrap;" x-text="channel.metarr?.metarr_filtered_meta_ops ? formatFilteredOps(channel.metarr.metarr_filtered_meta_ops, true) : 'Not set'"></span>
                             </div>
                             <div>

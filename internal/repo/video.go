@@ -1272,6 +1272,7 @@ var videoListColumns = strings.Join([]string{
 	consts.QVidFilesize,
 	consts.QVidCreatedAt,
 	consts.QVidUpdatedAt,
+	"COALESCE(" + consts.QVidOverrides + ", '') != ''", // Customized, as only options differing from the channel URL's are stored.
 }, ", ")
 
 // scanVideoList reads rows selected with videoListColumns into videos, without their metadata.
@@ -1306,6 +1307,7 @@ func scanVideoList(rows *sql.Rows) ([]*models.Video, error) {
 			&filesize,
 			&v.CreatedAt,
 			&v.UpdatedAt,
+			&v.Customized,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan video: %w", err)
 		}

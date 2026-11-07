@@ -33,6 +33,10 @@ const (
 	SettingsMoveOps                   = "move_ops"
 	SettingsYTDLPPreferredVideoCodecs = "ytdlp_preferred_video_codecs"
 	SettingsYTDLPPreferredAudioCodecs = "ytdlp_preferred_audio_codecs"
+
+	// Replace checkboxes.
+	SettingsFiltersReplaceInherited = "filters_replace_inherited"
+	SettingsMoveOpsReplaceInherited = "move_ops_replace_inherited"
 )
 
 // Metarr args keys.
@@ -60,4 +64,10 @@ const (
 	MetarrFilteredFilenameOps     = "metarr_filtered_filename_ops"
 	MetarrFilteredMetaOps         = "metarr_filtered_meta_ops"
 	MetarrMetaOps                 = "metarr_meta_ops"
+
+	// Replace checkboxes.
+	MetarrMetaOpsReplaceInherited             = "metarr_meta_ops_replace_inherited"
+	MetarrFilteredMetaOpsReplaceInherited     = "metarr_filtered_meta_ops_replace_inherited"
+	MetarrFilenameOpsReplaceInherited         = "metarr_filename_ops_replace_inherited"
+	MetarrFilteredFilenameOpsReplaceInherited = "metarr_filtered_filename_ops_replace_inherited"
 )

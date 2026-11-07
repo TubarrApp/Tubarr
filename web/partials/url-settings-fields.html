@@ -32,7 +32,7 @@
                             <li><strong>Post-processing:</strong> Metarr output directory, move operations, transcoding, meta/filename operations</li>
                           </ul>
                           <p class="mt-2 text-brand-600 dark:text-brand-400">💡 Any field left empty uses this URL's profile, if it sets one, else the channel setting.</p>
-                          <p class="text-brand-600 dark:text-brand-400">💡 Filters and operations are added to the channel's. Where both set the same thing, such as a field's value or the filename, this URL's is used.</p>
+                          <p class="text-brand-600 dark:text-brand-400">💡 Filters and operations are added to the channel's. Where both set the same thing, such as a field's value or the filename, this URL's is used. Tick "Replace the channel's" under one to use only this URL's and its profile's.</p>
                         </div>
 
                         <!-- Basic Tab for This URL -->
@@ -76,11 +76,14 @@
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filter File</label>
-                              <input type="text" x-model="urlEntry.custom.filter_file" :placeholder="urlHint(urlEntry, 'settings', 'filter_file', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                              <input type="text" x-model="urlEntry.custom.filter_file" :placeholder="urlHint(urlEntry, 'settings', 'filter_file', urlEntry.custom.filters_replace_inherited ? 'None' : 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filters (one per line, added to the channel's) <a href="help.html#filters" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
-                              <textarea x-model="urlEntry.custom.filters" rows="4" :placeholder="urlHint(urlEntry, 'settings', 'filters', 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
+                              <div class="flex flex-wrap items-center justify-between gap-x-3 mb-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filters (one per line) <a href="help.html#filters" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                                <label class="flex items-center cursor-pointer"><input type="checkbox" x-model="urlEntry.custom.filters_replace_inherited" class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500" /><span class="text-sm text-gray-700 dark:text-gray-300">Replace the channel's</span></label>
+                              </div>
+                              <textarea x-model="urlEntry.custom.filters" rows="4" :placeholder="urlHint(urlEntry, 'settings', 'filters', urlEntry.custom.filters_replace_inherited ? 'None' : 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
                             </div>
                           </div>
                         </div>
@@ -182,11 +185,14 @@
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Move Operations File</label>
-                              <input type="text" x-model="urlEntry.custom.move_ops_file" :placeholder="urlHint(urlEntry, 'settings', 'move_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                              <input type="text" x-model="urlEntry.custom.move_ops_file" :placeholder="urlHint(urlEntry, 'settings', 'move_ops_file', urlEntry.custom.move_ops_replace_inherited ? 'None' : 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Move Operations (one per line, checked before the channel's) <a href="help.html#move-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
-                              <textarea x-model="urlEntry.custom.move_ops" rows="2" :placeholder="urlHint(urlEntry, 'settings', 'move_ops', 'Checked before channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
+                              <div class="flex flex-wrap items-center justify-between gap-x-3 mb-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Move Operations (one per line) <a href="help.html#move-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                                <label class="flex items-center cursor-pointer"><input type="checkbox" x-model="urlEntry.custom.move_ops_replace_inherited" class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500" /><span class="text-sm text-gray-700 dark:text-gray-300">Replace the channel's</span></label>
+                              </div>
+                              <textarea x-model="urlEntry.custom.move_ops" rows="2" :placeholder="urlHint(urlEntry, 'settings', 'move_ops', urlEntry.custom.move_ops_replace_inherited ? 'None' : 'Checked before channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Rename Style</label>
@@ -208,36 +214,48 @@
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filename Operations File</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_filename_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filename_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                              <input type="text" x-model="urlEntry.custom.metarr_filename_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filename_ops_file', urlEntry.custom.metarr_filename_ops_replace_inherited ? 'None' : 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filename Operations (one per line, added to the channel's) <a href="help.html#filename-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
-                              <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filename_ops', 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
+                              <div class="flex flex-wrap items-center justify-between gap-x-3 mb-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filename Operations (one per line) <a href="help.html#filename-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                                <label class="flex items-center cursor-pointer"><input type="checkbox" x-model="urlEntry.custom.metarr_filename_ops_replace_inherited" class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500" /><span class="text-sm text-gray-700 dark:text-gray-300">Replace the channel's</span></label>
+                              </div>
+                              <textarea x-model="urlEntry.custom.metarr_filename_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filename_ops', urlEntry.custom.metarr_filename_ops_replace_inherited ? 'None' : 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Filename Operations File</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_filtered_filename_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_filename_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                              <input type="text" x-model="urlEntry.custom.metarr_filtered_filename_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_filename_ops_file', urlEntry.custom.metarr_filtered_filename_ops_replace_inherited ? 'None' : 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line, added to the channel's) <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
-                              <textarea x-model="urlEntry.custom.metarr_filtered_filename_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_filename_ops', 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
+                              <div class="flex flex-wrap items-center justify-between gap-x-3 mb-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filtered Filename Operations (one per line) <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                                <label class="flex items-center cursor-pointer"><input type="checkbox" x-model="urlEntry.custom.metarr_filtered_filename_ops_replace_inherited" class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500" /><span class="text-sm text-gray-700 dark:text-gray-300">Replace the channel's</span></label>
+                              </div>
+                              <textarea x-model="urlEntry.custom.metarr_filtered_filename_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_filename_ops', urlEntry.custom.metarr_filtered_filename_ops_replace_inherited ? 'None' : 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
                             </div>
                             <h4 class="col-span-full mt-4 text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide">Metadata</h4>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Meta Operations File</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_meta_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_meta_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Metadata Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_meta_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_meta_ops_file', urlEntry.custom.metarr_meta_ops_replace_inherited ? 'None' : 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Meta Operations (one per line, added to the channel's) <a href="help.html#meta-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
-                              <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_meta_ops', 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
+                              <div class="flex flex-wrap items-center justify-between gap-x-3 mb-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Metadata Operations (one per line) <a href="help.html#meta-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                                <label class="flex items-center cursor-pointer"><input type="checkbox" x-model="urlEntry.custom.metarr_meta_ops_replace_inherited" class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500" /><span class="text-sm text-gray-700 dark:text-gray-300">Replace the channel's</span></label>
+                              </div>
+                              <textarea x-model="urlEntry.custom.metarr_meta_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_meta_ops', urlEntry.custom.metarr_meta_ops_replace_inherited ? 'None' : 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Meta Operations File</label>
-                              <input type="text" x-model="urlEntry.custom.metarr_filtered_meta_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_meta_ops_file', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Metadata Operations File</label>
+                              <input type="text" x-model="urlEntry.custom.metarr_filtered_meta_ops_file" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_meta_ops_file', urlEntry.custom.metarr_filtered_meta_ops_replace_inherited ? 'None' : 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                             </div>
                             <div>
-                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Filtered Meta Operations (one per line, added to the channel's) <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
-                              <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_meta_ops', 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
+                              <div class="flex flex-wrap items-center justify-between gap-x-3 mb-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Filtered Metadata Operations (one per line) <a href="help.html#filtered-ops" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a></label>
+                                <label class="flex items-center cursor-pointer"><input type="checkbox" x-model="urlEntry.custom.metarr_filtered_meta_ops_replace_inherited" class="mr-2 rounded border-gray-300 text-brand-500 focus:ring-brand-500" /><span class="text-sm text-gray-700 dark:text-gray-300">Replace the channel's</span></label>
+                              </div>
+                              <textarea x-model="urlEntry.custom.metarr_filtered_meta_ops" rows="2" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_filtered_meta_ops', urlEntry.custom.metarr_filtered_meta_ops_replace_inherited ? 'None' : 'Append to channel setting')" class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"></textarea>
                             </div>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Delete Metadata Files</label>

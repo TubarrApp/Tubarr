@@ -23,7 +23,8 @@ func TestCrawlRequestsNeedFilterFile(t *testing.T) {
 	c := &models.Channel{ID: 1, Name: "Cats", ChanSettings: &models.Settings{}}
 	videos := []*models.Video{{URL: "https://example.com/watch/1"}, {URL: "https://example.com/watch/2"}}
 
-	missing := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats", ChanURLSettings: &models.Settings{FilterFile: filepath.Join(dir, "missing.txt")}}
+	missing := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats", ChanURLSettings: &models.Settings{}}
+	missing.Levels = []models.SettingsLevel{{Settings: &models.Settings{FilterFile: filepath.Join(dir, "missing.txt")}}, {Settings: missing.ChanURLSettings}} // Inherited from its channel.
 	if reqs, err := crawlRequests(c, missing, videos); err == nil || len(reqs) != 0 {
 		t.Errorf("crawlRequests with a missing filter file = %d requests, %v; want none and an error", len(reqs), err)
 	}

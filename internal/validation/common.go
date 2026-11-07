@@ -61,10 +61,14 @@ func CheckDestination(dir string) error {
 	if dir == "" {
 		return nil
 	}
+
+	// Get directory path before the first template tag.
 	base := dir
 	if before, _, ok := strings.Cut(dir, "{{"); ok {
 		base = filepath.Dir(before)
 	}
+
+	// Ensure the directory (pre-template tag) exists and is a directory.
 	info, err := os.Stat(base)
 	if err != nil {
 		return fmt.Errorf("destination %q isn't available: %w", base, err)
@@ -72,6 +76,7 @@ func CheckDestination(dir string) error {
 	if !info.IsDir() {
 		return fmt.Errorf("destination %q isn't available: it's a file, not a directory", base)
 	}
+
 	return nil
 }
 

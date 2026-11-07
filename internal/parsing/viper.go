@@ -209,6 +209,12 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 		}
 		dst.MetaFilterMoveOpFile = *v
 	}
+	if v := in.FiltersReplaceInherited; v != nil {
+		dst.FiltersReplaceInherited = *v
+	}
+	if v := in.MoveOpsReplaceInherited; v != nil {
+		dst.MoveOpsReplaceInherited = *v
+	}
 	if v := in.FromDate; v != nil {
 		if dst.FromDate, err = validation.ValidateToFromDate(*v); err != nil {
 			return fmt.Errorf("invalid %s: %w", keys.FromDate, err)
@@ -297,6 +303,18 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput, le
 			return fmt.Errorf("invalid %s: %w", keys.MFilteredMetaOpsFile, err)
 		}
 		dst.FilteredMetaOpsFile = *v
+	}
+	if v := in.MetaOpsReplaceInherited; v != nil {
+		dst.MetaOpsReplaceInherited = *v
+	}
+	if v := in.FilteredMetaOpsReplaceInherited; v != nil {
+		dst.FilteredMetaOpsReplaceInherited = *v
+	}
+	if v := in.FilenameOpsReplaceInherited; v != nil {
+		dst.FilenameOpsReplaceInherited = *v
+	}
+	if v := in.FilteredFilenameOpsReplaceInherited; v != nil {
+		dst.FilteredFilenameOpsReplaceInherited = *v
 	}
 	if v := in.RenameStyle; v != nil {
 		if err := validation.ValidateRenameFlag(*v); err != nil {

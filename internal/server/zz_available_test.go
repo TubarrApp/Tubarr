@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"tubarr/internal/app"
@@ -234,8 +235,8 @@ func TestAvailableVideosAPI(t *testing.T) {
 		return serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/run-metarr", chanID), "application/json", body).Code
 	}
 	out := filepath.Join(fuzzServer.dir, "videos") // An output folder must exist.
-	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"output_dir":%q}}`, pendingID, videos[1].ID, out)); code != http.StatusBadRequest {
-		t.Errorf("overrides for two videos: got %d, want 400", code)
+	if code := runMetarr(fmt.Sprintf(`{"overrides":{"output_dir":%q}}`, out)); code != http.StatusBadRequest {
+		t.Errorf("overrides without videos: got %d, want 400", code)
 	}
 	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d],"overrides":{"meta_ops":"artist:bogus:x"}}`, pendingID)); code != http.StatusBadRequest {
 		t.Errorf("invalid op: got %d, want 400", code)
@@ -288,6 +289,76 @@ func TestAvailableVideosAPI(t *testing.T) {
 	}
 	if o, err := vs.GetVideoOverrides(doneID); err != nil || o == nil || len(o.MetaOps) != 1 || o.MetaOps[0].OpValue != "Fixed" {
 		t.Errorf("edit & re-run stored overrides %+v, %v", o, err)
+	}
+
+	// Edit & Re-Process gives several processed videos from one channel URL the same options, but no filename or custom
+	// thumbnail, and not videos from another channel URL. Fresh videos, as the runs above may still hold theirs.
+	addFinished := func(videoURL string, channelURLID any, status consts.MetarrStatus) int64 {
+		t.Helper()
+		res, err := fuzzServer.db.Exec(`INSERT INTO videos (channel_id, channel_url_id, channel_url, finished, ignored, url, metarr_status)
+			VALUES (?, ?, 'https://example.com/@review', 1, 0, ?, ?)`, chanID, channelURLID, videoURL, status)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := res.LastInsertId()
+		return id
+	}
+	firstID := addFinished("https://example.com/v/several-1", cuID, consts.MetarrStatusDone)
+	secondID := addFinished("https://example.com/v/several-2", cuID, consts.MetarrStatusDone)
+	otherURLID := addFinished("https://example.com/v/several-no-url", nil, consts.MetarrStatusDone)
+	for _, tc := range []struct {
+		body string
+		code int
+		want string
+	}{
+		{fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"filename":"x"},"rerun":true}`, firstID, secondID), http.StatusBadRequest, "not several"},
+		{fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"thumbnail":"https://example.com/t.jpg"},"rerun":true}`, firstID, secondID), http.StatusBadRequest, "not several"},
+		{fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"meta_ops":"album:set:Both"},"rerun":true}`, firstID, otherURLID), http.StatusBadRequest, "one channel URL"},
+		{fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"meta_ops":"album:set:Both"}}`, firstID, secondID), http.StatusConflict, "isn't waiting"},
+	} {
+		w := serve(http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/run-metarr", chanID), "application/json", tc.body)
+		if w.Code != tc.code || !strings.Contains(w.Body.String(), tc.want) {
+			t.Errorf("%s: got %d %s, want %d saying %q", tc.body, w.Code, w.Body.String(), tc.code, tc.want)
+		}
+	}
+	for _, id := range []int64{firstID, secondID, otherURLID} {
+		if o, err := vs.GetVideoOverrides(id); err != nil || o != nil {
+			t.Errorf("rejected edits stored overrides %+v, %v for video %d", o, err, id)
+		}
+	}
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"meta_ops":"album:set:Both"},"rerun":true}`, firstID, secondID)); code != http.StatusAccepted {
+		t.Fatalf("edit & re-run on several videos: got %d, want 202", code)
+	}
+	for _, id := range []int64{firstID, secondID} {
+		if o, err := vs.GetVideoOverrides(id); err != nil || o == nil || len(o.MetaOps) != 1 || o.MetaOps[0].OpValue != "Both" {
+			t.Errorf("edit & re-run on several videos stored overrides %+v, %v for video %d", o, err, id)
+		}
+	}
+
+	// Edit & Post-Process does the same for several videos not yet processed.
+	pendingIDs := []int64{
+		addFinished("https://example.com/v/several-pending", cuID, consts.MetarrStatusPending),
+		addFinished("https://example.com/v/several-failed", cuID, consts.MetarrStatusFailed),
+	}
+	if code := runMetarr(fmt.Sprintf(`{"video_ids":[%d,%d],"overrides":{"meta_ops":"album:set:Pending"}}`, pendingIDs[0], pendingIDs[1])); code != http.StatusAccepted {
+		t.Fatalf("edit & run on several videos: got %d, want 202", code)
+	}
+	for _, id := range pendingIDs {
+		if o, err := vs.GetVideoOverrides(id); err != nil || o == nil || len(o.MetaOps) != 1 || o.MetaOps[0].OpValue != "Pending" {
+			t.Errorf("edit & run on several videos stored overrides %+v, %v for video %d", o, err, id)
+		}
+	}
+
+	// The channel's downloaded videos mark those with overrides customized, for the edit dialog to warn they're replaced.
+	w = serve(http.MethodGet, fmt.Sprintf("/api/v1/channels/%d/all-videos", chanID), "", "")
+	var downloaded []models.Video
+	if err := json.Unmarshal(w.Body.Bytes(), &downloaded); w.Code != http.StatusOK || err != nil {
+		t.Fatalf("listing downloaded videos: %d %s", w.Code, w.Body.String())
+	}
+	for _, v := range downloaded {
+		if want := slices.Contains(append([]int64{firstID, secondID, doneID, pendingID}, pendingIDs...), v.ID); v.Customized != want {
+			t.Errorf("downloaded video %d: got customized %t, want %t", v.ID, v.Customized, want)
+		}
 	}
 }
 

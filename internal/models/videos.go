@@ -16,6 +16,7 @@ type Video struct {
 	ChannelURL          string                `json:"channel_url" db:"channel_url"`
 	ThumbnailURL        string                `json:"thumbnail_url" db:"thumbnail_url"`
 	CustomThumbnail     bool                  `json:"custom_thumbnail,omitempty" db:"-"` // Download As set one, shown from /api/v1/videos/{id}/thumbnail.
+	Customized          bool                  `json:"customized,omitempty" db:"-"`       // Has Download As options, which its downloads and post-processing use.
 	VideoFilePath       string                `json:"video_path" db:"video_path"`
 	VideoDir            string                `json:"-" db:"-"`
 	JSONFilePath        string                `json:"json_path" db:"json_path"`
@@ -64,6 +65,17 @@ type VideoOverrides struct {
 
 	// Ops, transcode codecs, encoder args and extra FFmpeg args replace the channel URL's. Other blank fields use the channel URL's.
 	MetarrArgs
+
+	// The channel URL's ops when these were saved, so its lines in them can be refreshed. Nil keeps the ops as saved.
+	ChannelURLOps *OpLines `json:"channel_url_ops,omitempty"`
+}
+
+// OpLines holds the Download As dialog's op boxes, one op per line.
+type OpLines struct {
+	MetaOps             string `json:"meta_ops,omitempty"`
+	FilteredMetaOps     string `json:"filtered_meta_ops,omitempty"`
+	FilenameOps         string `json:"filename_ops,omitempty"`
+	FilteredFilenameOps string `json:"filtered_filename_ops,omitempty"`
 }
 
 // OverrideLines holds a video's overrides as edited in the Download As dialog, with ops and codecs newline-separated.
@@ -122,7 +134,6 @@ const (
 type AvailableVideo struct {
 	Video
 	ChannelName        string `json:"channel_name"`
-	Customized         bool   `json:"customized,omitempty"`       // Has Download As options, which downloading it uses.
 	RetriesOnCrawl     bool   `json:"retries_on_crawl,omitempty"` // A failed video the channel URL's next crawl downloads again.
 	CrawlDLRetries     int    `json:"-"`                          // Crawl retries it has used, all of them once it's left to the user.
 	CrawlDLRetriesLeft int    `json:"crawl_dl_retries_left,omitempty"`

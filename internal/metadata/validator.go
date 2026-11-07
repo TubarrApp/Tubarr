@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"strings"
 	"time"
 	"tubarr/internal/domain/logger"
@@ -215,11 +214,10 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	}
 
 	// Check download filters.
-	fileFilters, err := LoadFilterOpsFromFile(cu, dirParser)
+	allFilters, err := ChannelURLFilters(cu, dirParser)
 	if err != nil {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, err
 	}
-	allFilters := slices.Concat(cu.ChanURLSettings.Filters, fileFilters)
 
 	if !checkFilters(v, allFilters) {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
@@ -238,29 +236,28 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
-// loadFilteredOps returns the video's Download As filtered ops if set, else the channel URL's and its files'.
-func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) ([]models.FilteredMetaOps, []models.FilteredFilenameOps) {
+// loadFilteredOps returns the video's Download As filtered ops if set, as one level, else the channel URL's from every
+// level, farthest first.
+func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) ([][]models.FilteredMetaOps, [][]models.FilteredFilenameOps) {
 	if v.Overrides != nil {
-		return v.Overrides.FilteredMetaOps, v.Overrides.FilteredFilenameOps
+		return [][]models.FilteredMetaOps{v.Overrides.FilteredMetaOps}, [][]models.FilteredFilenameOps{v.Overrides.FilteredFilenameOps}
 	}
 
 	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
-	fileFilteredMetaOps, fileErr := LoadFilteredMetaOpsFromFile(cu, dirParser)
+	filteredMetaOps, fileErr := ChannelURLFilteredMetaOps(cu, dirParser)
 	if fileErr != nil {
 		logger.Pl.E("Filtered meta ops file for %q can't be used: %v", cu.URL, fileErr)
 	}
-	fileFilteredFilenameOps, fileErr := LoadFilteredFilenameOpsFromFile(cu, dirParser)
+	filteredFilenameOps, fileErr := ChannelURLFilteredFilenameOps(cu, dirParser)
 	if fileErr != nil {
 		logger.Pl.E("Filtered filename ops file for %q can't be used: %v", cu.URL, fileErr)
 	}
-	return slices.Concat(cu.ChanURLMetarrArgs.FilteredMetaOps, fileFilteredMetaOps),
-		slices.Concat(cu.ChanURLMetarrArgs.FilteredFilenameOps, fileFilteredFilenameOps)
+	return filteredMetaOps, filteredFilenameOps
 }
 
 // HandleMoveOps checks if Metarr should use an output directory based on existent metadata.
 func HandleMoveOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
-	// Copy of the database move ops, plus file-based move ops.
-	allMoveOps := slices.Concat(cu.ChanURLSettings.MetaFilterMoveOps, loadMoveOpsFromFile(cu, dirParser))
+	allMoveOps := channelURLMoveOps(cu, dirParser)
 
 	// Check each move operation against video metadata.
 	for _, op := range allMoveOps {

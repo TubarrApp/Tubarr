@@ -111,6 +111,7 @@ func pathOutsideDir(s string) bool {
 var fuzzServer struct {
 	once    sync.Once
 	handler http.Handler
+	ss      *serverStore // The router's queues, for tests to queue videos the API's handlers see.
 	db      *sql.DB
 	dir     string
 	logBuf  *bytes.Buffer
@@ -179,6 +180,7 @@ func setupFuzzServer(t *testing.T) {
 			fuzzServer.initErr = err
 			return
 		}
+		fuzzServer.ss = &ss
 		fuzzServer.db = dbase
 
 		form := url.Values{

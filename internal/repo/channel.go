@@ -528,6 +528,7 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	c.ProfileID = merged.ProfileID
 	c.Profile = merged.Profile
 	c.URLModels = merged.URLModels
+	c.LoadedAt = merged.LoadedAt
 
 	logger.Pl.S("Updated channel %q from config file", c.Name)
 	return nil
@@ -1045,7 +1046,7 @@ func (cs *ChannelStore) GetChannelModel(key, val string, mergeURLsWithParent boo
 	}
 	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", channelColumns, consts.DBChannels, key)
 
-	var c models.Channel
+	c := models.Channel{LoadedAt: time.Now()}
 	settingsJSON, metarrJSON, err := scanChannel(cs.q.QueryRow(query, val), &c)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, false, nil
@@ -1103,10 +1104,18 @@ func (cs *ChannelStore) loadChannelDetails(c *models.Channel, settingsJSON, meta
 		return err
 	}
 	if mergeURLsWithParent {
+		own := ownLevel(c.ChanSettings, c.ChanMetarrArgs) // Before merging changes them.
 		if c.Profile != nil {
-			mergeSettings(c.ChanSettings, c.Profile.ProfileSettings)
-			mergeMetarrArgs(c.ChanMetarrArgs, c.Profile.ProfileMetarrArgs)
+			profile := models.SettingsLevel{
+				Settings:   withoutReplacedSettings(c.ChanSettings, c.Profile.ProfileSettings),
+				MetarrArgs: withoutReplacedMetarrArgs(c.ChanMetarrArgs, c.Profile.ProfileMetarrArgs),
+			}
+			c.Levels = append(c.Levels, profile)
+			mergeSettings(c.ChanSettings, profile.Settings)
+			mergeMetarrArgs(c.ChanMetarrArgs, profile.MetarrArgs)
 		}
+		c.Levels = append(c.Levels, own)
+		stackLists(c.ChanSettings, c.ChanMetarrArgs, c.Levels)
 		c.ChanSettings.JSONDir = cmp.Or(c.ChanSettings.JSONDir, c.ChanSettings.VideoDir) // Without a JSON directory, metadata is saved with the videos.
 		parsing.FillChannelOutputDirectory(c)
 	}
@@ -1181,6 +1190,7 @@ func setLoadErr(c *models.Channel, err error) {
 // GetAllChannels retrieves all channels in the database.
 func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*models.Channel, hasRows bool, err error) {
 	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s", channelColumns, consts.DBChannels, consts.QChanName)
+	loadedAt := time.Now()
 	rows, err := cs.q.Query(query)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to query channels: %w", err)
@@ -1192,7 +1202,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 	}()
 
 	for rows.Next() {
-		var c models.Channel
+		c := models.Channel{LoadedAt: loadedAt}
 		settingsJSON, metarrJSON, err := scanChannel(rows, &c)
 		if err != nil {
 			return nil, true, fmt.Errorf("failed to scan channel: %w", err)
@@ -1753,12 +1763,14 @@ func displaySettingsStruct(s *models.Settings) {
 	fmt.Printf("External Downloader Args: %s\n", s.ExternalDownloaderArgs)
 	fmt.Printf("Filter Ops: %v\n", s.Filters)
 	fmt.Printf("Filter File: %s\n", s.FilterFile)
+	fmt.Printf("Replace Inherited Filter Ops? %v\n", s.FiltersReplaceInherited)
 	fmt.Printf("From Date: %q\n", s.FromDate)
 	fmt.Printf("To Date: %q\n", s.ToDate)
 	fmt.Printf("Max Filesize: %s\n", s.MaxFilesize)
 	fmt.Printf("Max Resolution: %s\n", s.MaxResolution)
 	fmt.Printf("Move Ops: %v\n", s.MetaFilterMoveOps)
 	fmt.Printf("Move Ops File: %s\n", s.MetaFilterMoveOpFile)
+	fmt.Printf("Replace Inherited Move Ops? %v\n", s.MoveOpsReplaceInherited)
 	fmt.Printf("Use Global Cookies: %v\n", useGlobalCookies)
 	fmt.Printf("Yt-dlp Output Extension: %s\n", s.YtdlpOutputExt)
 	fmt.Printf("Yt-dlp Extra Video Args: %s\n", s.ExtraYTDLPVideoArgs)
@@ -1781,12 +1793,16 @@ func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
 	fmt.Printf("Meta Operations File: %v\n", m.MetaOpsFile)
+	fmt.Printf("Replace Inherited Meta Operations? %v\n", m.MetaOpsReplaceInherited)
 	fmt.Printf("Filtered Meta Operations: %v\n", m.FilteredMetaOps)
 	fmt.Printf("Filtered Meta Operations File: %v\n", m.FilteredMetaOpsFile)
+	fmt.Printf("Replace Inherited Filtered Meta Operations? %v\n", m.FilteredMetaOpsReplaceInherited)
 	fmt.Printf("Filename Operations: %s\n", m.FilenameOps)
 	fmt.Printf("Filename Operations File: %s\n", m.FilenameOpsFile)
+	fmt.Printf("Replace Inherited Filename Operations? %v\n", m.FilenameOpsReplaceInherited)
 	fmt.Printf("Filtered Filename Operations: %v\n", m.FilteredFilenameOps)
 	fmt.Printf("Filtered Filename Operations File: %v\n", m.FilteredFilenameOpsFile)
+	fmt.Printf("Replace Inherited Filtered Filename Operations? %v\n", m.FilteredFilenameOpsReplaceInherited)
 	fmt.Printf("Extra FFmpeg Arguments: %s\n", m.ExtraFFmpegArgs)
 }
 

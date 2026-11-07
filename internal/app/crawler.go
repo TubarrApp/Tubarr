@@ -333,9 +333,9 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 
 // crawlRequests returns the download requests for a channel URL's crawled videos.
 //
-// An unusable filter file queues none of them, so nothing downloads unfiltered.
+// An unusable filter file at any level queues none of them, so nothing downloads unfiltered.
 func crawlRequests(c *models.Channel, cu *models.ChannelURL, videos []*models.Video) ([]queue.Request, error) {
-	if _, err := metadata.LoadFilterOpsFromFile(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
+	if _, err := metadata.ChannelURLFilters(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
 		logger.Pl.E("Not downloading crawled videos for %q until its filter file is fixed: %v", cu.URL, err)
 		return nil, fmt.Errorf("channel URL %q: %w", cu.URL, err)
 	}

@@ -74,9 +74,9 @@
               </p>
               <ul class="toc">
                 <li><a href="#writing-ops">Writing an operation</a></li>
-                <li><a href="#meta-ops">Meta ops</a></li>
+                <li><a href="#meta-ops">Metadata ops</a></li>
                 <li><a href="#groups">Group fields</a></li>
-                <li><a href="#meta-order">The order meta ops run in</a></li>
+                <li><a href="#meta-order">The order metadata ops run in</a></li>
                 <li><a href="#filename-ops">Filename ops</a></li>
                 <li><a href="#date-tags">Date tags</a></li>
                 <li><a href="#filters">Download filters</a></li>
@@ -97,10 +97,10 @@
               <!-- ===== Writing an operation ===== -->
               <h2 id="writing-ops">Writing an operation</h2>
               <p>
-                An operation is one line made of parts divided by <code>:</code>. Meta ops start with the metadata field
-                they change; filename ops have no field, since they change the filename.
+                An operation is one line made of parts divided by <code>:</code>. Metadata ops start with the field they
+                change; filename ops have no field, since they change the filename.
               </p>
-              <pre><code>title:prefix:[Archive]       a meta op: field, operation, value
+              <pre><code>title:prefix:[Archive]       a metadata op: field, operation, value
 prefix:[Archive]             a filename op: operation, value</code></pre>
               <ul>
                 <li>
@@ -132,12 +132,12 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
               </ul>
               <p>
                 Ops set on a channel apply to all its channel URLs. A channel URL's own ops (in its custom settings)
-                are added to the channel's.
+                are added to the channel's, unless <a href="#precedence">Replace the channel's</a> is ticked under them.
               </p>
 
-              <!-- ===== Meta ops ===== -->
-              <h2 id="meta-ops">Meta ops</h2>
-              <p>Meta ops change the video's metadata file (JSON or NFO), and through it the tags embedded in the video.</p>
+              <!-- ===== Metadata ops ===== -->
+              <h2 id="meta-ops">Metadata ops</h2>
+              <p>Metadata ops change the video's metadata file (JSON or NFO), and through it the tags embedded in the video.</p>
               <div class="table-wrap">
                 <table>
                   <tr><th>Operation</th><th>Example</th><th>What it does</th></tr>
@@ -166,7 +166,7 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                 </li>
                 <li>Dates must be written <code>YYYY-MM-DD</code> when set (<code>release_date:set:2024-05-01</code>), a year as <code>YYYY</code>.</li>
                 <li>
-                  NFO metadata files don't fill <code>{{field}}</code> tags, and filtered meta ops only work on JSON
+                  NFO metadata files don't fill <code>{{field}}</code> tags, and filtered metadata ops only work on JSON
                   files when Metarr is run on its own. (In Tubarr, filters are checked by Tubarr, so they work for every
                   video.)
                 </li>
@@ -196,7 +196,7 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                 fields may hold different values: copy from one field instead.
               </p>
 
-              <h3 id="meta-order">The order meta ops run in</h3>
+              <h3 id="meta-order">The order metadata ops run in</h3>
               <p>
                 Ops run in a fixed order by type, not in the order they're written, since a video's ops are gathered from
                 its channel, channel URL, ops files and matched filtered ops:
@@ -218,7 +218,7 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                 <table>
                   <tr><th>Operation</th><th>Example</th><th>What it does</th></tr>
                   <tr><td><code>set</code></td><td><code>set:{{uploader}} - {{fulltitle}}</code></td><td>Sets the whole name. One per video.</td></tr>
-                  <tr><td><code>prefix</code> / <code>suffix</code></td><td><code>prefix:[Cats] </code></td><td>Add text to the start or end, as for meta ops.</td></tr>
+                  <tr><td><code>prefix</code> / <code>suffix</code></td><td><code>prefix:[Cats] </code></td><td>Add text to the start or end, as for metadata ops.</td></tr>
                   <tr><td><code>replace</code></td><td><code>replace:_: </code></td><td>Replaces every match (case-sensitive).</td></tr>
                   <tr><td><code>replace-prefix</code> / <code>replace-suffix</code></td><td><code>replace-suffix: _v1:_final</code></td><td>Replace text only at the start or end.</td></tr>
                   <tr><td><code>regex-replace</code></td><td><code>regex-replace:[[^(.*) - (\d{4})$]]:$2 $1</code></td><td>Replaces every regex match.</td></tr>
@@ -318,10 +318,10 @@ title:omits:short:must</code></pre>
                 <code>must</code>/<code>any</code>. Several filters, or several ops, are joined with
                 <code>&amp;&amp;</code>: every filter must match, and then every op runs.
               </p>
-              <pre><code>title:contains:cat||genre:set:Cats                                filtered meta op
+              <pre><code>title:contains:cat||genre:set:Cats                                filtered metadata op
 title:contains:cat||prefix:[Cats]                                 filtered filename op (the filter reads metadata, the op renames)
 title:contains:cat&amp;&amp;duration:more-than:3600||prefix:[Long Cats]   only for cat videos over an hour long
-title:contains:cat||title:suffix: [Cats]&amp;&amp;genre:set:Cats          two meta ops for the same filter
+title:contains:cat||title:suffix: [Cats]&amp;&amp;genre:set:Cats          two metadata ops for the same filter
 title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffix: - Animal Kingdom   three filename ops</code></pre>
               <ul>
                 <li>
@@ -336,10 +336,15 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                   <code>&amp;{2}</code> instead.
                 </li>
                 <li>
-                  The ops still run in their usual order (see <a href="#meta-order">meta ops</a> and
+                  The ops still run in their usual order (see <a href="#meta-order">metadata ops</a> and
                   <a href="#filename-ops">filename ops</a>), not the order they're written in.
                 </li>
                 <li>To run an op when either of two filters matches, write the line once for each filter.</li>
+                <li>
+                  A matching filtered op beats a plain op that sets the same thing, e.g. a filtered
+                  <code>set</code> filename op beats the plain one. Of two matching filtered ops that set the same thing,
+                  the one from the nearer level (see <a href="#profiles">Profiles</a>) wins, then the earlier line.
+                </li>
                 <li>
                   To limit an op to one channel's videos, filter on its channel URL:
                   <code>channel_url:contains:youtube.com/@ChannelA||title:prefix:[A] </code>. (In Tubarr, a channel URL's
@@ -557,7 +562,14 @@ vp9:av1</code></pre>
                 </li>
               </ol>
               <p>
-                An ops file's ops replace the matching ops typed into the same settings.
+                An ops file's ops replace the matching ops typed into the same settings. Every level's file is used, as
+                part of its level: a nearer level's ops, typed or in a file, still beat a farther level's file.
+              </p>
+              <p>
+                <strong>Replace the channel's</strong>, under a URL's filters, move ops or one of its op lists, uses
+                only the URL's own list and file for it, with its profile's, leaving out the channel's. A channel's
+                <strong>Replace the profile's</strong> does the same with its profile's. Ticked with the list empty,
+                there are none of that kind.
               </p>
 
               <!-- ===== Profiles ===== -->
@@ -574,7 +586,8 @@ vp9:av1</code></pre>
                 <li>The channel's profile</li>
               </ol>
               <p>
-                Filters and ops are added together the same way, the nearer one winning where two set the same thing.
+                Filters and ops are added together the same way, the nearer one winning where two set the same thing,
+                unless a list's <a href="#precedence">Replace</a> box is ticked.
                 A profile's video directory can use <a href="#templates">template tags</a>, e.g.
                 <code>/media/{{channel_name}}</code>, so one profile can serve many channels. A channel with no video
                 directory of its own needs a profile with one, and a profile can't be deleted while a channel or URL
@@ -592,9 +605,13 @@ vp9:av1</code></pre>
                 downloaded, so they have no download options. A <strong>Login</strong> entered in Download As is used
                 for that one download and never saved. <strong>Revert to Defaults</strong> goes back to the channel
                 URL's. Options left the same as the channel URL's aren't kept, so the video then isn't customized and
-                follows later changes to the channel URL. To give several videos from one channel URL the same options,
-                select them on Available and choose <strong>Download As…</strong> above the list. A filename or custom
-                thumbnail is for one video only.
+                follows later changes to the channel URL. Each time the dialog opens, the channel URL's ops, including its
+                ops files, are filled in fresh, keeping any lines you added or deleted for that video. To give several
+                videos from one channel URL the same options,
+                select them on Available and choose <strong>Download As…</strong> above the list, or for downloaded
+                videos, select them on the channel's downloaded videos and choose
+                <strong>Edit &amp; Post-Process Selected</strong> or <strong>Edit &amp; Re-Process Selected</strong>.
+                A filename or custom thumbnail is for one video only.
               </p>
 
               <!-- ===== Queue ===== -->

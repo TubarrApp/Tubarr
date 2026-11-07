@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -47,6 +48,9 @@ func TestChildMatchParentEachField(t *testing.T) {
 			if name == "Settings.Paused" {
 				continue // Pausing is per URL, so a paused child never matches.
 			}
+			if strings.HasSuffix(name, "ReplaceInherited") {
+				continue // Tested in TestReplaceTicksNeverMatch.
+			}
 			parent, child := reflect.New(typ), reflect.New(typ)
 			setNonZero(parent.Elem().Field(i), 1)
 			setNonZero(child.Elem().Field(i), 1)
@@ -56,6 +60,36 @@ func TestChildMatchParentEachField(t *testing.T) {
 			setNonZero(child.Elem().Field(i), 2)
 			if tc.match(parent.Interface(), child.Interface()) {
 				t.Errorf("%s: a different value matches", name)
+			}
+		}
+	}
+}
+
+// TestReplaceTicksNeverMatch tests that a child's replace tick is its own, so a ticked child never matches a parent
+// ticked too, and a tick alone isn't all zero.
+func TestReplaceTicksNeverMatch(t *testing.T) {
+	for _, tc := range []struct {
+		model   any
+		match   func(parent, child any) bool
+		allZero func(child any) bool
+	}{
+		{Settings{}, func(p, c any) bool { return ChildSettingsMatchParent(p.(*Settings), c.(*Settings)) }, func(c any) bool { return SettingsAllZero(c.(*Settings)) }},
+		{MetarrArgs{}, func(p, c any) bool { return ChildMetarrArgsMatchParent(p.(*MetarrArgs), c.(*MetarrArgs)) }, func(c any) bool { return MetarrArgsAllZero(c.(*MetarrArgs)) }},
+	} {
+		typ := reflect.TypeOf(tc.model)
+		for i := range typ.NumField() {
+			name := typ.Name() + "." + typ.Field(i).Name
+			if !strings.HasSuffix(name, "ReplaceInherited") {
+				continue
+			}
+			parent, child := reflect.New(typ), reflect.New(typ)
+			parent.Elem().Field(i).SetBool(true)
+			child.Elem().Field(i).SetBool(true)
+			if tc.match(parent.Interface(), child.Interface()) {
+				t.Errorf("%s: a ticked child matches its parent, so it isn't saved", name)
+			}
+			if tc.allZero(child.Interface()) {
+				t.Errorf("%s: a tick alone counts as all zero, so it isn't saved", name)
 			}
 		}
 	}

@@ -53,6 +53,14 @@ type ChannelFlagValues struct {
 	FilteredFilenameOps []string
 	URLOutputDirs       []string
 
+	// Replace inherited filters and operations
+	FiltersReplaceInherited             bool
+	MoveOpsReplaceInherited             bool
+	MetaOpsReplaceInherited             bool
+	FilteredMetaOpsReplaceInherited     bool
+	FilenameOpsReplaceInherited         bool
+	FilteredFilenameOpsReplaceInherited bool
+
 	// Metarr settings
 	MetarrExt          string
 	RenameStyle        string

@@ -1,8 +1,8 @@
 package metarr
 
 import (
+	"errors"
 	"fmt"
-	"slices"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -11,25 +11,30 @@ import (
 	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
-// loadAndMergeMetaOps loads and merges meta ops: file ops override DB ops, then apply filtering
+// loadAndMergeMetaOps returns a video's meta ops: its channel URL's from every level, then its matched filtered ones.
 func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
-	// Load file ops (highest priority). An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
-	fileMetaOps, err := LoadMetaOpsFromFile(cu, dirParser)
+	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
+	ops, err := channelURLMetaOps(cu, dirParser)
 	if err != nil {
 		logger.Pl.E("Meta ops file for %q can't be used: %v", cu.URL, err)
 	}
+	return getDedupedMetaOpStrings(applyFilteredMetaOps(ops, v.FilteredMetaOps, v.URL, c.Name))
+}
 
-	// File ops override DB ops with same key
-	nonConflictingDBOps := models.FilterConflictingMetaOps(fileMetaOps, cu.ChanURLMetarrArgs.MetaOps)
-
-	// Combine
-	fileAndDBOps := slices.Concat(fileMetaOps, nonConflictingDBOps)
-
-	// Merge with filtered meta ops (per-video, stored in Video struct)
-	mergedOps := applyFilteredMetaOps(fileAndDBOps, v.FilteredMetaOps, v.URL, c.Name)
-
-	// Convert to strings, deduplicating
-	return getDedupedMetaOpStrings(mergedOps)
+// channelURLMetaOps returns a channel URL's meta ops from every level, with each level's ops file. Returns the errors of
+// files it can't use, whose ops are left out.
+func channelURLMetaOps(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.MetaOps, error) {
+	fileOps := make([][]models.MetaOps, len(cu.Levels))
+	var errs []error
+	for i, l := range cu.Levels {
+		if l.MetarrArgs == nil {
+			continue
+		}
+		var err error
+		fileOps[i], err = LoadMetaOpsFromFile(l.MetarrArgs.MetaOpsFile, dp)
+		errs = append(errs, err)
+	}
+	return models.StackMetaOps(cu.Levels, fileOps), errors.Join(errs...)
 }
 
 // overrideMetaOps returns the video's Download As meta ops, with its matched filtered meta ops.
@@ -37,18 +42,18 @@ func overrideMetaOps(v *models.Video, c *models.Channel) []string {
 	return getDedupedMetaOpStrings(applyFilteredMetaOps(v.Overrides.MetaOps, v.FilteredMetaOps, v.URL, c.Name))
 }
 
-// LoadMetaOpsFromFile loads in meta operations from the given file.
+// LoadMetaOpsFromFile loads in meta operations from the file at path, if set.
 //
 // File ops take precedence and will replace any matching DB ops. Returns an error if the file is set but can't be read
 // or parsed.
-func LoadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.MetaOps, error) {
-	if cu.ChanURLMetarrArgs.MetaOpsFile == "" {
+func LoadMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.MetaOps, error) {
+	if path == "" {
 		return nil, nil
 	}
 
-	metaOpsFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.MetaOpsFile, "meta ops")
+	metaOpsFile, err := dp.ParseDirectory(path, "meta ops")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse meta ops file path %q: %w", cu.ChanURLMetarrArgs.MetaOpsFile, err)
+		return nil, fmt.Errorf("failed to parse meta ops file path %q: %w", path, err)
 	}
 
 	logger.Pl.I("Adding meta ops from file %q...", metaOpsFile)
@@ -67,25 +72,14 @@ func LoadMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]
 	return parsedOps, nil
 }
 
-// applyFilteredMetaOps applies filtering rules to meta ops
+// applyFilteredMetaOps adds the matched filtered meta ops to ops, each beating any of ops it conflicts with.
 func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMetaOps, videoURL, channelName string) []models.MetaOps {
 	matchedFilteredOps := extractMatchedFilteredMetaOps(filteredOps)
-	matchedFilteredKeys := buildMetaOpKeySet(matchedFilteredOps, true)
-
-	// Keep only ops that aren't being replaced by MATCHED filtered ops
-	result := make([]models.MetaOps, 0, len(ops))
-	for _, op := range ops {
-		key := sharedparsing.FormatMetaOp(op)
-		if !matchedFilteredKeys[key] {
-			logger.Pl.D(2, "Added operation %q for video URL %q (Channel: %q)", op, videoURL, channelName)
-			result = append(result, op)
-		}
+	result := models.FilterConflictingMetaOps(matchedFilteredOps, ops)
+	for _, op := range result {
+		logger.Pl.D(2, "Added operation %q for video URL %q (Channel: %q)", sharedparsing.FormatMetaOp(op), videoURL, channelName)
 	}
-
-	// Add the matched filtered ops
-	result = append(result, matchedFilteredOps...)
-
-	return result
+	return append(result, matchedFilteredOps...)
 }
 
 // extractMatchedFilteredMetaOps gets only the filtered ops where filters matched
@@ -97,18 +91,6 @@ func extractMatchedFilteredMetaOps(filteredOps []models.FilteredMetaOps) []model
 		}
 	}
 	return result
-}
-
-// buildKeySet creates a set of keys from meta ops
-func buildMetaOpKeySet(ops []models.MetaOps, includeNonConflicting bool) map[string]bool {
-	metaOpsKeys := make(map[string]bool, len(ops))
-	for _, op := range ops {
-		_, nonConflicting := models.NonConflictingMetaOps[op.OpType]
-		if includeNonConflicting || !nonConflicting {
-			metaOpsKeys[sharedparsing.FormatMetaOp(op)] = true
-		}
-	}
-	return metaOpsKeys
 }
 
 // getDedupedMetaOpStrings converts ops to deduplicated string slice.

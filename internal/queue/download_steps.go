@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/limits"
 	"tubarr/internal/metadata"
+	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
@@ -159,9 +160,16 @@ func (q *DownloadQueue) prepare(d *download) error {
 	v.VideoDir = videoDir
 	v.JSONDir = jsonDir
 
-	// Download As videos don't use the ops files, so only Metarr being unusable holds them back.
-	if v.Overrides == nil || d.session.skipMetarr.Reason == models.SkipMetarrNoPath {
+	// Download As videos with ops of their own don't use the ops files, so only Metarr being unusable holds them back.
+	if v.Overrides == nil || v.Overrides.ChannelURLOps != nil || d.session.skipMetarr.Reason == models.SkipMetarrNoPath {
 		v.SkipMetarr = d.session.skipMetarr
+	}
+
+	// The channel URL's lines in Download As ops are refreshed, unless Metarr is held back anyway.
+	if !v.SkipMetarr.Skip {
+		if err := metarr.FollowChannelURLOps(v.Overrides, cu, d.dirParser); err != nil {
+			return err
+		}
 	}
 
 	// Use custom scraper if needed.
@@ -173,24 +181,32 @@ func (q *DownloadQueue) prepare(d *download) error {
 
 // acquireLane waits for a slot in the lane of the video's channel, or of its channel URL if that has a limit of its own.
 func (q *DownloadQueue) acquireLane(d *download) (release func(), err error) {
-	chanLimit := 1
-	if d.c.ChanSettings != nil {
-		chanLimit = sharedvalidation.ValidateConcurrencyLimit(d.c.ChanSettings.DownloadConcurrency)
-	}
-	urlLimit := chanLimit
-	if s := d.cu.ChanURLSettings; s != nil && s.DownloadConcurrency > 0 {
-		urlLimit = sharedvalidation.ValidateConcurrencyLimit(s.DownloadConcurrency)
-	}
-
-	lane := q.lanes.lane(d.c, d.cu, chanLimit, urlLimit)
-	if lane == nil {
-		return nil, nil
-	}
-
-	if err := lane.Acquire(d.startCtx); err != nil {
+	channelID := d.c.ID
+	channelURLID := d.cu.ID
+	if err := q.lanes.acquire(d.startCtx, channelID, channelURLID); err != nil {
 		return nil, err
 	}
-	return lane.Release, nil
+	return func() { q.lanes.release(channelID, channelURLID) }, nil
+}
+
+// downloadLimits returns how many of a channel's videos, and of each of its URLs', download at once (at least 1).
+func downloadLimits(c *models.Channel) laneLimits {
+	// The channel's limit.
+	channelLimit := 1
+	if c.ChanSettings != nil {
+		channelLimit = sharedvalidation.ValidateConcurrencyLimit(c.ChanSettings.DownloadConcurrency)
+	}
+	lim := newLaneLimits(c, channelLimit)
+
+	// Each URL's own limit, or the channel's.
+	for _, cu := range c.URLModels {
+		urlLimit := channelLimit
+		if s := cu.ChanURLSettings; s != nil && s.DownloadConcurrency > 0 {
+			urlLimit = sharedvalidation.ValidateConcurrencyLimit(s.DownloadConcurrency)
+		}
+		lim.setURL(cu.ID, urlLimit)
+	}
+	return lim
 }
 
 // postProcess hands a downloaded video to the post-processing queue, then stores it as finished.

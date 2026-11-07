@@ -81,6 +81,14 @@ func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
 	cmd.SetCustomYDLPArgFlags(c, &f.ExtraYTDLPVideoArgs, &f.ExtraYTDLPMetaArgs, &f.ExtraYTDLPCrawlArgs)
 
 	c.Flags().BoolVar(&f.AutoDownload, keys.AutoDownload, false, "Download new videos automatically (otherwise they wait in Available, see 'list-available' or the web UI)")
+
+	// Replace inherited lists instead of adding to them.
+	c.Flags().BoolVar(&f.FiltersReplaceInherited, keys.FilterOpsReplaceInherited, false, "Replace the filters and filter file inherited from the profile (for a channel) or the channel (for a URL), instead of adding to them")
+	c.Flags().BoolVar(&f.MoveOpsReplaceInherited, keys.MoveOpsReplaceInherited, false, "Replace the move ops and move ops file inherited from the profile (for a channel) or the channel (for a URL), instead of adding to them")
+	c.Flags().BoolVar(&f.MetaOpsReplaceInherited, keys.MMetaOpsReplaceInherited, false, "Replace the meta ops and meta ops file inherited from the profile (for a channel) or the channel (for a URL), instead of adding to them")
+	c.Flags().BoolVar(&f.FilteredMetaOpsReplaceInherited, keys.MFilteredMetaOpsReplaceInherited, false, "Replace the filtered meta ops and their file inherited from the profile (for a channel) or the channel (for a URL), instead of adding to them")
+	c.Flags().BoolVar(&f.FilenameOpsReplaceInherited, keys.MFilenameOpsReplaceInherited, false, "Replace the filename ops and filename ops file inherited from the profile (for a channel) or the channel (for a URL), instead of adding to them")
+	c.Flags().BoolVar(&f.FilteredFilenameOpsReplaceInherited, keys.MFilteredFilenameOpsReplaceInherited, false, "Replace the filtered filename ops and their file inherited from the profile (for a channel) or the channel (for a URL), instead of adding to them")
 }
 
 // mergeFlagsIntoInput merges flag values into the pointer struct.
@@ -186,6 +194,24 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	}
 	if cmd.Flags().Changed(keys.MFilteredFilenameOps) {
 		in.FilteredFilenameOps = &f.FilteredFilenameOps
+	}
+	if cmd.Flags().Changed(keys.FilterOpsReplaceInherited) {
+		in.FiltersReplaceInherited = &f.FiltersReplaceInherited
+	}
+	if cmd.Flags().Changed(keys.MoveOpsReplaceInherited) {
+		in.MoveOpsReplaceInherited = &f.MoveOpsReplaceInherited
+	}
+	if cmd.Flags().Changed(keys.MMetaOpsReplaceInherited) {
+		in.MetaOpsReplaceInherited = &f.MetaOpsReplaceInherited
+	}
+	if cmd.Flags().Changed(keys.MFilteredMetaOpsReplaceInherited) {
+		in.FilteredMetaOpsReplaceInherited = &f.FilteredMetaOpsReplaceInherited
+	}
+	if cmd.Flags().Changed(keys.MFilenameOpsReplaceInherited) {
+		in.FilenameOpsReplaceInherited = &f.FilenameOpsReplaceInherited
+	}
+	if cmd.Flags().Changed(keys.MFilteredFilenameOpsReplaceInherited) {
+		in.FilteredFilenameOpsReplaceInherited = &f.FilteredFilenameOpsReplaceInherited
 	}
 	if cmd.Flags().Changed(keys.MOutputExt) {
 		in.MetarrExt = &f.MetarrExt

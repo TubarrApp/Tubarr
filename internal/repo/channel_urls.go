@@ -372,6 +372,8 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 			return nil, err
 		}
 		if mergeWithParent {
+			cu.Levels = channelURLLevels(cu, c) // Before merging changes its own.
+
 			// Its profile fills in its unset settings before its channel.
 			if cu.Profile != nil {
 				cu.ChanURLSettings = cmp.Or(cu.ChanURLSettings, &models.Settings{})
@@ -388,6 +390,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 			cu.ChanURLMetarrArgs = &models.MetarrArgs{}
 		}
 		if mergeWithParent {
+			stackLists(cu.ChanURLSettings, cu.ChanURLMetarrArgs, cu.Levels)
 			parsing.FillChannelURLOutputDirectory(cu, c)
 		}
 	}
@@ -395,11 +398,11 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 }
 
 // inheritChannelSettings fills a channel URL's unset settings from its channel's: a copy of them all if it has none of
-// its own, else field by field. Pausing is per URL, so never inherited.
+// its own, else field by field, bar the lists it replaces. Pausing is per URL, so never inherited.
 func inheritChannelSettings(cu *models.ChannelURL, c *models.Channel) {
 	switch {
 	case cu.ChanURLSettings != nil:
-		mergeSettings(cu.ChanURLSettings, c.ChanSettings)
+		mergeSettings(cu.ChanURLSettings, withoutReplacedSettings(cu.ChanURLSettings, c.ChanSettings))
 	case c.ChanSettings != nil:
 		s := *c.ChanSettings
 		s.Paused = false
@@ -407,7 +410,7 @@ func inheritChannelSettings(cu *models.ChannelURL, c *models.Channel) {
 	}
 	switch {
 	case cu.ChanURLMetarrArgs != nil:
-		mergeMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs)
+		mergeMetarrArgs(cu.ChanURLMetarrArgs, withoutReplacedMetarrArgs(cu.ChanURLMetarrArgs, c.ChanMetarrArgs))
 	case c.ChanMetarrArgs != nil:
 		m := *c.ChanMetarrArgs
 		cu.ChanURLMetarrArgs = &m
@@ -480,8 +483,8 @@ func (cs *ChannelStore) channelURLExists(key, val string) bool {
 	return count > 0
 }
 
-// mergeSettings fills u's unset settings from ch, its channel's or profile's, adding to its filters and move ops.
-// Pausing isn't inherited.
+// mergeSettings fills u's unset settings from ch, its channel's or profile's. Pausing isn't inherited, and filters and
+// move ops are stacked from every level by stackLists.
 func mergeSettings(u, ch *models.Settings) {
 	if ch == nil {
 		return
@@ -501,9 +504,7 @@ func mergeSettings(u, ch *models.Settings) {
 	u.ExtraYTDLPVideoArgs = cmp.Or(u.ExtraYTDLPVideoArgs, ch.ExtraYTDLPVideoArgs)
 	u.ExtraYTDLPMetaArgs = cmp.Or(u.ExtraYTDLPMetaArgs, ch.ExtraYTDLPMetaArgs)
 	u.ExtraYTDLPCrawlArgs = cmp.Or(u.ExtraYTDLPCrawlArgs, ch.ExtraYTDLPCrawlArgs)
-	u.Filters = slices.Concat(ch.Filters, u.Filters)
 	u.FilterFile = cmp.Or(u.FilterFile, ch.FilterFile)
-	u.MetaFilterMoveOps = slices.Concat(u.MetaFilterMoveOps, ch.MetaFilterMoveOps) // URL's first, as the first match wins.
 	u.MetaFilterMoveOpFile = cmp.Or(u.MetaFilterMoveOpFile, ch.MetaFilterMoveOpFile)
 	u.FromDate = cmp.Or(u.FromDate, ch.FromDate)
 	u.ToDate = cmp.Or(u.ToDate, ch.ToDate)
@@ -512,21 +513,18 @@ func mergeSettings(u, ch *models.Settings) {
 	u.AutoDownload = inheritBool(u.AutoDownload, ch.AutoDownload)
 }
 
-// mergeMetarrArgs fills u's unset Metarr args from ch, its channel's or profile's, adding to its op lists.
+// mergeMetarrArgs fills u's unset Metarr args from ch, its channel's or profile's. Op lists are stacked from every
+// level by stackLists.
 func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	if ch == nil {
 		return
 	}
 	u.OutputExt = cmp.Or(u.OutputExt, ch.OutputExt)
 	u.PurgeOriginalVideo = inheritBool(u.PurgeOriginalVideo, ch.PurgeOriginalVideo)
-	u.FilenameOps = slices.Concat(models.FilterConflictingFilenameOps(u.FilenameOps, ch.FilenameOps), u.FilenameOps)
 	u.FilenameOpsFile = cmp.Or(u.FilenameOpsFile, ch.FilenameOpsFile)
-	u.FilteredFilenameOps = slices.Concat(ch.FilteredFilenameOps, u.FilteredFilenameOps)
 	u.FilteredFilenameOpsFile = cmp.Or(u.FilteredFilenameOpsFile, ch.FilteredFilenameOpsFile)
 	u.RenameStyle = cmp.Or(u.RenameStyle, ch.RenameStyle)
-	u.MetaOps = slices.Concat(models.FilterConflictingMetaOps(u.MetaOps, ch.MetaOps), u.MetaOps)
 	u.MetaOpsFile = cmp.Or(u.MetaOpsFile, ch.MetaOpsFile)
-	u.FilteredMetaOps = slices.Concat(ch.FilteredMetaOps, u.FilteredMetaOps)
 	u.FilteredMetaOpsFile = cmp.Or(u.FilteredMetaOpsFile, ch.FilteredMetaOpsFile)
 	u.WriteNFO = inheritBool(u.WriteNFO, ch.WriteNFO)
 	u.OutputDir = cmp.Or(u.OutputDir, ch.OutputDir)
@@ -540,6 +538,90 @@ func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	u.TranscodeAudioCodecs = inheritSlice(u.TranscodeAudioCodecs, ch.TranscodeAudioCodecs)
 	u.TranscodeVideoArgs = inheritSlice(u.TranscodeVideoArgs, ch.TranscodeVideoArgs)
 	u.ExtraFFmpegArgs = cmp.Or(u.ExtraFFmpegArgs, ch.ExtraFFmpegArgs)
+}
+
+// channelURLLevels returns the levels a channel URL's filters and op lists come from, farthest first: its channel's (set
+// when it's loaded merged), bar the lists the URL replaces, then its profile's and its own.
+func channelURLLevels(cu *models.ChannelURL, c *models.Channel) []models.SettingsLevel {
+	own := ownLevel(cu.ChanURLSettings, cu.ChanURLMetarrArgs)
+	levels := make([]models.SettingsLevel, 0, len(c.Levels)+2)
+	for _, l := range c.Levels {
+		levels = append(levels, models.SettingsLevel{
+			Settings:   withoutReplacedSettings(own.Settings, l.Settings),
+			MetarrArgs: withoutReplacedMetarrArgs(own.MetarrArgs, l.MetarrArgs),
+		})
+	}
+	if cu.Profile != nil {
+		levels = append(levels, models.SettingsLevel{Settings: cu.Profile.ProfileSettings, MetarrArgs: cu.Profile.ProfileMetarrArgs})
+	}
+	return append(levels, own)
+}
+
+// stackLists sets merged settings' filters and op lists from their levels, without the levels' files, which are read
+// when the lists are used.
+func stackLists(s *models.Settings, m *models.MetarrArgs, levels []models.SettingsLevel) {
+	s.Filters = models.StackFilters(levels, nil)
+	s.MetaFilterMoveOps = models.StackMoveOps(levels, nil)
+	m.MetaOps = models.StackMetaOps(levels, nil)
+	m.FilenameOps = models.StackFilenameOps(levels, nil)
+	m.FilteredMetaOps = slices.Concat(models.FilteredMetaOpsByLevel(levels, nil)...)
+	m.FilteredFilenameOps = slices.Concat(models.FilteredFilenameOpsByLevel(levels, nil)...)
+}
+
+// ownLevel returns a copy of settings and Metarr args as saved, empty where unset, before they're merged with others.
+func ownLevel(s *models.Settings, m *models.MetarrArgs) models.SettingsLevel {
+	own := models.SettingsLevel{Settings: &models.Settings{}, MetarrArgs: &models.MetarrArgs{}}
+	if s != nil {
+		sCopy := *s
+		own.Settings = &sCopy
+	}
+	if m != nil {
+		mCopy := *m
+		own.MetarrArgs = &mCopy
+	}
+	return own
+}
+
+// withoutReplacedSettings returns a copy of parent without the lists u replaces, for u to inherit the rest.
+func withoutReplacedSettings(u, parent *models.Settings) *models.Settings {
+	if parent == nil {
+		return nil
+	}
+	p := *parent
+	if u.FiltersReplaceInherited {
+		p.Filters = nil
+		p.FilterFile = ""
+	}
+	if u.MoveOpsReplaceInherited {
+		p.MetaFilterMoveOps = nil
+		p.MetaFilterMoveOpFile = ""
+	}
+	return &p
+}
+
+// withoutReplacedMetarrArgs returns a copy of parent without the op lists u replaces, for u to inherit the rest.
+func withoutReplacedMetarrArgs(u, parent *models.MetarrArgs) *models.MetarrArgs {
+	if parent == nil {
+		return nil
+	}
+	p := *parent
+	if u.MetaOpsReplaceInherited {
+		p.MetaOps = nil
+		p.MetaOpsFile = ""
+	}
+	if u.FilteredMetaOpsReplaceInherited {
+		p.FilteredMetaOps = nil
+		p.FilteredMetaOpsFile = ""
+	}
+	if u.FilenameOpsReplaceInherited {
+		p.FilenameOps = nil
+		p.FilenameOpsFile = ""
+	}
+	if u.FilteredFilenameOpsReplaceInherited {
+		p.FilteredFilenameOps = nil
+		p.FilteredFilenameOpsFile = ""
+	}
+	return &p
 }
 
 // inheritSlice returns s, or a copy of parent if s is empty.

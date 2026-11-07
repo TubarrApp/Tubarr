@@ -442,6 +442,13 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), channelErrStatus(err))
 		return
 	}
+
+	// Apply its new limits to its queued videos, waiting ones included.
+	if c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true); err != nil {
+		logger.Pl.W("Failed to reload channel %d to apply its new limits to queued videos: %v", channelID, err)
+	} else if found && c != nil {
+		ss.setQueueLimits(c)
+	}
 	writeText(w, http.StatusOK, "Channel updated successfully")
 }
 
@@ -1054,8 +1061,12 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 		}
 
 		// Options no different from the channel URL's aren't overrides, so the video keeps following the channel URL's.
+		// Otherwise the channel URL's ops are kept with them, so its lines can be refreshed.
 		if matchesChannelURL(ss.cs, c, channelURLID, overrides) {
 			overrides = nil
+		} else if overrides.ChannelURLOps, err = channelURLOps(ss.cs, c, channelURLID); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
 		}
 	}
 
@@ -1127,13 +1138,19 @@ func (ss *serverStore) handleGetOverrideOps(w http.ResponseWriter, r *http.Reque
 		DefaultsYtdlp  *settingsResponse     `json:"defaults_ytdlp"`  // The channel URL's settings, for its yt-dlp options.
 	}
 	var err error
-	if response.Defaults, err = metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
+	dirParser := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
+	if response.Defaults, err = metarr.ChannelURLOverrideLines(cu, dirParser); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	response.DefaultsMetarr = newMetarrArgsResponse(cu.ChanURLMetarrArgs)
 	response.DefaultsYtdlp = newSettingsResponse(cu.ChanURLSettings)
 	if overrides != nil {
+		// Its ops with the channel URL's lines refreshed, as they'd run now.
+		if err := metarr.FollowChannelURLOps(overrides, cu, dirParser); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		saved := metarr.VideoOverrideLines(overrides)
 		response.Saved = &saved
 		response.SavedMetarr = newMetarrArgsResponse(&overrides.MetarrArgs)
@@ -1301,7 +1318,7 @@ func (ss *serverStore) handleGetOverrideOpsFile(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	lines, err := metarr.FileOverrideLines(r.URL.Query().Get("box"), path, cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
+	lines, err := metarr.FileOverrideLines(r.URL.Query().Get("box"), path, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1311,11 +1328,11 @@ func (ss *serverStore) handleGetOverrideOpsFile(w http.ResponseWriter, r *http.R
 }
 
 // handleRunMetarr runs Metarr on the given videos, or all pending/failed videos if none are given. Overrides, for one
-// video, replace its options for this and later runs.
+// video or several from one channel URL, replace their options for this and later runs.
 func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	var requestBody struct {
 		VideoIDs  []int64               `json:"video_ids"`
-		Overrides *models.OverrideLines `json:"overrides"`   // Edit & Run, for one video.
+		Overrides *models.OverrideLines `json:"overrides"`   // Edit & Run, for one video or several from one channel URL.
 		Metarr    *metarrArgsInput      `json:"metarr"`      // Edit & Run's other Metarr args, with the overrides.
 		Rerun     bool                  `json:"rerun"`       // Also runs on given videos Metarr already processed.
 		Failed    bool                  `json:"failed_only"` // Runs on all the channel's videos Metarr failed on.
@@ -1336,13 +1353,19 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 
 	var overrides *models.VideoOverrides
 	if requestBody.Overrides != nil {
-		if len(requestBody.VideoIDs) != 1 {
-			http.Error(w, "overrides need one video", http.StatusBadRequest)
+		if len(requestBody.VideoIDs) == 0 {
+			http.Error(w, "overrides need the videos to run on", http.StatusBadRequest)
 			return
 		}
 		var err error
 		if overrides, err = parseOverrideLines(requestBody.Overrides, requestBody.Metarr); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Several videos can't share a filename or a custom thumbnail.
+		if len(requestBody.VideoIDs) > 1 && (overrides.Filename != "" || overrides.Thumbnail != "") {
+			http.Error(w, "a filename or custom thumbnail is for one video, not several", http.StatusBadRequest)
 			return
 		}
 	}
@@ -1379,7 +1402,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Edited options replace the video's earlier ones, kept for later runs.
+	// Edited options replace the videos' earlier ones, kept for later runs.
 	if overrides != nil {
 		awaiting, err := ss.vs.GetVideosAwaitingMetarr(c.ID, requestBody.Rerun)
 		if err != nil {
@@ -1391,19 +1414,32 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		i := slices.IndexFunc(awaiting, func(v *models.Video) bool { return v.ID == requestBody.VideoIDs[0] })
-		if i < 0 {
-			http.Error(w, "video isn't waiting for Metarr in this channel", http.StatusConflict)
-			return
+		// Videos given the same options must share the channel URL they're checked against.
+		var channelURLID int64
+		for n, id := range requestBody.VideoIDs {
+			i := slices.IndexFunc(awaiting, func(v *models.Video) bool { return v.ID == id })
+			if i < 0 {
+				http.Error(w, "video isn't waiting for Metarr in this channel", http.StatusConflict)
+				return
+			}
+			if n > 0 && awaiting[i].ChannelURLID != channelURLID {
+				http.Error(w, "videos edited together must be from one channel URL", http.StatusBadRequest)
+				return
+			}
+			channelURLID = awaiting[i].ChannelURLID
 		}
-		if err := checkOverridesFit(ss.cs, c, awaiting[i].ChannelURLID, overrides); err != nil {
+		if err := checkOverridesFit(ss.cs, c, channelURLID, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// Options no different from the channel URL's aren't overrides, so the video goes back to the channel URL's.
-		if matchesChannelURL(ss.cs, c, awaiting[i].ChannelURLID, overrides) {
+		// Options no different from the channel URL's aren't overrides, so the videos go back to the channel URL's.
+		// Otherwise the channel URL's ops are kept with them, so its lines can be refreshed.
+		if matchesChannelURL(ss.cs, c, channelURLID, overrides) {
 			overrides = nil
+		} else if overrides.ChannelURLOps, err = channelURLOps(ss.cs, c, channelURLID); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
 		}
 		if err := ss.vs.SetVideoOverrides(requestBody.VideoIDs, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1724,7 +1760,7 @@ func (ss *serverStore) handleSetCrawlConcurrency(w http.ResponseWriter, r *http.
 		logger.Pl.W("Failed to persist crawl concurrency to DB: %v", err)
 	}
 	viper.Set(keys.CrawlConcurrency, limit)
-	limits.InitGlobalCrawlLimit(limit)
+	limits.SetGlobalCrawlLimit(limit)
 	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Crawl concurrency updated", "limit": limit})
 }
 
@@ -1747,7 +1783,7 @@ func (ss *serverStore) handleSetGlobalDownloadConcurrency(w http.ResponseWriter,
 		logger.Pl.W("Failed to persist global download concurrency to DB: %v", err)
 	}
 	viper.Set(keys.GlobalDownloadConcurrency, limit)
-	limits.InitGlobalDownloadLimit(limit)
+	limits.SetGlobalDownloadLimit(limit)
 	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Global download concurrency updated", "limit": limit})
 }
 
@@ -1769,7 +1805,7 @@ func (ss *serverStore) handleSetPostProcessConcurrency(w http.ResponseWriter, r 
 		logger.Pl.W("Failed to persist post-processing concurrency to DB: %v", err)
 	}
 	viper.Set(keys.PostProcessConcurrency, limit)
-	limits.InitGlobalPostProcessLimit(limit)
+	limits.SetGlobalPostProcessLimit(limit)
 	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Post-processing concurrency updated", "limit": limit})
 }
 

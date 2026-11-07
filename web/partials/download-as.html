@@ -1,7 +1,7 @@
 <!-- Download As dialog: open with $dispatch('download-as', video), or an array of one channel URL's videos to give them the
-same options, or $dispatch('edit-metarr', video) to edit a downloaded video's options and run Metarr (again, on its finished
-files, if video.rerun). Dispatches download-as-done or edit-metarr-done with what it opened with once it starts, or
-download-as-cancel if Download As closes without starting. -->
+same options, or $dispatch('edit-metarr', video), or such an array, to edit downloaded videos' options and run Metarr (again,
+on their finished files, if video.rerun). Dispatches download-as-done or edit-metarr-done with what it opened with once it
+starts, or download-as-cancel if Download As closes without starting. -->
 <div
   x-data="downloadAsDialog()"
   @download-as.window="open($event.detail, 'download')"
@@ -38,7 +38,7 @@ download-as-cancel if Download As closes without starting. -->
               type="button"
               @click="addSetOp('all-titles', form.filename)"
               :disabled="multiple || !form.filename?.trim()"
-              title="Add all-titles:set: with this filename to the meta ops, so the video's titles match it."
+              title="Add all-titles:set: with this filename to the metadata ops, so the video's titles match it."
               class="text-xs text-brand-500 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
             >Apply to metadata</button>
           </div>
@@ -100,7 +100,7 @@ download-as-cancel if Download As closes without starting. -->
         <p x-show="thumbChoice === 'custom' && thumbError" class="mt-1 text-xs text-error-600 dark:text-error-500" x-text="thumbError"></p>
       </div>
       <p class="text-xs text-gray-500 dark:text-gray-400">
-        The ops below are <span x-text="multiple ? `their channel URL's` : `this video's channel URL's (or its last edits)`"></span>, one per line. Edits apply to <span x-text="multiple ? 'these videos' : 'this video'"></span> only, and are kept for later post-processing runs. Filtered ops still apply only if all their filters match the video's metadata. Load adds an ops file's ops to its box.
+        The ops below are <span x-text="multiple ? `their channel URL's` : `this video's channel URL's (or its last edits)`"></span>, one per line. Edits apply to <span x-text="multiple ? 'these videos' : 'this video'"></span> only, and are kept for later post-processing runs. Each time this opens, the channel URL's ops, including its ops files, are filled in fresh. Lines you add or delete here are kept. Filtered ops still apply only if all their filters match the video's metadata. Load adds an ops file's ops to its box. Loading a file again swaps in its current lines.
       </p>
       <template x-for="box in boxes" :key="box.key">
         <div>
@@ -323,6 +323,7 @@ download-as-cancel if Download As closes without starting. -->
       ytdlpDefaults: {}, // The channel URL's settings, for its yt-dlp options.
       opsFiles: {}, // Ops file paths typed in, by box.
       opsFileErrors: {}, // Why their Load failed, by box.
+      loadedOps: {}, // The lines each Load added, by box and then file path.
       thumbChoice: 'default', // 'default', 'custom' (form.thumbnail) or 'none' (stripped).
       auth: { username: '', password: '', login_url: '' }, // Login for this download only, never saved.
       uploading: false,
@@ -345,8 +346,8 @@ download-as-cancel if Download As closes without starting. -->
         { key: 'output_dir', label: 'Post-Process Directory', none: 'Default', note: ' / Set by move ops' }
       ],
       boxes: [
-        { key: 'meta_ops', label: 'Meta Ops', placeholder: 'title:prefix:[Cats] ', help: 'meta-ops' },
-        { key: 'filtered_meta_ops', label: 'Filtered Meta Ops', placeholder: 'title:contains:cat||genre:set:Cats', help: 'filtered-ops' },
+        { key: 'meta_ops', label: 'Metadata Ops', placeholder: 'title:prefix:[Cats] ', help: 'meta-ops' },
+        { key: 'filtered_meta_ops', label: 'Filtered Metadata Ops', placeholder: 'title:contains:cat||genre:set:Cats', help: 'filtered-ops' },
         { key: 'filename_ops', label: 'Filename Ops', placeholder: 'date-tag:prefix:ymd', help: 'filename-ops' },
         { key: 'filtered_filename_ops', label: 'Filtered Filename Ops', placeholder: 'title:contains:cat||prefix:[Cats] ', help: 'filtered-ops' }
       ],
@@ -382,6 +383,7 @@ download-as-cancel if Download As closes without starting. -->
         this.ytdlpDefaults = {};
         this.opsFiles = {};
         this.opsFileErrors = {};
+        this.loadedOps = {};
         this.form = { metarr: {} };
         // A login passed in (from Manual Downloads) is shown, ready to send.
         this.auth = { username: '', password: '', login_url: '', ...video.auth };
@@ -453,6 +455,7 @@ download-as-cancel if Download As closes without starting. -->
         this.thumbUploaded = null;
         this.thumbError = null;
         this.opsFileErrors = {};
+        this.loadedOps = {};
       },
 
       // Uploads the chosen image as the video's thumbnail, putting its saved path in the thumbnail box.
@@ -483,21 +486,26 @@ download-as-cancel if Download As closes without starting. -->
         }
       },
 
-      // Adds the ops in a file which apply to the video's channel URL to a box, leaving out lines it already has.
+      // Adds the ops in a file which apply to the video's channel URL to a box, leaving out lines it already has. Loading
+      // a file again swaps the lines it added for its current ones.
       async loadOpsFile(key) {
         const video = this.video;
+        const path = this.opsFiles[key].trim();
         this.opsFileErrors[key] = null;
         try {
-          const params = new URLSearchParams({ box: key, path: this.opsFiles[key].trim() });
+          const params = new URLSearchParams({ box: key, path });
           const response = await fetch(`/api/v1/channels/${video.channel_id}/override-ops/${video.channel_url_id}/file?${params}`);
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);
           }
-          const { lines } = await response.json();
-          const current = this.form[key] || '';
-          const have = current.split('\n');
-          const added = (lines || []).filter(l => !have.includes(l));
-          this.form[key] = [current.trimEnd(), ...added].filter(Boolean).join('\n');
+          const lines = (await response.json()).lines || [];
+          // Lines this file added before and no longer has come out. Trailing spaces stay, as an op's value may end in one.
+          const earlier = this.loadedOps[key]?.[path] || [];
+          const dropped = earlier.filter(l => !lines.includes(l));
+          const have = (this.form[key] || '').split('\n').filter(l => l.trim() && !dropped.includes(l));
+          const added = lines.filter(l => !have.includes(l));
+          this.form[key] = [...have, ...added].join('\n');
+          this.loadedOps[key] = { ...this.loadedOps[key], [path]: lines.filter(l => earlier.includes(l) || added.includes(l)) };
         } catch (err) {
           this.opsFileErrors[key] = `Couldn't load the ops file: ${err.message}`;
         }
@@ -529,7 +537,7 @@ download-as-cancel if Download As closes without starting. -->
         this.error = null;
         try {
           const response = this.mode === 'metarr'
-            ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: [video.id], overrides, metarr, rerun: video.rerun }) })
+            ? await fetch(`/api/v1/channels/${video.channel_id}/run-metarr`, { ...options, body: JSON.stringify({ video_ids: this.videos.map(v => v.id), overrides, metarr, rerun: video.rerun }) })
             : await fetch(`/api/v1/channels/${video.channel_id}/available`, { ...options, body: JSON.stringify({ action: 'download', video_ids: this.videos.map(v => v.id), overrides, metarr, auth: login }) });
           if (!response.ok) {
             throw new Error(await response.text() || response.statusText);

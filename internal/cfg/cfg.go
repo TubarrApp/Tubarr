@@ -89,9 +89,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		// Initialize global concurrency limits (0 = unlimited).
-		limits.InitGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
-		limits.InitGlobalCrawlLimit(viper.GetInt(keys.CrawlConcurrency))
-		limits.InitGlobalPostProcessLimit(viper.GetInt(keys.PostProcessConcurrency))
+		limits.SetGlobalDownloadLimit(viper.GetInt(keys.GlobalDownloadConcurrency))
+		limits.SetGlobalCrawlLimit(viper.GetInt(keys.CrawlConcurrency))
+		limits.SetGlobalPostProcessLimit(viper.GetInt(keys.PostProcessConcurrency))
 
 		// Setup benchmarking if flag is set. A failure only skips benchmarking.
 		if viper.GetBool(keys.Benchmarking) {

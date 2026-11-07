@@ -36,6 +36,13 @@ var perURLFixedKeys = []string{"paused", "use_global_cookies", "auto_download"}
 // perURLMetarrBools are the per-URL Metarr choices the channel pages send as booleans, with the custom settings.
 var perURLMetarrBools = []string{"metarr_purge_original_video", "metarr_write_nfo"}
 
+// replaceTicks are the Replace checkboxes under each list, which channels and URLs have but profiles don't.
+var replaceTicks = []string{
+	"filters_replace_inherited", "move_ops_replace_inherited",
+	"metarr_meta_ops_replace_inherited", "metarr_filtered_meta_ops_replace_inherited",
+	"metarr_filename_ops_replace_inherited", "metarr_filtered_filename_ops_replace_inherited",
+}
+
 // ---- Page parsing ----
 
 // webRoot is the repository's web folder.
@@ -373,7 +380,7 @@ func notificationKeys[T string | []models.Notification](v T) []string {
 // urlSettingValue types a per-URL value as the channel pages put it in their url_settings JSON.
 func urlSettingValue(key, v string, number bool) any {
 	switch {
-	case slices.Contains(perURLFixedKeys, key) || slices.Contains(perURLMetarrBools, key):
+	case slices.Contains(perURLFixedKeys, key) || slices.Contains(perURLMetarrBools, key) || slices.Contains(replaceTicks, key):
 		return v == "true"
 	case key == "ytdlp_preferred_video_codecs" || key == "ytdlp_preferred_audio_codecs":
 		return strings.Split(v, "\n")
@@ -439,6 +446,8 @@ func formSamples(t *testing.T) map[string][2]string {
 		"channel_config_file":          {file("config-a.yaml", "channel-name: Wiring\n"), file("config-b.yaml", "channel-name: Wiring\n")},
 		"ytdlp_preferred_video_codecs": {"av1\nvp9", "h264"},
 		"ytdlp_preferred_audio_codecs": {"opus", "aac\nopus"},
+		"filters_replace_inherited":    {"true", "false"},
+		"move_ops_replace_inherited":   {"false", "true"},
 
 		// Metarr.
 		"metarr_output_directory":                 {sub("out-a") + "/{{year}}", sub("out-b")},
@@ -464,6 +473,12 @@ func formSamples(t *testing.T) map[string][2]string {
 		"metarr_purge_metafile":                   {"json", "all"},
 		"metarr_purge_original_video":             {"false", "true"},
 		"metarr_write_nfo":                        {"true", "false"},
+
+		// Replace checkboxes.
+		"metarr_meta_ops_replace_inherited":              {"true", "false"},
+		"metarr_filtered_meta_ops_replace_inherited":     {"false", "true"},
+		"metarr_filename_ops_replace_inherited":          {"true", "false"},
+		"metarr_filtered_filename_ops_replace_inherited": {"false", "true"},
 	}
 }
 
@@ -752,8 +767,8 @@ func TestProfileFormRoundTrip(t *testing.T) {
 		keys   []string
 		hidden []string
 	}{
-		{"formData.settings.", settingsKeys, []string{"paused", "channel_config_file"}},
-		{"formData.metarr.", metarrKeys, nil},
+		{"formData.settings.", settingsKeys, slices.Concat([]string{"paused", "channel_config_file"}, replaceTicks)},
+		{"formData.metarr.", metarrKeys, replaceTicks},
 	} {
 		bound := boundKeys(bs, model.prefix)
 		for k := range bound {
@@ -767,8 +782,9 @@ func TestProfileFormRoundTrip(t *testing.T) {
 			}
 		}
 	}
-	reportDiff(t, "profiles.html", "settings model", settingsKeys, "settings the server returns", without(jsonTags(settingsResponse{}), "paused"))
-	reportDiff(t, "profiles.html", "Metarr model", metarrKeys, "Metarr settings the server returns", jsonTags(metarrArgsResponse{}))
+	channelOnly := func(k string) bool { return k == "paused" || slices.Contains(replaceTicks, k) }
+	reportDiff(t, "profiles.html", "settings model", settingsKeys, "settings the server returns", slices.DeleteFunc(jsonTags(settingsResponse{}), channelOnly))
+	reportDiff(t, "profiles.html", "Metarr model", metarrKeys, "Metarr settings the server returns", slices.DeleteFunc(jsonTags(metarrArgsResponse{}), channelOnly))
 
 	var id int64
 	for step, name := range []string{"Wiring Profile A", "Wiring Profile B"} {

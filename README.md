@@ -126,6 +126,8 @@ tubarr channel add \
 
 Each setting comes from the first of these that sets it: the URL's own settings, the URL's profile, the channel's own settings, then the channel's profile. Filters, move ops and filename/meta ops are added together instead, as a URL's are to its channel's.
 
+To use a channel's own list instead of adding it to its profile's, give that list's replace flag: `--filter-ops-replace-inherited`, `--move-ops-replace-inherited`, `--metarr-meta-ops-replace-inherited`, `--metarr-filtered-meta-ops-replace-inherited`, `--metarr-filename-ops-replace-inherited` or `--metarr-filtered-filename-ops-replace-inherited`. On `update-url-settings` the same flags make a URL leave out the channel's list, keeping its own profile's. Each covers its list's file too. Profiles don't take them.
+
 ---
 
 ## Running the Crawler
@@ -225,7 +227,7 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 
 ## Configuration Highlights
 
-- **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's. Its filters, move ops and filename/meta ops (filtered or not) are added to the channel's instead, with the URL's op used where both set the same thing. A [profile](#profiles) fills in what a channel or URL leaves blank.
+- **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's. Its filters, move ops and filename/meta ops (filtered or not) are added to the channel's instead, with the URL's op used where both set the same thing, unless it's set to replace them. A [profile](#profiles) fills in what a channel or URL leaves blank.
 - **Metarr args**: filename/meta operations, filtered operations, metadata-based move rules, FFmpeg transcode settings, metadata file deletion, per-URL output directories.
 - **Notifications**: URLs called when new videos are downloaded, for every channel URL or just one. `--notify` and config files set them for every channel URL; `channel notify-add --url` sets them for one. The web UI picks the channel URLs from a list.
 - **Global settings**: crawl concurrency, global and per-domain download limits, FlareSolverr URL, and custom site scraping rules (`--scrape-config-file`), also editable on the web UI's Settings page.

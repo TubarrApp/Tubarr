@@ -11,10 +11,18 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
+// DomainLimitKind is the type of thing being limited (e.g. downloads, or crawls).
+type DomainLimitKind string
+
+const (
+	DomainLimitKindDownload DomainLimitKind = "download"
+	DomainLimitKindCrawl    DomainLimitKind = "crawl"
+)
+
 // Per-domain limiters for video downloads and channel crawls.
 var (
-	DomainDownloads = &DomainLimiter{kind: "download", sems: make(map[string]*Semaphore)}
-	DomainCrawls    = &DomainLimiter{kind: "crawl", sems: make(map[string]*Semaphore)}
+	DomainDownloads = &DomainLimiter{kind: DomainLimitKindDownload, sems: make(map[string]*Semaphore)}
+	DomainCrawls    = &DomainLimiter{kind: DomainLimitKindCrawl, sems: make(map[string]*Semaphore)}
 )
 
 // Global limits across all channels.
@@ -24,39 +32,39 @@ var (
 	GlobalPostProcessing = NewSemaphore(0)
 )
 
-// InitGlobalDownloadLimit sets the download concurrency limit across all channels (0 = unlimited).
-func InitGlobalDownloadLimit(limit int) {
+// SetGlobalDownloadLimit sets the download concurrency limit across all channels (0 = unlimited).
+func SetGlobalDownloadLimit(limit int) {
 	GlobalDownloads.SetLimit(limit)
 	if limit > 0 {
-		logger.Pl.I("Global download concurrency limit set to %d", limit)
+		logger.Pl.I("Global download concurrency limit set to %d.", limit)
 	} else {
-		logger.Pl.I("Global download concurrency limit disabled (unlimited)")
+		logger.Pl.I("Global download concurrency limit disabled (unlimited).")
 	}
 }
 
-// InitGlobalCrawlLimit sets the scheduled crawl concurrency limit across all channels (0 = unlimited).
-func InitGlobalCrawlLimit(limit int) {
+// SetGlobalCrawlLimit sets the scheduled crawl concurrency limit across all channels (0 = unlimited).
+func SetGlobalCrawlLimit(limit int) {
 	GlobalCrawls.SetLimit(limit)
 	if limit > 0 {
-		logger.Pl.I("Global crawl concurrency limit set to %d", limit)
+		logger.Pl.I("Global crawl concurrency limit set to %d.", limit)
 	} else {
-		logger.Pl.I("Global crawl concurrency limit disabled (unlimited)")
+		logger.Pl.I("Global crawl concurrency limit disabled (unlimited).")
 	}
 }
 
-// InitGlobalPostProcessLimit sets the Metarr concurrency limit across all channels (0 = unlimited).
-func InitGlobalPostProcessLimit(limit int) {
+// SetGlobalPostProcessLimit sets the Metarr concurrency limit across all channels (0 = unlimited).
+func SetGlobalPostProcessLimit(limit int) {
 	GlobalPostProcessing.SetLimit(limit)
 	if limit > 0 {
-		logger.Pl.I("Global post-processing concurrency limit set to %d", limit)
+		logger.Pl.I("Global post-processing concurrency limit set to %d.", limit)
 	} else {
-		logger.Pl.I("Global post-processing concurrency limit disabled (unlimited)")
+		logger.Pl.I("Global post-processing concurrency limit disabled (unlimited).")
 	}
 }
 
 // DomainLimiter limits concurrent operations per domain. A domain with no limit is unlimited.
 type DomainLimiter struct {
-	kind string // The type of thing being limited (e.g. downloads, or crawls)
+	kind DomainLimitKind // The type of thing being limited (e.g. downloads, or crawls)
 	mu   sync.Mutex
 	sems map[string]*Semaphore
 }
@@ -71,7 +79,7 @@ func (l *DomainLimiter) Init(limits map[string]int) {
 			l.sems[NormalizeDomain(hostname)] = NewSemaphore(limit)
 		}
 	}
-	logger.Pl.I("Initialized %d domain %s limit(s)", len(l.sems), l.kind)
+	logger.Pl.I("Initialized %d domain %s limit(s).", len(l.sems), l.kind)
 }
 
 // Set updates the limit for one domain at runtime (0 removes it). Waiters get slots the new limit frees straight away.
@@ -79,9 +87,9 @@ func (l *DomainLimiter) Set(hostname string, limit int) {
 	hostname = NormalizeDomain(hostname)
 	l.semaphore(hostname).SetLimit(limit)
 	if limit > 0 {
-		logger.Pl.I("Domain %s limit for %q set to %d", l.kind, hostname, limit)
+		logger.Pl.I("Domain %s limit for %q set to %d.", l.kind, hostname, limit)
 	} else {
-		logger.Pl.I("Domain %s limit for %q removed (unlimited)", l.kind, hostname)
+		logger.Pl.I("Domain %s limit for %q removed (unlimited).", l.kind, hostname)
 	}
 }
 
@@ -92,7 +100,7 @@ func (l *DomainLimiter) Acquire(ctx context.Context, rawURL string) (*Semaphore,
 	sem := l.semaphore(hostname)
 
 	// Grab a semaphore slot.
-	if err := AcquireSlot(ctx, sem, hostname+" "+l.kind, rawURL); err != nil {
+	if err := AcquireSlot(ctx, sem, hostname+" "+string(l.kind), rawURL); err != nil {
 		return nil, err
 	}
 	return sem, nil

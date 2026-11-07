@@ -282,7 +282,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 	} {
 		logging.SetLevel(tc.level)
 		c := &models.Channel{ID: 1, Name: "Cats"}
-		cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: tc.args}
+		cu := withOwnLevel(&models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: tc.args})
 		v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json", Overrides: tc.overrides}
 		if got := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); !slices.Equal(got, tc.want) {
 			t.Errorf("%s:\ngot  %q\nwant %q", tc.name, got, tc.want)
@@ -302,7 +302,7 @@ func TestMakeMetarrCommandChannelTags(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := &models.Channel{ID: 1, Name: "Devon: Tracey"}
-	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: metaOps, FilenameOps: filenameOps}}
+	cu := withOwnLevel(&models.ChannelURL{URL: "https://example.com/@a", ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: metaOps, FilenameOps: filenameOps}})
 	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
 	want := []string{`all-credits:set:Devon\: Tracey`, "title:prefix:example.com/@a - ", `set:Devon\: Tracey - {{fulltitle}}`}
 

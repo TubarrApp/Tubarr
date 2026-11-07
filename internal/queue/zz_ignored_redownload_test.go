@@ -48,11 +48,8 @@ func TestFilteredVideoCanceledWhileWaiting(t *testing.T) {
 	dq := NewDownloadQueue(t.Context(), store, NewPostProcessingQueue(store))
 
 	// The channel's one slot is taken, so the video waits.
-	lane := dq.lanes.lane(c, cu, 1, 1)
-	if err := lane.Acquire(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	defer lane.Release()
+	dq.SetLimits(c)
+	takeSlot(t, &dq.lanes, c.ID, cu.ID)
 
 	v := &models.Video{URL: filteredVideoURL, ChannelURLID: cu.ID}
 	if queued, err := dq.Add(c, Request{Video: v, ByUser: true}); err != nil || len(queued) != 1 {

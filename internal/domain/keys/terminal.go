@@ -98,6 +98,10 @@ const (
 	MoveOps        string = "move-ops"
 	MoveOpsFile    string = "move-ops-file"
 	CrawlFreq      string = "crawl-freq"
+
+	// Replace the profile's or channel's filters or move ops instead of adding to them.
+	FilterOpsReplaceInherited string = "filter-ops-replace-inherited"
+	MoveOpsReplaceInherited   string = "move-ops-replace-inherited"
 )
 
 // Database operations.
@@ -131,6 +135,12 @@ const (
 	MOutputDir               string = "metarr-output-directory"
 	MOutputExt               string = "metarr-output-ext"
 	MExtraFFmpegArgs         string = "metarr-extra-ffmpeg-args"
+
+	// Replace the profile's or channel's ops instead of adding to them.
+	MMetaOpsReplaceInherited             string = "metarr-meta-ops-replace-inherited"
+	MFilteredMetaOpsReplaceInherited     string = "metarr-filtered-meta-ops-replace-inherited"
+	MFilenameOpsReplaceInherited         string = "metarr-filename-ops-replace-inherited"
+	MFilteredFilenameOpsReplaceInherited string = "metarr-filtered-filename-ops-replace-inherited"
 )
 
 // Custom additional commands.

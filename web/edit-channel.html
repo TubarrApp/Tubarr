@@ -387,7 +387,9 @@
               move_ops_file: '',
               move_ops: '',
               ytdlp_preferred_video_codecs: '',
-              ytdlp_preferred_audio_codecs: ''
+              ytdlp_preferred_audio_codecs: '',
+              filters_replace_inherited: false,
+              move_ops_replace_inherited: false
             },
             metarr: {
               metarr_output_directory: '',
@@ -412,7 +414,11 @@
               metarr_meta_ops: '',
               metarr_meta_ops_file: '',
               metarr_filtered_meta_ops: '',
-              metarr_filtered_meta_ops_file: ''
+              metarr_filtered_meta_ops_file: '',
+              metarr_meta_ops_replace_inherited: false,
+              metarr_filtered_meta_ops_replace_inherited: false,
+              metarr_filename_ops_replace_inherited: false,
+              metarr_filtered_filename_ops_replace_inherited: false
             }
           },
           error: '',
@@ -685,7 +691,13 @@
               metarr_filename_ops_file: '',
               metarr_filename_ops: '',
               metarr_filtered_filename_ops_file: '',
-              metarr_filtered_filename_ops: ''
+              metarr_filtered_filename_ops: '',
+              filters_replace_inherited: false,
+              move_ops_replace_inherited: false,
+              metarr_meta_ops_replace_inherited: false,
+              metarr_filtered_meta_ops_replace_inherited: false,
+              metarr_filename_ops_replace_inherited: false,
+              metarr_filtered_filename_ops_replace_inherited: false
             };
           },
 
@@ -695,8 +707,8 @@
 
             for (const key in custom) {
               const value = custom[key];
-              // Skip null, undefined, empty strings
-              if (value === null || value === undefined || value === '') continue;
+              // Skip null, undefined, empty strings and unticked boxes
+              if (value === null || value === undefined || value === '' || value === false) continue;
               // Shown outside the custom settings box.
               if (key === 'auto_download' || key === 'paused') continue;
               // Skip numeric defaults (0 is usually not set by user)
@@ -909,7 +921,8 @@
                   'external_downloader', 'external_downloader_args',
                   'extra_ytdlp_video_args', 'extra_ytdlp_meta_args', 'extra_ytdlp_crawl_args',
                   'move_ops_file', 'move_ops',
-                  'ytdlp_preferred_video_codecs', 'ytdlp_preferred_audio_codecs'
+                  'ytdlp_preferred_video_codecs', 'ytdlp_preferred_audio_codecs',
+                  'filters_replace_inherited', 'move_ops_replace_inherited'
                 ];
 
                 settingsFields.forEach(field => {
@@ -940,7 +953,9 @@
                   'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_meta_ops_file',
                   'metarr_filename_ops', 'metarr_filename_ops_file',
                   'metarr_filtered_meta_ops', 'metarr_filtered_meta_ops_file',
-                  'metarr_filtered_filename_ops', 'metarr_filtered_filename_ops_file'
+                  'metarr_filtered_filename_ops', 'metarr_filtered_filename_ops_file',
+                  'metarr_meta_ops_replace_inherited', 'metarr_filtered_meta_ops_replace_inherited',
+                  'metarr_filename_ops_replace_inherited', 'metarr_filtered_filename_ops_replace_inherited'
                 ];
 
                 metarrFields.forEach(field => {

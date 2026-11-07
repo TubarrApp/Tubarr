@@ -264,15 +264,24 @@
                           :title="expandedErrors[video.id] ? 'Click to show less' : 'Click to show the whole error'"
                           x-text="video.download_status.error"
                         ></p>
-                        <button
-                          x-show="!ignoredView"
-                          type="button"
-                          @click.stop="$dispatch('download-as', video)"
-                          title="Download this video with its own filename and Metarr ops."
-                          class="mt-2 text-xs text-brand-500 hover:underline dark:text-brand-400"
-                        >
-                          Download As…
-                        </button>
+                        <div x-show="!ignoredView" class="mt-2 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            @click.stop="$dispatch('download-as', video)"
+                            :disabled="downloading.includes(video.id)"
+                            title="Download this video with its own filename and Metarr ops."
+                            class="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            Download As…
+                          </button>
+                          <button
+                            type="button"
+                            @click.stop="downloadOne(video)"
+                            :disabled="downloading.includes(video.id)"
+                            class="px-3 py-1 text-xs font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            x-text="downloading.includes(video.id) ? 'Starting...' : 'Download'"
+                          ></button>
+                        </div>
                       </div>
                     </div>
                   </template>
@@ -336,6 +345,7 @@
           loading: true,
           error: null,
           working: false,
+          downloading: [], // IDs of videos whose own Download button's request is in flight.
           currentPage: 1,
           itemsPerPage: 24,
           lastClickedIndex: null,
@@ -543,6 +553,27 @@
             await this.refreshAfterAction();
             if (errors.length > 0) {
               alert(`Some videos could not be updated:\n\n${errors.join('\n')}`);
+            }
+          },
+
+          // Downloads one video from its card, then reloads the list it's removed from.
+          async downloadOne(video) {
+            this.downloading.push(video.id);
+            try {
+              const response = await fetch(`/api/v1/channels/${video.channel_id}/available`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'download', video_ids: [video.id] })
+              });
+              if (!response.ok) {
+                throw new Error(await response.text() || response.statusText);
+              }
+              delete this.selected[video.id];
+              await this.refreshAfterAction();
+            } catch (err) {
+              alert(`Failed to download "${video.title}": ${err.message}`);
+            } finally {
+              this.downloading = this.downloading.filter(id => id !== video.id);
             }
           },
 

@@ -54,6 +54,10 @@ type SettingsInput struct {
 	MoveOps      *[]string `viper:"move-ops"`
 	MoveOpFile   *string   `viper:"move-ops-file"`
 
+	// Replace the profile's or channel's filters or move ops instead of adding to them.
+	FiltersReplaceInherited *bool `viper:"filter-ops-replace-inherited"`
+	MoveOpsReplaceInherited *bool `viper:"move-ops-replace-inherited"`
+
 	// Extra arguments.
 	ExtraYTDLPVideoArgs *string `viper:"extra-ytdlp-video-args"`
 	ExtraYTDLPMetaArgs  *string `viper:"extra-ytdlp-meta-args"`
@@ -89,6 +93,12 @@ type MetarrArgsInput struct {
 	FilenameOps         *[]string `viper:"metarr-filename-ops"`
 	FilteredMetaOps     *[]string `viper:"metarr-filtered-meta-ops"`
 	FilteredFilenameOps *[]string `viper:"metarr-filtered-filename-ops"`
+
+	// Replace the profile's or channel's ops instead of adding to them.
+	MetaOpsReplaceInherited             *bool `viper:"metarr-meta-ops-replace-inherited"`
+	FilteredMetaOpsReplaceInherited     *bool `viper:"metarr-filtered-meta-ops-replace-inherited"`
+	FilenameOpsReplaceInherited         *bool `viper:"metarr-filename-ops-replace-inherited"`
+	FilteredFilenameOpsReplaceInherited *bool `viper:"metarr-filtered-filename-ops-replace-inherited"`
 
 	// Transcoding.
 	TranscodeGPU        *string   `viper:"metarr-transcode-gpu"`

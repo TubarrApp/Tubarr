@@ -20,6 +20,12 @@ const (
 	otherURL = "https://example.com/@b"
 )
 
+// withOwnLevel gives a channel URL built in a test its own settings as its only level, as loading it would.
+func withOwnLevel(cu *models.ChannelURL) *models.ChannelURL {
+	cu.Levels = []models.SettingsLevel{{Settings: cu.ChanURLSettings, MetarrArgs: cu.ChanURLMetarrArgs}}
+	return cu
+}
+
 // TestChannelURLOverrideLines tests the Download As dialog gets the channel URL's directories and ops, and that its
 // lines parse back.
 func TestChannelURLOverrideLines(t *testing.T) {
@@ -42,7 +48,7 @@ func TestChannelURLOverrideLines(t *testing.T) {
 	}
 
 	c := &models.Channel{ID: 1, Name: "Test"}
-	cu := &models.ChannelURL{
+	cu := withOwnLevel(&models.ChannelURL{
 		URL:             ownURL,
 		ChanURLSettings: &models.Settings{VideoDir: "/videos/{{channel_name}}", JSONDir: "/json"},
 		ChanURLMetarrArgs: &models.MetarrArgs{
@@ -51,7 +57,7 @@ func TestChannelURLOverrideLines(t *testing.T) {
 			FilteredMetaOps:     filteredMetaOps,
 			FilteredFilenameOps: filteredFilenameOps,
 		},
-	}
+	})
 	lines, err := ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
 	if err != nil {
 		t.Fatal(err)
@@ -136,22 +142,22 @@ func TestFileOverrideLines(t *testing.T) {
 		{"filtered_filename_ops", "title:contains:cat||prefix:[Cats] \ntitle:contains:cat&&duration:more-than:600||suffix: (long)\n",
 			[]string{"title:contains:cat||prefix:[Cats] ", "title:contains:cat&&duration:more-than:600||suffix: (long)"}},
 	} {
-		got, err := FileOverrideLines(tc.box, write(tc.box+".txt", tc.content), cu, dp)
+		got, err := FileOverrideLines(tc.box, write(tc.box+".txt", tc.content), dp)
 		if err != nil || !slices.Equal(got, tc.want) {
 			t.Errorf("%s: got %q, %v, want %q", tc.box, got, err, tc.want)
 		}
 	}
 
-	if _, err := FileOverrideLines("meta_ops", write("bad.txt", "artist:bogus:x\n"), cu, dp); err == nil {
+	if _, err := FileOverrideLines("meta_ops", write("bad.txt", "artist:bogus:x\n"), dp); err == nil {
 		t.Error("expected an error for an invalid op")
 	}
-	if _, err := FileOverrideLines("meta_ops", write("scoped.txt", ownURL+"|title:prefix:[A] \n"), cu, dp); err == nil {
+	if _, err := FileOverrideLines("meta_ops", write("scoped.txt", ownURL+"|title:prefix:[A] \n"), dp); err == nil {
 		t.Error("expected an error for an op with a channel URL")
 	}
-	if _, err := FileOverrideLines("meta_ops", filepath.Join(dir, "missing.txt"), cu, dp); err == nil {
+	if _, err := FileOverrideLines("meta_ops", filepath.Join(dir, "missing.txt"), dp); err == nil {
 		t.Error("expected an error for a missing file")
 	}
-	if _, err := FileOverrideLines("ops", write("ops.txt", "artist:set:Cats\n"), cu, dp); err == nil {
+	if _, err := FileOverrideLines("ops", write("ops.txt", "artist:set:Cats\n"), dp); err == nil {
 		t.Error("expected an error for an unknown box")
 	}
 }
@@ -210,6 +216,46 @@ func TestOverrideFilenameOps(t *testing.T) {
 	}
 }
 
+// TestMatchedFilteredOpsBeatPlain tests a matched filtered op replaces a plain op Metarr can't run alongside it, so
+// Metarr gets one filename set and the filtered artist, while other plain ops stay.
+func TestMatchedFilteredOpsBeatPlain(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	parseFilename := func(ops ...string) []models.FilenameOps {
+		t.Helper()
+		parsed, err := parsing.ParseFilenameOps(ops)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return parsed
+	}
+	parseMeta := func(ops ...string) []models.MetaOps {
+		t.Helper()
+		parsed, err := parsing.ParseMetaOps(ops)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return parsed
+	}
+	cu := withOwnLevel(&models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{
+		FilenameOps: parseFilename("set:Plain", "prefix:[P] "),
+		MetaOps:     parseMeta("artist:set:Plain", "title:suffix: [P]"),
+	}})
+	c := &models.Channel{ID: 1, Name: "Test"}
+	v := &models.Video{
+		URL:                 "https://example.com/v/1",
+		FilteredFilenameOps: []models.FilteredFilenameOps{{FiltersMatched: true, FilenameOps: parseFilename("set:Filtered")}},
+		FilteredMetaOps:     []models.FilteredMetaOps{{FiltersMatched: true, MetaOps: parseMeta("artist:set:Filtered")}},
+	}
+	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
+
+	if got, want := loadAndMergeFilenameOps(v, cu, c, dp), []string{"prefix:[P] ", "set:Filtered"}; !slices.Equal(got, want) {
+		t.Errorf("filename ops = %q, want %q", got, want)
+	}
+	if got, want := loadAndMergeMetaOps(v, cu, c, dp), []string{"title:suffix: [P]", "artist:set:Filtered"}; !slices.Equal(got, want) {
+		t.Errorf("meta ops = %q, want %q", got, want)
+	}
+}
+
 // TestMakeMetarrCommandOverrides tests a video's overrides replace the channel URL's ops, even when empty.
 func TestMakeMetarrCommandOverrides(t *testing.T) {
 	logger.Pl.Console = io.Discard
@@ -219,7 +265,7 @@ func TestMakeMetarrCommandOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := &models.Channel{ID: 1, Name: "Test"}
-	cu := &models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: channelOps}}
+	cu := withOwnLevel(&models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: channelOps}})
 	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/v.mp4", JSONFilePath: "/v.json", Overrides: &models.VideoOverrides{}}
 
 	args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))

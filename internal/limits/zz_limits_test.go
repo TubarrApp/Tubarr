@@ -245,9 +245,9 @@ func TestGlobalLimitsWakeWaiters(t *testing.T) {
 		init func(int)
 		sem  *Semaphore
 	}{
-		"downloads":       {InitGlobalDownloadLimit, GlobalDownloads},
-		"crawls":          {InitGlobalCrawlLimit, GlobalCrawls},
-		"post-processing": {InitGlobalPostProcessLimit, GlobalPostProcessing},
+		"downloads":       {SetGlobalDownloadLimit, GlobalDownloads},
+		"crawls":          {SetGlobalCrawlLimit, GlobalCrawls},
+		"post-processing": {SetGlobalPostProcessLimit, GlobalPostProcessing},
 	} {
 		for change, newLimit := range map[string]int{"raised": 2, "removed": 0} {
 			t.Run(name+" "+change, func(t *testing.T) {

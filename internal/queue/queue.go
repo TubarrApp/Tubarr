@@ -2,25 +2,27 @@ package queue
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 	"tubarr/internal/blocking"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/limits"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 )
 
-// Entry is one video in a queue, as its page shows it.
-type Entry struct {
+// QueueEntry is one video in a queue, as its page shows it.
+type QueueEntry struct {
 	VideoID        int64            `json:"video_id"`
 	ChannelID      int64            `json:"channel_id"`
 	ChannelName    string           `json:"channel_name"`
@@ -35,9 +37,9 @@ type Entry struct {
 	DownloadStatus *models.DLStatus `json:"download_status,omitempty"` // While in the download queue.
 }
 
-// newEntry returns a video's entry, queued now.
-func newEntry(v *models.Video, cu *models.ChannelURL, c *models.Channel) *Entry {
-	return &Entry{
+// newQueueEntry returns a video's entry, queued now.
+func newQueueEntry(v *models.Video, cu *models.ChannelURL, c *models.Channel) *QueueEntry {
+	return &QueueEntry{
 		VideoID:      v.ID,
 		ChannelID:    c.ID,
 		ChannelName:  c.Name,
@@ -51,9 +53,14 @@ func newEntry(v *models.Video, cu *models.ChannelURL, c *models.Channel) *Entry 
 }
 
 // lanes holds the slots of each channel, and of each channel URL with a limit of its own.
+//
+// Videos are given slots in the order they asked. Each video counts in the lane its channel's latest limits put it in,
+// so a changed limit applies to videos already running or waiting.
 type lanes struct {
-	mu   sync.Mutex
-	sems map[laneKey]*limits.Semaphore
+	mu      sync.Mutex
+	limits  map[int64]*laneLimits // By channel ID.
+	held    map[laneURL]int       // Slots held by each channel URL's videos.
+	waiting []*laneWaiter
 }
 
 // laneKey identifies a channel's lane, or a channel URL's if it has a limit of its own.
@@ -62,45 +69,154 @@ type laneKey struct {
 	id         int64
 }
 
-// lane returns the lane of a channel URL whose channel and URL have the given limits, or nil if neither has one.
-//
-// A URL whose limit is the channel's shares the channel's lane.
-func (l *lanes) lane(c *models.Channel, cu *models.ChannelURL, chanLimit, urlLimit int) *limits.Semaphore {
-	// Default: Set Channel limit from Channel settings.
-	key := laneKey{false, c.ID}
-	limit := chanLimit
+// laneURL identifies a channel URL whose videos take slots.
+type laneURL struct {
+	channelID    int64
+	channelURLID int64
+}
 
-	// ChannelURL concurrency limit overrides Channel's setting.
-	if urlLimit > 0 && urlLimit != chanLimit {
-		key = laneKey{true, cu.ID}
-		limit = urlLimit
+// laneLimits is a channel's limit (0 or less for none) and its URLs' limits, from a model of it loaded at loadedAt.
+type laneLimits struct {
+	loadedAt time.Time
+	channel  int
+	urls     map[int64]int // By channel URL ID, 0 for a URL whose limit is the channel's.
+}
+
+// laneWaiter is a video waiting for a slot.
+type laneWaiter struct {
+	url   laneURL
+	ready chan struct{} // Closed once it has a slot.
+}
+
+// newLaneLimits returns a channel's lane limits holding only its own limit, for setURL to add its URLs'.
+func newLaneLimits(c *models.Channel, channelLimit int) laneLimits {
+	return laneLimits{loadedAt: c.LoadedAt, channel: channelLimit, urls: make(map[int64]int, len(c.URLModels))}
+}
+
+// setURL sets a channel URL's limit, stored as 0 when it's the channel's so the URL shares the channel's lane.
+func (lim laneLimits) setURL(id int64, limit int) {
+	if limit == lim.channel {
+		limit = 0
 	}
+	lim.urls[id] = limit
+}
 
-	// No limit.
-	if limit <= 0 {
-		return nil
-	}
-
+// setLimits applies a channel's limits unless newer ones are already applied, giving waiting videos any slots they free.
+func (l *lanes) setLimits(channelID int64, lim laneLimits) {
 	// Lock lanes from modification.
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Create semaphore map if not yet present.
-	if l.sems == nil {
-		l.sems = make(map[laneKey]*limits.Semaphore)
+	// Keep the limits of the newest model.
+	stored := l.limits[channelID]
+	if stored != nil && lim.loadedAt.Before(stored.loadedAt) {
+		return
 	}
 
-	// Add semaphore to map for this key (or retrieve existing from map).
-	sem, exists := l.sems[key]
-	if !exists {
-		sem = limits.NewSemaphore(limit)
-		l.sems[key] = sem
+	// First limits for this channel.
+	if stored == nil {
+		if l.limits == nil {
+			l.limits = make(map[int64]*laneLimits)
+		}
+		stored = &laneLimits{urls: make(map[int64]int, len(lim.urls))}
+		l.limits[channelID] = stored
 	}
 
-	// Set semaphore concurrency limit.
-	sem.SetLimit(limit)
+	// Store the new limits, URLs they leave out (as a crawl's channel does) keeping theirs, then hand out freed slots.
+	stored.loadedAt = lim.loadedAt
+	stored.channel = lim.channel
+	maps.Copy(stored.urls, lim.urls)
+	l.grant()
+}
 
-	return sem
+// acquire waits for a slot in the lane of a channel URL's videos, or for ctx to end.
+func (l *lanes) acquire(ctx context.Context, channelID, channelURLID int64) error {
+	// Join the end of the line, taking a slot straight away if one is free.
+	w := &laneWaiter{url: laneURL{channelID, channelURLID}, ready: make(chan struct{})}
+	l.mu.Lock()
+	l.waiting = append(l.waiting, w)
+	l.grant()
+	l.mu.Unlock()
+
+	// Wait for a slot.
+	select {
+	case <-w.ready:
+		return nil
+	case <-ctx.Done():
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		select {
+		case <-w.ready: // Given a slot as ctx ended, so it goes to the next video.
+			l.free(w.url)
+		default:
+			if i := slices.Index(l.waiting, w); i >= 0 {
+				l.waiting = slices.Delete(l.waiting, i, i+1)
+			}
+		}
+		return ctx.Err()
+	}
+}
+
+// release frees a slot acquire gave to one of a channel URL's videos.
+func (l *lanes) release(channelID, channelURLID int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.free(laneURL{channelID, channelURLID})
+}
+
+// free frees a slot held by one of u's videos for the next waiting video. Must hold l.mu.
+func (l *lanes) free(u laneURL) {
+	l.held[u]--
+	if l.held[u] <= 0 {
+		delete(l.held, u)
+	}
+	l.grant()
+}
+
+// grant gives free slots to the longest waiting videos. Must hold l.mu.
+func (l *lanes) grant() {
+	if l.held == nil {
+		l.held = make(map[laneURL]int)
+	}
+	if len(l.waiting) == 0 {
+		return
+	}
+
+	// Count the slots in use in each lane, putting each video in the lane the limits put it in now.
+	inUse := make(map[laneKey]int, len(l.held))
+	for u, n := range l.held {
+		key, _ := l.lane(u)
+		inUse[key] += n
+	}
+
+	// Give each waiting video a slot if its lane has one free, oldest first.
+	waiting := l.waiting[:0]
+	for _, w := range l.waiting {
+		key, limit := l.lane(w.url)
+		if limit > 0 && inUse[key] >= limit {
+			waiting = append(waiting, w)
+			continue
+		}
+		inUse[key]++
+		l.held[w.url]++
+		close(w.ready)
+	}
+	clear(l.waiting[len(waiting):])
+	l.waiting = waiting
+}
+
+// lane returns the lane of a channel URL's videos and its limit (0 or less for none). Must hold l.mu.
+//
+// A URL whose limit is the channel's shares the channel's lane.
+func (l *lanes) lane(u laneURL) (key laneKey, concurrencyLimit int) {
+	lim := l.limits[u.channelID]
+	if lim == nil {
+		return laneKey{false, u.channelID}, 0
+	}
+	if limit := lim.urls[u.channelURLID]; limit > 0 {
+		return laneKey{true, u.channelURLID}, limit
+	}
+	return laneKey{false, u.channelID}, lim.channel
 }
 
 // ManualChannelURL returns the channel's URL with the given ID, or its manual downloads URL for 0. A video whose channel

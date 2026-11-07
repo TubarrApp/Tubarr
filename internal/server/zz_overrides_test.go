@@ -147,6 +147,7 @@ func TestMatchesChannelURL(t *testing.T) {
 			OutputDir:           "/out",
 		},
 	}
+	cu.Levels = []models.SettingsLevel{{Settings: cu.ChanURLSettings, MetarrArgs: cu.ChanURLMetarrArgs}} // As loading it would.
 	c := &models.Channel{URLModels: []*models.ChannelURL{cu}}
 	cs := &repo.ChannelStore{}
 

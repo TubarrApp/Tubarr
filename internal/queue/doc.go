@@ -57,6 +57,20 @@
 // lanes, every download needs a slot under the global and per-domain download limits, and every Metarr run a slot
 // under the channel's Metarr concurrency and the global post-processing limit.
 //
+// A changed limit applies straight away, to videos already running or waiting:
+//
+//   - A raised or removed limit starts the next waiting videos at once.
+//   - A lowered limit lets running videos finish, and starts no more until fewer are running than the new limit.
+//   - A channel URL that gains or loses a limit of its own moves to its new lane. Its running videos count there, and
+//     its waiting videos keep their place in line.
+//
+// Each queue keeps every channel's limits from the newest copy of the channel it was given, so a video holding an
+// older copy can't bring old limits back. Add and RunMetarr pass in their channel before its videos ask for slots.
+// After saving a channel's or a profile's settings, reload the channels and pass them to [DownloadQueue.SetLimits] and
+// [PostProcessingQueue.SetLimits]. The web server does this after each save, and every 10 seconds for every channel,
+// which also picks up settings a config file changed. The global and per-domain limits are changed in place when
+// they're saved on the Settings page.
+//
 // # Showing the queues
 //
 //   - Entries returns each queue's videos for the Downloads and Post-processing pages.

@@ -39,7 +39,7 @@ type videoKey struct {
 type claim struct {
 	download bool               // Held by a download, which other downloads can't take over.
 	stops    int                // How many times the channel had been stopped when its download took the video.
-	entry    *Entry             // Set while the video is in the queue.
+	entry    *QueueEntry        // Set while the video is in the queue.
 	cancel   context.CancelFunc // Cancels the video's Metarr run, set with entry.
 	done     chan struct{}      // Closed when the video is released.
 }
@@ -102,7 +102,7 @@ func (h *videoHold) postProcess(ctx context.Context, v *models.Video, cu *models
 	q.mu.Lock()
 	stopped := q.stops[c.ID] != h.claim.stops
 	if !stopped {
-		h.claim.entry, h.claim.cancel = newEntry(v, cu, c), cancel
+		h.claim.entry, h.claim.cancel = newQueueEntry(v, cu, c), cancel
 	}
 	q.mu.Unlock()
 	if stopped {
@@ -158,6 +158,9 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 
 	logger.Pl.I("Running Metarr on %d video(s) in channel %q", len(videos), c.Name)
 
+	// Its videos wait for slots under its current limits.
+	q.SetLimits(c)
+
 	var (
 		wg    sync.WaitGroup
 		mu    sync.Mutex
@@ -174,7 +177,8 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 			continue
 		}
 
-		// An unusable ops file leaves the URL's videos pending rather than run without its ops. Download As videos don't use them.
+		// An unusable ops file leaves the URL's videos pending rather than run without its ops. Download As videos with
+		// ops of their own don't use them.
 		skipErr, checked := skips[cu.ID]
 		if !checked {
 			var skip models.SkipMetarr
@@ -184,16 +188,24 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 			}
 			skips[cu.ID] = skipErr
 		}
-		if skipErr != nil && v.Overrides == nil {
+		if skipErr != nil && (v.Overrides == nil || v.Overrides.ChannelURLOps != nil) {
 			mu.Lock()
 			errs = append(errs, fmt.Errorf("video %q: %w", v.URL, skipErr))
 			mu.Unlock()
 			continue
 		}
 
+		// The channel URL's lines in Download As ops are refreshed.
+		if err := metarr.FollowChannelURLOps(v.Overrides, cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
+			mu.Lock()
+			errs = append(errs, fmt.Errorf("video %q: %w", v.URL, err))
+			mu.Unlock()
+			continue
+		}
+
 		key := videoKey{c.ID, v.URL}
 		vCtx, vCancel := context.WithCancel(ctx)
-		cl, added := q.add(key, newEntry(v, cu, c), vCancel)
+		cl, added := q.add(key, newQueueEntry(v, cu, c), vCancel)
 		if !added {
 			vCancel()
 			logger.Pl.W("Video %q is already being processed, skipping", v.URL)
@@ -269,9 +281,9 @@ func (q *PostProcessingQueue) Abort(channelID int64) (n int) {
 }
 
 // Entries returns the videos in the queue, oldest first.
-func (q *PostProcessingQueue) Entries() []Entry {
+func (q *PostProcessingQueue) Entries() []QueueEntry {
 	q.mu.Lock()
-	entries := make([]Entry, 0, len(q.claims))
+	entries := make([]QueueEntry, 0, len(q.claims))
 	for _, cl := range q.claims {
 		if cl.entry != nil {
 			entries = append(entries, *cl.entry)
@@ -284,7 +296,7 @@ func (q *PostProcessingQueue) Entries() []Entry {
 			entries[i].Progress = metarr.VideoProgress(entries[i].VideoID)
 		}
 	}
-	slices.SortFunc(entries, func(a, b Entry) int { return a.QueuedAt.Compare(b.QueuedAt) })
+	slices.SortFunc(entries, func(a, b QueueEntry) int { return a.QueuedAt.Compare(b.QueuedAt) })
 	return entries
 }
 
@@ -325,7 +337,7 @@ func (q *PostProcessingQueue) Wait(ctx context.Context) bool {
 }
 
 // add puts a video in the queue for a Metarr run, returning false if a download holds it or it's already in the queue.
-func (q *PostProcessingQueue) add(key videoKey, e *Entry, cancel context.CancelFunc) (*claim, bool) {
+func (q *PostProcessingQueue) add(key videoKey, e *QueueEntry, cancel context.CancelFunc) (*claim, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, held := q.claims[key]; held {
@@ -360,32 +372,42 @@ func (q *PostProcessingQueue) release(key videoKey, cl *claim) {
 //
 // The global slot is taken last, so a video waiting for its lane doesn't hold one.
 func (q *PostProcessingQueue) acquire(ctx context.Context, c *models.Channel, cu *models.ChannelURL) (release func(), err error) {
-	var chanLimit, urlLimit int
-	if c.ChanMetarrArgs != nil {
-		chanLimit = c.ChanMetarrArgs.MetarrConcurrency
-	}
-	if cu.ChanURLMetarrArgs != nil {
-		urlLimit = cu.ChanURLMetarrArgs.MetarrConcurrency // Merged, so equal to the channel's when inherited.
-	}
-
-	lane := q.lanes.lane(c, cu, chanLimit, urlLimit)
-	if lane != nil {
-		if err := lane.Acquire(ctx); err != nil {
-			return nil, err
-		}
+	if err := q.lanes.acquire(ctx, c.ID, cu.ID); err != nil {
+		return nil, err
 	}
 	if err := limits.GlobalPostProcessing.Acquire(ctx); err != nil {
-		if lane != nil {
-			lane.Release()
-		}
+		q.lanes.release(c.ID, cu.ID)
 		return nil, err
 	}
 	return func() {
 		limits.GlobalPostProcessing.Release()
-		if lane != nil {
-			lane.Release()
-		}
+		q.lanes.release(c.ID, cu.ID)
 	}, nil
+}
+
+// SetLimits applies a channel's Metarr concurrency to its videos in the queue, waiting ones included.
+func (q *PostProcessingQueue) SetLimits(c *models.Channel) {
+	q.lanes.setLimits(c.ID, metarrLimits(c))
+}
+
+// metarrLimits returns how many of a channel's videos, and of each of its URLs', run in Metarr at once (0 for no limit).
+func metarrLimits(c *models.Channel) laneLimits {
+	// The channel's limit.
+	var channelLimit int
+	if c.ChanMetarrArgs != nil {
+		channelLimit = c.ChanMetarrArgs.MetarrConcurrency
+	}
+	lim := newLaneLimits(c, channelLimit)
+
+	// Each URL's limit, merged with the channel's so equal to it when inherited.
+	for _, cu := range c.URLModels {
+		urlLimit := channelLimit
+		if cu.ChanURLMetarrArgs != nil {
+			urlLimit = cu.ChanURLMetarrArgs.MetarrConcurrency
+		}
+		lim.setURL(cu.ID, urlLimit)
+	}
+	return lim
 }
 
 // runVideoMetarr rebuilds a video's Metarr state from its metadata file and runs Metarr on it.

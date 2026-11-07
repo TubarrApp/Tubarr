@@ -11,6 +11,12 @@ import (
 	"tubarr/internal/parsing"
 )
 
+// withOwnLevel gives a channel URL built in a test its own settings as its only level, as loading it would.
+func withOwnLevel(cu *models.ChannelURL) *models.ChannelURL {
+	cu.Levels = []models.SettingsLevel{{Settings: cu.ChanURLSettings, MetarrArgs: cu.ChanURLMetarrArgs}}
+	return cu
+}
+
 // TestUnusableFilterFileSkipsVideo tests a filter file that can't be read stops a video downloading, as an error so it
 // isn't marked ignored, rather than letting it through unfiltered.
 func TestUnusableFilterFileSkipsVideo(t *testing.T) {
@@ -23,11 +29,11 @@ func TestUnusableFilterFileSkipsVideo(t *testing.T) {
 	}
 
 	c := &models.Channel{ID: 1, Name: "Cats"}
-	cu := &models.ChannelURL{
+	cu := withOwnLevel(&models.ChannelURL{
 		URL:               "https://example.com/@cats",
 		ChanURLSettings:   &models.Settings{FilterFile: filterFile},
 		ChanURLMetarrArgs: &models.MetarrArgs{},
-	}
+	})
 	newVideo := func() *models.Video {
 		return &models.Video{URL: "https://example.com/watch/1", JSONFilePath: jsonFile}
 	}
@@ -162,12 +168,50 @@ func TestFilteredOpsNumericField(t *testing.T) {
 		{"long duration string", map[string]any{"title": "Cats", "duration": "1:06:40"}, true},
 	} {
 		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: tt.meta}
-		if got := filteredMetaOpsMatches(v, cu, metaOps, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
+		if got := filteredMetaOpsMatches(v, cu, [][]models.FilteredMetaOps{metaOps}, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
 			t.Errorf("%s: filtered meta ops got %+v, want matched %v", tt.name, got, tt.want)
 		}
-		if got := filteredFilenameOpsMatches(v, cu, filenameOps, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
+		if got := filteredFilenameOpsMatches(v, cu, [][]models.FilteredFilenameOps{filenameOps}, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
 			t.Errorf("%s: filtered filename ops got %+v, want matched %v", tt.name, got, tt.want)
 		}
+	}
+}
+
+// TestMatchedFilteredOpsNearerThenFirstWin tests that of matched filtered ops setting the same thing, a nearer level's
+// wins, then the earlier line's in the same level, and that one matching a plain op still claims what it sets.
+func TestMatchedFilteredOpsNearerThenFirstWin(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	cat := []models.Filters{{Field: "title", FilterType: "contains", Value: "cat", MustAny: "must"}}
+	setName := func(v string) models.FilteredFilenameOps {
+		return models.FilteredFilenameOps{Filters: cat, FilenameOps: []models.FilenameOps{{OpType: "set", OpValue: v}}}
+	}
+	setArtist := func(v string) models.FilteredMetaOps {
+		return models.FilteredMetaOps{Filters: cat, MetaOps: []models.MetaOps{{Field: "artist", OpType: "set", OpValue: v}}}
+	}
+	plain := []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "Plain"}}
+	cu := &models.ChannelURL{ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: plain}}
+	v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: map[string]any{"title": "cat"}}
+
+	// Filename: the profile's set loses to the channel's, whose first line wins.
+	var gotNames []string
+	for _, ffo := range filteredFilenameOpsMatches(v, cu, [][]models.FilteredFilenameOps{{setName("Profile")}, {setName("First"), setName("Second")}}, "Cats") {
+		for _, fo := range ffo.FilenameOps {
+			gotNames = append(gotNames, fo.OpValue)
+		}
+	}
+	if len(gotNames) != 1 || gotNames[0] != "First" {
+		t.Errorf("filename sets kept = %q, want only the channel's first line", gotNames)
+	}
+
+	// Meta: the URL's matched op is the plain one, so it's dropped as a duplicate but still beats the profile's.
+	var gotArtists []string
+	for _, fmo := range filteredMetaOpsMatches(v, cu, [][]models.FilteredMetaOps{{setArtist("Profile")}, {setArtist("Plain")}}, "Cats") {
+		for _, mo := range fmo.MetaOps {
+			gotArtists = append(gotArtists, mo.OpValue)
+		}
+	}
+	if len(gotArtists) != 0 {
+		t.Errorf("artist sets kept = %q, want none, leaving the plain op", gotArtists)
 	}
 }
 
@@ -195,7 +239,7 @@ func TestHandleMoveOps(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", tt.name, err)
 		}
-		cu := &models.ChannelURL{URL: "https://tubesite.com/@cats", ChanURLSettings: &models.Settings{MetaFilterMoveOps: ops}}
+		cu := withOwnLevel(&models.ChannelURL{URL: "https://tubesite.com/@cats", ChanURLSettings: &models.Settings{MetaFilterMoveOps: ops}})
 		if got := HandleMoveOps(video, cu, nil, nil); got != tt.want {
 			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
 		}
@@ -230,11 +274,11 @@ func TestHandleMoveOpsOutputDirectoryTags(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", tt.name, err)
 		}
-		cu := &models.ChannelURL{
+		cu := withOwnLevel(&models.ChannelURL{
 			URL:               "https://tubesite.com/@cats",
 			ChanURLSettings:   &models.Settings{VideoDir: "/url-video", MetaFilterMoveOps: ops},
 			ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: tt.urlOutput},
-		}
+		})
 		if got := HandleMoveOps(video, cu, tt.c, nil); got != tt.want {
 			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
 		}

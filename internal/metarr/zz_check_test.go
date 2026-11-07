@@ -10,7 +10,8 @@ import (
 	"tubarr/internal/parsing"
 )
 
-// TestSkipReason tests each reason Metarr is held back for a channel URL, and that it isn't otherwise.
+// TestSkipReason tests each reason Metarr is held back for a channel URL, including for a file it inherits, and that it
+// isn't otherwise.
 func TestSkipReason(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	dir := t.TempDir()
@@ -29,7 +30,8 @@ func TestSkipReason(t *testing.T) {
 		"filtered meta ops file":     {args: models.MetarrArgs{FilteredMetaOpsFile: missing}, want: models.SkipMetarrMissingFilteredMetaOpsFile},
 		"filtered filename ops file": {args: models.MetarrArgs{FilteredFilenameOpsFile: missing}, want: models.SkipMetarrMissingFilteredFilenameOpsFile},
 	} {
-		cu := &models.ChannelURL{URL: "https://example.com/@cats", ChanURLMetarrArgs: &tc.args}
+		cu := &models.ChannelURL{URL: "https://example.com/@cats", ChanURLMetarrArgs: &models.MetarrArgs{}}
+		cu.Levels = []models.SettingsLevel{{MetarrArgs: &tc.args}, {MetarrArgs: cu.ChanURLMetarrArgs}} // Inherited from its channel.
 		skip, err := SkipReason(tc.installErr, cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
 		if skip.Skip != (tc.want != "") || skip.Reason != tc.want || (err != nil) != skip.Skip {
 			t.Errorf("%s: SkipReason = %+v, %v; want reason %q", name, skip, err, tc.want)

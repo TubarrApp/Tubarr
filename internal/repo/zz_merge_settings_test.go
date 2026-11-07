@@ -31,6 +31,8 @@ func fullSettings() *models.Settings {
 		MetaFilterMoveOpFile:      "/moves",
 		FromDate:                  "20240101",
 		ToDate:                    "20250101",
+		FiltersReplaceInherited:   true,
+		MoveOpsReplaceInherited:   true,
 		JSONDir:                   "/json",
 		VideoDir:                  "/video",
 		Paused:                    true,
@@ -66,7 +68,30 @@ func fullMetarrArgs() *models.MetarrArgs {
 		TranscodeAudioCodecs:    []string{"aac"},
 		TranscodeVideoArgs:      []string{"hevc:-crf 23"},
 		ExtraFFmpegArgs:         "-x",
+
+		MetaOpsReplaceInherited:             true,
+		FilteredMetaOpsReplaceInherited:     true,
+		FilenameOpsReplaceInherited:         true,
+		FilteredFilenameOpsReplaceInherited: true,
 	}
+}
+
+// withoutReplaceTicks returns m with its replace ticks cleared, as merging never passes them on.
+func withoutReplaceTicks(m *models.MetarrArgs) models.MetarrArgs {
+	m.MetaOpsReplaceInherited = false
+	m.FilteredMetaOpsReplaceInherited = false
+	m.FilenameOpsReplaceInherited = false
+	m.FilteredFilenameOpsReplaceInherited = false
+	return *m
+}
+
+// withoutOpLists returns m without its op lists, which merging leaves to stackLists.
+func withoutOpLists(m models.MetarrArgs) models.MetarrArgs {
+	m.MetaOps = nil
+	m.FilenameOps = nil
+	m.FilteredMetaOps = nil
+	m.FilteredFilenameOps = nil
+	return m
 }
 
 // requireAllSet fails if any field of the struct v points to is unset, so a new settings field must be added here.
@@ -80,7 +105,8 @@ func requireAllSet(t *testing.T, v any) {
 	}
 }
 
-// TestMergeSettingsInheritsAll tests a channel URL without settings of its own inherits every channel setting but Paused.
+// TestMergeSettingsInheritsAll tests a channel URL without settings of its own inherits every channel setting but
+// Paused, the replace ticks and the lists, which stackLists fills from every level.
 func TestMergeSettingsInheritsAll(t *testing.T) {
 	parent := fullSettings()
 	requireAllSet(t, parent)
@@ -89,12 +115,16 @@ func TestMergeSettingsInheritsAll(t *testing.T) {
 	mergeSettings(child, parent)
 	want := *fullSettings()
 	want.Paused = false
+	want.FiltersReplaceInherited = false
+	want.MoveOpsReplaceInherited = false
+	want.Filters = nil
+	want.MetaFilterMoveOps = nil
 	if !reflect.DeepEqual(*child, want) {
 		t.Errorf("inherited settings differ:\ngot  %+v\nwant %+v", *child, want)
 	}
 }
 
-// TestMergeSettingsKeepsOwn tests a channel URL keeps the settings it sets itself, its lists added to the channel's.
+// TestMergeSettingsKeepsOwn tests a channel URL keeps the settings it sets itself, leaving its lists to stackLists.
 func TestMergeSettingsKeepsOwn(t *testing.T) {
 	no := false
 	ownFilter := models.Filters{Field: "title", FilterType: "omits", Value: "dog", MustAny: "any"}
@@ -106,26 +136,30 @@ func TestMergeSettingsKeepsOwn(t *testing.T) {
 
 	want := *fullSettings()
 	want.VideoDir, want.Retries, want.UseGlobalCookies, want.YTDLPPreferredVideoCodecs = "/own", 5, &no, ownCodecs
-	want.Filters = append(want.Filters, ownFilter)
-	want.MetaFilterMoveOps = append([]models.MetaFilterMoveOps{ownMove}, want.MetaFilterMoveOps...)
+	want.FiltersReplaceInherited = false
+	want.MoveOpsReplaceInherited = false
+	want.Filters = []models.Filters{ownFilter}
+	want.MetaFilterMoveOps = []models.MetaFilterMoveOps{ownMove}
 	if !reflect.DeepEqual(*child, want) {
 		t.Errorf("merged settings differ:\ngot  %+v\nwant %+v", *child, want)
 	}
 }
 
-// TestMergeMetarrArgsInheritsAll tests a channel URL without Metarr args of its own inherits every channel one.
+// TestMergeMetarrArgsInheritsAll tests a channel URL without Metarr args of its own inherits every channel one but the
+// replace ticks and the op lists, which stackLists fills from every level.
 func TestMergeMetarrArgsInheritsAll(t *testing.T) {
 	parent := fullMetarrArgs()
 	requireAllSet(t, parent)
 
 	child := &models.MetarrArgs{}
 	mergeMetarrArgs(child, parent)
-	if want := *fullMetarrArgs(); !reflect.DeepEqual(*child, want) {
+	if want := withoutOpLists(withoutReplaceTicks(fullMetarrArgs())); !reflect.DeepEqual(*child, want) {
 		t.Errorf("inherited Metarr args differ:\ngot  %+v\nwant %+v", *child, want)
 	}
 }
 
-// TestMergeMetarrArgsKeepsOwn tests a channel URL keeps the Metarr args it sets itself, its ops added to the channel's.
+// TestMergeMetarrArgsKeepsOwn tests a channel URL keeps the Metarr args it sets itself, leaving its op lists to
+// stackLists.
 func TestMergeMetarrArgsKeepsOwn(t *testing.T) {
 	ownOp := models.MetaOps{Field: "title", OpType: "prefix", OpValue: "[B] "}
 	ownFilenameOp := models.FilenameOps{OpType: "suffix", OpValue: " [B]"}
@@ -136,45 +170,14 @@ func TestMergeMetarrArgsKeepsOwn(t *testing.T) {
 		FilteredMetaOps: []models.FilteredMetaOps{ownFiltered}, TranscodeVideoCodecs: ownCodecs}
 	mergeMetarrArgs(child, fullMetarrArgs())
 
-	want := *fullMetarrArgs()
+	want := withoutReplaceTicks(fullMetarrArgs())
 	want.OutputDir, want.MaxCPU, want.TranscodeVideoCodecs = "/own", 25, ownCodecs
-	want.MetaOps = append(want.MetaOps, ownOp)
-	want.FilenameOps = append(want.FilenameOps, ownFilenameOp)
-	want.FilteredMetaOps = append(want.FilteredMetaOps, ownFiltered)
+	want.MetaOps = []models.MetaOps{ownOp}
+	want.FilenameOps = []models.FilenameOps{ownFilenameOp}
+	want.FilteredMetaOps = []models.FilteredMetaOps{ownFiltered}
+	want.FilteredFilenameOps = nil
 	if !reflect.DeepEqual(*child, want) {
 		t.Errorf("merged Metarr args differ:\ngot  %+v\nwant %+v", *child, want)
-	}
-}
-
-// TestMergeOpsReplaceConflicting tests a channel URL's ops replace the channel's that Metarr can't run alongside them.
-func TestMergeOpsReplaceConflicting(t *testing.T) {
-	parent := &models.MetarrArgs{
-		MetaOps: []models.MetaOps{
-			{Field: "artist", OpType: "set", OpValue: "Channel"},
-			{Field: "title", OpType: "suffix", OpValue: " [C]"},
-		},
-		FilenameOps: []models.FilenameOps{
-			{OpType: "set", OpValue: "{{title}}"},
-			{OpType: "prefix", OpValue: "[C] "},
-		},
-	}
-	child := &models.MetarrArgs{
-		MetaOps:     []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "URL"}, {Field: "title", OpType: "suffix", OpValue: " [U]"}},
-		FilenameOps: []models.FilenameOps{{OpType: "set", OpValue: "{{fulltitle}}"}},
-	}
-	mergeMetarrArgs(child, parent)
-
-	wantMeta := []models.MetaOps{
-		{Field: "title", OpType: "suffix", OpValue: " [C]"},
-		{Field: "artist", OpType: "set", OpValue: "URL"},
-		{Field: "title", OpType: "suffix", OpValue: " [U]"},
-	}
-	wantFilename := []models.FilenameOps{{OpType: "prefix", OpValue: "[C] "}, {OpType: "set", OpValue: "{{fulltitle}}"}}
-	if !reflect.DeepEqual(child.MetaOps, wantMeta) {
-		t.Errorf("meta ops = %+v, want %+v", child.MetaOps, wantMeta)
-	}
-	if !reflect.DeepEqual(child.FilenameOps, wantFilename) {
-		t.Errorf("filename ops = %+v, want %+v", child.FilenameOps, wantFilename)
 	}
 }
 

@@ -91,16 +91,16 @@ var settingsPaths = []settingsPath{
 		return urlSettings(savedSettingsChannel(t, cs, name))
 	}},
 	{"profile add", func(t *testing.T, cs *repo.ChannelStore, name string, _, in []settingsKey) (*models.Settings, *models.MetarrArgs, error) {
-		if err := runSettingsCmd(addProfileCmd(cs), keys.ProfileName, name, withoutPause(in)); err != nil {
+		if err := runSettingsCmd(addProfileCmd(cs), keys.ProfileName, name, withoutChannelOnly(in)); err != nil {
 			return nil, nil, err
 		}
 		return savedProfile(t, cs, name)
 	}},
 	{"profile edit", func(t *testing.T, cs *repo.ChannelStore, name string, base, in []settingsKey) (*models.Settings, *models.MetarrArgs, error) {
-		if err := runSettingsCmd(addProfileCmd(cs), keys.ProfileName, name, withoutPause(base)); err != nil {
+		if err := runSettingsCmd(addProfileCmd(cs), keys.ProfileName, name, withoutChannelOnly(base)); err != nil {
 			t.Fatal(err)
 		}
-		if err := runSettingsCmd(editProfileCmd(cs), keys.ProfileName, name, withoutPause(in)); err != nil {
+		if err := runSettingsCmd(editProfileCmd(cs), keys.ProfileName, name, withoutChannelOnly(in)); err != nil {
 			return nil, nil, err
 		}
 		return savedProfile(t, cs, name)
@@ -111,10 +111,19 @@ var settingsPaths = []settingsPath{
 func TestSettingsInputPaths(t *testing.T) {
 	in, wantS, wantM := settingsFixture(t)
 
-	// The fields a path can't set, with the value it leaves. Profiles don't pause.
+	// The fields a path can't set, with the value it leaves. Profiles don't pause or replace inherited lists.
+	profileUnset := map[string]string{
+		"Paused":                                     "false",
+		"FiltersReplaceInherited":                    "false",
+		"MoveOpsReplaceInherited":                    "false",
+		"Metarr.MetaOpsReplaceInherited":             "false",
+		"Metarr.FilteredMetaOpsReplaceInherited":     "false",
+		"Metarr.FilenameOpsReplaceInherited":         "false",
+		"Metarr.FilteredFilenameOpsReplaceInherited": "false",
+	}
 	known := map[string]map[string]string{
-		"profile add":  {"Paused": "false"},
-		"profile edit": {"Paused": "false"},
+		"profile add":  profileUnset,
+		"profile edit": profileUnset,
 	}
 
 	for _, p := range settingsPaths {
@@ -308,6 +317,8 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		{keys.FilterOpsFile, "FilterFile", false, filterFile, ""},
 		{keys.MoveOps, "MetaFilterMoveOps", false, moveOps, []string{}},
 		{keys.MoveOpsFile, "MetaFilterMoveOpFile", false, moveFile, ""},
+		{keys.FilterOpsReplaceInherited, "FiltersReplaceInherited", false, true, false},
+		{keys.MoveOpsReplaceInherited, "MoveOpsReplaceInherited", false, true, false},
 		{keys.FromDate, "FromDate", false, "2024-01-02", ""},
 		{keys.ToDate, "ToDate", false, "2025-02-03", ""},
 		{keys.JSONDir, "JSONDir", false, jsonDir, ""},
@@ -324,6 +335,10 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		{keys.MMetaOpsFile, "MetaOpsFile", true, metaOpsFile, ""},
 		{keys.MFilteredMetaOps, "FilteredMetaOps", true, filteredMetaOps, []string{}},
 		{keys.MFilteredMetaOpsFile, "FilteredMetaOpsFile", true, filteredMetaOpsFile, ""},
+		{keys.MMetaOpsReplaceInherited, "MetaOpsReplaceInherited", true, true, false},
+		{keys.MFilteredMetaOpsReplaceInherited, "FilteredMetaOpsReplaceInherited", true, true, false},
+		{keys.MFilenameOpsReplaceInherited, "FilenameOpsReplaceInherited", true, true, false},
+		{keys.MFilteredFilenameOpsReplaceInherited, "FilteredFilenameOpsReplaceInherited", true, true, false},
 		{keys.MRenameStyle, "RenameStyle", true, "spaces", ""},
 		{keys.MExtraFFmpegArgs, "ExtraFFmpegArgs", true, "-map 0", ""},
 		{keys.MOutputDir, "OutputDir", true, outDir, ""},
@@ -366,6 +381,8 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		MetaFilterMoveOpFile:      moveFile,
 		FromDate:                  "20240102",
 		ToDate:                    "20250203",
+		FiltersReplaceInherited:   true,
+		MoveOpsReplaceInherited:   true,
 		JSONDir:                   jsonDir,
 		VideoDir:                  videoDir,
 		Paused:                    true,
@@ -396,6 +413,11 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		TranscodeAudioCodecs:    []string{"aac"},
 		TranscodeVideoArgs:      []string{"av1:-crf 35"},
 		ExtraFFmpegArgs:         "-map 0",
+
+		MetaOpsReplaceInherited:             true,
+		FilteredMetaOpsReplaceInherited:     true,
+		FilenameOpsReplaceInherited:         true,
+		FilteredFilenameOpsReplaceInherited: true,
 	}
 	wantM.FilenameOps, err = parsing.ParseFilenameOps(filenameOps)
 	must(err)
@@ -516,9 +538,11 @@ func savedProfile(t *testing.T, cs *repo.ChannelStore, name string) (*models.Set
 	return p.ProfileSettings, p.ProfileMetarrArgs, nil
 }
 
-// withoutPause returns the settings bar pausing, which profiles don't have.
-func withoutPause(in []settingsKey) []settingsKey {
-	return slices.DeleteFunc(slices.Clone(in), func(k settingsKey) bool { return k.key == keys.Pause })
+// withoutChannelOnly returns the settings bar pausing and replacing inherited lists, which profiles don't have.
+func withoutChannelOnly(in []settingsKey) []settingsKey {
+	return slices.DeleteFunc(slices.Clone(in), func(k settingsKey) bool {
+		return k.key == keys.Pause || slices.Contains(replaceInheritedFlags, k.key)
+	})
 }
 
 // runSettingsCmd runs a command on the channel or profile name, given by the nameFlag flag, with settings in as flags,

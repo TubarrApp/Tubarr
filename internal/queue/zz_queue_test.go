@@ -26,24 +26,6 @@ func TestManualChannelURL(t *testing.T) {
 	}
 }
 
-// TestLane tests channel URLs share their channel's lane unless they have a limit of their own.
-func TestLane(t *testing.T) {
-	var l lanes
-	c := &models.Channel{ID: 1}
-	inherits, own := &models.ChannelURL{ID: 10}, &models.ChannelURL{ID: 11}
-
-	channelLane := l.lane(c, inherits, 2, 2)
-	if channelLane == nil || l.lane(c, &models.ChannelURL{ID: 12}, 2, 2) != channelLane {
-		t.Error("URLs with the channel's limit don't share its lane")
-	}
-	if ownLane := l.lane(c, own, 2, 3); ownLane == nil || ownLane == channelLane {
-		t.Error("URL with a limit of its own shares the channel's lane")
-	}
-	if l.lane(c, inherits, 0, 0) != nil {
-		t.Error("got a lane with no limit set")
-	}
-}
-
 // TestWithYtdlpOverrides tests a video's Download As yt-dlp options replace its channel URL's, blank ones keeping the
 // channel URL's, without changing the channel URL itself.
 func TestWithYtdlpOverrides(t *testing.T) {

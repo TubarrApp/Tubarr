@@ -3,6 +3,7 @@ package metadata
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
@@ -70,13 +71,9 @@ func checkFilters(v *models.Video, filters []models.Filters) bool {
 	return true
 }
 
-// filteredMetaOpsMatches checks which arguments match and returns the meta operations.
-func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMetaOps []models.FilteredMetaOps, channelName string) []models.FilteredMetaOps {
-	if len(filteredMetaOps) == 0 {
-		return nil
-	}
-
-	result := make([]models.FilteredMetaOps, 0, len(filteredMetaOps))
+// filteredMetaOpsMatches marks which filtered meta ops match the video, from levels given farthest first, keeping only
+// matched ops a nearer level's, or an earlier line's in the same level, doesn't already set.
+func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]models.FilteredMetaOps, channelName string) []models.FilteredMetaOps {
 	dedupMetaOpsMap := make(map[string]bool)
 
 	metaOps := cu.ChanURLMetarrArgs.MetaOps
@@ -89,31 +86,41 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 		dedupMetaOpsMap[sharedparsing.FormatMetaOp(mo)] = true
 	}
 
-	// Check filtered meta ops.
-	for _, fmo := range filteredMetaOps {
-		// Check if filters match.
-		filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, fmo.Filters)
-		if err != nil {
-			logger.Pl.E("Filtered meta ops error: Video %q: %v", v.URL, err)
-		}
-
-		// Only deduplicate entries whose filters matched.
-		if filtersMatched {
-			dedupMetaOps := make([]models.MetaOps, 0, len(fmo.MetaOps))
-			for _, mo := range fmo.MetaOps {
-				key := sharedparsing.FormatMetaOp(mo)
-				if !dedupMetaOpsMap[key] {
-					dedupMetaOpsMap[key] = true
-					dedupMetaOps = append(dedupMetaOps, mo)
-				}
+	// Nearest level first, so its matched ops claim what they set before a farther level's can.
+	byLevel := make([][]models.FilteredMetaOps, len(levels))
+	claimed := make(map[string]bool)
+	for i, level := range slices.Backward(levels) {
+		for _, fmo := range level {
+			// Check if filters match.
+			filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, fmo.Filters)
+			if err != nil {
+				logger.Pl.E("Filtered meta ops error: Video %q: %v", v.URL, err)
 			}
-			fmo.MetaOps = dedupMetaOps
-		}
 
-		// Add to result, mark failures.
-		fmo.FiltersMatched = filtersMatched
-		result = append(result, fmo)
+			// Only keep matched ops nothing nearer or earlier sets, and drop duplicates.
+			if filtersMatched {
+				kept := make([]models.MetaOps, 0, len(fmo.MetaOps))
+				for _, mo := range fmo.MetaOps {
+					if key := models.MetaOpConflictKey(mo); key != "" {
+						if claimed[key] {
+							continue
+						}
+						claimed[key] = true
+					}
+					if key := sharedparsing.FormatMetaOp(mo); !dedupMetaOpsMap[key] {
+						dedupMetaOpsMap[key] = true
+						kept = append(kept, mo)
+					}
+				}
+				fmo.MetaOps = kept
+			}
+
+			// Add to result, mark failures.
+			fmo.FiltersMatched = filtersMatched
+			byLevel[i] = append(byLevel[i], fmo)
+		}
 	}
+	result := slices.Concat(byLevel...)
 
 	if logging.Level() >= 2 {
 		logger.Pl.P("Filtered meta op results for channel %q:", channelName)
@@ -126,13 +133,9 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, filteredMeta
 	return result
 }
 
-// filteredFilenameOpsMatches checks which arguments match and returns the filename operations.
-func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filteredFilenameOps []models.FilteredFilenameOps, channelName string) []models.FilteredFilenameOps {
-	if len(filteredFilenameOps) == 0 {
-		return nil
-	}
-
-	result := make([]models.FilteredFilenameOps, 0, len(filteredFilenameOps))
+// filteredFilenameOpsMatches marks which filtered filename ops match the video, from levels given farthest first,
+// keeping only matched ops a nearer level's, or an earlier line's in the same level, doesn't already set.
+func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]models.FilteredFilenameOps, channelName string) []models.FilteredFilenameOps {
 	dedupFilenameOpsMap := make(map[string]bool)
 
 	filenameOps := cu.ChanURLMetarrArgs.FilenameOps
@@ -144,31 +147,41 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, filtered
 		dedupFilenameOpsMap[sharedparsing.FormatFilenameOp(fo)] = true
 	}
 
-	// Check filtered filename ops.
-	for _, ffo := range filteredFilenameOps {
-		// Check if filters match.
-		filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, ffo.Filters)
-		if err != nil {
-			logger.Pl.E("Filtered filename ops error: Video %q: %v", v.URL, err)
-		}
-
-		// Only deduplicate entries whose filters matched.
-		if filtersMatched {
-			dedupFilenameOps := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
-			for _, fo := range ffo.FilenameOps {
-				key := sharedparsing.FormatFilenameOp(fo)
-				if !dedupFilenameOpsMap[key] {
-					dedupFilenameOpsMap[key] = true
-					dedupFilenameOps = append(dedupFilenameOps, fo)
-				}
+	// Nearest level first, so its matched ops claim what they set before a farther level's can.
+	byLevel := make([][]models.FilteredFilenameOps, len(levels))
+	claimed := make(map[string]bool)
+	for i, level := range slices.Backward(levels) {
+		for _, ffo := range level {
+			// Check if filters match.
+			filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, ffo.Filters)
+			if err != nil {
+				logger.Pl.E("Filtered filename ops error: Video %q: %v", v.URL, err)
 			}
-			ffo.FilenameOps = dedupFilenameOps
-		}
 
-		// Add to result, mark failures.
-		ffo.FiltersMatched = filtersMatched
-		result = append(result, ffo)
+			// Only keep matched ops nothing nearer or earlier sets, and drop duplicates.
+			if filtersMatched {
+				kept := make([]models.FilenameOps, 0, len(ffo.FilenameOps))
+				for _, fo := range ffo.FilenameOps {
+					if key := models.FilenameOpConflictKey(fo); key != "" {
+						if claimed[key] {
+							continue
+						}
+						claimed[key] = true
+					}
+					if key := sharedparsing.FormatFilenameOp(fo); !dedupFilenameOpsMap[key] {
+						dedupFilenameOpsMap[key] = true
+						kept = append(kept, fo)
+					}
+				}
+				ffo.FilenameOps = kept
+			}
+
+			// Add to result, mark failures.
+			ffo.FiltersMatched = filtersMatched
+			byLevel[i] = append(byLevel[i], ffo)
+		}
 	}
+	result := slices.Concat(byLevel...)
 
 	if logging.Level() >= 2 {
 		logger.Pl.P("Filtered filename op results for channel %q:", channelName)
@@ -245,17 +258,79 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 	return true, nil
 }
 
-// LoadFilterOpsFromFile loads filter operations from a file (one per line).
+// ChannelURLFilters returns a channel URL's download filters from every level, with each level's filter file. Returns an
+// error if a filter file can't be used, so videos aren't downloaded unfiltered.
+func ChannelURLFilters(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.Filters, error) {
+	fileFilters := make([][]models.Filters, len(cu.Levels))
+	var errs []error
+	for i, l := range cu.Levels {
+		if l.Settings == nil {
+			continue
+		}
+		var err error
+		fileFilters[i], err = loadFilterOpsFromFile(l.Settings.FilterFile, dp)
+		errs = append(errs, err)
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	return models.StackFilters(cu.Levels, fileFilters), nil
+}
+
+// ChannelURLFilteredMetaOps returns a channel URL's filtered meta ops by level, farthest first, with each level's file.
+// Returns the errors of files it can't use, whose ops are left out.
+func ChannelURLFilteredMetaOps(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([][]models.FilteredMetaOps, error) {
+	fileOps := make([][]models.FilteredMetaOps, len(cu.Levels))
+	var errs []error
+	for i, l := range cu.Levels {
+		if l.MetarrArgs == nil {
+			continue
+		}
+		var err error
+		fileOps[i], err = LoadFilteredMetaOpsFromFile(l.MetarrArgs.FilteredMetaOpsFile, dp)
+		errs = append(errs, err)
+	}
+	return models.FilteredMetaOpsByLevel(cu.Levels, fileOps), errors.Join(errs...)
+}
+
+// ChannelURLFilteredFilenameOps returns a channel URL's filtered filename ops by level, farthest first, with each level's
+// file. Returns the errors of files it can't use, whose ops are left out.
+func ChannelURLFilteredFilenameOps(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([][]models.FilteredFilenameOps, error) {
+	fileOps := make([][]models.FilteredFilenameOps, len(cu.Levels))
+	var errs []error
+	for i, l := range cu.Levels {
+		if l.MetarrArgs == nil {
+			continue
+		}
+		var err error
+		fileOps[i], err = LoadFilteredFilenameOpsFromFile(l.MetarrArgs.FilteredFilenameOpsFile, dp)
+		errs = append(errs, err)
+	}
+	return models.FilteredFilenameOpsByLevel(cu.Levels, fileOps), errors.Join(errs...)
+}
+
+// channelURLMoveOps returns a channel URL's move ops from every level, with each level's move ops file.
+func channelURLMoveOps(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaFilterMoveOps {
+	fileOps := make([][]models.MetaFilterMoveOps, len(cu.Levels))
+	for i, l := range cu.Levels {
+		if l.Settings != nil {
+			fileOps[i] = loadMoveOpsFromFile(l.Settings.MetaFilterMoveOpFile, dp)
+		}
+	}
+	return models.StackMoveOps(cu.Levels, fileOps)
+}
+
+// loadFilterOpsFromFile loads filter operations from the file at path (one per line), if set.
 //
 // Returns an error if the file is set but can't be read or parsed, so videos aren't downloaded unfiltered.
-func LoadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.Filters, error) {
-	if cu.ChanURLSettings.FilterFile == "" {
+func loadFilterOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.Filters, error) {
+	if path == "" {
 		return nil, nil
 	}
 
-	filterFile, err := dp.ParseDirectory(cu.ChanURLSettings.FilterFile, "filter-ops")
+	filterFile, err := dp.ParseDirectory(path, "filter-ops")
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to parse path %q: %w", errFilterFile, cu.ChanURLSettings.FilterFile, err)
+		return nil, fmt.Errorf("%w: failed to parse path %q: %w", errFilterFile, path, err)
 	}
 
 	logger.Pl.I("Adding filters from file %q...", filterFile)
@@ -286,17 +361,17 @@ func LoadFilterOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) (
 	return parsedFilters, nil
 }
 
-// LoadFilteredMetaOpsFromFile loads filtered meta operations from a file (one per line).
+// LoadFilteredMetaOpsFromFile loads filtered meta operations from the file at path (one per line), if set.
 //
 // Returns an error if the file is set but can't be read or parsed.
-func LoadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.FilteredMetaOps, error) {
-	if cu.ChanURLMetarrArgs.FilteredMetaOpsFile == "" {
+func LoadFilteredMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.FilteredMetaOps, error) {
+	if path == "" {
 		return nil, nil
 	}
 
-	filterFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.FilteredMetaOpsFile, "metarr-filtered-meta-ops")
+	filterFile, err := dp.ParseDirectory(path, "metarr-filtered-meta-ops")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse filtered meta ops file path %q: %w", cu.ChanURLMetarrArgs.FilteredMetaOpsFile, err)
+		return nil, fmt.Errorf("failed to parse filtered meta ops file path %q: %w", path, err)
 	}
 
 	logger.Pl.I("Adding filtered meta ops from file %q...", filterFile)
@@ -322,17 +397,17 @@ func LoadFilteredMetaOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryPar
 	return parsedFilters, nil
 }
 
-// LoadFilteredFilenameOpsFromFile loads filtered filename operations from a file (one per line).
+// LoadFilteredFilenameOpsFromFile loads filtered filename operations from the file at path (one per line), if set.
 //
 // Returns an error if the file is set but can't be read or parsed.
-func LoadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]models.FilteredFilenameOps, error) {
-	if cu.ChanURLMetarrArgs.FilteredFilenameOpsFile == "" {
+func LoadFilteredFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.FilteredFilenameOps, error) {
+	if path == "" {
 		return nil, nil
 	}
 
-	filterFile, err := dp.ParseDirectory(cu.ChanURLMetarrArgs.FilteredFilenameOpsFile, "metarr-filtered-filename-ops")
+	filterFile, err := dp.ParseDirectory(path, "metarr-filtered-filename-ops")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse filtered filename ops file path %q: %w", cu.ChanURLMetarrArgs.FilteredFilenameOpsFile, err)
+		return nil, fmt.Errorf("failed to parse filtered filename ops file path %q: %w", path, err)
 	}
 
 	logger.Pl.I("Adding filtered filename ops from file %q...", filterFile)
@@ -358,15 +433,15 @@ func LoadFilteredFilenameOpsFromFile(cu *models.ChannelURL, dp *parsing.Director
 	return parsedFilters, nil
 }
 
-// loadMoveOpsFromFile loads move operations from a file (one per line).
-func loadMoveOpsFromFile(cu *models.ChannelURL, dp *parsing.DirectoryParser) []models.MetaFilterMoveOps {
-	if cu.ChanURLSettings.MetaFilterMoveOpFile == "" {
+// loadMoveOpsFromFile loads move operations from the file at path (one per line), if set.
+func loadMoveOpsFromFile(path string, dp *parsing.DirectoryParser) []models.MetaFilterMoveOps {
+	if path == "" {
 		return nil
 	}
 
-	moveOpFile, err := dp.ParseDirectory(cu.ChanURLSettings.MetaFilterMoveOpFile, "move-ops")
+	moveOpFile, err := dp.ParseDirectory(path, "move-ops")
 	if err != nil {
-		logger.Pl.E("Failed to parse directory %q: %v", cu.ChanURLSettings.MetaFilterMoveOpFile, err)
+		logger.Pl.E("Failed to parse directory %q: %v", path, err)
 		return nil
 	}
 

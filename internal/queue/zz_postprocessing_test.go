@@ -22,7 +22,7 @@ func queueVideo(t *testing.T, q *PostProcessingQueue, channelID, videoID int64, 
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	e := &Entry{VideoID: videoID, ChannelID: channelID, QueuedAt: time.Now()}
+	e := &QueueEntry{VideoID: videoID, ChannelID: channelID, QueuedAt: time.Now()}
 	if started {
 		now := time.Now()
 		e.StartedAt = &now
@@ -96,7 +96,7 @@ func TestHold(t *testing.T) {
 	// A Metarr run on the video ends once canceled, after which the download takes it.
 	key := videoKey{c.ID, videoURL}
 	runCtx, cancelRun := context.WithCancel(context.Background())
-	run, _ := q.add(key, &Entry{VideoID: 1}, cancelRun)
+	run, _ := q.add(key, &QueueEntry{VideoID: 1}, cancelRun)
 	go func() {
 		<-runCtx.Done()
 		q.release(key, run)
@@ -142,11 +142,9 @@ func TestStopWhileWaitingForLane(t *testing.T) {
 	q := NewPostProcessingQueue(nil)
 	c := &models.Channel{ID: 1, Name: "Cats", ChanMetarrArgs: &models.MetarrArgs{MetarrConcurrency: 1}}
 	cu := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats", ChanURLMetarrArgs: &models.MetarrArgs{MetarrConcurrency: 1}}
-	lane := q.lanes.lane(c, cu, 1, 1)
-	if err := lane.Acquire(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	defer lane.Release()
+	c.URLModels = []*models.ChannelURL{cu}
+	q.SetLimits(c)
+	takeSlot(t, &q.lanes, c.ID, cu.ID)
 
 	hold, held, err := q.hold(context.Background(), c, "https://example.com/v/1")
 	if err != nil || !held {

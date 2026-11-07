@@ -191,6 +191,12 @@ type metarrArgsResponse struct {
 	FilenameOps             string   `json:"metarr_filename_ops,omitempty"`
 	FilteredMetaOps         string   `json:"metarr_filtered_meta_ops,omitempty"`
 	FilteredFilenameOps     string   `json:"metarr_filtered_filename_ops,omitempty"`
+
+	// Replace checkboxes.
+	MetaOpsReplaceInherited             bool `json:"metarr_meta_ops_replace_inherited,omitempty"`
+	FilteredMetaOpsReplaceInherited     bool `json:"metarr_filtered_meta_ops_replace_inherited,omitempty"`
+	FilenameOpsReplaceInherited         bool `json:"metarr_filename_ops_replace_inherited,omitempty"`
+	FilteredFilenameOpsReplaceInherited bool `json:"metarr_filtered_filename_ops_replace_inherited,omitempty"`
 }
 
 // newMetarrArgsResponse converts MetarrArgs for the web UI.
@@ -219,6 +225,11 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		FilteredMetaOpsFile:     m.FilteredMetaOpsFile,
 		MetaOps:                 strings.Join(sharedparsing.FormatMetaOps(m.MetaOps), "\n"),
 		FilenameOps:             strings.Join(sharedparsing.FormatFilenameOps(m.FilenameOps), "\n"),
+
+		MetaOpsReplaceInherited:             m.MetaOpsReplaceInherited,
+		FilteredMetaOpsReplaceInherited:     m.FilteredMetaOpsReplaceInherited,
+		FilenameOpsReplaceInherited:         m.FilenameOpsReplaceInherited,
+		FilteredFilenameOpsReplaceInherited: m.FilteredFilenameOpsReplaceInherited,
 	}
 	if m.MaxCPU > 0 {
 		maxCPU := min(m.MaxCPU, 100) // Stored as 101 to turn the limit off, which the form's 0-100 field can't hold.
@@ -264,6 +275,10 @@ type settingsResponse struct {
 	AutoDownload           *bool    `json:"auto_download,omitempty"`
 	PreferredVideoCodecs   []string `json:"ytdlp_preferred_video_codecs,omitempty"`
 	PreferredAudioCodecs   []string `json:"ytdlp_preferred_audio_codecs,omitempty"`
+
+	// Replace checkboxes.
+	FiltersReplaceInherited bool `json:"filters_replace_inherited,omitempty"`
+	MoveOpsReplaceInherited bool `json:"move_ops_replace_inherited,omitempty"`
 }
 
 // newSettingsResponse converts Settings for the web UI.
@@ -297,6 +312,9 @@ func newSettingsResponse(s *models.Settings) *settingsResponse {
 		AutoDownload:           s.AutoDownload,
 		PreferredVideoCodecs:   s.YTDLPPreferredVideoCodecs,
 		PreferredAudioCodecs:   s.YTDLPPreferredAudioCodecs,
+
+		FiltersReplaceInherited: s.FiltersReplaceInherited,
+		MoveOpsReplaceInherited: s.MoveOpsReplaceInherited,
 	}
 }
 
@@ -456,6 +474,10 @@ type settingsInput struct {
 	MoveOps                   *string  `json:"move_ops"`
 	YTDLPPreferredVideoCodecs []string `json:"ytdlp_preferred_video_codecs"`
 	YTDLPPreferredAudioCodecs []string `json:"ytdlp_preferred_audio_codecs"`
+
+	// Replace checkboxes.
+	FiltersReplaceInherited *bool `json:"filters_replace_inherited"`
+	MoveOpsReplaceInherited *bool `json:"move_ops_replace_inherited"`
 }
 
 // metarrArgsInput holds the per-URL MetarrArgs the web UI sent. Nil fields were not sent.
@@ -483,6 +505,12 @@ type metarrArgsInput struct {
 	FilteredFilenameOps     *string  `json:"metarr_filtered_filename_ops"`
 	MetaOps                 *string  `json:"metarr_meta_ops"`
 	FilteredMetaOps         *string  `json:"metarr_filtered_meta_ops"`
+
+	// Replace checkboxes.
+	MetaOpsReplaceInherited             *bool `json:"metarr_meta_ops_replace_inherited"`
+	FilteredMetaOpsReplaceInherited     *bool `json:"metarr_filtered_meta_ops_replace_inherited"`
+	FilenameOpsReplaceInherited         *bool `json:"metarr_filename_ops_replace_inherited"`
+	FilteredFilenameOpsReplaceInherited *bool `json:"metarr_filtered_filename_ops_replace_inherited"`
 }
 
 // parseURLSettings parses the per-URL settings JSON from the frontend.
@@ -653,6 +681,8 @@ func (in *settingsInput) input() *models.SettingsInput {
 		DLFilterFile:              in.FilterFile,
 		MoveOps:                   linesInput(in.MoveOps, splitNonEmptyLines),
 		MoveOpFile:                in.MoveOpsFile,
+		FiltersReplaceInherited:   in.FiltersReplaceInherited,
+		MoveOpsReplaceInherited:   in.MoveOpsReplaceInherited,
 		ExtraYTDLPVideoArgs:       in.ExtraYTDLPVideoArgs,
 		ExtraYTDLPMetaArgs:        in.ExtraYTDLPMetaArgs,
 		ExtraYTDLPCrawlArgs:       in.ExtraYTDLPCrawlArgs,
@@ -689,6 +719,11 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 		MaxCPU:                  in.MaxCPU,
 		MetarrConcurrency:       in.MetarrConcurrency,
 		ExtraFFmpegArgs:         in.ExtraFFmpegArgs,
+
+		MetaOpsReplaceInherited:             in.MetaOpsReplaceInherited,
+		FilteredMetaOpsReplaceInherited:     in.FilteredMetaOpsReplaceInherited,
+		FilenameOpsReplaceInherited:         in.FilenameOpsReplaceInherited,
+		FilteredFilenameOpsReplaceInherited: in.FilteredFilenameOpsReplaceInherited,
 	}
 }
 
@@ -760,6 +795,12 @@ func formString(r *http.Request, key string) *string {
 	return &v
 }
 
+// formTrue returns whether the form value key is "true", as settings input. An unticked checkbox reads as false.
+func formTrue(r *http.Request, key string) *bool {
+	b := r.FormValue(key) == "true"
+	return &b
+}
+
 // settingsFromForm parses and validates the channel form's Settings.
 func settingsFromForm(r *http.Request) (*models.Settings, error) {
 	downloadConcurrency, err := formInt(r, jsonkeys.SettingsMaxConcurrency)
@@ -793,6 +834,8 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 		DLFilterFile:              formString(r, jsonkeys.SettingsFilterFile),
 		MoveOps:                   linesInput(formString(r, jsonkeys.SettingsMoveOps), splitNonEmptyLines),
 		MoveOpFile:                formString(r, jsonkeys.SettingsMoveOpsFile),
+		FiltersReplaceInherited:   formTrue(r, jsonkeys.SettingsFiltersReplaceInherited),
+		MoveOpsReplaceInherited:   formTrue(r, jsonkeys.SettingsMoveOpsReplaceInherited),
 		ExtraYTDLPVideoArgs:       formString(r, jsonkeys.SettingsExtraYtdlpVideoArgs),
 		ExtraYTDLPMetaArgs:        formString(r, jsonkeys.SettingsExtraYtdlpMetaArgs),
 		ExtraYTDLPCrawlArgs:       formString(r, jsonkeys.SettingsExtraYtdlpCrawlArgs),
@@ -853,6 +896,11 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 		MaxCPU:                  &maxCPU,
 		MetarrConcurrency:       &concurrency,
 		ExtraFFmpegArgs:         formString(r, jsonkeys.MetarrExtraFFmpegArgs),
+
+		MetaOpsReplaceInherited:             formTrue(r, jsonkeys.MetarrMetaOpsReplaceInherited),
+		FilteredMetaOpsReplaceInherited:     formTrue(r, jsonkeys.MetarrFilteredMetaOpsReplaceInherited),
+		FilenameOpsReplaceInherited:         formTrue(r, jsonkeys.MetarrFilenameOpsReplaceInherited),
+		FilteredFilenameOpsReplaceInherited: formTrue(r, jsonkeys.MetarrFilteredFilenameOpsReplaceInherited),
 	}
 	// Left unset, this uses the profile's setting, else deletes the original.
 	if v := r.FormValue(jsonkeys.MetarrPurgeOriginalVideo); v != "" {
@@ -981,6 +1029,19 @@ func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLI
 		return fmt.Errorf("invalid post-processing options: %w", err)
 	}
 	return nil
+}
+
+// channelURLOps returns the channel URL's ops as Download As shows them, kept with saved ops so its lines can be refreshed.
+func channelURLOps(cs contracts.ChannelStore, c *models.Channel, channelURLID int64) (*models.OpLines, error) {
+	file.UpdateFromConfigFile(cs, c)
+	cu, err := queue.ManualChannelURL(cs, c, channelURLID)
+	if err != nil {
+		return nil, err
+	}
+	if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
+		return nil, fmt.Errorf("channel URL %q has no settings loaded", cu.URL)
+	}
+	return metarr.ChannelURLOpLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
 }
 
 // matchesChannelURL reports whether Download As options give the video nothing its channel URL doesn't already, so they

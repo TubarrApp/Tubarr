@@ -28,6 +28,7 @@ type ChannelURL struct {
 	UpdatedAt         time.Time             `json:"updated_at" db:"updated_at"`
 	ProfileID         int64                 `json:"profile_id" db:"profile_id"`
 	Profile           *Profile              `json:"-" db:"-"`
+	Levels            []SettingsLevel       `json:"-" db:"-"` // Where its filters and op lists come from. Set when loaded merged with its parents.
 }
 
 // NeedsAuth checks if this channel URL has details for authorization.

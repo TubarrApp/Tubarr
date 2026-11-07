@@ -63,6 +63,9 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 		return
 	}
 
+	// Apply their current limits to queued videos, catching changes saved without a web edit (such as by config files).
+	ss.setQueueLimits(freshChannels...)
+
 	logger.Pl.D(3, "Crawl watchdog: Checking %d channel(s) for scheduled crawls", len(freshChannels))
 	now := time.Now()
 	for _, c := range freshChannels {
@@ -124,6 +127,14 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 				logger.Pl.S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
 			}
 		}(&ch)
+	}
+}
+
+// setQueueLimits applies channels' current concurrency limits to their videos in both queues, waiting ones included.
+func (ss *serverStore) setQueueLimits(channels ...*models.Channel) {
+	for _, c := range channels {
+		ss.dq.SetLimits(c)
+		ss.pp.SetLimits(c)
 	}
 }
 

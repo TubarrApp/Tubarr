@@ -57,7 +57,7 @@ type DownloadQueue struct {
 // download is a video in the download queue.
 type download struct {
 	q         *DownloadQueue
-	entry     Entry           // As the Downloads page shows it.
+	entry     QueueEntry      // As the Downloads page shows it.
 	status    models.DLStatus // Its download status as last reported.
 	video     *models.Video
 	c         *models.Channel
@@ -112,6 +112,10 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 
 	// Load the channel's config file settings.
 	file.UpdateFromConfigFile(q.store.ChannelStore(), c)
+
+	// Its videos wait for slots under its current limits, in both queues.
+	q.SetLimits(c)
+	q.postProcessing.SetLimits(c)
 
 	// Videos sharing a channel URL and login share its cookies.
 	sessions := make(map[sessionKey]*session)
@@ -171,6 +175,11 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 	return queued, errors.Join(errs...)
 }
 
+// SetLimits applies a channel's download concurrency to its videos in the queue, waiting ones included.
+func (q *DownloadQueue) SetLimits(c *models.Channel) {
+	q.lanes.setLimits(c.ID, downloadLimits(c))
+}
+
 // Cancel cancels a video's download, waiting or running, returning false if it isn't in the queue.
 func (q *DownloadQueue) Cancel(videoID int64) bool {
 	q.mu.Lock()
@@ -226,9 +235,9 @@ func (q *DownloadQueue) Abort(channelID int64) bool {
 }
 
 // Entries returns the videos in the queue, oldest first, with their download status.
-func (q *DownloadQueue) Entries() []Entry {
+func (q *DownloadQueue) Entries() []QueueEntry {
 	q.mu.Lock()
-	entries := make([]Entry, 0, len(q.downloads))
+	entries := make([]QueueEntry, 0, len(q.downloads))
 	for _, d := range q.downloads {
 		e := d.entry
 		status := d.status
@@ -240,7 +249,7 @@ func (q *DownloadQueue) Entries() []Entry {
 	}
 	q.mu.Unlock()
 
-	slices.SortFunc(entries, func(a, b Entry) int { return a.QueuedAt.Compare(b.QueuedAt) })
+	slices.SortFunc(entries, func(a, b QueueEntry) int { return a.QueuedAt.Compare(b.QueuedAt) })
 	return entries
 }
 
@@ -332,7 +341,7 @@ func (q *DownloadQueue) newDownload(c *models.Channel, r Request, sessions map[s
 	startCtx, stop := context.WithCancelCause(ctx)
 	d := &download{
 		q:        q,
-		entry:    *newEntry(v, cu, c),
+		entry:    *newQueueEntry(v, cu, c),
 		status:   models.DLStatus{Status: consts.DLStatusQueued, Stage: "Waiting to start"},
 		video:    v,
 		c:        c,

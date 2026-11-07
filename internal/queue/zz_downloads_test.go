@@ -71,11 +71,8 @@ func TestAddThenStop(t *testing.T) {
 	dq := NewDownloadQueue(t.Context(), store, pp)
 
 	// The channel's one slot is taken, so the videos wait.
-	lane := dq.lanes.lane(c, cu, 1, 1)
-	if err := lane.Acquire(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	defer lane.Release()
+	dq.SetLimits(c)
+	takeSlot(t, &dq.lanes, c.ID, cu.ID)
 
 	chosen := &models.Video{URL: "https://example.com/v/chosen", ChannelURLID: cu.ID}
 	crawled := &models.Video{URL: "https://example.com/v/crawled", ChannelURLID: cu.ID}
@@ -114,11 +111,8 @@ func TestCancel(t *testing.T) {
 	store, db, c := newTestChannel(t)
 	cu := c.URLModels[0]
 	dq := NewDownloadQueue(t.Context(), store, NewPostProcessingQueue(store))
-	lane := dq.lanes.lane(c, cu, 1, 1)
-	if err := lane.Acquire(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	defer lane.Release()
+	dq.SetLimits(c)
+	takeSlot(t, &dq.lanes, c.ID, cu.ID)
 
 	v := &models.Video{URL: "https://example.com/v/1", ChannelURLID: cu.ID}
 	if queued, err := dq.Add(c, Request{Video: v}); err != nil || len(queued) != 1 {

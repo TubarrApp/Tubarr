@@ -48,6 +48,10 @@ type Settings struct {
 	FromDate             string              `json:"from_date"`
 	ToDate               string              `json:"to_date"`
 
+	// Replace the profile's (for a channel) or channel's (for a URL) filters or move ops instead of adding to them.
+	FiltersReplaceInherited bool `json:"filters_replace_inherited"`
+	MoveOpsReplaceInherited bool `json:"move_ops_replace_inherited"`
+
 	// JSON and video directories.
 	JSONDir  string `json:"json_directory"`
 	VideoDir string `json:"video_directory"`
@@ -74,6 +78,12 @@ type MetarrArgs struct {
 	FilteredMetaOps     []FilteredMetaOps `json:"metarr_filtered_meta_ops"`
 	FilteredMetaOpsFile string            `json:"metarr_filtered_meta_ops_file"`
 	WriteNFO            *bool             `json:"metarr_write_nfo,omitempty"`
+
+	// Replace the profile's (for a channel) or channel's (for a URL) ops instead of adding to them.
+	MetaOpsReplaceInherited             bool `json:"metarr_meta_ops_replace_inherited"`
+	FilteredMetaOpsReplaceInherited     bool `json:"metarr_filtered_meta_ops_replace_inherited"`
+	FilenameOpsReplaceInherited         bool `json:"metarr_filename_ops_replace_inherited"`
+	FilteredFilenameOpsReplaceInherited bool `json:"metarr_filtered_filename_ops_replace_inherited"`
 
 	// Metarr output directories, and metadata files to delete after processing (all, json or nfo).
 	OutputDir string `json:"metarr_output_directory"`
@@ -170,21 +180,36 @@ var ConflictingFilenameOps = map[string]struct{}{
 	sharedconsts.OpDeleteDateTag: {},
 }
 
+// MetaOpConflictKey returns the key meta ops share when only one of them should apply (field and op type, not value),
+// or "" for an op that applies alongside any other.
+func MetaOpConflictKey(op MetaOps) string {
+	if _, ok := NonConflictingMetaOps[op.OpType]; ok {
+		return ""
+	}
+	return op.Field + ":" + op.OpType
+}
+
+// FilenameOpConflictKey returns the key filename ops share when Metarr runs only one of them (the op type), or "" for an
+// op that runs alongside any other.
+func FilenameOpConflictKey(op FilenameOps) string {
+	if _, ok := ConflictingFilenameOps[op.OpType]; !ok {
+		return ""
+	}
+	return op.OpType
+}
+
 // FilterConflictingMetaOps removes base ops that conflict with override ops on the same field.
 func FilterConflictingMetaOps(overrides, base []MetaOps) []MetaOps {
 	overrideKeys := make(map[string]bool)
-
-	// Build conflicting key map (Field:OpType only, NOT value [otherwise conflicting keys may not match in map])
 	for _, op := range overrides {
-		if _, ok := NonConflictingMetaOps[op.OpType]; !ok {
-			overrideKeys[op.Field+":"+op.OpType] = true
+		if key := MetaOpConflictKey(op); key != "" {
+			overrideKeys[key] = true
 		}
 	}
 
 	result := make([]MetaOps, 0, len(base))
 	for _, op := range base {
-		_, nonConflicting := NonConflictingMetaOps[op.OpType]
-		if !overrideKeys[op.Field+":"+op.OpType] || nonConflicting {
+		if key := MetaOpConflictKey(op); key == "" || !overrideKeys[key] {
 			result = append(result, op)
 		} else {
 			logger.Pl.D(2, "Meta op overridden: %s", sharedparsing.FormatMetaOp(op))
@@ -196,19 +221,15 @@ func FilterConflictingMetaOps(overrides, base []MetaOps) []MetaOps {
 // FilterConflictingFilenameOps removes base ops of a type Metarr runs once, when override ops have that type.
 func FilterConflictingFilenameOps(overrides, base []FilenameOps) []FilenameOps {
 	overrideKeys := make(map[string]bool)
-
-	// Build conflict keys
 	for _, op := range overrides {
-		if _, conflicts := ConflictingFilenameOps[op.OpType]; conflicts {
-			overrideKeys[op.OpType] = true
+		if key := FilenameOpConflictKey(op); key != "" {
+			overrideKeys[key] = true
 		}
 	}
 
-	// Add new operations
 	result := make([]FilenameOps, 0, len(base))
 	for _, op := range base {
-		_, conflicts := ConflictingFilenameOps[op.OpType]
-		if !overrideKeys[op.OpType] || !conflicts {
+		if key := FilenameOpConflictKey(op); key == "" || !overrideKeys[key] {
 			result = append(result, op)
 		} else {
 			logger.Pl.D(2, "Filename op overridden: %s", sharedparsing.FormatFilenameOp(op))
@@ -284,6 +305,9 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 	// Boolean comparisons (pausing is per URL, never inherited).
 	if child.Paused {
 		return false
+	}
+	if child.FiltersReplaceInherited || child.MoveOpsReplaceInherited {
+		return false // A URL's own, never inherited.
 	}
 	if child.UseGlobalCookies != nil && (parent.UseGlobalCookies == nil || *parent.UseGlobalCookies != *child.UseGlobalCookies) {
 		return false
@@ -363,6 +387,9 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 	}
 	if child.WriteNFO != nil && (parent.WriteNFO == nil || *parent.WriteNFO != *child.WriteNFO) {
 		return false
+	}
+	if child.MetaOpsReplaceInherited || child.FilteredMetaOpsReplaceInherited || child.FilenameOpsReplaceInherited || child.FilteredFilenameOpsReplaceInherited {
+		return false // A URL's own, never inherited.
 	}
 
 	// Numeric comparisons
@@ -455,6 +482,9 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 		return false
 	}
 	if m.WriteNFO != nil {
+		return false
+	}
+	if m.MetaOpsReplaceInherited || m.FilteredMetaOpsReplaceInherited || m.FilenameOpsReplaceInherited || m.FilteredFilenameOpsReplaceInherited {
 		return false
 	}
 
@@ -574,6 +604,9 @@ func SettingsAllZero(s *Settings) bool {
 		return false
 	}
 	if s.ToDate != "" {
+		return false
+	}
+	if s.FiltersReplaceInherited || s.MoveOpsReplaceInherited {
 		return false
 	}
 
