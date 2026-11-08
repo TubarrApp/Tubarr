@@ -236,7 +236,7 @@ func (cm *CookieManager) flareSolverrFailed(host string, statusCode int, err err
 //
 // The solves are made under ctx, the context of the crawl or download job the cookies are for.
 func (cm *CookieManager) flareSolverrResolver(ctx context.Context, cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
-	pageURL, cookiePath := cu.URL, cu.CookiePath
+	pageURL, cookiePath := cu.URL, cu.Session.CookiePath
 	return func(staleGen int) (models.FlareSolverrSolve, error) {
 		sol, err := cm.flareSolverrSolution(ctx, pageURL, staleGen)
 		if err != nil {
@@ -252,7 +252,7 @@ func (cm *CookieManager) flareSolverrResolver(ctx context.Context, cu *models.Ch
 // flareSolverrNewer returns a function that, if a solve newer than gen has been made for cu's URL (e.g. by Tubarr's own
 // requests), rewrites cu's cookie file with its cookies on top of baseCookies and returns it. It never contacts FlareSolverr.
 func (cm *CookieManager) flareSolverrNewer(cu *models.ChannelURL, baseCookies []*http.Cookie) func(gen int) (models.FlareSolverrSolve, bool, error) {
-	pageURL, cookiePath := cu.URL, cu.CookiePath
+	pageURL, cookiePath := cu.URL, cu.Session.CookiePath
 	return func(gen int) (models.FlareSolverrSolve, bool, error) {
 		u, err := url.Parse(pageURL)
 		if err != nil {

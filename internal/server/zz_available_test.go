@@ -66,8 +66,8 @@ func TestAvailableVideosAPI(t *testing.T) {
 
 	vs := repo.GetVideoStore(fuzzServer.db)
 	if _, err := vs.AddAvailableVideos([]*models.Video{
-		{ChannelURLID: cuID, ChannelURL: "https://example.com/@review", URL: "https://example.com/v/a", Title: "A", ThumbnailURL: "https://example.com/a.jpg"},
-		{ChannelURLID: cuID, ChannelURL: "https://example.com/@review", URL: "https://example.com/v/b", Title: "B"},
+		{ChannelURLID: cuID, ChannelURL: "https://example.com/@review", URL: "https://example.com/v/a", Metadata: models.VideoMetadata{Title: "A", ThumbnailURL: "https://example.com/a.jpg"}},
+		{ChannelURLID: cuID, ChannelURL: "https://example.com/@review", URL: "https://example.com/v/b", Metadata: models.VideoMetadata{Title: "B"}},
 	}, chanID); err != nil {
 		t.Fatal(err)
 	}

@@ -41,8 +41,8 @@ func clearJobMapEntry(filepath string) {
 
 // InitMetarr begins processing with Metarr.
 func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) error {
-	// Metarr may move the file, changing v.VideoFilePath, so clear the path that was taken.
-	path := v.VideoFilePath
+	// Metarr may move the file, changing v.Files.VideoFilePath, so clear the path that was taken.
+	path := v.Files.VideoFilePath
 	if tryJobMap(path) {
 		return fmt.Errorf("metarr is already processing video %q", path)
 	}
@@ -73,7 +73,7 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 // finishMetafile takes the title, description and date from the metadata file Metarr finished with, then deletes the
 // file if the purge setting says to. Tubarr purges rather than Metarr, so it can read the file first.
 func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
-	if v.JSONFilePath == "" {
+	if v.Files.JSONFilePath == "" {
 		return nil
 	}
 	if err := metadata.RefreshFromMetarr(v); err != nil {
@@ -87,11 +87,11 @@ func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
 	if purge != "all" && purge != "json" { // Tubarr's metadata files are JSON.
 		return nil
 	}
-	if err := os.Remove(v.JSONFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("failed to purge metadata file %q: %w", v.JSONFilePath, err)
+	if err := os.Remove(v.Files.JSONFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("failed to purge metadata file %q: %w", v.Files.JSONFilePath, err)
 	}
-	logger.Pl.I("Purged metadata file %q", v.JSONFilePath)
-	v.JSONFilePath = ""
+	logger.Pl.I("Purged metadata file %q", v.Files.JSONFilePath)
+	v.Files.JSONFilePath = ""
 	return nil
 }
 
@@ -160,12 +160,12 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	}
 
 	// Get file size.
-	if size := file.Size(v.VideoFilePath); size > 0 {
-		v.Filesize = size
+	if size := file.Size(v.Files.VideoFilePath); size > 0 {
+		v.Metadata.Filesize = size
 	}
 
 	// Success.
-	logger.Pl.S("Metarr successfully processed video %q (file path: %q)", v.URL, v.VideoFilePath)
+	logger.Pl.S("Metarr successfully processed video %q (file path: %q)", v.URL, v.Files.VideoFilePath)
 	return nil
 }
 

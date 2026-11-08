@@ -19,9 +19,9 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	// 'Download As' overrides replace the channel URL's ops. Otherwise file ops override DB ops, then apply filtering.
 	var metaOps, filenameOps []string
 	if v.Overrides != nil {
-		metaOps, filenameOps = overrideMetaOps(v, c), overrideFilenameOps(v, c)
+		metaOps, filenameOps = overrideMetaOps(v), overrideFilenameOps(v)
 	} else {
-		metaOps, filenameOps = loadAndMergeMetaOps(v, cu, c, dirParser), loadAndMergeFilenameOps(v, cu, c, dirParser)
+		metaOps, filenameOps = loadAndMergeMetaOps(v, cu, dirParser), loadAndMergeFilenameOps(v, cu, dirParser)
 	}
 
 	// Fill Tubarr's tags in the ops, leaving the rest for Metarr.
@@ -59,9 +59,9 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Metarr takes each path whole, so commas and quotes in file names need no escaping.
-	metaFile := cmp.Or(v.JSONCustomFile, v.JSONFilePath)
-	logger.Pl.I("Making Metarr argument for video %q and JSON file %q.", v.VideoFilePath, metaFile)
-	args := []string{metkeys.VideoFile, v.VideoFilePath, metkeys.MetaFile, metaFile}
+	metaFile := cmp.Or(v.Files.JSONCustomFile, v.Files.JSONFilePath)
+	logger.Pl.I("Making Metarr argument for video %q and JSON file %q.", v.Files.VideoFilePath, metaFile)
+	args := []string{metkeys.VideoFile, v.Files.VideoFilePath, metkeys.MetaFile, metaFile}
 
 	// add adds the flag with val, unless val is blank.
 	add := func(flag, val string) {
@@ -141,8 +141,8 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *par
 		dir, _ = parsing.FillOutputDirectoryTags(v.Overrides.OutputDir, cu, dirParser.C)
 		name = "'Download As...' output directory"
 	// #1 Priority: Move operation filter output directory.
-	case v.MoveOpOutputDir != "":
-		dir = v.MoveOpOutputDir
+	case v.Files.MoveOpOutputDir != "":
+		dir = v.Files.MoveOpOutputDir
 	// #2 Priority: Use the output directory stored in channel URL directly.
 	case cu.ChanURLMetarrArgs.OutputDir != "":
 		dir = cu.ChanURLMetarrArgs.OutputDir

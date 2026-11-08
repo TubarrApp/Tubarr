@@ -50,7 +50,7 @@ func NewCookieManager() *CookieManager {
 func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
 	// Fetch auth details if this is a manual entry or not from DB. -- NEVER HAS AUTH? MAY BE UNNECESSARY CODE. --
 	if (cu.IsManual || cu.ID == 0) && !cu.NeedsAuth() { // Login details sent with manual videos win.
-		cu.Username, cu.Password, cu.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
+		cu.Login.Username, cu.Login.Password, cu.Login.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
 		if err != nil {
 			logger.Pl.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
 		}
@@ -67,14 +67,14 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	// Create cookie file path.
-	cu.CookiePath = generateCookieFilePath(c.Name, cu.URL)
+	cu.Session.CookiePath = generateCookieFilePath(c.Name, cu.URL)
 
 	// Collect cookies...
 	var authCookies, regCookies []*http.Cookie
 
 	// Cookies from direct login (always fresh, no caching).
 	if doLogin {
-		authCookies, err = login(ctx, cu.ToChannelAccessDetails())
+		authCookies, err = login(ctx, &cu.Login)
 		if ctx.Err() != nil {
 			return nil, "", ctx.Err()
 		}
@@ -100,7 +100,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// If FlareSolverr is unavailable, carries on without it (the failure is already logged).
 	if useFlareSolverr {
 		if sol, err := cm.flareSolverrSolution(ctx, cu.URL, 0); err == nil {
-			cu.FlareSolverr = models.NewFlareSolverrSolution(sol.ytDLPSolve(), cm.flareSolverrResolver(ctx, cu, cookies), cm.flareSolverrNewer(cu, cookies))
+			cu.Session.FlareSolverr = models.NewFlareSolverrSolution(sol.ytDLPSolve(), cm.flareSolverrResolver(ctx, cu, cookies), cm.flareSolverrNewer(cu, cookies))
 			cookies = mergeCookies(sol.cookies, cookies)
 		} else if ctx.Err() != nil {
 			return nil, "", ctx.Err()
@@ -127,11 +127,11 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 		}
 
 		// Save cookies to file for yt-dlp.
-		err = saveCookiesToFile(cookies, cu.CookiePath)
+		err = saveCookiesToFile(cookies, cu.Session.CookiePath)
 		if err != nil {
 			return nil, "", err
 		}
-		return cookies, cu.CookiePath, nil
+		return cookies, cu.Session.CookiePath, nil
 	}
 
 	return cookies, "", nil

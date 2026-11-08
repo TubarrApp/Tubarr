@@ -65,7 +65,7 @@ func scrapeTestRules(t *testing.T, pageURL string, rules []models.MetadataRule) 
 	}); err != nil {
 		t.Fatal(err)
 	}
-	return v.DirectVideoURL
+	return v.Metadata.DirectVideoURL
 }
 
 // TestScrapeFetchChain tests selectors that extract a value and follow it with fetch steps.

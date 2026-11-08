@@ -53,7 +53,7 @@ func TestIgnoredVideoReturnsToAvailable(t *testing.T) {
 	for _, status := range []consts.DownloadStatus{consts.DLStatusFailed, consts.DLStatusCanceled} {
 		t.Run(string(status), func(t *testing.T) {
 			_, vs, ds, c, cuID := redownloadStores(t)
-			v := &models.Video{ChannelURLID: cuID, ChannelURL: redownloadChannelURL, URL: redownloadVideoURL, Title: "One"}
+			v := &models.Video{ChannelURLID: cuID, ChannelURL: redownloadChannelURL, URL: redownloadVideoURL, Metadata: models.VideoMetadata{Title: "One"}}
 			v.MarkVideoAsIgnored()
 			if _, err := vs.AddVideos([]*models.Video{v}, c.ID); err != nil {
 				t.Fatal(err)
@@ -91,7 +91,7 @@ func TestRestartRecoversRedownload(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cs, vs, _, c, cuID := redownloadStores(t)
 			db := cs.GetDB()
-			videos := []*models.Video{{ChannelURLID: cuID, ChannelURL: redownloadChannelURL, URL: redownloadVideoURL, Title: "One"}}
+			videos := []*models.Video{{ChannelURLID: cuID, ChannelURL: redownloadChannelURL, URL: redownloadVideoURL, Metadata: models.VideoMetadata{Title: "One"}}}
 			if _, err := vs.AddAvailableVideos(videos, c.ID); err != nil {
 				t.Fatal(err)
 			}
@@ -128,7 +128,7 @@ func TestRestartRecoversRedownload(t *testing.T) {
 func TestRestartKeepsFinishedDownloads(t *testing.T) {
 	cs, vs, _, c, cuID := redownloadStores(t)
 	db := cs.GetDB()
-	videos := []*models.Video{{ChannelURLID: cuID, ChannelURL: redownloadChannelURL, URL: redownloadVideoURL, Title: "One"}}
+	videos := []*models.Video{{ChannelURLID: cuID, ChannelURL: redownloadChannelURL, URL: redownloadVideoURL, Metadata: models.VideoMetadata{Title: "One"}}}
 	if _, err := vs.AddAvailableVideos(videos, c.ID); err != nil {
 		t.Fatal(err)
 	}

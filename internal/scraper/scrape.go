@@ -93,7 +93,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Get access details once per ChannelURL - delegated to CookieManager
-		cu.Cookies, cu.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
+		cu.Session.Cookies, cu.Session.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
 		if err != nil {
 			crawlSem.Release()
 			if ctx.Err() != nil {
@@ -116,7 +116,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Fetch new episode URLs
-		newEpisodes, err := s.newEpisodeURLs(ctx, c.Name, cu, seenURLs)
+		newEpisodes, err := s.newEpisodeURLs(ctx, cu, seenURLs)
 		crawlSem.Release()
 		if err != nil {
 			if ctx.Err() != nil {
@@ -155,13 +155,16 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			}
 			video := &models.Video{
 				ChannelID:    c.ID,
+				ChannelName:  c.Name,
 				ChannelURLID: cu.ID,
 				ChannelURL:   cu.URL,
 				URL:          newURL,
-				Title:        lv.Title,
-				ThumbnailURL: lv.ThumbnailURL,
-				UploadDate:   lv.UploadDate,
-				Duration:     lv.Duration,
+				Metadata: models.VideoMetadata{
+					Title:        lv.Title,
+					ThumbnailURL: lv.ThumbnailURL,
+					UploadDate:   lv.UploadDate,
+					Duration:     lv.Duration,
+				},
 			}
 			cu.Videos = append(cu.Videos, video)
 			newRequests = append(newRequests, video)
@@ -203,19 +206,19 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 	}
 
 	// Validate required fields.
-	if v.Title == "" {
+	if v.Metadata.Title == "" {
 		logger.Pl.D(3, "Scraped metadata: %+v", metadata)
-		return fmt.Errorf("missing required metadata fields (title: %q)", v.Title)
+		return fmt.Errorf("missing required metadata fields (title: %q)", v.Metadata.Title)
 	}
 
 	// Metarr renames videos to their full title by default, which yt-dlp always fills.
 	if fulltitle, _ := metadata[sharedtags.JFulltitle].(string); fulltitle == "" {
-		metadata[sharedtags.JFulltitle] = v.Title
+		metadata[sharedtags.JFulltitle] = v.Metadata.Title
 	}
 
 	// Write metadata to file, named like yt-dlp's downloads: a hash of the URL keeps apart videos with the same title.
 	sum := sha256.Sum256([]byte(v.URL))
-	name := sharedparsing.SanitizePathComponent(sanitizeFilename(v.Title), 200) // Cut to 200 bytes, as yt-dlp's are.
+	name := sharedparsing.SanitizePathComponent(sanitizeFilename(v.Metadata.Title), 200) // Cut to 200 bytes, as yt-dlp's are.
 	filename := fmt.Sprintf("%s [%s].json", name, hex.EncodeToString(sum[:4]))
 	if err := file.WriteMetadataJSONFile(metadata, filename, outputDir, v); err != nil {
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
@@ -252,16 +255,16 @@ func (s *Scraper) ScraperURLCookies(ctx context.Context, cs contracts.ChannelSto
 }
 
 // newEpisodeURLs returns new episode URLs not yet downloaded, ignored, or Available, with what the listing shows of each.
-func (s *Scraper) newEpisodeURLs(ctx context.Context, channelName string, cu *models.ChannelURL, existingURLs []string) (map[string]*listedVideo, error) {
+func (s *Scraper) newEpisodeURLs(ctx context.Context, cu *models.ChannelURL, existingURLs []string) (map[string]*listedVideo, error) {
 	channelURL := cu.URL
 
 	// Custom crawl rules and built-in scrapers take priority over yt-dlp.
-	_, episodes, crawled, err := s.crawlChannelURLs(ctx, channelURL, cu.Cookies)
+	_, episodes, crawled, err := s.crawlChannelURLs(ctx, channelURL, cu.Session.Cookies)
 	if err != nil {
 		return nil, err
 	}
 	if !crawled {
-		if episodes, err = ytDlpURLFetch(ctx, channelName, cu); err != nil {
+		if episodes, err = ytDlpURLFetch(ctx, cu); err != nil {
 			return nil, err
 		}
 	}
@@ -312,9 +315,9 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 }
 
 // ytDlpURLFetch fetches a channel URL's video URLs using yt-dlp.
-func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelURL) (map[string]*listedVideo, error) {
+func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*listedVideo, error) {
 	uniqueEpisodeURLs := make(map[string]*listedVideo)
-	channelURL, fs := cu.URL, cu.FlareSolverr
+	channelURL, fs := cu.URL, cu.Session.FlareSolverr
 	var crawlArgs, browser string
 	if cu.ChanURLSettings != nil {
 		crawlArgs, browser = cu.ChanURLSettings.ExtraYTDLPCrawlArgs, cu.ChanURLSettings.CookiesFromBrowser
@@ -346,8 +349,8 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 		}
 
 		// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
-		if cu.CookiePath != "" {
-			args = append(args, command.CookiePath, cu.CookiePath)
+		if cu.Session.CookiePath != "" {
+			args = append(args, command.CookiePath, cu.Session.CookiePath)
 		}
 		if browser != "" {
 			args = append(args, command.CookiesFromBrowser, browser)
@@ -360,7 +363,7 @@ func ytDlpURLFetch(ctx context.Context, channelName string, cu *models.ChannelUR
 		args = append(args, command.OutputJSON, command.EndOfOptions, channelURL)
 		cmd := exec.CommandContext(ctx, sharedconsts.ProgramYTDLP, args...)
 
-		logger.Pl.I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", channelName, channelURL, cmd.String())
+		logger.Pl.I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
 
 		var err error
 		if j, err = cmd.Output(); err == nil {
@@ -692,7 +695,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		sharedtags.JDurationString: true,
 	}
 
-	// Recognized date fields, each validated as a full date string. Includes an order of preference for v.UploadDate.
+	// Recognized date fields, each validated as a full date string. Includes an order of preference for v.Metadata.UploadDate.
 	dateFields := map[string]bool{
 		sharedtags.JUploadDate:  true,
 		sharedtags.JReleaseDate: true,
@@ -727,7 +730,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 	}
 
 	// Setup scraping for recognized date fields. Each is written into the metadata JSON
-	// under its own key; v.UploadDate is resolved from these afterward, by precedence.
+	// under its own key; v.Metadata.UploadDate is resolved from these afterward, by precedence.
 	dateValues := make(map[string]*string, len(dateFields))
 	for fieldName := range dateFields {
 		rules, ok := rulesByField[fieldName]
@@ -765,22 +768,22 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 	// After scraping completes, populate the Video struct
 	collector.OnScraped(func(_ *colly.Response) {
 		if title != "" {
-			v.Title = title
+			v.Metadata.Title = title
 			metadata[sharedtags.JTitle] = title
 		}
 
 		if description != "" {
-			v.Description = description
+			v.Metadata.Description = description
 			metadata[sharedtags.JDescription] = description
 		}
 
 		if directVideoURL != "" {
-			v.DirectVideoURL = directVideoURL
+			v.Metadata.DirectVideoURL = directVideoURL
 			metadata[sharedtags.JDirectVideoURL] = directVideoURL
 		}
 
 		if thumbnailURL != "" {
-			v.ThumbnailURL = thumbnailURL
+			v.Metadata.ThumbnailURL = thumbnailURL
 			metadata[sharedtags.JThumbnail] = thumbnailURL
 		}
 
@@ -791,7 +794,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		parsedDuration, _ := sharedparsing.ParseDuration(duration)
 		parsedDurationStr, _ := sharedparsing.ParseDuration(durationString)
 		if secs := cmp.Or(parsedDuration, parsedDurationStr); secs > 0 {
-			v.Duration = secs
+			v.Metadata.Duration = secs
 			metadata[sharedtags.JDuration] = secs
 		} else if duration != "" || durationString != "" {
 			logger.Pl.W("Failed to parse a duration from field %q (%q) or %q (%q)", sharedtags.JDuration, duration, sharedtags.JDurationString, durationString)
@@ -811,12 +814,12 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			metadata[fieldName] = normalized
 		}
 
-		// v.UploadDate is resolved from whichever recognized date field parsed
+		// v.Metadata.UploadDate is resolved from whichever recognized date field parsed
 		// successfully, preferring upload_date, then release_date, then date.
 		for _, fieldName := range uploadDatePrecedence {
 			if t, ok := parsedDates[fieldName]; ok {
-				v.UploadDate = t
-				logger.Pl.I("Extracted upload date %q from field %q", v.UploadDate.String(), fieldName)
+				v.Metadata.UploadDate = t
+				logger.Pl.I("Extracted upload date %q from field %q", v.Metadata.UploadDate.String(), fieldName)
 				break
 			}
 		}

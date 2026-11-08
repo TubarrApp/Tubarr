@@ -85,7 +85,7 @@ func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) erro
 func (d *VideoDownload) cancelVideoDownload() error {
 	d.cleanup()
 	if errors.Is(context.Cause(d.Context), ErrCanceledByUser) {
-		removePartialFiles(d.Video.VideoDir, d.destinations)
+		removePartialFiles(d.Video.Files.VideoDir, d.destinations)
 	}
 	d.DLTracker.SetStatus(d.Video, consts.DLStatusCanceled, d.Video.DownloadStatus.Percent, "", d.Context.Err())
 	return fmt.Errorf("user canceled video download for %s: %w", d.Video.URL, d.Context.Err())
@@ -237,7 +237,7 @@ func ytdlpCodecRegex(codec string) string {
 // refreshFlareSolverr solves through FlareSolverr again if Cloudflare blocked a download for a FlareSolverr site,
 // so the next attempt uses fresh cookies. Reports whether it tried.
 func refreshFlareSolverr(cu *models.ChannelURL, videoURL string, fsGen int, dlErr error) bool {
-	fs := cu.FlareSolverr
+	fs := cu.Session.FlareSolverr
 	if fs == nil || !models.IsCloudflareBlock(dlErr.Error()) {
 		return false
 	}

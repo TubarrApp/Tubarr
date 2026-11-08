@@ -102,7 +102,7 @@ func (h *videoHold) postProcess(ctx context.Context, v *models.Video, cu *models
 	q.mu.Lock()
 	stopped := q.stops[c.ID] != h.claim.stops
 	if !stopped {
-		h.claim.entry, h.claim.cancel = newQueueEntry(v, cu, c), cancel
+		h.claim.entry, h.claim.cancel = newQueueEntry(v, cu), cancel
 	}
 	q.mu.Unlock()
 	if stopped {
@@ -110,7 +110,7 @@ func (h *videoHold) postProcess(ctx context.Context, v *models.Video, cu *models
 		return consts.MetarrStatusPending
 	}
 
-	release, err := q.acquire(ctx, c, cu)
+	release, err := q.acquire(ctx, cu)
 	if err != nil {
 		logger.Pl.W("Metarr not started for video %s, marking as pending", v.URL)
 		return consts.MetarrStatusPending
@@ -205,7 +205,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 
 		key := videoKey{c.ID, v.URL}
 		vCtx, vCancel := context.WithCancel(ctx)
-		cl, added := q.add(key, newQueueEntry(v, cu, c), vCancel)
+		cl, added := q.add(key, newQueueEntry(v, cu), vCancel)
 		if !added {
 			vCancel()
 			logger.Pl.W("Video %q is already being processed, skipping", v.URL)
@@ -216,7 +216,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 			defer q.release(key, cl)
 			defer vCancel()
 
-			release, err := q.acquire(vCtx, c, cu)
+			release, err := q.acquire(vCtx, cu)
 			if err != nil {
 				return
 			}
@@ -371,17 +371,17 @@ func (q *PostProcessingQueue) release(key videoKey, cl *claim) {
 // acquire waits for a slot in the video's lane, then a global one, returning a function releasing both.
 //
 // The global slot is taken last, so a video waiting for its lane doesn't hold one.
-func (q *PostProcessingQueue) acquire(ctx context.Context, c *models.Channel, cu *models.ChannelURL) (release func(), err error) {
-	if err := q.lanes.acquire(ctx, c.ID, cu.ID); err != nil {
+func (q *PostProcessingQueue) acquire(ctx context.Context, cu *models.ChannelURL) (release func(), err error) {
+	if err := q.lanes.acquire(ctx, cu.ChannelID, cu.ID); err != nil {
 		return nil, err
 	}
 	if err := limits.GlobalPostProcessing.Acquire(ctx); err != nil {
-		q.lanes.release(c.ID, cu.ID)
+		q.lanes.release(cu.ChannelID, cu.ID)
 		return nil, err
 	}
 	return func() {
 		limits.GlobalPostProcessing.Release()
-		q.lanes.release(c.ID, cu.ID)
+		q.lanes.release(cu.ChannelID, cu.ID)
 	}, nil
 }
 
@@ -412,7 +412,7 @@ func metarrLimits(c *models.Channel) laneLimits {
 
 // runVideoMetarr rebuilds a video's Metarr state from its metadata file and runs Metarr on it.
 func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Video, cu *models.ChannelURL, c *models.Channel) error {
-	for _, f := range []string{v.VideoFilePath, v.JSONFilePath} {
+	for _, f := range []string{v.Files.VideoFilePath, v.Files.JSONFilePath} {
 		if f == "" {
 			return errors.New("source file path not stored in database")
 		}
@@ -421,12 +421,12 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 		}
 	}
 
-	oldVideo, oldJSON := v.VideoFilePath, v.JSONFilePath
+	oldVideo, oldJSON := v.Files.VideoFilePath, v.Files.JSONFilePath
 	dirParser := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
 
 	// Video already passed filters on download, only the filtered ops are needed.
-	_, v.FilteredMetaOps, v.FilteredFilenameOps, _ = metadata.ValidateAndFilter(v, cu, c, dirParser)
-	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, c, dirParser)
+	_, v.FilteredMetaOps, v.FilteredFilenameOps, _ = metadata.ValidateAndFilter(v, cu, dirParser)
+	v.Files.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, c, dirParser)
 
 	v.MetarrStatus = execMetarr(ctx, v, cu, c, dirParser)
 
@@ -434,8 +434,8 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 	if ctx.Err() != nil {
 		logger.Pl.I("Metarr run for video %q was canceled, not storing result", v.URL)
 		// Metarr may have moved files before stopping, so keep where they are unless a newer download changed the row.
-		if v.VideoFilePath != oldVideo || v.JSONFilePath != oldJSON {
-			if updated, err := vs.UpdateVideoPaths(v.ID, oldVideo, oldJSON, v.VideoFilePath, v.JSONFilePath); err != nil {
+		if v.Files.VideoFilePath != oldVideo || v.Files.JSONFilePath != oldJSON {
+			if updated, err := vs.UpdateVideoPaths(v.ID, oldVideo, oldJSON, v.Files.VideoFilePath, v.Files.JSONFilePath); err != nil {
 				logger.Pl.E("Failed to store file paths for canceled Metarr run of video %q: %v", v.URL, err)
 			} else if updated {
 				logger.Pl.I("Stored file paths Metarr reported before it was canceled for video %q", v.URL)

@@ -391,7 +391,7 @@ func TestFlareSolverrNewerSolveForDownloads(t *testing.T) {
 	useFlareSolverr(t, fakeFlareSolverr(t, &solves))
 	cm := NewCookieManager()
 	ctx := context.Background()
-	cu := &models.ChannelURL{URL: "https://cf.example/channel", CookiePath: filepath.Join(t.TempDir(), "cookies.txt")}
+	cu := &models.ChannelURL{URL: "https://cf.example/channel", Session: models.ChannelURLSession{CookiePath: filepath.Join(t.TempDir(), "cookies.txt")}}
 
 	first, err := cm.flareSolverrSolution(ctx, cu.URL, 0)
 	if err != nil {
@@ -409,7 +409,7 @@ func TestFlareSolverrNewerSolveForDownloads(t *testing.T) {
 	if got := fs.Current(); got.Gen <= first.gen {
 		t.Errorf("expected the solution to switch to the newer solve, got gen %d (first was %d)", got.Gen, first.gen)
 	}
-	if cookies, _ := os.ReadFile(cu.CookiePath); !strings.Contains(string(cookies), "cf_clearance\t2") {
+	if cookies, _ := os.ReadFile(cu.Session.CookiePath); !strings.Contains(string(cookies), "cf_clearance\t2") {
 		t.Errorf("expected the cookie file to have the newer solve's cookie, got:\n%s", cookies)
 	}
 	if solves.Load() != 2 {

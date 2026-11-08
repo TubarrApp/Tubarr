@@ -870,7 +870,7 @@ func TestEditChangesURLPassword(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return c.URLModels[0].Password
+		return c.URLModels[0].Login.Password
 	}
 	if got := saved(); got != "old-pass" {
 		t.Fatalf("saved password = %q, want old-pass", got)
@@ -1103,7 +1103,7 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/channels/{}/available", keys: []string{"action", "video_ids", "overrides", "metarr", "auth"}, replay: func(t *testing.T) {
 			vs := repo.GetVideoStore(fuzzServer.db)
 			const videoURL = "https://example.com/v/wiring-available"
-			if _, err := vs.AddAvailableVideos([]*models.Video{{ChannelURLID: fuzzChannelURLID(t), ChannelURL: "https://example.com/@fuzz", URL: videoURL, Title: "Wiring"}}, 1); err != nil {
+			if _, err := vs.AddAvailableVideos([]*models.Video{{ChannelURLID: fuzzChannelURLID(t), ChannelURL: "https://example.com/@fuzz", URL: videoURL, Metadata: models.VideoMetadata{Title: "Wiring"}}}, 1); err != nil {
 				t.Fatal(err)
 			}
 			var videoID int64
@@ -1123,7 +1123,7 @@ func pageRequests() []pageRequest {
 			cuID := fuzzChannelURLID(t)
 			addFinished := func(videoURL string) string {
 				path := wiringFile(t, filepath.Base(videoURL)+".mp4", "video")
-				v := &models.Video{ChannelURLID: cuID, ChannelURL: "https://example.com/@fuzz", URL: videoURL, Title: "Wiring", VideoFilePath: path}
+				v := &models.Video{ChannelURLID: cuID, ChannelURL: "https://example.com/@fuzz", URL: videoURL, Metadata: models.VideoMetadata{Title: "Wiring"}, Files: models.VideoFiles{VideoFilePath: path}}
 				v.MarkVideoAsComplete()
 				if _, err := vs.AddVideo(v, 1, cuID); err != nil {
 					t.Fatal(err)

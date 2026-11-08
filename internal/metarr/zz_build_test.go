@@ -24,7 +24,7 @@ func TestMetaPurge(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{MetaPurge: "json"}}
-	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
 	if args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); slices.Contains(args, metkeys.PurgeMetaFile) {
 		t.Errorf("purge passed to Metarr: %q", args)
 	}
@@ -59,16 +59,16 @@ func TestFinishMetafile(t *testing.T) {
 			t.Fatal(err)
 		}
 		cu := &models.ChannelURL{ChanURLMetarrArgs: &models.MetarrArgs{MetaPurge: tc.purge}}
-		v := &models.Video{URL: "https://example.com/v/1", Title: "Stored", Description: "Stored", JSONFilePath: path}
+		v := &models.Video{URL: "https://example.com/v/1", Metadata: models.VideoMetadata{Title: "Stored", Description: "Stored"}, Files: models.VideoFiles{JSONFilePath: path}}
 		if err := finishMetafile(v, cu); err != nil {
 			t.Fatal(err)
 		}
-		if v.Title != "[2024-01-02] New" || v.Description != "Long" || v.UploadDate.Format("2006-01-02") != "2024-01-02" {
-			t.Errorf("purge %q: got title %q, description %q, date %v", tc.purge, v.Title, v.Description, v.UploadDate)
+		if v.Metadata.Title != "[2024-01-02] New" || v.Metadata.Description != "Long" || v.Metadata.UploadDate.Format("2006-01-02") != "2024-01-02" {
+			t.Errorf("purge %q: got title %q, description %q, date %v", tc.purge, v.Metadata.Title, v.Metadata.Description, v.Metadata.UploadDate)
 		}
 		_, statErr := os.Stat(path)
-		if purged := errors.Is(statErr, fs.ErrNotExist); purged != tc.purged || (v.JSONFilePath == "") != tc.purged {
-			t.Errorf("purge %q: file purged %t, path stored %q, want purged %t", tc.purge, purged, v.JSONFilePath, tc.purged)
+		if purged := errors.Is(statErr, fs.ErrNotExist); purged != tc.purged || (v.Files.JSONFilePath == "") != tc.purged {
+			t.Errorf("purge %q: file purged %t, path stored %q, want purged %t", tc.purge, purged, v.Files.JSONFilePath, tc.purged)
 		}
 	}
 }
@@ -82,7 +82,7 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{
 		OutputExt: "mp4", RenameStyle: "spaces", TranscodeVideoArgs: []string{"hevc:-crf 23"}, TranscodeVideoCodecs: []string{"h264:hevc"}, MaxCPU: 50,
 	}}
-	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
 	values := func(key string) []string {
 		t.Helper()
 		args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags))
@@ -123,7 +123,7 @@ func TestMakeMetarrCommandGPUNone(t *testing.T) {
 	logger.Pl.Console = io.Discard
 	t.Cleanup(viper.Reset)
 	c := &models.Channel{ID: 1, Name: "Cats"}
-	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
 	newURL := func(gpu string) *models.ChannelURL {
 		return &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{},
 			ChanURLMetarrArgs: &models.MetarrArgs{TranscodeGPU: gpu, TranscodeGPUNode: "/dev/dri/renderD128"}}
@@ -155,7 +155,7 @@ func TestMakeMetarrCommandExtSame(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{OutputExt: sharedconsts.ExtSame}}
-	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
 	if args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); slices.Contains(args, metkeys.Ext) {
 		t.Errorf("%q passed an extension to Metarr: %q", sharedconsts.ExtSame, args)
 	}
@@ -167,7 +167,7 @@ func TestMakeMetarrCommandThumbnail(t *testing.T) {
 	t.Cleanup(viper.Reset)
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{}}
-	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
 	args := func() []string {
 		return makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags))
 	}
@@ -283,7 +283,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 		logging.SetLevel(tc.level)
 		c := &models.Channel{ID: 1, Name: "Cats"}
 		cu := withOwnLevel(&models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: tc.args})
-		v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json", Overrides: tc.overrides}
+		v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}, Overrides: tc.overrides}
 		if got := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); !slices.Equal(got, tc.want) {
 			t.Errorf("%s:\ngot  %q\nwant %q", tc.name, got, tc.want)
 		}
@@ -307,7 +307,7 @@ func TestMakeMetarrCommandChannelTags(t *testing.T) {
 	want := []string{`all-credits:set:Devon\: Tracey`, "title:prefix:example.com/@a - ", `set:Devon\: Tracey - {{fulltitle}}`}
 
 	for _, overrides := range []*models.VideoOverrides{nil, {MetaOps: metaOps, FilenameOps: filenameOps}} {
-		v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/v.mp4", JSONFilePath: "/v.json", Overrides: overrides}
+		v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/v.mp4", JSONFilePath: "/v.json"}, Overrides: overrides}
 		args := makeMetarrCommand(v, cu, c, dp)
 		for _, op := range want {
 			if !slices.Contains(args, op) {

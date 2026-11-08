@@ -29,8 +29,8 @@ func TestExecuteAudioSource(t *testing.T) {
 	if n := countRuns(t, runs); n != 1 {
 		t.Errorf("ran yt-dlp %d times, want 1", n)
 	}
-	if vd.Video.VideoFilePath != audioPath {
-		t.Errorf("VideoFilePath = %q, want %q", vd.Video.VideoFilePath, audioPath)
+	if vd.Video.Files.VideoFilePath != audioPath {
+		t.Errorf("VideoFilePath = %q, want %q", vd.Video.Files.VideoFilePath, audioPath)
 	}
 }
 

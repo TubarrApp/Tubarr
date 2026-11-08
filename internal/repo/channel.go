@@ -653,7 +653,7 @@ func (cs *ChannelStore) AddNotifyURLs(channelID int64, notifications []*models.N
 }
 
 // AddAuth adds authentication details to a channel's URLs.
-func (cs *ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelAccessDetails) error {
+func (cs *ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.ChannelURLAccessDetails) error {
 	if !cs.channelExistsID(chanID) {
 		return fmt.Errorf("channel with ID %d does not exist", chanID)
 	}
@@ -790,7 +790,7 @@ func downloadDirs(s *models.Settings) []string {
 }
 
 // AddChannelWithDetails adds a channel with its logins and notifications in one transaction, setting c.ID.
-func (cs *ChannelStore) AddChannelWithDetails(c *models.Channel, authDetails map[string]*models.ChannelAccessDetails, notifications []*models.Notification) error {
+func (cs *ChannelStore) AddChannelWithDetails(c *models.Channel, authDetails map[string]*models.ChannelURLAccessDetails, notifications []*models.Notification) error {
 	return cs.inTx(func(tcs *ChannelStore) error {
 		id, err := tcs.AddChannel(c)
 		if err != nil {
@@ -937,8 +937,8 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			}
 		}
 
-		if cu.EncryptedPassword == "" && cu.Password != "" {
-			if cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password); err != nil {
+		if cu.Login.EncryptedPassword == "" && cu.Login.Password != "" {
+			if cu.Login.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Login.Password); err != nil {
 				return 0, fmt.Errorf("failed to encrypt password for URL %q: %w", cu.URL, err)
 			}
 		}
@@ -982,9 +982,9 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			urlInsertQuery,
 			id,
 			cu.URL,
-			cu.Username,
-			cu.EncryptedPassword,
-			cu.LoginURL,
+			cu.Login.Username,
+			cu.Login.EncryptedPassword,
+			cu.Login.LoginURL,
 			false,
 			customMetarrArgs,
 			customSettings,
@@ -1003,6 +1003,8 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			return 0, fmt.Errorf("failed to get last insert ID for URL %q: %w", cu.URL, err)
 		}
 		cu.ID = urlID
+		cu.ChannelID = id
+		cu.ChannelName = c.Name
 
 		logger.Pl.D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
 	}
@@ -1693,19 +1695,19 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	// Auth details.
 	gotAuthModels := false
 	for _, cu := range c.URLModels {
-		if cu.Password == "" && cu.EncryptedPassword != "" {
-			cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword)
+		if cu.Login.Password == "" && cu.Login.EncryptedPassword != "" {
+			cu.Login.Password, err = cs.PasswordMgr.Decrypt(cu.Login.EncryptedPassword)
 			if err != nil {
 				logger.Pl.W("Failed to decrypt password for channel %q URL %q: %v", c.Name, cu.URL, err)
 			}
 		}
 
-		if cu.Username != "" || cu.LoginURL != "" || cu.Password != "" {
+		if cu.Login.Username != "" || cu.Login.LoginURL != "" || cu.Login.Password != "" {
 			fmt.Printf("Channel URL: %s, Username: %s, Password: %s, Login URL: %s\n",
 				cu.URL,
-				cu.Username,
-				auth.StarPassword(cu.Password),
-				cu.LoginURL)
+				cu.Login.Username,
+				auth.StarPassword(cu.Login.Password),
+				cu.Login.LoginURL)
 
 			gotAuthModels = true
 		}

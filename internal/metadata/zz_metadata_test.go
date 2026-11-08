@@ -35,12 +35,12 @@ func TestUnusableFilterFileSkipsVideo(t *testing.T) {
 		ChanURLMetarrArgs: &models.MetarrArgs{},
 	})
 	newVideo := func() *models.Video {
-		return &models.Video{URL: "https://example.com/watch/1", JSONFilePath: jsonFile}
+		return &models.Video{URL: "https://example.com/watch/1", Files: models.VideoFiles{JSONFilePath: jsonFile}}
 	}
 	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
 
 	// Missing file: skipped with an error.
-	if pass, _, _, err := ValidateAndFilter(newVideo(), cu, c, dp); pass || !errors.Is(err, errFilterFile) {
+	if pass, _, _, err := ValidateAndFilter(newVideo(), cu, dp); pass || !errors.Is(err, errFilterFile) {
 		t.Errorf("missing filter file: passed = %v, err = %v; want not passed with errFilterFile", pass, err)
 	}
 
@@ -48,14 +48,14 @@ func TestUnusableFilterFileSkipsVideo(t *testing.T) {
 	if err := os.WriteFile(filterFile, []byte("not a filter\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if pass, _, _, err := ValidateAndFilter(newVideo(), cu, c, dp); pass || !errors.Is(err, errFilterFile) {
+	if pass, _, _, err := ValidateAndFilter(newVideo(), cu, dp); pass || !errors.Is(err, errFilterFile) {
 		t.Errorf("unparseable filter file: passed = %v, err = %v; want not passed with errFilterFile", pass, err)
 	}
 
 	// Chosen manually, so download filters (and the file) don't apply.
 	v := newVideo()
 	v.SkipFilters = true
-	if pass, _, _, err := handleFilters(v, cu, c, dp); !pass || err != nil {
+	if pass, _, _, err := handleFilters(v, cu, dp); !pass || err != nil {
 		t.Errorf("manual video: passed = %v, err = %v; want passed", pass, err)
 	}
 
@@ -63,7 +63,7 @@ func TestUnusableFilterFileSkipsVideo(t *testing.T) {
 	if err := os.WriteFile(filterFile, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if pass, _, _, err := handleFilters(newVideo(), cu, c, dp); !pass || err != nil {
+	if pass, _, _, err := handleFilters(newVideo(), cu, dp); !pass || err != nil {
 		t.Errorf("empty filter file: passed = %v, err = %v; want passed", pass, err)
 	}
 }
@@ -90,7 +90,7 @@ func TestMustAndAnyFilters(t *testing.T) {
 		{"tutorial", []models.Filters{tutorial}, true},
 	}
 	for _, tt := range tests {
-		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: map[string]any{"title": tt.title}}
+		v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: map[string]any{"title": tt.title}}}
 		if got := checkFilters(v, tt.filters); got != tt.want {
 			t.Errorf("checkFilters(%q, %v) = %v, want %v", tt.title, tt.filters, got, tt.want)
 		}
@@ -115,7 +115,7 @@ func TestCheckFiltersFieldValues(t *testing.T) {
 		{"missing field equals empty", models.Filters{Field: "absent", FilterType: "equals", MustAny: "must"}, true},
 	}
 	for _, tt := range tests {
-		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: meta}
+		v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: meta}}
 		if got := checkFilters(v, []models.Filters{tt.filter}); got != tt.want {
 			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
 		}
@@ -142,7 +142,7 @@ func TestPresenceAnyFilters(t *testing.T) {
 		{"date and no cats", map[string]any{"title": "Dogs", "date": "2024-01-02"}, []models.Filters{noDate, cats}, false},
 	}
 	for _, tt := range tests {
-		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: tt.meta}
+		v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: tt.meta}}
 		if got := checkFilters(v, tt.filters); got != tt.want {
 			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
 		}
@@ -167,11 +167,11 @@ func TestFilteredOpsNumericField(t *testing.T) {
 		{"long", map[string]any{"title": "Cats", "duration": 4000.0}, true},
 		{"long duration string", map[string]any{"title": "Cats", "duration": "1:06:40"}, true},
 	} {
-		v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: tt.meta}
-		if got := filteredMetaOpsMatches(v, cu, [][]models.FilteredMetaOps{metaOps}, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
+		v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: tt.meta}}
+		if got := filteredMetaOpsMatches(v, cu, [][]models.FilteredMetaOps{metaOps}); len(got) != 1 || got[0].FiltersMatched != tt.want {
 			t.Errorf("%s: filtered meta ops got %+v, want matched %v", tt.name, got, tt.want)
 		}
-		if got := filteredFilenameOpsMatches(v, cu, [][]models.FilteredFilenameOps{filenameOps}, "Cats"); len(got) != 1 || got[0].FiltersMatched != tt.want {
+		if got := filteredFilenameOpsMatches(v, cu, [][]models.FilteredFilenameOps{filenameOps}); len(got) != 1 || got[0].FiltersMatched != tt.want {
 			t.Errorf("%s: filtered filename ops got %+v, want matched %v", tt.name, got, tt.want)
 		}
 	}
@@ -190,11 +190,11 @@ func TestMatchedFilteredOpsNearerThenFirstWin(t *testing.T) {
 	}
 	plain := []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "Plain"}}
 	cu := &models.ChannelURL{ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: plain}}
-	v := &models.Video{URL: "https://example.com/watch/1", MetadataMap: map[string]any{"title": "cat"}}
+	v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: map[string]any{"title": "cat"}}}
 
 	// Filename: the profile's set loses to the channel's, whose first line wins.
 	var gotNames []string
-	for _, ffo := range filteredFilenameOpsMatches(v, cu, [][]models.FilteredFilenameOps{{setName("Profile")}, {setName("First"), setName("Second")}}, "Cats") {
+	for _, ffo := range filteredFilenameOpsMatches(v, cu, [][]models.FilteredFilenameOps{{setName("Profile")}, {setName("First"), setName("Second")}}) {
 		for _, fo := range ffo.FilenameOps {
 			gotNames = append(gotNames, fo.OpValue)
 		}
@@ -205,7 +205,7 @@ func TestMatchedFilteredOpsNearerThenFirstWin(t *testing.T) {
 
 	// Meta: the URL's matched op is the plain one, so it's dropped as a duplicate but still beats the profile's.
 	var gotArtists []string
-	for _, fmo := range filteredMetaOpsMatches(v, cu, [][]models.FilteredMetaOps{{setArtist("Profile")}, {setArtist("Plain")}}, "Cats") {
+	for _, fmo := range filteredMetaOpsMatches(v, cu, [][]models.FilteredMetaOps{{setArtist("Profile")}, {setArtist("Plain")}}) {
 		for _, mo := range fmo.MetaOps {
 			gotArtists = append(gotArtists, mo.OpValue)
 		}
@@ -218,7 +218,7 @@ func TestMatchedFilteredOpsNearerThenFirstWin(t *testing.T) {
 // TestHandleMoveOps tests move ops pick the first op whose filters all match, by any filter type, for their channel URL.
 func TestHandleMoveOps(t *testing.T) {
 	logger.Pl.Console = io.Discard
-	video := &models.Video{MetadataMap: map[string]any{"title": "Two Cats Playing", "duration": 4000}}
+	video := &models.Video{Metadata: models.VideoMetadata{Raw: map[string]any{"title": "Two Cats Playing", "duration": 4000}}}
 
 	tests := []struct {
 		name string
@@ -249,7 +249,7 @@ func TestHandleMoveOps(t *testing.T) {
 // TestHandleMoveOpsOutputDirectoryTags tests both tags fill from the output directory, else the video directory, and an op with neither is skipped.
 func TestHandleMoveOpsOutputDirectoryTags(t *testing.T) {
 	logger.Pl.Console = io.Discard
-	video := &models.Video{MetadataMap: map[string]any{"title": "Two Cats Playing"}}
+	video := &models.Video{Metadata: models.VideoMetadata{Raw: map[string]any{"title": "Two Cats Playing"}}}
 
 	withOutput := &models.Channel{ChanSettings: &models.Settings{VideoDir: "/channel-video"}, ChanMetarrArgs: &models.MetarrArgs{OutputDir: "/channel"}}
 	videoOnly := &models.Channel{ChanSettings: &models.Settings{VideoDir: "/channel-video"}, ChanMetarrArgs: &models.MetarrArgs{}}
@@ -295,20 +295,20 @@ func TestParseAndStoreJSONPrecedence(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	v := &models.Video{URL: "https://example.com/v/1", JSONFilePath: path}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{JSONFilePath: path}}
 	if valid, err := parseAndStoreJSON(v); err != nil || !valid {
 		t.Fatalf("valid %t, err %v", valid, err)
 	}
-	if v.Title != "Full" || v.Description != "Long desc" || v.UploadDate.Format("2006-01-02") != "2024-01-02" {
-		t.Errorf("got title %q, description %q, date %v", v.Title, v.Description, v.UploadDate)
+	if v.Metadata.Title != "Full" || v.Metadata.Description != "Long desc" || v.Metadata.UploadDate.Format("2006-01-02") != "2024-01-02" {
+		t.Errorf("got title %q, description %q, date %v", v.Metadata.Title, v.Metadata.Description, v.Metadata.UploadDate)
 	}
 
-	v = &models.Video{URL: "https://example.com/v/1", JSONFilePath: path, Title: "Kept", Description: "Kept"}
+	v = &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{JSONFilePath: path}, Metadata: models.VideoMetadata{Title: "Kept", Description: "Kept"}}
 	if _, err := parseAndStoreJSON(v); err != nil {
 		t.Fatal(err)
 	}
-	if v.Title != "Kept" || v.Description != "Kept" {
-		t.Errorf("stored values replaced: got title %q, description %q", v.Title, v.Description)
+	if v.Metadata.Title != "Kept" || v.Metadata.Description != "Kept" {
+		t.Errorf("stored values replaced: got title %q, description %q", v.Metadata.Title, v.Metadata.Description)
 	}
 }
 

@@ -268,7 +268,7 @@ func TestThumbnailUpload(t *testing.T) {
 	if err := s.VideoStore().SetVideoOverrides([]int64{videoID}, &models.VideoOverrides{StripThumbnail: true}); err != nil {
 		t.Fatal(err)
 	}
-	if v := shownThumbnail(); v.CustomThumbnail || v.ThumbnailURL != "" {
+	if v := shownThumbnail(); v.CustomThumbnail || v.Metadata.ThumbnailURL != "" {
 		t.Errorf("video with a stripped thumbnail still shows one: %+v", v)
 	}
 	if w := get(fmt.Sprintf("/api/v1/videos/%d/thumbnail", videoID)); w.Code != http.StatusNotFound {

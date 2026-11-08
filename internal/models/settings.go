@@ -103,16 +103,6 @@ type MetarrArgs struct {
 	ExtraFFmpegArgs      string   `json:"metarr_extra_ffmpeg_args"`
 }
 
-// ChannelAccessDetails holds details related to authentication and cookies.
-type ChannelAccessDetails struct {
-	Username,
-	Password,
-	EncryptedPassword,
-	LoginURL,
-	ChannelURL,
-	CookiePath string
-}
-
 // FilteredMetaOps allows meta operation entry based on filter matching.
 type FilteredMetaOps = sharedmodels.FilteredMetaOps
 

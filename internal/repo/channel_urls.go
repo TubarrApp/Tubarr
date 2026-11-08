@@ -68,8 +68,8 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		}
 	}
 
-	if cu.EncryptedPassword == "" && cu.Password != "" {
-		cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
+	if cu.Login.EncryptedPassword == "" && cu.Login.Password != "" {
+		cu.Login.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Login.Password)
 		if err != nil {
 			return 0, err
 		}
@@ -99,9 +99,9 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 	result, err := cs.q.Exec(query,
 		channelID,
 		cu.URL,
-		cu.Username,
-		cu.EncryptedPassword,
-		cu.LoginURL,
+		cu.Login.Username,
+		cu.Login.EncryptedPassword,
+		cu.Login.LoginURL,
 		isManual,
 		settingsJSON,
 		metarrJSON,
@@ -205,8 +205,8 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		return fmt.Errorf("failed to marshal settings: %w", err)
 	}
 
-	if cu.EncryptedPassword == "" && cu.Password != "" {
-		cu.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Password)
+	if cu.Login.EncryptedPassword == "" && cu.Login.Password != "" {
+		cu.Login.EncryptedPassword, err = cs.PasswordMgr.Encrypt(cu.Login.Password)
 		if err != nil {
 			return err
 		}
@@ -236,9 +236,9 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 
 	if _, err := cs.q.Exec(
 		query,
-		cu.Username,
-		cu.EncryptedPassword,
-		cu.LoginURL,
+		cu.Login.Username,
+		cu.Login.EncryptedPassword,
+		cu.Login.LoginURL,
 		metarrJSON,
 		settingsJSON,
 		cu.ProfileID,
@@ -312,7 +312,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 
 	var urlModels []*models.ChannelURL
 	for rows.Next() {
-		cu := &models.ChannelURL{}
+		cu := &models.ChannelURL{ChannelID: c.ID, ChannelName: c.Name}
 		var (
 			username, password, loginURL sql.NullString
 			settingsJSON, metarrJSON     []byte
@@ -337,12 +337,12 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		}
 
 		// Fill credentials.
-		cu.Username = username.String
-		cu.EncryptedPassword = password.String
-		cu.LoginURL = loginURL.String
+		cu.Login.Username = username.String
+		cu.Login.EncryptedPassword = password.String
+		cu.Login.LoginURL = loginURL.String
 
-		if cu.Password == "" && cu.EncryptedPassword != "" {
-			if cu.Password, err = cs.PasswordMgr.Decrypt(cu.EncryptedPassword); err != nil {
+		if cu.Login.Password == "" && cu.Login.EncryptedPassword != "" {
+			if cu.Login.Password, err = cs.PasswordMgr.Decrypt(cu.Login.EncryptedPassword); err != nil {
 				logger.Pl.W("Failed to decrypt password for channel URL %q: %v", cu.URL, err)
 			}
 		}

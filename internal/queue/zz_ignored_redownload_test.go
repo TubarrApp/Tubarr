@@ -20,7 +20,7 @@ const filteredVideoURL = "https://example.com/v/filtered-out"
 // storeFilteredVideo stores a video an earlier run filtered out.
 func storeFilteredVideo(t *testing.T, store contracts.Store, c *models.Channel) {
 	t.Helper()
-	v := &models.Video{URL: filteredVideoURL, ChannelURLID: c.URLModels[0].ID, ChannelURL: c.URLModels[0].URL, Title: "Filtered out"}
+	v := &models.Video{URL: filteredVideoURL, ChannelURLID: c.URLModels[0].ID, ChannelURL: c.URLModels[0].URL, Metadata: models.VideoMetadata{Title: "Filtered out"}}
 	v.MarkVideoAsIgnored()
 	if _, err := store.VideoStore().AddVideos([]*models.Video{v}, c.ID); err != nil {
 		t.Fatal(err)

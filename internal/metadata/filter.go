@@ -27,7 +27,7 @@ func checkFilters(v *models.Video, filters []models.Filters) bool {
 
 	// Filter loop.
 	for _, filter := range filters {
-		matched, skipped, metaText, err := sharedfilters.Match(v.MetadataMap, filter)
+		matched, skipped, metaText, err := sharedfilters.Match(v.Metadata.Raw, filter)
 		if err != nil {
 			logger.Pl.E("Download filter error: Video %q: %v", v.URL, err)
 			return false
@@ -73,7 +73,7 @@ func checkFilters(v *models.Video, filters []models.Filters) bool {
 
 // filteredMetaOpsMatches marks which filtered meta ops match the video, from levels given farthest first, keeping only
 // matched ops a nearer level's, or an earlier line's in the same level, doesn't already set.
-func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]models.FilteredMetaOps, channelName string) []models.FilteredMetaOps {
+func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]models.FilteredMetaOps) []models.FilteredMetaOps {
 	dedupMetaOpsMap := make(map[string]bool)
 
 	metaOps := cu.ChanURLMetarrArgs.MetaOps
@@ -92,7 +92,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]m
 	for i, level := range slices.Backward(levels) {
 		for _, fmo := range level {
 			// Check if filters match.
-			filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, fmo.Filters)
+			filtersMatched, err := sharedfilters.MatchAll(v.Metadata.Raw, fmo.Filters)
 			if err != nil {
 				logger.Pl.E("Filtered meta ops error: Video %q: %v", v.URL, err)
 			}
@@ -123,7 +123,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]m
 	result := slices.Concat(byLevel...)
 
 	if logging.Level() >= 2 {
-		logger.Pl.P("Filtered meta op results for channel %q:", channelName)
+		logger.Pl.P("Filtered meta op results for channel %q:", v.ChannelName)
 		for _, fmo := range result {
 			for _, mo := range fmo.MetaOps {
 				logger.Pl.P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatMetaOp(mo), fmo.FiltersMatched)
@@ -135,7 +135,7 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]m
 
 // filteredFilenameOpsMatches marks which filtered filename ops match the video, from levels given farthest first,
 // keeping only matched ops a nearer level's, or an earlier line's in the same level, doesn't already set.
-func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]models.FilteredFilenameOps, channelName string) []models.FilteredFilenameOps {
+func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]models.FilteredFilenameOps) []models.FilteredFilenameOps {
 	dedupFilenameOpsMap := make(map[string]bool)
 
 	filenameOps := cu.ChanURLMetarrArgs.FilenameOps
@@ -153,7 +153,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, levels [
 	for i, level := range slices.Backward(levels) {
 		for _, ffo := range level {
 			// Check if filters match.
-			filtersMatched, err := sharedfilters.MatchAll(v.MetadataMap, ffo.Filters)
+			filtersMatched, err := sharedfilters.MatchAll(v.Metadata.Raw, ffo.Filters)
 			if err != nil {
 				logger.Pl.E("Filtered filename ops error: Video %q: %v", v.URL, err)
 			}
@@ -184,7 +184,7 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, levels [
 	result := slices.Concat(byLevel...)
 
 	if logging.Level() >= 2 {
-		logger.Pl.P("Filtered filename op results for channel %q:", channelName)
+		logger.Pl.P("Filtered filename op results for channel %q:", v.ChannelName)
 		for _, ffo := range result {
 			for _, fo := range ffo.FilenameOps {
 				logger.Pl.P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatFilenameOp(fo), ffo.FiltersMatched)
@@ -195,19 +195,19 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, levels [
 }
 
 // uploadDateFilter filters a video based on its upload date.
-func uploadDateFilter(v *models.Video, cu *models.ChannelURL, channelName string) (passed bool, err error) {
-	if v.UploadDate.IsZero() {
+func uploadDateFilter(v *models.Video, cu *models.ChannelURL) (passed bool, err error) {
+	if v.Metadata.UploadDate.IsZero() {
 		logger.Pl.D(1, "Did not parse an upload date from the video %q, skipped applying to/from filters", v.URL)
 		return true, nil
 	}
 
-	uploadDateNum, err := strconv.Atoi(v.UploadDate.Format("20060102"))
+	uploadDateNum, err := strconv.Atoi(v.Metadata.UploadDate.Format("20060102"))
 	if err != nil {
 		return false, fmt.Errorf("failed to convert upload date to integer: %w", err)
 	}
 
 	// 'From date' filter
-	if passed, err = applyFromDateFilter(v, cu, uploadDateNum, channelName); err != nil {
+	if passed, err = applyFromDateFilter(v, cu, uploadDateNum); err != nil {
 		return false, err
 	}
 	if !passed {
@@ -215,11 +215,11 @@ func uploadDateFilter(v *models.Video, cu *models.ChannelURL, channelName string
 	}
 
 	// 'To date' filter
-	return applyToDateFilter(v, cu, uploadDateNum, channelName)
+	return applyToDateFilter(v, cu, uploadDateNum)
 }
 
 // applyFromDateFilter checks if the video passes the 'from date' filter.
-func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int, channelName string) (passed bool, err error) {
+func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int) (passed bool, err error) {
 	if cu.ChanURLSettings.FromDate == "" {
 		return true, nil
 	}
@@ -230,16 +230,16 @@ func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum i
 	}
 
 	if uploadDateNum < fromDate {
-		logger.Pl.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %d Video uploaded at: \"%d\"", v.URL, channelName, fromDate, uploadDateNum)
+		logger.Pl.I("Video %q failed 'From Date' filter for channel %q. Wanted from: %d Video uploaded at: \"%d\"", v.URL, v.ChannelName, fromDate, uploadDateNum)
 		return false, nil
 	}
 
-	logger.Pl.S("Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, channelName)
+	logger.Pl.S("Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, v.ChannelName)
 	return true, nil
 }
 
 // applyToDateFilter checks if the video passes the 'to date' filter.
-func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int, channelName string) (passed bool, err error) {
+func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int) (passed bool, err error) {
 	if cu.ChanURLSettings.ToDate == "" {
 		return true, nil
 	}
@@ -250,11 +250,11 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 	}
 
 	if uploadDateNum > toDate {
-		logger.Pl.I("Video %q failed 'To Date' filter for channel %q. Wanted to: %d Video uploaded at: \"%d\"", v.URL, channelName, toDate, uploadDateNum)
+		logger.Pl.I("Video %q failed 'To Date' filter for channel %q. Wanted to: %d Video uploaded at: \"%d\"", v.URL, v.ChannelName, toDate, uploadDateNum)
 		return false, nil
 	}
 
-	logger.Pl.S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.ToDate, uploadDateNum, channelName)
+	logger.Pl.S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.ToDate, uploadDateNum, v.ChannelName)
 	return true, nil
 }
 

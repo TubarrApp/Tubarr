@@ -25,13 +25,13 @@ func TestStoreFilenamesFromMetarr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &Video{VideoFilePath: "/in/v.webm", JSONFilePath: "/in/v.json"}
+			v := &Video{Files: VideoFiles{VideoFilePath: "/in/v.webm", JSONFilePath: "/in/v.json"}}
 			err := v.StoreFilenamesFromMetarr(tt.out)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("err = %v, wantErr %v", err, tt.wantErr)
 			}
-			if v.VideoFilePath != tt.wantVideo || v.JSONFilePath != tt.wantJSON {
-				t.Errorf("paths = %q, %q; want %q, %q", v.VideoFilePath, v.JSONFilePath, tt.wantVideo, tt.wantJSON)
+			if v.Files.VideoFilePath != tt.wantVideo || v.Files.JSONFilePath != tt.wantJSON {
+				t.Errorf("paths = %q, %q; want %q, %q", v.Files.VideoFilePath, v.Files.JSONFilePath, tt.wantVideo, tt.wantJSON)
 			}
 		})
 	}

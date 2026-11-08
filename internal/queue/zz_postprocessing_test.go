@@ -119,7 +119,7 @@ func TestHold(t *testing.T) {
 func TestStopKeepsHeldVideoPending(t *testing.T) {
 	q := NewPostProcessingQueue(nil)
 	c := &models.Channel{ID: 1, Name: "Cats"}
-	cu := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats"}
+	cu := &models.ChannelURL{ID: 1, ChannelID: c.ID, ChannelName: c.Name, URL: "https://example.com/@cats"}
 	hold, held, err := q.hold(context.Background(), c, "https://example.com/v/1")
 	if err != nil || !held {
 		t.Fatalf("Hold = %t, %v; want the video held", held, err)
@@ -141,7 +141,7 @@ func TestStopKeepsHeldVideoPending(t *testing.T) {
 func TestStopWhileWaitingForLane(t *testing.T) {
 	q := NewPostProcessingQueue(nil)
 	c := &models.Channel{ID: 1, Name: "Cats", ChanMetarrArgs: &models.MetarrArgs{MetarrConcurrency: 1}}
-	cu := &models.ChannelURL{ID: 1, URL: "https://example.com/@cats", ChanURLMetarrArgs: &models.MetarrArgs{MetarrConcurrency: 1}}
+	cu := &models.ChannelURL{ID: 1, ChannelID: c.ID, ChannelName: c.Name, URL: "https://example.com/@cats", ChanURLMetarrArgs: &models.MetarrArgs{MetarrConcurrency: 1}}
 	c.URLModels = []*models.ChannelURL{cu}
 	q.SetLimits(c)
 	takeSlot(t, &q.lanes, c.ID, cu.ID)

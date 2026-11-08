@@ -27,7 +27,7 @@ func TestUpdateVideoPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v.VideoFilePath, v.JSONFilePath = "/in/v.webm", "/in/v.json"
+	v.Files.VideoFilePath, v.Files.JSONFilePath = "/in/v.webm", "/in/v.json"
 	if err := vs.UpdateVideo(v, c.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestFinishedVideoLists(t *testing.T) {
 		{URL: "https://example.com/v/old", Finished: true},
 		{URL: "https://example.com/v/mid", Finished: true},
 		{URL: "https://example.com/v/ignored", Ignored: true},
-		{URL: "https://example.com/v/new", Finished: true, Title: "New"},
+		{URL: "https://example.com/v/new", Finished: true, Metadata: models.VideoMetadata{Title: "New"}},
 		{URL: "https://example.com/v/unfinished"},
 	} {
 		v.ChannelURL = cu.URL
@@ -129,7 +129,7 @@ func TestFinishedVideoLists(t *testing.T) {
 	if want := []string{"https://example.com/v/new", "https://example.com/v/mid"}; !slices.Equal(urls(latest), want) {
 		t.Fatalf("latest finished: got %q, want %q", urls(latest), want)
 	}
-	if v := latest[0]; v.Title != "New" || v.ChannelURLID != cu.ID || v.ChannelURL != cu.URL || !v.Finished {
+	if v := latest[0]; v.Metadata.Title != "New" || v.ChannelURLID != cu.ID || v.ChannelURL != cu.URL || !v.Finished {
 		t.Errorf("latest finished: fields not read: %+v", v)
 	}
 	if n, err := vs.CountFinishedVideos(t.Context(), c.ID); err != nil || n != 3 {

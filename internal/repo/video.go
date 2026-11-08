@@ -239,16 +239,16 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 
 	result, err := tx.Exec(
 		videoQuery,
-		v.ThumbnailURL,
-		v.Title,
-		v.Description,
-		v.VideoFilePath,
-		v.JSONFilePath,
+		v.Metadata.ThumbnailURL,
+		v.Metadata.Title,
+		v.Metadata.Description,
+		v.Files.VideoFilePath,
+		v.Files.JSONFilePath,
 		v.Finished,
 		v.Ignored,
-		v.UploadDate,
-		v.Filesize,
-		v.Duration,
+		v.Metadata.UploadDate,
+		v.Metadata.Filesize,
+		v.Metadata.Duration,
 		time.Now(),
 		v.MetarrStatus,
 		v.MetarrStatus, v.MetarrError,
@@ -347,10 +347,11 @@ func (vs *VideoStore) GetVideoChannelURLID(videoID int64) (int64, error) {
 func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error) {
 	//nolint:gosec // SQL identifiers are trusted constants.
 	query := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s "+
+		"SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM %s "+
 			"WHERE %s = ? AND %s = 1 AND %s = 0 AND (? OR %s != ?)",
 		consts.QVidID,
 		consts.QVidChanID,
+		videoChannelName,
 		consts.QVidChanURLID,
 		consts.QVidChanURL,
 		consts.QVidURL,
@@ -390,6 +391,7 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64, includeDone bool)
 		if err := rows.Scan(
 			&v.ID,
 			&v.ChannelID,
+			&v.ChannelName,
 			&channelURLID,
 			&channelURL,
 			&v.URL,
@@ -410,12 +412,12 @@ func (vs *VideoStore) GetVideosAwaitingMetarr(channelID int64, includeDone bool)
 
 		v.ChannelURLID = channelURLID.Int64
 		v.ChannelURL = channelURL.String
-		v.Title = title.String
-		v.Description = description.String
-		v.ThumbnailURL = thumbnailURL.String
-		v.UploadDate = uploadDate.Time
-		v.VideoFilePath = videoPath.String
-		v.JSONFilePath = jsonPath.String
+		v.Metadata.Title = title.String
+		v.Metadata.Description = description.String
+		v.Metadata.ThumbnailURL = thumbnailURL.String
+		v.Metadata.UploadDate = uploadDate.Time
+		v.Files.VideoFilePath = videoPath.String
+		v.Files.JSONFilePath = jsonPath.String
 		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
 		v.Finished = true
 
@@ -545,10 +547,10 @@ func (vs *VideoStore) AddAvailableVideos(videos []*models.Video, channelID int64
 		v.MarkVideoAsAvailable()
 
 		var uploadDate any
-		if !v.UploadDate.IsZero() {
-			uploadDate = v.UploadDate
+		if !v.Metadata.UploadDate.IsZero() {
+			uploadDate = v.Metadata.UploadDate
 		}
-		result, err := tx.Exec(vidQuery, channelID, v.ChannelURLID, v.ChannelURL, v.ThumbnailURL, v.URL, v.Title, uploadDate, v.Duration, now, now)
+		result, err := tx.Exec(vidQuery, channelID, v.ChannelURLID, v.ChannelURL, v.Metadata.ThumbnailURL, v.URL, v.Metadata.Title, uploadDate, v.Metadata.Duration, now, now)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert available video %q: %w", v.URL, err)
 		}
@@ -652,10 +654,10 @@ func (vs *VideoStore) GetAvailableVideos(statuses ...consts.DownloadStatus) (vid
 		v.DownloadStatus.ErrorMsg = errorMsg.String
 		v.ChannelURLID = channelURLID.Int64
 		v.ChannelURL = channelURL.String
-		v.Title = cmp.Or(title.String, v.URL)
-		v.ThumbnailURL = thumbnailURL.String
-		v.UploadDate = uploadDate.Time
-		v.Duration = int(duration.Int64)
+		v.Metadata.Title = cmp.Or(title.String, v.URL)
+		v.Metadata.ThumbnailURL = thumbnailURL.String
+		v.Metadata.UploadDate = uploadDate.Time
+		v.Metadata.Duration = int(duration.Int64)
 		videos = append(videos, &v)
 	}
 	if err := rows.Err(); err != nil {
@@ -695,11 +697,12 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 	)
 	//nolint:gosec // SQL identifiers are trusted constants.
 	selectQuery := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QVidURL,
 		consts.QVidChanURLID,
 		consts.QVidChanURL,
 		consts.QVidTitle,
+		videoChannelName,
 		consts.DBVideos,
 		consts.QVidID,
 	)
@@ -729,12 +732,12 @@ func (vs *VideoStore) ClaimVideos(channelID int64, videoIDs []int64, from []cons
 		v := &models.Video{ID: id, ChannelID: channelID}
 		var channelURLID sql.NullInt64
 		var channelURL, title sql.NullString
-		if err := tx.QueryRow(selectQuery, id).Scan(&v.URL, &channelURLID, &channelURL, &title); err != nil {
+		if err := tx.QueryRow(selectQuery, id).Scan(&v.URL, &channelURLID, &channelURL, &title, &v.ChannelName); err != nil {
 			return nil, fmt.Errorf("failed to read claimed video %d: %w", id, err)
 		}
 		v.ChannelURLID = channelURLID.Int64
 		v.ChannelURL = channelURL.String
-		v.Title = title.String
+		v.Metadata.Title = title.String
 		v.DownloadStatus.Status = status
 
 		if status == consts.DLStatusIgnored || restoring {
@@ -790,6 +793,11 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 			if _, err := tx.Exec(insertQuery, v.ID, consts.DLStatusQueued, crawlRetries); err != nil {
 				return false, fmt.Errorf("failed to queue video %q: %w", v.URL, err)
 			}
+			//nolint:gosec // SQL identifiers are trusted constants.
+			nameQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", videoChannelName, consts.DBVideos, consts.QVidID)
+			if err := tx.QueryRow(nameQuery, v.ID).Scan(&v.ChannelName); err != nil {
+				return false, fmt.Errorf("failed to read channel name for video %q: %w", v.URL, err)
+			}
 			v.ChannelID = channelID
 			v.DownloadStatus = models.DLStatus{Status: consts.DLStatusQueued}
 			return true, tx.Commit()
@@ -832,24 +840,25 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 
 	//nolint:gosec // SQL identifiers are trusted constants.
 	selectQuery := fmt.Sprintf(
-		"SELECT %s, %s, %s, %s FROM %s WHERE %s = ?",
+		"SELECT %s, %s, %s, %s, %s FROM %s WHERE %s = ?",
 		consts.QVidURL,
 		consts.QVidChanURLID,
 		consts.QVidChanURL,
 		consts.QVidTitle,
+		videoChannelName,
 		consts.DBVideos,
 		consts.QVidID,
 	)
 	var channelURLID sql.NullInt64
 	var videoURL, channelURL, title sql.NullString
-	if err := tx.QueryRow(selectQuery, v.ID).Scan(&videoURL, &channelURLID, &channelURL, &title); err != nil {
+	if err := tx.QueryRow(selectQuery, v.ID).Scan(&videoURL, &channelURLID, &channelURL, &title, &v.ChannelName); err != nil {
 		return false, fmt.Errorf("failed to read queued video %d: %w", v.ID, err)
 	}
 	v.ChannelID = channelID
 	v.URL = videoURL.String
 	v.ChannelURLID = channelURLID.Int64
 	v.ChannelURL = channelURL.String
-	v.Title = cmp.Or(title.String, v.Title)
+	v.Metadata.Title = cmp.Or(title.String, v.Metadata.Title)
 	v.DownloadStatus = models.DLStatus{Status: consts.DLStatusQueued}
 	return true, tx.Commit()
 }
@@ -1230,13 +1239,13 @@ func insertVideo(q querier, v *models.Video, channelID, channelURLID int64, now 
 		channelID,
 		channelURLID,
 		v.ChannelURL,
-		v.ThumbnailURL,
+		v.Metadata.ThumbnailURL,
 		v.URL,
-		v.Title,
-		v.Description,
+		v.Metadata.Title,
+		v.Metadata.Description,
 		v.Finished,
 		v.Ignored,
-		v.UploadDate,
+		v.Metadata.UploadDate,
 		now,
 		now,
 	)
@@ -1251,10 +1260,15 @@ func insertVideo(q querier, v *models.Video, channelID, channelURLID int64, now 
 	return id, nil
 }
 
+// videoChannelName selects a video's channel name, for queries on the videos table.
+const videoChannelName = "COALESCE((SELECT " + consts.DBChannels + "." + consts.QChanName + " FROM " + consts.DBChannels +
+	" WHERE " + consts.DBChannels + "." + consts.QChanID + " = " + consts.DBVideos + "." + consts.QVidChanID + "), '')"
+
 // videoListColumns are the columns scanVideoList reads, in its order.
 var videoListColumns = strings.Join([]string{
 	consts.QVidID,
 	consts.QVidChanID,
+	videoChannelName,
 	consts.QVidChanURLID,
 	consts.QVidChanURL,
 	consts.QVidThumbnailURL,
@@ -1290,6 +1304,7 @@ func scanVideoList(rows *sql.Rows) ([]*models.Video, error) {
 		if err := rows.Scan(
 			&v.ID,
 			&v.ChannelID,
+			&v.ChannelName,
 			&channelURLID,
 			&channelURL,
 			&thumbnailURL,
@@ -1313,17 +1328,17 @@ func scanVideoList(rows *sql.Rows) ([]*models.Video, error) {
 		}
 		v.ChannelURLID = channelURLID.Int64
 		v.ChannelURL = channelURL.String
-		v.ThumbnailURL = thumbnailURL.String
+		v.Metadata.ThumbnailURL = thumbnailURL.String
 		v.URL = videoURL.String
-		v.Title = title.String
-		v.Description = description.String
-		v.UploadDate = uploadDate.Time
+		v.Metadata.Title = title.String
+		v.Metadata.Description = description.String
+		v.Metadata.UploadDate = uploadDate.Time
 		v.MetarrStatus = consts.MetarrStatus(metarrStatus.String)
 		v.MetarrError = metarrError.String
-		v.VideoFilePath = videoPath.String
-		v.JSONFilePath = jsonPath.String // Edit & Re-Run needs the metadata file.
-		v.Duration = int(duration.Int64)
-		v.Filesize = filesize.Int64
+		v.Files.VideoFilePath = videoPath.String
+		v.Files.JSONFilePath = jsonPath.String // Edit & Re-Run needs the metadata file.
+		v.Metadata.Duration = int(duration.Int64)
+		v.Metadata.Filesize = filesize.Int64
 
 		videos = append(videos, &v)
 	}

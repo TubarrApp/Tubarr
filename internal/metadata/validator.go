@@ -22,8 +22,8 @@ import (
 // ValidateAndFilter parses JSON, applies filters, and checks move operations.
 //
 // Returns true if the video passes all filters and JSON validity checks.
-func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	logger.Pl.I("Validating and filtering JSON file %q...", v.JSONFilePath)
+func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
+	logger.Pl.I("Validating and filtering JSON file %q...", v.Files.JSONFilePath)
 	// Parse and store JSON.
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
@@ -31,7 +31,7 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	}
 
 	// Apply filters.
-	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, c, dirParser)
+	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, dirParser)
 	if err != nil {
 		if errors.Is(err, errFilterFile) {
 			// An error rather than a failed check, so the video is skipped but not marked ignored, and is tried again once the file is fixed.
@@ -50,15 +50,15 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, c *models.Channel
 // RefreshFromMetarr reloads v's metadata from the file Metarr finished with, taking the title, description and date it
 // has over the stored ones, as Metarr's meta ops may have changed them.
 func RefreshFromMetarr(v *models.Video) error {
-	m, err := readJSONFile(v.JSONFilePath)
+	m, err := readJSONFile(v.Files.JSONFilePath)
 	if err != nil {
 		return err
 	}
-	v.MetadataMap = m
-	v.Title = cmp.Or(sharedtags.FirstString(m, sharedtags.TitleKeys), v.Title)
-	v.Description = cmp.Or(sharedtags.FirstString(m, sharedtags.DescriptionKeys), v.Description)
+	v.Metadata.Raw = m
+	v.Metadata.Title = cmp.Or(sharedtags.FirstString(m, sharedtags.TitleKeys), v.Metadata.Title)
+	v.Metadata.Description = cmp.Or(sharedtags.FirstString(m, sharedtags.DescriptionKeys), v.Metadata.Description)
 	if d := metadataDate(m); !d.IsZero() {
-		v.UploadDate = d
+		v.Metadata.UploadDate = d
 	}
 	return nil
 }
@@ -121,48 +121,48 @@ func metadataDuration(m map[string]any) int {
 
 // parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
 func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
-	m, err := readJSONFile(v.JSONFilePath)
+	m, err := readJSONFile(v.Files.JSONFilePath)
 	if err != nil {
 		return false, err
 	}
 	if len(m) == 0 {
 		return false, nil
 	}
-	v.MetadataMap = m
+	v.Metadata.Raw = m
 
 	// Title, date and description, by the precedence Metarr embeds them with.
-	if v.Title == "" {
-		v.Title = cmp.Or(sharedtags.FirstString(m, sharedtags.TitleKeys), v.URL)
+	if v.Metadata.Title == "" {
+		v.Metadata.Title = cmp.Or(sharedtags.FirstString(m, sharedtags.TitleKeys), v.URL)
 	}
-	if v.UploadDate.IsZero() {
-		v.UploadDate = metadataDate(m)
+	if v.Metadata.UploadDate.IsZero() {
+		v.Metadata.UploadDate = metadataDate(m)
 	}
-	if v.Description == "" {
-		v.Description = sharedtags.FirstString(m, sharedtags.DescriptionKeys)
+	if v.Metadata.Description == "" {
+		v.Metadata.Description = sharedtags.FirstString(m, sharedtags.DescriptionKeys)
 	}
 
 	// The video's own duration replaces the crawl listing's.
 	if secs := metadataDuration(m); secs > 0 {
-		v.Duration = secs
+		v.Metadata.Duration = secs
 	}
 
 	// Select thumbnail
 	bestThumbnail(v, m)
 
-	logger.Pl.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Title)
+	logger.Pl.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Metadata.Title)
 	return true, nil
 }
 
 // bestThumbnail sets the video's thumbnail URL from its metadata, if it has no thumbnail URL already set.
 func bestThumbnail(v *models.Video, m map[string]any) {
 	// Already got thumbnail URL.
-	if v.ThumbnailURL != "" {
+	if v.Metadata.ThumbnailURL != "" {
 		return
 	}
 
 	// Check the single thumbnail field.
 	if thumbnail, _ := m[sharedtags.JThumbnail].(string); thumbnail != "" {
-		v.ThumbnailURL = thumbnail
+		v.Metadata.ThumbnailURL = thumbnail
 		return
 	}
 
@@ -192,24 +192,24 @@ func bestThumbnail(v *models.Video, m map[string]any) {
 		}
 	}
 	if best != "" {
-		v.ThumbnailURL = best
+		v.Metadata.ThumbnailURL = best
 		logger.Pl.D(2, "Selected thumbnail from array: %s", best)
 	}
 }
 
 // handleFilters uses user input filters to check if the video should be downloaded.
-func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
+func handleFilters(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (pass bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
 	filteredMetaOps, filteredFilenameOps := loadFilteredOps(v, cu, dirParser)
 
 	// Check filtered meta ops.
-	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, filteredMetaOps, c.Name)
+	useFilteredMetaOps = filteredMetaOpsMatches(v, cu, filteredMetaOps)
 
 	// Check filtered filename ops.
-	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, filteredFilenameOps, c.Name)
+	useFilteredFilenameOps = filteredFilenameOpsMatches(v, cu, filteredFilenameOps)
 
 	// Videos the user chose skip download filters.
 	if v.SkipFilters || cu.IsManual {
-		logger.Pl.I("Skipped download filters for %q in channel %q: Video was chosen manually.", v.URL, c.Name)
+		logger.Pl.I("Skipped download filters for %q in channel %q: Video was chosen manually.", v.URL, v.ChannelName)
 		return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
@@ -224,7 +224,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	}
 
 	// Check upload date filter.
-	passUploadDate, err := uploadDateFilter(v, cu, c.Name)
+	passUploadDate, err := uploadDateFilter(v, cu)
 	if err != nil {
 		return false, useFilteredMetaOps, useFilteredFilenameOps, err
 	}
@@ -232,7 +232,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
-	logger.Pl.S("Video %q for channel %q passed all filter checks", v.URL, c.Name)
+	logger.Pl.S("Video %q for channel %q passed all filter checks", v.URL, v.ChannelName)
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
@@ -262,7 +262,7 @@ func HandleMoveOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 	// Check each move operation against video metadata.
 	for _, op := range allMoveOps {
 		filters := sharedparsing.FormatFilters(op.Filters)
-		matched, err := sharedfilters.MatchAll(v.MetadataMap, op.Filters)
+		matched, err := sharedfilters.MatchAll(v.Metadata.Raw, op.Filters)
 		if err != nil {
 			logger.Pl.E("Skipping move op %q: %v", filters, err)
 			continue

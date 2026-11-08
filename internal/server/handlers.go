@@ -229,8 +229,8 @@ func (ss *serverStore) handleListChannels(w http.ResponseWriter, r *http.Request
 			cr.URLModels = append(cr.URLModels, channelURLResponse{
 				ID:       urlModel.ID,
 				URL:      urlModel.URL,
-				Username: urlModel.Username,
-				LoginURL: urlModel.LoginURL,
+				Username: urlModel.Login.Username,
+				LoginURL: urlModel.Login.LoginURL,
 				Settings: newSettingsResponse(urlModel.ChanURLSettings),
 				Metarr:   newMetarrArgsResponse(urlModel.ChanURLMetarrArgs),
 			})
@@ -278,12 +278,12 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 		if urlModel.URL == consts.ManualDownloadsCol {
 			continue
 		}
-		if urlModel.Username != "" || urlModel.LoginURL != "" {
+		if urlModel.Login.Username != "" || urlModel.Login.LoginURL != "" {
 			response.AuthDetails = append(response.AuthDetails, authDetailResponse{
 				ChannelURL:  urlModel.URL,
-				Username:    urlModel.Username,
-				HasPassword: urlModel.Password != "",
-				LoginURL:    urlModel.LoginURL,
+				Username:    urlModel.Login.Username,
+				HasPassword: urlModel.Login.Password != "",
+				LoginURL:    urlModel.Login.LoginURL,
 			})
 		}
 		if urlModel.ChanURLSettings != nil || urlModel.ChanURLMetarrArgs != nil || urlModel.ProfileID != 0 || urlModel.Name != "" {
@@ -342,7 +342,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 
 		// Auth details for this URL, if any.
 		if a, exists := f.authMap[u]; exists {
-			cu.Username, cu.Password, cu.LoginURL = a.Username, a.Password, a.LoginURL
+			cu.Login.Username, cu.Login.Password, cu.Login.LoginURL = a.Username, a.Password, a.LoginURL
 		}
 
 		// Apply per-URL custom settings if they exist.
@@ -488,11 +488,11 @@ func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request
 
 	// Blank paths for files moved or deleted outside Tubarr, so the page shows them as missing.
 	for _, v := range videos {
-		if v.VideoFilePath == "" {
+		if v.Files.VideoFilePath == "" {
 			continue
 		}
-		if _, err := os.Stat(v.VideoFilePath); err != nil {
-			v.VideoFilePath = ""
+		if _, err := os.Stat(v.Files.VideoFilePath); err != nil {
+			v.Files.VideoFilePath = ""
 		}
 	}
 	ss.applyThumbnailOverrides(videos)
@@ -1236,7 +1236,7 @@ func (ss *serverStore) applyThumbnailOverrides(videos []*models.Video) {
 		switch {
 		case !ok:
 		case o.StripThumbnail:
-			v.ThumbnailURL = ""
+			v.Metadata.ThumbnailURL = ""
 		case o.Thumbnail != "":
 			v.CustomThumbnail = true
 		}
@@ -1479,11 +1479,11 @@ func (ss *serverStore) handleLatestDownloads(w http.ResponseWriter, r *http.Requ
 
 	// Blank paths for files moved or deleted outside Tubarr, so the page shows them as missing.
 	for _, v := range videos {
-		if v.VideoFilePath == "" {
+		if v.Files.VideoFilePath == "" {
 			continue
 		}
-		if _, err := os.Stat(v.VideoFilePath); err != nil {
-			v.VideoFilePath = ""
+		if _, err := os.Stat(v.Files.VideoFilePath); err != nil {
+			v.Files.VideoFilePath = ""
 		}
 	}
 	ss.applyThumbnailOverrides(videos)

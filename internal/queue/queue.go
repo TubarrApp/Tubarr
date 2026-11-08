@@ -38,16 +38,16 @@ type QueueEntry struct {
 }
 
 // newQueueEntry returns a video's entry, queued now.
-func newQueueEntry(v *models.Video, cu *models.ChannelURL, c *models.Channel) *QueueEntry {
+func newQueueEntry(v *models.Video, cu *models.ChannelURL) *QueueEntry {
 	return &QueueEntry{
 		VideoID:      v.ID,
-		ChannelID:    c.ID,
-		ChannelName:  c.Name,
+		ChannelID:    cu.ChannelID,
+		ChannelName:  cu.ChannelName,
 		ChannelURLID: cu.ID,
 		ChannelURL:   cu.URL,
 		URL:          v.URL,
-		Title:        v.Title,
-		ThumbnailURL: v.ThumbnailURL,
+		Title:        v.Metadata.Title,
+		ThumbnailURL: v.Metadata.ThumbnailURL,
 		QueuedAt:     time.Now(),
 	}
 }

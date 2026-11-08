@@ -25,17 +25,17 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 	args = append(args,
 		command.SkipVideo,
 		command.WriteInfoJSON,
-		command.P, d.Video.JSONDir,
+		command.P, d.Video.Files.JSONDir,
 		command.Output, command.FilenameSyntax)
 
 	// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
-	if d.ChannelURL.CookiePath != "" {
-		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
+	if d.ChannelURL.Session.CookiePath != "" {
+		args = append(args, command.CookiePath, d.ChannelURL.Session.CookiePath)
 	}
 	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
 		args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
 	}
-	if d.ChannelURL.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
+	if d.ChannelURL.Session.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
 		logger.Pl.D(1, "No cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 
@@ -97,7 +97,7 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
-	args, d.fsGen = siterules.AddSiteRulesToYTDLP(d.Video.URL, d.ChannelURL.FlareSolverr, args)
+	args, d.fsGen = siterules.AddSiteRulesToYTDLP(d.Video.URL, d.ChannelURL.Session.FlareSolverr, args)
 
 	// Add target URL [ MUST GO LAST !! ].
 	args = append(args, command.EndOfOptions, d.Video.URL)
@@ -146,13 +146,13 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 		return fmt.Errorf("could not find JSON file path in output for %s", d.Video.URL)
 	}
 
-	d.Video.JSONFilePath = jsonPath
+	d.Video.Files.JSONFilePath = jsonPath
 
 	// Verify the file exists.
-	if err := verifyJSONDownload(d.Video.JSONFilePath); err != nil {
+	if err := verifyJSONDownload(d.Video.Files.JSONFilePath); err != nil {
 		return err
 	}
 
-	logger.Pl.I("Successfully saved JSON file to %q", d.Video.JSONFilePath)
+	logger.Pl.I("Successfully saved JSON file to %q", d.Video.Files.JSONFilePath)
 	return nil
 }

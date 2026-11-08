@@ -19,8 +19,8 @@ import (
 //
 //	'{"username":"john","password":"p@ss,word!","login_url":"https://login.example.com"}'
 //	'{"channel_url":"https://ch1.com","username":"user1","password":"pass1","login_url":"https://login1.com"}'
-func ParseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[string]*models.ChannelAccessDetails, error) {
-	authMap := make(map[string]*models.ChannelAccessDetails, len(cURLs))
+func ParseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[string]*models.ChannelURLAccessDetails, error) {
+	authMap := make(map[string]*models.ChannelURLAccessDetails, len(cURLs))
 
 	// Deduplicate
 	a = validation.DeduplicateSliceEntries(a)
@@ -28,7 +28,7 @@ func ParseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[st
 	// Handle delete all operation
 	if deleteAll {
 		for _, cURL := range cURLs {
-			authMap[cURL] = &models.ChannelAccessDetails{
+			authMap[cURL] = &models.ChannelURLAccessDetails{
 				Username: "",
 				Password: "",
 				LoginURL: "",
@@ -51,7 +51,7 @@ func ParseAuthDetails(u, p, l string, a, cURLs []string, deleteAll bool) (map[st
 
 	// Fallback: individual flags (u, p, l) for all channels
 	for _, cURL := range cURLs {
-		authMap[cURL] = &models.ChannelAccessDetails{
+		authMap[cURL] = &models.ChannelURLAccessDetails{
 			Username: u,
 			Password: p,
 			LoginURL: l,
@@ -69,8 +69,8 @@ type authDetails struct {
 }
 
 // parseJSONAuth parses JSON-formatted authentication strings.
-func parseJSONAuth(authStrings []string, cURLs []string) (map[string]*models.ChannelAccessDetails, error) {
-	authMap := make(map[string]*models.ChannelAccessDetails, len(authStrings))
+func parseJSONAuth(authStrings []string, cURLs []string) (map[string]*models.ChannelURLAccessDetails, error) {
+	authMap := make(map[string]*models.ChannelURLAccessDetails, len(authStrings))
 
 	for i, authStr := range authStrings {
 		var auth authDetails
@@ -111,7 +111,7 @@ func parseJSONAuth(authStrings []string, cURLs []string) (map[string]*models.Cha
 			return nil, fmt.Errorf("duplicate authentication entry for channel URL: %q", channelURL)
 		}
 
-		authMap[channelURL] = &models.ChannelAccessDetails{
+		authMap[channelURL] = &models.ChannelURLAccessDetails{
 			Username: auth.Username,
 			Password: auth.Password,
 			LoginURL: auth.LoginURL,

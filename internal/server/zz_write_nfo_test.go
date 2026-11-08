@@ -98,7 +98,7 @@ func TestWriteNFODownloadAs(t *testing.T) {
 
 	vs := repo.GetVideoStore(fuzzServer.db)
 	const videoURL = "https://example.com/v/nfo-download-as"
-	if _, err := vs.AddAvailableVideos([]*models.Video{{ChannelURLID: cuID, ChannelURL: channelURL, URL: videoURL, Title: "NFO"}}, chanID); err != nil {
+	if _, err := vs.AddAvailableVideos([]*models.Video{{ChannelURLID: cuID, ChannelURL: channelURL, URL: videoURL, Metadata: models.VideoMetadata{Title: "NFO"}}}, chanID); err != nil {
 		t.Fatal(err)
 	}
 	var videoID int64

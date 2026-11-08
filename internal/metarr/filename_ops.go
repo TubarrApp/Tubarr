@@ -15,13 +15,13 @@ import (
 
 // loadAndMergeFilenameOps returns a video's filename ops: its channel URL's from every level, then its matched filtered
 // ones.
-func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
+func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) []string {
 	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
 	ops, err := channelURLFilenameOps(cu, dirParser)
 	if err != nil {
 		logger.Pl.E("Filename ops file for %q can't be used: %v", cu.URL, err)
 	}
-	return getDedupedFilenameOpStrings(applyFilteredFilenameOps(ops, v.FilteredFilenameOps, v.URL, c.Name))
+	return getDedupedFilenameOpStrings(applyFilteredFilenameOps(ops, v.FilteredFilenameOps, v.URL, v.ChannelName))
 }
 
 // channelURLFilenameOps returns a channel URL's filename ops from every level, with each level's ops file. Returns the
@@ -42,8 +42,8 @@ func channelURLFilenameOps(cu *models.ChannelURL, dp *parsing.DirectoryParser) (
 
 // overrideFilenameOps returns the video's Download As filename ops, with its matched filtered filename ops and any
 // chosen filename. Metarr keeps only one set op, so a chosen filename replaces the others.
-func overrideFilenameOps(v *models.Video, c *models.Channel) []string {
-	ops := applyFilteredFilenameOps(v.Overrides.FilenameOps, v.FilteredFilenameOps, v.URL, c.Name)
+func overrideFilenameOps(v *models.Video) []string {
+	ops := applyFilteredFilenameOps(v.Overrides.FilenameOps, v.FilteredFilenameOps, v.URL, v.ChannelName)
 	if v.Overrides.Filename != "" {
 		ops = slices.DeleteFunc(ops, func(op models.FilenameOps) bool { return op.OpType == sharedconsts.OpSet })
 		ops = append(ops, models.FilenameOps{OpType: sharedconsts.OpSet, OpValue: v.Overrides.Filename})

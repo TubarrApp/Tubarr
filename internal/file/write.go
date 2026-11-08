@@ -32,7 +32,7 @@ func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, 
 		return fmt.Errorf("failed to write JSON: %w", err)
 	}
 
-	v.JSONCustomFile = filePath
+	v.Files.JSONCustomFile = filePath
 	return nil
 }
 

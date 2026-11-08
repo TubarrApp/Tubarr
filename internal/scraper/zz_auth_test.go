@@ -18,7 +18,7 @@ func TestLoginCookieDomain(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cookies, err := login(context.Background(), &models.ChannelAccessDetails{LoginURL: srv.URL, Username: "u", Password: "p"})
+	cookies, err := login(context.Background(), &models.ChannelURLAccessDetails{LoginURL: srv.URL, Username: "u", Password: "p"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestLoginRedirectCookie(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	cookies, err := login(context.Background(), &models.ChannelAccessDetails{LoginURL: srv.URL + "/login", Username: "u", Password: "p"})
+	cookies, err := login(context.Background(), &models.ChannelURLAccessDetails{LoginURL: srv.URL + "/login", Username: "u", Password: "p"})
 	if err != nil {
 		t.Fatal(err)
 	}

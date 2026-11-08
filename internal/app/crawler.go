@@ -114,7 +114,7 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 func ManualRequests(manualVideos []models.ManualVideo) []queue.Request {
 	reqs := make([]queue.Request, 0, len(manualVideos))
 	for _, mv := range manualVideos {
-		v := &models.Video{URL: mv.URL, ChannelURLID: mv.ChannelURLID, Title: mv.Title}
+		v := &models.Video{URL: mv.URL, ChannelURLID: mv.ChannelURLID, Metadata: models.VideoMetadata{Title: mv.Title}}
 		reqs = append(reqs, queue.Request{Video: v, ByUser: true, Auth: mv.Auth})
 	}
 	return reqs
@@ -457,7 +457,7 @@ func AddManualAvailable(s contracts.Store, c *models.Channel, manualVideos []mod
 		if err != nil {
 			return nil, nil, err
 		}
-		requests = append(requests, &models.Video{ChannelID: c.ID, ChannelURLID: cu.ID, ChannelURL: cu.URL, URL: mv.URL})
+		requests = append(requests, &models.Video{ChannelID: c.ID, ChannelName: c.Name, ChannelURLID: cu.ID, ChannelURL: cu.URL, URL: mv.URL})
 	}
 	addedURLs, err := s.VideoStore().AddAvailableVideos(requests, c.ID)
 	if err != nil {

@@ -57,7 +57,7 @@ func TestQueueVideo(t *testing.T) {
 	}
 
 	// A URL the channel doesn't have is stored as queued.
-	v := &models.Video{URL: "https://example.com/v/new", ChannelURLID: c.URLModels[0].ID, Title: "New"}
+	v := &models.Video{URL: "https://example.com/v/new", ChannelURLID: c.URLModels[0].ID, Metadata: models.VideoMetadata{Title: "New"}}
 	if claimed, err := vs.QueueVideo(c.ID, v, false); err != nil || !claimed || v.ID == 0 || statusOf(v.ID) != consts.DLStatusQueued {
 		t.Errorf("new URL: claimed %t, %v (ID %d); want it stored as queued", claimed, err, v.ID)
 	}

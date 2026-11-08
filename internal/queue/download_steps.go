@@ -97,7 +97,7 @@ func (q *DownloadQueue) process(d *download) error {
 	}
 
 	// Check move operations.
-	v.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, d.c, d.dirParser)
+	v.Files.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, d.c, d.dirParser)
 
 	// Wait for a download slot for its domain, then a global one.
 	d.SetStatus(v, consts.DLStatusQueued, 0, "Waiting for download slot", nil)
@@ -157,8 +157,8 @@ func (q *DownloadQueue) prepare(d *download) error {
 			return err
 		}
 	}
-	v.VideoDir = videoDir
-	v.JSONDir = jsonDir
+	v.Files.VideoDir = videoDir
+	v.Files.JSONDir = jsonDir
 
 	// Download As videos with ops of their own don't use the ops files, so only Metarr being unusable holds them back.
 	if v.Overrides == nil || v.Overrides.ChannelURLOps != nil || d.session.skipMetarr.Reason == models.SkipMetarrNoPath {
@@ -173,7 +173,7 @@ func (q *DownloadQueue) prepare(d *download) error {
 	}
 
 	// Use custom scraper if needed.
-	if v.JSONFilePath, err = executeCustomScraper(d.startCtx, d.session.scraper, v, d.cu.Cookies); err != nil {
+	if v.Files.JSONFilePath, err = executeCustomScraper(d.startCtx, d.session.scraper, v, d.cu.Session.Cookies); err != nil {
 		return fmt.Errorf("custom scraper failed: %w", err)
 	}
 	return nil
@@ -236,7 +236,7 @@ func (q *DownloadQueue) postProcess(d *download, hold *videoHold) {
 		v.MetarrStatus = hold.postProcess(q.ctx, v, d.cu, d.c, d.dirParser)
 	}
 
-	if err := completeAndStoreVideo(cs, vs, v, d.c); err != nil {
+	if err := completeAndStoreVideo(cs, vs, v); err != nil {
 		logger.Pl.E("Failed to complete video %q after metarr: %v", v.URL, err)
 	}
 }
@@ -280,25 +280,25 @@ func executeCustomScraper(ctx context.Context, s *scraper.Scraper, v *models.Vid
 	}
 
 	// Detect custom site.
-	if err := s.ScrapeCustomSite(ctx, v.URL, v.JSONDir, v, cookies); err != nil {
+	if err := s.ScrapeCustomSite(ctx, v.URL, v.Files.JSONDir, v, cookies); err != nil {
 		return "", err
 	}
 
-	return v.JSONCustomFile, nil
+	return v.Files.JSONCustomFile, nil
 }
 
 // completeAndStoreVideo marks a video as complete.
-func completeAndStoreVideo(cs contracts.ChannelStore, vs contracts.VideoStore, v *models.Video, c *models.Channel) error {
+func completeAndStoreVideo(cs contracts.ChannelStore, vs contracts.VideoStore, v *models.Video) error {
 	v.MarkVideoAsComplete()
 
 	// Update video in database.
-	if err := vs.UpdateVideo(v, c.ID); err != nil {
+	if err := vs.UpdateVideo(v, v.ChannelID); err != nil {
 		return fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 
 	// Add to unseen list and set notification dot.
-	if err := cs.AddNewVideoURLs(c.ID, []string{v.URL}); err != nil {
-		logger.Pl.E("Failed to update channel %q notification status: %v", c.Name, err)
+	if err := cs.AddNewVideoURLs(v.ChannelID, []string{v.URL}); err != nil {
+		logger.Pl.E("Failed to update channel %q notification status: %v", v.ChannelName, err)
 	}
 
 	return nil
@@ -320,7 +320,7 @@ func processJSON(
 	}
 
 	// ONLY download JSON if it's NOT a custom file (custom scraper already created it).
-	if v.JSONCustomFile == "" {
+	if v.Files.JSONCustomFile == "" {
 		dl, err := downloads.NewJSONDownload(ctx, v, cu, c, ds, tracker, &downloads.Options{
 			MaxAttempts:      downloadAttempts(cu),
 			RetryMaxInterval: 5,
@@ -333,11 +333,11 @@ func processJSON(
 			return false, err
 		}
 	} else {
-		logger.Pl.D(1, "Skipping JSON download - using custom scraped file: %s", v.JSONCustomFile)
+		logger.Pl.D(1, "Skipping JSON download - using custom scraped file: %s", v.Files.JSONCustomFile)
 	}
 
 	// Validate and filter.
-	passedChecks, useFilteredMetaOps, useFilteredFilenameOps, err := metadata.ValidateAndFilter(v, cu, c, dirParser)
+	passedChecks, useFilteredMetaOps, useFilteredFilenameOps, err := metadata.ValidateAndFilter(v, cu, dirParser)
 	if err != nil {
 		return false, err
 	}
@@ -348,9 +348,9 @@ func processJSON(
 	// If video failed checks, mark and save to DB.
 	if !passedChecks {
 		// Remove metadata JSON file since video is being ignored.
-		if v.JSONFilePath != "" {
-			if err := file.RemoveMetadataJSON(v.JSONFilePath); err != nil && !os.IsNotExist(err) {
-				logger.Pl.W("Failed to remove metadata file for ignored video %q: %v", v.JSONFilePath, err)
+		if v.Files.JSONFilePath != "" {
+			if err := file.RemoveMetadataJSON(v.Files.JSONFilePath); err != nil && !os.IsNotExist(err) {
+				logger.Pl.W("Failed to remove metadata file for ignored video %q: %v", v.Files.JSONFilePath, err)
 			}
 		}
 

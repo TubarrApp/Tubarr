@@ -18,7 +18,7 @@ import (
 )
 
 // login logs the user in and returns the authentication cookie.
-func login(ctx context.Context, a *models.ChannelAccessDetails) ([]*http.Cookie, error) {
+func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err

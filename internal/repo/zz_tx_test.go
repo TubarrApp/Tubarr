@@ -90,7 +90,7 @@ func TestWithTxRollsBack(t *testing.T) {
 func TestAddChannelWithDetailsRollsBack(t *testing.T) {
 	cs := newTestChannelStore(t)
 	c := testChannel(t, "chan", "https://example.com/@a")
-	err := cs.AddChannelWithDetails(c, map[string]*models.ChannelAccessDetails{"https://example.com/@other": {Username: "bob"}}, nil)
+	err := cs.AddChannelWithDetails(c, map[string]*models.ChannelURLAccessDetails{"https://example.com/@other": {Username: "bob"}}, nil)
 	if !errors.Is(err, contracts.ErrInvalidChannel) {
 		t.Fatalf("expected ErrInvalidChannel for a login on a URL not in the channel, got %v", err)
 	}
@@ -203,7 +203,7 @@ func TestAddAuthPerURL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := cs.AddAuth(id, map[string]*models.ChannelAccessDetails{
+	if err := cs.AddAuth(id, map[string]*models.ChannelURLAccessDetails{
 		"https://example.com/@a": {Username: "alice", Password: "secret", LoginURL: "https://example.com/login"},
 	}); err != nil {
 		t.Fatal(err)
@@ -215,7 +215,7 @@ func TestAddAuthPerURL(t *testing.T) {
 		t.Errorf("URL b: got user %q, %v, want none", user, err)
 	}
 
-	err = cs.AddAuth(id, map[string]*models.ChannelAccessDetails{"https://example.com/@other": {Username: "bob"}})
+	err = cs.AddAuth(id, map[string]*models.ChannelURLAccessDetails{"https://example.com/@other": {Username: "bob"}})
 	if !errors.Is(err, contracts.ErrInvalidChannel) {
 		t.Errorf("expected ErrInvalidChannel for a URL not in the channel, got %v", err)
 	}

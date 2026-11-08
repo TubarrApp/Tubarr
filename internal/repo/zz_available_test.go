@@ -44,7 +44,7 @@ func TestAvailableVideos(t *testing.T) {
 
 	newVideos := func() []*models.Video {
 		return []*models.Video{
-			{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1", Title: "One", Duration: 60},
+			{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1", Metadata: models.VideoMetadata{Title: "One", Duration: 60}},
 			{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/2"},
 		}
 	}
@@ -77,7 +77,7 @@ func TestAvailableVideos(t *testing.T) {
 			one = v
 		}
 	}
-	if one == nil || one.Title != "One" || one.Duration != 60 || one.ChannelName != "Test" || one.DownloadStatus.Status != consts.DLStatusAvailable {
+	if one == nil || one.Metadata.Title != "One" || one.Metadata.Duration != 60 || one.ChannelName != "Test" || one.DownloadStatus.Status != consts.DLStatusAvailable {
 		t.Fatalf("video 1: got %+v", one)
 	}
 
@@ -89,8 +89,8 @@ func TestAvailableVideos(t *testing.T) {
 			t.Fatalf("first queue of video %d: got %t, %v, want claimed", id, claimed, err)
 		}
 		// Queued videos keep their title, so the Downloads page can show it before the metadata arrives.
-		if v.URL == "https://example.com/v/1" && v.Title != "One" {
-			t.Errorf("queued video 1's title = %q, want \"One\"", v.Title)
+		if v.URL == "https://example.com/v/1" && v.Metadata.Title != "One" {
+			t.Errorf("queued video 1's title = %q, want \"One\"", v.Metadata.Title)
 		}
 		if claimed, err := vs.QueueVideo(chanID, &models.Video{ID: id}, true); err != nil || claimed {
 			t.Fatalf("second queue of video %d: got %t, %v, want refused", id, claimed, err)
@@ -275,7 +275,7 @@ func TestVideoOverrides(t *testing.T) {
 	cuID, _ := res.LastInsertId()
 	vs := GetVideoStore(db)
 
-	v := &models.Video{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1", Title: "One"}
+	v := &models.Video{ChannelURLID: cuID, ChannelURL: "https://example.com/@a", URL: "https://example.com/v/1", Metadata: models.VideoMetadata{Title: "One"}}
 	if _, err := vs.AddAvailableVideos([]*models.Video{v}, chanID); err != nil {
 		t.Fatal(err)
 	}

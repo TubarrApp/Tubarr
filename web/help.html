@@ -410,6 +410,51 @@ vp9:av1</code></pre>
                 converts everything to HEVC, except VP9, which becomes AV1. Only one plain codec is allowed, and each
                 source codec can only be named once.
               </p>
+              <p>
+                <code>lc_</code>, <code>mc_</code> or <code>hc_</code> in front of a source codec makes a line apply only
+                to videos with low, medium or high compression, worked out from the bitrate. Converting a highly
+                compressed video saves little space and loses quality, so this can skip the ones not worth it:
+              </p>
+              <pre><code>lc_h264:av1
+mc_h264:hevc</code></pre>
+              <p>
+                converts low-compression H.264 to AV1 and medium-compression H.264 to HEVC, and copies high-compression
+                H.264 as it is. A line with a level comes before one for the same codec without, which comes before the
+                plain codec. A prefix needs a target codec, and if a video's level can't be worked out, only lines
+                without a prefix apply to it.
+              </p>
+              <p>
+                The borders depend on the codec, as newer codecs need fewer bits for the same picture or sound. Anything
+                above the <code>mc_</code> border is <code>lc_</code>. For a 1080p video at 30 frames a second:
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Video codec</th><th><code>hc_</code> below</th><th><code>mc_</code> below</th></tr>
+                  <tr><td>H.264, VP8</td><td>2.5 Mbps</td><td>5 Mbps</td></tr>
+                  <tr><td>HEVC, VP9</td><td>1.5 Mbps</td><td>3 Mbps</td></tr>
+                  <tr><td>AV1</td><td>1.25 Mbps</td><td>2.5 Mbps</td></tr>
+                  <tr><td>MPEG-2</td><td>5 Mbps</td><td>10 Mbps</td></tr>
+                </table>
+              </div>
+              <p>
+                The video borders grow with the picture size and frame rate: a 1080p video at 60 frames a second gets
+                twice these, and a 4K one at 30 frames a second four times. For stereo audio:
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Audio codec</th><th><code>hc_</code> below</th><th><code>mc_</code> below</th></tr>
+                  <tr><td>MP3, AC-3</td><td>128 kbps</td><td>256 kbps</td></tr>
+                  <tr><td>AAC, E-AC-3, Vorbis</td><td>96 kbps</td><td>192 kbps</td></tr>
+                  <tr><td>Opus</td><td>77 kbps</td><td>154 kbps</td></tr>
+                  <tr><td>MP2, DTS</td><td>192 kbps</td><td>384 kbps</td></tr>
+                </table>
+              </div>
+              <p>
+                A 5.1 track gets three times these. Lossless audio (ALAC, FLAC, PCM, TrueHD, WAV) nearly always counts as
+                <code>lc_</code>. MKV and WebM files don't store their audio's bitrate, so when any line has a prefix,
+                Metarr works it out by reading the whole file. That's quick for most videos, but can take a few minutes
+                for very long ones on a slow drive or network share.
+              </p>
               <ul>
                 <li>Video codecs: <code>av1</code>, <code>h264</code>, <code>hevc</code>, <code>mpeg2</code>, <code>vp8</code>, <code>vp9</code>. Audio codecs: <code>aac</code>, <code>ac3</code>, <code>alac</code>, <code>dts</code>, <code>eac3</code>, <code>flac</code>, <code>mp2</code>, <code>mp3</code>, <code>opus</code>, <code>pcm</code>, <code>truehd</code>, <code>vorbis</code>, <code>wav</code>. Common other names work too (<code>h265</code>, <code>x264</code>, <code>libmp3lame</code>).</li>
                 <li><strong>GPU Acceleration</strong> encodes on the graphics card (<code>auto</code>, <code>cuda</code>, <code>qsv</code> or <code>vaapi</code>, with <strong>GPU Node Path</strong> for VA-API, e.g. <code>/dev/dri/renderD128</code>).</li>
@@ -473,17 +518,6 @@ vp9:av1</code></pre>
                   doesn't keep track of it, so deleting the video's files leaves it.
                 </li>
               </ul>
-              <p>
-                Prefixing a 'from' codec entry with <code>lc_</code>, <code>mc_</code>, or <code>hc_</code>_ can be used to selectively encode based on detected compression level.
-                <ul>
-                <li><strong>lc_:</strong> Low compression.</li>
-                <li><strong>mc_:</strong> Medium compression.</li>
-                <li><strong>hc_:</strong> High compression.</li>
-                </ul>
-                An entry such as <code>lc_h264:av1</code> would only transcode from <code>h264</code> to <code>av1</code> if the compression level
-                in the video with a <code>h264</code> codec had low compression. This can avoid unnecessary transcodes when filesize improvements are
-                likely to be minimal.
-              </p>
 
               <!-- ===== yt-dlp ===== -->
               <h2 id="ytdlp">yt-dlp download options</h2>

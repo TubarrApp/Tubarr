@@ -97,11 +97,11 @@ func newTestDownloads(ctx context.Context, t *testing.T, url string, maxAttempts
 	cu := &models.ChannelURL{ChanURLSettings: &models.Settings{}}
 	c := &models.Channel{ChanSettings: &models.Settings{}, ChanMetarrArgs: &models.MetarrArgs{}}
 	tracker := statusTracker{}
-	vd, err := NewVideoDownload(ctx, &models.Video{URL: url, VideoDir: t.TempDir()}, cu, c, nilDBStore{}, tracker, opts)
+	vd, err := NewVideoDownload(ctx, &models.Video{URL: url, Files: models.VideoFiles{VideoDir: t.TempDir()}}, cu, c, nilDBStore{}, tracker, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jd, err := NewJSONDownload(ctx, &models.Video{URL: url, JSONDir: t.TempDir()}, cu, c, nilDBStore{}, tracker, opts)
+	jd, err := NewJSONDownload(ctx, &models.Video{URL: url, Files: models.VideoFiles{JSONDir: t.TempDir()}}, cu, c, nilDBStore{}, tracker, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,8 +154,8 @@ func TestExecuteVideoSucceedsFirstTry(t *testing.T) {
 	if n := countRuns(t, runs); n != 1 {
 		t.Errorf("ran yt-dlp %d times, want 1", n)
 	}
-	if vd.Video.VideoFilePath != videoPath {
-		t.Errorf("VideoFilePath = %q, want %q", vd.Video.VideoFilePath, videoPath)
+	if vd.Video.Files.VideoFilePath != videoPath {
+		t.Errorf("VideoFilePath = %q, want %q", vd.Video.Files.VideoFilePath, videoPath)
 	}
 }
 
@@ -235,11 +235,11 @@ func TestExecuteBlockedDomainSkipsYTDLP(t *testing.T) {
 	store := blockCheckStore{db: db}
 	url := "https://www.blocked.example/v"
 
-	vd, err := NewVideoDownload(t.Context(), &models.Video{URL: url, VideoDir: t.TempDir()}, cu, c, store, tracker, opts)
+	vd, err := NewVideoDownload(t.Context(), &models.Video{URL: url, Files: models.VideoFiles{VideoDir: t.TempDir()}}, cu, c, store, tracker, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jd, err := NewJSONDownload(t.Context(), &models.Video{URL: url, JSONDir: t.TempDir()}, cu, c, store, tracker, opts)
+	jd, err := NewJSONDownload(t.Context(), &models.Video{URL: url, Files: models.VideoFiles{JSONDir: t.TempDir()}}, cu, c, store, tracker, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func TestCancelRemovesPartials(t *testing.T) {
 			ctx, cancel := context.WithCancelCause(t.Context())
 			defer cancel(nil)
 			d := &VideoDownload{
-				Video:      &models.Video{ID: 800001, URL: "https://a.example/v", VideoDir: dir},
+				Video:      &models.Video{ID: 800001, URL: "https://a.example/v", Files: models.VideoFiles{VideoDir: dir}},
 				Channel:    &models.Channel{},
 				ChannelURL: &models.ChannelURL{ChanURLSettings: &models.Settings{}},
 				DLTracker:  statusTracker{},
@@ -371,8 +371,8 @@ func TestExecuteVideoDownloadTrailingOutput(t *testing.T) {
 					t.Fatal("executeVideoDownload() hung")
 				}
 
-				if d.Video.VideoFilePath != videoPath {
-					t.Errorf("VideoFilePath = %q, want %q", d.Video.VideoFilePath, videoPath)
+				if d.Video.Files.VideoFilePath != videoPath {
+					t.Errorf("VideoFilePath = %q, want %q", d.Video.Files.VideoFilePath, videoPath)
 				}
 				if strings.Contains(logs.String(), "Scanner error") {
 					t.Fatalf("pipe read after close:\n%s", logs.String())

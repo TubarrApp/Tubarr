@@ -61,7 +61,7 @@ func checkLiveProgress(t *testing.T, downloader, dlArgs, ytdlpArgs string, wantI
 	defer cancel()
 
 	d := &VideoDownload{
-		Video:   &models.Video{URL: liveTestVideoURL, VideoDir: t.TempDir(), Duration: liveTestVideoDuration},
+		Video:   &models.Video{URL: liveTestVideoURL, Files: models.VideoFiles{VideoDir: t.TempDir()}, Metadata: models.VideoMetadata{Duration: liveTestVideoDuration}},
 		Channel: &models.Channel{},
 		ChannelURL: &models.ChannelURL{ChanURLSettings: &models.Settings{
 			ExternalDownloader:     downloader,

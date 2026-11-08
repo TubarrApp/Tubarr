@@ -376,7 +376,7 @@ type channelForm struct {
 	name          string
 	urls          []string
 	renames       map[string]string // Saved URL to its new address, for URLs edited in place.
-	authMap       map[string]*models.ChannelAccessDetails
+	authMap       map[string]*models.ChannelURLAccessDetails
 	urlSettings   map[string]urlSettings
 	notifications []*models.Notification
 	configFile    string
@@ -588,11 +588,11 @@ func syncChannelURLs(cs contracts.ChannelStore, channelID int64, existing []*mod
 			// A blank password keeps the saved one, as passwords aren't sent to the edit page. Clearing the ciphertext
 			// makes a new password get encrypted, and a cleared login get stored blank.
 			if parsedPassword != "" || parsedUsername == "" {
-				existingURLModel.Password = parsedPassword
-				existingURLModel.EncryptedPassword = ""
+				existingURLModel.Login.Password = parsedPassword
+				existingURLModel.Login.EncryptedPassword = ""
 			}
-			existingURLModel.Username = parsedUsername
-			existingURLModel.LoginURL = parsedLoginURL
+			existingURLModel.Login.Username = parsedUsername
+			existingURLModel.Login.LoginURL = parsedLoginURL
 			existingURLModel.UpdatedAt = now
 			existingURLModel.ChanURLSettings = urlSettings.Settings
 			existingURLModel.ChanURLMetarrArgs = urlSettings.Metarr
@@ -607,9 +607,7 @@ func syncChannelURLs(cs contracts.ChannelStore, channelID int64, existing []*mod
 
 		chanURL := &models.ChannelURL{
 			URL:               u,
-			Username:          parsedUsername,
-			Password:          parsedPassword,
-			LoginURL:          parsedLoginURL,
+			Login:             models.ChannelURLAccessDetails{Username: parsedUsername, Password: parsedPassword, LoginURL: parsedLoginURL},
 			ChanURLSettings:   urlSettings.Settings,
 			ChanURLMetarrArgs: urlSettings.Metarr,
 			ProfileID:         urlSettings.ProfileID,

@@ -12,13 +12,13 @@ import (
 )
 
 // loadAndMergeMetaOps returns a video's meta ops: its channel URL's from every level, then its matched filtered ones.
-func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
+func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) []string {
 	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
 	ops, err := channelURLMetaOps(cu, dirParser)
 	if err != nil {
 		logger.Pl.E("Meta ops file for %q can't be used: %v", cu.URL, err)
 	}
-	return getDedupedMetaOpStrings(applyFilteredMetaOps(ops, v.FilteredMetaOps, v.URL, c.Name))
+	return getDedupedMetaOpStrings(applyFilteredMetaOps(ops, v.FilteredMetaOps, v.URL, v.ChannelName))
 }
 
 // channelURLMetaOps returns a channel URL's meta ops from every level, with each level's ops file. Returns the errors of
@@ -38,8 +38,8 @@ func channelURLMetaOps(cu *models.ChannelURL, dp *parsing.DirectoryParser) ([]mo
 }
 
 // overrideMetaOps returns the video's Download As meta ops, with its matched filtered meta ops.
-func overrideMetaOps(v *models.Video, c *models.Channel) []string {
-	return getDedupedMetaOpStrings(applyFilteredMetaOps(v.Overrides.MetaOps, v.FilteredMetaOps, v.URL, c.Name))
+func overrideMetaOps(v *models.Video) []string {
+	return getDedupedMetaOpStrings(applyFilteredMetaOps(v.Overrides.MetaOps, v.FilteredMetaOps, v.URL, v.ChannelName))
 }
 
 // LoadMetaOpsFromFile loads in meta operations from the file at path, if set.

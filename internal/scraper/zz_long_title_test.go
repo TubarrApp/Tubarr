@@ -43,8 +43,8 @@ func TestScrapeCustomSiteLongTitle(t *testing.T) {
 			if len(entries) != 1 {
 				t.Fatalf("wrote %d files, want 1", len(entries))
 			}
-			if v.Title != tc.title {
-				t.Errorf("title = %q, want it whole", v.Title)
+			if v.Metadata.Title != tc.title {
+				t.Errorf("title = %q, want it whole", v.Metadata.Title)
 			}
 		})
 	}

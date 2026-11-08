@@ -47,7 +47,7 @@ func LoadChannelInputFile(path string) (models.ChannelInput, error) {
 // BuildChannelFromInput builds a new channel and its logins from input, validating them.
 func BuildChannelFromInput(input models.ChannelInput) (
 	*models.Channel,
-	map[string]*models.ChannelAccessDetails,
+	map[string]*models.ChannelURLAccessDetails,
 	error,
 ) {
 	if input.Name == nil || *input.Name == "" {
@@ -102,7 +102,7 @@ func BuildChannelFromInput(input models.ChannelInput) (
 			UpdatedAt: now,
 		}
 		if a, exists := authMap[u]; exists {
-			cu.Username, cu.Password, cu.LoginURL = a.Username, a.Password, a.LoginURL
+			cu.Login.Username, cu.Login.Password, cu.Login.LoginURL = a.Username, a.Password, a.LoginURL
 		}
 		if override, ok := input.URLSettings[strings.ToLower(u)]; ok {
 			if override.Name != nil {

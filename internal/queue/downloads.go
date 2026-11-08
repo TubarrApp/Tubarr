@@ -328,9 +328,9 @@ func (q *DownloadQueue) newDownload(c *models.Channel, r Request, sessions map[s
 		sessionCU := cu
 		if r.Auth != nil {
 			withAuth := *cu // A copy, so the login isn't kept on the channel's model.
-			withAuth.Username = r.Auth.Username
-			withAuth.Password = r.Auth.Password
-			withAuth.LoginURL = r.Auth.LoginURL
+			withAuth.Login.Username = r.Auth.Username
+			withAuth.Login.Password = r.Auth.Password
+			withAuth.Login.LoginURL = r.Auth.LoginURL
 			sessionCU = &withAuth
 		}
 		s = &session{cu: sessionCU, scraper: scraper.New()}
@@ -341,7 +341,7 @@ func (q *DownloadQueue) newDownload(c *models.Channel, r Request, sessions map[s
 	startCtx, stop := context.WithCancelCause(ctx)
 	d := &download{
 		q:        q,
-		entry:    *newQueueEntry(v, cu, c),
+		entry:    *newQueueEntry(v, cu),
 		status:   models.DLStatus{Status: consts.DLStatusQueued, Stage: "Waiting to start"},
 		video:    v,
 		c:        c,
@@ -516,8 +516,8 @@ func (d *download) SendUpdate(v *models.Video) {
 		s.Error = nil
 	}
 	d.status = s
-	if v.Title != "" {
-		d.entry.Title = v.Title
+	if v.Metadata.Title != "" {
+		d.entry.Title = v.Metadata.Title
 	}
 	d.q.mu.Unlock()
 
@@ -539,8 +539,8 @@ func (d *download) SendUpdate(v *models.Video) {
 func (s *session) ready(ctx context.Context, cs contracts.ChannelStore, c *models.Channel) error {
 	s.once.Do(func() {
 		// Cookies a crawl already fetched are reused.
-		if s.cu.CookiePath == "" {
-			s.cu.Cookies, s.cu.CookiePath, s.err = s.scraper.ScraperURLCookies(ctx, cs, c, s.cu)
+		if s.cu.Session.CookiePath == "" {
+			s.cu.Session.Cookies, s.cu.Session.CookiePath, s.err = s.scraper.ScraperURLCookies(ctx, cs, c, s.cu)
 		}
 
 		// Metarr is held back if it can't run or an ops file can't be used, leaving videos pending for Run Metarr.

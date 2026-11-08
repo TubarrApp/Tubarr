@@ -592,11 +592,11 @@ func printAvailableVideo(label string, v *models.AvailableVideo, withChannel boo
 	if v.DownloadStatus.Status != consts.DLStatusAvailable {
 		details = append(details, string(v.DownloadStatus.Status))
 	}
-	if !v.UploadDate.IsZero() {
-		details = append(details, v.UploadDate.Format("2006-01-02"))
+	if !v.Metadata.UploadDate.IsZero() {
+		details = append(details, v.Metadata.UploadDate.Format("2006-01-02"))
 	}
 
-	fmt.Printf("%s %s", label, v.Title)
+	fmt.Printf("%s %s", label, v.Metadata.Title)
 	if len(details) > 0 {
 		fmt.Printf(" (%s)", strings.Join(details, ", "))
 	}
@@ -1323,7 +1323,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 				cmd.Flags().Changed(keys.AuthDetails)
 
 			// Parse authentication details if set by user, clearing all if the flag is set.
-			var authDetails map[string]*models.ChannelAccessDetails
+			var authDetails map[string]*models.ChannelURLAccessDetails
 			if gotAuthDetails || deleteAuth {
 				if authDetails, err = auth.ParseAuthDetails(flags.Username, flags.Password, flags.LoginURL, flags.AuthDetails, c.GetURLs(), deleteAuth); err != nil {
 					return err

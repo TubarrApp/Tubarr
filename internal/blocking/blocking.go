@@ -33,7 +33,7 @@ func GetBlockContext(cu *models.ChannelURL) vars.BlockContext {
 	}
 
 	// Priority #1: Username/password authentication.
-	if cu.LoginURL != "" && cu.Username != "" {
+	if cu.Login.LoginURL != "" && cu.Login.Username != "" {
 		return vars.BlockContextAuth
 	}
 

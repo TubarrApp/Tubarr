@@ -168,7 +168,7 @@ func TestParseMetarrOutputDirOverride(t *testing.T) {
 
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: "/out"}}
-	v := &models.Video{MoveOpOutputDir: "/moved", Overrides: &models.VideoOverrides{OutputDir: "/chosen/{{channel_name}}"}}
+	v := &models.Video{Files: models.VideoFiles{MoveOpOutputDir: "/moved"}, Overrides: &models.VideoOverrides{OutputDir: "/chosen/{{channel_name}}"}}
 	if got := parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); got != "/chosen/Cats" {
 		t.Errorf("got %q, want /chosen/Cats", got)
 	}
@@ -201,7 +201,7 @@ func TestOverrideFilenameOps(t *testing.T) {
 		},
 	}
 
-	got := parse(overrideFilenameOps(v, &models.Channel{Name: "Test"})...)
+	got := parse(overrideFilenameOps(v)...)
 	var sets []string
 	for _, op := range got {
 		if op.OpType == sharedconsts.OpSet {
@@ -248,10 +248,10 @@ func TestMatchedFilteredOpsBeatPlain(t *testing.T) {
 	}
 	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
 
-	if got, want := loadAndMergeFilenameOps(v, cu, c, dp), []string{"prefix:[P] ", "set:Filtered"}; !slices.Equal(got, want) {
+	if got, want := loadAndMergeFilenameOps(v, cu, dp), []string{"prefix:[P] ", "set:Filtered"}; !slices.Equal(got, want) {
 		t.Errorf("filename ops = %q, want %q", got, want)
 	}
-	if got, want := loadAndMergeMetaOps(v, cu, c, dp), []string{"title:suffix: [P]", "artist:set:Filtered"}; !slices.Equal(got, want) {
+	if got, want := loadAndMergeMetaOps(v, cu, dp), []string{"title:suffix: [P]", "artist:set:Filtered"}; !slices.Equal(got, want) {
 		t.Errorf("meta ops = %q, want %q", got, want)
 	}
 }
@@ -266,7 +266,7 @@ func TestMakeMetarrCommandOverrides(t *testing.T) {
 	}
 	c := &models.Channel{ID: 1, Name: "Test"}
 	cu := withOwnLevel(&models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{MetaOps: channelOps}})
-	v := &models.Video{URL: "https://example.com/v/1", VideoFilePath: "/v.mp4", JSONFilePath: "/v.json", Overrides: &models.VideoOverrides{}}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/v.mp4", JSONFilePath: "/v.json"}, Overrides: &models.VideoOverrides{}}
 
 	args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
 	for _, unwanted := range []string{"artist:set:Channel"} {

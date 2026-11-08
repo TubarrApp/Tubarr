@@ -31,7 +31,7 @@ func TestDeleteFilesTakesNFO(t *testing.T) {
 	// addVideo saves a finished video with the given files.
 	addVideo := func(url, videoFile, jsonFile string) {
 		t.Helper()
-		v := &models.Video{URL: url, ChannelURL: "https://example.com/@a", VideoFilePath: filepath.Join(dir, videoFile), JSONFilePath: filepath.Join(dir, jsonFile)}
+		v := &models.Video{URL: url, ChannelURL: "https://example.com/@a", Files: models.VideoFiles{VideoFilePath: filepath.Join(dir, videoFile), JSONFilePath: filepath.Join(dir, jsonFile)}}
 		v.MarkVideoAsComplete()
 		if _, err := vs.AddVideo(v, c.ID, c.URLModels[0].ID); err != nil {
 			t.Fatal(err)
@@ -100,7 +100,7 @@ func TestVideoFilePathsNFONeedsVideo(t *testing.T) {
 	}
 	vs := GetVideoStore(cs.db)
 	const videoURL = "https://example.com/v/json-only"
-	v := &models.Video{URL: videoURL, ChannelURL: "https://example.com/@a", JSONFilePath: "/json/only.json"}
+	v := &models.Video{URL: videoURL, ChannelURL: "https://example.com/@a", Files: models.VideoFiles{JSONFilePath: "/json/only.json"}}
 	if _, err := vs.AddVideo(v, c.ID, c.URLModels[0].ID); err != nil {
 		t.Fatal(err)
 	}

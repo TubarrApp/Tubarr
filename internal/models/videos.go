@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -8,42 +9,86 @@ import (
 	"tubarr/internal/domain/logger"
 )
 
-// Video contains fields relating to a video, and a pointer to the channel it belongs to.
+// Video is a video in a channel, with its metadata, files and download state.
 type Video struct {
-	ID                  int64                 `json:"id" db:"id"`
-	ChannelID           int64                 `json:"channel_id" db:"channel_id"`
-	ChannelURLID        int64                 `json:"channel_url_id" db:"channel_url_id"`
-	ChannelURL          string                `json:"channel_url" db:"channel_url"`
-	ThumbnailURL        string                `json:"thumbnail_url" db:"thumbnail_url"`
-	CustomThumbnail     bool                  `json:"custom_thumbnail,omitempty" db:"-"` // Download As set one, shown from /api/v1/videos/{id}/thumbnail.
-	Customized          bool                  `json:"customized,omitempty" db:"-"`       // Has Download As options, which its downloads and post-processing use.
-	VideoFilePath       string                `json:"video_path" db:"video_path"`
-	VideoDir            string                `json:"-" db:"-"`
-	JSONFilePath        string                `json:"json_path" db:"json_path"`
-	JSONDir             string                `json:"-" db:"-"`
-	Finished            bool                  `json:"finished" db:"finished"`
-	JSONCustomFile      string                `json:"-" db:"-"`
-	URL                 string                `json:"url" db:"url"`
-	DirectVideoURL      string                `json:"-" db:"-"`
-	Title               string                `json:"title" db:"title"`
-	Description         string                `json:"description" db:"description"`
-	UploadDate          time.Time             `json:"upload_date" db:"upload_date"`
-	Duration            int                   `json:"duration" db:"duration"` // Seconds, if the crawl listing gave it.
-	Filesize            int64                 `json:"filesize" db:"filesize"` // Size in bytes.
-	MetadataMap         map[string]any        `json:"-" db:"-"`
-	DownloadStatus      DLStatus              `json:"download_status" db:"download_status"`
-	CreatedAt           time.Time             `json:"created_at" db:"created_at"`
-	UpdatedAt           time.Time             `json:"updated_at" db:"updated_at"`
-	MoveOpOutputDir     string                `json:"-" db:"-"`
-	Ignored             bool                  `json:"ignored" db:"ignored"`
-	MetarrStatus        consts.MetarrStatus   `json:"metarr_status" db:"metarr_status"`
-	MetarrError         string                `json:"metarr_error,omitempty" db:"metarr_error"` // Why Metarr last failed.
-	FilteredMetaOps     []FilteredMetaOps     `json:"-" db:"-"`                                 // Per-video filtered meta operations
-	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"`                                 // Per-video filtered filename operations
-	SkipFilters         bool                  `json:"-" db:"-"`                                 // Chosen by the user, so download filters don't apply.
+	// Identity.
+	ID           int64  `json:"id" db:"id"`
+	URL          string `json:"url" db:"url"`
+	ChannelID    int64  `json:"channel_id" db:"channel_id"`
+	ChannelName  string `json:"channel_name,omitempty" db:"-"` // Its channel's name, set when loaded.
+	ChannelURLID int64  `json:"channel_url_id" db:"channel_url_id"`
+	ChannelURL   string `json:"channel_url" db:"channel_url"`
+
+	// In the JSON at the top level.
+	Metadata VideoMetadata `json:"-" db:"-"`
+	Files    VideoFiles    `json:"-" db:"-"`
+
+	// State.
+	DownloadStatus DLStatus            `json:"download_status" db:"download_status"`
+	Finished       bool                `json:"finished" db:"finished"`
+	Ignored        bool                `json:"ignored" db:"ignored"`
+	MetarrStatus   consts.MetarrStatus `json:"metarr_status" db:"metarr_status"`
+	MetarrError    string              `json:"metarr_error,omitempty" db:"metarr_error"` // Why Metarr last failed.
+	CreatedAt      time.Time           `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at" db:"updated_at"`
+
+	// Download As.
+	Overrides       *VideoOverrides `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's settings.
+	Customized      bool            `json:"customized,omitempty" db:"-"`        // Has Download As options, which its downloads and post-processing use.
+	CustomThumbnail bool            `json:"custom_thumbnail,omitempty" db:"-"`  // Download As set one, shown from /api/v1/videos/{id}/thumbnail.
+
+	// This run's processing.
+	FilteredMetaOps     []FilteredMetaOps     `json:"-" db:"-"` // Filtered meta ops matching this video.
+	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"` // Filtered filename ops matching this video.
+	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
 	SkipMetarr          SkipMetarr            `json:"-" db:"-"`
-	SkipDownloads       SkipDownloads         `json:"-" db:"-"`
-	Overrides           *VideoOverrides       `json:"overrides,omitempty" db:"overrides"` // Chosen with Download As, in place of the channel URL's settings.
+}
+
+// VideoMetadata holds the metadata elements of a video.
+type VideoMetadata struct {
+	Raw            map[string]any `json:"-" db:"-"` // The metadata file's fields.
+	Description    string         `json:"description" db:"description"`
+	DirectVideoURL string         `json:"-" db:"-"`
+	Duration       int            `json:"duration" db:"duration"` // Seconds, if the crawl listing gave it.
+	Filesize       int64          `json:"filesize" db:"filesize"` // Size in bytes.
+	ThumbnailURL   string         `json:"thumbnail_url" db:"thumbnail_url"`
+	Title          string         `json:"title" db:"title"`
+	UploadDate     time.Time      `json:"upload_date" db:"upload_date"`
+}
+
+// VideoFiles holds the file paths of a video.
+type VideoFiles struct {
+	VideoFilePath   string `json:"video_path" db:"video_path"`
+	VideoDir        string `json:"-" db:"-"`
+	JSONFilePath    string `json:"json_path" db:"json_path"`
+	JSONDir         string `json:"-" db:"-"`
+	JSONCustomFile  string `json:"-" db:"-"`
+	MoveOpOutputDir string `json:"-" db:"-"` // Where a move op sends the finished files.
+}
+
+// videoFields is a Video without its JSON methods.
+type videoFields Video
+
+// videoJSON is a video's JSON, with its metadata and file fields at the top level.
+type videoJSON struct {
+	*videoFields
+	*VideoMetadata
+	*VideoFiles
+}
+
+// jsonFields returns the video's JSON fields, pointing into the video.
+func (v *Video) jsonFields() videoJSON {
+	return videoJSON{(*videoFields)(v), &v.Metadata, &v.Files}
+}
+
+// MarshalJSON writes the video with its metadata and file fields at the top level.
+func (v Video) MarshalJSON() ([]byte, error) {
+	return json.Marshal(v.jsonFields())
+}
+
+// UnmarshalJSON reads a video written by MarshalJSON.
+func (v *Video) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, new(v.jsonFields()))
 }
 
 // VideoOverrides holds a video's directories, yt-dlp options and Metarr args chosen with Download As, used instead of its
@@ -116,27 +161,33 @@ const (
 	SkipMetarrMissingFilteredFilenameOpsFile SkipMetarrReasons = "filtered filename ops path is set, but the file can't be read or parsed"
 )
 
-// SkipDownloads skips any JSON or video downloads with a given reason.
-type SkipDownloads struct {
-	Skip   bool
-	Reason SkipDownloadReasons
-}
-
-// SkipDownloadReasons are reasons a download was skipped.
-type SkipDownloadReasons string
-
-// SkipDownloadReasons strings.
-const (
-	SkipDLMissingFilterFile SkipDownloadReasons = "filter file path is set, but file appears to be unreachable"
-)
-
-// AvailableVideo is a video awaiting the user's choice to download it, with its channel's name.
+// AvailableVideo is a video awaiting the user's choice to download it.
 type AvailableVideo struct {
 	Video
-	ChannelName        string `json:"channel_name"`
-	RetriesOnCrawl     bool   `json:"retries_on_crawl,omitempty"` // A failed video the channel URL's next crawl downloads again.
-	CrawlDLRetries     int    `json:"-"`                          // Crawl retries it has used, all of them once it's left to the user.
-	CrawlDLRetriesLeft int    `json:"crawl_dl_retries_left,omitempty"`
+	CrawlRetries
+}
+
+// CrawlRetries is how an available video's crawls retry its download.
+type CrawlRetries struct {
+	RetriesOnCrawl     bool `json:"retries_on_crawl,omitempty"` // A failed video the channel URL's next crawl downloads again.
+	CrawlDLRetries     int  `json:"-"`                          // Crawl retries it has used, all of them once it's left to the user.
+	CrawlDLRetriesLeft int  `json:"crawl_dl_retries_left,omitempty"`
+}
+
+// availableVideoJSON is an available video's JSON, as Video's JSON methods would drop its crawl retries.
+type availableVideoJSON struct {
+	videoJSON
+	*CrawlRetries
+}
+
+// MarshalJSON writes the video with its crawl retries.
+func (v AvailableVideo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(availableVideoJSON{v.jsonFields(), &v.CrawlRetries})
+}
+
+// UnmarshalJSON reads an available video written by MarshalJSON.
+func (v *AvailableVideo) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, &availableVideoJSON{v.jsonFields(), &v.CrawlRetries})
 }
 
 // ManualVideo is a video URL sent in for a channel, through the channel URL with the given ID (0 for its manual downloads).
@@ -171,14 +222,14 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 		// Video path, reported as soon as it changes and again once final, so the last line wins.
 		for _, prefix := range []string{"current video path: ", "final video path: "} {
 			if after, ok := strings.CutPrefix(l, prefix); ok && after != "" {
-				v.VideoFilePath = after
+				v.Files.VideoFilePath = after
 				gotVideo = true
 			}
 		}
 
 		// JSON path, empty once the metafile was purged or is gone.
 		if after, ok := strings.CutPrefix(l, "final json path: "); ok {
-			v.JSONFilePath = after
+			v.Files.JSONFilePath = after
 		}
 	}
 
@@ -187,14 +238,14 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 		return fmt.Errorf("metarr did not return the final video path for %q. Got lines: %v", v.URL, lines)
 	}
 
-	logger.Pl.I("Video %q got file paths from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.VideoFilePath, v.JSONFilePath)
+	logger.Pl.I("Video %q got file paths from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.Files.VideoFilePath, v.Files.JSONFilePath)
 	return nil
 }
 
 // MarkVideoAsIgnored marks the video as completed and ignored.
 func (v *Video) MarkVideoAsIgnored() {
-	if v.Title == "" && v.URL != "" {
-		v.Title = v.URL
+	if v.Metadata.Title == "" && v.URL != "" {
+		v.Metadata.Title = v.URL
 	}
 	v.DownloadStatus.Status = consts.DLStatusIgnored
 	v.DownloadStatus.Percent = 0.0
@@ -204,8 +255,8 @@ func (v *Video) MarkVideoAsIgnored() {
 
 // MarkVideoAsAvailable marks the video as awaiting the user's choice to download it.
 func (v *Video) MarkVideoAsAvailable() {
-	if v.Title == "" && v.URL != "" {
-		v.Title = v.URL
+	if v.Metadata.Title == "" && v.URL != "" {
+		v.Metadata.Title = v.URL
 	}
 	v.DownloadStatus.Status = consts.DLStatusAvailable
 	v.DownloadStatus.Percent = 0.0

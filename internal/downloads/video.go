@@ -3,6 +3,7 @@ package downloads
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -31,17 +32,18 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	// Restrict filenames.
 	args = append(args, command.RestrictFilenames)
 
-	// Infer video filename from JSON filename, escaping '%' so yt-dlp writes it as named.
+	// Name the video after its JSON file, as the title may have changed since, escaping '%' so yt-dlp writes it as named.
 	var outputSyntax string
-	if d.Video.JSONCustomFile != "" {
-		JSONFileName := strings.TrimSuffix(filepath.Base(d.Video.JSONCustomFile), ".json")
+	if jsonPath := cmp.Or(d.Video.Files.JSONCustomFile, d.Video.Files.JSONFilePath); jsonPath != "" {
+		JSONFileName := strings.TrimSuffix(filepath.Base(jsonPath), sharedconsts.MExtJSON)
+		JSONFileName = strings.TrimSuffix(JSONFileName, ".info") // yt-dlp writes NAME.info.json.
 		outputSyntax = strings.ReplaceAll(JSONFileName, "%", "%%") + ".%(ext)s"
 	} else {
 		outputSyntax = command.FilenameSyntax
 	}
 
 	// Output location + restricted filename syntax.
-	args = append(args, command.P, d.Video.VideoDir)
+	args = append(args, command.P, d.Video.Files.VideoDir)
 	args = append(args, command.Output, outputSyntax)
 
 	// Print filename to console upon completion.
@@ -51,13 +53,13 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	args = append(args, command.Progress, command.ProgressNewline, command.ProgressTemplate, command.ProgressTemplateFmt)
 
 	// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
-	if d.ChannelURL.CookiePath != "" {
-		args = append(args, command.CookiePath, d.ChannelURL.CookiePath)
+	if d.ChannelURL.Session.CookiePath != "" {
+		args = append(args, command.CookiePath, d.ChannelURL.Session.CookiePath)
 	}
 	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
 		args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
 	}
-	if d.ChannelURL.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
+	if d.ChannelURL.Session.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
 		logger.Pl.D(1, "No cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
 
@@ -155,11 +157,11 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	}
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
-	args, d.fsGen = siterules.AddSiteRulesToYTDLP(d.Video.URL, d.ChannelURL.FlareSolverr, args)
+	args, d.fsGen = siterules.AddSiteRulesToYTDLP(d.Video.URL, d.ChannelURL.Session.FlareSolverr, args)
 
 	// Add target URL [ MUST GO LAST !! ]
-	if d.Video.DirectVideoURL != "" {
-		args = append(args, command.EndOfOptions, d.Video.DirectVideoURL)
+	if d.Video.Metadata.DirectVideoURL != "" {
+		args = append(args, command.EndOfOptions, d.Video.Metadata.DirectVideoURL)
 	} else {
 		args = append(args, command.EndOfOptions, d.Video.URL)
 	}
@@ -257,19 +259,19 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	if result.filename == "" {
 		return errors.New("no output filename captured")
 	}
-	d.Video.VideoFilePath = result.filename
+	d.Video.Files.VideoFilePath = result.filename
 
 	// Ensure file is fully written.
-	if err := d.waitForFile(d.Video.VideoFilePath, 10*time.Second); err != nil {
+	if err := d.waitForFile(d.Video.Files.VideoFilePath, 10*time.Second); err != nil {
 		return err
 	}
 
 	// Poll filesize.
-	if size := file.Size(d.Video.VideoFilePath); size > 0 {
-		d.Video.Filesize = size
+	if size := file.Size(d.Video.Files.VideoFilePath); size > 0 {
+		d.Video.Metadata.Filesize = size
 	}
 
-	return verifyVideoDownload(d.Video.VideoFilePath)
+	return verifyVideoDownload(d.Video.Files.VideoFilePath)
 }
 
 // scanVideoCmdOutput scans the yt-dlp video download output for the completed filename or errors.
@@ -351,13 +353,13 @@ func (d *VideoDownload) setDownloaderEnv(cmd *exec.Cmd) (cleanup func(), err err
 
 // durationSeconds returns the video duration from its metadata, falling back to the crawl listing's duration.
 func (d *VideoDownload) durationSeconds() float64 {
-	switch v := d.Video.MetadataMap["duration"].(type) {
+	switch v := d.Video.Metadata.Raw["duration"].(type) {
 	case float64:
 		return v
 	case int:
 		return float64(v)
 	}
-	return float64(d.Video.Duration)
+	return float64(d.Video.Metadata.Duration)
 }
 
 // updateProgress sends a status update when the status or whole percentage changes.
