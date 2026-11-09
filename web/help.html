@@ -355,8 +355,8 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                   <code>channel_url:contains:youtube.com/@ChannelA||title:prefix:[A] </code>. (In Tubarr, a channel URL's
                   custom settings do this more simply.)
                 </li>
-                <li>A <code>|</code> at the end of the filter's value is written <code>\|</code> to distinguish it from the filter/operation <code>||</code> separator. For example, <code>title:contains:|CATS\|||description:suffix: - Cat videos.</code> would look for <code>|CATS|</code> in the title field and, if found, suffix the description field with <code> - Cat videos.</code></li>
-                <li>Likewise, a <code>&amp;&amp;</code> in a filter's value is written <code>\&amp;&amp;</code>, and a <code>&amp;</code> at the end of it <code>\&amp;</code>, so they aren't read as joining two filters. For example, <code>title:contains:Tom \&amp;&amp; Jerry||genre:set:Cartoons</code> looks for <code>Tom &amp;&amp; Jerry</code> in the title field.</li>
+                <li>A <code>|</code> at the end of the filter's value is written <code>\|</code> to distinguish it from the filter/operation <code>||</code> separator. For example, <code>title:contains:|CATS\|||description:suffix: - Cat videos.</code> would look for <code>|cats|</code> in the title field and, if found, suffix the description field with <code> - Cat videos.</code></li>
+                <li>Likewise, a <code>&amp;&amp;</code> in a filter's value is written <code>\&amp;&amp;</code>, and a <code>&amp;</code> at the end of it <code>\&amp;</code>, so they aren't read as joining two filters. For example, <code>title:contains:Tom \&amp;&amp; Jerry||genre:set:Cartoons</code> looks for <code>tom &amp;&amp; jerry</code> in the title field.</li>
               </ul>
 
               <!-- ===== Move ops ===== -->
