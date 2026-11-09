@@ -802,6 +802,24 @@ func TestParseMetarrOutputDirOverride(t *testing.T) {
 	}
 }
 
+// TestParseMetarrOutputDirReprocess tests a re-process moves the files only to its own output directory, never to a
+// move op's or the channel URL's.
+func TestParseMetarrOutputDirReprocess(t *testing.T) {
+	logger.Pl.Console = io.Discard
+
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := &models.ChannelURL{URL: ownURL, ChanURLMetarrArgs: &models.MetarrArgs{OutputDir: "/out"}}
+	v := &models.Video{Reprocess: true, Files: models.VideoFiles{MoveOpOutputDir: "/moved"}}
+	if got := parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); got != "" {
+		t.Errorf("re-process with no output directory of its own: got %q, want none", got)
+	}
+
+	v.Overrides = &models.VideoOverrides{OutputDir: "/chosen/{{channel_name}}"}
+	if got := parseMetarrOutputDir(v, cu, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); got != "/chosen/Cats" {
+		t.Errorf("re-process with its own output directory: got %q, want /chosen/Cats", got)
+	}
+}
+
 // TestOverrideFilenameOps tests a chosen filename replaces every other set op, and only matched filtered ops are added.
 func TestOverrideFilenameOps(t *testing.T) {
 	logger.Pl.Console = io.Discard

@@ -53,8 +53,11 @@ starts, or download-as-cancel if Download As closes without starting. -->
         <p x-show="!multiple" class="mt-1 text-xs text-gray-500 dark:text-gray-400">Without the extension. Template tags like {{upload_date}} work. Replaces any set filename op.</p>
         <p x-show="multiple" class="mt-1 text-xs text-gray-500 dark:text-gray-400">A filename is for one video. To rename several, use filename ops.</p>
       </div>
-      <p class="text-xs text-gray-500 dark:text-gray-400">
+      <p x-show="!video?.rerun" class="text-xs text-gray-500 dark:text-gray-400">
         Blank directories use the defaults, shown faded. Metarr moves the finished video to the output directory, if there is one.
+      </p>
+      <p x-show="video?.rerun" class="text-xs text-gray-500 dark:text-gray-400">
+        Re-processing leaves the files where they are: move ops and the output directory aren't used. To move them, fill in Post-Process Directory.
       </p>
       <template x-for="dir in visibleDirs" :key="dir.key">
         <div>
@@ -62,7 +65,7 @@ starts, or download-as-cancel if Download As closes without starting. -->
           <input
             type="text"
             x-model="form[dir.key]"
-            :placeholder="(defaults[dir.key] || dir.none) + (dir.note || '')"
+            :placeholder="(video?.rerun && dir.rerun) || (defaults[dir.key] || dir.none) + (dir.note || '')"
             class="w-full h-8 rounded border px-2 text-xs placeholder:text-gray-400 dark:bg-gray-900 dark:border-gray-700 dark:text-white/90"
           />
         </div>
@@ -343,7 +346,7 @@ starts, or download-as-cancel if Download As closes without starting. -->
       dirs: [
         { key: 'video_dir', label: 'Video Directory', none: "The channel URL's" },
         { key: 'json_dir', label: 'JSON Directory', none: "The channel URL's" },
-        { key: 'output_dir', label: 'Post-Process Directory', none: 'Default', note: ' / Set by move ops' }
+        { key: 'output_dir', label: 'Post-Process Directory', none: 'Default', note: ' / Set by move ops', rerun: 'Blank leaves the files where they are' }
       ],
       boxes: [
         { key: 'meta_ops', label: 'Metadata Ops', placeholder: 'title:prefix:[Cats] ', help: 'meta-ops' },

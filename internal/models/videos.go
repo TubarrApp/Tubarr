@@ -42,6 +42,7 @@ type Video struct {
 	FilteredFilenameOps []FilteredFilenameOps `json:"-" db:"-"` // Filtered filename ops matching this video.
 	SkipFilters         bool                  `json:"-" db:"-"` // Chosen by the user, so download filters don't apply.
 	SkipMetarr          SkipMetarr            `json:"-" db:"-"`
+	Reprocess           bool                  `json:"-" db:"-"` // Edit & Re-Process, so only its output directory moves the files.
 }
 
 // VideoMetadata holds the metadata elements of a video.

@@ -339,6 +339,11 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                   The ops still run in their usual order (see <a href="#meta-order">metadata ops</a> and
                   <a href="#filename-ops">filename ops</a>), not the order they're written in.
                 </li>
+                <li>
+                  Filters check the metadata as it was downloaded, before any metadata op changes it, so
+                  <code>title:contains:[cats]</code> won't see a <code>title:prefix:[Cats] </code> from the same run.
+                  <strong>Edit &amp; Re-Process</strong> checks the metadata as the last run left it instead.
+                </li>
                 <li>To run an op when either of two filters matches, write the line once for each filter.</li>
                 <li>
                   A matching filtered op beats a plain op that sets the same thing, e.g. a filtered
@@ -350,8 +355,8 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                   <code>channel_url:contains:youtube.com/@ChannelA||title:prefix:[A] </code>. (In Tubarr, a channel URL's
                   custom settings do this more simply.)
                 </li>
-                <li>A <code>|</code> at the end of the filter's value is written <code>\|</code> to distinguish it from the filter/operation <code>||</code> separator. For example, <code>title:contains:|CATS\|||description:suffix: - Cat videos.</code> would look for <code>|cats|</code> in the title field and, if found, suffix the description field with <code> - Cat videos.</code></li>
-                <li>Likewise, a <code>&amp;&amp;</code> in a filter's value is written <code>\&amp;&amp;</code>, and a <code>&amp;</code> at the end of it <code>\&amp;</code>, so they aren't read as joining two filters. For example, <code>title:contains:Tom \&amp;&amp; Jerry||genre:set:Cartoons</code> looks for <code>tom &amp;&amp; jerry</code> in the title field.</li>
+                <li>A <code>|</code> at the end of the filter's value is written <code>\|</code> to distinguish it from the filter/operation <code>||</code> separator. For example, <code>title:contains:|CATS\|||description:suffix: - Cat videos.</code> would look for <code>|CATS|</code> in the title field and, if found, suffix the description field with <code> - Cat videos.</code></li>
+                <li>Likewise, a <code>&amp;&amp;</code> in a filter's value is written <code>\&amp;&amp;</code>, and a <code>&amp;</code> at the end of it <code>\&amp;</code>, so they aren't read as joining two filters. For example, <code>title:contains:Tom \&amp;&amp; Jerry||genre:set:Cartoons</code> looks for <code>Tom &amp;&amp; Jerry</code> in the title field.</li>
               </ul>
 
               <!-- ===== Move ops ===== -->
@@ -362,12 +367,14 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                 <code>&amp;&amp;</code> to require all of them:
                 <code>title:contains:podcast&amp;&amp;duration:more-than:3600||/media/long podcasts</code>. The first move op
                 that matches wins, and a channel URL's own move ops are checked before the channel's.
+                Like filtered ops, they check the metadata as downloaded, and <strong>Edit &amp; Re-Process</strong>
+                doesn't use them (see below).
               </p>
               <p>
                 In a move op, <code>{{channel_url_output_directory}}</code> is the channel URL's Metarr
                 <strong>Output Directory</strong>, or its video directory if it has none, e.g.
                 <code>title:contains:podcast||{{channel_url_output_directory}}/Podcasts</code> puts podcasts in a folder inside it,
-                so changing the output directory moves them too. <code>{{channel_output_directory}}</code> does the same
+                so changing the output directory changes where podcasts go too. <code>{{channel_output_directory}}</code> does the same
                 with the channel's directories.
               </p>
               <p>Where a finished video goes, first match first:</p>
@@ -377,6 +384,10 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                 <li>The channel URL's (or channel's) Metarr <strong>Output Directory</strong></li>
                 <li>Otherwise it stays in the video directory</li>
               </ol>
+              <p>
+                <strong>Edit &amp; Re-Process</strong> only uses the first: without a Post-Process Directory, the files
+                stay where they are, so a video never changes folder because of its own ops.
+              </p>
               <p>
                 Tubarr never creates download folders: a video or JSON directory must already exist, so an unmounted
                 drive isn't filled by mistake. A directory using <a href="#templates">template tags</a> needs its fixed

@@ -223,7 +223,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 			defer release()
 			q.started(cl)
 
-			if err := runVideoMetarr(vCtx, q.store.VideoStore(), v, cu, c); err != nil {
+			if err := runVideoMetarr(vCtx, q.store.VideoStore(), v, cu, c, rerun); err != nil {
 				logger.Pl.E("Metarr run failed for video %q: %v", v.URL, err)
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("video %q: %w", v.URL, err))
@@ -411,7 +411,8 @@ func metarrLimits(c *models.Channel) laneLimits {
 }
 
 // runVideoMetarr rebuilds a video's Metarr state from its metadata file and runs Metarr on it.
-func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Video, cu *models.ChannelURL, c *models.Channel) error {
+// A rerun leaves the files where they are unless the video has its own output directory.
+func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Video, cu *models.ChannelURL, c *models.Channel, rerun bool) error {
 	for _, f := range []string{v.Files.VideoFilePath, v.Files.JSONFilePath} {
 		if f == "" {
 			return errors.New("source file path not stored in database")
@@ -426,7 +427,12 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 
 	// Video already passed filters on download, only the filtered ops are needed.
 	_, v.FilteredMetaOps, v.FilteredFilenameOps, _ = metadata.ValidateAndFilter(v, cu, dirParser)
-	v.Files.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, c, dirParser)
+
+	// Move ops only place a video on its first run, as the last run's ops may have changed what they match.
+	v.Reprocess = rerun
+	if !rerun {
+		v.Files.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, c, dirParser)
+	}
 
 	v.MetarrStatus = execMetarr(ctx, v, cu, c, dirParser)
 
