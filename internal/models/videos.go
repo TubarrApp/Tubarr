@@ -242,7 +242,7 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 	return nil
 }
 
-// MarkVideoAsIgnored marks the video as completed and ignored.
+// MarkVideoAsIgnored marks the video as ignored, so crawls skip it without downloading.
 func (v *Video) MarkVideoAsIgnored() {
 	if v.Metadata.Title == "" && v.URL != "" {
 		v.Metadata.Title = v.URL

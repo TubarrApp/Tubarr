@@ -12,7 +12,6 @@ const (
 	axelProgressStr  = `^\[\s*(\d+)%\]`
 	curlBarStr       = `#\s*(\d+(?:\.\d+)?)%$`
 	wgetDotStr       = `^\s*\d+[KMGT]\s*(\d{1,3})%`
-	dlPercentStr     = `\[download\]\s+(\d+\.?\d*)%`
 	yearFragmentsStr = `^(\d{4})?y?(\d{1,2})?m?(\d{1,2})?d?$`
 	maxFilesizeStr   = `^\d+(\.\d+)?[kmg]?$`
 )
@@ -23,7 +22,6 @@ var (
 	onceAriaProgress  sync.Once
 	onceAxelProgress  sync.Once
 	onceCurlBar       sync.Once
-	onceDLPercentage  sync.Once
 	onceWgetDot       sync.Once
 	onceYearFragments sync.Once
 	onceMaxFilesize   sync.Once
@@ -32,7 +30,6 @@ var (
 	AriaProgress  *regexp.Regexp
 	AxelProgress  *regexp.Regexp
 	CurlBar       *regexp.Regexp
-	DLPercentage  *regexp.Regexp
 	WgetDot       *regexp.Regexp
 	YearFragments *regexp.Regexp
 	MaxFilesize   *regexp.Regexp
@@ -68,14 +65,6 @@ func CurlBarCompile() *regexp.Regexp {
 		CurlBar = regexp.MustCompile(curlBarStr)
 	})
 	return CurlBar
-}
-
-// DownloadPercentCompile compiles the regex for handling regular download progress bars.
-func DownloadPercentCompile() *regexp.Regexp {
-	onceDLPercentage.Do(func() {
-		DLPercentage = regexp.MustCompile(dlPercentStr)
-	})
-	return DLPercentage
 }
 
 // WgetDotCompile compiles regex for wget "dot" progress lines.

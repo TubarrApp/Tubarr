@@ -4,13 +4,12 @@ package downloaders
 import (
 	"strconv"
 	"strings"
-	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/regex"
 )
 
 // Aria2OutputParser parses the terminal output from Aria2C.
-func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, currentPct float64, currentStatus consts.DownloadStatus) (parsedLine bool, totalItemsFound, downloadedItems int, pct float64, status consts.DownloadStatus) {
+func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, currentPct float64) (parsedLine bool, totalItemsFound, downloadedItems int, pct float64) {
 	// New batch beginning....
 	if matches := regex.AriaItemCountCompile().FindStringSubmatch(line); matches != nil {
 		count, err := strconv.Atoi(matches[1])
@@ -19,7 +18,7 @@ func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, cur
 			count = 0
 		}
 		logger.Pl.D(1, "New aria2 batch detected: %d item(s)", count)
-		return true, count, 0, 0.0, consts.DLStatusDownloading
+		return true, count, 0, 0.0
 	}
 
 	// Progress percentages
@@ -30,7 +29,7 @@ func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, cur
 
 			if parsedPct, err := strconv.ParseFloat(matches[1], 64); err == nil { // If err IS nil
 				logger.Pl.D(1, "Parsed progress %.1f%% from line: %q", parsedPct, line)
-				return true, totalItemCount, 0, parsedPct, consts.DLStatusDownloading
+				return true, totalItemCount, 0, parsedPct
 			}
 			logger.Pl.D(1, "Failed to parse percentage from line: %q", line)
 		}
@@ -44,10 +43,10 @@ func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, cur
 			if pct > 100.0 {
 				pct = 100.0
 			}
-			return true, totalItemCount, downloadedItemCount, pct, consts.DLStatusDownloading
+			return true, totalItemCount, downloadedItemCount, pct
 		}
 	}
 
 	// Nothing to parse
-	return false, totalItemCount, downloadedItemCount, currentPct, currentStatus
+	return false, totalItemCount, downloadedItemCount, currentPct
 }

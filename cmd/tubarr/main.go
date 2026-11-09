@@ -75,6 +75,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Release the instance lock and close benchmark files if main panics.
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Pl.E("Panic occurred: %v", r)
+			cleanup(progControl, startTime)
+			panic(r)
+		}
+	}()
+
 	// Load in Metarr logs.
 	vars.MetarrLogs = file.LoadMetarrLogs()
 

@@ -164,7 +164,6 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 			r.Put("/{id}/update", ss.handleUpdateChannel)
 			r.Delete("/{id}/delete", ss.handleDeleteChannel)
 			r.Delete("/{id}/delete-videos", ss.handleDeleteChannelVideos)
-			r.Delete("/{id}/cancel-download/{videoID}", ss.handleCancelDownload)
 			r.Post("/{id}/crawl", ss.handleCrawlChannel)
 			r.Post("/{id}/stop-queue", ss.handleStopQueue)
 			r.Post("/{id}/abort", ss.handleAbortAll)
@@ -236,7 +235,7 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 	})
 
 	// --- Static Frontend ---
-	// Serve compiled web UI for all unmatched routes (after API routes).
+	// Serve the web UI's pages and files for all unmatched routes (after API routes).
 	staticHandler, err := StaticHandler()
 	if err != nil {
 		return nil, err
@@ -359,7 +358,6 @@ func StaticHandler() (http.Handler, error) {
 	}
 
 	fs := http.FileServer(http.Dir(webRoot))
-	notFoundPage := filepath.Join(webRoot, "404.html")
 	indexPage := filepath.Join(webRoot, "index.html")
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -388,14 +386,7 @@ func StaticHandler() (http.Handler, error) {
 			return
 		}
 
-		// Otherwise, show 404 page if it exists
-		if _, err := os.Stat(notFoundPage); err == nil {
-			w.WriteHeader(http.StatusNotFound)
-			http.ServeFile(w, r, notFoundPage)
-			return
-		}
-
-		// Final fallback: plain 404 text
+		// Otherwise, plain 404 text
 		http.NotFound(w, r)
 	}), nil
 }

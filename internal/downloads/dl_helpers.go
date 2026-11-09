@@ -14,11 +14,14 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/blocking"
+	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedfiles"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
@@ -191,6 +194,38 @@ func hostname(uri string) string {
 		return ""
 	}
 	return parsed.Hostname()
+}
+
+// cookieArgs returns the channel URL's cookie file and browser cookie args, which yt-dlp combines (the file's winning where both set one).
+func cookieArgs(cu *models.ChannelURL) []string {
+	var args []string
+	if cu.Session.CookiePath != "" {
+		args = append(args, command.CookiePath, cu.Session.CookiePath)
+	}
+	if cu.ChanURLSettings.CookiesFromBrowser != "" {
+		args = append(args, command.CookiesFromBrowser, cu.ChanURLSettings.CookiesFromBrowser)
+	}
+	return args
+}
+
+// extraArgs splits the user's extra yt-dlp arguments, dropping them all if one is a blocked option.
+func extraArgs(extra, videoURL string) ([]string, error) {
+	if extra == "" {
+		return nil, nil
+	}
+	args, err := sharedparsing.ShellSplit(extra)
+	if err != nil {
+		return nil, err
+	}
+
+	// Refuse extra yt-dlp arguments containing disallowed options.
+	if !sharedconsts.InsecureArgumentsAllowed() {
+		if blocked, blockedKey := sharedconsts.HasBlockedOptions(args, sharedconsts.BlockedYtdlpOptions); blocked {
+			logger.Pl.W("Refusing extra YT-DLP arguments for video URL %q: Option %q is not allowed for YT-DLP.", videoURL, blockedKey)
+			return nil, nil
+		}
+	}
+	return args, nil
 }
 
 // buildVideoCodecList builds the codec preference string for yt-dlp.

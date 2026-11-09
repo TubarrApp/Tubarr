@@ -16,7 +16,7 @@ import (
 // loadAndMergeFilenameOps returns a video's filename ops: its channel URL's from every level, then its matched filtered
 // ones.
 func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) []string {
-	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
+	// An unusable file holds back Metarr for the whole batch, see SkipReason.
 	ops, err := channelURLFilenameOps(cu, dirParser)
 	if err != nil {
 		logger.Pl.E("Filename ops file for %q can't be used: %v", cu.URL, err)

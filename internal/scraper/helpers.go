@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 	"tubarr/internal/domain/logger"
-
-	"golang.org/x/net/publicsuffix"
 )
 
 // listedVideo holds what a channel listing shows of a video, which may be nothing beyond its URL.
@@ -80,15 +78,6 @@ func (e *ytDlpEntry) videoEntries() []*ytDlpEntry {
 }
 
 const rumble = "rumble.com"
-
-// getBaseDomain returns the base domain for an inputted URL.
-func getBaseDomain(rawURL string) (string, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "", err
-	}
-	return publicsuffix.EffectiveTLDPlusOne(u.Hostname())
-}
 
 // normalizeURL standardizes URLs for comparison by removing protocol and any trailing slashes.
 func normalizeURL(inputURL string) string {

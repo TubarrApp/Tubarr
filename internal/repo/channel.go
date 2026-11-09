@@ -233,32 +233,6 @@ func (cs *ChannelStore) RemoveNewVideoURLs(channelID int64, urls []string) error
 	return nil
 }
 
-// GetChannelName returns the channel name from an input key and value.
-func (cs *ChannelStore) GetChannelName(key, val string) (string, error) {
-	if err := validKey(key, consts.ValidChannelKeys); err != nil {
-		return "", err
-	}
-
-	var name string
-	//nolint:gosec // Key validated above.
-	query := fmt.Sprintf(
-		"SELECT %s FROM %s WHERE %s = ?",
-		consts.QChanName,
-		consts.DBChannels,
-		key,
-	)
-
-	err := cs.q.QueryRow(query, val).Scan(&name)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", fmt.Errorf("channel with %s %q does not exist", key, val)
-		}
-		return "", err
-	}
-
-	return name, nil
-}
-
 // GetChannelID gets the channel ID from an input key and value.
 func (cs *ChannelStore) GetChannelID(key, val string) (int64, error) {
 	if err := validKey(key, consts.ValidChannelKeys); err != nil {

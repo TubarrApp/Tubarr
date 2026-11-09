@@ -75,12 +75,9 @@ type ChannelStore interface {
 	UseUpCrawlDLRetries(channelURLID int64) error
 	GetAuth(channelID int64, url string) (username, password, loginURL string, err error)
 	GetChannelID(key, val string) (int64, error)
-	GetChannelName(key, val string) (string, error)
 	GetChannelModel(key, val string, mergeURLsWithParent bool) (*models.Channel, bool, error)
 	GetChannelURLModel(channelID int64, urlStr string, mergeWithParent bool) (chanURL *models.ChannelURL, hasRows bool, err error)
-	GetChannelURLModels(c *models.Channel, mergeWithParent bool) ([]*models.ChannelURL, error)
 	GetNotifyURLs(id int64) ([]*models.Notification, error)
-	GetNewVideoURLs(key, val string) ([]string, error)
 
 	// Profile operations.
 	AddProfile(p *models.Profile) error
@@ -101,19 +98,15 @@ type DownloadStore interface {
 	GetDB() *sql.DB
 
 	// Update operations.
-	SetDownloadStatus(v *models.Video) error
 	UpdateDownloadStatus(ctx context.Context, update models.StatusUpdate) error
 }
 
 // VideoStore allows access to video repo methods.
 type VideoStore interface {
-	GetDB() *sql.DB
-
 	// Get operations.
 	GetVideoURLByID(videoID int64) (videoURL string, err error)
 	GetVideoThumbnailURL(videoID int64) (thumbURL string, err error)
 	GetVideoChannelURLID(videoID int64) (channelURLID int64, err error)
-	VideoExists(v *models.Video, channelID int64) (videoID int64, exists bool)
 	GetVideosAwaitingMetarr(channelID int64, includeDone bool) (videos []*models.Video, err error)
 	GetLatestFinishedVideos(ctx context.Context, channelID int64, n int) (videos []*models.Video, err error)
 	CountFinishedVideos(ctx context.Context, channelID int64) (n int, err error)

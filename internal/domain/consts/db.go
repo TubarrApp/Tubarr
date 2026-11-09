@@ -30,16 +30,6 @@ const (
 	QProgRunning   = "running"
 )
 
-// ValidProgramKeys holds valid keys for the program database.
-var ValidProgramKeys = map[string]struct{}{
-	QProgHost:      {},
-	QProgID:        {},
-	QProgHeartbeat: {},
-	QProgPID:       {},
-	QProgStartedAt: {},
-	QProgRunning:   {},
-}
-
 // Channel database entry keys.
 const (
 	QChanID                   = "id"
@@ -150,7 +140,6 @@ const (
 	QVidDuration     = "duration"
 	QVidFilesize     = "filesize"
 	QVidDLStatus     = "download_status"
-	QVidDLPercentage = "download_pct"
 	QVidMetarrStatus = "metarr_status"
 	QVidMetarrError  = "metarr_error"
 	QVidOverrides    = "overrides"
@@ -158,33 +147,6 @@ const (
 	QVidUpdatedAt    = "updated_at"
 	QVidChanName     = "channel_name"
 )
-
-// ValidVideoKeys holds valid keys for the video database.
-var ValidVideoKeys = map[string]struct{}{
-	QVidID:           {},
-	QVidChanID:       {},
-	QVidChanURLID:    {},
-	QVidChanURL:      {},
-	QVidFinished:     {},
-	QVidIgnored:      {},
-	QVidThumbnailURL: {},
-	QVidURL:          {},
-	QVidTitle:        {},
-	QVidDescription:  {},
-	QVidVideoPath:    {},
-	QVidJSONPath:     {},
-	QVidUploadDate:   {},
-	QVidDuration:     {},
-	QVidFilesize:     {},
-	QVidDLStatus:     {},
-	QVidDLPercentage: {},
-	QVidMetarrStatus: {},
-	QVidMetarrError:  {},
-	QVidOverrides:    {},
-	QVidCreatedAt:    {},
-	QVidUpdatedAt:    {},
-	QVidChanName:     {},
-}
 
 // Downloads database entry keys.
 const (
@@ -198,18 +160,6 @@ const (
 	QCrawlDLRetries = "crawl_download_retries" // Crawls which retried a failed download, not a download's own retries.
 )
 
-// ValidDownloadKeys holds valid keys for the download database.
-var ValidDownloadKeys = map[string]struct{}{
-	QDLVidID:     {},
-	QDLStatus:    {},
-	QDLPct:       {},
-	QDLError:     {},
-	QDLCreatedAt: {},
-	QDLUpdatedAt: {},
-
-	QCrawlDLRetries: {},
-}
-
 // Notification database entry keys.
 const (
 	QNotifyChanID    = "channel_id"
@@ -219,28 +169,12 @@ const (
 	QNotifyUpdatedAt = "updated_at"
 )
 
-// ValidNotificationKeys holds valid keys for the notification database.
-var ValidNotificationKeys = map[string]struct{}{
-	QNotifyChanID:    {},
-	QNotifyURL:       {},
-	QNotifyChanURL:   {},
-	QNotifyCreatedAt: {},
-	QNotifyUpdatedAt: {},
-}
-
 // Blocked domains database entry keys.
 const (
 	QBlockedDomain  = "domain"
 	QBlockedContext = "context"
 	QBlockedAt      = "blocked_at"
 )
-
-// ValidBlockedDomainKeys holds valid keys for the blocked domains database.
-var ValidBlockedDomainKeys = map[string]struct{}{
-	QBlockedDomain:  {},
-	QBlockedContext: {},
-	QBlockedAt:      {},
-}
 
 // Blocked domain videos database entry keys.
 const (
@@ -249,14 +183,6 @@ const (
 	QBlockedVideoID        = "video_id"
 	QBlockedVideoChannelID = "channel_id"
 )
-
-// ValidBlockedVideoDomainKeys holds valid keys for the blocked domains database.
-var ValidBlockedVideoDomainKeys = map[string]struct{}{
-	QBlockedVideoDomain:    {},
-	QBlockedVideoContext:   {},
-	QBlockedVideoID:        {},
-	QBlockedVideoChannelID: {},
-}
 
 // Misc
 const (

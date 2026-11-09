@@ -243,7 +243,7 @@ func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.
 		return [][]models.FilteredMetaOps{v.Overrides.FilteredMetaOps}, [][]models.FilteredFilenameOps{v.Overrides.FilteredFilenameOps}
 	}
 
-	// An unusable file holds back Metarr for the whole batch, see app.metarrSkip.
+	// An unusable file holds back Metarr for the whole batch, see metarr.SkipReason.
 	filteredMetaOps, fileErr := ChannelURLFilteredMetaOps(cu, dirParser)
 	if fileErr != nil {
 		logger.Pl.E("Filtered meta ops file for %q can't be used: %v", cu.URL, fileErr)

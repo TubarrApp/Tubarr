@@ -27,11 +27,6 @@ func GetVideoStore(db *sql.DB) *VideoStore {
 	}
 }
 
-// GetDB returns the database.
-func (vs *VideoStore) GetDB() *sql.DB {
-	return vs.DB
-}
-
 // AddVideos adds multiple videos to the database, returning them with filled IDs.
 //
 // Videos without URLs are skipped, and errors for each are returned.

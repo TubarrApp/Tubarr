@@ -80,7 +80,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 
 		// Add jitter
 		var jitter time.Duration
-		if !abstractions.IsSet(keys.SkipAllWaits) {
+		if !abstractions.GetBool(keys.SkipAllWaits) {
 			jitter = times.CalculateJitter(c)
 		}
 

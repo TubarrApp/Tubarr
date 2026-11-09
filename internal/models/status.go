@@ -15,14 +15,9 @@ type DLStatus struct {
 
 // StatusUpdate models updates to the download status of a video.
 type StatusUpdate struct {
-	VideoID      int64
-	VideoTitle   string
-	ChannelID    int64
-	ChannelURLID int64
-	ChannelURL   string
-	VideoURL     string
-	Status       consts.DownloadStatus
-	Percent      float64
-	Stage        string
-	Error        error
+	VideoID  int64
+	VideoURL string
+	Status   consts.DownloadStatus
+	Percent  float64
+	Error    error
 }

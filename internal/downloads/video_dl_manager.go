@@ -14,7 +14,7 @@ import (
 )
 
 // NewVideoDownload creates a download operation with specified options.
-func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker Tracker, opts *Options) (*VideoDownload, error) {
+func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker Tracker, opts Options) (*VideoDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -25,15 +25,9 @@ func NewVideoDownload(procCtx context.Context, video *models.Video, channelURL *
 		Channel:    channel,
 		DLStore:    dlStore,
 		DLTracker:  tracker,
+		Options:    opts,
 		Context:    procCtx,
 	}
-
-	if opts != nil {
-		dl.Options = *opts
-	} else {
-		dl.Options = DefaultOptions
-	}
-
 	return dl, nil
 }
 

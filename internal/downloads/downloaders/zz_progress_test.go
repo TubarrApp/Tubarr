@@ -3,7 +3,6 @@ package downloaders
 import (
 	"math"
 	"testing"
-	"tubarr/internal/domain/consts"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
@@ -105,21 +104,21 @@ func TestAria2OutputParser(t *testing.T) {
 	readout := "[#7b70f9 1.1MiB/5.0MiB(23%) CN:5 DL:717KiB ETA:5s]"
 
 	// No "Downloading N item(s)" notice (yt-dlp's default aria2c invocation).
-	if ok, _, _, pct, _ := Aria2OutputParser(readout, 0, 0, 0, consts.DLStatusQueued); !ok || pct != 23 {
+	if ok, _, _, pct := Aria2OutputParser(readout, 0, 0, 0); !ok || pct != 23 {
 		t.Errorf("readout without batch notice: got (%v, %v), want (true, 23)", ok, pct)
 	}
 
 	// Batch notice, then readout.
-	ok, total, _, _, _ := Aria2OutputParser("10/15 22:08:24 [NOTICE] Downloading 1 item(s)", 0, 0, 0, consts.DLStatusQueued)
+	ok, total, _, _ := Aria2OutputParser("10/15 22:08:24 [NOTICE] Downloading 1 item(s)", 0, 0, 0)
 	if !ok || total != 1 {
 		t.Fatalf("batch notice: got (%v, %d), want (true, 1)", ok, total)
 	}
-	if ok, _, _, pct, _ := Aria2OutputParser(readout, total, 0, 0, consts.DLStatusDownloading); !ok || pct != 23 {
+	if ok, _, _, pct := Aria2OutputParser(readout, total, 0, 0); !ok || pct != 23 {
 		t.Errorf("readout after batch notice: got (%v, %v), want (true, 23)", ok, pct)
 	}
 
 	// Multi-item batches track completed items.
-	if ok, _, done, pct, _ := Aria2OutputParser("[NOTICE] Download complete: /a.part", 4, 1, 25, consts.DLStatusDownloading); !ok || done != 2 || pct != 50 {
+	if ok, _, done, pct := Aria2OutputParser("[NOTICE] Download complete: /a.part", 4, 1, 25); !ok || done != 2 || pct != 50 {
 		t.Errorf("multi-item completion: got (%v, %d, %v), want (true, 2, 50)", ok, done, pct)
 	}
 }

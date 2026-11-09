@@ -13,7 +13,7 @@ import (
 )
 
 // NewJSONDownload creates a download operation with specified options.
-func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker Tracker, opts *Options) (*JSONDownload, error) {
+func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker Tracker, opts Options) (*JSONDownload, error) {
 	if video == nil {
 		return nil, errors.New("video cannot be nil")
 	}
@@ -26,15 +26,9 @@ func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *m
 		ChannelURL: channelURL,
 		DLStore:    dlStore,
 		DLTracker:  tracker,
+		Options:    opts,
 		Context:    procCtx,
 	}
-
-	if opts != nil {
-		dl.Options = *opts
-	} else {
-		dl.Options = DefaultOptions
-	}
-
 	return dl, nil
 }
 

@@ -14,7 +14,7 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-// makeMetarrCommand combines arguments from both Viper config and model settings.
+// makeMetarrCommand returns Metarr's arguments for the video, from its Download As options and its channel URL's settings.
 func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) []string {
 	// 'Download As' overrides replace the channel URL's ops. Otherwise file ops override DB ops, then apply filtering.
 	var metaOps, filenameOps []string
@@ -122,14 +122,6 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	// No metadata purge: Tubarr purges once it has read the file, see finishMetafile.
 	return args
 }
-
-// // configString returns the global config value for key if it was set, never a flag's default.
-// func configString(key string) string {
-// 	if !abstractions.IsSet(key) {
-// 		return ""
-// 	}
-// 	return abstractions.GetString(key)
-// }
 
 // parseMetarrOutputDir parses and returns the output directory.
 func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) string {

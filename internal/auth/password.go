@@ -23,7 +23,6 @@ const asterisks = "********"
 type PasswordManager struct {
 	key         []byte
 	aesFilepath string
-	StarText    string
 }
 
 // NewPasswordManager returns a password manager using the configuration file's AES key file.
@@ -104,7 +103,7 @@ func (pm *PasswordManager) Decrypt(encoded string) (plaintextPassword string, er
 	return string(plaintext), nil
 }
 
-// StarPassword returns a string of asterisks matching the password length.
+// StarPassword returns a fixed run of asterisks for a set password, or "" for none.
 func StarPassword(p string) string {
 	if p == "" {
 		return ""

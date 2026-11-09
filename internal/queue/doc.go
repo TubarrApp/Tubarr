@@ -13,8 +13,8 @@
 //   - It claims each video in the database, so nothing else downloads it at the same time. A URL the channel doesn't
 //     have yet is stored first. Videos already queued or downloading are left out of what Add returns.
 //   - It shows each video on the Downloads page as queued, then starts it in the background.
-//   - Each video waits for a slot in its channel's lane (see Concurrency below), fetches its metadata and checks it
-//     against the channel's filters, waits for a download slot, then downloads.
+//   - Each video waits for a slot in its channel's lane (see Concurrency below), then for a download slot, then fetches
+//     its metadata, checks it against the channel's filters, and downloads.
 //   - A downloaded video is handed to the post-processing queue to run Metarr, then stored as finished.
 //   - Every video leaves the queue with a final status: Finished, Ignored (filtered out), Canceled, or Failed with why.
 //     Canceled and Failed videos go back to the Available list.
@@ -54,8 +54,9 @@
 //
 // Each channel has a lane: how many of its videos download at once (its download concurrency setting). A channel URL
 // with its own setting gets a lane of its own. Videos in a lane start in the order they were added. On top of the
-// lanes, every download needs a slot under the global and per-domain download limits, and every Metarr run a slot
-// under the channel's Metarr concurrency and the global post-processing limit.
+// lanes, every download needs a slot under the global and per-domain download limits, held from its metadata fetch to
+// the end of its download, and every Metarr run a slot under the channel's Metarr concurrency and the global
+// post-processing limit.
 //
 // A changed limit applies straight away, to videos already running or waiting:
 //

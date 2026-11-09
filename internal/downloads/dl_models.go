@@ -30,12 +30,6 @@ type Options struct {
 	RetryMaxInterval int
 }
 
-// DefaultOptions provides sensible defaults.
-var DefaultOptions = Options{
-	MaxAttempts:      1 + consts.DefaultDownloadRetries,
-	RetryMaxInterval: 20,
-}
-
 // VideoDownload encapsulates a video download operation.
 type VideoDownload struct {
 	Video      *models.Video

@@ -153,7 +153,7 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                   <tr><td><code>copy-to</code></td><td><code>uploader:copy-to:artist</code></td><td>Copies this field's value into another field.</td></tr>
                   <tr><td><code>paste-from</code></td><td><code>artist:paste-from:uploader</code></td><td>The same, the other way round: fills this field from another.</td></tr>
                   <tr><td><code>date-tag</code></td><td><code>title:date-tag:prefix:ymd</code></td><td>Adds the video's date, e.g. <code>[24-05-01] My Video</code>. See <a href="#date-tags">Date tags</a>.</td></tr>
-                  <tr><td><code>delete-date-tag</code></td><td><code>title:delete-date-tag:all:ymd</code></td><td>Removes date tags from the <code>prefix</code>, <code>suffix</code> or <code>all</code> of the field.</td></tr>
+                  <tr><td><code>delete-date-tag</code></td><td><code>title:delete-date-tag</code></td><td>Removes every date tag from the field, whatever its date format.</td></tr>
                 </table>
               </div>
               <p>Some rules:</p>
@@ -224,7 +224,7 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                   <tr><td><code>regex-replace</code></td><td><code>regex-replace:[[^(.*) - (\d{4})$]]:$2 $1</code></td><td>Replaces every regex match.</td></tr>
                   <tr><td><code>keep-after</code> / <code>keep-before</code></td><td><code>keep-before: |</code></td><td>Keep only the text after or before the first delimiter.</td></tr>
                   <tr><td><code>date-tag</code></td><td><code>date-tag:prefix:Ymd</code></td><td>Adds the video's date. One per video.</td></tr>
-                  <tr><td><code>delete-date-tag</code></td><td><code>delete-date-tag:all:ymd</code></td><td>Removes date tags. One per video.</td></tr>
+                  <tr><td><code>delete-date-tag</code></td><td><code>delete-date-tag</code></td><td>Removes every date tag from the name.</td></tr>
                 </table>
               </div>
               <p>
@@ -252,8 +252,8 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
               <p>
                 A date tag is the video's date in brackets, made from its release or upload date. It goes at the
                 <code>prefix</code> or <code>suffix</code>; adding one replaces a date tag already in that place, so
-                running the ops again doesn't stack them. <code>delete-date-tag</code> also takes <code>all</code>, to remove
-                date tags from anywhere in the field.
+                running the ops again doesn't stack them. <code>delete-date-tag</code> removes date tags from anywhere in the
+                field, in any of the formats below.
               </p>
               <div class="table-wrap">
                 <table>
@@ -656,15 +656,16 @@ mc_h264:hevc</code></pre>
                   The <strong>channel's Max Concurrency</strong> (one at a time when 0), or a channel URL's own if it has
                   one. A channel's videos wait their turn here.
                 </li>
-                <li>The video's metadata is fetched.</li>
                 <li><strong>Domain Limits</strong> (Settings), per site.</li>
                 <li><strong>Download Concurrency</strong> (Settings), across all channels.</li>
               </ol>
               <p>
-                So within one channel videos start in the order queued; across channels, whichever channel's next video
-                finishes fetching its metadata first gets the next slot. <strong>Crawl Concurrency</strong> limits how
-                many channels are checked for new videos at once, and <strong>Post-processing Concurrency</strong> how
-                many Metarr runs happen at once (a channel can set a lower limit of its own). 0 means unlimited.
+                A video keeps its place under all three while its metadata is fetched and checked against the filters,
+                and while it downloads. So within one channel videos start in the order queued; across channels, the
+                next slot goes to whichever channel's video has waited longest for it. <strong>Crawl Concurrency</strong>
+                limits how many channels are checked for new videos at once, and <strong>Post-processing
+                Concurrency</strong> how many Metarr runs happen at once (a channel can set a lower limit of its own). 0
+                means unlimited.
               </p>
               <p>
                 A download that fails is run again up to <strong>Download Retries</strong> times (2 when blank), after a

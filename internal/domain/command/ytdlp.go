@@ -84,7 +84,6 @@ const (
 	DownloaderAria = "aria2c"
 
 	AriaLog         = "--console-log-level=notice"
-	AriaLogFile     = "--log=-"
 	AriaInterval    = "--summary-interval=1"
 	AriaNoColor     = "--enable-color=false"
 	AriaNoRPC       = "--enable-rpc=false"

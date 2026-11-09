@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
@@ -126,7 +125,6 @@ var rootCmd = &cobra.Command{
 		if len(args) == 0 {
 			viper.Set(keys.TerminalRunDefaultBehavior, true)
 		}
-		viper.Set("execute", true)
 		return nil
 	},
 }
@@ -134,8 +132,6 @@ var rootCmd = &cobra.Command{
 // InitCommands initializes all commands and their flags.
 func InitCommands(ctx context.Context, s contracts.Store, dq *queue.DownloadQueue, pp *queue.PostProcessingQueue) error {
 	settingsStore = s.TubarrSettingsStore()
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer("_", "-")) // Convert jsonkeys.SettingsVideoDirectory to "video-directory".
 
 	// Web interface flags (always registered, flags aren't parsed until Execute).
 	rootCmd.PersistentFlags().Bool(keys.RunWebInterface, false, "Run Tubarr as a web interface")
@@ -148,21 +144,15 @@ func InitCommands(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 		return err
 	}
 
-	// Only true here when set by env, skip CLI flags and commands.
-	if viper.GetBool(keys.RunWebInterface) {
-		return nil
-	}
-
 	// CLI flags.
 	cmd.InitProgramFlags(rootCmd)
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err
 	}
 
-	// Add Channel and Video function commands.
+	// Add channel, profile and auth commands.
 	rootCmd.AddCommand(InitChannelCmds(ctx, s, dq, pp))
 	rootCmd.AddCommand(InitProfileCmds(s.ChannelStore()))
-	rootCmd.AddCommand(InitVideoCmds(s))
 	rootCmd.AddCommand(InitAuthCmds(s))
 
 	return nil

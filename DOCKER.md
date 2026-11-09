@@ -161,6 +161,12 @@ To run Tubarr as a systemd service with Podman:
 
 ## Updating Tubarr
 
+To update without interrupting a crawl, download or post-processing run, first check that Tubarr is idle. `/api/v1/status/idle` needs no login, and returns 200 when nothing is running, or 503 with the number of running jobs:
+
+```bash
+curl -s -w ' %{http_code}\n' http://localhost:8827/api/v1/status/idle
+```
+
 ### With Docker Compose:
 ```bash
 docker compose pull

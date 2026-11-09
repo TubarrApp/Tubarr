@@ -21,8 +21,8 @@ import (
 	"tubarr/internal/validation"
 )
 
-// QueueEntry is one video in a queue, as its page shows it.
-type QueueEntry struct {
+// Entry is one video in a queue, as its page shows it.
+type Entry struct {
 	VideoID        int64            `json:"video_id"`
 	ChannelID      int64            `json:"channel_id"`
 	ChannelName    string           `json:"channel_name"`
@@ -38,8 +38,8 @@ type QueueEntry struct {
 }
 
 // newQueueEntry returns a video's entry, queued now.
-func newQueueEntry(v *models.Video, cu *models.ChannelURL) *QueueEntry {
-	return &QueueEntry{
+func newQueueEntry(v *models.Video, cu *models.ChannelURL) *Entry {
+	return &Entry{
 		VideoID:      v.ID,
 		ChannelID:    cu.ChannelID,
 		ChannelName:  cu.ChannelName,

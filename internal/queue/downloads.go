@@ -57,7 +57,7 @@ type DownloadQueue struct {
 // download is a video in the download queue.
 type download struct {
 	q         *DownloadQueue
-	entry     QueueEntry      // As the Downloads page shows it.
+	entry     Entry           // As the Downloads page shows it.
 	status    models.DLStatus // Its download status as last reported.
 	video     *models.Video
 	c         *models.Channel
@@ -149,28 +149,21 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 
 		// A claimed video which can't be queued fails, so it returns to the Available list.
 		d, err := q.newDownload(c, r, sessions)
-		if err == nil && !q.insert(d) {
+		switch {
+		case err != nil:
+		case d == nil: // Nil guard.
+			err = fmt.Errorf("video %q: newDownload returned nil without an error", v.URL)
+		case !q.insert(d):
 			err = fmt.Errorf("video %q is already being downloaded for another channel", v.URL)
-		}
-		if err != nil {
-			logger.Pl.E("Not downloading video %q: %v", v.URL, err)
-			q.storeStatus(v, consts.DLStatusFailed, 0, err)
-			errs = append(errs, err)
+		default:
+			// Begin download.
+			queued = append(queued, v)
+			go q.run(d)
 			continue
 		}
-		queued = append(queued, v)
-
-		// Nil guard.
-		if d == nil {
-			err := fmt.Errorf("video %q: newDownload returned nil without an error", v.URL)
-			logger.Pl.E("Not downloading video %q: %v", v.URL, err)
-			q.storeStatus(v, consts.DLStatusFailed, 0, err)
-			errs = append(errs, err)
-			continue
-		}
-
-		// Begin download.
-		go q.run(d)
+		logger.Pl.E("Not downloading video %q: %v", v.URL, err)
+		q.storeStatus(v, consts.DLStatusFailed, 0, err)
+		errs = append(errs, err)
 	}
 	return queued, errors.Join(errs...)
 }
@@ -235,9 +228,9 @@ func (q *DownloadQueue) Abort(channelID int64) bool {
 }
 
 // Entries returns the videos in the queue, oldest first, with their download status.
-func (q *DownloadQueue) Entries() []QueueEntry {
+func (q *DownloadQueue) Entries() []Entry {
 	q.mu.Lock()
-	entries := make([]QueueEntry, 0, len(q.downloads))
+	entries := make([]Entry, 0, len(q.downloads))
 	for _, d := range q.downloads {
 		e := d.entry
 		status := d.status
@@ -249,7 +242,7 @@ func (q *DownloadQueue) Entries() []QueueEntry {
 	}
 	q.mu.Unlock()
 
-	slices.SortFunc(entries, func(a, b QueueEntry) int { return a.QueuedAt.Compare(b.QueuedAt) })
+	slices.SortFunc(entries, func(a, b Entry) int { return a.QueuedAt.Compare(b.QueuedAt) })
 	return entries
 }
 

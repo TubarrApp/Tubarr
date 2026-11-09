@@ -156,6 +156,13 @@ func (d *Database) initTables() error {
 		return err
 	}
 
+	// Older versions had these columns, which nothing read or wrote (download status and percentage are in downloads).
+	for _, col := range []string{"url_file", "video_directory", "json_directory", "download_status", "download_pct"} {
+		if _, err := dropColumnIfPresent(tx, "videos", col); err != nil {
+			return err
+		}
+	}
+
 	if err := initDownloadsTable(tx); err != nil {
 		return err
 	}

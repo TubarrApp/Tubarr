@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -22,7 +21,6 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/limits"
@@ -31,7 +29,6 @@ import (
 	"tubarr/internal/times"
 	"tubarr/internal/validation"
 
-	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/shareddates"
 	"github.com/TubarrApp/gocommon/sharedparsing"
@@ -269,18 +266,6 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, cu *models.ChannelURL, exi
 		}
 	}
 
-	// Add URLs given with --add-url, which have no listing details.
-	if episodes == nil {
-		episodes = make(map[string]*listedVideo)
-	}
-	if abstractions.IsSet(keys.URLAdd) {
-		for _, u := range abstractions.GetStringSlice(keys.URLAdd) {
-			if _, ok := episodes[u]; !ok {
-				episodes[u] = &listedVideo{Order: len(episodes)}
-			}
-		}
-	}
-
 	// Filter out existing URLs
 	episodeURLs := make([]string, 0, len(episodes))
 	for u := range episodes {
@@ -337,7 +322,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			}
 
 			// Refuse extra yt-dlp arguments containing disallowed options.
-			if allowInsecureStr, allowInsecure := os.LookupEnv(sharedconsts.EnvAllowInsecureArguments); !allowInsecure || (allowInsecureStr == "" || (allowInsecureStr != "1" && allowInsecureStr != "true")) {
+			if !sharedconsts.InsecureArgumentsAllowed() {
 				if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
 					logger.Pl.W("Refusing extra YT-DLP arguments for channel URL %q: Option %q is not allowed for YT-DLP.", cu.URL, blockedKey)
 				} else {
@@ -392,7 +377,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 	}
 
 	// Retrieve base domain for comparisons.
-	chanBaseDomain, _ := getBaseDomain(channelURL)
+	chanBaseDomain := limits.Hostname(channelURL)
 
 	// Process entries and add to map.
 	for _, entry := range result.videoEntries() {

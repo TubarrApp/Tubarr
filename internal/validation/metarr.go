@@ -3,14 +3,12 @@ package validation
 import (
 	"fmt"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
-	"github.com/TubarrApp/gocommon/sharedenums"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
@@ -27,15 +25,6 @@ func ValidateRenameFlag(flag string) error {
 	default:
 		return fmt.Errorf("invalid renaming style %q, accept: %v", flag, slices.Sorted(maps.Keys(sharedconsts.ValidRenameFlags)))
 	}
-}
-
-// ValidateDateFormat reports whether dateFmt is a date format directive Metarr accepts.
-func ValidateDateFormat(dateFmt string) bool {
-	if _, err := sharedenums.ParseDateFormat(dateFmt); err != nil {
-		logger.Pl.E(err.Error())
-		return false
-	}
-	return true
 }
 
 // ValidatePurgeMetafiles returns the normalized type of metafile purge for Metarr to perform: keep, all, json, nfo or "".
@@ -122,7 +111,7 @@ func ValidateExtraFFmpegArgs(a string) error {
 	if err != nil {
 		return err
 	}
-	if allowInsecureStr, allowInsecure := os.LookupEnv(sharedconsts.EnvAllowInsecureArguments); !allowInsecure || (allowInsecureStr == "" || (allowInsecureStr != "1" && allowInsecureStr != "true")) {
+	if !sharedconsts.InsecureArgumentsAllowed() {
 		if blocked, option := sharedconsts.HasBlockedOptions(args, sharedconsts.BlockedFFmpegOptions); blocked {
 			return fmt.Errorf("option %q is not allowed", option)
 		}
@@ -134,18 +123,14 @@ func ValidateExtraFFmpegArgs(a string) error {
 	return nil
 }
 
-// dedupSlice deduplicates entries in a slice so each entry only appears once.
+// dedupSlice drops blank entries, then deduplicates the rest so each entry only appears once.
 func dedupSlice(pairs []string) []string {
-	dedup := make([]string, 0, len(pairs))
-
+	nonBlank := make([]string, 0, len(pairs))
 	for _, p := range pairs {
-		if p == "" {
-			continue
-		}
-		if !slices.Contains(dedup, p) {
-			dedup = append(dedup, p)
+		if p != "" {
+			nonBlank = append(nonBlank, p)
 		}
 	}
-
+	dedup, _ := sharedparsing.Deduplicate(nonBlank)
 	return dedup
 }

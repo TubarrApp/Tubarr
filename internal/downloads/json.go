@@ -3,7 +3,6 @@ package downloads
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"tubarr/internal/domain/command"
@@ -11,7 +10,6 @@ import (
 	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
-	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // buildJSONCommand builds and returns the argument for downloading metadata files for the given URL.
@@ -28,16 +26,12 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 		command.P, d.Video.Files.JSONDir,
 		command.Output, command.FilenameSyntax)
 
-	// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
-	if d.ChannelURL.Session.CookiePath != "" {
-		args = append(args, command.CookiePath, d.ChannelURL.Session.CookiePath)
-	}
-	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
-		args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
-	}
-	if d.ChannelURL.Session.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
+	// Cookie file and browser cookies.
+	cookies := cookieArgs(d.ChannelURL)
+	if len(cookies) == 0 {
 		logger.Pl.D(1, "No cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
+	args = append(args, cookies...)
 
 	// Max filesize specified.
 	if d.ChannelURL.ChanURLSettings.MaxFilesize != "" {
@@ -49,52 +43,15 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 		args = append(args, command.FormatSort, command.FormatSortMaxRes+d.ChannelURL.ChanURLSettings.MaxResolution)
 	}
 
-	// External downloaders and arguments.
-	if d.ChannelURL.ChanURLSettings.ExternalDownloader != "" {
-		args = append(args, command.ExternalDLer, d.ChannelURL.ChanURLSettings.ExternalDownloader)
-		if d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs != "" {
-			switch d.ChannelURL.ChanURLSettings.ExternalDownloader {
-			case command.DownloaderAria:
-				ariaCmd := command.DownloaderAria + ":" +
-					d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs +
-					" " +
-					command.AriaLog +
-					" " +
-					command.AriaNoRPC +
-					" " +
-					command.AriaNoColor +
-					" " +
-					command.AriaShowConsole +
-					" " +
-					command.AriaInterval
-				args = append(args, command.ExternalDLArgs, ariaCmd)
-			default:
-				args = append(args, command.ExternalDLArgs, d.ChannelURL.ChanURLSettings.ExternalDownloaderArgs)
-			}
-		}
-	}
-
 	// Randomize requests (avoid detection as bot).
 	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments.
-	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs; extra != "" {
-		extraArgs, err := sharedparsing.ShellSplit(extra)
-		if err != nil {
-			return nil, err
-		}
-
-		// Refuse extra yt-dlp arguments containing disallowed options.
-		if allowInsecureStr, allowInsecure := os.LookupEnv(sharedconsts.EnvAllowInsecureArguments); !allowInsecure || (allowInsecureStr == "" || (allowInsecureStr != "1" && allowInsecureStr != "true")) {
-			if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
-				logger.Pl.W("Refusing extra YT-DLP arguments for video URL %q: Option %q is not allowed for YT-DLP.", d.Video.URL, blockedKey)
-			} else {
-				args = append(args, extraArgs...)
-			}
-		} else {
-			args = append(args, extraArgs...)
-		}
+	extra, err := extraArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs, d.Video.URL)
+	if err != nil {
+		return nil, err
 	}
+	args = append(args, extra...)
 
 	// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
 	args, d.fsGen = siterules.AddSiteRulesToYTDLP(d.Video.URL, d.ChannelURL.Session.FlareSolverr, args)

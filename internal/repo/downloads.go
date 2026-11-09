@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
@@ -25,30 +24,6 @@ func GetDownloadStore(db *sql.DB) *DownloadStore {
 // GetDB returns the database.
 func (ds *DownloadStore) GetDB() *sql.DB {
 	return ds.DB
-}
-
-// SetDownloadStatus updates the download status of a single video.
-func (ds *DownloadStore) SetDownloadStatus(v *models.Video) error {
-	//nolint:gosec // SQL identifiers are trusted constants.
-	query := fmt.Sprintf(
-		"UPDATE %s SET %s = ?, %s = ?, %s = ? WHERE %s = ?",
-		consts.DBDownloads,
-		consts.QDLStatus,
-		consts.QDLPct,
-		consts.QDLUpdatedAt,
-		consts.QVidID,
-	)
-
-	if _, err := ds.DB.Exec(
-		query,
-		v.DownloadStatus.Status,
-		v.DownloadStatus.Percent,
-		time.Now(),
-		v.ID,
-	); err != nil {
-		return fmt.Errorf("failed to update status for video %d: %w", v.ID, err)
-	}
-	return nil
 }
 
 // UpdateDownloadStatus retrieves the download status of a video and updates it in the database.

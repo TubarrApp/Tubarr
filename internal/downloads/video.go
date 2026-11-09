@@ -22,7 +22,6 @@ import (
 	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
-	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // buildVideoCommand builds the command to download a video using yt-dlp.
@@ -52,16 +51,12 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	// Machine-readable progress lines.
 	args = append(args, command.Progress, command.ProgressNewline, command.ProgressTemplate, command.ProgressTemplateFmt)
 
-	// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
-	if d.ChannelURL.Session.CookiePath != "" {
-		args = append(args, command.CookiePath, d.ChannelURL.Session.CookiePath)
-	}
-	if d.ChannelURL.ChanURLSettings.CookiesFromBrowser != "" {
-		args = append(args, command.CookiesFromBrowser, d.ChannelURL.ChanURLSettings.CookiesFromBrowser)
-	}
-	if d.ChannelURL.Session.CookiePath == "" && d.ChannelURL.ChanURLSettings.CookiesFromBrowser == "" {
+	// Cookie file and browser cookies.
+	cookies := cookieArgs(d.ChannelURL)
+	if len(cookies) == 0 {
 		logger.Pl.D(1, "No cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
+	args = append(args, cookies...)
 
 	// Max filesize specified.
 	if d.ChannelURL.ChanURLSettings.MaxFilesize != "" {
@@ -125,23 +120,11 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	args = append(args, command.SleepRequests...)
 
 	// Additional user arguments.
-	if extra := d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs; extra != "" {
-		extraArgs, err := sharedparsing.ShellSplit(extra)
-		if err != nil {
-			return nil, err
-		}
-
-		// Refuse extra yt-dlp arguments containing disallowed options.
-		if allowInsecureStr, allowInsecure := os.LookupEnv(sharedconsts.EnvAllowInsecureArguments); !allowInsecure || (allowInsecureStr == "" || (allowInsecureStr != "1" && allowInsecureStr != "true")) {
-			if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
-				logger.Pl.W("Refusing extra YT-DLP arguments for video URL %q: Option %q is not allowed for YT-DLP.", d.Video.URL, blockedKey)
-			} else {
-				args = append(args, extraArgs...)
-			}
-		} else {
-			args = append(args, extraArgs...)
-		}
+	extra, err := extraArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs, d.Video.URL)
+	if err != nil {
+		return nil, err
 	}
+	args = append(args, extra...)
 
 	// Add preferred codecs.
 	switch {

@@ -567,26 +567,6 @@ func (ss *serverStore) handleGetDownloads(w http.ResponseWriter, r *http.Request
 	writeJSON(w, r, http.StatusOK, allDownloads)
 }
 
-// handleCancelDownload cancels an active download by video ID.
-func (ss *serverStore) handleCancelDownload(w http.ResponseWriter, r *http.Request) {
-	videoIDStr := chi.URLParam(r, consts.WebParamVideoID)
-	videoID, err := strconv.ParseInt(videoIDStr, 10, 64)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid video ID %q: %v", videoIDStr, err), http.StatusBadRequest)
-		return
-	}
-
-	if err := ss.cancelDownload(videoID); err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, errNoActiveDownload) {
-			status = http.StatusNotFound
-		}
-		http.Error(w, fmt.Sprintf("failed to cancel download: %v", err), status)
-		return
-	}
-	writeJSON(w, r, http.StatusOK, map[string]string{"message": "Download canceled successfully"})
-}
-
 // handleCancelDownloads cancels several downloads by video ID.
 func (ss *serverStore) handleCancelDownloads(w http.ResponseWriter, r *http.Request) {
 	var body struct {

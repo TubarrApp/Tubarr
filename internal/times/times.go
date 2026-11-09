@@ -17,7 +17,7 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
-// StartupWait adds a 0–30 minute wait time with a visible countdown.
+// StartupWait adds a random wait of up to consts.DefaultStartupStaggerMinutes with a visible countdown.
 // This is used to help avoid bot detection.
 func StartupWait(ctx context.Context) error {
 	if abstractions.GetBool(keys.SkipInitialWait) || abstractions.GetBool(keys.SkipAllWaits) {
@@ -25,7 +25,7 @@ func StartupWait(ctx context.Context) error {
 		return nil
 	}
 
-	// Add random stagger on startup (0–30 minutes)
+	// Add random stagger on startup.
 	stagger := RandomMinsDuration(consts.DefaultStartupStaggerMinutes)
 	logger.Pl.I("Waiting %v before beginning channel check (helps hide cronjobs from bot detection). To skip startup jitter, use:\n\ntubarr -s\n", stagger.Round(time.Second))
 

@@ -12,9 +12,9 @@ import (
 	"tubarr/internal/blocking"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
+	"tubarr/internal/limits"
 	"tubarr/internal/metadata"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -23,7 +23,6 @@ import (
 	"tubarr/internal/times"
 	"tubarr/internal/validation"
 
-	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
 
@@ -44,15 +43,8 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 		logger.Pl.W("Failed to clean expired blocks: %v", err)
 	}
 
-	// Get crawl concurrency (0 = unlimited, meaning all channels can crawl simultaneously).
-	conc := abstractions.GetInt(keys.CrawlConcurrency)
-	if conc <= 0 {
-		conc = len(channels) // Unlimited: allow all channels to crawl at once.
-	}
-
 	var (
 		errChan = make(chan error, len(channels))
-		sem     = make(chan struct{}, conc)
 		wg      sync.WaitGroup
 	)
 
@@ -63,7 +55,17 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 			continue
 		}
 
-		// Load in config file.
+		// Crawl the URLs due, each on its own crawl frequency or the channel's.
+		now := time.Now()
+		due, next := c.DueURLs(now, 0, false)
+		if len(due) == 0 {
+			if next >= 0 && !c.ChanSettings.Paused {
+				logger.Pl.P("Channel %q: next check in %s\n", c.Name, next.Round(time.Second))
+			}
+			continue
+		}
+
+		// The config file may change what's due, or pause the channel.
 		file.UpdateFromConfigFile(s.ChannelStore(), c)
 
 		// Ignore channel if paused.
@@ -71,13 +73,7 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 			logger.Pl.I("Channel with name %q is paused, skipping checks.", c.Name)
 			continue
 		}
-
-		// Crawl the URLs due, each on its own crawl frequency or the channel's.
-		due, next := c.DueURLs(time.Now(), 0, false)
-		if len(due) == 0 {
-			if next >= 0 {
-				logger.Pl.P("Channel %q: next check in %s\n", c.Name, next.Round(time.Second))
-			}
+		if due, _ = c.DueURLs(now, 0, false); len(due) == 0 {
 			continue
 		}
 		logger.Pl.I("Channel %q: %d URL(s) due a crawl", c.Name, len(due))
@@ -86,10 +82,11 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 
 		// Run concurrent jobs.
 		wg.Go(func() {
-			sem <- struct{}{}
-			defer func() {
-				<-sem
-			}()
+			if err := limits.AcquireSlot(ctx, limits.GlobalCrawls, "crawl", ch.Name); err != nil {
+				logger.Pl.D(1, "Crawl for channel %q did not start: %v", ch.Name, err)
+				return
+			}
+			defer limits.GlobalCrawls.Release()
 
 			// Initiate crawl.
 			if performedCrawls, err := CrawlChannel(ctx, s, dq, &ch); err != nil {

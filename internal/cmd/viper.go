@@ -19,8 +19,8 @@ func InitProgramFlags(rootCmd *cobra.Command) {
 	// Output benchmarking files
 	rootCmd.PersistentFlags().Bool(keys.Benchmarking, false, "Benchmarks the program")
 
-	// Global Concurrency
-	rootCmd.PersistentFlags().StringP(keys.CrawlConcurrency, "c", "", "Concurrency for this instance of Tubarr")
+	// Global Crawl Concurrency
+	rootCmd.PersistentFlags().IntP(keys.CrawlConcurrency, "c", 0, "Maximum channels crawled at once (0 = unlimited)")
 
 	// Global Download Concurrency
 	rootCmd.PersistentFlags().Int(keys.GlobalDownloadConcurrency, 0, "Maximum concurrent video downloads across all channels (0 = unlimited)")

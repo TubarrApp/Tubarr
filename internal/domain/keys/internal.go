@@ -4,8 +4,3 @@ package keys
 const (
 	TerminalRunDefaultBehavior = "terminalRunDefaultBehavior"
 )
-
-// Benchmarking
-const (
-	BenchFiles string = "benchFiles"
-)

@@ -36,7 +36,6 @@ const (
 	FlareSolverrURL   string = "flaresolverr-url"
 	VideoDir          string = "video-directory"
 	JSONDir           string = "json-directory"
-	MetarrPreset      string = "metarr-preset"
 )
 
 // Transcoding.
@@ -76,7 +75,6 @@ const (
 	DomainDownloadLimits      string = "domain-download-limits"
 	DomainCrawlLimits         string = "domain-crawl-limits"
 	URLFile                   string = "url-file"
-	URLAdd                    string = "add-url"
 	URLs                      string = "urls"
 	ChannelURL                string = "channel-url"
 	URL                       string = "url"
@@ -104,12 +102,6 @@ const (
 	MoveOpsReplaceInherited   string = "move-ops-replace-inherited"
 )
 
-// Database operations.
-const (
-	DBOpsInput   string = "db-ops"
-	ChanOpsInput string = "channel-ops"
-)
-
 // Metarr operations.
 const (
 	MMetaOps                 string = "metarr-meta-ops"
@@ -126,11 +118,6 @@ const (
 	MRenameStyle             string = "metarr-rename-style"
 	MMaxCPU                  string = "metarr-max-cpu"
 	MMinFreeMem              string = "metarr-min-free-mem"
-	MMetaOverwrite           string = "metarr-meta-overwrite"
-	MMetaPreserve            string = "metarr-meta-preserve"
-	MNoFileOverwrite         string = "metarr-no-file-overwrite"
-	MTranscodeAudioCodec     string = "metarr-transcode-audio-codecs"
-	MTranscodeVideoCodec     string = "metarr-transcode-video-codec"
 	MConcurrency             string = "metarr-concurrency"
 	MOutputDir               string = "metarr-output-directory"
 	MOutputExt               string = "metarr-output-ext"

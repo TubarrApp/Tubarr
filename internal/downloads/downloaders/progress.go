@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"strings"
 	"tubarr/internal/domain/command"
-	"tubarr/internal/domain/consts"
 )
 
 // Name resolves a yt-dlp external downloader setting (name, path, or "PROTO:NAME") to its downloader name, as yt-dlp does.
@@ -55,7 +54,7 @@ func (p *ProgressParser) Parse(line string) (pct, speed float64, ok bool) {
 
 	switch p.downloader {
 	case command.DownloaderAria:
-		ok, p.ariaTotal, p.ariaDone, pct, _ = Aria2OutputParser(line, p.ariaTotal, p.ariaDone, p.pct, consts.DLStatusDownloading)
+		ok, p.ariaTotal, p.ariaDone, pct = Aria2OutputParser(line, p.ariaTotal, p.ariaDone, p.pct)
 	case command.DownloaderAxel:
 		pct, ok = AxelProgressParser(line)
 	case command.DownloaderCurl:

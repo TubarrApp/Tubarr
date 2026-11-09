@@ -51,7 +51,6 @@ type ChannelFlagValues struct {
 	FilenameOps         []string
 	FilteredMetaOps     []string
 	FilteredFilenameOps []string
-	URLOutputDirs       []string
 
 	// Replace inherited filters and operations
 	FiltersReplaceInherited             bool

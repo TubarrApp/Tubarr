@@ -39,7 +39,7 @@ type videoKey struct {
 type claim struct {
 	download bool               // Held by a download, which other downloads can't take over.
 	stops    int                // How many times the channel had been stopped when its download took the video.
-	entry    *QueueEntry        // Set while the video is in the queue.
+	entry    *Entry             // Set while the video is in the queue.
 	cancel   context.CancelFunc // Cancels the video's Metarr run, set with entry.
 	done     chan struct{}      // Closed when the video is released.
 }
@@ -281,9 +281,9 @@ func (q *PostProcessingQueue) Abort(channelID int64) (n int) {
 }
 
 // Entries returns the videos in the queue, oldest first.
-func (q *PostProcessingQueue) Entries() []QueueEntry {
+func (q *PostProcessingQueue) Entries() []Entry {
 	q.mu.Lock()
-	entries := make([]QueueEntry, 0, len(q.claims))
+	entries := make([]Entry, 0, len(q.claims))
 	for _, cl := range q.claims {
 		if cl.entry != nil {
 			entries = append(entries, *cl.entry)
@@ -296,7 +296,7 @@ func (q *PostProcessingQueue) Entries() []QueueEntry {
 			entries[i].Progress = metarr.VideoProgress(entries[i].VideoID)
 		}
 	}
-	slices.SortFunc(entries, func(a, b QueueEntry) int { return a.QueuedAt.Compare(b.QueuedAt) })
+	slices.SortFunc(entries, func(a, b Entry) int { return a.QueuedAt.Compare(b.QueuedAt) })
 	return entries
 }
 
@@ -337,7 +337,7 @@ func (q *PostProcessingQueue) Wait(ctx context.Context) bool {
 }
 
 // add puts a video in the queue for a Metarr run, returning false if a download holds it or it's already in the queue.
-func (q *PostProcessingQueue) add(key videoKey, e *QueueEntry, cancel context.CancelFunc) (*claim, bool) {
+func (q *PostProcessingQueue) add(key videoKey, e *Entry, cancel context.CancelFunc) (*claim, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, held := q.claims[key]; held {

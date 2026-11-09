@@ -13,6 +13,7 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
+	"tubarr/internal/limits"
 	"tubarr/internal/models"
 	"tubarr/internal/siterules"
 
@@ -141,9 +142,9 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 // Caches within the current crawl session for performance, but fresh CookieManager per crawl.
 func (cm *CookieManager) GetGlobalCookies(u string) ([]*http.Cookie, error) {
 	logger.Pl.I("Retrieving global cookies for URL: %q", u)
-	baseDomain, err := getBaseDomain(u)
-	if err != nil {
-		return nil, fmt.Errorf("error extracting base domain in cookie grab: %w", err)
+	baseDomain := limits.Hostname(u)
+	if baseDomain == "" {
+		return nil, fmt.Errorf("error extracting base domain in cookie grab from URL %q", u)
 	}
 
 	// Check if cookies already exist for domain in this session.

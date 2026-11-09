@@ -15,7 +15,6 @@ const (
 	FilenameOps        = "--filename-ops"
 	PurgeOriginalVideo = "--purge-original-video"
 	OutputDir          = "--output-directory"
-	PurgeMetaFile      = "--purge-metafile"
 )
 
 // Metadata operations.
