@@ -70,9 +70,6 @@ func (q *DownloadQueue) process(d *download) error {
 	if err := downloads.CheckIfAvoidURL(v, cu, cs.GetDB()); err != nil {
 		return err
 	}
-	if err := DomainBlocked(cu); err != nil {
-		return err
-	}
 
 	// Bot detection avoidance wait time.
 	if err := times.WaitTime(d.startCtx, times.RandomSecsDuration(consts.DefaultBotAvoidanceSeconds), c.Name, "", v.URL); err != nil {
@@ -85,8 +82,25 @@ func (q *DownloadQueue) process(d *download) error {
 	}
 	cu = d.cu // Download As may have given the video yt-dlp options of its own.
 
-	// Process JSON metadata phase.
+	// Wait for a download slot for its domain, then a global one, held through the metadata fetch and the download.
+	d.SetStatus(v, consts.DLStatusQueued, 0, "Waiting for download slot", nil)
+	domainSem, err := limits.DomainDownloads.Acquire(d.startCtx, v.URL)
+	if err != nil {
+		return err
+	}
+	defer domainSem.Release()
+	if err := limits.AcquireSlot(d.startCtx, limits.GlobalDownloads, "global download", v.URL); err != nil {
+		return err
+	}
+	defer limits.GlobalDownloads.Release()
+
+	// Use custom scraper if needed.
 	d.SetStatus(v, consts.DLStatusQueued, 0, "Fetching metadata", nil)
+	if v.Files.JSONFilePath, err = executeCustomScraper(d.startCtx, d.session.scraper, v, cu.Session.Cookies); err != nil {
+		return fmt.Errorf("custom scraper failed: %w", err)
+	}
+
+	// Process JSON metadata phase.
 	proceed, err := processJSON(d.startCtx, q.store.VideoStore(), q.store.DownloadStore(), d, d.dirParser, c, cu, v)
 	if err != nil {
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
@@ -98,18 +112,6 @@ func (q *DownloadQueue) process(d *download) error {
 
 	// Check move operations.
 	v.Files.MoveOpOutputDir = metadata.HandleMoveOps(v, cu, d.c, d.dirParser)
-
-	// Wait for a download slot for its domain, then a global one.
-	d.SetStatus(v, consts.DLStatusQueued, 0, "Waiting for download slot", nil)
-	domainSem, err := limits.DomainDownloads.Acquire(d.startCtx, v.URL)
-	if err != nil {
-		return err
-	}
-	defer domainSem.Release()
-	if err := limits.AcquireSlot(d.startCtx, limits.GlobalDownloads, "global download", v.URL); err != nil {
-		return err
-	}
-	defer limits.GlobalDownloads.Release()
 
 	// Process video download phase, which Stop no longer reaches.
 	if !q.startDownloading(d) {
@@ -170,11 +172,6 @@ func (q *DownloadQueue) prepare(d *download) error {
 		if err := metarr.FollowChannelURLOps(v.Overrides, cu, d.dirParser); err != nil {
 			return err
 		}
-	}
-
-	// Use custom scraper if needed.
-	if v.Files.JSONFilePath, err = executeCustomScraper(d.startCtx, d.session.scraper, v, d.cu.Session.Cookies); err != nil {
-		return fmt.Errorf("custom scraper failed: %w", err)
 	}
 	return nil
 }
@@ -321,7 +318,7 @@ func processJSON(
 
 	// ONLY download JSON if it's NOT a custom file (custom scraper already created it).
 	if v.Files.JSONCustomFile == "" {
-		dl, err := downloads.NewJSONDownload(ctx, v, cu, c, ds, tracker, &downloads.Options{
+		dl, err := downloads.NewJSONDownload(ctx, v, cu, c, ds, tracker, downloads.Options{
 			MaxAttempts:      downloadAttempts(cu),
 			RetryMaxInterval: 5,
 		})
@@ -383,7 +380,7 @@ func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c
 
 	logger.Pl.I("Processing video download for URL: %s", v.URL)
 
-	dl, err := downloads.NewVideoDownload(ctx, v, cu, c, ds, tracker, &downloads.Options{
+	dl, err := downloads.NewVideoDownload(ctx, v, cu, c, ds, tracker, downloads.Options{
 		MaxAttempts:      downloadAttempts(cu),
 		RetryMaxInterval: 20,
 	})
