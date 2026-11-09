@@ -5543,19 +5543,19 @@ func TestWithDefaultPort(t *testing.T) {
 	}
 }
 
-// TestMetarrLogURL tests that Metarr is pointed at a reachable address for each listen address.
-func TestMetarrLogURL(t *testing.T) {
+// TestLocalURL tests that Metarr and the container scripts are pointed at a reachable address for each listen address.
+func TestLocalURL(t *testing.T) {
 	for _, tc := range []struct{ scheme, addr, want string }{
-		{"http", "127.0.0.1:8827", "http://127.0.0.1:8827/metarr-logs"},
-		{"http", ":8827", "http://127.0.0.1:8827/metarr-logs"},
-		{"https", "0.0.0.0:9000", "https://127.0.0.1:9000/metarr-logs"},
-		{"https", "[::]:9000", "https://127.0.0.1:9000/metarr-logs"},
-		{"http", "192.168.1.5:8827", "http://192.168.1.5:8827/metarr-logs"},
-		{"http", "[::1]:8827", "http://[::1]:8827/metarr-logs"},
-		{"http", "localhost:8827", "http://localhost:8827/metarr-logs"},
+		{"http", "127.0.0.1:8827", "http://127.0.0.1:8827"},
+		{"http", ":8827", "http://127.0.0.1:8827"},
+		{"https", "0.0.0.0:9000", "https://127.0.0.1:9000"},
+		{"https", "[::]:9000", "https://127.0.0.1:9000"},
+		{"http", "192.168.1.5:8827", "http://192.168.1.5:8827"},
+		{"http", "[::1]:8827", "http://[::1]:8827"},
+		{"http", "localhost:8827", "http://localhost:8827"},
 	} {
-		if got := metarrLogURL(tc.scheme, tc.addr); got != tc.want {
-			t.Errorf("metarrLogURL(%q, %q) = %q, want %q", tc.scheme, tc.addr, got, tc.want)
+		if got := localURL(tc.scheme, tc.addr); got != tc.want {
+			t.Errorf("localURL(%q, %q) = %q, want %q", tc.scheme, tc.addr, got, tc.want)
 		}
 	}
 }

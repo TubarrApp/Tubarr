@@ -282,7 +282,7 @@ COPY --from=builder /build/tubarr /app/tubarr
 COPY --from=builder /build/metarr /usr/local/bin/metarr
 
 ######## Auto-updater ########
-# Updates yt-dlp and curl_cffi together at start and daily.
+# Updates yt-dlp and curl_cffi together at start and every 6 hours, once Tubarr is idle.
 COPY auto-updater.sh /usr/local/bin/auto-updater
 RUN chmod +x /usr/local/bin/auto-updater
 
@@ -323,9 +323,9 @@ ENV TUBARR_WEB_ADDRESS=:8827
 EXPOSE 8827
 VOLUME ["/home/tubarr/.tubarr", "/downloads", "/metadata"]
 
+# Tubarr writes the URL it serves on to the temp file at startup. Certificates aren't checked, as most are self-signed.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8827/health || \
-      wget --no-verbose --tries=1 --spider --no-check-certificate https://localhost:8827/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider --no-check-certificate "$(cat "${TMPDIR:-/tmp}/tubarr-web-url")/health" || exit 1
 
 # tini runs as PID 1, reaping processes orphaned by yt-dlp, ffmpeg and the external downloaders.
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]

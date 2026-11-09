@@ -74,8 +74,8 @@ func withDefaultPort(addr string) string {
 	return net.JoinHostPort(strings.Trim(addr, "[]"), defaultTubarrPort)
 }
 
-// metarrLogURL returns the URL Metarr posts its logs to, using loopback when listening on all addresses.
-func metarrLogURL(scheme, addr string) string {
+// localURL returns the base URL to reach the server on from the same machine, using loopback when listening on all addresses.
+func localURL(scheme, addr string) string {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return ""
@@ -83,8 +83,11 @@ func metarrLogURL(scheme, addr string) string {
 	if ip, err := netip.ParseAddr(host); host == "" || (err == nil && ip.IsUnspecified()) {
 		host = "127.0.0.1"
 	}
-	return scheme + "://" + net.JoinHostPort(host, port) + serverauth.MetarrLogsPath
+	return scheme + "://" + net.JoinHostPort(host, port)
 }
+
+// webURLFile is the temp file holding localURL, read by the container healthcheck and yt-dlp updater.
+const webURLFile = "tubarr-web-url"
 
 // healthPath is the container healthcheck endpoint.
 const healthPath = "/health"
@@ -283,7 +286,15 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 		return err
 	}
 	addr := listenAddress()
-	vars.MetarrLogURL = metarrLogURL(scheme, addr)
+	if baseURL := localURL(scheme, addr); baseURL != "" {
+		vars.MetarrLogURL = baseURL + serverauth.MetarrLogsPath
+
+		// Tells the container scripts where the server is, whichever of --web-address or TUBARR_WEB_ADDRESS set it.
+		urlFile := filepath.Join(os.TempDir(), webURLFile)
+		if err := os.WriteFile(urlFile, []byte(baseURL+"\n"), 0o600); err != nil {
+			logger.Pl.W("Failed to write %s, the Docker healthcheck and yt-dlp updater won't find the web server: %v", urlFile, err)
+		}
+	}
 
 	srv := &http.Server{
 		Addr:              addr,
