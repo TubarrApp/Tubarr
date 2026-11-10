@@ -1037,18 +1037,22 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 				return
 			}
 		}
-		if err := checkOverridesFit(ss.cs, c, channelURLID, overrides); err != nil {
+		cu, defaults, err := channelURLDefaults(ss.cs, c, channelURLID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if err := checkOverridesFit(cu, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Options no different from the channel URL's aren't overrides, so the video keeps following the channel URL's.
 		// Otherwise the channel URL's ops are kept with them, so its lines can be refreshed.
-		if matchesChannelURL(ss.cs, c, channelURLID, overrides) {
+		if matchesChannelURL(cu, defaults, overrides) {
 			overrides = nil
-		} else if overrides.ChannelURLOps, err = channelURLOps(ss.cs, c, channelURLID); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
+		} else {
+			overrides.ChannelURLOps = defaults.Ops()
 		}
 	}
 
@@ -1410,18 +1414,22 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 			}
 			channelURLID = awaiting[i].ChannelURLID
 		}
-		if err := checkOverridesFit(ss.cs, c, channelURLID, overrides); err != nil {
+		cu, defaults, err := channelURLDefaults(ss.cs, c, channelURLID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if err := checkOverridesFit(cu, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// Options no different from the channel URL's aren't overrides, so the videos go back to the channel URL's.
 		// Otherwise the channel URL's ops are kept with them, so its lines can be refreshed.
-		if matchesChannelURL(ss.cs, c, channelURLID, overrides) {
+		if matchesChannelURL(cu, defaults, overrides) {
 			overrides = nil
-		} else if overrides.ChannelURLOps, err = channelURLOps(ss.cs, c, channelURLID); err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
+		} else {
+			overrides.ChannelURLOps = defaults.Ops()
 		}
 		if err := ss.vs.SetVideoOverrides(requestBody.VideoIDs, overrides); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

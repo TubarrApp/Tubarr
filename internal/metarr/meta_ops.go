@@ -51,12 +51,12 @@ func LoadMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.Met
 		return nil, nil
 	}
 
-	metaOpsFile, err := dp.ParseDirectory(path, "meta ops")
+	metaOpsFile, err := dp.ParseDirectory(path, "meta ops file")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse meta ops file path %q: %w", path, err)
 	}
 
-	logger.Pl.I("Adding meta ops from file %q...", metaOpsFile)
+	dp.C.Log().D(1, "Adding meta ops from file %q...", metaOpsFile)
 	ops, err := file.ReadOpLines(metaOpsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read meta ops file: %w", err)
@@ -68,7 +68,7 @@ func LoadMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.Met
 		return nil, fmt.Errorf("invalid meta ops in %q: %w", metaOpsFile, err)
 	}
 
-	logger.Pl.I("Loaded %d meta ops from file", len(parsedOps))
+	dp.C.Log().D(1, "Loaded %d meta ops from file", len(parsedOps))
 	return parsedOps, nil
 }
 

@@ -151,6 +151,16 @@ type OverrideLines struct {
 	YTDLPPreferredAudioCodecs string `json:"ytdlp_preferred_audio_codecs"`
 }
 
+// Ops returns the lines' op boxes.
+func (l OverrideLines) Ops() *OpLines {
+	return &OpLines{
+		MetaOps:             l.MetaOps,
+		FilteredMetaOps:     l.FilteredMetaOps,
+		FilenameOps:         l.FilenameOps,
+		FilteredFilenameOps: l.FilteredFilenameOps,
+	}
+}
+
 // SkipMetarr skips Metarr processing with a given reason.
 type SkipMetarr struct {
 	Skip   bool

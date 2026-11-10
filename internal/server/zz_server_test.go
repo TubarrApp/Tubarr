@@ -5122,6 +5122,7 @@ func TestCheckOverridesFit(t *testing.T) {
 	c := &models.Channel{URLModels: []*models.ChannelURL{
 		{ID: 1, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeVideoCodecs: []string{"h264"}}},
 		{ID: 2, ChanURLMetarrArgs: &models.MetarrArgs{OutputExt: "webm"}},
+		{ID: 3},
 		{ID: 4, ChanURLMetarrArgs: &models.MetarrArgs{ExtraFFmpegArgs: "-af volume=0.5", TranscodeAudioCodecs: []string{"aac"}}},
 		{ID: 5, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeGPU: "cuda", TranscodeVideoArgs: []string{"av1:-preset p5"}}},
 	}}
@@ -5136,7 +5137,7 @@ func TestCheckOverridesFit(t *testing.T) {
 		{"webm replacing the URL's h264 with vp9", 1, models.MetarrArgs{OutputExt: "webm", TranscodeVideoCodecs: []string{"vp9"}}, true},
 		{"h264 under the URL's webm", 2, models.MetarrArgs{TranscodeVideoCodecs: []string{"h264"}}, false},
 		{"mp4 replacing the URL's webm", 2, models.MetarrArgs{OutputExt: "mp4", TranscodeVideoCodecs: []string{"h264"}}, true},
-		{"unknown URL", 3, models.MetarrArgs{OutputExt: "webm"}, true},
+		{"URL with no Metarr args", 3, models.MetarrArgs{OutputExt: "webm"}, true},
 		{"a copy line", 1, models.MetarrArgs{TranscodeVideoArgs: []string{"copy:-crf 20"}}, false},
 		{"an NVENC preset with no GPU", 1, models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}}, false},
 		{"an NVENC preset under the URL's GPU", 5, models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}}, true},
@@ -5147,7 +5148,7 @@ func TestCheckOverridesFit(t *testing.T) {
 		{"another audio codec with the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"ac3"}, ExtraFFmpegArgs: "-af volume=0.5"}, true},
 	}
 	for _, tt := range tests {
-		err := checkOverridesFit(&repo.ChannelStore{}, c, tt.urlID, &models.VideoOverrides{MetarrArgs: tt.o})
+		err := checkOverridesFit(c.URLByID(tt.urlID), &models.VideoOverrides{MetarrArgs: tt.o})
 		if (err == nil) != tt.fits {
 			t.Errorf("%s: got error %v, want fits %t", tt.name, err, tt.fits)
 		}
@@ -5187,7 +5188,6 @@ func TestMatchesChannelURL(t *testing.T) {
 	}
 	cu.Levels = []models.SettingsLevel{{Settings: cu.ChanURLSettings, MetarrArgs: cu.ChanURLMetarrArgs}} // As loading it would.
 	c := &models.Channel{URLModels: []*models.ChannelURL{cu}}
-	cs := &repo.ChannelStore{}
 
 	// The dialog's defaults sent back as Revert to Defaults leaves them: the channel URL's ops, the rest blank.
 	defaults, err := metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
@@ -5203,7 +5203,7 @@ func TestMatchesChannelURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !matchesChannelURL(cs, c, cu.ID, sent) {
+	if !matchesChannelURL(cu, defaults, sent) {
 		t.Fatalf("the dialog's defaults %+v didn't match the channel URL's", defaults)
 	}
 
@@ -5229,7 +5229,7 @@ func TestMatchesChannelURL(t *testing.T) {
 		o.FilteredMetaOps = sent.FilteredMetaOps
 		o.FilenameOps = sent.FilenameOps
 		o.FilteredFilenameOps = sent.FilteredFilenameOps
-		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+		if got := matchesChannelURL(cu, defaults, &o); got != tt.matches {
 			t.Errorf("%s: got match %t, want %t", tt.name, got, tt.matches)
 		}
 	}
@@ -5252,7 +5252,7 @@ func TestMatchesChannelURL(t *testing.T) {
 		cu.ChanURLMetarrArgs.WriteNFO = tt.url
 		o := *sent
 		o.WriteNFO = tt.got
-		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+		if got := matchesChannelURL(cu, defaults, &o); got != tt.matches {
 			t.Errorf("Write NFO Files, %s: got match %t, want %t", tt.name, got, tt.matches)
 		}
 	}
@@ -5277,7 +5277,7 @@ func TestMatchesChannelURL(t *testing.T) {
 		cu.ChanURLMetarrArgs.PurgeOriginalVideo = tt.url
 		o := *sent
 		o.PurgeOriginalVideo = tt.got
-		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+		if got := matchesChannelURL(cu, defaults, &o); got != tt.matches {
 			t.Errorf("Keep Original Video Files, %s: got match %t, want %t", tt.name, got, tt.matches)
 		}
 	}
@@ -5291,7 +5291,7 @@ func TestMatchesChannelURL(t *testing.T) {
 	for name, ops := range map[string][]models.MetaOps{"emptied": nil, "added to": moreOps} {
 		o := *sent
 		o.MetaOps = ops
-		if matchesChannelURL(cs, c, cu.ID, &o) {
+		if matchesChannelURL(cu, defaults, &o) {
 			t.Errorf("meta ops %s matched the channel URL's", name)
 		}
 	}
@@ -5325,7 +5325,7 @@ func TestMatchesChannelURL(t *testing.T) {
 		o.TranscodeAudioCodecs = tt.audio
 		o.TranscodeVideoArgs = tt.args
 		o.ExtraFFmpegArgs = tt.extra
-		if got := matchesChannelURL(cs, c, cu.ID, &o); got != tt.matches {
+		if got := matchesChannelURL(cu, defaults, &o); got != tt.matches {
 			t.Errorf("transcode boxes, %s: got match %t, want %t", tt.name, got, tt.matches)
 		}
 	}

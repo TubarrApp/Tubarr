@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
 ###############################
-# 1. Builder stage (Ubuntu)
+# 1. Build base (Ubuntu)
 ###############################
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:24.04 AS build-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -40,12 +40,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libva-dev \
     libva-drm2 \
     libdrm-dev \
-    intel-media-va-driver-non-free \
-    libmfx-gen1.2 \
-    \
-    # NVIDIA NVENC/NVDEC runtime libs
-    libnvidia-encode-550 \
-    libnvidia-decode-550 \
     \
     # FFprobe / misc
     zlib1g-dev \
@@ -60,6 +54,11 @@ RUN wget https://go.dev/dl/go1.27.3.linux-amd64.tar.gz && \
 
 ENV PATH="/usr/local/go/bin:${PATH}"
 WORKDIR /build
+
+###############################
+# 2. FFmpeg builder
+###############################
+FROM build-base AS ffmpeg-builder
 
 ############ NVENC headers ############
 # Pinned: newer headers raise the minimum host driver (n13.1 needs 610+, dropping Maxwell/Pascal/Volta cards).
@@ -153,6 +152,12 @@ RUN ls -la /usr/local/bin
 RUN test -f /usr/local/bin/ffmpeg
 RUN test -f /usr/local/bin/ffprobe
 
+###############################
+# 3. Go builder
+###############################
+# Separate from the FFmpeg builder so both build at the same time.
+FROM build-base AS go-builder
+
 ############ Build Tubarr ############
 COPY go.mod go.sum ./
 RUN go mod download
@@ -176,7 +181,7 @@ RUN git clone --depth 1 --branch "$METARR_REF" https://github.com/TubarrApp/Meta
         -o /build/metarr ./cmd/metarr
 
 ###############################
-# 2. Runtime Stage (Ubuntu)
+# 4. Runtime Stage (Ubuntu)
 ###############################
 FROM ubuntu:24.04
 
@@ -242,9 +247,9 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
 RUN chmod 1777 /tmp
 
 ######## Install FFmpeg runtime ########
-COPY --from=builder /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
-COPY --from=builder /usr/local/bin/ffprobe /usr/local/bin/ffprobe
-COPY --from=builder /usr/local/lib/ /usr/local/lib/
+COPY --from=ffmpeg-builder /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
+COPY --from=ffmpeg-builder /usr/local/bin/ffprobe /usr/local/bin/ffprobe
+COPY --from=ffmpeg-builder /usr/local/lib/ /usr/local/lib/
 RUN ldconfig
 
 ######## Install yt-dlp (nightly) with a compatible curl_cffi ########
@@ -269,8 +274,8 @@ RUN wget -O /tmp/deno.zip \
     rm /tmp/deno.zip
 
 ######## Copy Tubarr + Metarr ########
-COPY --from=builder /build/tubarr /app/tubarr
-COPY --from=builder /build/metarr /usr/local/bin/metarr
+COPY --from=go-builder /build/tubarr /app/tubarr
+COPY --from=go-builder /build/metarr /usr/local/bin/metarr
 
 ######## Auto-updater ########
 # Updates yt-dlp and curl_cffi together at start and every 6 hours, once Tubarr is idle.
@@ -279,7 +284,7 @@ RUN chmod +x /usr/local/bin/auto-updater
 
 ######## App files ########
 WORKDIR /app
-COPY --from=builder /build/web /app/web
+COPY --from=go-builder /build/web /app/web
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

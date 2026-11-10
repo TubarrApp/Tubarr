@@ -60,12 +60,12 @@ func LoadFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models
 		return nil, nil
 	}
 
-	filenameOpsFile, err := dp.ParseDirectory(path, "filename ops")
+	filenameOpsFile, err := dp.ParseDirectory(path, "filename ops file")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse filename ops file path %q: %w", path, err)
 	}
 
-	logger.Pl.I("Adding filename ops from file %q...", filenameOpsFile)
+	dp.C.Log().D(1, "Adding filename ops from file %q...", filenameOpsFile)
 	ops, err := file.ReadOpLines(filenameOpsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read filename ops file: %w", err)
@@ -77,7 +77,7 @@ func LoadFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models
 		return nil, fmt.Errorf("invalid filename ops in %q: %w", filenameOpsFile, err)
 	}
 
-	logger.Pl.I("Loaded %d filename ops from file", len(parsedOps))
+	dp.C.Log().D(1, "Loaded %d filename ops from file", len(parsedOps))
 	return parsedOps, nil
 }
 

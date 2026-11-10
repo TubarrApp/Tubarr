@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -328,19 +327,19 @@ func loadFilterOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.F
 		return nil, nil
 	}
 
-	filterFile, err := dp.ParseDirectory(path, "filter-ops")
+	filterFile, err := dp.ParseDirectory(path, "filter file")
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to parse path %q: %w", errFilterFile, path, err)
 	}
 
-	logger.Pl.I("Adding filters from file %q...", filterFile)
+	dp.C.Log().D(1, "Adding filters from file %q...", filterFile)
 	filters, err := file.ReadFileLines(filterFile)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errFilterFile, err)
 	}
 
 	if len(filters) == 0 {
-		logger.Pl.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
+		dp.C.Log().I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
 		return nil, nil
 	}
 
@@ -355,7 +354,7 @@ func loadFilterOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.F
 		return nil, fmt.Errorf("%w: invalid filters in %q: %w", errFilterFile, filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		logger.Pl.D(1, "Found following filters in file:\n\n%v", parsedFilters)
+		dp.C.Log().D(1, "Found following filters in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters, nil
@@ -369,19 +368,19 @@ func LoadFilteredMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]mo
 		return nil, nil
 	}
 
-	filterFile, err := dp.ParseDirectory(path, "metarr-filtered-meta-ops")
+	filterFile, err := dp.ParseDirectory(path, "filtered meta ops file")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse filtered meta ops file path %q: %w", path, err)
 	}
 
-	logger.Pl.I("Adding filtered meta ops from file %q...", filterFile)
+	dp.C.Log().D(1, "Adding filtered meta ops from file %q...", filterFile)
 	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read filtered meta ops file: %w", err)
 	}
 
 	if len(filters) == 0 {
-		logger.Pl.I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
+		dp.C.Log().I("No valid filters found in file. Format is one per line 'title:contains:dogs:must' (Only download videos with 'dogs' in the title)")
 		return nil, nil
 	}
 
@@ -391,7 +390,7 @@ func LoadFilteredMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]mo
 		return nil, fmt.Errorf("invalid filtered meta ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		logger.Pl.D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
+		dp.C.Log().D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters, nil
@@ -405,19 +404,19 @@ func LoadFilteredFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) (
 		return nil, nil
 	}
 
-	filterFile, err := dp.ParseDirectory(path, "metarr-filtered-filename-ops")
+	filterFile, err := dp.ParseDirectory(path, "filtered filename ops file")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse filtered filename ops file path %q: %w", path, err)
 	}
 
-	logger.Pl.I("Adding filtered filename ops from file %q...", filterFile)
+	dp.C.Log().D(1, "Adding filtered filename ops from file %q...", filterFile)
 	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read filtered filename ops file: %w", err)
 	}
 
 	if len(filters) == 0 {
-		logger.Pl.I("No valid filtered filename ops found in file. Format is one per line 'title:contains:dogs:must' (Only apply filename ops to videos with 'dogs' in the title)")
+		dp.C.Log().I("No valid filtered filename ops found in file. Format is one per line 'title:contains:dogs:must' (Only apply filename ops to videos with 'dogs' in the title)")
 		return nil, nil
 	}
 
@@ -427,7 +426,7 @@ func LoadFilteredFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) (
 		return nil, fmt.Errorf("invalid filtered filename ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		logger.Pl.D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
+		dp.C.Log().D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters, nil
@@ -439,37 +438,37 @@ func loadMoveOpsFromFile(path string, dp *parsing.DirectoryParser) []models.Meta
 		return nil
 	}
 
-	moveOpFile, err := dp.ParseDirectory(path, "move-ops")
+	moveOpFile, err := dp.ParseDirectory(path, "move ops file")
 	if err != nil {
-		logger.Pl.E("Failed to parse directory %q: %v", path, err)
+		dp.C.Log().E("Failed to parse directory %q: %v", path, err)
 		return nil
 	}
 
-	logger.Pl.I("Adding filter move operations from file %q...", moveOpFile)
+	dp.C.Log().D(1, "Adding filter move operations from file %q...", moveOpFile)
 	moves, err := file.ReadFileLines(moveOpFile)
 	if err != nil {
-		logger.Pl.E("Error loading filter move operations from file %q: %v", moveOpFile, err)
+		dp.C.Log().E("Error loading filter move operations from file %q: %v", moveOpFile, err)
 	}
 
 	if len(moves) == 0 {
-		logger.Pl.I("No valid filter move operations found in file. Format is one per line 'title:contains:dogs||/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs')")
+		dp.C.Log().I("No valid filter move operations found in file. Format is one per line 'title:contains:dogs||/home/dogs' (Metarr outputs files with 'dogs' in the title to '/home/dogs')")
 		return nil
 	}
 
 	// Parse meta filter move ops from strings
 	parsedMoves, err := parsing.ParseMetaFilterMoveOps(moves)
 	if err != nil {
-		logger.Pl.E("Error parsing filter move operations from file %q: %v", moveOpFile, err)
+		dp.C.Log().E("Error parsing filter move operations from file %q: %v", moveOpFile, err)
 		return nil
 	}
 
 	// Validate the parsed ops
 	if err := validation.ValidateMetaFilterMoveOps(parsedMoves, true); err != nil {
-		logger.Pl.E("Error validating filter move operations from file %q: %v", moveOpFile, err)
+		dp.C.Log().E("Error validating filter move operations from file %q: %v", moveOpFile, err)
 		return nil
 	}
 	if len(parsedMoves) > 0 {
-		logger.Pl.D(1, "Found following filter move operations in file:\n\n%v", parsedMoves)
+		dp.C.Log().D(1, "Found following filter move operations in file:\n\n%v", parsedMoves)
 	}
 
 	return parsedMoves

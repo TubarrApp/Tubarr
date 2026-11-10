@@ -1019,12 +1019,29 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 	return o, nil
 }
 
-// checkOverridesFit returns an error if Download As options, with blank ones using the video's channel URL's as Metarr
-// gets them, can't work together.
-func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLID int64, o *models.VideoOverrides) error {
+// channelURLDefaults returns the channel URL, with its channel's config file applied, and its ops and directories as
+// Download As shows them. Returns an error if the channel URL doesn't exist or has no settings loaded.
+func channelURLDefaults(cs contracts.ChannelStore, c *models.Channel, channelURLID int64) (*models.ChannelURL, models.OverrideLines, error) {
+	file.UpdateFromConfigFile(cs, c)
+	cu, err := queue.ManualChannelURL(cs, c, channelURLID)
+	if err != nil {
+		return nil, models.OverrideLines{}, err
+	}
+	if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
+		return nil, models.OverrideLines{}, fmt.Errorf("channel URL %q has no settings loaded", cu.URL)
+	}
+	defaults, err := metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
+	if err != nil {
+		return nil, models.OverrideLines{}, err
+	}
+	return cu, defaults, nil
+}
+
+// checkOverridesFit returns an error if Download As options, with blank ones using the channel URL's as Metarr gets
+// them, can't work together.
+func checkOverridesFit(cu *models.ChannelURL, o *models.VideoOverrides) error {
 	m := o.MetarrArgs
-	if cu, err := queue.ManualChannelURL(cs, c, channelURLID); err == nil && cu.ChanURLMetarrArgs != nil {
-		u := cu.ChanURLMetarrArgs
+	if u := cu.ChanURLMetarrArgs; u != nil {
 		m.OutputExt = cmp.Or(m.OutputExt, u.OutputExt)
 		m.TranscodeGPU = cmp.Or(m.TranscodeGPU, u.TranscodeGPU)
 		m.TranscodeGPUNode = cmp.Or(m.TranscodeGPUNode, u.TranscodeGPUNode)
@@ -1038,30 +1055,11 @@ func checkOverridesFit(cs contracts.ChannelStore, c *models.Channel, channelURLI
 	return nil
 }
 
-// channelURLOps returns the channel URL's ops as Download As shows them, kept with saved ops so its lines can be refreshed.
-func channelURLOps(cs contracts.ChannelStore, c *models.Channel, channelURLID int64) (*models.OpLines, error) {
-	file.UpdateFromConfigFile(cs, c)
-	cu, err := queue.ManualChannelURL(cs, c, channelURLID)
-	if err != nil {
-		return nil, err
-	}
-	if cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
-		return nil, fmt.Errorf("channel URL %q has no settings loaded", cu.URL)
-	}
-	return metarr.ChannelURLOpLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
-}
-
 // matchesChannelURL reports whether Download As options give the video nothing its channel URL doesn't already, so they
-// aren't overrides. Blank options use the channel URL's, and the op and transcode boxes replace its.
-func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLID int64, o *models.VideoOverrides) bool {
-	// The channel URL's settings and ops, as Download As shows them.
-	file.UpdateFromConfigFile(cs, c)
-	cu, err := queue.ManualChannelURL(cs, c, channelURLID)
-	if err != nil || cu.ChanURLSettings == nil || cu.ChanURLMetarrArgs == nil {
-		return false
-	}
-	defaults, err := metarr.ChannelURLOverrideLines(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags))
-	if err != nil {
+// aren't overrides. Blank options use the channel URL's, and the op and transcode boxes replace its, given as defaults.
+func matchesChannelURL(cu *models.ChannelURL, defaults models.OverrideLines, o *models.VideoOverrides) bool {
+	s, m := cu.ChanURLSettings, cu.ChanURLMetarrArgs
+	if s == nil || m == nil {
 		return false
 	}
 
@@ -1078,7 +1076,6 @@ func matchesChannelURL(cs contracts.ChannelStore, c *models.Channel, channelURLI
 	}
 
 	// Every other option blank or the channel URL's, merged as yt-dlp and Metarr get them.
-	s, m := cu.ChanURLSettings, cu.ChanURLMetarrArgs
 	writesNFO := m.WriteNFO != nil && *m.WriteNFO
 	purgesOriginal := m.PurgeOriginalVideo == nil || *m.PurgeOriginalVideo
 	return cmp.Or(o.VideoDir, s.VideoDir) == s.VideoDir &&

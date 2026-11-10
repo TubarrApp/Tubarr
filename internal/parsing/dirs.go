@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -49,8 +48,8 @@ func NewDirectoryParser(c *models.Channel, cu *models.ChannelURL, tagType Tubarr
 	}
 }
 
-// ParseDirectory returns the absolute directory path with template replacements.
-func (dp *DirectoryParser) ParseDirectory(dir string, fileType string) (parsedDir string, err error) {
+// ParseDirectory returns the absolute path with template replacements, logged under name (e.g. "move ops file").
+func (dp *DirectoryParser) ParseDirectory(dir string, name string) (parsedDir string, err error) {
 	if dir == "" {
 		return "", errors.New("directory sent in empty")
 	}
@@ -70,7 +69,7 @@ func (dp *DirectoryParser) ParseDirectory(dir string, fileType string) (parsedDi
 		return parsed, err
 	}
 
-	logger.Pl.I("Parsed %s file output directory as %q", fileType, parsed)
+	dp.C.Log().D(1, "Parsed %s as %q", name, parsed)
 	return parsed, nil
 }
 

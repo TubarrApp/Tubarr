@@ -48,12 +48,7 @@ func ChannelURLOpLines(cu *models.ChannelURL, dirParser *parsing.DirectoryParser
 	if err != nil {
 		return nil, err
 	}
-	return &models.OpLines{
-		MetaOps:             lines.MetaOps,
-		FilteredMetaOps:     lines.FilteredMetaOps,
-		FilenameOps:         lines.FilenameOps,
-		FilteredFilenameOps: lines.FilteredFilenameOps,
-	}, nil
+	return lines.Ops(), nil
 }
 
 // FollowChannelURLOps refreshes the channel URL's lines in a video's saved ops, from its ops and ops files as they are
