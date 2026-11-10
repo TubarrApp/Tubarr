@@ -7,15 +7,8 @@ FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Add multiverse and universe repos
-RUN sed -i 's/^# deb .*universe/deb &/' /etc/apt/sources.list \
- && sed -i 's/^# deb-src .*universe/deb-src &/' /etc/apt/sources.list \
- && sed -i 's/^# deb .*multiverse/deb &/' /etc/apt/sources.list \
- && sed -i 's/^# deb-src .*multiverse/deb-src &/' /etc/apt/sources.list \
- && apt-get update
-
-# Core build deps + Go toolchain deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core build deps + Go toolchain deps
     ca-certificates \
     git \
     wget \
@@ -28,18 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xz-utils \
     tzdata \
     sqlite3 libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Go manually (Ubuntu’s golang-go is too old)
-RUN wget https://go.dev/dl/go1.27.3.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go1.27.3.linux-amd64.tar.gz && \
-    rm go1.27.3.linux-amd64.tar.gz
-
-ENV PATH="/usr/local/go/bin:${PATH}"
-WORKDIR /build
-
-############ FFmpeg build dependencies ############
-RUN apt-get update && apt-get install -y --no-install-recommends \
+    \
+    # FFmpeg build dependencies
     # Video codecs
     libx264-dev \
     libvpx-dev \
@@ -69,6 +52,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libbz2-dev \
     libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Go manually (Ubuntu’s golang-go is too old)
+RUN wget https://go.dev/dl/go1.27.3.linux-amd64.tar.gz && \
+    tar -C /usr/local -xzf go1.27.3.linux-amd64.tar.gz && \
+    rm go1.27.3.linux-amd64.tar.gz
+
+ENV PATH="/usr/local/go/bin:${PATH}"
+WORKDIR /build
 
 ############ NVENC headers ############
 # Pinned: newer headers raise the minimum host driver (n13.1 needs 610+, dropping Maxwell/Pascal/Volta cards).
@@ -203,6 +194,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu \
     tini \
     tzdata \
+    unzip \
     wget \
     xz-utils \
     # Runtime libraries matching FFmpeg build extras
@@ -269,8 +261,7 @@ RUN python3 -m venv /opt/httpie \
     && http --version
 
 ######## Install Deno globally ########
-RUN apt-get update && apt-get install -y unzip && rm -rf /var/lib/apt/lists/* && \
-    wget -O /tmp/deno.zip \
+RUN wget -O /tmp/deno.zip \
         https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip && \
     unzip -o /tmp/deno.zip -d /usr/local/bin && \
     chmod +x /usr/local/bin/deno && \
