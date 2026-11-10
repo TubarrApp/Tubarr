@@ -115,6 +115,7 @@ const (
 	MMetaPurge               string = "metarr-purge-metafile"
 	MPurgeOriginalVideo      string = "metarr-purge-original-video"
 	MWriteNFO                string = "metarr-write-nfo"
+	MAutoPostProcess         string = "metarr-auto-post-process"
 	MRenameStyle             string = "metarr-rename-style"
 	MMaxCPU                  string = "metarr-max-cpu"
 	MMinFreeMem              string = "metarr-min-free-mem"

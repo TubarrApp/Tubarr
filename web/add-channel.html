@@ -394,6 +394,7 @@
                   metarr_purge_metafile: '',
                   metarr_purge_original_video: '',
                   metarr_write_nfo: '',
+                  metarr_auto_post_process: '',
                   metarr_output_ext: '',
                   metarr_rename_style: '',
                   metarr_concurrency: null,
@@ -458,6 +459,7 @@
               metarr_purge_metafile: '',
               metarr_purge_original_video: '',
               metarr_write_nfo: '',
+              metarr_auto_post_process: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: '',
@@ -561,6 +563,7 @@
                 metarr_purge_metafile: '',
                 metarr_purge_original_video: '',
                 metarr_write_nfo: '',
+                metarr_auto_post_process: '',
                 metarr_output_ext: '',
                 metarr_rename_style: '',
                 metarr_concurrency: null,
@@ -830,6 +833,12 @@
                 const writeNFOValue = normalizeBool(urlEntry.custom.metarr_write_nfo);
                 if (typeof writeNFOValue === 'boolean') {
                   metarr.metarr_write_nfo = writeNFOValue;
+                }
+
+                // Process Post-Process After Download from its dropdown (empty inherits from the channel)
+                const autoPostProcessValue = normalizeBool(urlEntry.custom.metarr_auto_post_process);
+                if (typeof autoPostProcessValue === 'boolean') {
+                  metarr.metarr_auto_post_process = autoPostProcessValue;
                 }
               }
 

@@ -1198,6 +1198,7 @@ func fullMetarrArgs() *models.MetarrArgs {
 		FilteredMetaOps:         []models.FilteredMetaOps{{Filters: []models.Filters{cat}, MetaOps: []models.MetaOps{{Field: "artist", OpType: "set", OpValue: "C"}}}},
 		FilteredMetaOpsFile:     "/filtered-meta-ops",
 		WriteNFO:                &yes,
+		AutoPostProcess:         &yes,
 		OutputDir:               "/out",
 		MetaPurge:               "all",
 		MetarrConcurrency:       2,

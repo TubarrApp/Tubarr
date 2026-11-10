@@ -172,6 +172,7 @@ type metarrArgsResponse struct {
 	MetaPurge               string   `json:"metarr_purge_metafile,omitempty"`
 	PurgeOriginalVideo      *bool    `json:"metarr_purge_original_video,omitempty"`
 	WriteNFO                *bool    `json:"metarr_write_nfo,omitempty"`
+	AutoPostProcess         *bool    `json:"metarr_auto_post_process,omitempty"`
 	OutputExt               string   `json:"metarr_output_ext,omitempty"`
 	RenameStyle             string   `json:"metarr_rename_style,omitempty"`
 	MetarrConcurrency       int      `json:"metarr_concurrency,omitempty"`
@@ -209,6 +210,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		MetaPurge:               m.MetaPurge,
 		PurgeOriginalVideo:      m.PurgeOriginalVideo,
 		WriteNFO:                m.WriteNFO,
+		AutoPostProcess:         m.AutoPostProcess,
 		OutputExt:               m.OutputExt,
 		RenameStyle:             m.RenameStyle,
 		MetarrConcurrency:       max(m.MetarrConcurrency, 0),
@@ -496,6 +498,7 @@ type metarrArgsInput struct {
 	MetaPurge               *string  `json:"metarr_purge_metafile"`
 	PurgeOriginalVideo      *bool    `json:"metarr_purge_original_video"`
 	WriteNFO                *bool    `json:"metarr_write_nfo"`
+	AutoPostProcess         *bool    `json:"metarr_auto_post_process"`
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
 	VideoArgs               *string  `json:"metarr_transcode_video_args"` // Newline-separated, as in the main form.
@@ -698,6 +701,7 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 		MetaPurge:               in.MetaPurge,
 		PurgeOriginalVideo:      in.PurgeOriginalVideo,
 		WriteNFO:                in.WriteNFO,
+		AutoPostProcess:         in.AutoPostProcess,
 		MetarrExt:               in.OutputExt,
 		RenameStyle:             in.RenameStyle,
 		MetaOpsFile:             in.MetaOpsFile,
@@ -909,6 +913,11 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 	if v := r.FormValue(jsonkeys.MetarrWriteNFO); v != "" {
 		writeNFO := v == "true"
 		in.WriteNFO = &writeNFO
+	}
+	// Left unset, this uses the profile's setting, else post-processes each video once it downloads.
+	if v := r.FormValue(jsonkeys.MetarrAutoPostProcess); v != "" {
+		autoPostProcess := v == "true"
+		in.AutoPostProcess = &autoPostProcess
 	}
 
 	m := &models.MetarrArgs{}

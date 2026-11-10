@@ -53,7 +53,7 @@ func New() *Scraper {
 // GetNewReleases checks a channel's URLs for new video URLs, returning those found alongside any per-URL errors.
 func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, ignoreCrawl bool) ([]*models.Video, error) {
 	if len(c.URLModels) == 0 {
-		logger.Pl.D(1, "Channel %q has no URLs configured, skipping automatic crawl", c.Name)
+		logger.Pl.Channel(c.Name).D(1, "Channel %q has no URLs configured, skipping automatic crawl", c.Name)
 		return []*models.Video{}, nil
 	}
 
@@ -73,7 +73,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		if cu.IsManual || (!ignoreCrawl && cu.Paused()) {
 			continue
 		}
-		logger.Pl.D(1, "Processing channel URL %q", cu.URL)
+		logger.Pl.Channel(c.Name).D(1, "Processing channel URL %q", cu.URL)
 
 		// Stagger crawls of the channel's URLs (the channel already waited before the first).
 		if crawledAny {
@@ -96,7 +96,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			if ctx.Err() != nil {
 				return nil, err
 			}
-			logger.Pl.E("Skipping channel URL %q, failed to get cookies: %v", cu.URL, err)
+			logger.Pl.Channel(c.Name).E("Skipping channel URL %q, failed to get cookies: %v", cu.URL, err)
 			urlErrs = errors.Join(urlErrs, fmt.Errorf("channel URL %q: %w", cu.URL, err))
 			continue
 		}
@@ -108,7 +108,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		if !c.AutoDownloads(cu) {
 			seenURLs = slices.Concat(existingURLs, failedURLs)
 			if err := cs.UseUpCrawlDLRetries(cu.ID); err != nil {
-				logger.Pl.E("Failed to use up crawl retries for channel URL %q: %v", cu.URL, err)
+				logger.Pl.Channel(c.Name).E("Failed to use up crawl retries for channel URL %q: %v", cu.URL, err)
 			}
 		}
 
@@ -119,7 +119,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			if ctx.Err() != nil {
 				return nil, err
 			}
-			logger.Pl.E("Skipping channel URL %q, crawl failed: %v", cu.URL, err)
+			logger.Pl.Channel(c.Name).E("Skipping channel URL %q, crawl failed: %v", cu.URL, err)
 			urlErrs = errors.Join(urlErrs, fmt.Errorf("channel URL %q: %w", cu.URL, err))
 			continue
 		}
@@ -133,7 +133,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 				}
 			}
 			if err := cs.AddCrawlDLRetries(c.ID, retried); err != nil {
-				logger.Pl.E("Failed to count crawl retries for channel URL %q: %v", cu.URL, err)
+				logger.Pl.Channel(c.Name).E("Failed to count crawl retries for channel URL %q: %v", cu.URL, err)
 			}
 		}
 
@@ -144,7 +144,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 				continue
 			}
 			if !validation.IsHTTPURL(newURL) {
-				logger.Pl.W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
+				logger.Pl.Channel(c.Name).W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
 				continue
 			}
 			if !validation.IsHTTPURL(lv.ThumbnailURL) {
@@ -170,7 +170,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 	// Print summary
 	if len(newRequests) > 0 {
-		logger.Pl.I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
+		logger.Pl.Channel(c.Name).I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
 		for i, v := range newRequests {
 			if v == nil {
 				continue
@@ -274,7 +274,7 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, cu *models.ChannelURL, exi
 	newURLs := ignoreDownloadedURLs(episodeURLs, existingURLs)
 
 	if len(newURLs) == 0 {
-		logger.Pl.I("No new videos at %s", channelURL)
+		logger.Pl.Channel(cu.ChannelName).I("No new videos at %s", channelURL)
 		return nil, nil
 	}
 	newEpisodes := make(map[string]*listedVideo, len(newURLs))
@@ -303,6 +303,7 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*listedVideo, error) {
 	uniqueEpisodeURLs := make(map[string]*listedVideo)
 	channelURL, fs := cu.URL, cu.Session.FlareSolverr
+	log := logger.Pl.Channel(cu.ChannelName)
 	var crawlArgs, browser string
 	if cu.ChanURLSettings != nil {
 		crawlArgs, browser = cu.ChanURLSettings.ExtraYTDLPCrawlArgs, cu.ChanURLSettings.CookiesFromBrowser
@@ -324,7 +325,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			// Refuse extra yt-dlp arguments containing disallowed options.
 			if !sharedconsts.InsecureArgumentsAllowed() {
 				if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
-					logger.Pl.W("Refusing extra YT-DLP arguments for channel URL %q: Option %q is not allowed for YT-DLP.", cu.URL, blockedKey)
+					log.W("Refusing extra YT-DLP arguments for channel URL %q: Option %q is not allowed for YT-DLP.", cu.URL, blockedKey)
 				} else {
 					args = append(args, extraArgs...)
 				}
@@ -348,7 +349,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		args = append(args, command.OutputJSON, command.EndOfOptions, channelURL)
 		cmd := exec.CommandContext(ctx, sharedconsts.ProgramYTDLP, args...)
 
-		logger.Pl.I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
+		log.I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
 
 		var err error
 		if j, err = cmd.Output(); err == nil {
@@ -363,13 +364,13 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			return uniqueEpisodeURLs, fmt.Errorf("yt-dlp command failed: %w: %s", err, stderr)
 		}
 
-		logger.Pl.W("Cloudflare blocked yt-dlp for %q, refreshing its FlareSolverr solve...", channelURL)
+		log.W("Cloudflare blocked yt-dlp for %q, refreshing its FlareSolverr solve...", channelURL)
 		if err := fs.Refresh(fsGen); err != nil {
 			return uniqueEpisodeURLs, fmt.Errorf("yt-dlp was blocked by Cloudflare (%s), and a fresh FlareSolverr solve failed: %w", stderr, err)
 		}
 	}
 
-	logger.Pl.D(5, "Retrieved command output from yt-dlp for channel %q:\n\n%s", channelURL, string(j))
+	log.D(5, "Retrieved command output from yt-dlp for channel %q:\n\n%s", channelURL, string(j))
 
 	var result ytDlpEntry
 	if err := json.Unmarshal(j, &result); err != nil {
@@ -387,7 +388,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		}
 		// Filter out the channel URL itself if it appears in the entries list.
 		if normalizeURL(entry.URL) == normalizeURL(channelURL) {
-			logger.Pl.D(3, "Skipping entry (entry %q is the exact channel URL: %q)", entry.URL, channelURL)
+			log.D(3, "Skipping entry (entry %q is the exact channel URL: %q)", entry.URL, channelURL)
 			continue
 		}
 		// Normalize Rumble URLs.
@@ -395,13 +396,13 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			if isValidRumbleVideoURL(entry.URL) {
 				entry.URL = removeQueryParams(entry.URL)
 			} else {
-				logger.Pl.D(2, "Rumble URL %q is not a valid video link, skipping...", entry.URL)
+				log.D(2, "Rumble URL %q is not a valid video link, skipping...", entry.URL)
 				continue
 			}
 		}
 		// Add to map to ensure uniqueness.
 		mergeListed(uniqueEpisodeURLs, entry.URL, entry.listed())
-		logger.Pl.D(3, "Added entry for channel %q: %q", channelURL, entry)
+		log.D(3, "Added entry for channel %q: %q", channelURL, entry)
 	}
 
 	return uniqueEpisodeURLs, nil

@@ -108,7 +108,7 @@ Single values come from the nearest level that sets them: **URL → URL's profil
 
 Load with `mergeURLsWithParent` false when you want only what's saved for that level, such as on an edit page.
 
-Each loaded channel records `LoadedAt`. The queues keep the limits from the newest model they've been given, so a job holding an old copy can't bring back old limits.
+Each loaded channel records when it was read (`LoadedAt`). The queues only take limits from a channel read later than the last one they took limits from. This stops a long crawl, which loaded the channel before you saved new limits, from putting the old limits back when it queues its videos.
 
 ### Ops and filter files
 
@@ -135,7 +135,7 @@ A channel can point at a YAML, TOML or JSON file holding its settings. `file.Upd
 
 | Trigger | Path |
 |---|---|
-| Web, on schedule | `serverStore.startCrawlWatchdog` ([internal/server/methods.go](internal/server/methods.go)) ticks every 10 seconds and calls `crawlDueChannels`. That reloads every channel, applies their limits to the queues, and for each channel works out which URLs are due (`Channel.DueURLs`, with `times.CalculateJitter` added). It reloads the config file, skips paused channels, takes the channel's crawl lock (`state.TryLockCrawl`) and a global crawl slot (`limits.GlobalCrawls`), then calls `app.CrawlChannel` with only the due URLs. |
+| Web, on schedule | `serverStore.startCrawlWatchdog` ([internal/server/methods.go](internal/server/methods.go)) ticks every 10 seconds and calls `crawlDueChannels`. That reloads every channel, applies their limits to the queues, and for each channel works out which URLs are due (`Channel.DueURLs`, with `times.CalculateJitter` added: a random few minutes picked once per crawl, cleared when the crawl marks its URLs scanned). It reloads the config file, skips paused channels, takes the channel's crawl lock (`state.TryLockCrawl`) and a global crawl slot (`limits.GlobalCrawls`), then calls `app.CrawlChannel` with only the due URLs. |
 | Web, Crawl button | `handleCrawlChannel`. An optional `url_ids` body picks the URLs, paused ones included. |
 | Terminal, bare `tubarr` | `app.CheckChannels` ([internal/app/crawler.go](internal/app/crawler.go)) does the same as the watchdog, once, with its own semaphore sized by the crawl concurrency setting and no jitter. |
 | Terminal, `tubarr channel crawl` | `crawlChannelCmd` takes the crawl lock and calls `app.CrawlChannel`. |
@@ -211,7 +211,7 @@ Read [internal/queue/doc.go](internal/queue/doc.go) for the queue's rules. This 
 1. `PostProcessingQueue.hold` reserves the video for this download, canceling any Metarr run on it first.
 2. `DownloadQueue.process`:
    1. `acquireLane` waits for a slot in the channel's lane, or its URL's own lane (see [Concurrency](#concurrency-and-limits)).
-   2. `session.ready` runs once per session: it fetches cookies (`Scraper.ScraperURLCookies`) unless a crawl already did, and decides whether Metarr can run (`metarr.CheckInstalled`, `metarr.SkipReason`).
+   2. `session.ready` runs once per session: it fetches cookies (`Scraper.ScraperURLCookies`) unless a crawl already did, and decides whether Metarr can run (`metarr.CheckInstalled`, `metarr.SkipReason`), and whether it should (`MetarrArgs.AutoPostProcess`, Post-Process After Download). The manual Post-Process path only calls `SkipReason`, so turning the setting off never blocks the buttons.
    3. Blocked domains fail fast: `downloads.CheckIfAvoidURL` and `queue.DomainBlocked`.
    4. A random bot-avoidance wait.
    5. `prepare` works out where the video goes: a directory parser for the templates, the video's Download As options if the user chose it (`VideoStore.GetVideoOverrides`, `withYtdlpOverrides`), `CheckDestinations`, the filled video and JSON directories, whether Metarr is held back (`Video.SkipMetarr`), and the channel URL's current lines in Download As ops (`metarr.FollowChannelURLOps`).
@@ -273,7 +273,7 @@ A video is in at most one queue: `hold` cancels a Metarr run when the video is d
 | Abort All | `POST /api/v1/channels/{id}/abort` | `state.StopCrawl`, `DownloadQueue.Abort`, `PostProcessingQueue.Abort` |
 | Stop Post-Processing | `POST /api/v1/channels/{id}/stop-metarr` | `PostProcessingQueue.Cancel` |
 
-Each download has two contexts. `ctx` is canceled by Cancel, Abort and shutdown. `startCtx` is also canceled by Stop, which only reaches videos not yet downloading. The cancel cause (`downloads.ErrCanceledByUser`, `errStopped`, `errAborted`) is what `finalStatus` reads to choose the stored status.
+Each download has two contexts. `ctx` is canceled by Cancel, Abort and shutdown. `preDownloadCtx` is also canceled by Stop, which only reaches videos not yet downloading. The cancel cause (`downloads.ErrCanceledByUser`, `errStopped`, `errAborted`) is what `finalStatus` reads to choose the stored status.
 
 yt-dlp runs in its own process group (`useProcessGroup` in [proc_unix.go](internal/downloads/proc_unix.go)), so canceling it also stops ffmpeg or aria2c under it. A user cancel deletes the partial files yt-dlp reported (`removePartialFiles`).
 
@@ -330,7 +330,8 @@ The download statuses are the `consts.DLStatus*` constants and the Metarr status
 - Every API route is listed in `NewRouter`. Handlers are in [handlers.go](internal/server/handlers.go) and [profiles.go](internal/server/profiles.go), and form and JSON parsing is in [helpers.go](internal/server/helpers.go).
 - Pages: `StaticHandler` serves `web/` from beside the binary. Each `.html` page goes through `fillIncludes`, which replaces `<!-- include:name key="value" -->` with `web/partials/name.html`, filling its `{{key}}` placeholders. The settings fields shared by the add channel, edit channel and profile pages are [web/partials/settings-fields.html](web/partials/settings-fields.html).
 - The pages poll `/api/v1/channels/activity` (which channels are crawling, downloading, stopping or in Metarr), `/api/v1/downloads` and `/api/v1/post-processing`.
-- Metarr's logs: `metarr.InitMetarr` starts Metarr with `TUBARR_LOG_URL` and `TUBARR_LOG_TOKEN` set, and Metarr posts its log lines to `/metarr-logs` (`handlePostMetarrLogs`), which the Logs page shows.
+- Metarr's logs: `metarr.InitMetarr` starts Metarr with `TUBARR_LOG_URL` and `TUBARR_LOG_TOKEN` set, and Metarr posts its log lines to `/metarr-logs` (`handlePostMetarrLogs`) every 2 seconds, which the Logs page shows. The reply is Tubarr's debug level, which Metarr switches to, so a level change reaches Metarr runs already going.
+- Channel logs: work done for a channel logs through `logger.Pl.Channel(name)`, which adds a `channel` field to the JSON line. Metarr's lines get the same field from the `channel` query parameter `InitMetarr` puts on `TUBARR_LOG_URL` (`withLogChannel`). The Logs page filters on the field in the browser, and `logs.html?channel=Name` opens it filtered. Log through `Channel` in new crawl, download and post-processing code.
 
 ---
 
@@ -368,7 +369,7 @@ The commands in [internal/cfg](internal/cfg/) call the same functions as the web
 These are the places a channel setting is wired, using `ExtraYTDLPCrawlArgs` as the example. Search for it to see each one.
 
 1. **Model**: the field and its JSON tag on `models.Settings` ([internal/models/settings.go](internal/models/settings.go)), plus `ChildSettingsMatchParent` and `SettingsAllZero` in the same file.
-2. **Inheritance**: `mergeSettings` ([internal/repo/channel_urls.go](internal/repo/channel_urls.go)), unless it's a list, which is stacked instead (`models.Stack*` in [levels.go](internal/models/levels.go)).
+2. **Inheritance**: `mergeSettings` ([internal/repo/channel_urls.go](internal/repo/channel_urls.go)), unless it's a filter or op list (download filters, move ops, meta ops, filename ops, filtered ops), which is stacked instead (`models.Stack*` in [levels.go](internal/models/levels.go)). Other lists, such as codecs, are inherited whole like single values (`inheritSlice`).
 3. **Input and validation**: `models.SettingsInput` ([internal/models/vars.go](internal/models/vars.go), its `viper` tag is the config file key) and `parsing.ApplySettingsInput` ([internal/parsing/viper.go](internal/parsing/viper.go)). Add a check to `validation.ValidateSettingsModel` if a saved value can be wrong.
 4. **Terminal**: the flag name in `keys` ([internal/domain/keys/terminal.go](internal/domain/keys/terminal.go)), the flag in [internal/cmd/cobra.go](internal/cmd/cobra.go), `models.ChannelFlagValues` ([flags.go](internal/models/flags.go)), `mergeFlagsIntoInput` ([internal/cfg/helpers.go](internal/cfg/helpers.go)), `clearURLSettings` ([internal/cfg/channel_urls.go](internal/cfg/channel_urls.go)), and `displaySettingsStruct` ([internal/repo/channel.go](internal/repo/channel.go)).
 5. **Web**: the form key in `jsonkeys` ([internal/domain/jsonkeys/json_keys.go](internal/domain/jsonkeys/json_keys.go)), `settingsFromForm` (channel and profile forms), `settingsInput` and its `input` method (each URL's settings), and `settingsResponse` with `newSettingsResponse` (sent to the pages), all in [internal/server/helpers.go](internal/server/helpers.go), then the field in [web/partials/settings-fields.html](web/partials/settings-fields.html), [url-settings-fields.html](web/partials/url-settings-fields.html) for channel URLs, and wherever add-channel, edit-channel, list-channels and profiles read it.

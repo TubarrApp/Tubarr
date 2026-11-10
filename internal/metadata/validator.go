@@ -23,11 +23,11 @@ import (
 //
 // Returns true if the video passes all filters and JSON validity checks.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	logger.Pl.I("Validating and filtering JSON file %q...", v.Files.JSONFilePath)
+	logger.Pl.Channel(cu.ChannelName).I("Validating and filtering JSON file %q...", v.Files.JSONFilePath)
 	// Parse and store JSON.
 	jsonValid, err := parseAndStoreJSON(v)
 	if err != nil {
-		logger.Pl.E("JSON parsing/storage failed for %q: %v", v.URL, err)
+		logger.Pl.Channel(cu.ChannelName).E("JSON parsing/storage failed for %q: %v", v.URL, err)
 	}
 
 	// Apply filters.
@@ -37,7 +37,7 @@ func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, dirParser *parsin
 			// An error rather than a failed check, so the video is skipped but not marked ignored, and is tried again once the file is fixed.
 			return false, useFilteredMetaOps, useFilteredFilenameOps, fmt.Errorf("skipping %q: %w", v.URL, err)
 		}
-		logger.Pl.E("filter operation checks failed for %q: %v", v.URL, err)
+		logger.Pl.Channel(cu.ChannelName).E("filter operation checks failed for %q: %v", v.URL, err)
 	}
 
 	if !jsonValid || !passedFilters {
@@ -149,7 +149,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	// Select thumbnail
 	bestThumbnail(v, m)
 
-	logger.Pl.D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Metadata.Title)
+	logger.Pl.Channel(v.ChannelName).D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Metadata.Title)
 	return true, nil
 }
 
@@ -209,7 +209,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 
 	// Videos the user chose skip download filters.
 	if v.SkipFilters || cu.IsManual {
-		logger.Pl.I("Skipped download filters for %q in channel %q: Video was chosen manually.", v.URL, v.ChannelName)
+		logger.Pl.Channel(cu.ChannelName).I("Skipped download filters for %q in channel %q: Video was chosen manually.", v.URL, v.ChannelName)
 		return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
@@ -232,7 +232,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
-	logger.Pl.S("Video %q for channel %q passed all filter checks", v.URL, v.ChannelName)
+	logger.Pl.Channel(cu.ChannelName).S("Video %q for channel %q passed all filter checks", v.URL, v.ChannelName)
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
@@ -246,11 +246,11 @@ func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.
 	// An unusable file holds back Metarr for the whole batch, see metarr.SkipReason.
 	filteredMetaOps, fileErr := ChannelURLFilteredMetaOps(cu, dirParser)
 	if fileErr != nil {
-		logger.Pl.E("Filtered meta ops file for %q can't be used: %v", cu.URL, fileErr)
+		logger.Pl.Channel(cu.ChannelName).E("Filtered meta ops file for %q can't be used: %v", cu.URL, fileErr)
 	}
 	filteredFilenameOps, fileErr := ChannelURLFilteredFilenameOps(cu, dirParser)
 	if fileErr != nil {
-		logger.Pl.E("Filtered filename ops file for %q can't be used: %v", cu.URL, fileErr)
+		logger.Pl.Channel(cu.ChannelName).E("Filtered filename ops file for %q can't be used: %v", cu.URL, fileErr)
 	}
 	return filteredMetaOps, filteredFilenameOps
 }
@@ -258,13 +258,14 @@ func loadFilteredOps(v *models.Video, cu *models.ChannelURL, dirParser *parsing.
 // HandleMoveOps checks if Metarr should use an output directory based on existent metadata.
 func HandleMoveOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) string {
 	allMoveOps := channelURLMoveOps(cu, dirParser)
+	log := logger.Pl.Channel(cu.ChannelName) // c may be nil, cu never is.
 
 	// Check each move operation against video metadata.
 	for _, op := range allMoveOps {
 		filters := sharedparsing.FormatFilters(op.Filters)
 		matched, err := sharedfilters.MatchAll(v.Metadata.Raw, op.Filters)
 		if err != nil {
-			logger.Pl.E("Skipping move op %q: %v", filters, err)
+			log.E("Skipping move op %q: %v", filters, err)
 			continue
 		}
 		if !matched {
@@ -274,10 +275,10 @@ func HandleMoveOps(v *models.Video, cu *models.ChannelURL, c *models.Channel, di
 		// Fill the output directory tags, skipping the op if one has no directory to fill from.
 		outputDir, allFilled := parsing.FillOutputDirectoryTags(op.OutputDir, cu, c)
 		if !allFilled {
-			logger.Pl.W("Skipping move op %q: %q uses an output directory tag with no directory to fill it from", filters, op.OutputDir)
+			log.W("Skipping move op %q: %q uses an output directory tag with no directory to fill it from", filters, op.OutputDir)
 			continue
 		}
-		logger.Pl.I("Move op matched: %q. Output directory retrieved as %q", filters, outputDir)
+		log.I("Move op matched: %q. Output directory retrieved as %q", filters, outputDir)
 		return outputDir
 	}
 

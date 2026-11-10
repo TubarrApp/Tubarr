@@ -122,6 +122,20 @@
                       </select>
                     </div>
 
+                    <div class="flex items-center gap-2" title="Only lines about one channel's crawls, downloads and post-processing">
+                      <label for="logChannel" class="text-sm font-medium text-gray-700 dark:text-gray-300">Channel:</label>
+                      <select
+                        id="logChannel"
+                        x-model="channelFilter"
+                        class="pl-3 pr-8 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700"
+                      >
+                        <option value="">All</option>
+                        <template x-for="name in channels" :key="name">
+                          <option :value="name" x-text="name" :selected="name === channelFilter"></option>
+                        </template>
+                      </select>
+                    </div>
+
                     <div class="flex items-center gap-2" title="How much debug detail Tubarr writes to the log">
                       <label for="logLevel" class="text-sm font-medium text-gray-700 dark:text-gray-300">Debug level:</label>
                       <select
@@ -142,7 +156,7 @@
                   </div>
 
                   <div class="text-sm text-gray-500 dark:text-gray-400">
-                    <span x-text="typeFilter ? `${shownLogs.length} of ${logs.length} entries` : `${logs.length} entries`"></span>
+                    <span x-text="typeFilter || channelFilter ? `${shownLogs.length} of ${logs.length} entries` : `${logs.length} entries`"></span>
                   </div>
                 </div>
 
@@ -156,7 +170,7 @@
                   <template x-if="shownLogs.length === 0">
                     <div class="text-gray-500 text-center py-8">
                       <p x-show="!loading && logs.length === 0">No logs available</p>
-                      <p x-show="!loading && logs.length > 0">No entries of this type</p>
+                      <p x-show="!loading && logs.length > 0" x-text="channelFilter ? 'No entries of this type for this channel' : 'No entries of this type'"></p>
                       <p x-show="loading && logs.length === 0">Loading logs...</p>
                     </div>
                   </template>
@@ -197,16 +211,26 @@
           isAtBottom: true,
           logLevel: -1,
           typeFilter: '', // Log entry level to show, '' for all.
+          channelFilter: new URLSearchParams(window.location.search).get('channel') || '', // Channel whose lines to show, '' for all.
           activeTab: 'tubarr',
 
-          // Lines without a level (e.g. run separators) only show under All.
+          // Lines without a level (e.g. run separators) only show under All, and lines about no channel only show under All channels.
           get shownLogs() {
-            if (!this.typeFilter) return this.logs;
-            return this.logs.filter(log => String(log.level || '').toLowerCase() === this.typeFilter);
+            return this.logs.filter(log =>
+              (!this.typeFilter || String(log.level || '').toLowerCase() === this.typeFilter) &&
+              (!this.channelFilter || log.channel === this.channelFilter));
+          },
+
+          // Channels with lines in the loaded logs, plus the chosen one so it stays selected before its lines arrive.
+          get channels() {
+            const names = new Set(this.logs.map(log => log.channel).filter(name => typeof name === 'string' && name));
+            if (this.channelFilter) names.add(this.channelFilter);
+            return [...names].sort((a, b) => a.localeCompare(b));
           },
 
           init() {
             this.$watch('typeFilter', () => this.$nextTick(() => this.scrollToBottom()));
+            this.$watch('channelFilter', () => this.$nextTick(() => this.scrollToBottom()));
             this.fetchLogLevel();
             this.fetchLogs();
             this.startAutoRefresh();
@@ -330,6 +354,11 @@
               }
 
               parts.push(`<span style="color: ${color}; font-weight: bold;">[${this.escapeHtml(levelUpper)}]</span>`);
+            }
+
+            // Channel in brand purple
+            if (log.channel) {
+              parts.push(`<span style="color: #a78bfa;">[${this.escapeHtml(String(log.channel))}]</span>`);
             }
 
             // Function in dim cyan

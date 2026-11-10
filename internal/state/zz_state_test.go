@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // TestCrawlLock tests a channel only crawls once at a time, a stop cancels the crawl and shows it as stopping until it
@@ -52,5 +53,32 @@ func TestUnlockCancelsContext(t *testing.T) {
 	unlock()
 	if ctx.Err() == nil {
 		t.Fatal("unlock did not cancel the crawl's context")
+	}
+}
+
+// TestJitterPickedOncePerCrawl tests a channel keeps its picked jitter until it crawls or its URL count changes.
+func TestJitterPickedOncePerCrawl(t *testing.T) {
+	picks := 0
+	pick := func() time.Duration {
+		picks++
+		return time.Duration(picks) * time.Minute
+	}
+	defer ClearJitter(3)
+
+	// Checks before the crawl keep the first pick.
+	first := GetOrComputeJitter(3, 2, pick)
+	if again := GetOrComputeJitter(3, 2, pick); again != first || picks != 1 {
+		t.Fatalf("jitter picked again on a later check: %v then %v, %d picks", first, again, picks)
+	}
+
+	// A changed URL count picks again.
+	if GetOrComputeJitter(3, 3, pick); picks != 2 {
+		t.Fatalf("URL count change didn't pick again, %d picks", picks)
+	}
+
+	// A crawl clears it, so the next check picks again.
+	ClearJitter(3)
+	if GetOrComputeJitter(3, 3, pick); picks != 3 {
+		t.Fatalf("crawl didn't clear the jitter, %d picks", picks)
 	}
 }

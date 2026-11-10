@@ -5,6 +5,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 	"tubarr/internal/domain/logger"
 )
 
@@ -72,16 +73,17 @@ func CrawlingChannels() (active, stopping []int64) {
 
 // ---- Jitter Times --------------------------------------------------------------------------
 
-// Cached jitter times per channel
+// watchdogJitter holds each channel's jitter until it next crawls, by channel ID.
 var watchdogJitter sync.Map
 
+// jitterCache is a channel's picked jitter, and how many URLs it had when picked.
 type jitterCache struct {
-	jitter   int
+	jitter   time.Duration
 	urlCount int
 }
 
-// GetOrComputeJitter returns existing jitter or recalculates if URL count changed.
-func GetOrComputeJitter(channelID int64, chanURLCount int, compute func() int) int {
+// GetOrComputeJitter returns a channel's picked jitter, picking it again if its URL count changed.
+func GetOrComputeJitter(channelID int64, chanURLCount int, compute func() time.Duration) time.Duration {
 	if val, ok := watchdogJitter.Load(channelID); ok {
 		if jc, ok := val.(jitterCache); ok {
 			if jc.urlCount == chanURLCount {
@@ -93,4 +95,9 @@ func GetOrComputeJitter(channelID int64, chanURLCount int, compute func() int) i
 	j := compute()
 	watchdogJitter.Store(channelID, jitterCache{jitter: j, urlCount: chanURLCount})
 	return j
+}
+
+// ClearJitter drops a channel's jitter once it crawls, so its next crawl picks a new one.
+func ClearJitter(channelID int64) {
+	watchdogJitter.Delete(channelID)
 }

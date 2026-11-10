@@ -529,6 +529,7 @@ func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	u.WriteNFO = inheritBool(u.WriteNFO, ch.WriteNFO)
 	u.OutputDir = cmp.Or(u.OutputDir, ch.OutputDir)
 	u.MetaPurge = cmp.Or(u.MetaPurge, ch.MetaPurge)
+	u.AutoPostProcess = inheritBool(u.AutoPostProcess, ch.AutoPostProcess)
 	u.MetarrConcurrency = cmp.Or(u.MetarrConcurrency, ch.MetarrConcurrency)
 	u.MaxCPU = cmp.Or(u.MaxCPU, ch.MaxCPU)
 	u.MinFreeMem = cmp.Or(u.MinFreeMem, ch.MinFreeMem)

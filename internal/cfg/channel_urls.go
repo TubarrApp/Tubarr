@@ -228,6 +228,8 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 			m.PurgeOriginalVideo = nil
 		case keys.MWriteNFO:
 			m.WriteNFO = nil
+		case keys.MAutoPostProcess:
+			m.AutoPostProcess = nil
 		case keys.MOutputExt:
 			m.OutputExt = ""
 		case keys.MRenameStyle:

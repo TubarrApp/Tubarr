@@ -16,7 +16,7 @@ func loadAndMergeMetaOps(v *models.Video, cu *models.ChannelURL, dirParser *pars
 	// An unusable file holds back Metarr for the whole batch, see SkipReason.
 	ops, err := channelURLMetaOps(cu, dirParser)
 	if err != nil {
-		logger.Pl.E("Meta ops file for %q can't be used: %v", cu.URL, err)
+		logger.Pl.Channel(cu.ChannelName).E("Meta ops file for %q can't be used: %v", cu.URL, err)
 	}
 	return getDedupedMetaOpStrings(applyFilteredMetaOps(ops, v.FilteredMetaOps, v.URL, v.ChannelName))
 }
@@ -77,7 +77,7 @@ func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMet
 	matchedFilteredOps := extractMatchedFilteredMetaOps(filteredOps)
 	result := models.FilterConflictingMetaOps(matchedFilteredOps, ops)
 	for _, op := range result {
-		logger.Pl.D(2, "Added operation %q for video URL %q (Channel: %q)", sharedparsing.FormatMetaOp(op), videoURL, channelName)
+		logger.Pl.Channel(channelName).D(2, "Added operation %q for video URL %q (Channel: %q)", sharedparsing.FormatMetaOp(op), videoURL, channelName)
 	}
 	return append(result, matchedFilteredOps...)
 }

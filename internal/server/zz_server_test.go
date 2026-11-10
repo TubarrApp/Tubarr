@@ -60,6 +60,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/TubarrApp/gocommon/abstractions"
+	"github.com/TubarrApp/gocommon/logging"
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/spf13/viper"
@@ -1950,7 +1951,7 @@ const (
 var perURLFixedKeys = []string{"paused", "use_global_cookies", "auto_download"}
 
 // perURLMetarrBools are the per-URL Metarr choices the channel pages send as booleans, with the custom settings.
-var perURLMetarrBools = []string{"metarr_purge_original_video", "metarr_write_nfo"}
+var perURLMetarrBools = []string{"metarr_purge_original_video", "metarr_write_nfo", "metarr_auto_post_process"}
 
 // replaceTicks are the Replace checkboxes under each list, which channels and URLs have but profiles don't.
 var replaceTicks = []string{
@@ -2389,6 +2390,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		"metarr_purge_metafile":                   {"json", "all"},
 		"metarr_purge_original_video":             {"false", "true"},
 		"metarr_write_nfo":                        {"true", "false"},
+		"metarr_auto_post_process":                {"false", "true"},
 
 		// Replace checkboxes.
 		"metarr_meta_ops_replace_inherited":              {"true", "false"},
@@ -4884,6 +4886,50 @@ func TestMaxCPUFieldsTakeDecimals(t *testing.T) {
 		if !regexp.MustCompile(`step="any"`).Match(found) {
 			t.Errorf("%s: Max CPU field has no step=\"any\": %s", partial, found)
 		}
+	}
+}
+
+// ******************************** Metarr logs ***************************************************************************************
+
+// TestPostMetarrLogsTagsChannel tests Metarr's lines are tagged with the channel in the log URL, other lines kept as
+// sent, and the reply is Tubarr's debug level.
+func TestPostMetarrLogsTagsChannel(t *testing.T) {
+	vars.MetarrLogsMutex.Lock()
+	saved := vars.MetarrLogs
+	vars.MetarrLogs = nil
+	vars.MetarrLogsMutex.Unlock()
+	t.Cleanup(func() {
+		vars.MetarrLogsMutex.Lock()
+		vars.MetarrLogs = saved
+		vars.MetarrLogsMutex.Unlock()
+	})
+
+	body := `{"level":"info","message":"renamed"}` + "\nnot json\n" + `{"level":"warn","channel":"Dogs","message":"kept"}` + "\n"
+	req := httptest.NewRequest(http.MethodPost, "/metarr-logs?channel=Cats+%26+Co", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	(&serverStore{}).handlePostMetarrLogs(w, req)
+	if got, want := w.Body.String(), strconv.Itoa(logging.Level()); got != want {
+		t.Errorf("reply = %q, want the debug level %q", got, want)
+	}
+
+	vars.MetarrLogsMutex.RLock()
+	lines := slices.Clone(vars.MetarrLogs)
+	vars.MetarrLogsMutex.RUnlock()
+	if len(lines) != 3 {
+		t.Fatalf("stored %d lines, want 3", len(lines))
+	}
+	var tagged map[string]any
+	if err := json.Unmarshal(lines[0], &tagged); err != nil {
+		t.Fatal(err)
+	}
+	if tagged["channel"] != "Cats & Co" || tagged["message"] != "renamed" {
+		t.Errorf("first line = %s, want it tagged Cats & Co", lines[0])
+	}
+	if string(lines[1]) != "not json\n" {
+		t.Errorf("plain line = %q, want it kept as sent", lines[1])
+	}
+	if !strings.Contains(string(lines[2]), `"channel":"Dogs"`) {
+		t.Errorf("already tagged line = %s, want its own channel kept", lines[2])
 	}
 }
 

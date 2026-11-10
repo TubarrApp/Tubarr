@@ -108,6 +108,7 @@ type MetarrArgsInput struct {
 	TranscodeAudioCodec *[]string `viper:"metarr-transcode-audio-codecs"`
 
 	// Resources and limits.
+	AutoPostProcess   *bool    `viper:"metarr-auto-post-process"`
 	MinFreeMem        *string  `viper:"metarr-min-free-mem"`
 	MaxCPU            *float64 `viper:"metarr-max-cpu"`
 	MetarrConcurrency *int     `viper:"metarr-concurrency"`

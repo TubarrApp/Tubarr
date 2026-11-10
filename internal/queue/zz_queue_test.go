@@ -334,15 +334,15 @@ func TestFinalStatus(t *testing.T) {
 			defer shutdown()
 			q := NewDownloadQueue(qCtx, nil, nil)
 			ctx, cancel := context.WithCancelCause(qCtx)
-			startCtx, stop := context.WithCancelCause(ctx)
+			preDownloadCtx, stop := context.WithCancelCause(ctx)
 			defer cancel(nil)
 			defer stop(nil)
 			d := &download{
-				video:       &models.Video{DownloadStatus: models.DLStatus{Status: tt.status}},
-				byUser:      tt.byUser,
-				downloading: tt.downloading,
-				ctx:         ctx,
-				startCtx:    startCtx,
+				video:          &models.Video{DownloadStatus: models.DLStatus{Status: tt.status}},
+				byUser:         tt.byUser,
+				downloading:    tt.downloading,
+				ctx:            ctx,
+				preDownloadCtx: preDownloadCtx,
 			}
 			if tt.cancel != nil {
 				cancel(tt.cancel)
@@ -367,8 +367,8 @@ func TestStopLetsDownloadsFinish(t *testing.T) {
 	q := NewDownloadQueue(t.Context(), nil, nil)
 	add := func(id, channelID int64, downloading bool) *download {
 		ctx, cancel := context.WithCancelCause(t.Context())
-		startCtx, stop := context.WithCancelCause(ctx)
-		d := &download{video: &models.Video{ID: id}, c: &models.Channel{ID: channelID}, ctx: ctx, cancel: cancel, startCtx: startCtx, stop: stop, downloading: downloading}
+		preDownloadCtx, stop := context.WithCancelCause(ctx)
+		d := &download{video: &models.Video{ID: id}, c: &models.Channel{ID: channelID}, ctx: ctx, cancel: cancel, preDownloadCtx: preDownloadCtx, stop: stop, downloading: downloading}
 		q.downloads[id] = d
 		return d
 	}
@@ -376,7 +376,7 @@ func TestStopLetsDownloadsFinish(t *testing.T) {
 	downloading := add(2, 1, true)
 	otherChannel := add(3, 2, false)
 
-	if !q.Stop(1) || waiting.startCtx.Err() == nil || downloading.startCtx.Err() != nil || otherChannel.startCtx.Err() != nil {
+	if !q.Stop(1) || waiting.preDownloadCtx.Err() == nil || downloading.preDownloadCtx.Err() != nil || otherChannel.preDownloadCtx.Err() != nil {
 		t.Fatal("Stop should cancel only the channel's waiting video")
 	}
 	if active, stopping := q.Channels(); len(active) != 1 || active[0] != 2 || len(stopping) != 1 || stopping[0] != 1 {
@@ -398,7 +398,7 @@ func TestSendUpdate(t *testing.T) {
 	if _, err := store.VideoStore().QueueVideo(c.ID, v, true); err != nil {
 		t.Fatal(err)
 	}
-	d := &download{q: NewDownloadQueue(t.Context(), store, nil), video: v}
+	d := &download{q: NewDownloadQueue(t.Context(), store, nil), video: v, c: c}
 
 	d.SetStatus(v, consts.DLStatusDownloading, 10, "", nil)
 	d.SetStatus(v, consts.DLStatusDownloading, 50, "", nil)
@@ -1225,5 +1225,86 @@ func TestRunMetarrLeavesPendingForMissingOpsFile(t *testing.T) {
 	}
 	if q.Len() != 0 {
 		t.Errorf("%d video(s) left in the queue after the run", q.Len())
+	}
+}
+
+// TestAutoPostProcessOff tests turning off Post-Process After Download holds back Metarr after downloads only, while
+// the user's own Post-Process still runs it.
+func TestAutoPostProcessOff(t *testing.T) {
+	// A metarr that answers --help, and records any real run.
+	bin, dir := t.TempDir(), t.TempDir()
+	ran := filepath.Join(dir, "metarr-ran")
+	script := fmt.Sprintf("#!/bin/sh\n[ \"$1\" = --help ] && exit 0\ntouch %q\n", ran)
+	if err := os.WriteFile(filepath.Join(bin, sharedconsts.ProgramMetarr), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	// After a download: off holds Metarr back, unset and on don't.
+	yes, no := true, false
+	c := &models.Channel{Name: "Cats", ChanSettings: &models.Settings{VideoDir: dir}}
+	for _, tc := range []struct {
+		name string
+		auto *bool
+		want models.SkipMetarr
+	}{
+		{"unset", nil, models.SkipMetarr{}},
+		{"on", &yes, models.SkipMetarr{}},
+		{"off", &no, models.SkipMetarr{Skip: true, Reason: models.SkipMetarrAutoPostProcessOff}},
+	} {
+		cu := &models.ChannelURL{
+			URL:               "https://example.com/@cats",
+			ChanURLMetarrArgs: &models.MetarrArgs{AutoPostProcess: tc.auto},
+			Session:           models.ChannelURLSession{CookiePath: "fetched"}, // Already fetched, so no cookie store is needed.
+		}
+		s := &session{cu: cu}
+		if err := s.ready(context.Background(), nil, c); err != nil {
+			t.Fatalf("%s: ready = %v", tc.name, err)
+		}
+		if s.skipMetarr != tc.want {
+			t.Errorf("%s: skip = %+v, want %+v", tc.name, s.skipMetarr, tc.want)
+		}
+	}
+
+	// The user's Post-Process still runs Metarr.
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	store, err := repo.InitStores(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := NewPostProcessingQueue(store)
+	id, err := store.ChannelStore().AddChannel(&models.Channel{
+		Name:           "Cats",
+		ChanSettings:   &models.Settings{VideoDir: dir},
+		ChanMetarrArgs: &models.MetarrArgs{AutoPostProcess: &no},
+		URLModels:      []*models.ChannelURL{{URL: "https://example.com/@cats"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, _, err := store.ChannelStore().GetChannelModel(consts.QChanID, strconv.FormatInt(id, 10), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	video, metaFile := filepath.Join(dir, "v.mp4"), filepath.Join(dir, "v.json")
+	for _, f := range []string{video, metaFile} {
+		if err := os.WriteFile(f, []byte("{}"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO videos (channel_id, channel_url_id, channel_url, finished, ignored, url, video_path, json_path, metarr_status)
+		VALUES (?, ?, ?, 1, 0, 'https://example.com/watch/1', ?, ?, ?)`,
+		loaded.ID, loaded.URLModels[0].ID, loaded.URLModels[0].URL, video, metaFile, consts.MetarrStatusPending); err != nil {
+		t.Fatal(err)
+	}
+	_ = q.RunMetarr(context.Background(), loaded, nil, false) // The stand-in Metarr gives no final paths, so this fails after running.
+	if _, err := os.Stat(ran); err != nil {
+		t.Error("Post-Process didn't run Metarr with Post-Process After Download turned off")
 	}
 }

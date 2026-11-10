@@ -351,6 +351,10 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput, le
 		b := *v
 		dst.WriteNFO = &b
 	}
+	if v := in.AutoPostProcess; v != nil {
+		b := *v
+		dst.AutoPostProcess = &b
+	}
 	if v := in.MetarrConcurrency; v != nil {
 		dst.MetarrConcurrency = max(*v, 0)
 	}

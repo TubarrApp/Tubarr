@@ -53,7 +53,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	if (cu.IsManual || cu.ID == 0) && !cu.NeedsAuth() { // Login details sent with manual videos win.
 		cu.Login.Username, cu.Login.Password, cu.Login.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
 		if err != nil {
-			logger.Pl.E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
+			logger.Pl.Channel(c.Name).E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
 		}
 	}
 
@@ -80,7 +80,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 			return nil, "", ctx.Err()
 		}
 		if err != nil {
-			logger.Pl.E("Failed to get auth cookies for %q: %v", cu.URL, err)
+			logger.Pl.Channel(c.Name).E("Failed to get auth cookies for %q: %v", cu.URL, err)
 		}
 	}
 
@@ -89,7 +89,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 		if cu.URL != "" && !cu.IsManual {
 			regCookies, err = cm.GetGlobalCookies(cu.URL)
 			if err != nil {
-				logger.Pl.E("Failed to get cookies for %q: %v", cu.URL, err)
+				logger.Pl.Channel(c.Name).E("Failed to get cookies for %q: %v", cu.URL, err)
 			}
 		}
 	}
@@ -109,7 +109,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	for i := range cookies {
-		logger.Pl.D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
+		logger.Pl.Channel(c.Name).D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
 	}
 
 	// Store merged cookies in cookie manager.
@@ -123,7 +123,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 				cookies = mergeCookies(cookies, existing)
 			}
 			cm.cookies[hostname] = cookies
-			logger.Pl.D(2, "Stored %d cookies for hostname %q in this crawl session", len(cookies), hostname)
+			logger.Pl.Channel(c.Name).D(2, "Stored %d cookies for hostname %q in this crawl session", len(cookies), hostname)
 			cm.mu.Unlock()
 		}
 

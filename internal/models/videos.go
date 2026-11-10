@@ -156,6 +156,7 @@ type SkipMetarrReasons string
 // SkipMetarrReasons strings.
 const (
 	SkipMetarrNoPath                         SkipMetarrReasons = "metarr isn't on $PATH or won't run"
+	SkipMetarrAutoPostProcessOff             SkipMetarrReasons = "post-processing after download is turned off"
 	SkipMetarrMissingFilenameOpsFile         SkipMetarrReasons = "filename ops path is set, but the file can't be read or parsed"
 	SkipMetarrMissingMetaOpsFile             SkipMetarrReasons = "meta ops path is set, but the file can't be read or parsed"
 	SkipMetarrMissingFilteredMetaOpsFile     SkipMetarrReasons = "filtered meta ops path is set, but the file can't be read or parsed"

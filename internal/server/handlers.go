@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -61,7 +62,7 @@ func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ign
 func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 	saved, found, err := ss.cs.GetChannelModel(consts.QChanID, strconv.FormatInt(c.ID, 10), true)
 	if err != nil || !found || saved == nil {
-		logger.Pl.E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", c.Name, found, err)
+		logger.Pl.Channel(c.Name).E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", c.Name, found, err)
 		return
 	}
 	ss.startIgnoreCrawl(saved)
@@ -76,16 +77,16 @@ func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 func (ss *serverStore) startIgnoreCrawl(c *models.Channel) bool {
 	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID)
 	if !ok {
-		logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
+		logger.Pl.Channel(c.Name).I("Channel %q is already being crawled, skipping...", c.Name)
 		return false
 	}
-	logger.Pl.I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
+	logger.Pl.Channel(c.Name).I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
 	go func(ctx context.Context) {
 		defer unlock()
 		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-			logger.Pl.E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+			logger.Pl.Channel(c.Name).E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
 		} else {
-			logger.Pl.S("Successfully completed ignore crawl for channel %q", c.Name)
+			logger.Pl.Channel(c.Name).S("Successfully completed ignore crawl for channel %q", c.Name)
 		}
 	}(crawlCtx)
 	return true
@@ -462,7 +463,7 @@ func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Reques
 
 	// Stop the channel's crawl, downloads and Metarr runs, which would otherwise carry on for a deleted channel.
 	if crawling, downloading, n := state.StopCrawl(c.ID), ss.dq.Abort(c.ID), ss.pp.Abort(c.ID); crawling || downloading || n > 0 {
-		logger.Pl.I("Stopped running work for channel %q before deleting it (%d Metarr process(es))", c.Name, n)
+		logger.Pl.Channel(c.Name).I("Stopped running work for channel %q before deleting it (%d Metarr process(es))", c.Name, n)
 	}
 
 	if err := ss.cs.DeleteChannel(consts.QChanID, id); err != nil {
@@ -650,19 +651,19 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 		//nolint:contextcheck
 		go func(ctx context.Context) {
 			defer unlock()
-			logger.Pl.I("Starting crawl for channel %q (ID: %d) via web request", c.Name, c.ID)
+			logger.Pl.Channel(c.Name).I("Starting crawl for channel %q (ID: %d) via web request", c.Name, c.ID)
 
 			if performedCrawls, err := app.CrawlChannel(ctx, ss.s, ss.dq, c); err != nil {
-				logger.Pl.E("Encountered errors crawling channel %q: %v", c.Name, err)
+				logger.Pl.Channel(c.Name).E("Encountered errors crawling channel %q: %v", c.Name, err)
 			} else if performedCrawls {
-				logger.Pl.S("Completed crawl for channel %q", c.Name)
+				logger.Pl.Channel(c.Name).S("Completed crawl for channel %q", c.Name)
 			}
 		}(crawlCtx)
 
 		writeJSON(w, r, http.StatusAccepted, map[string]string{"message": "Channel crawl started"})
 		return
 	}
-	logger.Pl.I("Channel %q is already being crawled, skipping crawl...", c.Name)
+	logger.Pl.Channel(c.Name).I("Channel %q is already being crawled, skipping crawl...", c.Name)
 	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "The channel is already being crawled. Try again once it finishes."})
 }
 
@@ -680,7 +681,7 @@ func (ss *serverStore) handleStopQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Pl.I("Stopping queued work for channel %q via web request", c.Name)
+	logger.Pl.Channel(c.Name).I("Stopping queued work for channel %q via web request", c.Name)
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
@@ -698,7 +699,7 @@ func (ss *serverStore) handleAbortAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Pl.I("Aborting all work for channel %q via web request (%d Metarr process(es))", c.Name, n)
+	logger.Pl.Channel(c.Name).I("Aborting all work for channel %q via web request (%d Metarr process(es))", c.Name, n)
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
@@ -721,7 +722,7 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	logger.Pl.I("Stopping %d Metarr process(es) for channel %q via web request", n, c.Name)
+	logger.Pl.Channel(c.Name).I("Stopping %d Metarr process(es) for channel %q via web request", n, c.Name)
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
@@ -860,7 +861,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	active, _ := ss.dq.Channels()
 	waiting := slices.Contains(active, c.ID)
 
-	logger.Pl.I("Queuing manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
+	logger.Pl.Channel(c.Name).I("Queuing manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
 	queued, err := ss.dq.Add(c, app.ManualRequests(requestBody.ManualVideos)...)
 	if len(queued) == 0 {
 		msg := "no videos were queued, they may already be queued or downloading"
@@ -871,7 +872,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err != nil {
-		logger.Pl.E("Encountered errors queuing URLs for channel %q: %v", c.Name, err)
+		logger.Pl.Channel(c.Name).E("Encountered errors queuing URLs for channel %q: %v", c.Name, err)
 	}
 	writeJSON(w, r, http.StatusAccepted, map[string]bool{"queued": waiting})
 }
@@ -1052,10 +1053,10 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 
 	// Download As overrides replace any earlier ones, and a plain download keeps them.
 	if status == consts.DLStatusQueued {
-		logger.Pl.I("Queuing download of %d available video(s) for channel %q via web request", len(requestBody.VideoIDs), c.Name)
+		logger.Pl.Channel(c.Name).I("Queuing download of %d available video(s) for channel %q via web request", len(requestBody.VideoIDs), c.Name)
 		queued, err := ss.dq.Add(c, app.AvailableRequests(requestBody.VideoIDs, requestBody.Auth, requestBody.Overrides != nil, overrides)...)
 		if err != nil {
-			logger.Pl.E("Encountered errors queuing available videos for channel %q: %v", c.Name, err)
+			logger.Pl.Channel(c.Name).E("Encountered errors queuing available videos for channel %q: %v", c.Name, err)
 			if len(queued) == 0 {
 				http.Error(w, fmt.Sprintf("failed to queue videos: %v", err), http.StatusInternalServerError)
 				return
@@ -1431,9 +1432,9 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	go func(ctx context.Context) {
 		file.UpdateFromConfigFile(ss.cs, c)
 		if err := ss.pp.RunMetarr(ctx, c, requestBody.VideoIDs, requestBody.Rerun); err != nil {
-			logger.Pl.E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
+			logger.Pl.Channel(c.Name).E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
 		} else {
-			logger.Pl.S("Completed Metarr run for channel %q", c.Name)
+			logger.Pl.Channel(c.Name).S("Completed Metarr run for channel %q", c.Name)
 		}
 	}(ss.ctx)
 	writeText(w, http.StatusAccepted, "Metarr run started.")
@@ -1533,6 +1534,31 @@ func (ss *serverStore) handleGetMetarrLogs(w http.ResponseWriter, r *http.Reques
 	writeLogLines(w, r, logs)
 }
 
+// withLogChannel tags a Metarr JSON log line with the channel its run was for, as Tubarr's own channel lines are. Lines
+// that aren't JSON objects, or are already tagged, are kept as they are.
+func withLogChannel(line []byte, channel string) []byte {
+	if channel == "" {
+		return line
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(line, &fields); err != nil || fields == nil {
+		return line
+	}
+	if _, tagged := fields[consts.WebParamLogChannel]; tagged {
+		return line
+	}
+	name, err := json.Marshal(channel)
+	if err != nil {
+		return line
+	}
+	fields[consts.WebParamLogChannel] = name
+	tagged, err := json.Marshal(fields)
+	if err != nil {
+		return line
+	}
+	return tagged
+}
+
 // writeLogLines sends log lines as plain text, stopping if the client leaves.
 func writeLogLines(w http.ResponseWriter, r *http.Request, lines [][]byte) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1549,7 +1575,8 @@ func writeLogLines(w http.ResponseWriter, r *http.Request, lines [][]byte) {
 	}
 }
 
-// handlePostMetarrLogs receives log entries from Metarr instances via POST.
+// handlePostMetarrLogs receives log entries from Metarr instances via POST, replying with Tubarr's debug level so
+// running Metarr instances follow changes to it.
 func (ss *serverStore) handlePostMetarrLogs(w http.ResponseWriter, r *http.Request) {
 	// Read the log body from the request.
 	body, err := io.ReadAll(r.Body)
@@ -1565,13 +1592,14 @@ func (ss *serverStore) handlePostMetarrLogs(w http.ResponseWriter, r *http.Reque
 	}()
 
 	if len(body) == 0 {
-		// No logs to add, return success.
-		w.WriteHeader(http.StatusOK)
+		// No logs to add, Metarr is only asking for the level.
+		writeText(w, http.StatusOK, strconv.Itoa(logging.Level()))
 		return
 	}
 
 	// Split body into lines (each log entry should end with a newline).
 	lines := strings.Split(string(body), "\n")
+	channel := r.URL.Query().Get(consts.WebParamLogChannel) // The channel whose video this Metarr run is for.
 
 	// Lock and append non-empty lines to the global log store.
 	vars.MetarrLogsMutex.Lock()
@@ -1580,7 +1608,7 @@ func (ss *serverStore) handlePostMetarrLogs(w http.ResponseWriter, r *http.Reque
 	for _, line := range lines {
 		if len(line) > 0 {
 			// Append newline back since Split removes it.
-			vars.MetarrLogs = append(vars.MetarrLogs, []byte(line+"\n"))
+			vars.MetarrLogs = append(vars.MetarrLogs, append(withLogChannel([]byte(line), channel), '\n'))
 		}
 	}
 
@@ -1591,7 +1619,7 @@ func (ss *serverStore) handlePostMetarrLogs(w http.ResponseWriter, r *http.Reque
 		vars.MetarrLogs = vars.MetarrLogs[excess:]
 	}
 
-	w.WriteHeader(http.StatusOK)
+	writeText(w, http.StatusOK, strconv.Itoa(logging.Level()))
 }
 
 // handleGetBlockedDomains returns all currently blocked domains with their contexts, timestamps, and blocked videos.

@@ -407,7 +407,7 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 		return nil
 	}
 
-	logger.Pl.D(1, "Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
+	logger.Pl.Channel(c.Name).D(1, "Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
 	if _, _, err := sharedvalidation.ValidateFile(cfgFile, false, sharedtemplates.NoTemplateTags); err != nil {
 		return err
 	}
@@ -504,7 +504,7 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	c.URLModels = merged.URLModels
 	c.LoadedAt = merged.LoadedAt
 
-	logger.Pl.S("Updated channel %q from config file", c.Name)
+	logger.Pl.Channel(c.Name).S("Updated channel %q from config file", c.Name)
 	return nil
 }
 
@@ -1186,7 +1186,7 @@ func (cs *ChannelStore) GetAllChannels(mergeURLsWithParent bool) (channels []*mo
 
 		// A channel that can't be read is left out, and one failing validation is kept with its LoadErr.
 		if err := cs.loadChannelDetails(&c, settingsJSON, metarrJSON, mergeURLsWithParent); err != nil {
-			logger.Pl.E("Skipping channel %q: %v", c.Name, err)
+			logger.Pl.Channel(c.Name).E("Skipping channel %q: %v", c.Name, err)
 			continue
 		}
 		channels = append(channels, &c)
@@ -1491,7 +1491,7 @@ func (cs *ChannelStore) GetDownloadedVideos(c *models.Channel) (videos []*models
 		return nil, true, err
 	}
 
-	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(videos), c.Name)
+	logger.Pl.Channel(c.Name).I("Found %d previously downloaded videos for channel %q", len(videos), c.Name)
 	return videos, true, nil
 }
 
@@ -1530,7 +1530,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logger.Pl.E("Failed to close rows for channel %v: %v", c.Name, err)
+			logger.Pl.Channel(c.Name).E("Failed to close rows for channel %v: %v", c.Name, err)
 		}
 	}()
 
@@ -1554,7 +1554,7 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 		return nil, nil, fmt.Errorf("row iteration error: %w", err)
 	}
 
-	logger.Pl.I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
+	logger.Pl.Channel(c.Name).I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
 	return urls, failedURLs, nil
 }
 
@@ -1597,7 +1597,7 @@ func (cs *ChannelStore) UseUpCrawlDLRetries(channelURLID int64) error {
 func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 	notifyURLs, err := cs.GetNotifyURLs(c.ID)
 	if err != nil {
-		logger.Pl.E("Unable to fetch notification URLs for channel %q: %v", c.Name, err)
+		logger.Pl.Channel(c.Name).E("Unable to fetch notification URLs for channel %q: %v", c.Name, err)
 	}
 
 	s := c.ChanSettings
@@ -1672,7 +1672,7 @@ func (cs *ChannelStore) DisplaySettings(c *models.Channel) {
 		if cu.Login.Password == "" && cu.Login.EncryptedPassword != "" {
 			cu.Login.Password, err = cs.PasswordMgr.Decrypt(cu.Login.EncryptedPassword)
 			if err != nil {
-				logger.Pl.W("Failed to decrypt password for channel %q URL %q: %v", c.Name, cu.URL, err)
+				logger.Pl.Channel(c.Name).W("Failed to decrypt password for channel %q URL %q: %v", c.Name, cu.URL, err)
 			}
 		}
 
@@ -1758,6 +1758,7 @@ func displaySettingsStruct(s *models.Settings) {
 func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Default Output Directory: %s\n", m.OutputDir)
 	fmt.Printf("Output Filetype: %s\n", m.OutputExt)
+	fmt.Printf("Post-Process After Download: %v\n", m.AutoPostProcess == nil || *m.AutoPostProcess)
 	fmt.Printf("Metarr Concurrency: %d\n", m.MetarrConcurrency)
 	fmt.Printf("Max CPU: %.2f\n", m.MaxCPU)
 	fmt.Printf("Min Free Memory: %s\n", m.MinFreeMem)

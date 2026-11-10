@@ -55,6 +55,7 @@ const (
 	MetarrMetaPurge               = "metarr_purge_metafile"
 	MetarrPurgeOriginalVideo      = "metarr_purge_original_video"
 	MetarrWriteNFO                = "metarr_write_nfo"
+	MetarrAutoPostProcess         = "metarr_auto_post_process"
 	MetarrVideoCodecs             = "metarr_transcode_video_transcode_codecs"
 	MetarrAudioCodecs             = "metarr_transcode_audio_codecs"
 	MetarrTranscodeVideoArgs      = "metarr_transcode_video_args"

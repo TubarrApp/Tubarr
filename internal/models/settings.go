@@ -4,11 +4,9 @@ import (
 	"cmp"
 	"encoding/json"
 	"slices"
-	"tubarr/internal/domain/logger"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedmodels"
-	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // DomainLimit holds a domain's concurrent download and crawl limits (0 = unlimited).
@@ -90,6 +88,7 @@ type MetarrArgs struct {
 	MetaPurge string `json:"metarr_purge_metafile"`
 
 	// Program operations.
+	AutoPostProcess   *bool   `json:"metarr_auto_post_process,omitempty"` // Nil inherits (channel URLs) or means true (channels).
 	MetarrConcurrency int     `json:"metarr_concurrency"`
 	MaxCPU            float64 `json:"metarr_max_cpu_usage"`
 	MinFreeMem        string  `json:"metarr_min_free_mem"`
@@ -201,8 +200,6 @@ func FilterConflictingMetaOps(overrides, base []MetaOps) []MetaOps {
 	for _, op := range base {
 		if key := MetaOpConflictKey(op); key == "" || !overrideKeys[key] {
 			result = append(result, op)
-		} else {
-			logger.Pl.D(2, "Meta op overridden: %s", sharedparsing.FormatMetaOp(op))
 		}
 	}
 	return result
@@ -221,8 +218,6 @@ func FilterConflictingFilenameOps(overrides, base []FilenameOps) []FilenameOps {
 	for _, op := range base {
 		if key := FilenameOpConflictKey(op); key == "" || !overrideKeys[key] {
 			result = append(result, op)
-		} else {
-			logger.Pl.D(2, "Filename op overridden: %s", sharedparsing.FormatFilenameOp(op))
 		}
 	}
 	return result
@@ -378,6 +373,9 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 	if child.WriteNFO != nil && (parent.WriteNFO == nil || *parent.WriteNFO != *child.WriteNFO) {
 		return false
 	}
+	if child.AutoPostProcess != nil && (parent.AutoPostProcess == nil || *parent.AutoPostProcess != *child.AutoPostProcess) {
+		return false
+	}
 	if child.MetaOpsReplaceInherited || child.FilteredMetaOpsReplaceInherited || child.FilenameOpsReplaceInherited || child.FilteredFilenameOpsReplaceInherited {
 		return false // A URL's own, never inherited.
 	}
@@ -472,6 +470,9 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 		return false
 	}
 	if m.WriteNFO != nil {
+		return false
+	}
+	if m.AutoPostProcess != nil {
 		return false
 	}
 	if m.MetaOpsReplaceInherited || m.FilteredMetaOpsReplaceInherited || m.FilenameOpsReplaceInherited || m.FilteredFilenameOpsReplaceInherited {

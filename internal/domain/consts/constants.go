@@ -29,11 +29,12 @@ var BotTimeoutMap = map[string]float64{
 
 // Web keys are keys used by the web UI as URL parameters and so on.
 const (
-	WebParamChannelID = "id"
-	WebParamProfileID = "id"
-	WebParamURLID     = "urlID"
-	WebParamLogLevel  = "level"
-	WebParamDomain    = "domain"
-	WebParamHostname  = "hostname"
-	WebParamContext   = "context"
+	WebParamChannelID  = "id"
+	WebParamProfileID  = "id"
+	WebParamURLID      = "urlID"
+	WebParamLogLevel   = "level"
+	WebParamLogChannel = "channel" // Also the field the logger tags a channel's log lines with.
+	WebParamDomain     = "domain"
+	WebParamHostname   = "hostname"
+	WebParamContext    = "context"
 )

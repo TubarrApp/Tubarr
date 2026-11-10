@@ -359,6 +359,10 @@
                               <span class="text-gray-500 dark:text-gray-400">Write NFO Files:</span>
                               <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_write_nfo ? 'Yes' : 'No'"></span>
                             </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Post-Process After Download:</span>
+                              <span class="ml-2 text-gray-900 dark:text-white" x-text="channel.metarr?.metarr_auto_post_process === false ? 'No' : 'Yes'"></span>
+                            </div>
 
                             <h5 class="col-span-full mt-2 text-sm font-semibold text-gray-800 dark:text-white/90">Encoding</h5>
                             <div>

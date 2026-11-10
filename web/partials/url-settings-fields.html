@@ -29,7 +29,7 @@
                           <ul class="list-disc list-inside space-y-1 ml-2">
                             <li><strong>Basic:</strong> Directories, concurrency, crawl frequency, retries, global cookies, dates, filters</li>
                             <li><strong>Yt-dlp:</strong> Output extension, browser cookies, external downloaders, max filesize, extra args, preferred codecs</li>
-                            <li><strong>Post-processing:</strong> Metarr output directory, move operations, transcoding, meta/filename operations</li>
+                            <li><strong>Post-processing:</strong> Whether to post-process after download, Metarr output directory, move operations, transcoding, meta/filename operations</li>
                           </ul>
                           <p class="mt-2 text-brand-600 dark:text-brand-400">💡 Any field left empty uses this URL's profile, if it sets one, else the channel setting.</p>
                           <p class="text-brand-600 dark:text-brand-400">💡 Filters and operations are added to the channel's. Where both set the same thing, such as a field's value or the filename, this URL's is used. Tick "Replace the channel's" under one to use only this URL's and its profile's.</p>
@@ -164,7 +164,16 @@
                         <!-- Metarr Tab for This URL -->
                         <div x-show="open && urlTab === 'metarr'" class="space-y-4">
                           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <h4 class="col-span-full text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide">Files and Directories</h4>
+                            <h4 class="col-span-full text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide">When to Run</h4>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Post-Process After Download</label>
+                              <select x-model="urlEntry.custom.metarr_auto_post_process" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                                <option value="" x-text="urlBoolHint(urlEntry, 'metarr_auto_post_process', 'Yes', 'No')"></option>
+                                <option value="true">Yes</option>
+                                <option value="false">No</option>
+                              </select>
+                            </div>
+                            <h4 class="col-span-full mt-4 text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide">Files and Directories</h4>
                             <div>
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Output Directory</label>
                               <input type="text" x-model="urlEntry.custom.metarr_output_directory" :placeholder="urlHint(urlEntry, 'metarr', 'metarr_output_directory', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />

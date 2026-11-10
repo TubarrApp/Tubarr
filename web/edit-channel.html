@@ -396,6 +396,7 @@
               metarr_purge_metafile: '',
               metarr_purge_original_video: '',
               metarr_write_nfo: '',
+              metarr_auto_post_process: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: '',
@@ -587,7 +588,7 @@
                           urlEntry.custom[key] = value.join('\n');
                         } else if (key === 'metarr_max_cpu_usage' && value === 0) {
                           urlEntry.custom[key] = null;
-                        } else if (key === 'metarr_purge_original_video' || key === 'metarr_write_nfo') {
+                        } else if (key === 'metarr_purge_original_video' || key === 'metarr_write_nfo' || key === 'metarr_auto_post_process') {
                           urlEntry.custom[key] = String(value);
                         } else {
                           urlEntry.custom[key] = value;
@@ -632,7 +633,7 @@
                     this.formData.metarr[key] = value.join('\n');
                   } else if (key === 'metarr_max_cpu_usage' && value === 0) {
                     this.formData.metarr[key] = '';
-                  } else if (key === 'metarr_purge_original_video' || key === 'metarr_write_nfo') {
+                  } else if (key === 'metarr_purge_original_video' || key === 'metarr_write_nfo' || key === 'metarr_auto_post_process') {
                     this.formData.metarr[key] = String(value);
                   } else {
                     this.formData.metarr[key] = value;
@@ -673,6 +674,7 @@
               metarr_purge_metafile: '',
               metarr_purge_original_video: '',
               metarr_write_nfo: '',
+              metarr_auto_post_process: '',
               metarr_output_ext: '',
               metarr_rename_style: '',
               metarr_concurrency: null,
@@ -982,6 +984,12 @@
                 const writeNFOValue = normalizeBool(urlEntry.custom.metarr_write_nfo);
                 if (typeof writeNFOValue === 'boolean') {
                   metarr.metarr_write_nfo = writeNFOValue;
+                }
+
+                // Process Post-Process After Download from its dropdown (empty inherits from the channel)
+                const autoPostProcessValue = normalizeBool(urlEntry.custom.metarr_auto_post_process);
+                if (typeof autoPostProcessValue === 'boolean') {
+                  metarr.metarr_auto_post_process = autoPostProcessValue;
                 }
               }
 

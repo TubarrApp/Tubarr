@@ -20,6 +20,7 @@ import (
 	"tubarr/internal/parsing"
 	"tubarr/internal/queue"
 	"tubarr/internal/scraper"
+	"tubarr/internal/state"
 	"tubarr/internal/times"
 	"tubarr/internal/validation"
 
@@ -51,7 +52,7 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 	// Iterate over channels.
 	for _, c := range channels {
 		if c.LoadErr != nil {
-			logger.Pl.W("Skipping crawl: %v", c.LoadErr)
+			logger.Pl.Channel(c.Name).W("Skipping crawl: %v", c.LoadErr)
 			continue
 		}
 
@@ -70,20 +71,20 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 
 		// Ignore channel if paused.
 		if c.ChanSettings.Paused {
-			logger.Pl.I("Channel with name %q is paused, skipping checks.", c.Name)
+			logger.Pl.Channel(c.Name).I("Channel with name %q is paused, skipping checks.", c.Name)
 			continue
 		}
 		if due, _ = c.DueURLs(now, 0, false); len(due) == 0 {
 			continue
 		}
-		logger.Pl.I("Channel %q: %d URL(s) due a crawl", c.Name, len(due))
+		logger.Pl.Channel(c.Name).I("Channel %q: %d URL(s) due a crawl", c.Name, len(due))
 		ch := *c
 		ch.URLModels = due
 
 		// Run concurrent jobs.
 		wg.Go(func() {
 			if err := limits.AcquireSlot(ctx, limits.GlobalCrawls, "crawl", ch.Name); err != nil {
-				logger.Pl.D(1, "Crawl for channel %q did not start: %v", ch.Name, err)
+				logger.Pl.Channel(ch.Name).D(1, "Crawl for channel %q did not start: %v", ch.Name, err)
 				return
 			}
 			defer limits.GlobalCrawls.Release()
@@ -92,7 +93,7 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 			if performedCrawls, err := CrawlChannel(ctx, s, dq, &ch); err != nil {
 				errChan <- err
 			} else if performedCrawls {
-				logger.Pl.S("Completed crawl for channel %q", ch.Name)
+				logger.Pl.Channel(ch.Name).S("Completed crawl for channel %q", ch.Name)
 			}
 		})
 	}
@@ -160,7 +161,7 @@ func RemoveDismissedFromNew(cs contracts.ChannelStore, c *models.Channel, dismis
 		urls = append(urls, v.URL)
 	}
 	if err := cs.RemoveNewVideoURLs(c.ID, urls); err != nil {
-		logger.Pl.E("Failed to update new video URLs for channel %q: %v", c.Name, err)
+		logger.Pl.Channel(c.Name).E("Failed to update new video URLs for channel %q: %v", c.Name, err)
 	}
 }
 
@@ -186,6 +187,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 		}
 	}
 	markScanned := func() error {
+		state.ClearJitter(c.ID) // The next scheduled crawl waits a newly picked jitter.
 		if err := s.ChannelStore().UpdateChannelURLsLastScan(urlIDs); err != nil {
 			return err
 		}
@@ -195,7 +197,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 	// Filter out any URLs that are blocked globally for their authentication context.
 	var hasAllowed bool
 	if c.URLModels, hasAllowed = filterAllowedValidURLs(c); !hasAllowed {
-		logger.Pl.D(4, "No URLs for channel %q can be crawled (blocked, or destination unavailable), skipping crawl", c.Name)
+		logger.Pl.Channel(c.Name).D(4, "No URLs for channel %q can be crawled (blocked, or destination unavailable), skipping crawl", c.Name)
 		// Counts as a scan, so the URLs wait for their next crawl instead of being retried every check.
 		if err := markScanned(); err != nil {
 			return false, fmt.Errorf("failed to update last scan time: %w", err)
@@ -207,7 +209,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 	urlsToCrawl := 0
 	for _, cu := range c.URLModels {
 		if cu.Paused() {
-			logger.Pl.D(1, "Skipping paused channel URL %q...", cu.URL)
+			logger.Pl.Channel(c.Name).D(1, "Skipping paused channel URL %q...", cu.URL)
 			continue
 		}
 		if !cu.IsManual {
@@ -215,7 +217,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 		}
 	}
 	if urlsToCrawl == 0 {
-		logger.Pl.I("No monitored URLs for channel %q", c.Name)
+		logger.Pl.Channel(c.Name).I("No monitored URLs for channel %q", c.Name)
 		return false, nil
 	}
 
@@ -233,20 +235,20 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 	}
 
 	fmt.Println()
-	logger.Pl.I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
+	logger.Pl.Channel(c.Name).I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
 
 	// Get new releases for channel.
 	scrape := scraper.New()
 	videos, crawlErr := scrape.GetNewReleases(ctx, cs, c, false)
 	if crawlErr != nil && len(videos) == 0 {
 		if updateErr := markScanned(); updateErr != nil {
-			logger.Pl.E("Failed to update channel %q last scan time after failure to crawl channel: %v", c.Name, updateErr)
+			logger.Pl.Channel(c.Name).E("Failed to update channel %q last scan time after failure to crawl channel: %v", c.Name, updateErr)
 		}
 		return false, crawlErr
 	}
 
 	if len(videos) == 0 {
-		logger.Pl.I("No new releases found for channel %q", c.Name)
+		logger.Pl.Channel(c.Name).I("No new releases found for channel %q", c.Name)
 		if err := markScanned(); err != nil {
 			return true, fmt.Errorf("no new releases found for channel %q. Failed to update last scan time: %w", c.Name, err)
 		}
@@ -281,7 +283,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 			break
 		}
 
-		logger.Pl.I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
+		logger.Pl.Channel(c.Name).I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 
 		// Leave for the user to choose from if not auto downloading.
 		if !c.AutoDownloads(cu) {
@@ -291,9 +293,9 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 				continue
 			}
 			if err := cs.AddNewVideoURLs(c.ID, addedURLs); err != nil {
-				logger.Pl.E("Failed to set notification dot for channel %q: %v", c.Name, err)
+				logger.Pl.Channel(c.Name).E("Failed to set notification dot for channel %q: %v", c.Name, err)
 			}
-			logger.Pl.S("Added %d video(s) as available for URL %q %s(Channel: %s)%s", len(addedURLs), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
+			logger.Pl.Channel(c.Name).S("Added %d video(s) as available for URL %q %s(Channel: %s)%s", len(addedURLs), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 			nAvailable += len(addedURLs)
 			continue
 		}
@@ -306,7 +308,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 		}
 		queued, err := dq.Add(c, reqs...)
 		procError = errors.Join(procError, err)
-		logger.Pl.S("Queued %d video(s) for URL %q %s(Channel: %s)%s", len(queued), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
+		logger.Pl.Channel(c.Name).S("Queued %d video(s) for URL %q %s(Channel: %s)%s", len(queued), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 		nQueued += len(queued)
 	}
 
@@ -333,7 +335,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 // An unusable filter file at any level queues none of them, so nothing downloads unfiltered.
 func crawlRequests(c *models.Channel, cu *models.ChannelURL, videos []*models.Video) ([]queue.Request, error) {
 	if _, err := metadata.ChannelURLFilters(cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); err != nil {
-		logger.Pl.E("Not downloading crawled videos for %q until its filter file is fixed: %v", cu.URL, err)
+		logger.Pl.Channel(c.Name).E("Not downloading crawled videos for %q until its filter file is fixed: %v", cu.URL, err)
 		return nil, fmt.Errorf("channel URL %q: %w", cu.URL, err)
 	}
 	reqs := make([]queue.Request, 0, len(videos))
@@ -370,7 +372,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 		toIgnore := make([]*models.Video, 0, len(videos))
 		for _, v := range videos {
 			if v.URL == "" {
-				logger.Pl.D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
+				logger.Pl.Channel(c.Name).D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
 				continue
 			}
 			v.MarkVideoAsIgnored()
@@ -379,14 +381,14 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 
 		validVideos, err := s.VideoStore().AddVideos(toIgnore, c.ID)
 		if err != nil {
-			logger.Pl.E("Encountered the following errors adding videos for channel %q: %v", c.Name, err)
+			logger.Pl.Channel(c.Name).E("Encountered the following errors adding videos for channel %q: %v", c.Name, err)
 
 			if len(validVideos) == 0 {
 				return fmt.Errorf("no videos were successfully added to the ignore list for channel with ID %d", c.ID)
 			}
 		}
 
-		logger.Pl.S("Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
+		logger.Pl.Channel(c.Name).S("Added %d videos to the ignore list in channel %q", len(validVideos), c.Name)
 	}
 	return crawlErr
 }
@@ -402,13 +404,13 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 
 		// Check if this URL is blocked globally for its authentication context.
 		if err := queue.DomainBlocked(cu); err != nil {
-			logger.Pl.D(2, "Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
+			logger.Pl.Channel(c.Name).D(2, "Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
 			continue
 		}
 
 		// Don't download anywhere unexpected (e.g. onto the local disk under an unmounted drive's mount point).
 		if err := queue.CheckDestinations(c, cu, nil); err != nil {
-			logger.Pl.E("Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
+			logger.Pl.Channel(c.Name).E("Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
 			continue
 		}
 
@@ -499,7 +501,7 @@ func AddChannelFromInput(cs contracts.ChannelStore, input models.ChannelInput) (
 			return nil, fmt.Errorf("%w: invalid notification URLs: %w", contracts.ErrInvalidChannel, err)
 		}
 	}
-	logger.Pl.I("Adding channel %q to Tubarr...", c.Name)
+	logger.Pl.Channel(c.Name).I("Adding channel %q to Tubarr...", c.Name)
 	if err := cs.AddChannelWithDetails(c, authMap, notifications); err != nil {
 		return nil, err
 	}

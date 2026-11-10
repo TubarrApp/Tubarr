@@ -50,9 +50,9 @@ func (d *VideoDownload) Execute() error {
 			return err
 		}
 
-		logger.Pl.I("Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
+		logger.Pl.Channel(d.Channel.Name).I("Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
 		if d.Context.Err() != nil {
-			logger.Pl.W("Download canceled: %v", d.Context.Err())
+			logger.Pl.Channel(d.Channel.Name).W("Download canceled: %v", d.Context.Err())
 			return d.cancelVideoDownload()
 		}
 
@@ -60,7 +60,7 @@ func (d *VideoDownload) Execute() error {
 		if err == nil {
 			d.Video.UpdatedAt = time.Now()
 			d.DLTracker.SetStatus(d.Video, consts.DLStatusCompleted, 100.0, "", nil)
-			logger.Pl.S("Successfully completed video download for URL: %s", d.Video.URL)
+			logger.Pl.Channel(d.Channel.Name).S("Successfully completed video download for URL: %s", d.Video.URL)
 			return nil
 		}
 		if d.Context.Err() != nil {
@@ -79,7 +79,7 @@ func (d *VideoDownload) Execute() error {
 
 		// Other errors - retry, unless that was the last attempt.
 		lastErr = err
-		logger.Pl.E("Download attempt %d failed: %v", attempt, err)
+		logger.Pl.Channel(d.Channel.Name).E("Download attempt %d failed: %v", attempt, err)
 		d.DLTracker.SetStatus(d.Video, consts.DLStatusFailed, d.Video.DownloadStatus.Percent, "", err)
 		if attempt == d.Options.MaxAttempts {
 			break
@@ -89,12 +89,12 @@ func (d *VideoDownload) Execute() error {
 		}
 
 		randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
-		logger.Pl.I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
+		logger.Pl.Channel(d.Channel.Name).I("Waiting %.0f seconds before retrying video download for %q...", randWait.Seconds(), d.Video.URL)
 		d.DLTracker.SetStatus(d.Video, consts.DLStatusQueued, 0,
 			fmt.Sprintf("Retrying in %.0fs (attempt %d/%d)", randWait.Seconds(), attempt+1, d.Options.MaxAttempts), nil)
 		select {
 		case <-d.Context.Done():
-			logger.Pl.W("Download canceled: %v", d.Context.Err())
+			logger.Pl.Channel(d.Channel.Name).W("Download canceled: %v", d.Context.Err())
 			return d.cancelVideoDownload()
 		case <-time.After(randWait):
 		}

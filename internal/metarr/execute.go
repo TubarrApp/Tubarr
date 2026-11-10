@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
 	"sync"
 	"syscall"
+	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
 	"tubarr/internal/file"
@@ -50,7 +52,7 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 
 	args := makeMetarrCommand(v, cu, c, dirParser)
 	if len(args) == 0 {
-		logger.Pl.I("No Metarr arguments built, returning...")
+		logger.Pl.Channel(c.Name).I("No Metarr arguments built, returning...")
 		return nil
 	}
 
@@ -59,12 +61,14 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}
 	if vars.MetarrLogToken != "" {
+		// The channel goes in the log URL, so the Logs page can show this run's lines with the channel's.
+		logURL := vars.MetarrLogURL + "?" + url.Values{consts.WebParamLogChannel: {c.Name}}.Encode()
 		cmd.Env = append(cmd.Environ(),
 			sharedconsts.EnvTubarrLogToken+"="+vars.MetarrLogToken,
-			sharedconsts.EnvTubarrLogURL+"="+vars.MetarrLogURL)
+			sharedconsts.EnvTubarrLogURL+"="+logURL)
 	}
 
-	if err := runMetarr(cmd, v); err != nil {
+	if err := runMetarr(cmd, v, c.Name); err != nil {
 		return err
 	}
 	return finishMetafile(v, cu)
@@ -77,7 +81,7 @@ func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
 		return nil
 	}
 	if err := metadata.RefreshFromMetarr(v); err != nil {
-		logger.Pl.E("Failed to read the metadata Metarr wrote for %q, keeping the stored title and description: %v", v.URL, err)
+		logger.Pl.Channel(cu.ChannelName).E("Failed to read the metadata Metarr wrote for %q, keeping the stored title and description: %v", v.URL, err)
 	}
 
 	purge, err := metaPurge(v, cu)
@@ -90,7 +94,7 @@ func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
 	if err := os.Remove(v.Files.JSONFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("failed to purge metadata file %q: %w", v.Files.JSONFilePath, err)
 	}
-	logger.Pl.I("Purged metadata file %q", v.Files.JSONFilePath)
+	logger.Pl.Channel(cu.ChannelName).I("Purged metadata file %q", v.Files.JSONFilePath)
 	v.Files.JSONFilePath = ""
 	return nil
 }
@@ -134,9 +138,9 @@ func runWithProgress(cmd *exec.Cmd, videoID int64) (string, error) {
 	return out.String(), cmd.Wait()
 }
 
-// runMetarr runs a Metarr command with a built argument list.
-func runMetarr(cmd *exec.Cmd, v *models.Video) error {
-	logger.Pl.I("Running Metarr command:\n\n%s\n", cmd.String())
+// runMetarr runs a Metarr command with a built argument list, logging as the channel the video belongs to.
+func runMetarr(cmd *exec.Cmd, v *models.Video, channelName string) error {
+	logger.Pl.Channel(channelName).I("Running Metarr command:\n\n%s\n", cmd.String())
 
 	cmd.Stderr = os.Stderr
 
@@ -145,7 +149,7 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	if err != nil {
 		// Metarr still reports where the files are after a failed rename or move.
 		if storeErr := v.StoreFilenamesFromMetarr(metarrStdout); storeErr != nil {
-			logger.Pl.D(1, "No file paths stored from failed Metarr run for %q: %v", v.URL, storeErr)
+			logger.Pl.Channel(channelName).D(1, "No file paths stored from failed Metarr run for %q: %v", v.URL, storeErr)
 		}
 		// Metarr's own account of why it failed, rather than just its exit status.
 		if msgs := metarrErrors(metarrStdout); len(msgs) > 0 {
@@ -165,7 +169,7 @@ func runMetarr(cmd *exec.Cmd, v *models.Video) error {
 	}
 
 	// Success.
-	logger.Pl.S("Metarr successfully processed video %q (file path: %q)", v.URL, v.Files.VideoFilePath)
+	logger.Pl.Channel(channelName).S("Metarr successfully processed video %q (file path: %q)", v.URL, v.Files.VideoFilePath)
 	return nil
 }
 

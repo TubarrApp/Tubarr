@@ -71,7 +71,7 @@ func setChannelSettingsFlags(c *cobra.Command, f *models.ChannelFlagValues) {
 		&f.CookiesFromBrowser, &f.MaxFilesize, &f.MaxResolution, &f.DLFilterFile, &f.DLFilters,
 		&f.YTDLPPreferredVideoCodecs, &f.YTDLPPreferredAudioCodecs)
 
-	cmd.SetMetarrFlags(c, &f.MaxCPU, &f.MetarrConcurrency, &f.PurgeOriginalVideo, &f.WriteNFO, &f.MetarrExt, &f.ExtraFFmpegArgs, &f.MinFreeMem,
+	cmd.SetMetarrFlags(c, &f.MaxCPU, &f.MetarrConcurrency, &f.PurgeOriginalVideo, &f.WriteNFO, &f.AutoPostProcess, &f.MetarrExt, &f.ExtraFFmpegArgs, &f.MinFreeMem,
 		&f.OutDir, &f.MetaPurge, &f.RenameStyle, &f.MetaOpsFile, &f.FilteredMetaOpsFile, &f.FilenameOpsFile,
 		&f.FilteredFilenameOpsFile, &f.FilenameOps, &f.FilteredFilenameOps, &f.MetaOps, &f.FilteredMetaOps)
 
@@ -230,6 +230,9 @@ func mergeFlagsIntoInput(cmd *cobra.Command, f *models.ChannelFlagValues, in *mo
 	}
 	if cmd.Flags().Changed(keys.MWriteNFO) {
 		in.WriteNFO = &f.WriteNFO
+	}
+	if cmd.Flags().Changed(keys.MAutoPostProcess) {
+		in.AutoPostProcess = &f.AutoPostProcess
 	}
 	if cmd.Flags().Changed(keys.TranscodeGPU) {
 		in.TranscodeGPU = &f.TranscodeGPU
