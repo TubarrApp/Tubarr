@@ -221,16 +221,34 @@
               (!this.channelFilter || log.channel === this.channelFilter));
           },
 
-          // Channels with lines in the loaded logs, plus the chosen one so it stays selected before its lines arrive.
+          channelNames: [], // Every channel's name, from the channel list.
+
+          // Every channel, plus names only found in the logs (e.g. a deleted or renamed channel) and the chosen one.
           get channels() {
-            const names = new Set(this.logs.map(log => log.channel).filter(name => typeof name === 'string' && name));
+            const names = new Set(this.channelNames);
+            this.logs.forEach(log => {
+              if (typeof log.channel === 'string' && log.channel) names.add(log.channel);
+            });
             if (this.channelFilter) names.add(this.channelFilter);
             return [...names].sort((a, b) => a.localeCompare(b));
+          },
+
+          async fetchChannelNames() {
+            try {
+              const response = await fetch('/api/v1/channels/all');
+              if (response.ok) {
+                const data = await response.json();
+                this.channelNames = (data || []).map(c => c.name).filter(name => name);
+              }
+            } catch (err) {
+              console.error('Error fetching channels:', err);
+            }
           },
 
           init() {
             this.$watch('typeFilter', () => this.$nextTick(() => this.scrollToBottom()));
             this.$watch('channelFilter', () => this.$nextTick(() => this.scrollToBottom()));
+            this.fetchChannelNames();
             this.fetchLogLevel();
             this.fetchLogs();
             this.startAutoRefresh();
