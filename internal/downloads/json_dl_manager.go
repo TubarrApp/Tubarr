@@ -7,18 +7,17 @@ import (
 	"fmt"
 	"time"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/times"
 )
 
 // NewJSONDownload creates a download operation with specified options.
 func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *models.ChannelURL, channel *models.Channel, dlStore contracts.DownloadStore, tracker Tracker, opts Options) (*JSONDownload, error) {
-	if video == nil {
-		return nil, errors.New("video cannot be nil")
+	if video == nil || channelURL == nil || channel == nil {
+		return nil, fmt.Errorf("invalid nil parameter (video: %v, channel URL: %v, channel: %v)", video == nil, channelURL == nil, channel == nil)
 	}
 
-	logger.Pl.D(1, "JSON download called with video URL: %q", video.URL)
+	video.Log().D(1, "JSON download called with video URL: %q", video.URL)
 
 	dl := &JSONDownload{
 		Video:      video,
@@ -53,9 +52,9 @@ func (d *JSONDownload) Execute() error {
 			return err
 		}
 
-		logger.Pl.Channel(d.Channel.Name).I("Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
+		d.Channel.Log().I("Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
 		if d.Context.Err() != nil {
-			logger.Pl.Channel(d.Channel.Name).W("Download canceled: %v", d.Context.Err())
+			d.Channel.Log().W("Download canceled: %v", d.Context.Err())
 			return d.cancelJSONDownload()
 		}
 
@@ -63,7 +62,7 @@ func (d *JSONDownload) Execute() error {
 		err := d.jsonDLAttempt()
 		if err == nil { // If err IS nil
 			d.Video.UpdatedAt = time.Now()
-			logger.Pl.Channel(d.Channel.Name).S("Successfully completed JSON download for URL: %s", d.Video.URL)
+			d.Channel.Log().S("Successfully completed JSON download for URL: %s", d.Video.URL)
 			return nil
 		}
 
@@ -81,7 +80,7 @@ func (d *JSONDownload) Execute() error {
 
 		// Other errors - retry, unless that was the last attempt.
 		lastErr = err
-		logger.Pl.Channel(d.Channel.Name).E("Download attempt %d failed: %v", attempt, err)
+		d.Channel.Log().E("Download attempt %d failed: %v", attempt, err)
 		if attempt == d.Options.MaxAttempts {
 			break
 		}
@@ -90,10 +89,10 @@ func (d *JSONDownload) Execute() error {
 		}
 
 		randWait := times.RandomSecsDuration(d.Options.RetryMaxInterval)
-		logger.Pl.Channel(d.Channel.Name).I("Waiting %.0f seconds before retrying JSON download for %q...", randWait.Seconds(), d.Video.URL)
+		d.Channel.Log().I("Waiting %.0f seconds before retrying JSON download for %q...", randWait.Seconds(), d.Video.URL)
 		select {
 		case <-d.Context.Done():
-			logger.Pl.Channel(d.Channel.Name).W("Download canceled: %v", d.Context.Err())
+			d.Channel.Log().W("Download canceled: %v", d.Context.Err())
 			return d.cancelJSONDownload()
 		case <-time.After(randWait):
 		}

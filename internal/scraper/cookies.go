@@ -53,7 +53,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	if (cu.IsManual || cu.ID == 0) && !cu.NeedsAuth() { // Login details sent with manual videos win.
 		cu.Login.Username, cu.Login.Password, cu.Login.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
 		if err != nil {
-			logger.Pl.Channel(c.Name).E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
+			c.Log().E("Error getting authentication for channel ID %d, URL %q: %v", c.ID, cu.URL, err)
 		}
 	}
 
@@ -75,21 +75,21 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 
 	// Cookies from direct login (always fresh, no caching).
 	if doLogin {
-		authCookies, err = login(ctx, &cu.Login)
+		authCookies, err = login(ctx, &cu.Login, c.Name)
 		if ctx.Err() != nil {
 			return nil, "", ctx.Err()
 		}
 		if err != nil {
-			logger.Pl.Channel(c.Name).E("Failed to get auth cookies for %q: %v", cu.URL, err)
+			c.Log().E("Failed to get auth cookies for %q: %v", cu.URL, err)
 		}
 	}
 
 	// Cookies from browser cookie stores.
 	if useGlobal {
 		if cu.URL != "" && !cu.IsManual {
-			regCookies, err = cm.GetGlobalCookies(cu.URL)
+			regCookies, err = cm.GetGlobalCookies(cu.URL, c.Name)
 			if err != nil {
-				logger.Pl.Channel(c.Name).E("Failed to get cookies for %q: %v", cu.URL, err)
+				c.Log().E("Failed to get cookies for %q: %v", cu.URL, err)
 			}
 		}
 	}
@@ -100,7 +100,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// Cookies from FlareSolverr (override others, e.g. stale Cloudflare cookies from a browser store).
 	// If FlareSolverr is unavailable, carries on without it (the failure is already logged).
 	if useFlareSolverr {
-		if sol, err := cm.flareSolverrSolution(ctx, cu.URL, 0); err == nil {
+		if sol, err := cm.flareSolverrSolution(ctx, cu.URL, c.Name, 0); err == nil {
 			cu.Session.FlareSolverr = models.NewFlareSolverrSolution(sol.ytDLPSolve(), cm.flareSolverrResolver(ctx, cu, cookies), cm.flareSolverrNewer(cu, cookies))
 			cookies = mergeCookies(sol.cookies, cookies)
 		} else if ctx.Err() != nil {
@@ -109,7 +109,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	for i := range cookies {
-		logger.Pl.Channel(c.Name).D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
+		c.Log().D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
 	}
 
 	// Store merged cookies in cookie manager.
@@ -123,12 +123,12 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 				cookies = mergeCookies(cookies, existing)
 			}
 			cm.cookies[hostname] = cookies
-			logger.Pl.Channel(c.Name).D(2, "Stored %d cookies for hostname %q in this crawl session", len(cookies), hostname)
+			c.Log().D(2, "Stored %d cookies for hostname %q in this crawl session", len(cookies), hostname)
 			cm.mu.Unlock()
 		}
 
 		// Save cookies to file for yt-dlp.
-		err = saveCookiesToFile(cookies, cu.Session.CookiePath)
+		err = saveCookiesToFile(cookies, cu.Session.CookiePath, c.Name)
 		if err != nil {
 			return nil, "", err
 		}
@@ -140,8 +140,8 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 
 // GetGlobalCookies retrieves cookies for a given URL from browser stores.
 // Caches within the current crawl session for performance, but fresh CookieManager per crawl.
-func (cm *CookieManager) GetGlobalCookies(u string) ([]*http.Cookie, error) {
-	logger.Pl.I("Retrieving global cookies for URL: %q", u)
+func (cm *CookieManager) GetGlobalCookies(u, channelName string) ([]*http.Cookie, error) {
+	logger.Pl.Channel(channelName).I("Retrieving global cookies for URL: %q", u)
 	baseDomain := limits.Hostname(u)
 	if baseDomain == "" {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab from URL %q", u)
@@ -155,24 +155,24 @@ func (cm *CookieManager) GetGlobalCookies(u string) ([]*http.Cookie, error) {
 	}
 	cm.mu.RUnlock()
 	if len(cookies) > 0 {
-		logger.Pl.D(2, "Using cached cookies for domain %q from this crawl session", baseDomain)
+		logger.Pl.Channel(channelName).D(2, "Using cached cookies for domain %q from this crawl session", baseDomain)
 		return cookies, nil
 	}
 
 	// Load cookies from browser stores.
-	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(baseDomain))
-	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(u))
+	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(baseDomain, channelName))
+	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(u, channelName))
 
 	// Store cookies for this crawl session.
 	if len(cookies) > 0 {
 		// Debug log.
 		for _, c := range cookies {
-			logger.Pl.D(2, "Loaded global cookie for %q: %v", baseDomain, c)
+			logger.Pl.Channel(channelName).D(2, "Loaded global cookie for %q: %v", baseDomain, c)
 		}
 
 		// Cache in memory for this session.
 		cm.mu.Lock()
-		logger.Pl.I("Caching %d cookies for domain %q for this crawl session", len(cookies), baseDomain)
+		logger.Pl.Channel(channelName).I("Caching %d cookies for domain %q for this crawl session", len(cookies), baseDomain)
 		cm.cookies[baseDomain] = cookies
 		cm.mu.Unlock()
 	}
@@ -181,23 +181,23 @@ func (cm *CookieManager) GetGlobalCookies(u string) ([]*http.Cookie, error) {
 }
 
 // GetCachedCookies retrieves cookies from the current crawl session for a domain.
-func (cm *CookieManager) GetCachedCookies(hostname string) []*http.Cookie {
+func (cm *CookieManager) GetCachedCookies(hostname, channelName string) []*http.Cookie {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
 	if cookies, ok := cm.cookies[hostname]; ok {
-		logger.Pl.D(2, "Retrieved %d cached cookies for hostname %q from this crawl session", len(cookies), hostname)
+		logger.Pl.Channel(channelName).D(2, "Retrieved %d cached cookies for hostname %q from this crawl session", len(cookies), hostname)
 		return cookies
 	}
 
-	logger.Pl.D(2, "No cached cookies found for hostname %q in this crawl session", hostname)
+	logger.Pl.Channel(channelName).D(2, "No cached cookies found for hostname %q in this crawl session", hostname)
 	return nil
 }
 
 // ******************************** Private ********************************
 
 // loadCookiesForDomain loads the cookies associated with a particularly domain.
-func (cm *CookieManager) loadCookiesForDomain(domain string) (cookies []*http.Cookie) {
+func (cm *CookieManager) loadCookiesForDomain(domain, channelName string) (cookies []*http.Cookie) {
 	// Find cookies from browsers.
 	for _, d := range []string{domain, "." + domain} {
 		cookiesFound := 0
@@ -211,12 +211,12 @@ func (cm *CookieManager) loadCookiesForDomain(domain string) (cookies []*http.Co
 		}
 
 		if cookiesFound > 0 {
-			logger.Pl.I("Found %d cookies for domain %s", cookiesFound, d)
+			logger.Pl.Channel(channelName).I("Found %d cookies for domain %s", cookiesFound, d)
 		}
 	}
 
 	if len(cookies) == 0 {
-		logger.Pl.I("No cookies found for domain %s", domain)
+		logger.Pl.Channel(channelName).I("No cookies found for domain %s", domain)
 	}
 
 	return cookies
@@ -257,9 +257,9 @@ func generateCookieFilePath(channelName, videoURL string) string {
 }
 
 // saveCookiesToFile saves the cookies to a file in Netscape format.
-func saveCookiesToFile(cookies []*http.Cookie, cookieFilePath string) error {
+func saveCookiesToFile(cookies []*http.Cookie, cookieFilePath, channelName string) error {
 	if len(cookies) == 0 {
-		logger.Pl.D(2, "No cookies to write, skipping cookie file creation at %q", cookieFilePath)
+		logger.Pl.Channel(channelName).D(2, "No cookies to write, skipping cookie file creation at %q", cookieFilePath)
 		return nil
 	}
 
@@ -273,14 +273,14 @@ func saveCookiesToFile(cookies []*http.Cookie, cookieFilePath string) error {
 	}
 
 	// Log the cookies for debugging.
-	logger.Pl.D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
+	logger.Pl.Channel(channelName).D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
 
 	// Write each cookie in Netscape format.
 	for _, cookie := range cookies {
 		// Domains are set where cookies are obtained (from the host that sent them), so a missing one can't be guessed here.
 		domain := cookie.Domain
 		if domain == "" {
-			logger.Pl.D(2, "Skipping cookie %q: it has no domain", cookie.Name)
+			logger.Pl.Channel(channelName).D(2, "Skipping cookie %q: it has no domain", cookie.Name)
 			continue
 		}
 

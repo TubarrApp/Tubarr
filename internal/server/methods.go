@@ -72,7 +72,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 		if c.LoadErr != nil {
 			if msg := c.LoadErr.Error(); reported[c.ID] != msg {
 				reported[c.ID] = msg
-				logger.Pl.E("Crawl watchdog: skipping crawls until fixed: %v", c.LoadErr)
+				c.Log().E("Crawl watchdog: skipping crawls until fixed: %v", c.LoadErr)
 			}
 			continue
 		}
@@ -89,14 +89,14 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 		if len(due) == 0 {
 			continue
 		}
-		logger.Pl.Channel(c.Name).D(4, "channel %q - %d URL(s) due", c.Name, len(due))
+		c.Log().D(4, "channel %q - %d URL(s) due", c.Name, len(due))
 
 		// The config file may change what's due, or pause the channel.
 		file.UpdateFromConfigFile(ss.s.ChannelStore(), c)
 
 		// Skip paused channels
 		if c.ChanSettings.Paused {
-			logger.Pl.Channel(c.Name).D(3, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
+			c.Log().D(3, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
 			continue
 		}
 		if due, _ = c.DueURLs(now, jitter, true); len(due) == 0 {
@@ -115,16 +115,16 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 			defer unlock()
 
 			if err := limits.AcquireSlot(crawlCtx, limits.GlobalCrawls, "crawl", ch.Name); err != nil {
-				logger.Pl.Channel(ch.Name).D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
+				ch.Log().D(1, "Crawl watchdog: Crawl for channel %q did not start: %v", ch.Name, err)
 				return
 			}
 			defer limits.GlobalCrawls.Release()
 
-			logger.Pl.Channel(ch.Name).D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
+			ch.Log().D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
 			if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ss.dq, ch); err != nil {
-				logger.Pl.Channel(ch.Name).E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
+				ch.Log().E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
 			} else if performedCrawls {
-				logger.Pl.Channel(ch.Name).S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
+				ch.Log().S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
 			}
 		}(&ch)
 	}

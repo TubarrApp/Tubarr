@@ -231,6 +231,18 @@ func storedStatus(t *testing.T, db *sql.DB, videoID int64) (consts.DownloadStatu
 	return status, errMsg.String
 }
 
+// TestAddRefusesNil tests Add returns an error rather than panicking for a nil channel or a request without a video.
+func TestAddRefusesNil(t *testing.T) {
+	store, _, c := newTestChannel(t)
+	q := NewDownloadQueue(t.Context(), store, NewPostProcessingQueue(store))
+	if _, err := q.Add(nil, Request{Video: &models.Video{URL: "https://example.com/v/1"}}); err == nil {
+		t.Error("Add with a nil channel succeeded")
+	}
+	if queued, err := q.Add(c, Request{}); err == nil || len(queued) != 0 {
+		t.Errorf("Add with a request without a video = %d queued, %v; want an error", len(queued), err)
+	}
+}
+
 // TestAddThenStop tests videos waiting for their channel's lane are stopped: one the user chose returns as canceled, a
 // crawled one as failed, and a video already queued isn't queued again.
 func TestAddThenStop(t *testing.T) {

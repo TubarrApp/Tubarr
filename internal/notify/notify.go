@@ -10,7 +10,6 @@ import (
 	"slices"
 	"time"
 	"tubarr/internal/contracts"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/network"
 
@@ -40,7 +39,7 @@ func Services(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew [
 		return fmt.Errorf("failed to get notification URLs for channel %q (ID: %d): %w", c.Name, c.ID, err)
 	}
 	if len(notifications) == 0 {
-		logger.Pl.Channel(c.Name).D(1, "No notification URLs configured for channel %q (ID: %d)", c.Name, c.ID)
+		c.Log().D(1, "No notification URLs configured for channel %q (ID: %d)", c.Name, c.ID)
 		return nil
 	}
 
@@ -55,14 +54,14 @@ func Services(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew [
 	for _, n := range notifications {
 
 		if n.ChannelURL == "" {
-			logger.Pl.Channel(c.Name).D(3, "Channel URL is empty for notification URL %q, adding to notification list", n.ChannelURL)
+			c.Log().D(3, "Channel URL is empty for notification URL %q, adding to notification list", n.ChannelURL)
 			urls = append(urls, n.NotifyURL)
 			continue
 		}
 
-		logger.Pl.Channel(c.Name).D(3, "Checking %q exists in notification", n.ChannelURL)
+		c.Log().D(3, "Checking %q exists in notification", n.ChannelURL)
 		if channelsWithNewMap[sharedparsing.NormalizeChannelURL(n.ChannelURL)] {
-			logger.Pl.Channel(c.Name).D(3, "Found %q in notification  adding to notification list", n.ChannelURL)
+			c.Log().D(3, "Found %q in notification  adding to notification list", n.ChannelURL)
 			urls = append(urls, n.NotifyURL)
 		}
 	}
@@ -73,7 +72,7 @@ func Services(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew [
 
 	// Check if any valid URLs.
 	if len(urls) == 0 {
-		logger.Pl.Channel(c.Name).D(2, "No notification URLs matched for channel %q (ID: %d)", c.Name, c.ID)
+		c.Log().D(2, "No notification URLs matched for channel %q (ID: %d)", c.Name, c.ID)
 		return nil
 	}
 
@@ -99,7 +98,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				logger.Pl.Channel(c.Name).E("Failed to close HTTP response body: %v", err)
+				c.Log().E("Failed to close HTTP response body: %v", err)
 			}
 		}()
 
@@ -120,7 +119,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 			errs = append(errs, fmt.Errorf("invalid notification URL for channel %q", c.Name))
 			continue
 		}
-		logger.Pl.Channel(c.Name).D(1, "Notifying %q for channel %q", parsed.Host, c.Name)
+		c.Log().D(1, "Notifying %q for channel %q", parsed.Host, c.Name)
 
 		regClient, lanClient := newNotifyHTTPClients((30 * time.Second), (10 * time.Second))
 		client := regClient
@@ -132,12 +131,12 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 			errs = append(errs, fmt.Errorf("failed to notify %q: %w", parsed.Host, err))
 			continue
 		}
-		logger.Pl.Channel(c.Name).S("Successfully notified %q for channel %q", parsed.Host, c.Name)
+		c.Log().S("Successfully notified %q for channel %q", parsed.Host, c.Name)
 		notified = append(notified, parsed.Host)
 	}
 
 	if len(errs) == 0 {
-		logger.Pl.Channel(c.Name).S("Successfully notified all URLs for channel %q: %v", c.Name, notified)
+		c.Log().S("Successfully notified all URLs for channel %q: %v", c.Name, notified)
 		return nil
 	}
 

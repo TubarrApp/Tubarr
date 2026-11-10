@@ -216,6 +216,29 @@ func TestETA(t *testing.T) {
 
 // ******************************** Execute *******************************************************************************************
 
+// TestNewDownloadsRefuseNil tests the download constructors return an error, rather than a download that would panic, when
+// given a nil video, channel URL or channel.
+func TestNewDownloadsRefuseNil(t *testing.T) {
+	v, cu, c := &models.Video{URL: "https://example.com/v"}, &models.ChannelURL{}, &models.Channel{}
+	for _, tc := range []struct {
+		missing string
+		v       *models.Video
+		cu      *models.ChannelURL
+		c       *models.Channel
+	}{
+		{"video", nil, cu, c},
+		{"channel URL", v, nil, c},
+		{"channel", v, cu, nil},
+	} {
+		if _, err := NewVideoDownload(t.Context(), tc.v, tc.cu, tc.c, nilDBStore{}, nil, Options{}); err == nil {
+			t.Errorf("NewVideoDownload without a %s succeeded", tc.missing)
+		}
+		if _, err := NewJSONDownload(t.Context(), tc.v, tc.cu, tc.c, nilDBStore{}, nil, Options{}); err == nil {
+			t.Errorf("NewJSONDownload without a %s succeeded", tc.missing)
+		}
+	}
+}
+
 // nilDBStore is a download store without a database, so Execute's domain block checks are skipped.
 type nilDBStore struct{}
 

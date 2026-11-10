@@ -121,7 +121,7 @@ func addAuth(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success.
-			logger.Pl.S("Channel with %s %q set authentication details", key, val)
+			c.Log().S("Channel with %s %q set authentication details", key, val)
 			return nil
 		},
 	}
@@ -245,9 +245,9 @@ func manualDownloadVideoURLs(cs contracts.ChannelStore, s contracts.Store, dq *q
 				if err != nil {
 					return err
 				}
-				logger.Pl.S("Added %d video(s) to channel %q's Available list", len(added), c.Name)
+				c.Log().S("Added %d video(s) to channel %q's Available list", len(added), c.Name)
 				if len(existing) > 0 {
-					logger.Pl.W("Skipped %d video(s) already in channel %q:\n%s", len(existing), c.Name, strings.Join(existing, "\n"))
+					c.Log().W("Skipped %d video(s) already in channel %q:\n%s", len(existing), c.Name, strings.Join(existing, "\n"))
 				}
 				return nil
 			}
@@ -261,7 +261,7 @@ func manualDownloadVideoURLs(cs contracts.ChannelStore, s contracts.Store, dq *q
 			}
 			queued, err := dq.Add(c, app.ManualRequests(manualVideos)...)
 			if len(queued) == 0 && err == nil {
-				logger.Pl.I("No videos queued for channel %q, they may already be queued or downloading", c.Name)
+				c.Log().I("No videos queued for channel %q, they may already be queued or downloading", c.Name)
 			}
 			return err
 		},
@@ -305,7 +305,7 @@ func runMetarrCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.St
 				for _, u := range urls {
 					idx := slices.IndexFunc(videos, func(v *models.Video) bool { return v.URL == u })
 					if idx == -1 {
-						logger.Pl.W("Video %q is not awaiting Metarr in channel %q, skipping", u, c.Name)
+						c.Log().W("Video %q is not awaiting Metarr in channel %q, skipping", u, c.Name)
 						continue
 					}
 					ids = append(ids, videos[idx].ID)
@@ -394,7 +394,7 @@ func downloadAvailableCmd(cs contracts.ChannelStore, s contracts.Store, dq *queu
 				return c.LoadErr
 			}
 			if len(videos) == 0 {
-				logger.Pl.I("No videos waiting in Available for channel %q", c.Name)
+				c.Log().I("No videos waiting in Available for channel %q", c.Name)
 				return nil
 			}
 			chosen, err := chooseAvailableVideos(c, videos, all, ids, urls, "Download")
@@ -408,10 +408,10 @@ func downloadAvailableCmd(cs contracts.ChannelStore, s contracts.Store, dq *queu
 			// Queue the videos, which Tubarr downloads before exiting.
 			queued, err := dq.Add(c, app.AvailableRequests(chosen, nil, false, nil)...)
 			if len(queued) == 0 && err == nil {
-				logger.Pl.I("Videos are no longer available for channel %q, they may already be downloading", c.Name)
+				c.Log().I("Videos are no longer available for channel %q, they may already be downloading", c.Name)
 				return nil
 			}
-			logger.Pl.I("Queued %d available video(s) for channel %q", len(queued), c.Name)
+			c.Log().I("Queued %d available video(s) for channel %q", len(queued), c.Name)
 			return err
 		},
 	}
@@ -443,7 +443,7 @@ func dismissAvailableCmd(cs contracts.ChannelStore, s contracts.Store) *cobra.Co
 				return err
 			}
 			if len(videos) == 0 {
-				logger.Pl.I("No videos waiting in Available for channel %q", c.Name)
+				c.Log().I("No videos waiting in Available for channel %q", c.Name)
 				return nil
 			}
 			chosen, err := chooseAvailableVideos(c, videos, all, ids, urls, "Dismiss")
@@ -459,7 +459,7 @@ func dismissAvailableCmd(cs contracts.ChannelStore, s contracts.Store) *cobra.Co
 				return err
 			}
 			app.RemoveDismissedFromNew(cs, c, claimed)
-			logger.Pl.S("Dismissed %d video(s) from Available for channel %q", len(claimed), c.Name)
+			c.Log().S("Dismissed %d video(s) from Available for channel %q", len(claimed), c.Name)
 			return nil
 		},
 	}
@@ -506,12 +506,12 @@ func chooseAvailableVideos(c *models.Channel, videos []*models.AvailableVideo, a
 	}
 	for _, id := range ids {
 		if !slices.ContainsFunc(videos, func(v *models.AvailableVideo) bool { return v.ID == id }) {
-			logger.Pl.W("Video ID %d is not in Available for channel %q, skipping", id, c.Name)
+			c.Log().W("Video ID %d is not in Available for channel %q, skipping", id, c.Name)
 		}
 	}
 	for _, u := range urls {
 		if !slices.ContainsFunc(videos, func(v *models.AvailableVideo) bool { return v.URL == u }) {
-			logger.Pl.W("Video %q is not in Available for channel %q, skipping", u, c.Name)
+			c.Log().W("Video %q is not in Available for channel %q, skipping", u, c.Name)
 		}
 	}
 	return chosen, nil
@@ -709,7 +709,7 @@ func addNotifyURLs(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success.
-			logger.Pl.S("Added %d notify URL(s) for channel with %s %q", len(notifications), key, val)
+			c.Log().S("Added %d notify URL(s) for channel with %s %q", len(notifications), key, val)
 			return nil
 		},
 	}
@@ -788,7 +788,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 
 			// Log retrieved URLs.
 			cURLs := c.GetURLs()
-			logger.Pl.D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
+			c.Log().D(3, "Retrieved channel %q with URLs: %v", c.Name, cURLs)
 
 			// Run ignore crawl.
 			if crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID); ok {
@@ -803,11 +803,11 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 					return err
 				}
 			} else {
-				logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
+				c.Log().I("Channel %q is already being crawled, skipping...", c.Name)
 			}
 
 			// Success.
-			logger.Pl.S("Completed ignore crawl for channel with %s %q", key, val)
+			c.Log().S("Completed ignore crawl for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -846,7 +846,7 @@ func pauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success.
-			logger.Pl.S("Paused channel %q", c.Name)
+			c.Log().S("Paused channel %q", c.Name)
 			return nil
 		},
 	}
@@ -885,7 +885,7 @@ func unpauseChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success.
-			logger.Pl.S("Unpaused channel %q", c.Name)
+			c.Log().S("Unpaused channel %q", c.Name)
 			return nil
 		},
 	}
@@ -1000,7 +1000,7 @@ func addChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts.S
 			if input.IgnoreRun != nil && *input.IgnoreRun {
 				runIgnoreCrawl(ctx, s, c)
 			}
-			logger.Pl.S("Completed addition of channel %q to Tubarr", c.Name)
+			c.Log().S("Completed addition of channel %q to Tubarr", c.Name)
 			return nil
 		},
 	}
@@ -1080,7 +1080,7 @@ func addBatchChannelsCmd(ctx context.Context, cs contracts.ChannelStore, s contr
 				}
 
 				successes = append(successes, batchConfigFile)
-				logger.Pl.S("Successfully added channel %q from config file: %s", c.Name, batchConfigFile)
+				c.Log().S("Successfully added channel %q from config file: %s", c.Name, batchConfigFile)
 			}
 
 			fmt.Println()
@@ -1175,6 +1175,7 @@ func listChannelCmd(cs contracts.ChannelStore) *cobra.Command {
 			// As saved, so each URL shows only its own settings.
 			c, hasRows, err := cs.GetChannelModel(key, val, false)
 			if !hasRows {
+				// c is nil here, so don't try to log with it.
 				logger.Pl.I("Entry for channel with %s %q does not exist in the database", key, val)
 				return nil
 			}
@@ -1250,10 +1251,10 @@ func crawlChannelCmd(ctx context.Context, cs contracts.ChannelStore, s contracts
 				if performedCrawls, err := app.CrawlChannel(crawlCtx, s, dq, c); err != nil {
 					return err
 				} else if performedCrawls {
-					logger.Pl.S("Completed crawl for channel with %s %q", key, val)
+					c.Log().S("Completed crawl for channel with %s %q", key, val)
 				}
 			} else {
-				logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
+				c.Log().I("Channel %q is already being crawled, skipping...", c.Name)
 			}
 
 			// Success.
@@ -1387,7 +1388,7 @@ func updateChannelSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 			}
 
 			// Success.
-			logger.Pl.S("Completed update for channel with %s %q", key, val)
+			c.Log().S("Completed update for channel with %s %q", key, val)
 			return nil
 		},
 	}
@@ -1484,19 +1485,19 @@ func runIgnoreCrawl(ctx context.Context, s contracts.Store, added *models.Channe
 	// Reloaded, with its settings filled in as jobs use them.
 	c, found, err := s.ChannelStore().GetChannelModel(consts.QChanID, strconv.FormatInt(added.ID, 10), true)
 	if err != nil || !found || c == nil {
-		logger.Pl.E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", added.Name, found, err)
+		added.Log().E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", added.Name, found, err)
 		return
 	}
 
 	crawlCtx, unlock, ok := state.TryLockCrawl(ctx, c.ID)
 	if !ok {
-		logger.Pl.I("Channel %q is already being crawled, skipping...", c.Name)
+		c.Log().I("Channel %q is already being crawled, skipping...", c.Name)
 		return
 	}
 	defer unlock()
-	logger.Pl.I("Running an 'ignore crawl' for channel %q...", c.Name)
+	c.Log().I("Running an 'ignore crawl' for channel %q...", c.Name)
 	if err := app.CrawlChannelIgnore(crawlCtx, s, c); err != nil {
-		logger.Pl.E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
+		c.Log().E("Failed to complete ignore crawl run for %q: %v", c.Name, err)
 	}
 }
 

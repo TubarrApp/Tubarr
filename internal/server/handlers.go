@@ -62,7 +62,7 @@ func (ss *serverStore) addChannelFromConfig(path string) (c *models.Channel, ign
 func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 	saved, found, err := ss.cs.GetChannelModel(consts.QChanID, strconv.FormatInt(c.ID, 10), true)
 	if err != nil || !found || saved == nil {
-		logger.Pl.Channel(c.Name).E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", c.Name, found, err)
+		c.Log().E("Failed to load channel (or got nil channel) %q for its ignore crawl (found: %t): %v", c.Name, found, err)
 		return
 	}
 	ss.startIgnoreCrawl(saved)
@@ -77,16 +77,16 @@ func (ss *serverStore) startNewChannelIgnoreCrawl(c *models.Channel) {
 func (ss *serverStore) startIgnoreCrawl(c *models.Channel) bool {
 	crawlCtx, unlock, ok := state.TryLockCrawl(ss.ctx, c.ID)
 	if !ok {
-		logger.Pl.Channel(c.Name).I("Channel %q is already being crawled, skipping...", c.Name)
+		c.Log().I("Channel %q is already being crawled, skipping...", c.Name)
 		return false
 	}
-	logger.Pl.Channel(c.Name).I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
+	c.Log().I("Running ignore crawl for channel %q. No videos before this point will be downloaded to this channel.", c.Name)
 	go func(ctx context.Context) {
 		defer unlock()
 		if err := app.CrawlChannelIgnore(ctx, ss.s, c); err != nil {
-			logger.Pl.Channel(c.Name).E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
+			c.Log().E("Failed to run ignore crawl for channel %q: %v", c.Name, err)
 		} else {
-			logger.Pl.Channel(c.Name).S("Successfully completed ignore crawl for channel %q", c.Name)
+			c.Log().S("Successfully completed ignore crawl for channel %q", c.Name)
 		}
 	}(crawlCtx)
 	return true
@@ -300,7 +300,7 @@ func (ss *serverStore) handleGetChannel(w http.ResponseWriter, r *http.Request) 
 	// Notification URLs.
 	notifications, err := ss.cs.GetNotifyURLs(c.ID)
 	if err != nil {
-		logger.Pl.E("Failed to fetch notification URLs for channel %d: %v", c.ID, err)
+		c.Log().E("Failed to fetch notification URLs for channel %d: %v", c.ID, err)
 	}
 	for _, n := range notifications {
 		if n.NotifyURL != "" {
@@ -339,7 +339,7 @@ func (ss *serverStore) handleCreateChannel(w http.ResponseWriter, r *http.Reques
 		UpdatedAt:         now,
 	}
 	for _, u := range f.urls {
-		cu := &models.ChannelURL{URL: u, LastScan: now, CreatedAt: now, UpdatedAt: now}
+		cu := &models.ChannelURL{URL: u, ChannelName: f.name, LastScan: now, CreatedAt: now, UpdatedAt: now}
 
 		// Auth details for this URL, if any.
 		if a, exists := f.authMap[u]; exists {
@@ -446,6 +446,7 @@ func (ss *serverStore) handleUpdateChannel(w http.ResponseWriter, r *http.Reques
 
 	// Apply its new limits to its queued videos, waiting ones included.
 	if c, found, err := ss.cs.GetChannelModel(consts.QChanID, idStr, true); err != nil {
+		// c could be nil, do not log with it.
 		logger.Pl.W("Failed to reload channel %d to apply its new limits to queued videos: %v", channelID, err)
 	} else if found && c != nil {
 		ss.setQueueLimits(c)
@@ -463,11 +464,11 @@ func (ss *serverStore) handleDeleteChannel(w http.ResponseWriter, r *http.Reques
 
 	// Stop the channel's crawl, downloads and Metarr runs, which would otherwise carry on for a deleted channel.
 	if crawling, downloading, n := state.StopCrawl(c.ID), ss.dq.Abort(c.ID), ss.pp.Abort(c.ID); crawling || downloading || n > 0 {
-		logger.Pl.Channel(c.Name).I("Stopped running work for channel %q before deleting it (%d Metarr process(es))", c.Name, n)
+		c.Log().I("Stopped running work for channel %q before deleting it (%d Metarr process(es))", c.Name, n)
 	}
 
 	if err := ss.cs.DeleteChannel(consts.QChanID, id); err != nil {
-		logger.Pl.E("Failed to delete channel %q: %v", id, err)
+		c.Log().E("Failed to delete channel %q: %v", id, err)
 		http.Error(w, fmt.Sprintf("failed to delete channel %q: %v", id, err), http.StatusInternalServerError)
 		return
 	}
@@ -651,19 +652,19 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 		//nolint:contextcheck
 		go func(ctx context.Context) {
 			defer unlock()
-			logger.Pl.Channel(c.Name).I("Starting crawl for channel %q (ID: %d) via web request", c.Name, c.ID)
+			c.Log().I("Starting crawl for channel %q (ID: %d) via web request", c.Name, c.ID)
 
 			if performedCrawls, err := app.CrawlChannel(ctx, ss.s, ss.dq, c); err != nil {
-				logger.Pl.Channel(c.Name).E("Encountered errors crawling channel %q: %v", c.Name, err)
+				c.Log().E("Encountered errors crawling channel %q: %v", c.Name, err)
 			} else if performedCrawls {
-				logger.Pl.Channel(c.Name).S("Completed crawl for channel %q", c.Name)
+				c.Log().S("Completed crawl for channel %q", c.Name)
 			}
 		}(crawlCtx)
 
 		writeJSON(w, r, http.StatusAccepted, map[string]string{"message": "Channel crawl started"})
 		return
 	}
-	logger.Pl.Channel(c.Name).I("Channel %q is already being crawled, skipping crawl...", c.Name)
+	c.Log().I("Channel %q is already being crawled, skipping crawl...", c.Name)
 	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "The channel is already being crawled. Try again once it finishes."})
 }
 
@@ -681,7 +682,7 @@ func (ss *serverStore) handleStopQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Pl.Channel(c.Name).I("Stopping queued work for channel %q via web request", c.Name)
+	c.Log().I("Stopping queued work for channel %q via web request", c.Name)
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
@@ -699,7 +700,7 @@ func (ss *serverStore) handleAbortAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Pl.Channel(c.Name).I("Aborting all work for channel %q via web request (%d Metarr process(es))", c.Name, n)
+	c.Log().I("Aborting all work for channel %q via web request (%d Metarr process(es))", c.Name, n)
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
@@ -722,7 +723,7 @@ func (ss *serverStore) handleStopMetarr(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	logger.Pl.Channel(c.Name).I("Stopping %d Metarr process(es) for channel %q via web request", n, c.Name)
+	c.Log().I("Stopping %d Metarr process(es) for channel %q via web request", n, c.Name)
 	writeText(w, http.StatusAccepted, "Stopping.")
 }
 
@@ -861,7 +862,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	active, _ := ss.dq.Channels()
 	waiting := slices.Contains(active, c.ID)
 
-	logger.Pl.Channel(c.Name).I("Queuing manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
+	c.Log().I("Queuing manual download of %d URL(s) for channel %q (ID: %d) via web request", len(requestBody.ManualVideos), c.Name, c.ID)
 	queued, err := ss.dq.Add(c, app.ManualRequests(requestBody.ManualVideos)...)
 	if len(queued) == 0 {
 		msg := "no videos were queued, they may already be queued or downloading"
@@ -872,7 +873,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err != nil {
-		logger.Pl.Channel(c.Name).E("Encountered errors queuing URLs for channel %q: %v", c.Name, err)
+		c.Log().E("Encountered errors queuing URLs for channel %q: %v", c.Name, err)
 	}
 	writeJSON(w, r, http.StatusAccepted, map[string]bool{"queued": waiting})
 }
@@ -1053,10 +1054,10 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 
 	// Download As overrides replace any earlier ones, and a plain download keeps them.
 	if status == consts.DLStatusQueued {
-		logger.Pl.Channel(c.Name).I("Queuing download of %d available video(s) for channel %q via web request", len(requestBody.VideoIDs), c.Name)
+		c.Log().I("Queuing download of %d available video(s) for channel %q via web request", len(requestBody.VideoIDs), c.Name)
 		queued, err := ss.dq.Add(c, app.AvailableRequests(requestBody.VideoIDs, requestBody.Auth, requestBody.Overrides != nil, overrides)...)
 		if err != nil {
-			logger.Pl.Channel(c.Name).E("Encountered errors queuing available videos for channel %q: %v", c.Name, err)
+			c.Log().E("Encountered errors queuing available videos for channel %q: %v", c.Name, err)
 			if len(queued) == 0 {
 				http.Error(w, fmt.Sprintf("failed to queue videos: %v", err), http.StatusInternalServerError)
 				return
@@ -1432,9 +1433,9 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	go func(ctx context.Context) {
 		file.UpdateFromConfigFile(ss.cs, c)
 		if err := ss.pp.RunMetarr(ctx, c, requestBody.VideoIDs, requestBody.Rerun); err != nil {
-			logger.Pl.Channel(c.Name).E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
+			c.Log().E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
 		} else {
-			logger.Pl.Channel(c.Name).S("Completed Metarr run for channel %q", c.Name)
+			c.Log().S("Completed Metarr run for channel %q", c.Name)
 		}
 	}(ss.ctx)
 	writeText(w, http.StatusAccepted, "Metarr run started.")
@@ -1721,7 +1722,8 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 // handleTogglePauseChannel toggles the pause state of a channel.
 func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, consts.WebParamChannelID)
-	if _, ok := ss.channelFromRequest(w, r); !ok {
+	c, ok := ss.channelFromRequest(w, r)
+	if !ok {
 		return
 	}
 
@@ -1736,7 +1738,7 @@ func (ss *serverStore) handleTogglePauseChannel(w http.ResponseWriter, r *http.R
 		return nil
 	})
 	if err != nil {
-		logger.Pl.E("Failed to update channel pause state: %v", err)
+		c.Log().E("Failed to update channel pause state: %v", err)
 		http.Error(w, fmt.Sprintf("failed to update channel pause state: %v", err), http.StatusInternalServerError)
 		return
 	}

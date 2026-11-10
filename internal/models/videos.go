@@ -7,6 +7,8 @@ import (
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
+
+	"github.com/TubarrApp/gocommon/logging"
 )
 
 // Video is a video in a channel, with its metadata, files and download state.
@@ -75,6 +77,11 @@ type videoJSON struct {
 	*videoFields
 	*VideoMetadata
 	*VideoFiles
+}
+
+// Log returns a logger whose lines are tagged with the name of the video's channel.
+func (v *Video) Log() logging.ChannelLogger {
+	return logger.Pl.Channel(v.ChannelName)
 }
 
 // jsonFields returns the video's JSON fields, pointing into the video.
@@ -240,7 +247,7 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 		return fmt.Errorf("metarr did not return the final video path for %q. Got lines: %v", v.URL, lines)
 	}
 
-	logger.Pl.I("Video %q got file paths from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.Files.VideoFilePath, v.Files.JSONFilePath)
+	v.Log().I("Video %q got file paths from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.Files.VideoFilePath, v.Files.JSONFilePath)
 	return nil
 }
 

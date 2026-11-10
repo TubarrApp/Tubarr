@@ -2710,6 +2710,31 @@ func TestChannelURLNameSaved(t *testing.T) {
 	}
 }
 
+// TestAddChannelURLChannelName tests a channel URL gets its channel's name when added, so its log lines are tagged, and
+// that adding one to a channel that doesn't exist fails.
+func TestAddChannelURLChannelName(t *testing.T) {
+	cs := newTestChannelStore(t)
+	c := testChannel(t, "Cool Channel", "https://example.com/@a")
+	if err := cs.AddChannelWithDetails(c, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.URLModels[0].ChannelName; got != c.Name {
+		t.Errorf("URL added with its channel has channel name %q, want %q", got, c.Name)
+	}
+
+	added := &models.ChannelURL{URL: "https://example.com/@b"}
+	if _, err := cs.AddChannelURL(c.ID, added, false); err != nil {
+		t.Fatal(err)
+	}
+	if added.ChannelName != c.Name {
+		t.Errorf("URL added later has channel name %q, want %q", added.ChannelName, c.Name)
+	}
+
+	if _, err := cs.AddChannelURL(c.ID+1000, &models.ChannelURL{URL: "https://example.com/@c"}, false); err == nil {
+		t.Error("adding a URL to a channel that doesn't exist succeeded")
+	}
+}
+
 // ******************************** Videos ********************************************************************************************
 
 // TestUpdateVideoPaths tests that paths are only stored while the row still holds the paths a run started from.

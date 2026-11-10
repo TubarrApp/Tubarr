@@ -10,7 +10,6 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/enums"
 	"tubarr/internal/domain/keys"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 
@@ -60,11 +59,11 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					return fmt.Errorf("URL %q not found for channel %q", url, c.Name)
 				}
 				urlsToUpdate = append(urlsToUpdate, cu)
-				logger.Pl.I("Updating settings for URL: %s", url)
+				c.Log().I("Updating settings for URL: %s", url)
 			} else {
 				// Update all URLs.
 				urlsToUpdate = c.URLModels
-				logger.Pl.I("Updating settings for %d URL(s) in channel %q", len(urlsToUpdate), c.Name)
+				c.Log().I("Updating settings for %d URL(s) in channel %q", len(urlsToUpdate), c.Name)
 			}
 
 			// If reset flag is set, clear settings to inherit from channel.
@@ -80,7 +79,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 						continue
 					}
 
-					logger.Pl.S("Reset settings for URL %q - will now inherit from channel defaults", cu.URL)
+					c.Log().S("Reset settings for URL %q - will now inherit from channel defaults", cu.URL)
 				}
 				return errors.Join(errs...)
 			}
@@ -129,12 +128,12 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					continue
 				}
 
-				logger.Pl.D(1, "Updated settings for URL: %s", cu.URL)
+				c.Log().D(1, "Updated settings for URL: %s", cu.URL)
 				updatedCount++
 			}
 
 			if updatedCount > 0 || len(errs) == 0 {
-				logger.Pl.S("Successfully updated settings for %d URL(s) in channel %q", updatedCount, c.Name)
+				c.Log().S("Successfully updated settings for %d URL(s) in channel %q", updatedCount, c.Name)
 			}
 			return errors.Join(errs...)
 		},

@@ -43,7 +43,7 @@ func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
 
 	if c.ChannelConfigFile != "" && !c.UpdatedFromConfig {
 		if err := cs.UpdateChannelFromConfig(c); err != nil {
-			logger.Pl.E("failed to update from config file %q: %v", c.ChannelConfigFile, err)
+			c.Log().E("failed to update from config file %q: %v", c.ChannelConfigFile, err)
 		}
 
 		c.UpdatedFromConfig = true

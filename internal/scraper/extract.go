@@ -16,10 +16,10 @@ import (
 
 // ruleValue runs a scraped value through a rule's json_path, regex, and follow-up requests, returning "" if any stage
 // finds nothing.
-func ruleValue(c *colly.Collector, pageURL, value string, rule models.MetadataRule) string {
+func ruleValue(c *colly.Collector, pageURL, value, channelName string, rule models.MetadataRule) string {
 	value = extractValue(value, rule.JSONPath, rule.Regex)
 	if value == "" {
-		logger.Pl.D(2, "Selector %q for field %q: nothing left after json_path/regex", rule.Selector, rule.Name)
+		logger.Pl.Channel(channelName).D(2, "Selector %q for field %q: nothing left after json_path/regex", rule.Selector, rule.Name)
 		return ""
 	}
 
@@ -27,31 +27,31 @@ func ruleValue(c *colly.Collector, pageURL, value string, rule models.MetadataRu
 	for i, step := range rule.Fetch {
 		stepURL, err := fetchStepURL(prevURL, step.URL, value)
 		if err != nil {
-			logger.Pl.W("Field %q fetch step %d: %v", rule.Name, i+1, err)
+			logger.Pl.Channel(channelName).W("Field %q fetch step %d: %v", rule.Name, i+1, err)
 			return ""
 		}
 
 		if err := checkFetchTarget(pageURL, stepURL); err != nil {
-			logger.Pl.W("Field %q fetch step %d: %v", rule.Name, i+1, err)
+			logger.Pl.Channel(channelName).W("Field %q fetch step %d: %v", rule.Name, i+1, err)
 			return ""
 		}
 
-		logger.Pl.D(2, "Field %q fetch step %d: requesting %q", rule.Name, i+1, stepURL)
+		logger.Pl.Channel(channelName).D(2, "Field %q fetch step %d: requesting %q", rule.Name, i+1, stepURL)
 		body, err := fetchBody(c, stepURL, prevURL)
 		if err != nil {
-			logger.Pl.W("Field %q fetch step %d: request for %q failed: %v", rule.Name, i+1, stepURL, err)
+			logger.Pl.Channel(channelName).W("Field %q fetch step %d: request for %q failed: %v", rule.Name, i+1, stepURL, err)
 			return ""
 		}
 
 		value = string(body)
 		if step.Selector != "" {
 			if value, err = selectValue(body, step.Selector, step.Attr); err != nil {
-				logger.Pl.W("Field %q fetch step %d: failed to parse %q as HTML: %v", rule.Name, i+1, stepURL, err)
+				logger.Pl.Channel(channelName).W("Field %q fetch step %d: failed to parse %q as HTML: %v", rule.Name, i+1, stepURL, err)
 				return ""
 			}
 		}
 		if value = extractValue(value, step.JSONPath, step.Regex); value == "" {
-			logger.Pl.D(2, "Field %q fetch step %d: nothing found in response from %q", rule.Name, i+1, stepURL)
+			logger.Pl.Channel(channelName).D(2, "Field %q fetch step %d: nothing found in response from %q", rule.Name, i+1, stepURL)
 			return ""
 		}
 		prevURL = stepURL

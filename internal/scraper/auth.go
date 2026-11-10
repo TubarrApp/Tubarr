@@ -18,13 +18,13 @@ import (
 )
 
 // login logs the user in and returns the authentication cookie.
-func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cookie, error) {
+func login(ctx context.Context, a *models.ChannelURLAccessDetails, channelName string) ([]*http.Cookie, error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, err
 	}
 	client := &http.Client{Jar: jar}
-	logger.Pl.I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, auth.StarPassword(a.Password))
+	logger.Pl.Channel(channelName).I("Logging in to %q with username %q and password %s", a.LoginURL, a.Username, auth.StarPassword(a.Password))
 
 	// 'GET' the login page to get a fresh token
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.LoginURL, nil)
@@ -41,7 +41,7 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cook
 	defer func() {
 		if getResp != nil && getResp.Body != nil {
 			if err := getResp.Body.Close(); err != nil {
-				logger.Pl.E("failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
+				logger.Pl.Channel(channelName).E("failed to close 'resp.Body' for login URL %v: %v", a.LoginURL, err)
 			}
 		}
 	}()
@@ -50,7 +50,7 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cook
 	if err != nil {
 		return nil, err
 	}
-	logger.Pl.D(4, "Got login page body %s", string(body))
+	logger.Pl.Channel(channelName).D(4, "Got login page body %s", string(body))
 
 	// Parse the login page to find any hidden token fields
 	token := parseToken(string(body))
@@ -63,7 +63,7 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cook
 	if token != "" {
 		data.Set("_token", token)
 	}
-	logger.Pl.D(1, "Sending token %q", data.Get("_token"))
+	logger.Pl.Channel(channelName).D(1, "Sending token %q", data.Get("_token"))
 
 	// 'POST' auth details to the login form
 	req, err = http.NewRequestWithContext(ctx, http.MethodPost, a.LoginURL, strings.NewReader(data.Encode()))
@@ -82,7 +82,7 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cook
 	defer func() {
 		if postResp != nil && postResp.Body != nil {
 			if err := postResp.Body.Close(); err != nil {
-				logger.Pl.E("failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
+				logger.Pl.Channel(channelName).E("failed to close 'resp.Body' for login URL (after sending token) %v: %v", a.LoginURL, err)
 			}
 		}
 	}()
@@ -91,10 +91,10 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cook
 	final := postResp.Request.URL
 	switch {
 	case postResp.StatusCode >= 400:
-		logger.Pl.W("Login to %q answered %q: check the username and password", a.LoginURL, postResp.Status)
+		logger.Pl.Channel(channelName).W("Login to %q answered %q: check the username and password", a.LoginURL, postResp.Status)
 	case postResp.Request.Method == http.MethodGet && final.Host == req.URL.Host &&
 		strings.TrimSuffix(final.Path, "/") == strings.TrimSuffix(req.URL.Path, "/"):
-		logger.Pl.W("Login to %q redirected back to the login page: check the username and password", a.LoginURL)
+		logger.Pl.Channel(channelName).W("Login to %q redirected back to the login page: check the username and password", a.LoginURL)
 	}
 
 	// Cookies from the final response keep their attributes. The jar's others for the login and final URLs (e.g. a
@@ -118,7 +118,7 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails) ([]*http.Cook
 	}
 	if logging.Level() > 1 {
 		for _, cookie := range cookies {
-			logger.Pl.I("Cookie received: %s; Expires=%s", cookie.Name, cookie.Expires) // Value omitted, it's a session secret.
+			logger.Pl.Channel(channelName).I("Cookie received: %s; Expires=%s", cookie.Name, cookie.Expires) // Value omitted, it's a session secret.
 		}
 	}
 

@@ -3,6 +3,9 @@ package models
 import (
 	"net/http"
 	"time"
+	"tubarr/internal/domain/logger"
+
+	"github.com/TubarrApp/gocommon/logging"
 )
 
 // ChannelURL contains fields relating to a channel's URL.
@@ -39,6 +42,11 @@ type ChannelURLSession struct {
 	CookiePath   string
 	Cookies      []*http.Cookie
 	FlareSolverr *FlareSolverrSolution
+}
+
+// Log returns a logger whose lines are tagged with the name of the URL's channel.
+func (cu *ChannelURL) Log() logging.ChannelLogger {
+	return logger.Pl.Channel(cu.ChannelName)
 }
 
 // NeedsAuth checks if this channel URL has details for authorization.

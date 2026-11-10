@@ -4,7 +4,6 @@ package metarr
 import (
 	"cmp"
 	"strconv"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -60,7 +59,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 
 	// Metarr takes each path whole, so commas and quotes in file names need no escaping.
 	metaFile := cmp.Or(v.Files.JSONCustomFile, v.Files.JSONFilePath)
-	logger.Pl.Channel(c.Name).I("Making Metarr argument for video %q and JSON file %q.", v.Files.VideoFilePath, metaFile)
+	c.Log().I("Making Metarr argument for video %q and JSON file %q.", v.Files.VideoFilePath, metaFile)
 	args := []string{metkeys.VideoFile, v.Files.VideoFilePath, metkeys.MetaFile, metaFile}
 
 	// add adds the flag with val, unless val is blank.
@@ -80,7 +79,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	addEach(metkeys.FilenameOps, filenameOps)
 	addEach(metkeys.MetaOps, metaOps)
 	if len(metaOps) > 0 {
-		logger.Pl.Channel(c.Name).D(3, "User set meta ops, will set meta overwrite key...")
+		c.Log().D(3, "User set meta ops, will set meta overwrite key...")
 		args = append(args, metkeys.MetaOW)
 	}
 	if maxCPU := cmp.Or(o.MaxCPU, m.MaxCPU); maxCPU > 0 {
@@ -147,7 +146,7 @@ func parseMetarrOutputDir(v *models.Video, cu *models.ChannelURL, dirParser *par
 
 	parsed, err := dirParser.ParseDirectory(dir, name)
 	if err != nil {
-		logger.Pl.Channel(cu.ChannelName).E("Failed to parse directory %q for video with URL %q: %v", dir, v.URL, err)
+		cu.Log().E("Failed to parse directory %q for video with URL %q: %v", dir, v.URL, err)
 		return ""
 	}
 	return parsed

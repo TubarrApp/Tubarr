@@ -11,7 +11,6 @@ import (
 	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads"
 	"tubarr/internal/file"
 	"tubarr/internal/metarr"
@@ -108,6 +107,9 @@ func NewDownloadQueue(ctx context.Context, s contracts.Store, postProcessing *Po
 //
 // Videos already queued or downloading, for this channel or another, are left out.
 func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*models.Video, err error) {
+	if c == nil {
+		return nil, errors.New("channel cannot be nil")
+	}
 	vs := q.store.VideoStore()
 
 	// Load the channel's config file settings.
@@ -123,6 +125,11 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 	var errs []error
 	for _, r := range reqs {
 		v := r.Video
+		if v == nil {
+			errs = append(errs, errors.New("a download request has no video"))
+			continue
+		}
+		v.ChannelName = c.Name // So the video's log lines are tagged with the channel it downloads for.
 		name := cmp.Or(v.URL, "ID "+strconv.FormatInt(v.ID, 10))
 
 		// A URL the channel may not have yet is stored with the channel URL it downloads through.
@@ -143,7 +150,7 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 			continue
 		}
 		if !claimed {
-			logger.Pl.Channel(c.Name).I("Video %s is already queued or downloading, or no longer available, skipping", name)
+			c.Log().I("Video %s is already queued or downloading, or no longer available, skipping", name)
 			continue
 		}
 
@@ -161,7 +168,7 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 			go q.run(d)
 			continue
 		}
-		logger.Pl.Channel(c.Name).E("Not downloading video %q: %v", v.URL, err)
+		c.Log().E("Not downloading video %q: %v", v.URL, err)
 		q.storeStatus(v, consts.DLStatusFailed, 0, err)
 		errs = append(errs, err)
 	}
@@ -181,7 +188,7 @@ func (q *DownloadQueue) Cancel(videoID int64) bool {
 	if !ok || d.done {
 		return false
 	}
-	logger.Pl.Channel(d.c.Name).I("Canceling download of video %q", d.video.URL)
+	d.c.Log().I("Canceling download of video %q", d.video.URL)
 	d.cancel(downloads.ErrCanceledByUser)
 	return true
 }
@@ -374,7 +381,7 @@ func (q *DownloadQueue) insert(d *download) bool {
 func (q *DownloadQueue) finish(d *download, err error) {
 	status, err := q.finalStatus(d, err)
 	if err != nil {
-		logger.Pl.Channel(d.c.Name).E("Video %q not downloaded: %v", d.video.URL, err)
+		d.c.Log().E("Video %q not downloaded: %v", d.video.URL, err)
 	}
 	d.SetStatus(d.video, status, d.video.DownloadStatus.Percent, "", err)
 
@@ -412,7 +419,7 @@ func (q *DownloadQueue) finish(d *download, err error) {
 	if len(notifyURLs) > 0 {
 		go func() {
 			if err := notify.Services(q.store.ChannelStore(), d.c, notifyURLs); err != nil {
-				logger.Pl.Channel(d.c.Name).E("Failed to notify services for channel %q: %v", d.c.Name, err)
+				d.c.Log().E("Failed to notify services for channel %q: %v", d.c.Name, err)
 			}
 		}()
 	}
@@ -482,7 +489,7 @@ func (q *DownloadQueue) storeStatus(v *models.Video, status consts.DownloadStatu
 
 	// Stored even while shutting down, so the video's final status isn't lost.
 	if err := q.store.DownloadStore().UpdateDownloadStatus(context.WithoutCancel(q.ctx), update); err != nil {
-		logger.Pl.E("Failed to store download status for video %q: %v", v.URL, err)
+		v.Log().E("Failed to store download status for video %q: %v", v.URL, err)
 	}
 }
 
@@ -517,9 +524,9 @@ func (d *download) SendUpdate(v *models.Video) {
 	// Status changes are logged at info level, progress only when debugging.
 	const statusFmt = "Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n"
 	if s.Status != prev.Status {
-		logger.Pl.Channel(d.c.Name).I(statusFmt, v.URL, s.Status, s.Percent, s.Error)
+		d.c.Log().I(statusFmt, v.URL, s.Status, s.Percent, s.Error)
 	} else if s.Percent != prev.Percent || s.Stage != prev.Stage {
-		logger.Pl.Channel(d.c.Name).D(2, statusFmt, v.URL, s.Status, s.Percent, s.Error)
+		d.c.Log().D(2, statusFmt, v.URL, s.Status, s.Percent, s.Error)
 	}
 
 	// Status changes are stored, as is reaching 100%.
@@ -540,7 +547,7 @@ func (s *session) ready(ctx context.Context, cs contracts.ChannelStore, c *model
 		var skipErr error
 		s.skipMetarr, skipErr = metarr.SkipReason(metarr.CheckInstalled(ctx), s.cu, parsing.NewDirectoryParser(c, s.cu, parsing.TubarrTags))
 		if skipErr != nil {
-			logger.Pl.Channel(c.Name).E("Not running Metarr for %q (videos stay pending for Run Metarr): %s: %v", s.cu.URL, s.skipMetarr.Reason, skipErr)
+			c.Log().E("Not running Metarr for %q (videos stay pending for Run Metarr): %s: %v", s.cu.URL, s.skipMetarr.Reason, skipErr)
 		}
 
 		// Turned off, videos stay pending until the user post-processes them.

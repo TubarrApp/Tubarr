@@ -52,7 +52,7 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 
 	args := makeMetarrCommand(v, cu, c, dirParser)
 	if len(args) == 0 {
-		logger.Pl.Channel(c.Name).I("No Metarr arguments built, returning...")
+		c.Log().I("No Metarr arguments built, returning...")
 		return nil
 	}
 
@@ -68,7 +68,7 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 			sharedconsts.EnvTubarrLogURL+"="+logURL)
 	}
 
-	if err := runMetarr(cmd, v, c.Name); err != nil {
+	if err := runMetarr(cmd, v); err != nil {
 		return err
 	}
 	return finishMetafile(v, cu)
@@ -81,7 +81,7 @@ func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
 		return nil
 	}
 	if err := metadata.RefreshFromMetarr(v); err != nil {
-		logger.Pl.Channel(cu.ChannelName).E("Failed to read the metadata Metarr wrote for %q, keeping the stored title and description: %v", v.URL, err)
+		cu.Log().E("Failed to read the metadata Metarr wrote for %q, keeping the stored title and description: %v", v.URL, err)
 	}
 
 	purge, err := metaPurge(v, cu)
@@ -94,7 +94,7 @@ func finishMetafile(v *models.Video, cu *models.ChannelURL) error {
 	if err := os.Remove(v.Files.JSONFilePath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("failed to purge metadata file %q: %w", v.Files.JSONFilePath, err)
 	}
-	logger.Pl.Channel(cu.ChannelName).I("Purged metadata file %q", v.Files.JSONFilePath)
+	cu.Log().I("Purged metadata file %q", v.Files.JSONFilePath)
 	v.Files.JSONFilePath = ""
 	return nil
 }
@@ -138,9 +138,9 @@ func runWithProgress(cmd *exec.Cmd, videoID int64) (string, error) {
 	return out.String(), cmd.Wait()
 }
 
-// runMetarr runs a Metarr command with a built argument list, logging as the channel the video belongs to.
-func runMetarr(cmd *exec.Cmd, v *models.Video, channelName string) error {
-	logger.Pl.Channel(channelName).I("Running Metarr command:\n\n%s\n", cmd.String())
+// runMetarr runs a Metarr command with a built argument list.
+func runMetarr(cmd *exec.Cmd, v *models.Video) error {
+	v.Log().I("Running Metarr command:\n\n%s\n", cmd.String())
 
 	cmd.Stderr = os.Stderr
 
@@ -149,7 +149,7 @@ func runMetarr(cmd *exec.Cmd, v *models.Video, channelName string) error {
 	if err != nil {
 		// Metarr still reports where the files are after a failed rename or move.
 		if storeErr := v.StoreFilenamesFromMetarr(metarrStdout); storeErr != nil {
-			logger.Pl.Channel(channelName).D(1, "No file paths stored from failed Metarr run for %q: %v", v.URL, storeErr)
+			v.Log().D(1, "No file paths stored from failed Metarr run for %q: %v", v.URL, storeErr)
 		}
 		// Metarr's own account of why it failed, rather than just its exit status.
 		if msgs := metarrErrors(metarrStdout); len(msgs) > 0 {
@@ -169,7 +169,7 @@ func runMetarr(cmd *exec.Cmd, v *models.Video, channelName string) error {
 	}
 
 	// Success.
-	logger.Pl.Channel(channelName).S("Metarr successfully processed video %q (file path: %q)", v.URL, v.Files.VideoFilePath)
+	v.Log().S("Metarr successfully processed video %q (file path: %q)", v.URL, v.Files.VideoFilePath)
 	return nil
 }
 

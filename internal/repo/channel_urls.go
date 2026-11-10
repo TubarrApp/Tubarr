@@ -28,9 +28,16 @@ func (cs *ChannelStore) AddChannelURL(channelID int64, cu *models.ChannelURL, is
 
 // addChannelURL adds a new channel URL to the database.
 func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, isManual bool) (chanURLID int64, err error) {
-	if !cs.channelExistsID(channelID) {
+	// The channel must exist, and its name tags the URL's log lines.
+	//nolint:gosec // SQL identifiers are trusted constants.
+	nameQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QChanName, consts.DBChannels, consts.QChanID)
+	if err := cs.q.QueryRow(nameQuery, channelID).Scan(&cu.ChannelName); errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("channel with ID %d does not exist", channelID)
+	} else if err != nil {
+		return 0, fmt.Errorf("failed to look up channel with ID %d: %w", channelID, err)
 	}
+
+	// Check the channel URL's settings and files, and that its profile exists. The channel's own settings are checked when it is saved.
 	cs.touch(channelID)
 	if !isManual {
 		if err := validation.ValidateChannelURL(cu.URL); err != nil {
@@ -120,7 +127,7 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
 
-	logger.Pl.D(1, "Added channel URL %q (ID: %d, is_manual: %v) to channel ID %d", cu.URL, id, isManual, channelID)
+	cu.Log().D(1, "Added channel URL %q (ID: %d, is_manual: %v) to channel ID %d", cu.URL, id, isManual, channelID)
 	return id, nil
 }
 
@@ -248,7 +255,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		return err
 	}
 
-	logger.Pl.S("Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
+	cu.Log().S("Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
 	return nil
 }
 
@@ -306,7 +313,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logger.Pl.E("Failed to close rows: %v", err)
+			c.Log().E("Failed to close rows: %v", err)
 		}
 	}()
 
@@ -343,7 +350,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 
 		if cu.Login.Password == "" && cu.Login.EncryptedPassword != "" {
 			if cu.Login.Password, err = cs.PasswordMgr.Decrypt(cu.Login.EncryptedPassword); err != nil {
-				logger.Pl.W("Failed to decrypt password for channel URL %q: %v", cu.URL, err)
+				c.Log().W("Failed to decrypt password for channel URL %q: %v", cu.URL, err)
 			}
 		}
 

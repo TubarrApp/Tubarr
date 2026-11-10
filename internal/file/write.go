@@ -21,7 +21,7 @@ func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, 
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			logger.Pl.E("failed to close file %v due to error: %v", filePath, err)
+			v.Log().E("failed to close file %v due to error: %v", filePath, err)
 		}
 	}()
 

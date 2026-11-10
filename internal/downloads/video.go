@@ -16,7 +16,6 @@ import (
 	"time"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/file"
 	"tubarr/internal/siterules"
@@ -54,7 +53,7 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	// Cookie file and browser cookies.
 	cookies := cookieArgs(d.ChannelURL)
 	if len(cookies) == 0 {
-		logger.Pl.Channel(d.Channel.Name).D(1, "No cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
+		d.Channel.Log().D(1, "No cookies set for channel %q and URL %q, skipping cookies in video download", d.Channel.Name, d.Video.URL)
 	}
 	args = append(args, cookies...)
 
@@ -187,7 +186,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	lineChan := make(chan string, 100)
 
-	logger.Pl.Channel(d.Channel.Name).I("Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
+	d.Channel.Log().I("Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
@@ -203,12 +202,12 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 				select {
 				case lineChan <- scanner.Text():
 				case <-d.Context.Done():
-					logger.Pl.Channel(d.Channel.Name).W("Download canceled: %v", d.Context.Err())
+					d.Channel.Log().W("Download canceled: %v", d.Context.Err())
 					return
 				}
 			}
 			if err := scanner.Err(); err != nil {
-				logger.Pl.Channel(d.Channel.Name).E("Scanner error reading yt-dlp output: %v", err)
+				d.Channel.Log().E("Scanner error reading yt-dlp output: %v", err)
 			}
 		})
 	}
@@ -230,7 +229,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	waitErr := cmd.Wait()
 
 	if err := d.Context.Err(); err != nil {
-		logger.Pl.Channel(d.Channel.Name).W("Download canceled: %v", err)
+		d.Channel.Log().W("Download canceled: %v", err)
 		return err
 	}
 	if result.err != nil {
@@ -268,7 +267,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 	)
 	for line := range lineChan {
 		if line != "" {
-			logger.Pl.Channel(d.Channel.Name).D(4, "Video %d download terminal output: %q", d.Video.ID, line)
+			d.Channel.Log().D(4, "Video %d download terminal output: %q", d.Video.ID, line)
 		}
 
 		// Keep draining after completion so the pipe readers can reach EOF before cmd.Wait.
@@ -329,7 +328,7 @@ func (d *VideoDownload) setDownloaderEnv(cmd *exec.Cmd) (cleanup func(), err err
 	cmd.Env = append(cmd.Environ(), command.HttpieConfigDirEnv+"="+dir)
 	return func() {
 		if err := os.RemoveAll(dir); err != nil {
-			logger.Pl.Channel(d.Channel.Name).W("Failed to remove temporary httpie config directory %q: %v", dir, err)
+			d.Channel.Log().W("Failed to remove temporary httpie config directory %q: %v", dir, err)
 		}
 	}, nil
 }

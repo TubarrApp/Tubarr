@@ -88,7 +88,7 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, channelUR
 	}
 
 	fmt.Println()
-	logger.Pl.I("Sleeping %v before processing %s", stagger.Round(time.Second), target)
+	logger.Pl.Channel(channelName).I("Sleeping %v before processing %s", stagger.Round(time.Second), target)
 
 	waitTimer := time.NewTimer(stagger)
 	defer waitTimer.Stop()

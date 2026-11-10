@@ -96,10 +96,11 @@ func BuildChannelFromInput(input models.ChannelInput) (
 			continue
 		}
 		cu := &models.ChannelURL{
-			URL:       u,
-			LastScan:  now,
-			CreatedAt: now,
-			UpdatedAt: now,
+			URL:         u,
+			ChannelName: c.Name,
+			LastScan:    now,
+			CreatedAt:   now,
+			UpdatedAt:   now,
 		}
 		if a, exists := authMap[u]; exists {
 			cu.Login.Username, cu.Login.Password, cu.Login.LoginURL = a.Username, a.Password, a.LoginURL

@@ -165,7 +165,7 @@ func flareSolverrGet(ctx context.Context, baseURL, pageURL string, timeout time.
 //
 // A failure is logged once and remembered for the rest of the crawl session, so callers can fall back to normal requests
 // without waiting on FlareSolverr again for every page.
-func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL string, staleGen int) (*flareSolverrSolution, error) {
+func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL, channelName string, staleGen int) (*flareSolverrSolution, error) {
 	u, err := url.Parse(pageURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL %q: %w", pageURL, err)
@@ -178,7 +178,7 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 
 	if sol, ok := cm.fsSolutions[host]; ok && sol.gen > staleGen {
 		if staleGen > 0 {
-			logger.Pl.I("Using the FlareSolverr solve from %s for %q (newer than the one that was blocked)", sol.solvedAt.Format(time.TimeOnly), host)
+			logger.Pl.Channel(channelName).I("Using the FlareSolverr solve from %s for %q (newer than the one that was blocked)", sol.solvedAt.Format(time.TimeOnly), host)
 		}
 		return sol, nil
 	}
@@ -188,10 +188,10 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 
 	baseURL := abstractions.GetString(keys.FlareSolverrURL)
 	if baseURL == "" {
-		return nil, cm.flareSolverrFailed(host, http.StatusNotFound, errors.New("no FlareSolverr URL is set in settings"))
+		return nil, cm.flareSolverrFailed(host, channelName, http.StatusNotFound, errors.New("no FlareSolverr URL is set in settings"))
 	}
 
-	logger.Pl.I("Solving %q through FlareSolverr at %q...", homeURL, baseURL)
+	logger.Pl.Channel(channelName).I("Solving %q through FlareSolverr at %q...", homeURL, baseURL)
 	timeout := consts.FlareSolverrDefaultTimeout
 	if rules, ok := siterules.MatchAny(pageURL); ok && rules.FlareSolverrTimeout > 0 {
 		timeout = rules.FlareSolverrTimeout
@@ -201,14 +201,14 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 		if ctx.Err() != nil {
 			return nil, err // Canceled, not a FlareSolverr failure.
 		}
-		return nil, cm.flareSolverrFailed(host, statusCode, err)
+		return nil, cm.flareSolverrFailed(host, channelName, statusCode, err)
 	}
 	if !cm.fsHeadersTried {
 		cm.fsHeadersTried = true
 		if cm.fsHeaders, err = flareSolverrBrowserHeaders(ctx, baseURL); err != nil {
-			logger.Pl.W("Could not copy FlareSolverr's browser headers, so Tubarr will send its own Chrome headers: %v", err)
+			logger.Pl.Channel(channelName).W("Could not copy FlareSolverr's browser headers, so Tubarr will send its own Chrome headers: %v", err)
 		} else {
-			logger.Pl.I("Copied %d request headers from FlareSolverr's browser", len(cm.fsHeaders))
+			logger.Pl.Channel(channelName).I("Copied %d request headers from FlareSolverr's browser", len(cm.fsHeaders))
 		}
 	}
 	sol.headers = cm.fsHeaders
@@ -217,17 +217,17 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL strin
 	sol.gen, sol.solvedAt = cm.fsGen, time.Now()
 	cm.fsSolutions[host] = sol
 
-	logger.Pl.S("FlareSolverr solved %q (%d cookies, user agent %q)", homeURL, len(sol.cookies), sol.userAgent)
+	logger.Pl.Channel(channelName).S("FlareSolverr solved %q (%d cookies, user agent %q)", homeURL, len(sol.cookies), sol.userAgent)
 	return sol, nil
 }
 
 // flareSolverrFailed logs and remembers a FlareSolverr failure for host for the rest of the crawl session.
 //
 // Must be called with cm.fsMu held.
-func (cm *CookieManager) flareSolverrFailed(host string, statusCode int, err error) error {
+func (cm *CookieManager) flareSolverrFailed(host, channelName string, statusCode int, err error) error {
 	err = fmt.Errorf("FlareSolverr unavailable for %q (status %d): %w", host, statusCode, err)
 	cm.fsFailures[host] = err
-	logger.Pl.W("%v. Falling back to normal requests for %q for the rest of this crawl.", err, host)
+	logger.Pl.Channel(channelName).W("%v. Falling back to normal requests for %q for the rest of this crawl.", err, host)
 	return err
 }
 
@@ -238,11 +238,11 @@ func (cm *CookieManager) flareSolverrFailed(host string, statusCode int, err err
 func (cm *CookieManager) flareSolverrResolver(ctx context.Context, cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
 	pageURL, cookiePath := cu.URL, cu.Session.CookiePath
 	return func(staleGen int) (models.FlareSolverrSolve, error) {
-		sol, err := cm.flareSolverrSolution(ctx, pageURL, staleGen)
+		sol, err := cm.flareSolverrSolution(ctx, pageURL, cu.ChannelName, staleGen)
 		if err != nil {
 			return models.FlareSolverrSolve{}, err
 		}
-		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), cookiePath); err != nil {
+		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), cookiePath, cu.ChannelName); err != nil {
 			return models.FlareSolverrSolve{}, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
 		}
 		return sol.ytDLPSolve(), nil
@@ -265,10 +265,10 @@ func (cm *CookieManager) flareSolverrNewer(cu *models.ChannelURL, baseCookies []
 			return models.FlareSolverrSolve{}, false, nil
 		}
 
-		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), cookiePath); err != nil {
+		if err := saveCookiesToFile(mergeCookies(sol.cookies, baseCookies), cookiePath, cu.ChannelName); err != nil {
 			return models.FlareSolverrSolve{}, false, fmt.Errorf("failed to save FlareSolverr cookies for %q: %w", pageURL, err)
 		}
-		logger.Pl.I("Using the newer FlareSolverr solve from %s for %q", sol.solvedAt.Format(time.TimeOnly), u.Hostname())
+		cu.Log().I("Using the newer FlareSolverr solve from %s for %q", sol.solvedAt.Format(time.TimeOnly), u.Hostname())
 		return sol.ytDLPSolve(), true, nil
 	}
 }
@@ -290,8 +290,8 @@ func isCloudflareChallenge(status int, header http.Header, body []byte) bool {
 }
 
 // logCloudflareChallenge logs the details of a Cloudflare challenge response, to help diagnose why it was challenged.
-func logCloudflareChallenge(urlStr string, r *colly.Response) {
-	logger.Pl.I("Cloudflare challenge for %q: HTTP %d, cf-mitigated %q, cf-ray %q",
+func logCloudflareChallenge(urlStr, channelName string, r *colly.Response) {
+	logger.Pl.Channel(channelName).I("Cloudflare challenge for %q: HTTP %d, cf-mitigated %q, cf-ray %q",
 		urlStr, r.StatusCode, r.Headers.Get("Cf-Mitigated"), r.Headers.Get("Cf-Ray"))
 }
 

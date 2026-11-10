@@ -3,6 +3,9 @@ package models
 
 import (
 	"time"
+	"tubarr/internal/domain/logger"
+
+	"github.com/TubarrApp/gocommon/logging"
 )
 
 // Channel is the top level model for a channel.
@@ -29,6 +32,11 @@ type Channel struct {
 
 // DefaultCrawlFreq is the crawl frequency in minutes for a channel without one.
 const DefaultCrawlFreq = 30
+
+// Log returns a logger whose lines are tagged with the channel's name, so the Logs page can show them by channel.
+func (c *Channel) Log() logging.ChannelLogger {
+	return logger.Pl.Channel(c.Name)
+}
 
 // URLCrawlFreq returns a URL's crawl frequency setting in minutes: its own, else the channel's.
 func (c *Channel) URLCrawlFreq(cu *ChannelURL) int {

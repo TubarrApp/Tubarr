@@ -91,7 +91,7 @@ func TestCrawlWithRule(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			query := models.SiteRules{Site: "test", Crawl: &tt.rule}
-			got, err := New().crawlWithRule(t.Context(), srv.URL+"/channel", nil, query)
+			got, err := New().crawlWithRule(t.Context(), srv.URL+"/channel", "", nil, query)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -115,7 +115,7 @@ func TestCrawlWithRuleRequestError(t *testing.T) {
 	defer srv.Close()
 
 	query := models.SiteRules{Site: "test", Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-	if _, err := New().crawlWithRule(t.Context(), srv.URL, nil, query); err == nil {
+	if _, err := New().crawlWithRule(t.Context(), srv.URL, "", nil, query); err == nil {
 		t.Error("expected an error for a 403 channel page")
 	}
 }
@@ -131,7 +131,7 @@ func TestCrawlWithRuleCanceled(t *testing.T) {
 	defer cancel()
 	start := time.Now()
 	query := models.SiteRules{Site: "test", Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-	if _, err := New().crawlWithRule(ctx, srv.URL, nil, query); err == nil {
+	if _, err := New().crawlWithRule(ctx, srv.URL, "", nil, query); err == nil {
 		t.Error("expected an error for a canceled request")
 	}
 	if elapsed := time.Since(start); elapsed > 10*time.Second {
@@ -141,7 +141,7 @@ func TestCrawlWithRuleCanceled(t *testing.T) {
 
 // TestCrawlWithRuleNilRule tests that crawlWithRule returns an error rather than panicking when a site has no crawl rule.
 func TestCrawlWithRuleNilRule(t *testing.T) {
-	if _, err := New().crawlWithRule(t.Context(), "https://example.com", nil, models.SiteRules{Site: "example.com"}); err == nil {
+	if _, err := New().crawlWithRule(t.Context(), "https://example.com", "", nil, models.SiteRules{Site: "example.com"}); err == nil {
 		t.Error("expected an error for a site with no crawl rule")
 	}
 }
@@ -160,7 +160,7 @@ func TestCrawlWithRuleUserAgent(t *testing.T) {
 
 	for _, impersonate := range []string{"", "chrome"} {
 		query := models.SiteRules{Site: "test", Impersonate: impersonate, UserAgent: userAgent, Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-		got, err := New().crawlWithRule(t.Context(), srv.URL, nil, query)
+		got, err := New().crawlWithRule(t.Context(), srv.URL, "", nil, query)
 		if err != nil || len(got) != 1 {
 			t.Errorf("impersonate %q: expected the site's user agent to be sent, got %v, %v", impersonate, got, err)
 		}
@@ -204,7 +204,7 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 			{Name: sharedtags.JUploadDate, Selector: "time"},
 		},
 	}
-	got, err := New().crawlWithRule(t.Context(), srv.URL, nil, models.SiteRules{Site: "test", Crawl: &html})
+	got, err := New().crawlWithRule(t.Context(), srv.URL, "", nil, models.SiteRules{Site: "test", Crawl: &html})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +231,7 @@ func TestCrawlWithRulePreviewFields(t *testing.T) {
 			{Name: sharedtags.JUploadDate, JSONPath: "upload_date"},
 		},
 	}
-	got, err = New().crawlWithRule(t.Context(), srv.URL, nil, models.SiteRules{Site: "test", Crawl: &json})
+	got, err = New().crawlWithRule(t.Context(), srv.URL, "", nil, models.SiteRules{Site: "test", Crawl: &json})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestLoginCookieDomain(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cookies, err := login(context.Background(), &models.ChannelURLAccessDetails{LoginURL: srv.URL, Username: "u", Password: "p"})
+	cookies, err := login(context.Background(), &models.ChannelURLAccessDetails{LoginURL: srv.URL, Username: "u", Password: "p"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestLoginRedirectCookie(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	cookies, err := login(context.Background(), &models.ChannelURLAccessDetails{LoginURL: srv.URL + "/login", Username: "u", Password: "p"})
+	cookies, err := login(context.Background(), &models.ChannelURLAccessDetails{LoginURL: srv.URL + "/login", Username: "u", Password: "p"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestCookieFileWritable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := saveCookiesToFile([]*http.Cookie{{Name: "a", Value: "1", Domain: "example.com", Path: "/"}}, path); err != nil {
+	if err := saveCookiesToFile([]*http.Cookie{{Name: "a", Value: "1", Domain: "example.com", Path: "/"}}, path, ""); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(path)
@@ -385,7 +385,7 @@ func scrapeTestRules(t *testing.T, pageURL string, rules []models.MetadataRule) 
 	s := New()
 	v := &models.Video{URL: pageURL}
 	query := models.SiteRules{Site: "test", Metadata: rules}
-	if err := s.visitPage(t.Context(), pageURL, nil, query, func(c *colly.Collector) {
+	if err := s.visitPage(t.Context(), pageURL, "", nil, query, func(c *colly.Collector) {
 		s.ScrapeWithRules(pageURL, c, v, query)
 	}); err != nil {
 		t.Fatal(err)
@@ -495,7 +495,7 @@ func TestScrapeDuration(t *testing.T) {
 			v := &models.Video{URL: srv.URL}
 			query := models.SiteRules{Site: "test", Metadata: tt.rules}
 			var metadata map[string]any
-			if err := s.visitPage(t.Context(), srv.URL, nil, query, func(c *colly.Collector) {
+			if err := s.visitPage(t.Context(), srv.URL, "", nil, query, func(c *colly.Collector) {
 				metadata = s.ScrapeWithRules(srv.URL, c, v, query)
 			}); err != nil {
 				t.Fatal(err)
@@ -661,7 +661,7 @@ func TestCrawlWithRuleFlareSolverr(t *testing.T) {
 	useFlareSolverr(t, fakeFlareSolverr(t, &solves))
 	site := fakeCloudflareSite(t, 1)
 
-	got, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
+	got, err := New().crawlWithRule(t.Context(), site.URL+"/channel", "", nil, flareSolverrQuery())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -680,7 +680,7 @@ func TestCrawlWithRuleFlareSolverrResolve(t *testing.T) {
 
 	// The site only accepts the second solve's cookie, so the first attempt is challenged.
 	site := fakeCloudflareSite(t, 2)
-	got, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
+	got, err := New().crawlWithRule(t.Context(), site.URL+"/channel", "", nil, flareSolverrQuery())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -691,7 +691,7 @@ func TestCrawlWithRuleFlareSolverrResolve(t *testing.T) {
 	// A site that keeps challenging fails after one retry, rather than solving forever.
 	solves.Store(0)
 	site = fakeCloudflareSite(t, 100)
-	if _, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery()); err == nil || !strings.Contains(err.Error(), "again after a fresh FlareSolverr solve") {
+	if _, err := New().crawlWithRule(t.Context(), site.URL+"/channel", "", nil, flareSolverrQuery()); err == nil || !strings.Contains(err.Error(), "again after a fresh FlareSolverr solve") {
 		t.Errorf("expected a still-challenged error, got %v", err)
 	}
 	if solves.Load() != 2 {
@@ -735,14 +735,14 @@ func TestCrawlWithRuleFlareSolverrFallback(t *testing.T) {
 
 	// No FlareSolverr URL: crawls the site with normal requests.
 	viper.Set(keys.FlareSolverrURL, "")
-	got, err := New().crawlWithRule(t.Context(), plain.URL+"/channel", nil, flareSolverrQuery())
+	got, err := New().crawlWithRule(t.Context(), plain.URL+"/channel", "", nil, flareSolverrQuery())
 	if err != nil || len(got) != 1 {
 		t.Fatalf("expected a fallback crawl to find 1 URL, got %v, %v", got, err)
 	}
 
 	// If Cloudflare then challenges, the error says why FlareSolverr wasn't used.
 	site := fakeCloudflareSite(t, 1)
-	_, err = New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
+	_, err = New().crawlWithRule(t.Context(), site.URL+"/channel", "", nil, flareSolverrQuery())
 	if err == nil || !strings.Contains(err.Error(), "FlareSolverr could not be used") || !strings.Contains(err.Error(), "no FlareSolverr URL") {
 		t.Errorf("expected an error explaining FlareSolverr wasn't used, got %v", err)
 	}
@@ -752,7 +752,7 @@ func TestCrawlWithRuleFlareSolverrFallback(t *testing.T) {
 	useFlareSolverr(t, fakeFailingFlareSolverr(t, 0, &calls))
 	s := New()
 	for range 3 {
-		if _, err := s.crawlWithRule(t.Context(), plain.URL+"/channel", nil, flareSolverrQuery()); err != nil {
+		if _, err := s.crawlWithRule(t.Context(), plain.URL+"/channel", "", nil, flareSolverrQuery()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -768,7 +768,7 @@ func TestCrawlWithRuleFlareSolverrResolveFails(t *testing.T) {
 
 	// The site only accepts a second solve, which fails.
 	site := fakeCloudflareSite(t, 2)
-	_, err := New().crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery())
+	_, err := New().crawlWithRule(t.Context(), site.URL+"/channel", "", nil, flareSolverrQuery())
 	if err == nil || !strings.Contains(err.Error(), "fresh FlareSolverr solve failed") || !strings.Contains(err.Error(), "Error solving the challenge") {
 		t.Errorf("expected a failed fresh solve error, got %v", err)
 	}
@@ -781,24 +781,24 @@ func TestFlareSolverrSolutionCache(t *testing.T) {
 	cm := NewCookieManager()
 	ctx := context.Background()
 
-	first, err := cm.flareSolverrSolution(ctx, "https://cf.example/a", 0)
+	first, err := cm.flareSolverrSolution(ctx, "https://cf.example/a", "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := lastSolvedURL.Load(); got != "https://cf.example/" {
 		t.Errorf("expected the site's homepage to be solved, got %v", got)
 	}
-	if again, _ := cm.flareSolverrSolution(ctx, "https://cf.example/b", 0); again != first {
+	if again, _ := cm.flareSolverrSolution(ctx, "https://cf.example/b", "", 0); again != first {
 		t.Error("expected the cached solution for the same hostname")
 	}
-	fresh, err := cm.flareSolverrSolution(ctx, "https://cf.example/a", first.gen)
+	fresh, err := cm.flareSolverrSolution(ctx, "https://cf.example/a", "", first.gen)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if fresh.gen <= first.gen || fresh.cookies[0].Value != "2" {
 		t.Errorf("expected a newer solution, got gen %d (was %d) with cookie %q", fresh.gen, first.gen, fresh.cookies[0].Value)
 	}
-	if again, _ := cm.flareSolverrSolution(ctx, "https://cf.example/a", first.gen); again != fresh {
+	if again, _ := cm.flareSolverrSolution(ctx, "https://cf.example/a", "", first.gen); again != fresh {
 		t.Error("expected a stale request after a refresh to reuse the refreshed solution")
 	}
 	if solves.Load() != 2 {
@@ -853,14 +853,14 @@ func TestFlareSolverrSiteTimeout(t *testing.T) {
 	siterules.Register([]models.SiteScraper{{Domain: "slow.example", FlareSolverr: true, FlareSolverrTimeout: 120 * time.Second}})
 
 	cm := NewCookieManager()
-	if _, err := cm.flareSolverrSolution(context.Background(), "https://slow.example/channel", 0); err != nil {
+	if _, err := cm.flareSolverrSolution(context.Background(), "https://slow.example/channel", "", 0); err != nil {
 		t.Fatal(err)
 	}
 	if got := lastMaxTimeout.Load(); got != 120000 {
 		t.Errorf("site with a 120s timeout: FlareSolverr got maxTimeout %d, want 120000", got)
 	}
 
-	if _, err := cm.flareSolverrSolution(context.Background(), "https://other.example/channel", 0); err != nil {
+	if _, err := cm.flareSolverrSolution(context.Background(), "https://other.example/channel", "", 0); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := lastMaxTimeout.Load(), consts.FlareSolverrDefaultTimeout.Milliseconds(); got != want {
@@ -905,7 +905,7 @@ func TestFlareSolverrCopiesBrowserHeaders(t *testing.T) {
 
 	s := New()
 	for range 2 {
-		if _, err := s.crawlWithRule(t.Context(), site.URL+"/channel", nil, flareSolverrQuery()); err != nil {
+		if _, err := s.crawlWithRule(t.Context(), site.URL+"/channel", "", nil, flareSolverrQuery()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -929,7 +929,7 @@ func TestFlareSolverrNewerSolveForDownloads(t *testing.T) {
 	ctx := context.Background()
 	cu := &models.ChannelURL{URL: "https://cf.example/channel", Session: models.ChannelURLSession{CookiePath: filepath.Join(t.TempDir(), "cookies.txt")}}
 
-	first, err := cm.flareSolverrSolution(ctx, cu.URL, 0)
+	first, err := cm.flareSolverrSolution(ctx, cu.URL, "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -939,7 +939,7 @@ func TestFlareSolverrNewerSolveForDownloads(t *testing.T) {
 	}
 
 	// Tubarr's own request is challenged and solves again.
-	if _, err := cm.flareSolverrSolution(ctx, cu.URL, first.gen); err != nil {
+	if _, err := cm.flareSolverrSolution(ctx, cu.URL, "", first.gen); err != nil {
 		t.Fatal(err)
 	}
 	if got := fs.Current(); got.Gen <= first.gen {
@@ -961,11 +961,11 @@ func TestCrawlWithRuleFlareSolverrResolveWithChannelCookies(t *testing.T) {
 	site := fakeCloudflareSite(t, 2) // Only accepts the second solve's cookie.
 
 	s := New()
-	first, err := s.cookieManager.flareSolverrSolution(context.Background(), site.URL+"/channel", 0)
+	first, err := s.cookieManager.flareSolverrSolution(context.Background(), site.URL+"/channel", "", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.crawlWithRule(t.Context(), site.URL+"/channel", first.cookies, flareSolverrQuery()); err != nil {
+	if _, err := s.crawlWithRule(t.Context(), site.URL+"/channel", "", first.cookies, flareSolverrQuery()); err != nil {
 		t.Errorf("expected the retry to use the refreshed solve's cookies, got %v", err)
 	}
 	if solves.Load() != 2 {
@@ -1002,7 +1002,7 @@ func TestChromeHeadersSent(t *testing.T) {
 	crawl := func(impersonate string) {
 		t.Helper()
 		query := models.SiteRules{Site: "test", Impersonate: impersonate, UserAgent: userAgent, Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-		if _, err := New().crawlWithRule(t.Context(), srv.URL, []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
+		if _, err := New().crawlWithRule(t.Context(), srv.URL, "", []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1047,7 +1047,7 @@ func TestFirefoxHeadersSent(t *testing.T) {
 	defer srv.Close()
 
 	query := models.SiteRules{Site: "test", Impersonate: "firefox", UserAgent: userAgent, Crawl: &models.CrawlRule{Selector: "a[href]", Attr: "href"}}
-	if _, err := New().crawlWithRule(t.Context(), srv.URL, []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
+	if _, err := New().crawlWithRule(t.Context(), srv.URL, "", []*http.Cookie{{Name: "session", Value: "abc"}}, query); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1364,7 +1364,7 @@ func FuzzSaveCookiesToFile(f *testing.F) {
 		wantWritten := domain != ""
 
 		p := filepath.Join(t.TempDir(), "cookies.txt")
-		if err := saveCookiesToFile([]*http.Cookie{{Name: name, Value: value, Domain: domain, Path: path}}, p); err != nil {
+		if err := saveCookiesToFile([]*http.Cookie{{Name: name, Value: value, Domain: domain, Path: path}}, p, ""); err != nil {
 			t.Fatal(err)
 		}
 		data, err := os.ReadFile(p)

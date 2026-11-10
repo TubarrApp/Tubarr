@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"strings"
 	"tubarr/internal/domain/command"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/siterules"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -29,7 +28,7 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 	// Cookie file and browser cookies.
 	cookies := cookieArgs(d.ChannelURL)
 	if len(cookies) == 0 {
-		logger.Pl.Channel(d.Channel.Name).D(1, "No cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
+		d.Channel.Log().D(1, "No cookies set for channel %q and URL %q, skipping cookies in JSON download", d.Channel.Name, d.Video.URL)
 	}
 	args = append(args, cookies...)
 
@@ -76,7 +75,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	logger.Pl.Channel(d.Channel.Name).I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
+	d.Channel.Log().I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	err := cmd.Run()
 	killProcessGroup(cmd)
 	if err != nil {
@@ -86,20 +85,20 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	// Find the line containing the JSON path.
 	outputLines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
 	if len(outputLines) == 0 {
-		logger.Pl.Channel(d.Channel.Name).D(3, "Full stdout: %s", stdout.String())
-		logger.Pl.Channel(d.Channel.Name).D(3, "Full stderr: %s", stderr.String())
+		d.Channel.Log().D(3, "Full stdout: %s", stdout.String())
+		d.Channel.Log().D(3, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("no output lines found for %s", d.Video.URL)
 	}
 
 	var jsonPath string
 
 	fileLine := outputLines[len(outputLines)-1]
-	logger.Pl.Channel(d.Channel.Name).D(1, "File line captured as: %v", fileLine)
+	d.Channel.Log().D(1, "File line captured as: %v", fileLine)
 
 	_, jsonPath, found := strings.Cut(fileLine, ": ")
 	if !found || jsonPath == "" {
-		logger.Pl.Channel(d.Channel.Name).D(1, "Full stdout: %s", stdout.String())
-		logger.Pl.Channel(d.Channel.Name).D(1, "Full stderr: %s", stderr.String())
+		d.Channel.Log().D(1, "Full stdout: %s", stdout.String())
+		d.Channel.Log().D(1, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("could not find JSON file path in output for %s", d.Video.URL)
 	}
 
@@ -110,6 +109,6 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 		return err
 	}
 
-	logger.Pl.Channel(d.Channel.Name).I("Successfully saved JSON file to %q", d.Video.Files.JSONFilePath)
+	d.Channel.Log().I("Successfully saved JSON file to %q", d.Video.Files.JSONFilePath)
 	return nil
 }

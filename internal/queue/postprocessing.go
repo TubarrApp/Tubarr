@@ -10,7 +10,6 @@ import (
 	"time"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/consts"
-	"tubarr/internal/domain/logger"
 	"tubarr/internal/limits"
 	"tubarr/internal/metadata"
 	"tubarr/internal/metarr"
@@ -79,7 +78,7 @@ func (q *PostProcessingQueue) hold(ctx context.Context, c *models.Channel, video
 			q.mu.Unlock()
 			return nil, false, nil
 		}
-		logger.Pl.Channel(c.Name).I("Cancelling Metarr run for video %q in favor of new download", videoURL)
+		c.Log().I("Cancelling Metarr run for video %q in favor of new download", videoURL)
 		held.cancel()
 		q.mu.Unlock()
 
@@ -106,13 +105,13 @@ func (h *videoHold) postProcess(ctx context.Context, v *models.Video, cu *models
 	}
 	q.mu.Unlock()
 	if stopped {
-		logger.Pl.Channel(c.Name).W("Metarr not started for video %s as its channel was stopped, marking as pending", v.URL)
+		c.Log().W("Metarr not started for video %s as its channel was stopped, marking as pending", v.URL)
 		return consts.MetarrStatusPending
 	}
 
 	release, err := q.acquire(ctx, cu)
 	if err != nil {
-		logger.Pl.Channel(c.Name).W("Metarr not started for video %s, marking as pending", v.URL)
+		c.Log().W("Metarr not started for video %s, marking as pending", v.URL)
 		return consts.MetarrStatusPending
 	}
 	defer release()
@@ -152,11 +151,11 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 		videos = filterVideosByID(videos, videoIDs)
 	}
 	if len(videos) == 0 {
-		logger.Pl.Channel(c.Name).I("No videos awaiting Metarr in channel %q", c.Name)
+		c.Log().I("No videos awaiting Metarr in channel %q", c.Name)
 		return nil
 	}
 
-	logger.Pl.Channel(c.Name).I("Running Metarr on %d video(s) in channel %q", len(videos), c.Name)
+	c.Log().I("Running Metarr on %d video(s) in channel %q", len(videos), c.Name)
 
 	// Its videos wait for slots under its current limits.
 	q.SetLimits(c)
@@ -169,6 +168,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 	)
 
 	for _, v := range videos {
+		v.ChannelName = c.Name // So the video's log lines are tagged with its channel.
 		cu, err := ManualChannelURL(q.store.ChannelStore(), c, v.ChannelURLID)
 		if err != nil {
 			mu.Lock()
@@ -184,7 +184,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 			var skip models.SkipMetarr
 			if skip, skipErr = metarr.SkipReason(nil, cu, parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)); skipErr != nil {
 				skipErr = fmt.Errorf("%s: %w", skip.Reason, skipErr)
-				logger.Pl.Channel(c.Name).E("Not running Metarr for %q, its videos stay pending: %v", cu.URL, skipErr)
+				c.Log().E("Not running Metarr for %q, its videos stay pending: %v", cu.URL, skipErr)
 			}
 			skips[cu.ID] = skipErr
 		}
@@ -208,7 +208,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 		cl, added := q.add(key, newQueueEntry(v, cu), vCancel)
 		if !added {
 			vCancel()
-			logger.Pl.Channel(c.Name).W("Video %q is already being processed, skipping", v.URL)
+			c.Log().W("Video %q is already being processed, skipping", v.URL)
 			continue
 		}
 
@@ -224,7 +224,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 			q.started(cl)
 
 			if err := runVideoMetarr(vCtx, q.store.VideoStore(), v, cu, c, rerun); err != nil {
-				logger.Pl.Channel(c.Name).E("Metarr run failed for video %q: %v", v.URL, err)
+				c.Log().E("Metarr run failed for video %q: %v", v.URL, err)
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("video %q: %w", v.URL, err))
 				mu.Unlock()
@@ -438,13 +438,13 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 
 	// Canceled (stopped, new download of this video, or shutdown), leave the database entry as it was.
 	if ctx.Err() != nil {
-		logger.Pl.Channel(c.Name).I("Metarr run for video %q was canceled, not storing result", v.URL)
+		c.Log().I("Metarr run for video %q was canceled, not storing result", v.URL)
 		// Metarr may have moved files before stopping, so keep where they are unless a newer download changed the row.
 		if v.Files.VideoFilePath != oldVideo || v.Files.JSONFilePath != oldJSON {
 			if updated, err := vs.UpdateVideoPaths(v.ID, oldVideo, oldJSON, v.Files.VideoFilePath, v.Files.JSONFilePath); err != nil {
-				logger.Pl.Channel(c.Name).E("Failed to store file paths for canceled Metarr run of video %q: %v", v.URL, err)
+				c.Log().E("Failed to store file paths for canceled Metarr run of video %q: %v", v.URL, err)
 			} else if updated {
-				logger.Pl.Channel(c.Name).I("Stored file paths Metarr reported before it was canceled for video %q", v.URL)
+				c.Log().I("Stored file paths Metarr reported before it was canceled for video %q", v.URL)
 			}
 		}
 		return nil //nolint:nilerr // Cancellation is not a failure.
@@ -465,10 +465,10 @@ func runVideoMetarr(ctx context.Context, vs contracts.VideoStore, v *models.Vide
 func execMetarr(ctx context.Context, v *models.Video, cu *models.ChannelURL, c *models.Channel, dirParser *parsing.DirectoryParser) consts.MetarrStatus {
 	if err := metarr.InitMetarr(ctx, v, cu, c, dirParser); err != nil {
 		if ctx.Err() != nil {
-			logger.Pl.Channel(c.Name).W("Metarr canceled for video %q: %v", v.URL, err)
+			c.Log().W("Metarr canceled for video %q: %v", v.URL, err)
 			return consts.MetarrStatusPending
 		}
-		logger.Pl.Channel(c.Name).E("Metarr processing error for video %q: %v", v.URL, err)
+		c.Log().E("Metarr processing error for video %q: %v", v.URL, err)
 		v.MetarrError = err.Error()
 		return consts.MetarrStatusFailed
 	}

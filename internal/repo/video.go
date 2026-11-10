@@ -125,7 +125,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 
 	// Check if video already exists
 	if id, exists := vs.VideoExists(v, channelID); exists {
-		logger.Pl.D(1, "Video %q already exists in the database with ID %d", v.URL, id)
+		v.Log().D(1, "Video %q already exists in the database with ID %d", v.URL, id)
 		v.ID = id // UpdateVideo sets the download status by ID.
 		if err := vs.UpdateVideo(v, channelID); err != nil {
 			return id, fmt.Errorf("failed to update existing video: %w", err)
@@ -146,7 +146,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	v.ID = videoID
 
 	// Insert into downloads table
-	logger.Pl.D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
+	v.Log().D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
 
 	//nolint:gosec // SQL identifiers are trusted constants.
 	dlSQL := fmt.Sprintf(
@@ -158,7 +158,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	)
 	dlArgs := []any{videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent}
 
-	logger.Pl.D(1, "Download insert SQL: %s (args: %v)", dlSQL, dlArgs)
+	v.Log().D(1, "Download insert SQL: %s (args: %v)", dlSQL, dlArgs)
 
 	if _, err := tx.Exec(dlSQL, dlArgs...); err != nil {
 		return 0, fmt.Errorf("failed to insert download status for video %d: %w", videoID, err)
@@ -169,7 +169,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		return 0, fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
 
-	logger.Pl.D(1, "Inserted video %q with ID %d successfully", v.URL, videoID)
+	v.Log().D(1, "Inserted video %q with ID %d successfully", v.URL, videoID)
 	return videoID, nil
 }
 
@@ -282,7 +282,7 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 		return fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
 
-	logger.Pl.S("Updated video with URL: %s", v.URL)
+	v.Log().S("Updated video with URL: %s", v.URL)
 	return nil
 }
 

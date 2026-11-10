@@ -106,7 +106,7 @@ func (q *DownloadQueue) process(d *download) error {
 		return fmt.Errorf("metadata processing error for video URL %q: %w", v.URL, err)
 	}
 	if !proceed {
-		logger.Pl.Channel(c.Name).I("Skipping further processing for ignored video: %s", v.URL)
+		c.Log().I("Skipping further processing for ignored video: %s", v.URL)
 		return nil
 	}
 
@@ -226,21 +226,21 @@ func (q *DownloadQueue) postProcess(d *download, hold *videoHold) {
 	if v.SkipMetarr.Skip {
 		// Metarr held back: finished with Metarr pending, so Run Metarr can process it once fixed (or when the user chooses).
 		if v.SkipMetarr.Reason == models.SkipMetarrAutoPostProcessOff {
-			logger.Pl.Channel(d.c.Name).I("Not post-processing %q, it stays pending: %s", v.URL, v.SkipMetarr.Reason)
+			d.c.Log().I("Not post-processing %q, it stays pending: %s", v.URL, v.SkipMetarr.Reason)
 		} else {
-			logger.Pl.Channel(d.c.Name).W("Skipping Metarr for %q, marking it finished with Metarr pending: %s", v.URL, v.SkipMetarr.Reason)
+			d.c.Log().W("Skipping Metarr for %q, marking it finished with Metarr pending: %s", v.URL, v.SkipMetarr.Reason)
 		}
 		v.MetarrStatus = consts.MetarrStatusPending
 	} else {
 		// Store the downloaded file's path first, so startup can recover the video if Tubarr stops during Metarr.
 		if err := vs.UpdateVideo(v, d.c.ID); err != nil {
-			logger.Pl.Channel(d.c.Name).E("Failed to store downloaded file path for video %q before Metarr: %v", v.URL, err)
+			d.c.Log().E("Failed to store downloaded file path for video %q before Metarr: %v", v.URL, err)
 		}
 		v.MetarrStatus = hold.postProcess(q.ctx, v, d.cu, d.c, d.dirParser)
 	}
 
 	if err := completeAndStoreVideo(cs, vs, v); err != nil {
-		logger.Pl.Channel(d.c.Name).E("Failed to complete video %q after metarr: %v", v.URL, err)
+		d.c.Log().E("Failed to complete video %q after metarr: %v", v.URL, err)
 	}
 }
 
@@ -301,7 +301,7 @@ func completeAndStoreVideo(cs contracts.ChannelStore, vs contracts.VideoStore, v
 
 	// Add to unseen list and set notification dot.
 	if err := cs.AddNewVideoURLs(v.ChannelID, []string{v.URL}); err != nil {
-		logger.Pl.Channel(v.ChannelName).E("Failed to update channel %q notification status: %v", v.ChannelName, err)
+		v.Log().E("Failed to update channel %q notification status: %v", v.ChannelName, err)
 	}
 
 	return nil
@@ -336,7 +336,7 @@ func processJSON(
 			return false, err
 		}
 	} else {
-		logger.Pl.Channel(c.Name).D(1, "Skipping JSON download - using custom scraped file: %s", v.Files.JSONCustomFile)
+		c.Log().D(1, "Skipping JSON download - using custom scraped file: %s", v.Files.JSONCustomFile)
 	}
 
 	// Validate and filter.
@@ -353,7 +353,7 @@ func processJSON(
 		// Remove metadata JSON file since video is being ignored.
 		if v.Files.JSONFilePath != "" {
 			if err := file.RemoveMetadataJSON(v.Files.JSONFilePath); err != nil && !os.IsNotExist(err) {
-				logger.Pl.Channel(c.Name).W("Failed to remove metadata file for ignored video %q: %v", v.Files.JSONFilePath, err)
+				c.Log().W("Failed to remove metadata file for ignored video %q: %v", v.Files.JSONFilePath, err)
 			}
 		}
 
@@ -367,14 +367,14 @@ func processJSON(
 	// Will download this video (passed checks).
 	v.DownloadStatus.Status = consts.DLStatusQueued
 	v.DownloadStatus.Percent = 0.0
-	logger.Pl.Channel(c.Name).D(1, "Setting video %q to Queued status before saving to DB", v.URL)
+	c.Log().D(1, "Setting video %q to Queued status before saving to DB", v.URL)
 
 	// Save video to database.
 	if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
 		return false, fmt.Errorf("failed to update video DB entry: %w", err)
 	}
 
-	logger.Pl.Channel(c.Name).S("Processed metadata for: %s", v.URL)
+	c.Log().S("Processed metadata for: %s", v.URL)
 	return true, nil
 }
 
@@ -384,7 +384,7 @@ func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c
 		return fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
 	}
 
-	logger.Pl.Channel(c.Name).I("Processing video download for URL: %s", v.URL)
+	c.Log().I("Processing video download for URL: %s", v.URL)
 
 	dl, err := downloads.NewVideoDownload(ctx, v, cu, c, ds, tracker, downloads.Options{
 		MaxAttempts:      downloadAttempts(cu),
@@ -398,7 +398,7 @@ func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c
 		return err
 	}
 
-	logger.Pl.Channel(c.Name).D(1, "Successfully processed and marked as downloaded: %s", v.URL)
+	c.Log().D(1, "Successfully processed and marked as downloaded: %s", v.URL)
 	return nil
 }
 

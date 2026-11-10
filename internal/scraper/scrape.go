@@ -53,7 +53,7 @@ func New() *Scraper {
 // GetNewReleases checks a channel's URLs for new video URLs, returning those found alongside any per-URL errors.
 func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, ignoreCrawl bool) ([]*models.Video, error) {
 	if len(c.URLModels) == 0 {
-		logger.Pl.Channel(c.Name).D(1, "Channel %q has no URLs configured, skipping automatic crawl", c.Name)
+		c.Log().D(1, "Channel %q has no URLs configured, skipping automatic crawl", c.Name)
 		return []*models.Video{}, nil
 	}
 
@@ -73,7 +73,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		if cu.IsManual || (!ignoreCrawl && cu.Paused()) {
 			continue
 		}
-		logger.Pl.Channel(c.Name).D(1, "Processing channel URL %q", cu.URL)
+		c.Log().D(1, "Processing channel URL %q", cu.URL)
 
 		// Stagger crawls of the channel's URLs (the channel already waited before the first).
 		if crawledAny {
@@ -96,7 +96,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			if ctx.Err() != nil {
 				return nil, err
 			}
-			logger.Pl.Channel(c.Name).E("Skipping channel URL %q, failed to get cookies: %v", cu.URL, err)
+			c.Log().E("Skipping channel URL %q, failed to get cookies: %v", cu.URL, err)
 			urlErrs = errors.Join(urlErrs, fmt.Errorf("channel URL %q: %w", cu.URL, err))
 			continue
 		}
@@ -108,7 +108,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		if !c.AutoDownloads(cu) {
 			seenURLs = slices.Concat(existingURLs, failedURLs)
 			if err := cs.UseUpCrawlDLRetries(cu.ID); err != nil {
-				logger.Pl.Channel(c.Name).E("Failed to use up crawl retries for channel URL %q: %v", cu.URL, err)
+				c.Log().E("Failed to use up crawl retries for channel URL %q: %v", cu.URL, err)
 			}
 		}
 
@@ -119,7 +119,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 			if ctx.Err() != nil {
 				return nil, err
 			}
-			logger.Pl.Channel(c.Name).E("Skipping channel URL %q, crawl failed: %v", cu.URL, err)
+			c.Log().E("Skipping channel URL %q, crawl failed: %v", cu.URL, err)
 			urlErrs = errors.Join(urlErrs, fmt.Errorf("channel URL %q: %w", cu.URL, err))
 			continue
 		}
@@ -133,7 +133,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 				}
 			}
 			if err := cs.AddCrawlDLRetries(c.ID, retried); err != nil {
-				logger.Pl.Channel(c.Name).E("Failed to count crawl retries for channel URL %q: %v", cu.URL, err)
+				c.Log().E("Failed to count crawl retries for channel URL %q: %v", cu.URL, err)
 			}
 		}
 
@@ -144,7 +144,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 				continue
 			}
 			if !validation.IsHTTPURL(newURL) {
-				logger.Pl.Channel(c.Name).W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
+				c.Log().W("Skipping crawled URL %q for channel %q: not an http(s) URL", newURL, c.Name)
 				continue
 			}
 			if !validation.IsHTTPURL(lv.ThumbnailURL) {
@@ -170,12 +170,12 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 
 	// Print summary
 	if len(newRequests) > 0 {
-		logger.Pl.Channel(c.Name).I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
+		c.Log().I("Found %d new video URL requests for channel %q:", len(newRequests), c.Name)
 		for i, v := range newRequests {
 			if v == nil {
 				continue
 			}
-			logger.Pl.P("%s#%d%s - %q", sharedconsts.ColorBlue, i+1, sharedconsts.ColorReset, v.URL)
+			c.Log().P("%s#%d%s - %q", sharedconsts.ColorBlue, i+1, sharedconsts.ColorReset, v.URL)
 			if i >= consts.MaxDisplayedVideos {
 				break
 			}
@@ -190,13 +190,13 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 	// Find a registered rule set (built-in or user-supplied) based on URL domain.
 	query, ok := siterules.MatchMetadata(v.URL)
 	if !ok {
-		logger.Pl.D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
+		v.Log().D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
 		return nil // Not a custom site.
 	}
 
 	// Visit the webpage.
 	metadata := make(map[string]any)
-	if err := s.visitPage(ctx, urlStr, cookies, query, func(c *colly.Collector) {
+	if err := s.visitPage(ctx, urlStr, v.ChannelName, cookies, query, func(c *colly.Collector) {
 		metadata = s.ScrapeWithRules(urlStr, c, v, query)
 	}); err != nil {
 		return fmt.Errorf("failed to visit URL: %w", err)
@@ -204,7 +204,7 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 
 	// Validate required fields.
 	if v.Metadata.Title == "" {
-		logger.Pl.D(3, "Scraped metadata: %+v", metadata)
+		v.Log().D(3, "Scraped metadata: %+v", metadata)
 		return fmt.Errorf("missing required metadata fields (title: %q)", v.Metadata.Title)
 	}
 
@@ -221,7 +221,7 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 		return fmt.Errorf("failed to write metadata JSON: %w", err)
 	}
 
-	logger.Pl.S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
+	v.Log().S("Successfully wrote metadata JSON to %s/%s", outputDir, filename)
 	return nil
 }
 
@@ -237,7 +237,7 @@ func TestScrapeSite(ctx context.Context, urlStr string) (matched bool, site stri
 
 	s := New()
 	v := &models.Video{URL: urlStr}
-	if err := s.visitPage(ctx, urlStr, nil, query, func(c *colly.Collector) {
+	if err := s.visitPage(ctx, urlStr, "", nil, query, func(c *colly.Collector) {
 		metadata = s.ScrapeWithRules(urlStr, c, v, query)
 	}); err != nil {
 		return true, query.Site, nil, fmt.Errorf("failed to visit URL: %w", err)
@@ -256,7 +256,7 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, cu *models.ChannelURL, exi
 	channelURL := cu.URL
 
 	// Custom crawl rules and built-in scrapers take priority over yt-dlp.
-	_, episodes, crawled, err := s.crawlChannelURLs(ctx, channelURL, cu.Session.Cookies)
+	_, episodes, crawled, err := s.crawlChannelURLs(ctx, channelURL, cu.ChannelName, cu.Session.Cookies)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +274,7 @@ func (s *Scraper) newEpisodeURLs(ctx context.Context, cu *models.ChannelURL, exi
 	newURLs := ignoreDownloadedURLs(episodeURLs, existingURLs)
 
 	if len(newURLs) == 0 {
-		logger.Pl.Channel(cu.ChannelName).I("No new videos at %s", channelURL)
+		cu.Log().I("No new videos at %s", channelURL)
 		return nil, nil
 	}
 	newEpisodes := make(map[string]*listedVideo, len(newURLs))
@@ -303,7 +303,6 @@ func ignoreDownloadedURLs(inputURLs, existingURLs []string) []string {
 func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*listedVideo, error) {
 	uniqueEpisodeURLs := make(map[string]*listedVideo)
 	channelURL, fs := cu.URL, cu.Session.FlareSolverr
-	log := logger.Pl.Channel(cu.ChannelName)
 	var crawlArgs, browser string
 	if cu.ChanURLSettings != nil {
 		crawlArgs, browser = cu.ChanURLSettings.ExtraYTDLPCrawlArgs, cu.ChanURLSettings.CookiesFromBrowser
@@ -325,7 +324,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			// Refuse extra yt-dlp arguments containing disallowed options.
 			if !sharedconsts.InsecureArgumentsAllowed() {
 				if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
-					log.W("Refusing extra YT-DLP arguments for channel URL %q: Option %q is not allowed for YT-DLP.", cu.URL, blockedKey)
+					cu.Log().W("Refusing extra YT-DLP arguments for channel URL %q: Option %q is not allowed for YT-DLP.", cu.URL, blockedKey)
 				} else {
 					args = append(args, extraArgs...)
 				}
@@ -349,7 +348,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		args = append(args, command.OutputJSON, command.EndOfOptions, channelURL)
 		cmd := exec.CommandContext(ctx, sharedconsts.ProgramYTDLP, args...)
 
-		log.I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
+		cu.Log().I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
 
 		var err error
 		if j, err = cmd.Output(); err == nil {
@@ -364,13 +363,13 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			return uniqueEpisodeURLs, fmt.Errorf("yt-dlp command failed: %w: %s", err, stderr)
 		}
 
-		log.W("Cloudflare blocked yt-dlp for %q, refreshing its FlareSolverr solve...", channelURL)
+		cu.Log().W("Cloudflare blocked yt-dlp for %q, refreshing its FlareSolverr solve...", channelURL)
 		if err := fs.Refresh(fsGen); err != nil {
 			return uniqueEpisodeURLs, fmt.Errorf("yt-dlp was blocked by Cloudflare (%s), and a fresh FlareSolverr solve failed: %w", stderr, err)
 		}
 	}
 
-	log.D(5, "Retrieved command output from yt-dlp for channel %q:\n\n%s", channelURL, string(j))
+	cu.Log().D(5, "Retrieved command output from yt-dlp for channel %q:\n\n%s", channelURL, string(j))
 
 	var result ytDlpEntry
 	if err := json.Unmarshal(j, &result); err != nil {
@@ -388,7 +387,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		}
 		// Filter out the channel URL itself if it appears in the entries list.
 		if normalizeURL(entry.URL) == normalizeURL(channelURL) {
-			log.D(3, "Skipping entry (entry %q is the exact channel URL: %q)", entry.URL, channelURL)
+			cu.Log().D(3, "Skipping entry (entry %q is the exact channel URL: %q)", entry.URL, channelURL)
 			continue
 		}
 		// Normalize Rumble URLs.
@@ -396,13 +395,13 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			if isValidRumbleVideoURL(entry.URL) {
 				entry.URL = removeQueryParams(entry.URL)
 			} else {
-				log.D(2, "Rumble URL %q is not a valid video link, skipping...", entry.URL)
+				cu.Log().D(2, "Rumble URL %q is not a valid video link, skipping...", entry.URL)
 				continue
 			}
 		}
 		// Add to map to ensure uniqueness.
 		mergeListed(uniqueEpisodeURLs, entry.URL, entry.listed())
-		log.D(3, "Added entry for channel %q: %q", channelURL, entry)
+		cu.Log().D(3, "Added entry for channel %q: %q", channelURL, entry)
 	}
 
 	return uniqueEpisodeURLs, nil
@@ -413,20 +412,20 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 // For FlareSolverr sites, requests use the solved cookies and user agent, and a Cloudflare challenge
 // triggers one fresh FlareSolverr solve and retry. If FlareSolverr is unavailable, falls back to the
 // site's normal requests.
-func (s *Scraper) visitPage(ctx context.Context, urlStr string, cookies []*http.Cookie, query models.SiteRules, setup func(c *colly.Collector)) error {
+func (s *Scraper) visitPage(ctx context.Context, urlStr, channelName string, cookies []*http.Cookie, query models.SiteRules, setup func(c *colly.Collector)) error {
 	var (
 		sol   *flareSolverrSolution
 		fsErr error
 	)
 	if query.FlareSolverr {
-		sol, fsErr = s.cookieManager.flareSolverrSolution(ctx, urlStr, 0)
+		sol, fsErr = s.cookieManager.flareSolverrSolution(ctx, urlStr, channelName, 0)
 	}
 
 	for retried := false; ; retried = true {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		challenged, err := s.visitPageOnce(ctx, urlStr, cookies, query, sol, setup)
+		challenged, err := s.visitPageOnce(ctx, urlStr, channelName, cookies, query, sol, setup)
 		switch {
 		case !challenged:
 			return err
@@ -438,16 +437,16 @@ func (s *Scraper) visitPage(ctx context.Context, urlStr string, cookies []*http.
 			return fmt.Errorf("cloudflare challenged the request for %q again after a fresh FlareSolverr solve", urlStr)
 		}
 
-		logger.Pl.W("Cloudflare challenged the request for %q, refreshing its FlareSolverr solve...", urlStr)
-		if sol, err = s.cookieManager.flareSolverrSolution(ctx, urlStr, sol.gen); err != nil {
+		logger.Pl.Channel(channelName).W("Cloudflare challenged the request for %q, refreshing its FlareSolverr solve...", urlStr)
+		if sol, err = s.cookieManager.flareSolverrSolution(ctx, urlStr, channelName, sol.gen); err != nil {
 			return fmt.Errorf("cloudflare challenged the request for %q, and a fresh FlareSolverr solve failed: %w", urlStr, err)
 		}
 	}
 }
 
 // visitPageOnce makes a single visitPage attempt, reporting whether Cloudflare challenged it.
-func (s *Scraper) visitPageOnce(ctx context.Context, urlStr string, cookies []*http.Cookie, query models.SiteRules, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
-	c, err := initializeCollector(ctx, urlStr, s.cookieManager, query, sol, cookies)
+func (s *Scraper) visitPageOnce(ctx context.Context, urlStr, channelName string, cookies []*http.Cookie, query models.SiteRules, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
+	c, err := initializeCollector(ctx, urlStr, channelName, s.cookieManager, query, sol, cookies)
 	if err != nil {
 		return false, err
 	}
@@ -456,13 +455,13 @@ func (s *Scraper) visitPageOnce(ctx context.Context, urlStr string, cookies []*h
 	c.OnResponse(func(r *colly.Response) {
 		if isCloudflareChallenge(r.StatusCode, *r.Headers, r.Body) {
 			challenged = true
-			logCloudflareChallenge(urlStr, r)
+			logCloudflareChallenge(urlStr, channelName, r)
 		}
 	})
 	c.OnError(func(r *colly.Response, err error) {
 		if r.Headers != nil && isCloudflareChallenge(r.StatusCode, *r.Headers, r.Body) {
 			challenged = true
-			logCloudflareChallenge(urlStr, r)
+			logCloudflareChallenge(urlStr, channelName, r)
 		}
 		reqErr = fmt.Errorf("request for %q failed (HTTP %d): %w", urlStr, r.StatusCode, err)
 	})
@@ -481,7 +480,7 @@ func (s *Scraper) visitPageOnce(ctx context.Context, urlStr string, cookies []*h
 // Cookies are set in order, later ones replacing earlier ones with the same name: this crawl session's, then the caller's
 // (e.g. the channel URL's), then for FlareSolverr sites (sol set), the solution's, so a refreshed solve isn't undone by
 // older Cloudflare cookies. FlareSolverr sites impersonate Chrome with the solution's user agent. Requests are canceled with ctx.
-func initializeCollector(ctx context.Context, urlStr string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
+func initializeCollector(ctx context.Context, urlStr, channelName string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
@@ -494,11 +493,11 @@ func initializeCollector(ctx context.Context, urlStr string, cm *CookieManager, 
 	}
 
 	// Get cookies from cookie manager for this crawl session.
-	if cached := cm.GetCachedCookies(parsedURL.Hostname()); cached != nil {
+	if cached := cm.GetCachedCookies(parsedURL.Hostname(), channelName); cached != nil {
 		jar.SetCookies(parsedURL, cached)
-		logger.Pl.D(2, "Set %d cookies for scraper from this crawl session", len(cached))
+		logger.Pl.Channel(channelName).D(2, "Set %d cookies for scraper from this crawl session", len(cached))
 	} else {
-		logger.Pl.D(2, "No cookies available for scraper for hostname %q", parsedURL.Hostname())
+		logger.Pl.Channel(channelName).D(2, "No cookies available for scraper for hostname %q", parsedURL.Hostname())
 	}
 	if len(cookies) > 0 {
 		jar.SetCookies(parsedURL, cookies)
@@ -560,7 +559,7 @@ func sanitizeFilename(name string) string {
 }
 
 // setupFieldScraping applies scraping rules for a specific field.
-func setupFieldScraping(c *colly.Collector, fieldName string, rules []models.MetadataRule, result *string) {
+func setupFieldScraping(c *colly.Collector, fieldName, channelName string, rules []models.MetadataRule, result *string) {
 	if result == nil {
 		return
 	}
@@ -599,11 +598,11 @@ func setupFieldScraping(c *colly.Collector, fieldName string, rules []models.Met
 			value = html.UnescapeString(value)
 			value = strings.TrimSpace(value)
 			if value != "" && (rule.JSONPath != "" || rule.Regex != nil || len(rule.Fetch) > 0) {
-				value = ruleValue(c, h.Request.URL.String(), value, rule)
+				value = ruleValue(c, h.Request.URL.String(), value, channelName, rule)
 			}
 
 			if value != "" {
-				logger.Pl.S("Grabbed value %q for field %q using selector %q", value, fieldName, rule.Selector)
+				logger.Pl.Channel(channelName).S("Grabbed value %q for field %q using selector %q", value, fieldName, rule.Selector)
 				*result = value
 			}
 		})
@@ -663,7 +662,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		durationString string
 	)
 
-	logger.Pl.I("Scraping %q using rules for %s...", urlStr, query.Site)
+	v.Log().I("Scraping %q using rules for %s...", urlStr, query.Site)
 
 	// Group rules by field name
 	rulesByField := make(map[string][]models.MetadataRule)
@@ -697,22 +696,22 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 
 	// Setup scraping for each known field
 	if rules, ok := rulesByField[sharedtags.JTitle]; ok {
-		setupFieldScraping(collector, sharedtags.JTitle, rules, &title)
+		setupFieldScraping(collector, sharedtags.JTitle, v.ChannelName, rules, &title)
 	}
 	if rules, ok := rulesByField[sharedtags.JDescription]; ok {
-		setupFieldScraping(collector, sharedtags.JDescription, rules, &description)
+		setupFieldScraping(collector, sharedtags.JDescription, v.ChannelName, rules, &description)
 	}
 	if rules, ok := rulesByField[sharedtags.JDirectVideoURL]; ok {
-		setupFieldScraping(collector, sharedtags.JDirectVideoURL, rules, &directVideoURL)
+		setupFieldScraping(collector, sharedtags.JDirectVideoURL, v.ChannelName, rules, &directVideoURL)
 	}
 	if rules, ok := rulesByField[sharedtags.JThumbnail]; ok {
-		setupFieldScraping(collector, sharedtags.JThumbnail, rules, &thumbnailURL)
+		setupFieldScraping(collector, sharedtags.JThumbnail, v.ChannelName, rules, &thumbnailURL)
 	}
 	if rules, ok := rulesByField[sharedtags.JDuration]; ok {
-		setupFieldScraping(collector, sharedtags.JDuration, rules, &duration)
+		setupFieldScraping(collector, sharedtags.JDuration, v.ChannelName, rules, &duration)
 	}
 	if rules, ok := rulesByField[sharedtags.JDurationString]; ok {
-		setupFieldScraping(collector, sharedtags.JDurationString, rules, &durationString)
+		setupFieldScraping(collector, sharedtags.JDurationString, v.ChannelName, rules, &durationString)
 	}
 
 	// Setup scraping for recognized date fields. Each is written into the metadata JSON
@@ -724,7 +723,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			continue
 		}
 		value := new(string)
-		setupFieldScraping(collector, fieldName, rules, value)
+		setupFieldScraping(collector, fieldName, v.ChannelName, rules, value)
 		dateValues[fieldName] = value
 	}
 	yearValues := make(map[string]*string, len(yearFields))
@@ -734,7 +733,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			continue
 		}
 		value := new(string)
-		setupFieldScraping(collector, fieldName, rules, value)
+		setupFieldScraping(collector, fieldName, v.ChannelName, rules, value)
 		yearValues[fieldName] = value
 	}
 
@@ -747,7 +746,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			continue
 		}
 		value := new(string)
-		setupFieldScraping(collector, fieldName, rules, value)
+		setupFieldScraping(collector, fieldName, v.ChannelName, rules, value)
 		extraFields[fieldName] = value
 	}
 
@@ -783,7 +782,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			v.Metadata.Duration = secs
 			metadata[sharedtags.JDuration] = secs
 		} else if duration != "" || durationString != "" {
-			logger.Pl.W("Failed to parse a duration from field %q (%q) or %q (%q)", sharedtags.JDuration, duration, sharedtags.JDurationString, durationString)
+			v.Log().W("Failed to parse a duration from field %q (%q) or %q (%q)", sharedtags.JDuration, duration, sharedtags.JDurationString, durationString)
 		}
 
 		parsedDates := make(map[string]time.Time, len(dateValues))
@@ -793,7 +792,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			}
 			normalized, t := parseScrapedDate(*value)
 			if t.IsZero() {
-				logger.Pl.W("Failed to parse date for field %q: %q", fieldName, *value)
+				v.Log().W("Failed to parse date for field %q: %q", fieldName, *value)
 			} else {
 				parsedDates[fieldName] = t
 			}
@@ -805,7 +804,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		for _, fieldName := range uploadDatePrecedence {
 			if t, ok := parsedDates[fieldName]; ok {
 				v.Metadata.UploadDate = t
-				logger.Pl.I("Extracted upload date %q from field %q", v.Metadata.UploadDate.String(), fieldName)
+				v.Log().I("Extracted upload date %q from field %q", v.Metadata.UploadDate.String(), fieldName)
 				break
 			}
 		}
@@ -816,7 +815,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 			}
 			normalized, ok := parseScrapedYear(*value)
 			if !ok {
-				logger.Pl.W("Scraped value for field %q does not look like a valid year: %q", fieldName, *value)
+				v.Log().W("Scraped value for field %q does not look like a valid year: %q", fieldName, *value)
 			}
 			metadata[fieldName] = normalized
 		}

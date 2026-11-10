@@ -19,7 +19,7 @@ func loadAndMergeFilenameOps(v *models.Video, cu *models.ChannelURL, dirParser *
 	// An unusable file holds back Metarr for the whole batch, see SkipReason.
 	ops, err := channelURLFilenameOps(cu, dirParser)
 	if err != nil {
-		logger.Pl.Channel(cu.ChannelName).E("Filename ops file for %q can't be used: %v", cu.URL, err)
+		cu.Log().E("Filename ops file for %q can't be used: %v", cu.URL, err)
 	}
 	return getDedupedFilenameOpStrings(applyFilteredFilenameOps(ops, v.FilteredFilenameOps, v.URL, v.ChannelName))
 }

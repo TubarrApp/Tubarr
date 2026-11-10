@@ -148,18 +148,17 @@ func checkBotDetection(v *models.Video, cu *models.ChannelURL, db *sql.DB, input
 
 	// Avoid using the 'ChannelURL' URL, which can be the manual download value.
 	host := hostname(v.URL)
-	log := logger.Pl.Channel(cu.ChannelName)
 	switch {
 	case host == "":
-		log.E("Failed to parse URL %q after bot detection", v.URL)
+		cu.Log().E("Failed to parse URL %q after bot detection", v.URL)
 	case db == nil:
-		log.E("Cannot record bot detection for %q: database is nil", host)
+		cu.Log().E("Cannot record bot detection for %q: database is nil", host)
 	default:
 		blockContext := blocking.GetBlockContext(cu)
 		if err := blocking.BlockDomain(db, host, blockContext); err != nil {
-			log.E("Failed to block %q after bot detection: %v", host, err)
+			cu.Log().E("Failed to block %q after bot detection: %v", host, err)
 		} else if err := blocking.AddBlockedVideo(db, host, blockContext, v.ID, v.ChannelID); err != nil {
-			log.W("Failed to record blocked video %d: %v", v.ID, err)
+			cu.Log().W("Failed to record blocked video %d: %v", v.ID, err)
 		}
 	}
 
@@ -174,14 +173,14 @@ func CheckIfAvoidURL(v *models.Video, cu *models.ChannelURL, db *sql.DB) error {
 
 	siteHost := hostname(v.URL)
 	if siteHost == "" {
-		logger.Pl.Channel(cu.ChannelName).E("Could not parse URL %q, will check against full URL instead", v.URL)
+		cu.Log().E("Could not parse URL %q, will check against full URL instead", v.URL)
 		siteHost = v.URL
 	}
 
 	blockCtx := blocking.GetBlockContext(cu)
 	if isBlocked, _, remaining := blocking.IsBlocked(siteHost, blockCtx); isBlocked {
 		if err := blocking.AddBlockedVideo(db, siteHost, blockCtx, v.ID, v.ChannelID); err != nil {
-			logger.Pl.Channel(cu.ChannelName).W("Failed to record blocked video %d: %v", v.ID, err)
+			cu.Log().W("Failed to record blocked video %d: %v", v.ID, err)
 		}
 		return fmt.Errorf("%s is blocked for %s requests until %s", siteHost, blockCtx, time.Now().Add(remaining).Format("2006-01-02 15:04 MST"))
 	}
@@ -278,9 +277,9 @@ func refreshFlareSolverr(cu *models.ChannelURL, videoURL string, fsGen int, dlEr
 		return false
 	}
 
-	logger.Pl.Channel(cu.ChannelName).W("Cloudflare blocked the download of %q, refreshing its FlareSolverr solve...", videoURL)
+	cu.Log().W("Cloudflare blocked the download of %q, refreshing its FlareSolverr solve...", videoURL)
 	if err := fs.Refresh(fsGen); err != nil {
-		logger.Pl.Channel(cu.ChannelName).E("FlareSolverr solve failed for %q: %v", videoURL, err)
+		cu.Log().E("FlareSolverr solve failed for %q: %v", videoURL, err)
 	}
 	return true
 }
