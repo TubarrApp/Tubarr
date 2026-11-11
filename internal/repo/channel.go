@@ -509,22 +509,40 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 	return nil
 }
 
-// AddURLToIgnore adds a URL into the database to ignore in subsequent crawls.
+// AddURLToIgnore adds a video URL the channel's crawls skip, stored ignored as an ignore crawl stores them.
 func (cs *ChannelStore) AddURLToIgnore(channelID int64, ignoreURL string) error {
 	if !cs.channelExistsID(channelID) {
 		return fmt.Errorf("channel with ID %d does not exist", channelID)
 	}
 
 	//nolint:gosec // SQL identifiers are trusted constants.
-	query := fmt.Sprintf(
-		"INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)",
+	videoQuery := fmt.Sprintf(
+		"INSERT INTO %s (%s, %s, %s, %s, %s, %s) VALUES (?, ?, ?, ?, ?, ?)",
 		consts.DBVideos,
 		consts.QVidChanID,
 		consts.QVidURL,
-		consts.QVidFinished,
+		consts.QVidTitle,
+		consts.QVidIgnored,
+		consts.QVidCreatedAt,
+		consts.QVidUpdatedAt,
 	)
+	//nolint:gosec // SQL identifiers are trusted constants.
+	dlQuery := fmt.Sprintf("INSERT INTO %s (%s, %s) VALUES (?, ?)", consts.DBDownloads, consts.QDLVidID, consts.QDLStatus)
 
-	if _, err := cs.q.Exec(query, channelID, ignoreURL, true); err != nil {
+	// The video, titled with its URL, and its Ignored download status.
+	now := time.Now()
+	if err := cs.inTx(func(tcs *ChannelStore) error {
+		result, err := tcs.q.Exec(videoQuery, channelID, ignoreURL, ignoreURL, true, now, now)
+		if err != nil {
+			return err
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return err
+		}
+		_, err = tcs.q.Exec(dlQuery, id, consts.DLStatusIgnored)
+		return err
+	}); err != nil {
 		return err
 	}
 
@@ -907,7 +925,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 		c.Log().D(1, "Inserting URL %d: %q", i+1, cu.URL)
 
 		// Validate URL format (skip empty URLs and the special "manual-downloads" URL).
-		if cu.URL != "" && cu.URL != "manual-downloads" {
+		if cu.URL != "" && cu.URL != consts.ManualDownloadsCol {
 			if _, err := url.ParseRequestURI(cu.URL); err != nil {
 				return 0, fmt.Errorf("invalid URL %q: %w", cu.URL, err)
 			}
@@ -919,17 +937,17 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 			}
 		}
 
-		// Check if custom args exist.
+		// The URL's own settings, stored as given, as an edit stores them.
 		var (
 			customMetarrArgs []byte
 			customSettings   []byte
 		)
-		if !models.MetarrArgsAllZero(cu.ChanURLMetarrArgs) && !models.ChildMetarrArgsMatchParent(c.ChanMetarrArgs, cu.ChanURLMetarrArgs) {
+		if cu.ChanURLMetarrArgs != nil {
 			if customMetarrArgs, err = json.Marshal(cu.ChanURLMetarrArgs); err != nil {
 				return 0, fmt.Errorf("failed to marshal settings: %w", err)
 			}
 		}
-		if !models.SettingsAllZero(cu.ChanURLSettings) && !models.ChildSettingsMatchParent(c.ChanSettings, cu.ChanURLSettings) {
+		if cu.ChanURLSettings != nil {
 			if customSettings, err = json.Marshal(cu.ChanURLSettings); err != nil {
 				return 0, fmt.Errorf("failed to marshal settings: %w", err)
 			}
@@ -1093,7 +1111,6 @@ func (cs *ChannelStore) loadChannelDetails(c *models.Channel, settingsJSON, meta
 		}
 		c.Levels = append(c.Levels, own)
 		stackLists(c.ChanSettings, c.ChanMetarrArgs, c.Levels)
-		c.ChanSettings.JSONDir = cmp.Or(c.ChanSettings.JSONDir, c.ChanSettings.VideoDir) // Without a JSON directory, metadata is saved with the videos.
 		parsing.FillChannelOutputDirectory(c)
 	}
 
@@ -1102,6 +1119,11 @@ func (cs *ChannelStore) loadChannelDetails(c *models.Channel, settingsJSON, meta
 		return fmt.Errorf("failed to fetch URL models for channel: %w", err)
 	}
 	c.URLModels = urlModels
+
+	// Without a JSON directory, metadata is saved with the videos. Filled in once its URLs merged, so each uses its own.
+	if mergeURLsWithParent {
+		c.ChanSettings.JSONDir = cmp.Or(c.ChanSettings.JSONDir, c.ChanSettings.VideoDir)
+	}
 	if loadErr == nil {
 		loadErr = profilesErr(c)
 	}

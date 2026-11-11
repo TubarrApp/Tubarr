@@ -164,10 +164,9 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 		dst.UseGlobalCookies = &b
 	}
 	if v := in.YTDLPOutputExt; v != nil {
-		if err := validation.ValidateYtdlpOutputExtension(*v); err != nil {
+		if dst.YtdlpOutputExt, err = validation.ValidateYtdlpOutputExtension(*v); err != nil {
 			return fmt.Errorf("invalid %s: %w", keys.YtdlpOutputExt, err)
 		}
-		dst.YtdlpOutputExt = *v
 	}
 	if v := in.YTDLPPreferredVideoCodecs; v != nil {
 		if dst.YTDLPPreferredVideoCodecs, err = validation.ValidateYtdlpVideoCodecs(*v); err != nil {
@@ -180,12 +179,21 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 		}
 	}
 	if v := in.ExtraYTDLPVideoArgs; v != nil {
+		if _, err := validation.ValidateExtraYtdlpArgs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.ExtraYTDLPVideoArgs, err)
+		}
 		dst.ExtraYTDLPVideoArgs = *v
 	}
 	if v := in.ExtraYTDLPMetaArgs; v != nil {
+		if _, err := validation.ValidateExtraYtdlpArgs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.ExtraYTDLPMetaArgs, err)
+		}
 		dst.ExtraYTDLPMetaArgs = *v
 	}
 	if v := in.ExtraYTDLPCrawlArgs; v != nil {
+		if _, err := validation.ValidateExtraYtdlpArgs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.ExtraYTDLPCrawlArgs, err)
+		}
 		dst.ExtraYTDLPCrawlArgs = *v
 	}
 	if v := in.DLFilters; v != nil {
@@ -441,8 +449,11 @@ func convertConfigValue[T any](v any) (T, bool) {
 		}
 
 	case float64:
-		if i, ok := v.(int); ok {
-			return any(float64(i)).(T), true
+		switch n := v.(type) {
+		case int:
+			return any(float64(n)).(T), true
+		case int64:
+			return any(float64(n)).(T), true
 		}
 
 	case []string:

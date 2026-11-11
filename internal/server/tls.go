@@ -81,7 +81,7 @@ func loadKeyPair(certPath, keyPath string) (tls.Certificate, error) {
 	if keyPath != "" {
 		return tls.LoadX509KeyPair(certPath, keyPath)
 	}
-	data, err := os.ReadFile(certPath)
+	data, err := os.ReadFile(certPath) //nolint:gosec // The certificate set in settings.
 	if err != nil {
 		return tls.Certificate{}, err
 	}
@@ -213,7 +213,7 @@ func newestModTime(files ...string) (time.Time, error) {
 // A hostname change doesn't regenerate it: containers get a new hostname when recreated, and a new certificate would
 // bring back the browser warning for no benefit. Deleting the file makes a new one.
 func loadOrCreateSelfSigned(path string) (*tls.Certificate, error) {
-	if data, err := os.ReadFile(path); err == nil {
+	if data, err := os.ReadFile(path); err == nil { //nolint:gosec // The self-signed certificate in Tubarr's directory.
 		cert, err := tls.X509KeyPair(data, data)
 		if err == nil && cert.Leaf != nil && time.Until(cert.Leaf.NotAfter) > selfSignedRenewAt {
 			return &cert, nil

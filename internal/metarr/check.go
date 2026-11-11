@@ -16,6 +16,7 @@ func CheckInstalled(ctx context.Context) error {
 	if _, err := exec.LookPath(sharedconsts.ProgramMetarr); err != nil {
 		return err
 	}
+	//nolint:gosec // Metarr's help, with no user input.
 	if err := exec.CommandContext(ctx, sharedconsts.ProgramMetarr, "--help").Run(); err != nil {
 		return fmt.Errorf("found '%s' in $PATH but failed to execute: %w", sharedconsts.ProgramMetarr, err)
 	}

@@ -253,6 +253,7 @@ func manualDownloadVideoURLs(cs contracts.ChannelStore, s contracts.Store, dq *q
 			}
 
 			// Queue the URLs, which Tubarr downloads before exiting.
+			file.UpdateFromConfigFile(cs, c)
 			if c.LoadErr != nil {
 				return c.LoadErr
 			}
@@ -390,6 +391,7 @@ func downloadAvailableCmd(cs contracts.ChannelStore, s contracts.Store, dq *queu
 			if err != nil {
 				return err
 			}
+			file.UpdateFromConfigFile(cs, c)
 			if c.LoadErr != nil {
 				return c.LoadErr
 			}

@@ -64,8 +64,11 @@ func (d *Database) reportForeignKeyViolations() {
 		return
 	}
 	defer func() {
-		if err := rows.Close(); err != nil {
-			logger.Pl.W("Failed to close database foreign key check: %v", err)
+		if closeErr := rows.Close(); closeErr != nil {
+			logger.Pl.W("Failed to close database foreign key check: %v", closeErr)
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			logger.Pl.W("Encountered error in rows: %v", rowsErr)
 		}
 	}()
 

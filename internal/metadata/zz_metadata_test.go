@@ -68,6 +68,44 @@ func TestUnusableFilterFileSkipsVideo(t *testing.T) {
 	}
 }
 
+// TestUnusableMetadataSkipsVideo tests a metadata file or download filter that can't be used is an error, so the
+// video fails rather than being marked ignored.
+func TestUnusableMetadataSkipsVideo(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	dir := t.TempDir()
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := withOwnLevel(&models.ChannelURL{
+		URL:               "https://example.com/@cats",
+		ChanURLSettings:   &models.Settings{},
+		ChanURLMetarrArgs: &models.MetarrArgs{},
+	})
+	dp := parsing.NewDirectoryParser(c, cu, parsing.TubarrTags)
+	videoWith := func(body string) *models.Video {
+		path := filepath.Join(dir, "video.json")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return &models.Video{URL: "https://example.com/watch/1", Files: models.VideoFiles{JSONFilePath: path}}
+	}
+
+	// Metadata that can't be read, or has nothing in it.
+	for name, body := range map[string]string{"corrupt": `{"title":`, "empty object": `{}`, "null": `null`} {
+		if pass, _, _, err := ValidateAndFilter(videoWith(body), cu, dp); pass || err == nil {
+			t.Errorf("%s metadata: passed = %v, err = %v; want not passed with an error", name, pass, err)
+		}
+	}
+	missing := &models.Video{URL: "https://example.com/watch/1", Files: models.VideoFiles{JSONFilePath: filepath.Join(dir, "absent.json")}}
+	if pass, _, _, err := ValidateAndFilter(missing, cu, dp); pass || err == nil {
+		t.Errorf("missing metadata file: passed = %v, err = %v; want not passed with an error", pass, err)
+	}
+
+	// A download filter that can't be checked.
+	cu.ChanURLSettings.Filters = []models.Filters{{Field: "title", FilterType: "regex-contains", Value: "(", MustAny: "must"}}
+	if pass, _, _, err := ValidateAndFilter(videoWith(`{"title":"A video"}`), cu, dp); pass || err == nil {
+		t.Errorf("unusable filter: passed = %v, err = %v; want not passed with an error", pass, err)
+	}
+}
+
 // TestMustAndAnyFilters tests a video passes when every 'must' filter passes and, if there are 'any' filters, at least
 // one of them does.
 func TestMustAndAnyFilters(t *testing.T) {
@@ -91,8 +129,8 @@ func TestMustAndAnyFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: map[string]any{"title": tt.title}}}
-		if got := checkFilters(v, tt.filters); got != tt.want {
-			t.Errorf("checkFilters(%q, %v) = %v, want %v", tt.title, tt.filters, got, tt.want)
+		if got, err := checkFilters(v, tt.filters); err != nil || got != tt.want {
+			t.Errorf("checkFilters(%q, %v) = %v, %v; want %v", tt.title, tt.filters, got, err, tt.want)
 		}
 	}
 }
@@ -116,8 +154,8 @@ func TestCheckFiltersFieldValues(t *testing.T) {
 	}
 	for _, tt := range tests {
 		v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: meta}}
-		if got := checkFilters(v, []models.Filters{tt.filter}); got != tt.want {
-			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
+		if got, err := checkFilters(v, []models.Filters{tt.filter}); err != nil || got != tt.want {
+			t.Errorf("%s: got %v, %v; want %v", tt.name, got, err, tt.want)
 		}
 	}
 }
@@ -143,8 +181,8 @@ func TestPresenceAnyFilters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		v := &models.Video{URL: "https://example.com/watch/1", Metadata: models.VideoMetadata{Raw: tt.meta}}
-		if got := checkFilters(v, tt.filters); got != tt.want {
-			t.Errorf("%s: got %v, want %v", tt.name, got, tt.want)
+		if got, err := checkFilters(v, tt.filters); err != nil || got != tt.want {
+			t.Errorf("%s: got %v, %v; want %v", tt.name, got, err, tt.want)
 		}
 	}
 }
@@ -296,15 +334,15 @@ func TestParseAndStoreJSONPrecedence(t *testing.T) {
 	}
 
 	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{JSONFilePath: path}}
-	if valid, err := parseAndStoreJSON(v); err != nil || !valid {
-		t.Fatalf("valid %t, err %v", valid, err)
+	if err := parseAndStoreJSON(v); err != nil {
+		t.Fatal(err)
 	}
 	if v.Metadata.Title != "Full" || v.Metadata.Description != "Long desc" || v.Metadata.UploadDate.Format("2006-01-02") != "2024-01-02" {
 		t.Errorf("got title %q, description %q, date %v", v.Metadata.Title, v.Metadata.Description, v.Metadata.UploadDate)
 	}
 
 	v = &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{JSONFilePath: path}, Metadata: models.VideoMetadata{Title: "Kept", Description: "Kept"}}
-	if _, err := parseAndStoreJSON(v); err != nil {
+	if err := parseAndStoreJSON(v); err != nil {
 		t.Fatal(err)
 	}
 	if v.Metadata.Title != "Kept" || v.Metadata.Description != "Kept" {

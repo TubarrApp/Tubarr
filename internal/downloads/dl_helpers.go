@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,10 +17,9 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 
-	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedfiles"
-	"github.com/TubarrApp/gocommon/sharedparsing"
 )
 
 // verifyJSONDownload verifies the JSON file downloaded and contains valid JSON data.
@@ -65,11 +63,11 @@ func verifyVideoDownload(videoPath string) error {
 }
 
 // waitForFile waits until the file is ready in the file system.
-func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) error {
+func (d *VideoDownload) waitForFile(path string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 
-		if _, err := os.Stat(filepath); err == nil { // err IS nil
+		if _, err := os.Stat(path); err == nil { // err IS nil
 			return nil
 		} else if !os.IsNotExist(err) {
 			return fmt.Errorf("unexpected error while checking file: %w", err)
@@ -81,7 +79,7 @@ func (d *VideoDownload) waitForFile(filepath string, timeout time.Duration) erro
 		case <-time.After(consts.Interval100ms):
 		}
 	}
-	return fmt.Errorf("file not ready or empty after %v: %s", timeout, filepath)
+	return fmt.Errorf("file not ready or empty after %v: %s", timeout, path)
 }
 
 // cancelVideoDownload cancels the download, typically due to user input.
@@ -147,7 +145,7 @@ func checkBotDetection(v *models.Video, cu *models.ChannelURL, db *sql.DB, input
 	}
 
 	// Avoid using the 'ChannelURL' URL, which can be the manual download value.
-	host := hostname(v.URL)
+	host := network.Hostname(v.URL)
 	switch {
 	case host == "":
 		cu.Log().E("Failed to parse URL %q after bot detection", v.URL)
@@ -171,7 +169,7 @@ func CheckIfAvoidURL(v *models.Video, cu *models.ChannelURL, db *sql.DB) error {
 		return nil
 	}
 
-	siteHost := hostname(v.URL)
+	siteHost := network.Hostname(v.URL)
 	if siteHost == "" {
 		cu.Log().E("Could not parse URL %q, will check against full URL instead", v.URL)
 		siteHost = v.URL
@@ -187,15 +185,6 @@ func CheckIfAvoidURL(v *models.Video, cu *models.ChannelURL, db *sql.DB) error {
 	return nil
 }
 
-// hostname returns a URL's hostname, or "" if it can't be parsed.
-func hostname(uri string) string {
-	parsed, err := url.Parse(uri)
-	if err != nil {
-		return ""
-	}
-	return parsed.Hostname()
-}
-
 // cookieArgs returns the channel URL's cookie file and browser cookie args, which yt-dlp combines (the file's winning where both set one).
 func cookieArgs(cu *models.ChannelURL) []string {
 	var args []string
@@ -206,26 +195,6 @@ func cookieArgs(cu *models.ChannelURL) []string {
 		args = append(args, command.CookiesFromBrowser, cu.ChanURLSettings.CookiesFromBrowser)
 	}
 	return args
-}
-
-// extraArgs splits the user's extra yt-dlp arguments, dropping them all if one is a blocked option.
-func extraArgs(extra, videoURL string) ([]string, error) {
-	if extra == "" {
-		return nil, nil
-	}
-	args, err := sharedparsing.ShellSplit(extra)
-	if err != nil {
-		return nil, err
-	}
-
-	// Refuse extra yt-dlp arguments containing disallowed options.
-	if !sharedconsts.InsecureArgumentsAllowed() {
-		if blocked, blockedKey := sharedconsts.HasBlockedOptions(args, sharedconsts.BlockedYtdlpOptions); blocked {
-			logger.Pl.W("Refusing extra YT-DLP arguments for video URL %q: Option %q is not allowed for YT-DLP.", videoURL, blockedKey)
-			return nil, nil
-		}
-	}
-	return args, nil
 }
 
 // buildVideoCodecList builds the codec preference string for yt-dlp.

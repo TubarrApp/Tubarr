@@ -34,9 +34,11 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	}
 
 	if s.FromDate != "" {
-		if s.FromDate, err = ValidateToFromDate(s.FromDate); err != nil {
+		fromDate, err := ValidateToFromDate(s.FromDate)
+		if err != nil {
 			return fmt.Errorf("invalid from date %q in settings: %w", s.FromDate, err)
 		}
+		s.FromDate = fromDate
 	}
 
 	if checkPaths && s.JSONDir != "" {
@@ -49,14 +51,18 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	}
 
 	if s.MaxFilesize != "" {
-		if s.MaxFilesize, err = ValidateMaxFilesize(s.MaxFilesize); err != nil {
+		maxFilesize, err := ValidateMaxFilesize(s.MaxFilesize)
+		if err != nil {
 			return fmt.Errorf("invalid max filesize %q in settings: %w", s.MaxFilesize, err)
 		}
+		s.MaxFilesize = maxFilesize
 	}
 	if s.MaxResolution != "" {
-		if s.MaxResolution, err = sharedvalidation.ValidateMaxResolution(s.MaxResolution); err != nil {
+		maxResolution, err := sharedvalidation.ValidateMaxResolution(s.MaxResolution)
+		if err != nil {
 			return fmt.Errorf("invalid max resolution in settings: %w", err)
 		}
+		s.MaxResolution = maxResolution
 	}
 
 	if checkPaths && s.MetaFilterMoveOpFile != "" {
@@ -73,9 +79,11 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 
 	s.Retries = max(s.Retries, 0)
 	if s.ToDate != "" {
-		if s.ToDate, err = ValidateToFromDate(s.ToDate); err != nil {
+		toDate, err := ValidateToFromDate(s.ToDate)
+		if err != nil {
 			return fmt.Errorf("invalid to date %q in settings: %w", s.ToDate, err)
 		}
+		s.ToDate = toDate
 	}
 
 	if checkPaths && s.VideoDir != "" {
@@ -88,10 +96,22 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	}
 
 	if s.YtdlpOutputExt != "" {
-		s.YtdlpOutputExt = strings.ToLower(s.YtdlpOutputExt)
-		if err = ValidateYtdlpOutputExtension(s.YtdlpOutputExt); err != nil {
-			return fmt.Errorf("invalid YT-DLP extension %q in settings: %w", s.YtdlpOutputExt, err)
+		ext, err := ValidateYtdlpOutputExtension(s.YtdlpOutputExt)
+		if err != nil {
+			return fmt.Errorf("invalid YT-DLP extension in settings: %w", err)
 		}
+		s.YtdlpOutputExt = ext
+	}
+
+	// Extra yt-dlp args.
+	if _, err = ValidateExtraYtdlpArgs(s.ExtraYTDLPVideoArgs); err != nil {
+		return fmt.Errorf("invalid extra yt-dlp video args in settings: %w", err)
+	}
+	if _, err = ValidateExtraYtdlpArgs(s.ExtraYTDLPMetaArgs); err != nil {
+		return fmt.Errorf("invalid extra yt-dlp metadata args in settings: %w", err)
+	}
+	if _, err = ValidateExtraYtdlpArgs(s.ExtraYTDLPCrawlArgs); err != nil {
+		return fmt.Errorf("invalid extra yt-dlp crawl args in settings: %w", err)
 	}
 
 	return nil
@@ -170,9 +190,11 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 
 	// GPU arguments
 	if m.TranscodeGPU != "" {
-		if _, err := ValidateGPUAcceleration(m.TranscodeGPU); err != nil {
+		gpu, err := ValidateGPUAcceleration(m.TranscodeGPU)
+		if err != nil {
 			return fmt.Errorf("invalid GPU config in Metarr Settings: %w", err)
 		}
+		m.TranscodeGPU = gpu
 	}
 	if checkPaths && m.TranscodeGPUNode != "" {
 		if _, err := sharedvalidation.ValidateAccelTypeDeviceNode(m.TranscodeGPU, m.TranscodeGPUNode); err != nil {
@@ -208,10 +230,11 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 			return fmt.Errorf("invalid output directory in Metarr settings: %w", err)
 		}
 	}
-	var err error
-	if m.MetaPurge, err = ValidatePurgeMetafiles(m.MetaPurge); err != nil {
+	metaPurge, err := ValidatePurgeMetafiles(m.MetaPurge)
+	if err != nil {
 		return fmt.Errorf("invalid metadata purge in Metarr settings: %w", err)
 	}
+	m.MetaPurge = metaPurge
 
 	// Codecs
 	if m.TranscodeAudioCodecs != nil {

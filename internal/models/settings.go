@@ -561,7 +561,7 @@ func SettingsAllZero(s *Settings) bool {
 	if s.Retries != 0 {
 		return false
 	}
-	if s.UseGlobalCookies != nil && *s.UseGlobalCookies {
+	if s.UseGlobalCookies != nil {
 		return false
 	}
 	if s.YtdlpOutputExt != "" {

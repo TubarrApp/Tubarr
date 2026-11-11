@@ -7,7 +7,48 @@ import (
 	"strconv"
 	"strings"
 	"tubarr/internal/domain/logger"
+
+	"golang.org/x/net/publicsuffix"
 )
+
+// Hostname returns a URL's hostname in lowercase, or "" if it can't be parsed.
+func Hostname(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Hostname())
+}
+
+// Domain returns the eTLD+1 hostname of a URL (e.g. "youtube.com").
+func Domain(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return RegisteredDomain(parsed.Hostname())
+}
+
+// NormalizeDomain returns the eTLD+1 of a hostname or URL as entered by a user (e.g. "www.youtube.com" → "youtube.com").
+func NormalizeDomain(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.Contains(s, "://") {
+		return Domain(s)
+	}
+	host, _, _ := strings.Cut(s, "/")
+	return RegisteredDomain(host)
+}
+
+// RegisteredDomain returns the eTLD+1 of a hostname, or the lowercased hostname if it has none.
+//
+// Lowercases first, as the public suffix list is lowercase ("EXAMPLE.CO.UK" would otherwise give "co.uk").
+func RegisteredDomain(hostname string) string {
+	hostname = strings.ToLower(hostname)
+	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
+		return domain
+	}
+	return hostname
+}
 
 // IsPrivateNetwork returns true if the URL is detected as a LAN network.
 func IsPrivateNetwork(host string) bool {

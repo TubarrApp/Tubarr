@@ -38,11 +38,7 @@ func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, cur
 	default:
 		if strings.Contains(strings.ToLower(line), "download complete") {
 			downloadedItemCount++
-
-			pct := float64(downloadedItemCount) / float64(totalItemCount) * 100
-			if pct > 100.0 {
-				pct = 100.0
-			}
+			pct = min(float64(downloadedItemCount)/float64(totalItemCount)*100, 100.0)
 			return true, totalItemCount, downloadedItemCount, pct
 		}
 	}

@@ -153,7 +153,7 @@ const (
 const (
 	WebUsername       = "web-username"
 	WebPasswordHash   = "web-password-hash"
-	WebAPIKey         = "web-api-key"
+	WebAPIKey         = "web-api-key"              //nolint:gosec // A settings key, not a credential.
 	WebAuthMode       = "web-auth-mode"            // "required", "local" or "none".
 	WebSkipLocalhost  = "web-skip-login-localhost" // "true" or "false", replaced by WebAuthMode, which it sets once.
 	WebSkipLogin      = "web-skip-login"           // JSON list of IPs and CIDR ranges.

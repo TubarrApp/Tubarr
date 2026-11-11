@@ -21,6 +21,7 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/domain/paths"
 	"tubarr/internal/models"
 	"tubarr/internal/siterules"
 
@@ -332,6 +333,47 @@ func TestCookieFileWritable(t *testing.T) {
 	}
 	if mode := info.Mode().Perm(); mode&0o600 != 0o600 {
 		t.Errorf("cookie file saved with mode %o, want it readable and writable by its owner", mode)
+	}
+}
+
+// TestURLCookiesStayTheirOwn tests that two of a channel's URLs on one host, logging in to different accounts in the
+// same crawl, each get only their own login's cookies, in their cookie files too.
+func TestURLCookiesStayTheirOwn(t *testing.T) {
+	home := paths.HomeTubarrDir
+	paths.HomeTubarrDir = t.TempDir()
+	t.Cleanup(func() { paths.HomeTubarrDir = home })
+
+	// A login page setting a cookie named after the account.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			http.SetCookie(w, &http.Cookie{Name: "account_" + r.PostFormValue("username"), Value: "1"})
+		}
+	}))
+	defer srv.Close()
+
+	cm := NewCookieManager()
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	urlCookies := func(id int64, rawURL, username string) (names []string, file string) {
+		t.Helper()
+		cu := &models.ChannelURL{ID: id, URL: rawURL, Login: models.ChannelURLAccessDetails{Username: username, Password: "p", LoginURL: srv.URL}}
+		cookies, path, err := cm.GetChannelURLCookies(t.Context(), nil, c, cu, rawURL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, cookie := range cookies {
+			names = append(names, cookie.Name)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return names, string(data)
+	}
+
+	urlCookies(1, "https://logins.example/@a", "a")
+	names, file := urlCookies(2, "https://logins.example/@b", "b")
+	if !slices.Equal(names, []string{"account_b"}) || strings.Contains(file, "account_a") {
+		t.Errorf("second URL got cookies %v, file:\n%s\nwant only its own login's", names, file)
 	}
 }
 
@@ -933,7 +975,7 @@ func TestFlareSolverrNewerSolveForDownloads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fs := models.NewFlareSolverrSolution(first.ytDLPSolve(), cm.flareSolverrResolver(t.Context(), cu, nil), cm.flareSolverrNewer(cu, nil))
+	fs := models.NewFlareSolverrSolution(first.ytDLPSolve(), cm.flareSolverrResolver(t.Context(), cu, cu.URL, nil), cm.flareSolverrNewer(cu, cu.URL, nil))
 	if got := fs.Current(); got.Gen != first.gen {
 		t.Errorf("expected the first solve with nothing newer, got gen %d", got.Gen)
 	}
@@ -1397,10 +1439,10 @@ func FuzzGenerateCookieFilePath(f *testing.F) {
 		f.Add(s, "https://rumble.com/c/x")
 		f.Add(s, "")
 	}
-	f.Fuzz(func(t *testing.T, channelName, videoURL string) {
-		p := generateCookieFilePath(channelName, videoURL)
+	f.Fuzz(func(t *testing.T, channelName, channelURL string) {
+		p := generateCookieFilePath(channelName, channelURL, "example.com")
 		dir := filepath.Dir(p)
-		if base := filepath.Clean(filepath.Dir(generateCookieFilePath("x", ""))); dir != base {
+		if base := filepath.Clean(filepath.Dir(generateCookieFilePath("x", "", ""))); dir != base {
 			t.Errorf("cookie file for channel %q is in %q, not Tubarr's directory %q", channelName, dir, base)
 		}
 	})

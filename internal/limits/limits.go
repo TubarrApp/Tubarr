@@ -3,17 +3,15 @@ package limits
 
 import (
 	"context"
-	"net/url"
-	"strings"
 	"sync"
 	"tubarr/internal/domain/logger"
-
-	"golang.org/x/net/publicsuffix"
+	"tubarr/internal/network"
 )
 
 // DomainLimitKind is the type of thing being limited (e.g. downloads, or crawls).
 type DomainLimitKind string
 
+// Kinds of thing a domain limit applies to.
 const (
 	DomainLimitKindDownload DomainLimitKind = "download"
 	DomainLimitKindCrawl    DomainLimitKind = "crawl"
@@ -76,7 +74,7 @@ func (l *DomainLimiter) Init(limits map[string]int) {
 	l.sems = make(map[string]*Semaphore)
 	for hostname, limit := range limits {
 		if limit > 0 {
-			l.sems[NormalizeDomain(hostname)] = NewSemaphore(limit)
+			l.sems[network.NormalizeDomain(hostname)] = NewSemaphore(limit)
 		}
 	}
 	logger.Pl.I("Initialized %d domain %s limit(s).", len(l.sems), l.kind)
@@ -84,7 +82,7 @@ func (l *DomainLimiter) Init(limits map[string]int) {
 
 // Set updates the limit for one domain at runtime (0 removes it). Waiters get slots the new limit frees straight away.
 func (l *DomainLimiter) Set(hostname string, limit int) {
-	hostname = NormalizeDomain(hostname)
+	hostname = network.NormalizeDomain(hostname)
 	l.semaphore(hostname).SetLimit(limit)
 	if limit > 0 {
 		logger.Pl.I("Domain %s limit for %q set to %d.", l.kind, hostname, limit)
@@ -96,7 +94,7 @@ func (l *DomainLimiter) Set(hostname string, limit int) {
 // Acquire blocks until a slot is free for rawURL's domain, or ctx is done. Call Release on the returned semaphore.
 func (l *DomainLimiter) Acquire(ctx context.Context, rawURL string) (*Semaphore, error) {
 	// Each hostname can have a different concurrency limit.
-	hostname := Hostname(rawURL)
+	hostname := network.Domain(rawURL)
 	sem := l.semaphore(hostname)
 
 	// Grab a semaphore slot.
@@ -132,34 +130,4 @@ func AcquireSlot(ctx context.Context, sem *Semaphore, limitDesc, target string) 
 	}
 	logger.Pl.D(1, "Got a %s slot for %q", limitDesc, target)
 	return nil
-}
-
-// Hostname returns the eTLD+1 hostname of a URL (e.g. "youtube.com").
-func Hostname(rawURL string) string {
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	return RegisteredDomain(parsed.Hostname())
-}
-
-// NormalizeDomain returns the eTLD+1 of a hostname or URL as entered by a user (e.g. "www.youtube.com" → "youtube.com").
-func NormalizeDomain(s string) string {
-	s = strings.TrimSpace(s)
-	if strings.Contains(s, "://") {
-		return Hostname(s)
-	}
-	host, _, _ := strings.Cut(s, "/")
-	return RegisteredDomain(host)
-}
-
-// RegisteredDomain returns the eTLD+1 of a hostname, or the lowercased hostname if it has none.
-//
-// Lowercases first, as the public suffix list is lowercase ("EXAMPLE.CO.UK" would otherwise give "co.uk").
-func RegisteredDomain(hostname string) string {
-	hostname = strings.ToLower(hostname)
-	if domain, err := publicsuffix.EffectiveTLDPlusOne(hostname); err == nil {
-		return domain
-	}
-	return hostname
 }

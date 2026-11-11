@@ -3,7 +3,6 @@ package cfg
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 	"tubarr/internal/cmd"
@@ -73,13 +72,12 @@ var rootCmd = &cobra.Command{
 				}
 			}
 
-			// Scrape config file path and FlareSolverr URL.
+			// Scrape config file path and FlareSolverr URL, unless set by flag for this run.
 			for _, k := range []string{keys.ScrapeConfigFile, keys.FlareSolverrURL} {
 				if cmd.Flags().Changed(k) {
-					if err := settingsStore.SetSetting(k, viper.GetString(k)); err != nil {
-						logger.Pl.W("Failed to persist setting %q to DB: %v", k, err)
-					}
-				} else if val, found, err := settingsStore.GetSetting(k); err != nil {
+					continue
+				}
+				if val, found, err := settingsStore.GetSetting(k); err != nil {
 					logger.Pl.W("Failed to load setting %q from DB: %v", k, err)
 				} else if found {
 					viper.Set(k, val)
@@ -108,11 +106,9 @@ var rootCmd = &cobra.Command{
 			if _, statErr := os.Stat(scrapeConfigFile); os.IsNotExist(statErr) {
 				// File not found (e.g. on a drive not yet mounted). The setting is kept for when it's back.
 				logger.Pl.W("Scrape config file %q doesn't exist, using built-in scrape rules", scrapeConfigFile)
+			} else if sites, err := parsing.ParseScrapeSelectorsFile(scrapeConfigFile); err != nil {
+				logger.Pl.E("Failed to load scrape config file, using built-in scrape rules until it's fixed: %v", err)
 			} else {
-				sites, err := parsing.ParseScrapeSelectorsFile(scrapeConfigFile)
-				if err != nil {
-					return fmt.Errorf("failed loading scrape config file: %w", err)
-				}
 				siterules.Register(sites)
 			}
 		}
@@ -140,11 +136,8 @@ func InitCommands(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 	rootCmd.PersistentFlags().Bool(keys.WebHTTPS, false, "Serve the web interface over HTTPS, overriding the Settings page (env "+sharedconsts.EnvTubarrWebHTTPS+")")
 	rootCmd.PersistentFlags().String(keys.WebTLSCert, "", "HTTPS certificate path, PEM with or without the key, overriding the Settings page (env "+sharedconsts.EnvTubarrWebTLSCert+")")
 	rootCmd.PersistentFlags().String(keys.WebTLSKey, "", "HTTPS private key path, if not in the --"+keys.WebTLSCert+" file (env "+sharedconsts.EnvTubarrWebTLSKey+")")
-	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
-		return err
-	}
 
-	// CLI flags.
+	// CLI flags, then bind every persistent flag to viper.
 	cmd.InitProgramFlags(rootCmd)
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		return err

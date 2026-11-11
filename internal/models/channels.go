@@ -27,7 +27,7 @@ type Channel struct {
 	CreatedAt            time.Time `db:"created_at"`
 	UpdatedAt            time.Time `db:"updated_at"`
 	NewVideoNotification bool      `db:"new_video_notification"`
-	LoadErr              error     // Why its saved settings failed validation on load: it can be listed, fixed or deleted, but not run.
+	LoadErr              error     // Why its saved settings or config file can't be used: it can be listed, fixed or deleted, but not run.
 }
 
 // DefaultCrawlFreq is the crawl frequency in minutes for a channel without one.

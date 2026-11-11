@@ -329,7 +329,7 @@ func StartServer(inputCtx context.Context, inputCtxCancel context.CancelFunc, st
 	}()
 
 	// Start crawl watchdog in background (respects ctx cancellation).
-	go ss.startCrawlWatchdog(inputCtx, nil)
+	go ss.startCrawlWatchdog(inputCtx)
 
 	// Wait for interrupt signal.
 	select {
@@ -383,6 +383,7 @@ func StaticHandler() (http.Handler, error) {
 		}
 
 		// Serve existing file if present
+		//nolint:gosec // Cleaned while rooted, so it stays inside webRoot.
 		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 			if filepath.Ext(fullPath) == ".html" {
 				servePage(w, r, webRoot, fullPath)
@@ -410,7 +411,7 @@ var (
 
 // servePage serves an HTML page, with its includes filled in.
 func servePage(w http.ResponseWriter, r *http.Request, webRoot, page string) {
-	content, err := os.ReadFile(page)
+	content, err := os.ReadFile(page) //nolint:gosec // A page inside webRoot.
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -429,7 +430,7 @@ func fillIncludes(webRoot string, content []byte) ([]byte, error) {
 	var includeErr error
 	content = includeRe.ReplaceAllFunc(content, func(marker []byte) []byte {
 		m := includeRe.FindSubmatch(marker)
-		partial, err := os.ReadFile(filepath.Join(webRoot, "partials", string(m[1])+".html"))
+		partial, err := os.ReadFile(filepath.Join(webRoot, "partials", string(m[1])+".html")) //nolint:gosec // Named with word characters and dashes only.
 		if err != nil {
 			includeErr = err
 			return nil

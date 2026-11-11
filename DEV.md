@@ -53,7 +53,7 @@ Code shared with Metarr (the operation and filter grammar, logging, constants) i
 | [internal/blocking](internal/blocking/) | Domains blocked after bot detection |
 | [internal/server](internal/server/) | The HTTP API and the web pages |
 | [internal/server/serverauth](internal/server/serverauth/) | Web logins, sessions, the API key, trusted proxies |
-| [internal/siterules](internal/siterules/) | Built-in and user scrape rules, matched by URL |
+| [internal/siterules](internal/siterules/) | Built-in and user scrape rules, matched by the URL's host (the most specific domain wins) |
 | [internal/state](internal/state/) | Which channels are crawling, and crawl jitter |
 | [internal/notify](internal/notify/) | Calling notification URLs |
 | [internal/file](internal/file/) | Channel config files, ops files, thumbnails |
@@ -77,7 +77,7 @@ Everything starts in [cmd/tubarr/main.go](cmd/tubarr/main.go):
 4. `file.LoadMetarrLogs` and `blocking.LoadBlockedDomains` load what the web pages show.
 5. The two queues are made, once for the life of the process: `queue.NewPostProcessingQueue`, then `queue.NewDownloadQueue`, which hands its finished downloads to the first.
 6. `startHeartbeat` ([control.go](cmd/tubarr/control.go)) runs in the background.
-7. `cfg.InitCommands` registers the flags and commands, and `cfg.Execute` runs Cobra. Before any command runs, `rootCmd.PersistentPreRunE` ([internal/cfg/cfg.go](internal/cfg/cfg.go)) loads the saved global settings from the `settings` table, unless a flag set them: log level, crawl, download and post-processing concurrency, domain limits, the scrape rules file and the FlareSolverr URL. It applies the global limits (`limits.SetGlobal*Limit`) and loads the scrape rules into `siterules`.
+7. `cfg.InitCommands` registers the flags and commands, and `cfg.Execute` runs Cobra. Before any command runs, `rootCmd.PersistentPreRunE` ([internal/cfg/cfg.go](internal/cfg/cfg.go)) loads the saved global settings from the `settings` table, unless a flag sets them for that run: log level, crawl, download and post-processing concurrency, domain limits, the scrape rules file and the FlareSolverr URL. It applies the global limits (`limits.SetGlobal*Limit`) and loads the scrape rules into `siterules`. A rules file that can't be read is logged, and the built-in rules are used until it's fixed.
 8. Then one of:
    - `--web`: `server.StartServer` runs until the process is told to stop.
    - bare `tubarr`: `times.StartupWait` (a random wait of up to 15 minutes, skipped with `-s`), then `app.CheckChannels` crawls what's due.
@@ -102,7 +102,7 @@ Everything starts in [cmd/tubarr/main.go](cmd/tubarr/main.go):
 
 1. The channel's saved JSON settings are decoded, and `validateLoadedSettings` checks them. Invalid settings don't stop the load: they set `Channel.LoadErr`, so the channel still shows on the web pages, but crawls, downloads and Metarr runs refuse it until it's fixed.
 2. With `mergeURLsWithParent` true (what every job uses), the channel's profile fills in the settings the channel leaves blank (`mergeSettings`, `mergeMetarrArgs`), the list settings are stacked (`stackLists`), and output directory tags are filled (`parsing.FillChannelOutputDirectory`).
-3. `GetChannelURLModels` ([internal/repo/channel_urls.go](internal/repo/channel_urls.go)) loads the URLs. Merged, each URL's blank settings are filled first from its own profile, then from its channel (`inheritChannelSettings`).
+3. `GetChannelURLModels` ([internal/repo/channel_urls.go](internal/repo/channel_urls.go)) loads the URLs. Merged, each URL's blank settings are filled first from its own profile, then from its channel (`inheritChannelSettings`). A URL without a JSON directory saves metadata beside its own video directory if it has one, else in the channel's JSON directory. A channel without one saves metadata in its video directory.
 
 Single values come from the nearest level that sets them: **URL → URL's profile → channel → channel's profile**. Lists (download filters, move ops, meta ops, filename ops and both filtered op lists) are added together across the levels instead, unless a level's `*ReplaceInherited` flag drops its parent's list (`withoutReplacedSettings`, `withoutReplacedMetarrArgs`). Each level's lists are kept in `Channel.Levels` and `ChannelURL.Levels`, so run-time code can add each level's ops file in its place.
 
@@ -119,7 +119,7 @@ A level can name an ops or filter file as well as typed ops. Files are read when
 
 ### Channel config files
 
-A channel can point at a YAML, TOML or JSON file holding its settings. `file.UpdateFromConfigFile` calls `ChannelStore.UpdateChannelFromConfig`, which re-reads the file (`parsing.LoadChannelInputFile`), writes any changes to the database, and reloads the model. It runs at most once per loaded model (`Channel.UpdatedFromConfig`), and is called before a crawl, in `DownloadQueue.Add`, before Run Metarr, and when the Download As dialog opens.
+A channel can point at a YAML, TOML or JSON file holding its settings. `file.UpdateFromConfigFile` calls `ChannelStore.UpdateChannelFromConfig`, which re-reads the file (`parsing.LoadChannelInputFile`), writes any changes to the database, and reloads the model. It runs at most once per loaded model (`Channel.UpdatedFromConfig`), and is called before a crawl, in `DownloadQueue.Add`, before Run Metarr, and when the Download As dialog opens. A file that can't be used sets `Channel.LoadErr`, so the channel is held back as for invalid saved settings, rather than run with what was saved before.
 
 ### Saving a channel
 
@@ -148,7 +148,7 @@ A URL is due when its crawl frequency (its own, else the channel's, `Channel.URL
 2. `times.WaitTime` waits a random few seconds, against bot detection.
 3. `Scraper.GetNewReleases` ([internal/scraper/scrape.go](internal/scraper/scrape.go)) finds the new videos:
    1. `ChannelStore.GetDownloadedOrIgnoredVideoURLs` returns the URLs the channel has already **seen** (finished, ignored, Available, Canceled, queued, downloading, or Failed with no crawl retries left), and the failed ones a crawl can still retry.
-   2. For each URL, after a wait between URLs: a per-domain crawl slot (`limits.DomainCrawls`), then cookies and any login (`CookieManager.GetChannelURLCookies`, kept in `cu.Session`).
+   2. For each URL, after a wait between URLs: a per-domain crawl slot (`limits.DomainCrawls`), then cookies and any login (`CookieManager.GetChannelURLCookies`, kept in `cu.Session`). Each URL's cookies are its own: the crawl only shares the browser cookies it read for a domain, and FlareSolverr solves for a host.
    3. `newEpisodeURLs` lists the URL's videos. Site crawl rules come first (`crawlChannelURLs`, matched with `siterules.MatchCrawl`), else yt-dlp (`ytDlpURLFetch`, running `yt-dlp --flat-playlist -J`). Seen URLs are dropped (`ignoreDownloadedURLs`).
    4. Crawl retries: on a URL that downloads automatically, each failed video found again uses one retry (`ChannelStore.AddCrawlDLRetries`), up to `consts.MaxCrawlDLRetries`. On a URL that doesn't, failed videos are left to the user (`ChannelStore.UseUpCrawlDLRetries`).
    5. Each new URL becomes a `models.Video`, in the channel's listing order, with the title, thumbnail, date and duration the listing showed.
@@ -159,7 +159,7 @@ A URL is due when its crawl frequency (its own, else the channel's, `Channel.URL
 
 ### Ignore crawls
 
-An ignore crawl marks everything a channel lists now as done, so only videos after it are new. `app.CrawlChannelIgnore` calls `GetNewReleases` with `ignoreCrawl` true, marks each video ignored (`Video.MarkVideoAsIgnored`) and stores them with `VideoStore.AddVideos`. It runs from the web's Ignore Crawl button (`handleIgnoreCrawlChannel`), when a channel is added with "ignore run" set, and from `tubarr channel ignore-crawl`.
+An ignore crawl marks everything a channel lists now as done, so only videos after it are new. `app.CrawlChannelIgnore` calls `GetNewReleases` with `ignoreCrawl` true, marks each video ignored (`Video.MarkVideoAsIgnored`) and stores them with `VideoStore.AddVideos`. It runs from the web's Ignore Crawl button (`handleIgnoreCrawlChannel`), when a channel is added with "ignore run" set, and from `tubarr channel ignore-crawl`. `tubarr channel ignore-video-url` stores one URL the same way (`ChannelStore.AddURLToIgnore`).
 
 ---
 
@@ -197,12 +197,12 @@ Read [internal/queue/doc.go](internal/queue/doc.go) for the queue's rules. This 
 
 [internal/queue/downloads.go](internal/queue/downloads.go). This is the only way a video enters the download queue, from crawls, Available, manual URLs and the terminal alike.
 
-1. `file.UpdateFromConfigFile`, then `SetLimits` on both queues with this copy of the channel.
+1. `file.UpdateFromConfigFile`, refusing the channel if that sets `Channel.LoadErr`, then `SetLimits` on both queues with this copy of the channel.
 2. For each `queue.Request`:
    1. A video with no ID yet gets the channel URL it downloads through (`DownloadQueue.channelURL`).
-   2. `VideoStore.QueueVideo` claims it in the database, setting it to Queued. A crawled video can only be claimed from Failed (a crawl retry), whereas one the user chose can be claimed from anything except Queued or Downloading. A URL the channel doesn't have yet is inserted. A video that isn't claimed is skipped.
-   3. `newDownload` stores Download As options if the request replaces them, and finds the `session` it shares with the request's other videos through the same channel URL and login, so they share cookies and the check on whether Metarr can run.
-   4. `insert` puts it in the queue (refusing a URL another channel is downloading), and `go DownloadQueue.run` starts it.
+   2. `VideoStore.QueueVideo` claims it in the database, setting it to Queued. A crawled video can only be claimed from Failed (a crawl retry), whereas one the user chose can be claimed from anything except Queued or Downloading. A URL the channel doesn't have yet is inserted. A video that isn't claimed is skipped. Claiming clears the video's ignored and finished flags, so it shows on the Available page if this download fails.
+   3. `newDownload` stores Download As options if the request replaces them, and finds the `session` it shares with the request's other videos through the same channel URL and login on the same host, so they share cookies and the check on whether Metarr can run. A session for a host other than the channel URL's leaves out the crawl's cookies and fetches its own for the video's host.
+   4. `insert` puts it in the queue and `go DownloadQueue.run` starts it. A URL another channel is downloading fails, while a video claimed again between its own download's attempts is skipped.
 
 ### Through the queue: `DownloadQueue.run`
 
@@ -211,7 +211,7 @@ Read [internal/queue/doc.go](internal/queue/doc.go) for the queue's rules. This 
 1. `PostProcessingQueue.hold` reserves the video for this download, canceling any Metarr run on it first.
 2. `DownloadQueue.process`:
    1. `acquireLane` waits for a slot in the channel's lane, or its URL's own lane (see [Concurrency](#concurrency-and-limits)).
-   2. `session.ready` runs once per session: it fetches cookies (`Scraper.ScraperURLCookies`) unless a crawl already did, and decides whether Metarr can run (`metarr.CheckInstalled`, `metarr.SkipReason`), and whether it should (`MetarrArgs.AutoPostProcess`, Post-Process After Download). The manual Post-Process path only calls `SkipReason`, so turning the setting off never blocks the buttons.
+   2. `session.ready` runs once per session: it fetches cookies for the session's host (`Scraper.ScraperURLCookies`) unless a crawl already did, and decides whether Metarr can run (`metarr.CheckInstalled`, `metarr.SkipReason`), and whether it should (`MetarrArgs.AutoPostProcess`, Post-Process After Download). The manual Post-Process path only calls `SkipReason`, so turning the setting off never blocks the buttons.
    3. Blocked domains fail fast: `downloads.CheckIfAvoidURL` and `queue.DomainBlocked`.
    4. A random bot-avoidance wait.
    5. `prepare` works out where the video goes: a directory parser for the templates, the video's Download As options if the user chose it (`VideoStore.GetVideoOverrides`, `withYtdlpOverrides`), `CheckDestinations`, the filled video and JSON directories, whether Metarr is held back (`Video.SkipMetarr`), and the channel URL's current lines in Download As ops (`metarr.FollowChannelURLOps`).
@@ -220,15 +220,16 @@ Read [internal/queue/doc.go](internal/queue/doc.go) for the queue's rules. This 
    8. `processJSON`:
       - `downloads.NewJSONDownload(...).Execute()` ([internal/downloads/json_dl_manager.go](internal/downloads/json_dl_manager.go)) runs `yt-dlp --skip-download --write-info-json`, built by `JSONDownload.buildJSONCommand`, retrying on failure.
       - `metadata.ValidateAndFilter` ([internal/metadata/validator.go](internal/metadata/validator.go)) reads the JSON (`parseAndStoreJSON`: title, date, description, duration, thumbnail), applies the download filters and date range (`handleFilters`, skipped for videos the user chose and manual URLs), and picks the filtered meta and filename ops that match.
-      - A video that fails the filters is marked ignored (`MarkVideoAsIgnored`), stored with `VideoStore.AddVideo`, has its JSON deleted, and leaves the queue as Ignored. One that passes is stored with its metadata.
+      - A video that fails the filters is marked ignored (`MarkVideoAsIgnored`), stored with `VideoStore.AddVideo`, has its JSON deleted, and leaves the queue as Ignored. One that passes is stored with its metadata. A JSON file or filter that can't be used fails the download instead.
    9. `metadata.HandleMoveOps` picks a move op's output directory if one matches (`Video.Files.MoveOpOutputDir`).
    10. `startDownloading` marks it downloading. From here, Stop Queue lets it finish.
    11. `processVideo` calls `downloads.NewVideoDownload(...).Execute()` ([internal/downloads/video_dl_manager.go](internal/downloads/video_dl_manager.go)). It tries up to `downloadAttempts` times (1 plus the Download Retries setting). Each attempt builds the command (`VideoDownload.buildVideoCommand` in [video.go](internal/downloads/video.go): output named after the JSON file, Tubarr's progress template, cookies, codecs, external downloader, extra args) and runs it (`executeVideoDownload`), reading every output line:
        - progress lines go through `downloaders.ProgressParser.Parse` to `download.SendUpdate`.
        - the line starting `command.FinalPathPrefix` gives the finished file's path.
        - bot-detection text makes `checkBotDetection` block the domain and stop without retrying.
-3. `DownloadQueue.finish` works out the final status (`finalStatus`: Finished, Ignored, Canceled or Failed with why), stores it (`storeStatus` → `DownloadStore.UpdateDownloadStatus`), and takes the video out of the queue. Ignored ones stay on the Downloads page for 5 seconds so it can show they were filtered out. When the channel's last video leaves the queue, `notify.Services` calls the notification URLs for the channel URLs that got new videos.
-4. A finished download goes on to `DownloadQueue.postProcess` (next section). Otherwise the hold is released.
+3. `DownloadQueue.finish` works out the final status (`finalStatus`: Finished, Ignored, Canceled or Failed with why), stores it (`storeStatus` → `DownloadStore.UpdateDownloadStatus`), and takes the video out of the queue. Ignored ones stay on the Downloads page for 5 seconds so it can show they were filtered out.
+4. A finished download goes on to `DownloadQueue.postProcess` (next section).
+5. `notifyIfLast` counts the video's run as over, then the hold is released. Once none of the channel's videos are downloading or post-processing, `notify.Services` calls the notification URLs for the channel URLs that got new videos. So they're called after Metarr has placed the files, or when the downloads end if Metarr is held back.
 
 ### What the Downloads page shows
 
@@ -250,11 +251,11 @@ Read [internal/queue/doc.go](internal/queue/doc.go) for the queue's rules. This 
      2. `runMetarr` runs it through `runWithProgress`, which keeps FFmpeg's progress for the Post-processing page (`metarr.VideoProgress`). `Video.StoreFilenamesFromMetarr` reads where Metarr left the files from its "final video path:" and "final json path:" lines.
      3. `finishMetafile` re-reads the JSON Metarr left (`metadata.RefreshFromMetarr`), so titles changed by meta ops are stored, then deletes it if the purge setting says so.
    - The video's `MetarrStatus` becomes `done`, `failed` (with `MetarrError`), or `pending` if the run was canceled.
-3. `completeAndStoreVideo` marks it finished (`Video.MarkVideoAsComplete`), stores it (`VideoStore.UpdateVideo`) and sets the notification dot.
+3. `completeAndStoreVideo` marks it finished (`Video.MarkVideoAsComplete`), stores it (`VideoStore.UpdateVideo`) and sets the notification dot. `addNewVideo` then records its channel URL for the notification URLs (step 5 above).
 
 ### Running Metarr later
 
-The Post-Process buttons on a channel's videos page (Post-Process pending, Post-Process Selected, Edit & Post-Process Selected) post to `handleRunMetarr`, which can save new Download As options for the videos first (`VideoStore.SetVideoOverrides`), then calls `PostProcessingQueue.RunMetarr(ctx, channel, videoIDs, rerun)`. That loads the videos (`VideoStore.GetVideosAwaitingMetarr`) and, for each, `runVideoMetarr`: it re-reads the JSON for the filtered ops and move ops, then calls `execMetarr` as above. The terminal's `tubarr channel run-metarr` calls the same.
+The Post-Process buttons on a channel's videos page (Post-Process pending, Post-Process Selected, Edit & Post-Process Selected) post to `handleRunMetarr`, which can save new Download As options for the videos first (`VideoStore.SetVideoOverrides`), then calls `PostProcessingQueue.RunMetarr(ctx, channel, videoIDs, rerun)`. That loads the videos (`VideoStore.GetVideosAwaitingMetarr`) and, for each, `runVideoMetarr`: it re-reads the JSON for the filtered ops and move ops, then calls `execMetarr` as above. The terminal's `tubarr channel run-metarr` calls the same. Once the run ends, `notify.Services` calls the notification URLs again for the channel URLs whose videos Metarr finished, as it may have moved their files.
 
 A video is in at most one queue: `hold` cancels a Metarr run when the video is downloaded again, and `RunMetarr` skips videos a download holds.
 
@@ -300,7 +301,7 @@ Lanes ([internal/queue/queue.go](internal/queue/queue.go)) give each channel a s
 ## Bot detection and blocked domains
 
 - `downloads.checkBotDetection` ([dl_helpers.go](internal/downloads/dl_helpers.go)) looks for "not a bot" or "not a robot" in a failed yt-dlp run's error. If found, `blocking.BlockDomain` ([internal/blocking/blocking.go](internal/blocking/blocking.go)) blocks the domain, and the download stops without retrying.
-- Blocks are by registered domain (`limits.RegisteredDomain`, so `www.youtube.com` and `youtube.com` are one) and by **block context**: unauthenticated, cookies, or login (`blocking.GetBlockContext`). A block on unauthenticated requests doesn't stop a channel URL that logs in.
+- Blocks are by registered domain (`network.RegisteredDomain`, so `www.youtube.com` and `youtube.com` are one) and by **block context**: unauthenticated, cookies, or login (`blocking.GetBlockContext`). A block on unauthenticated requests doesn't stop a channel URL that logs in.
 - `downloads.CheckIfAvoidURL` checks before each download attempt, and `queue.DomainBlocked` before crawling and downloading.
 - Blocks expire (`blocking.GetTimeoutForDomain`). `blocking.CleanExpiredBlocks` runs before crawls. The Blocked Domains page lifts one with `handleUnblockDomain`, and the terminal with `tubarr channel unblock`.
 

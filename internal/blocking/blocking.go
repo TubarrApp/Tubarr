@@ -12,8 +12,8 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/vars"
-	"tubarr/internal/limits"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 )
 
 // ParseBlockContext returns the block context named s, or "" (every context) if s is blank.
@@ -51,7 +51,7 @@ func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) erro
 	now := time.Now()
 
 	// Normalize domain to eTLD+1.
-	normalizedDomain := limits.RegisteredDomain(domain)
+	normalizedDomain := network.RegisteredDomain(domain)
 
 	// Update in-memory state.
 	vars.BlockedDomainsMutex.Lock()
@@ -88,7 +88,7 @@ func BlockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) erro
 
 // AddBlockedVideo adds a video to the list of blocked videos for a given context.
 func AddBlockedVideo(db *sql.DB, hostname string, blockContext vars.BlockContext, videoID, channelID int64) error {
-	normalizedDomain := limits.RegisteredDomain(hostname)
+	normalizedDomain := network.RegisteredDomain(hostname)
 
 	vars.BlockedDomainsMutex.Lock()
 	defer vars.BlockedDomainsMutex.Unlock()
@@ -135,7 +135,7 @@ func AddBlockedVideo(db *sql.DB, hostname string, blockContext vars.BlockContext
 //
 // Returns true if blocked and timeout has not expired.
 func IsBlocked(domain string, blockContext vars.BlockContext) (isBlocked bool, blockedAt time.Time, remainingTime time.Duration) {
-	normalizedDomain := limits.RegisteredDomain(domain)
+	normalizedDomain := network.RegisteredDomain(domain)
 
 	vars.BlockedDomainsMutex.RLock()
 	defer vars.BlockedDomainsMutex.RUnlock()
@@ -165,7 +165,7 @@ func IsBlocked(domain string, blockContext vars.BlockContext) (isBlocked bool, b
 
 // UnblockDomain unblocks a domain for a specific context (or all contexts if context is empty).
 func UnblockDomain(db *sql.DB, domain string, blockContext vars.BlockContext) error {
-	normalizedDomain := limits.RegisteredDomain(domain)
+	normalizedDomain := network.RegisteredDomain(domain)
 
 	vars.BlockedDomainsMutex.Lock()
 	defer vars.BlockedDomainsMutex.Unlock()

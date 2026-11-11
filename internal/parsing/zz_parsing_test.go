@@ -11,6 +11,7 @@ import (
 	"time"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/enums"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/file"
 	"tubarr/internal/models"
@@ -470,6 +471,25 @@ func TestParseScrapeSelectorsFileNeedsSites(t *testing.T) {
 	sites, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, "empty.yaml", "sites: []\n"))
 	if err != nil || len(sites) != 0 {
 		t.Errorf("sites: [] = %d sites, %v; want 0, nil", len(sites), err)
+	}
+}
+
+// TestParseScrapeSelectorsFileDomain tests a site's domain must be a hostname, and is read lowercase without dots around it.
+func TestParseScrapeSelectorsFileDomain(t *testing.T) {
+	site := func(domain string) string {
+		return "sites:\n  - domain: '" + domain + "'\n    flaresolverr: true\n"
+	}
+	for _, bad := range []string{"https://example.com", "example.com/videos", "example.com:8080"} {
+		if _, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, "rules.yaml", site(bad))); err == nil {
+			t.Errorf("domain %q was accepted", bad)
+		}
+	}
+	sites, err := ParseScrapeSelectorsFile(writeScrapeConfig(t, "rules.yaml", site(" .Example.COM. ")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sites) != 1 || sites[0].Domain != "example.com" {
+		t.Errorf("sites = %+v, want one for example.com", sites)
 	}
 }
 
@@ -966,5 +986,18 @@ func TestConvertConfigValueRejectsMapsAndLists(t *testing.T) {
 		if got, ok := convertConfigValue[string](v); !ok || got != want {
 			t.Errorf("convertConfigValue[string](%#v) = %q, %v, want %q", v, got, ok, want)
 		}
+	}
+}
+
+// TestTOMLWholeNumberForDecimalSetting tests a whole number in a TOML file is read for a decimal setting, as TOML
+// gives whole numbers as int64.
+func TestTOMLWholeNumberForDecimalSetting(t *testing.T) {
+	v := viper.New()
+	v.SetConfigType("toml")
+	if err := v.ReadConfig(strings.NewReader(keys.MMaxCPU + " = 50\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := GetConfigValue[float64](v, keys.MMaxCPU); !ok || got != 50 {
+		t.Errorf("GetConfigValue = %v, %t, want 50", got, ok)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/TubarrApp/gocommon/abstractions"
 	"github.com/TubarrApp/gocommon/logging"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtemplates"
 	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
@@ -128,14 +129,14 @@ func ValidateChannelURL(u string) error {
 	return nil
 }
 
-// ValidateYtdlpOutputExtension validates the merge-output-format compatibility of the inputted extension.
-func ValidateYtdlpOutputExtension(e string) error {
-	if e == "" || e == sharedconsts.ExtSame {
-		return nil
-	}
+// ValidateYtdlpOutputExtension returns the merge-output-format extension e names, or an error if yt-dlp can't merge to it.
+func ValidateYtdlpOutputExtension(e string) (string, error) {
 	e = strings.TrimSpace(e)
 	e = strings.TrimPrefix(e, ".")
 	e = strings.ToLower(e)
+	if e == "" || e == sharedconsts.ExtSame {
+		return e, nil
+	}
 
 	if !slices.Contains([]string{
 		"avi",
@@ -145,10 +146,24 @@ func ValidateYtdlpOutputExtension(e string) error {
 		"mp4",
 		"webm",
 	}, e) {
-		return fmt.Errorf("yt-dlp output extension %v is invalid or not supported", e)
+		return "", fmt.Errorf("yt-dlp output extension %v is invalid or not supported", e)
 	}
 
-	return nil
+	return e, nil
+}
+
+// ValidateExtraYtdlpArgs splits extra yt-dlp args, refusing them if one is a blocked option.
+func ValidateExtraYtdlpArgs(a string) ([]string, error) {
+	args, err := sharedparsing.ShellSplit(a)
+	if err != nil {
+		return nil, err
+	}
+	if !sharedconsts.InsecureArgumentsAllowed() {
+		if blocked, option := sharedconsts.HasBlockedOptions(args, sharedconsts.BlockedYtdlpOptions); blocked {
+			return nil, fmt.Errorf("option %q is not allowed", option)
+		}
+	}
+	return args, nil
 }
 
 // ValidateLoggingLevel checks and validates the debug level.

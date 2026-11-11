@@ -338,6 +338,17 @@ func TestSettingsAllZeroCodecs(t *testing.T) {
 	}
 }
 
+// TestSettingsAllZeroExplicitNo tests that a yes/no setting chosen as No still counts as set, so it isn't dropped on save.
+func TestSettingsAllZeroExplicitNo(t *testing.T) {
+	no := false
+	if SettingsAllZero(&Settings{UseGlobalCookies: &no}) {
+		t.Error("Use Global Cookies set to No reported as all zero")
+	}
+	if SettingsAllZero(&Settings{AutoDownload: &no}) {
+		t.Error("Auto Download set to No reported as all zero")
+	}
+}
+
 // TestChildSettingsMatchParentLists tests that identical lists of several different entries match.
 func TestChildSettingsMatchParentLists(t *testing.T) {
 	filters := []Filters{

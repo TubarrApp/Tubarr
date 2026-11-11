@@ -38,15 +38,16 @@ func Size(f string) (s int64) {
 	return fInfo.Size()
 }
 
-// UpdateFromConfigFile loads in config file data.
+// UpdateFromConfigFile applies the channel's config file, once per loaded model, setting its LoadErr if the file can't be used.
 func UpdateFromConfigFile(cs contracts.ChannelStore, c *models.Channel) {
+	if c.ChannelConfigFile == "" || c.UpdatedFromConfig {
+		return
+	}
+	c.UpdatedFromConfig = true
 
-	if c.ChannelConfigFile != "" && !c.UpdatedFromConfig {
-		if err := cs.UpdateChannelFromConfig(c); err != nil {
-			c.Log().E("failed to update from config file %q: %v", c.ChannelConfigFile, err)
-		}
-
-		c.UpdatedFromConfig = true
+	// A file that can't be used holds the channel back, rather than letting it run on its saved settings.
+	if err := cs.UpdateChannelFromConfig(c); err != nil && c.LoadErr == nil {
+		c.LoadErr = fmt.Errorf("channel %q's config file %q can't be used, fix it or remove it from the channel: %w", c.Name, c.ChannelConfigFile, err)
 	}
 }
 

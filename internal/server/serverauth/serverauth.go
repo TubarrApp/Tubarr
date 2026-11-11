@@ -33,8 +33,8 @@ const (
 	sessionLifetime = 30 * 24 * time.Hour
 	sessionRenewAt  = 29 * 24 * time.Hour // Renew sessions with less than this left, at most about once a day.
 
-	apiKeyHeader   = "X-Api-Key"
-	logTokenHeader = "X-Tubarr-Log-Token"
+	apiKeyHeader   = "X-Api-Key"          //nolint:gosec // A header name, not a credential.
+	logTokenHeader = "X-Tubarr-Log-Token" //nolint:gosec // A header name, not a credential.
 
 	// MetarrLogsPath is the endpoint Metarr posts logs to, authorized by the log token alone.
 	MetarrLogsPath = "/metarr-logs"
@@ -569,6 +569,7 @@ func (m *Manager) endSession(w http.ResponseWriter, r *http.Request) {
 			logger.Pl.W("Failed to delete web session: %v", err)
 		}
 	}
+	//nolint:gosec // Deletes the session cookie, which needs no Secure flag.
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    "",
@@ -588,6 +589,7 @@ func (m *Manager) setSessionCookie(w http.ResponseWriter, r *http.Request, token
 			m.mu.RUnlock()
 		}
 	}
+	//nolint:gosec // Secure only over HTTPS, as browsers refuse Secure cookies sent over plain HTTP.
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    token,

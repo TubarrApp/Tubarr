@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 	"tubarr/internal/domain/logger"
+	"tubarr/internal/network"
 
 	"github.com/TubarrApp/gocommon/logging"
 )
@@ -46,7 +47,7 @@ func FuzzDomainLimiter(f *testing.F) {
 
 		// Holders over a lowered limit keep their slots, so only an unchanging limit on the URL's domain is a hard cap.
 		fixedLimit := 0
-		if len(changes) == 0 && Hostname(rawURL) == NormalizeDomain(hostname) {
+		if len(changes) == 0 && network.Domain(rawURL) == network.NormalizeDomain(hostname) {
 			fixedLimit = int(limit % 5)
 		}
 
@@ -99,8 +100,8 @@ func FuzzDomainLimiter(f *testing.F) {
 		l.mu.Unlock()
 
 		// Lookups use the same hostname form the limits are stored under.
-		if h := Hostname(rawURL); h != strings.ToLower(h) {
-			t.Errorf("Hostname(%q) = %q is not lowercase", rawURL, h)
+		if h := network.Domain(rawURL); h != strings.ToLower(h) {
+			t.Errorf("Domain(%q) = %q is not lowercase", rawURL, h)
 		}
 	})
 }
@@ -345,38 +346,6 @@ func TestDomainLimiterConcurrentStress(t *testing.T) {
 		})
 	}
 	wg.Wait()
-}
-
-// TestNormalizeDomain tests that hostnames and URLs as users enter them reduce to the domain limits are looked up by.
-func TestNormalizeDomain(t *testing.T) {
-	tests := map[string]string{
-		"youtube.com":                      "youtube.com",
-		"www.YouTube.com":                  "youtube.com",
-		" m.youtube.com ":                  "youtube.com",
-		"https://www.youtube.com/@channel": "youtube.com",
-		"www.bbc.co.uk/iplayer":            "bbc.co.uk",
-		"WWW.EXAMPLE.CO.UK":                "example.co.uk", // Uppercase suffixes must still match the list.
-		"https://Example.Co.Uk/video":      "example.co.uk",
-	}
-	for in, want := range tests {
-		if got := NormalizeDomain(in); got != want {
-			t.Errorf("NormalizeDomain(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// TestRegisteredDomain tests hosts reduce to their registered domain whatever their case.
-func TestRegisteredDomain(t *testing.T) {
-	for in, want := range map[string]string{
-		"www.youtube.com":   "youtube.com",
-		"WWW.YouTube.COM":   "youtube.com",
-		"www.bbc.co.uk":     "bbc.co.uk",
-		"WWW.EXAMPLE.CO.UK": "example.co.uk",
-	} {
-		if got := RegisteredDomain(in); got != want {
-			t.Errorf("RegisteredDomain(%q) = %q, want %q", in, got, want)
-		}
-	}
 }
 
 // ******************************** Semaphore *****************************************************************************************

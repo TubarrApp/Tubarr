@@ -9,11 +9,61 @@ import (
 	"tubarr/internal/domain/logger"
 )
 
+// ******************************** Domains *******************************************************************************************
+
 // TestMain sets up the test environment for the net package.
 func TestMain(m *testing.M) {
 	logger.Pl.Console = io.Discard
 	os.Exit(m.Run())
 }
+
+// TestHostname tests a URL's host comes back lowercase without its port, and a URL that can't be parsed gives "".
+func TestHostname(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://WWW.Example.COM/v/1": "www.example.com",
+		"http://Example.com:8080/x":   "example.com",
+		"https://[::1]:443/":          "::1",
+		"://no-scheme":                "",
+	} {
+		if got := Hostname(in); got != want {
+			t.Errorf("Hostname(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestNormalizeDomain tests that hostnames and URLs as users enter them reduce to the domain limits are looked up by.
+func TestNormalizeDomain(t *testing.T) {
+	tests := map[string]string{
+		"youtube.com":                      "youtube.com",
+		"www.YouTube.com":                  "youtube.com",
+		" m.youtube.com ":                  "youtube.com",
+		"https://www.youtube.com/@channel": "youtube.com",
+		"www.bbc.co.uk/iplayer":            "bbc.co.uk",
+		"WWW.EXAMPLE.CO.UK":                "example.co.uk", // Uppercase suffixes must still match the list.
+		"https://Example.Co.Uk/video":      "example.co.uk",
+	}
+	for in, want := range tests {
+		if got := NormalizeDomain(in); got != want {
+			t.Errorf("NormalizeDomain(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestRegisteredDomain tests hosts reduce to their registered domain whatever their case.
+func TestRegisteredDomain(t *testing.T) {
+	for in, want := range map[string]string{
+		"www.youtube.com":   "youtube.com",
+		"WWW.YouTube.COM":   "youtube.com",
+		"www.bbc.co.uk":     "bbc.co.uk",
+		"WWW.EXAMPLE.CO.UK": "example.co.uk",
+	} {
+		if got := RegisteredDomain(in); got != want {
+			t.Errorf("RegisteredDomain(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// ******************************** Private networks **********************************************************************************
 
 // FuzzIsPrivateNetwork tests that IsPrivateNetwork agrees with the standard library's classification for every IP
 // address, in each form the notifier passes it (a URL's Host: host, host:port or [ipv6]:port). Only IP addresses are

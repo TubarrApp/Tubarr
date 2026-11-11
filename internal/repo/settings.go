@@ -3,6 +3,7 @@ package repo
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -33,7 +34,7 @@ func (ss *TubarrSettingsStore) GetSetting(key string) (string, bool, error) {
 		fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", consts.QSettingsVal, consts.DBSettings, consts.QSettingsKey),
 		key,
 	).Scan(&val)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
 	if err != nil {

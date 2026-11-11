@@ -15,6 +15,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 	"tubarr/internal/notify"
 	"tubarr/internal/parsing"
 	"tubarr/internal/scraper"
@@ -49,7 +50,8 @@ type DownloadQueue struct {
 	downloads map[int64]*download // By video ID.
 	urls      map[string]int64    // Video IDs by URL, so two channels never download the same video at once.
 	stopping  map[int64]bool      // Channels stopped while they still have videos in the queue.
-	newVideos map[int64][]string  // Channel URLs that got new videos, by channel, notified once the channel's queue empties.
+	running   map[int64]int       // Videos each channel has downloading or post-processing.
+	newVideos map[int64][]string  // Channel URLs that got new videos, by channel, notified once none of its videos are running.
 	changed   chan struct{}       // Closed and replaced whenever a video leaves the queue.
 }
 
@@ -74,16 +76,18 @@ type download struct {
 	done        bool // Finished, and only still shown on the Downloads page.
 }
 
-// sessionKey identifies the channel URL, and any login, that videos in one request download through.
+// sessionKey identifies the channel URL, any login, and the host that videos in one request download through.
 type sessionKey struct {
 	channelURLID int64
 	auth         models.ManualAuth
+	host         string
 }
 
-// session is what the videos of one request share when they download through the same channel URL and login.
+// session is what the videos of one request share when they download through the same channel URL and login, from one host.
 type session struct {
 	once       sync.Once
 	cu         *models.ChannelURL
+	videoURL   string // Its first video's URL, whose host its cookies are for.
 	scraper    *scraper.Scraper
 	skipMetarr models.SkipMetarr
 	err        error
@@ -98,6 +102,7 @@ func NewDownloadQueue(ctx context.Context, s contracts.Store, postProcessing *Po
 		downloads:      make(map[int64]*download),
 		urls:           make(map[string]int64),
 		stopping:       make(map[int64]bool),
+		running:        make(map[int64]int),
 		newVideos:      make(map[int64][]string),
 		changed:        make(chan struct{}),
 	}
@@ -112,14 +117,17 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 	}
 	vs := q.store.VideoStore()
 
-	// Load the channel's config file settings.
+	// Load the channel's config file settings, holding back its videos if they can't be used.
 	file.UpdateFromConfigFile(q.store.ChannelStore(), c)
+	if c.LoadErr != nil {
+		return nil, c.LoadErr
+	}
 
 	// Its videos wait for slots under its current limits, in both queues.
 	q.SetLimits(c)
 	q.postProcessing.SetLimits(c)
 
-	// Videos sharing a channel URL and login share its cookies.
+	// Videos sharing a channel URL, login and host share their cookies.
 	sessions := make(map[sessionKey]*session)
 
 	var errs []error
@@ -158,15 +166,26 @@ func (q *DownloadQueue) Add(c *models.Channel, reqs ...Request) (queued []*model
 		d, err := q.newDownload(c, r, sessions)
 		switch {
 		case err != nil:
-		case d == nil: // Nil guard.
+			// Exit switch (will log error)
+		case d == nil:
+			// Nil guard.
 			err = fmt.Errorf("video %q: newDownload returned nil without an error", v.URL)
-		case !q.insert(d):
-			err = fmt.Errorf("video %q is already being downloaded for another channel", v.URL)
 		default:
-			// Begin download.
-			queued = append(queued, v)
-			go q.run(d)
-			continue
+			takenBy, inserted := q.insert(d)
+			if inserted {
+				// Begin download.
+				queued = append(queued, v)
+				go q.run(d)
+				continue
+			}
+			d.cancel(nil)
+
+			// Claimed again while its own download is between attempts, which carries on.
+			if takenBy == v.ID {
+				c.Log().I("Video %s is already queued or downloading, skipping", name)
+				continue
+			}
+			err = fmt.Errorf("video %q is already being downloaded for another channel", v.URL)
 		}
 		c.Log().E("Not downloading video %q: %v", v.URL, err)
 		q.storeStatus(v, consts.DLStatusFailed, 0, err)
@@ -318,22 +337,26 @@ func (q *DownloadQueue) newDownload(c *models.Channel, r Request, sessions map[s
 		return nil, err
 	}
 
-	// Videos sharing a channel URL and login share a session.
-	key := sessionKey{channelURLID: cu.ID}
+	// Videos sharing a channel URL, login and host share a session.
+	host := network.Hostname(v.URL)
+	key := sessionKey{channelURLID: cu.ID, host: host}
 	if r.Auth != nil {
 		key.auth = *r.Auth
 	}
 	s := sessions[key]
 	if s == nil {
-		sessionCU := cu
+		sessionCU := *cu // A copy, so the session's login and cookies aren't kept on the channel's model.
 		if r.Auth != nil {
-			withAuth := *cu // A copy, so the login isn't kept on the channel's model.
-			withAuth.Login.Username = r.Auth.Username
-			withAuth.Login.Password = r.Auth.Password
-			withAuth.Login.LoginURL = r.Auth.LoginURL
-			sessionCU = &withAuth
+			sessionCU.Login.Username = r.Auth.Username
+			sessionCU.Login.Password = r.Auth.Password
+			sessionCU.Login.LoginURL = r.Auth.LoginURL
 		}
-		s = &session{cu: sessionCU, scraper: scraper.New()}
+
+		// A crawl's cookies are for the channel URL's own host, so videos on another host fetch their own.
+		if host != network.Hostname(cu.URL) {
+			sessionCU.Session = models.ChannelURLSession{}
+		}
+		s = &session{cu: &sessionCU, videoURL: v.URL, scraper: scraper.New()}
 		sessions[key] = s
 	}
 
@@ -365,16 +388,17 @@ func (q *DownloadQueue) channelURL(c *models.Channel, channelURLID int64) (*mode
 	return ManualChannelURL(q.store.ChannelStore(), c, channelURLID)
 }
 
-// insert puts a download in the queue, returning false if another channel's download has the same video URL.
-func (q *DownloadQueue) insert(d *download) bool {
+// insert puts a download in the queue, or returns the ID of the video already downloading its URL.
+func (q *DownloadQueue) insert(d *download) (takenBy int64, inserted bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if _, taken := q.urls[d.video.URL]; taken {
-		return false
+	if id, taken := q.urls[d.video.URL]; taken {
+		return id, false
 	}
 	q.downloads[d.video.ID] = d
 	q.urls[d.video.URL] = d.video.ID
-	return true
+	q.running[d.c.ID]++
+	return 0, true
 }
 
 // finish stores the video's final download status and takes it out of the queue.
@@ -398,15 +422,8 @@ func (q *DownloadQueue) finish(d *download, err error) {
 		delete(q.downloads, d.video.ID)
 	}
 
-	// The channel's notification services are told once its queue empties.
-	if status == consts.DLStatusCompleted && !slices.Contains(q.newVideos[d.c.ID], d.cu.URL) {
-		q.newVideos[d.c.ID] = append(q.newVideos[d.c.ID], d.cu.URL)
-	}
-	var notifyURLs []string
 	if !q.hasChannel(d.c.ID) {
 		delete(q.stopping, d.c.ID)
-		notifyURLs = q.newVideos[d.c.ID]
-		delete(q.newVideos, d.c.ID)
 	}
 
 	close(q.changed)
@@ -414,14 +431,36 @@ func (q *DownloadQueue) finish(d *download, err error) {
 	q.mu.Unlock()
 
 	d.cancel(nil)
+}
 
-	// Sent in the background, so a slow service doesn't hold up post-processing.
-	if len(notifyURLs) > 0 {
-		go func() {
-			if err := notify.Services(q.store.ChannelStore(), d.c, notifyURLs); err != nil {
-				d.c.Log().E("Failed to notify services for channel %q: %v", d.c.Name, err)
-			}
-		}()
+// addNewVideo records that the download's channel URL got a new video, for its channel's notification services.
+func (q *DownloadQueue) addNewVideo(d *download) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if !slices.Contains(q.newVideos[d.c.ID], d.cu.URL) {
+		q.newVideos[d.c.ID] = append(q.newVideos[d.c.ID], d.cu.URL)
+	}
+}
+
+// notifyIfLast ends one of the channel's running videos, telling its notification services about its new videos once none are left.
+func (q *DownloadQueue) notifyIfLast(c *models.Channel) {
+	q.mu.Lock()
+	q.running[c.ID]--
+	if q.running[c.ID] > 0 {
+		q.mu.Unlock()
+		return
+	}
+	delete(q.running, c.ID)
+	urls := q.newVideos[c.ID]
+	delete(q.newVideos, c.ID)
+	q.mu.Unlock()
+
+	// Tell the services.
+	if len(urls) == 0 {
+		return
+	}
+	if err := notify.Services(q.store.ChannelStore(), c, urls); err != nil {
+		c.Log().E("Failed to notify services for channel %q: %v", c.Name, err)
 	}
 }
 
@@ -540,7 +579,7 @@ func (s *session) ready(ctx context.Context, cs contracts.ChannelStore, c *model
 	s.once.Do(func() {
 		// Cookies a crawl already fetched are reused.
 		if s.cu.Session.CookiePath == "" {
-			s.cu.Session.Cookies, s.cu.Session.CookiePath, s.err = s.scraper.ScraperURLCookies(ctx, cs, c, s.cu)
+			s.cu.Session.Cookies, s.cu.Session.CookiePath, s.err = s.scraper.ScraperURLCookies(ctx, cs, c, s.cu, s.videoURL)
 		}
 
 		// Metarr is held back if it can't run or an ops file can't be used, leaving videos pending for Run Metarr.

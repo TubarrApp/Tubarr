@@ -68,6 +68,10 @@ func CheckChannels(ctx context.Context, s contracts.Store, dq *queue.DownloadQue
 
 		// The config file may change what's due, or pause the channel.
 		file.UpdateFromConfigFile(s.ChannelStore(), c)
+		if c.LoadErr != nil {
+			c.Log().W("Skipping crawl: %v", c.LoadErr)
+			continue
+		}
 
 		// Ignore channel if paused.
 		if c.ChanSettings.Paused {
@@ -170,6 +174,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 	if c == nil {
 		return false, errors.New("channel cannot be nil")
 	}
+	file.UpdateFromConfigFile(s.ChannelStore(), c)
 	if c.LoadErr != nil {
 		return false, c.LoadErr
 	}
@@ -350,15 +355,15 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 	if c == nil {
 		return errors.New("channel cannot be nil")
 	}
-	if c.LoadErr != nil {
-		return c.LoadErr
-	}
 	cs := s.ChannelStore()
 
 	// Global domain blocking is checked per-URL during scraping.
 
 	// Load in config file.
 	file.UpdateFromConfigFile(cs, c)
+	if c.LoadErr != nil {
+		return c.LoadErr
+	}
 
 	// Get new releases.
 	scrape := scraper.New()

@@ -826,11 +826,11 @@ func (vs *VideoStore) QueueVideo(channelID int64, v *models.Video, byUser bool) 
 		return false, nil // Already queued or downloading, not a crawl retry, or in another channel.
 	}
 
-	// A video chosen again is no longer ignored, so it returns to Available if this download fails.
+	// A video chosen again is no longer ignored or finished, so it returns to Available if this download fails.
 	//nolint:gosec // SQL identifiers are trusted constants.
-	ignoredQuery := fmt.Sprintf("UPDATE %s SET %s = 0 WHERE %s = ?", consts.DBVideos, consts.QVidIgnored, consts.QVidID)
+	ignoredQuery := fmt.Sprintf("UPDATE %s SET %s = 0, %s = 0 WHERE %s = ?", consts.DBVideos, consts.QVidIgnored, consts.QVidFinished, consts.QVidID)
 	if _, err := tx.Exec(ignoredQuery, v.ID); err != nil {
-		return false, fmt.Errorf("failed to clear ignored for video %d: %w", v.ID, err)
+		return false, fmt.Errorf("failed to clear ignored and finished for video %d: %w", v.ID, err)
 	}
 
 	//nolint:gosec // SQL identifiers are trusted constants.
@@ -885,7 +885,6 @@ func (vs *VideoStore) ReconnectOrphanedVideos() (reconnected int64, err error) {
 
 	targets := map[channelURLKey]*target{} // nil where two of a channel's URLs match the same address.
 
-	//nolint:gosec // SQL identifiers are trusted constants.
 	rows, err := tx.Query(
 		//nolint:gosec // SQL identifiers are trusted constants.
 		fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s = 0",

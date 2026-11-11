@@ -1837,6 +1837,24 @@ func TestCrawlButtonReadsConfigFile(t *testing.T) {
 	}
 }
 
+// TestBrokenConfigFileHoldsCrawlsBack tests a config file that can't be read stops the scheduled crawl and the Crawl
+// button, rather than crawling with the saved settings.
+func TestBrokenConfigFileHoldsCrawlsBack(t *testing.T) {
+	id, runs, cfg := crawlConfigChannel(t, "BrokenConfig")
+	if err := os.WriteFile(cfg, []byte("channel-name: [unclosed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	crawlConfigStore(t).crawlDueChannels(t.Context(), map[int64]string{})
+	if w := sendRequest(t, http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/crawl", id), "", ""); w.Code != http.StatusConflict {
+		t.Errorf("crawl = %d %s, want %d", w.Code, w.Body.String(), http.StatusConflict)
+	}
+	active, _ := state.CrawlingChannels()
+	if _, err := os.Stat(runs); err == nil || slices.Contains(active, id) {
+		t.Error("the channel was crawled with a config file that can't be read")
+	}
+}
+
 // ******************************** Follow ops ****************************************************************************************
 
 // TestEditAndRunFollowsChannelURLOps tests Edit & Run keeps the channel URL's ops with a video's, so reopening it fills

@@ -226,10 +226,10 @@ type ManualAuth struct {
 
 // StoreFilenamesFromMetarr stores filenames after Metarr completion.
 func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
-	lines := strings.Split(cmdOut, "\n")
-	if len(lines) == 0 {
+	if strings.TrimSpace(cmdOut) == "" {
 		return fmt.Errorf("metarr did not return any lines for %q, could not grab final file paths", v.URL)
 	}
+	lines := strings.Split(cmdOut, "\n")
 
 	// Find file path lines.
 	gotVideo := false

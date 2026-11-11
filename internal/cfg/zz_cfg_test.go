@@ -13,6 +13,7 @@ import (
 	"testing"
 	"tubarr/internal/app"
 	"tubarr/internal/cmd"
+	"tubarr/internal/contracts"
 	"tubarr/internal/database"
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/keys"
@@ -21,9 +22,11 @@ import (
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
 	"tubarr/internal/repo"
+	"tubarr/internal/siterules"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 // ******************************** Available *****************************************************************************************
@@ -56,6 +59,77 @@ func TestParsePicks(t *testing.T) {
 		if !tt.wantErr && !slices.Equal(got, tt.want) {
 			t.Errorf("parsePicks(%q) = %v, want %v", tt.input, got, tt.want)
 		}
+	}
+}
+
+// ******************************** Global settings ***********************************************************************************
+
+// preRun runs the root command's pre-run with args over a new database's settings, returning them.
+func preRun(t *testing.T, args ...string) (contracts.TubarrSettingsStore, error) {
+	t.Helper()
+	logger.Pl.Console = io.Discard
+	paths.HomeTubarrDir = t.TempDir()
+	paths.DBFilePath = filepath.Join(paths.HomeTubarrDir, "tubarr.db")
+	db, err := database.InitDB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	store, err := repo.InitStores(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The flags, given to viper as Execute binds them.
+	c := &cobra.Command{Use: "tubarr"}
+	cmd.InitProgramFlags(c)
+	if err := c.ParseFlags(args); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{keys.ScrapeConfigFile, keys.FlareSolverrURL} {
+		viper.Set(k, c.Flags().Lookup(k).Value.String())
+	}
+	settingsStore = store.TubarrSettingsStore()
+	t.Cleanup(func() {
+		settingsStore = nil
+		viper.Set(keys.ScrapeConfigFile, nil)
+		viper.Set(keys.FlareSolverrURL, nil)
+		siterules.Reset()
+	})
+	return settingsStore, rootCmd.PersistentPreRunE(c, nil)
+}
+
+// TestGlobalFlagsAreForTheRun tests the scrape rules file and FlareSolverr URL flags apply to their run, leaving the
+// saved settings the Settings page uses alone.
+func TestGlobalFlagsAreForTheRun(t *testing.T) {
+	const fsURL = "http://127.0.0.1:8191"
+	rules := filepath.Join(t.TempDir(), "rules.yaml")
+	tss, err := preRun(t, "--"+keys.FlareSolverrURL+"="+fsURL, "--"+keys.ScrapeConfigFile+"="+rules)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := viper.GetString(keys.FlareSolverrURL); got != fsURL {
+		t.Errorf("FlareSolverr URL for the run = %q, want the flag's %q", got, fsURL)
+	}
+	for _, k := range []string{keys.FlareSolverrURL, keys.ScrapeConfigFile} {
+		if val, found, err := tss.GetSetting(k); err != nil || found {
+			t.Errorf("--%s saved as %q (%v), want it left unsaved", k, val, err)
+		}
+	}
+}
+
+// TestBrokenScrapeRulesFileKeepsCommandsRunning tests a scrape rules file that can't be read leaves commands running on
+// the built-in rules, rather than failing every command.
+func TestBrokenScrapeRulesFileKeepsCommandsRunning(t *testing.T) {
+	rules := filepath.Join(t.TempDir(), "rules.yaml")
+	if err := os.WriteFile(rules, []byte("sites: [unclosed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := preRun(t, "--"+keys.ScrapeConfigFile+"="+rules); err != nil {
+		t.Errorf("pre-run = %v, want commands to run on the built-in rules", err)
+	}
+	if _, ok := siterules.MatchAny("https://rumble.com/c/cats"); !ok {
+		t.Error("built-in scrape rules not registered")
 	}
 }
 

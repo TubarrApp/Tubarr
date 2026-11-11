@@ -388,6 +388,11 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 				mergeSettings(cu.ChanURLSettings, cu.Profile.ProfileSettings)
 				mergeMetarrArgs(cu.ChanURLMetarrArgs, cu.Profile.ProfileMetarrArgs)
 			}
+
+			// With a video directory of its own and no JSON directory, its metadata is saved beside its videos.
+			if s := cu.ChanURLSettings; s != nil && s.JSONDir == "" {
+				s.JSONDir = s.VideoDir
+			}
 			inheritChannelSettings(cu, c)
 		}
 		if cu.ChanURLSettings == nil {
@@ -398,6 +403,7 @@ func (cs *ChannelStore) GetChannelURLModels(c *models.Channel, mergeWithParent b
 		}
 		if mergeWithParent {
 			stackLists(cu.ChanURLSettings, cu.ChanURLMetarrArgs, cu.Levels)
+			cu.ChanURLSettings.JSONDir = cmp.Or(cu.ChanURLSettings.JSONDir, cu.ChanURLSettings.VideoDir) // Without a JSON directory, metadata is saved with its videos.
 			parsing.FillChannelURLOutputDirectory(cu, c)
 		}
 	}

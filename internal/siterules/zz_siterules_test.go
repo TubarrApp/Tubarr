@@ -190,6 +190,31 @@ func TestRegisterFlareSolverrTimeout(t *testing.T) {
 	}
 }
 
+// TestMatchHost tests a site matches its domain and subdomains by the URL's host alone, the most specific domain winning.
+func TestMatchHost(t *testing.T) {
+	t.Cleanup(Reset)
+	Reset()
+	Register([]models.SiteScraper{{Domain: "match.example"}, {Domain: "videos.match.example"}})
+
+	// Repeated, as the registry is a map and a tie broken by its order would differ between runs.
+	for range 20 {
+		for rawURL, want := range map[string]string{
+			"https://match.example/v/1":                "match.example",
+			"https://www.match.example/v/1":            "match.example",
+			"https://VIDEOS.Match.Example/v/1":         "videos.match.example",
+			"https://cdn.videos.match.example/v/1":     "videos.match.example",
+			"https://notmatch.example/v/1":             "",
+			"https://other.example/?ref=match.example": "",
+			"https://match.example.other.example/v/1":  "",
+		} {
+			rules, ok := MatchAny(rawURL)
+			if ok != (want != "") || rules.Site != want {
+				t.Fatalf("MatchAny(%q) = %q, %t, want %q", rawURL, rules.Site, ok, want)
+			}
+		}
+	}
+}
+
 // TestStripArg tests removing a flag and its value, including a flag given with no value before another flag.
 func TestStripArg(t *testing.T) {
 	tests := []struct {

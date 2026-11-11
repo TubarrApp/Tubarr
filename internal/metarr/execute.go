@@ -56,7 +56,8 @@ func InitMetarr(metarrCtx context.Context, v *models.Video, cu *models.ChannelUR
 		return nil
 	}
 
-	cmd := exec.CommandContext(metarrCtx, "metarr", args...)
+	//nolint:gosec // Metarr with the args Tubarr builds.
+	cmd := exec.CommandContext(metarrCtx, sharedconsts.ProgramMetarr, args...)
 	cmd.Cancel = func() error {
 		return cmd.Process.Signal(syscall.SIGTERM)
 	}

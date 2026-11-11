@@ -34,19 +34,22 @@ func (q *DownloadQueue) run(d *download) {
 	// Check that neither of the above errors triggered.
 	if err != nil {
 		q.finish(d, err)
+		q.notifyIfLast(d.c)
 		return
 	}
 
 	// Download the video, then post-process it if it downloaded.
 	err = q.process(d)
 	q.finish(d, err)
-	if d.video.DownloadStatus.Status != consts.DLStatusCompleted {
-		if hold != nil {
-			hold.release()
-		}
-		return
+	if d.video.DownloadStatus.Status == consts.DLStatusCompleted {
+		q.postProcess(d, hold)
 	}
-	q.postProcess(d, hold)
+
+	// Notified before the hold ends, so terminal runs wait for the notification before exiting.
+	q.notifyIfLast(d.c)
+	if hold != nil {
+		hold.release()
+	}
 }
 
 // process waits for the video's turn, fetches and checks its metadata, then downloads it.
@@ -208,13 +211,12 @@ func downloadLimits(c *models.Channel) laneLimits {
 	return lim
 }
 
-// postProcess hands a downloaded video to the post-processing queue, then stores it as finished.
+// postProcess hands a downloaded video to the post-processing queue, then stores it as finished and new.
 func (q *DownloadQueue) postProcess(d *download, hold *videoHold) {
 	if hold == nil {
 		logger.Pl.E("Video hold model nil")
 		return
 	}
-	defer hold.release()
 
 	if d == nil {
 		logger.Pl.E("Download model nil")
@@ -242,6 +244,9 @@ func (q *DownloadQueue) postProcess(d *download, hold *videoHold) {
 	if err := completeAndStoreVideo(cs, vs, v); err != nil {
 		d.c.Log().E("Failed to complete video %q after metarr: %v", v.URL, err)
 	}
+
+	// Its channel URL's notification services are told once none of the channel's videos are running.
+	q.addNewVideo(d)
 }
 
 // withYtdlpOverrides returns a copy of cu with the video's Download As yt-dlp options in place of its own, blank ones

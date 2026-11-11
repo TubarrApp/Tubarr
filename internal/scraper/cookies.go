@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,8 +12,8 @@ import (
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/paths"
-	"tubarr/internal/limits"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 	"tubarr/internal/siterules"
 
 	"github.com/browserutils/kooky"
@@ -24,8 +23,8 @@ import (
 
 // CookieManager handles cookie operations.
 type CookieManager struct {
-	mu      sync.RWMutex
-	cookies map[string][]*http.Cookie
+	mu      sync.Mutex
+	cookies map[string][]*http.Cookie // Browser store cookies by domain, read once per crawl session.
 
 	// FlareSolverr solutions by hostname for this crawl session.
 	fsMu        sync.Mutex
@@ -47,8 +46,8 @@ func NewCookieManager() *CookieManager {
 	}
 }
 
-// GetChannelURLCookies returns channel access details for a given video.
-func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
+// GetChannelURLCookies returns a channel URL's cookies for requests to pageURL's host: its own URL when crawling, a video's when downloading.
+func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL, pageURL string) (cookies []*http.Cookie, cookieFilePath string, err error) {
 	// Fetch auth details if this is a manual entry or not from DB. -- NEVER HAS AUTH? MAY BE UNNECESSARY CODE. --
 	if (cu.IsManual || cu.ID == 0) && !cu.NeedsAuth() { // Login details sent with manual videos win.
 		cu.Login.Username, cu.Login.Password, cu.Login.LoginURL, err = cs.GetAuth(c.ID, cu.URL)
@@ -60,7 +59,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// Should login, use browser cookies, or use FlareSolverr?
 	doLogin := cu.NeedsAuth()
 	useGlobal := cu.ChanURLSettings != nil && cu.ChanURLSettings.UseGlobalCookies != nil && *cu.ChanURLSettings.UseGlobalCookies
-	useFlareSolverr := siterules.UsesFlareSolverr(cu.URL)
+	useFlareSolverr := siterules.UsesFlareSolverr(pageURL)
 
 	// Early return if no cookies needed.
 	if !doLogin && !useGlobal && !useFlareSolverr {
@@ -68,7 +67,8 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	// Create cookie file path.
-	cu.Session.CookiePath = generateCookieFilePath(c.Name, cu.URL)
+	host := network.Hostname(pageURL)
+	cu.Session.CookiePath = generateCookieFilePath(c.Name, cu.URL, host)
 
 	// Collect cookies...
 	var authCookies, regCookies []*http.Cookie
@@ -84,13 +84,11 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 		}
 	}
 
-	// Cookies from browser cookie stores.
+	// Cookies from browser cookie stores, for the page's site.
 	if useGlobal {
-		if cu.URL != "" && !cu.IsManual {
-			regCookies, err = cm.GetGlobalCookies(cu.URL, c.Name)
-			if err != nil {
-				c.Log().E("Failed to get cookies for %q: %v", cu.URL, err)
-			}
+		regCookies, err = cm.GetGlobalCookies(pageURL, c.Name)
+		if err != nil {
+			c.Log().E("Failed to get cookies for %q: %v", pageURL, err)
 		}
 	}
 
@@ -100,8 +98,8 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	// Cookies from FlareSolverr (override others, e.g. stale Cloudflare cookies from a browser store).
 	// If FlareSolverr is unavailable, carries on without it (the failure is already logged).
 	if useFlareSolverr {
-		if sol, err := cm.flareSolverrSolution(ctx, cu.URL, c.Name, 0); err == nil {
-			cu.Session.FlareSolverr = models.NewFlareSolverrSolution(sol.ytDLPSolve(), cm.flareSolverrResolver(ctx, cu, cookies), cm.flareSolverrNewer(cu, cookies))
+		if sol, err := cm.flareSolverrSolution(ctx, pageURL, c.Name, 0); err == nil {
+			cu.Session.FlareSolverr = models.NewFlareSolverrSolution(sol.ytDLPSolve(), cm.flareSolverrResolver(ctx, cu, pageURL, cookies), cm.flareSolverrNewer(cu, pageURL, cookies))
 			cookies = mergeCookies(sol.cookies, cookies)
 		} else if ctx.Err() != nil {
 			return nil, "", ctx.Err()
@@ -109,25 +107,11 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	for i := range cookies {
-		c.Log().D(3, "Got cookie for URL %q: %v", cu.URL, cookies[i])
+		c.Log().D(3, "Got cookie for URL %q: %v", pageURL, cookies[i])
 	}
 
-	// Store merged cookies in cookie manager.
+	// Save cookies to file for yt-dlp.
 	if len(cookies) > 0 {
-		parsed, err := url.Parse(cu.URL)
-		if err == nil {
-			hostname := parsed.Hostname()
-			cm.mu.Lock()
-			// Merge with any existing cookies for this domain in the session, these winning (e.g. a login sent with manual videos).
-			if existing, ok := cm.cookies[hostname]; ok {
-				cookies = mergeCookies(cookies, existing)
-			}
-			cm.cookies[hostname] = cookies
-			c.Log().D(2, "Stored %d cookies for hostname %q in this crawl session", len(cookies), hostname)
-			cm.mu.Unlock()
-		}
-
-		// Save cookies to file for yt-dlp.
 		err = saveCookiesToFile(cookies, cu.Session.CookiePath, c.Name)
 		if err != nil {
 			return nil, "", err
@@ -138,60 +122,35 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	return cookies, "", nil
 }
 
-// GetGlobalCookies retrieves cookies for a given URL from browser stores.
-// Caches within the current crawl session for performance, but fresh CookieManager per crawl.
+// GetGlobalCookies returns browser store cookies for a URL's site and its own host, reading each domain once per crawl session.
 func (cm *CookieManager) GetGlobalCookies(u, channelName string) ([]*http.Cookie, error) {
 	logger.Pl.Channel(channelName).I("Retrieving global cookies for URL: %q", u)
-	baseDomain := limits.Hostname(u)
+	baseDomain := network.Domain(u)
 	if baseDomain == "" {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab from URL %q", u)
 	}
 
-	// Check if cookies already exist for domain in this session.
+	// The site's cookies, and the URL's own host's.
+	domains := []string{baseDomain}
+	if host := network.Hostname(u); host != baseDomain {
+		domains = append(domains, host)
+	}
+
+	// Each domain is read from the browser stores once, as its cookies are the same for every URL.
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	var cookies []*http.Cookie
-	cm.mu.RLock()
-	if baseCookies, ok := cm.cookies[baseDomain]; ok {
-		cookies = mergeCookies(cookies, baseCookies)
-	}
-	cm.mu.RUnlock()
-	if len(cookies) > 0 {
-		logger.Pl.Channel(channelName).D(2, "Using cached cookies for domain %q from this crawl session", baseDomain)
-		return cookies, nil
-	}
-
-	// Load cookies from browser stores.
-	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(baseDomain, channelName))
-	cookies = mergeCookies(cookies, cm.loadCookiesForDomain(u, channelName))
-
-	// Store cookies for this crawl session.
-	if len(cookies) > 0 {
-		// Debug log.
-		for _, c := range cookies {
-			logger.Pl.Channel(channelName).D(2, "Loaded global cookie for %q: %v", baseDomain, c)
+	for _, d := range domains {
+		found, cached := cm.cookies[d]
+		if cached {
+			logger.Pl.Channel(channelName).D(2, "Using browser cookies for %q read earlier in this crawl session", d)
+		} else {
+			found = cm.loadCookiesForDomain(d, channelName)
+			cm.cookies[d] = found
 		}
-
-		// Cache in memory for this session.
-		cm.mu.Lock()
-		logger.Pl.Channel(channelName).I("Caching %d cookies for domain %q for this crawl session", len(cookies), baseDomain)
-		cm.cookies[baseDomain] = cookies
-		cm.mu.Unlock()
+		cookies = mergeCookies(cookies, found)
 	}
-
 	return cookies, nil
-}
-
-// GetCachedCookies retrieves cookies from the current crawl session for a domain.
-func (cm *CookieManager) GetCachedCookies(hostname, channelName string) []*http.Cookie {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-
-	if cookies, ok := cm.cookies[hostname]; ok {
-		logger.Pl.Channel(channelName).D(2, "Retrieved %d cached cookies for hostname %q from this crawl session", len(cookies), hostname)
-		return cookies
-	}
-
-	logger.Pl.Channel(channelName).D(2, "No cached cookies found for hostname %q in this crawl session", hostname)
-	return nil
 }
 
 // ******************************** Private ********************************
@@ -222,17 +181,12 @@ func (cm *CookieManager) loadCookiesForDomain(domain, channelName string) (cooki
 	return cookies
 }
 
-// convertToHTTPCookies converts kooky cookies to http.Cookie format.
+// convertToHTTPCookies converts kooky cookies to http.Cookie format, keeping all their attributes.
 func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 	httpCookies := make([]*http.Cookie, len(kookyCookies))
 	for i, c := range kookyCookies {
-		httpCookies[i] = &http.Cookie{
-			Name:   c.Name,
-			Value:  c.Value,
-			Path:   c.Path,
-			Domain: c.Domain,
-			Secure: c.Secure,
-		}
+		cookie := c.Cookie
+		httpCookies[i] = &cookie
 	}
 	return httpCookies
 }
@@ -240,17 +194,12 @@ func convertToHTTPCookies(kookyCookies []*kooky.Cookie) []*http.Cookie {
 // cookieFileNameReplacer turns a channel name into a single file name, so names like "AC/DC" can't point into other folders.
 var cookieFileNameReplacer = strings.NewReplacer(" ", "-", "/", "-", "\\", "-")
 
-// generateCookieFilePath generates a unique authentication file path per channel and URL.
-func generateCookieFilePath(channelName, videoURL string) string {
+// generateCookieFilePath returns the cookie file of a channel URL's requests to host, one per channel, URL and host.
+func generateCookieFilePath(channelName, channelURL, host string) string {
 	name := cookieFileNameReplacer.Replace(channelName)
 
-	// If no specific URL is provided, return the default per-channel auth file.
-	if videoURL == "" {
-		return filepath.Join(paths.HomeTubarrDir, name+".txt")
-	}
-
-	// Generate a short hash for the URL to ensure uniqueness.
-	urlHash := sha256.Sum256([]byte(videoURL))
+	// Generate a short hash for the URL and host to ensure uniqueness.
+	urlHash := sha256.Sum256([]byte(channelURL + " " + host))
 	hashString := fmt.Sprintf("%x", urlHash[:8]) // First 8 bytes (16 hex characters).
 
 	return filepath.Join(paths.HomeTubarrDir, fmt.Sprintf("%s_%s.txt", name, hashString))

@@ -30,6 +30,7 @@ import (
 	"tubarr/internal/limits"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 	"tubarr/internal/parsing"
 	"tubarr/internal/queue"
 	"tubarr/internal/scraper"
@@ -138,7 +139,7 @@ func (ss *serverStore) handleAddChannelsFromDir(w http.ResponseWriter, r *http.R
 	// Scan directory for config files
 	batchConfigFiles, err := file.ScanDirectoryForConfigFiles(addFromDir)
 	if err != nil {
-		http.Error(w, string(fmt.Appendf(nil, "failed to scan directory: %v", err)), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("failed to scan directory: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -493,6 +494,7 @@ func (ss *serverStore) handleGetAllVideos(w http.ResponseWriter, r *http.Request
 		if v.Files.VideoFilePath == "" {
 			continue
 		}
+		//nolint:gosec // A downloaded video's stored path.
 		if _, err := os.Stat(v.Files.VideoFilePath); err != nil {
 			v.Files.VideoFilePath = ""
 		}
@@ -608,11 +610,11 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
+	file.UpdateFromConfigFile(ss.cs, c) // Before the URLs are picked, as a reload replaces them.
 	if c.LoadErr != nil {
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
 	}
-	file.UpdateFromConfigFile(ss.cs, c) // Before the URLs are picked, as a reload replaces them.
 
 	// An optional body picks which URLs to crawl; picked paused URLs are crawled too.
 	var requestBody struct {
@@ -808,6 +810,7 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 	if !ok {
 		return
 	}
+	file.UpdateFromConfigFile(ss.cs, c)
 	if c.LoadErr != nil {
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
@@ -845,6 +848,7 @@ func (ss *serverStore) handleDownloadURLs(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
+	file.UpdateFromConfigFile(ss.cs, c)
 	if c.LoadErr != nil {
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
@@ -1015,9 +1019,12 @@ func (ss *serverStore) handleAvailableAction(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	if c.LoadErr != nil && status == consts.DLStatusQueued {
-		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
-		return
+	if status == consts.DLStatusQueued {
+		file.UpdateFromConfigFile(ss.cs, c)
+		if c.LoadErr != nil {
+			http.Error(w, c.LoadErr.Error(), http.StatusConflict)
+			return
+		}
 	}
 	if overrides != nil {
 		// Videos given the same options must share the channel URL they're checked against.
@@ -1360,6 +1367,7 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	file.UpdateFromConfigFile(ss.cs, c)
 	if c.LoadErr != nil {
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
 		return
@@ -1439,7 +1447,6 @@ func (ss *serverStore) handleRunMetarr(w http.ResponseWriter, r *http.Request) {
 
 	//nolint:contextcheck
 	go func(ctx context.Context) {
-		file.UpdateFromConfigFile(ss.cs, c)
 		if err := ss.pp.RunMetarr(ctx, c, requestBody.VideoIDs, requestBody.Rerun); err != nil {
 			c.Log().E("Encountered errors running Metarr for channel %q: %v", c.Name, err)
 		} else {
@@ -1511,12 +1518,12 @@ func (ss *serverStore) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 // handleGetIdle reports running crawls and videos being downloaded or post-processed, returning 503 if there are any.
 func (ss *serverStore) handleGetIdle(w http.ResponseWriter, r *http.Request) {
-	running := app.RunningProcesses() + int32(ss.dq.Len()) + int32(ss.pp.Len())
+	running := int(app.RunningProcesses()) + ss.dq.Len() + ss.pp.Len()
 	status := http.StatusOK
 	if running > 0 {
 		status = http.StatusServiceUnavailable
 	}
-	writeJSON(w, r, status, map[string]int32{"running": running})
+	writeJSON(w, r, status, map[string]int{"running": running})
 }
 
 // handleGetLogLevel retrieves the current logging level.
@@ -1710,15 +1717,15 @@ func (ss *serverStore) handleNewVideoNotificationSeen(w http.ResponseWriter, r *
 		return
 	}
 
+	// Lock for the dot and new video URL array update, which change together.
+	vars.UpdateNewVideoURLMutex.Lock()
+	defer vars.UpdateNewVideoURLMutex.Unlock()
+
 	// Set notification to false.
 	if err := ss.cs.SetNotificationDot(c.ID, false); err != nil {
 		http.Error(w, fmt.Sprintf("failed to mark new video notification as seen for channel ID %q: %v", id, err), http.StatusInternalServerError)
 		return
 	}
-
-	// Lock for new video URL array update.
-	vars.UpdateNewVideoURLMutex.Lock()
-	defer vars.UpdateNewVideoURLMutex.Unlock()
 
 	// Update new video URL array.
 	if err := ss.cs.UpdateNewVideoURLs(consts.QChanID, id, []string{}); err != nil {
@@ -1839,7 +1846,7 @@ func (ss *serverStore) handleGetDomainLimits(w http.ResponseWriter, r *http.Requ
 
 // handleSetDomainLimit sets the download and crawl concurrency limits for a specific domain (0 or blank = unlimited).
 func (ss *serverStore) handleSetDomainLimit(w http.ResponseWriter, r *http.Request) {
-	hostname := limits.NormalizeDomain(r.FormValue("hostname"))
+	hostname := network.NormalizeDomain(r.FormValue("hostname"))
 	if hostname == "" {
 		http.Error(w, "hostname parameter is required", http.StatusBadRequest)
 		return
@@ -1868,7 +1875,7 @@ func (ss *serverStore) handleSetDomainLimit(w http.ResponseWriter, r *http.Reque
 
 // handleDeleteDomainLimit removes the download and crawl concurrency limits for a specific domain.
 func (ss *serverStore) handleDeleteDomainLimit(w http.ResponseWriter, r *http.Request) {
-	hostname := limits.NormalizeDomain(chi.URLParam(r, consts.WebParamHostname))
+	hostname := network.NormalizeDomain(chi.URLParam(r, consts.WebParamHostname))
 	if hostname == "" {
 		http.Error(w, "hostname is required", http.StatusBadRequest)
 		return
@@ -2099,7 +2106,7 @@ func (ss *serverStore) handleSetScrapeConfigContent(w http.ResponseWriter, r *ht
 		return
 	}
 
-	current, err := os.ReadFile(path)
+	current, err := os.ReadFile(path) //nolint:gosec // The scrape config file set in settings.
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to read scrape config file: %v", err), http.StatusInternalServerError)
 		return

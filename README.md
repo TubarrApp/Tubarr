@@ -230,7 +230,7 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 
 - **Settings**: per-channel download concurrency, crawl frequency, retry counts, `yt-dlp` args, cookie sources, date and metadata filters, templated directories, automatic or manual (Available) downloads. A channel URL's own settings override the channel's, and any it leaves blank use the channel's. Its filters, move ops and filename/meta ops (filtered or not) are added to the channel's instead, with the URL's op used where both set the same thing, unless it's set to replace them. A [profile](#profiles) fills in what a channel or URL leaves blank.
 - **Metarr args**: filename/meta operations, filtered operations, metadata-based move rules, FFmpeg transcode settings, metadata file deletion, per-URL output directories.
-- **Notifications**: URLs called when new videos are downloaded, for every channel URL or just one. `--notify` and config files set them for every channel URL; `channel notify-add --url` sets them for one. The web UI picks the channel URLs from a list.
+- **Notifications**: URLs called for every channel URL or just one, once new videos are downloaded and post-processed, and again when Metarr is run on them later, since it may move the files. With post-processing off, they're called once the downloads finish. `--notify` and config files set them for every channel URL; `channel notify-add --url` sets them for one. The web UI picks the channel URLs from a list.
 - **Global settings**: crawl concurrency, global and per-domain download limits, FlareSolverr URL, and custom site scraping rules (`--scrape-config-file`), also editable on the web UI's Settings page.
 - **Security**: credentials are encrypted via `~/.tubarr/.passwords/aes.txt`.
 

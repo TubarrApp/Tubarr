@@ -7,6 +7,7 @@ import (
 	"strings"
 	"tubarr/internal/domain/command"
 	"tubarr/internal/siterules"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
@@ -45,10 +46,10 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 	// Randomize requests (avoid detection as bot).
 	args = append(args, command.SleepRequests...)
 
-	// Additional user arguments.
-	extra, err := extraArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs, d.Video.URL)
+	// Additional user arguments, refused if one is a blocked option.
+	extra, err := validation.ValidateExtraYtdlpArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPMetaArgs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid extra yt-dlp metadata args: %w", err)
 	}
 	args = append(args, extra...)
 
@@ -59,6 +60,7 @@ func (d *JSONDownload) buildJSONCommand() (*exec.Cmd, error) {
 	args = append(args, command.EndOfOptions, d.Video.URL)
 
 	// Build command with context.
+	//nolint:gosec // yt-dlp with the args Tubarr builds, the user's checked against the blocked options.
 	cmd := exec.CommandContext(d.Context, sharedconsts.ProgramYTDLP, args...)
 	useProcessGroup(cmd)
 	return cmd, nil
@@ -83,12 +85,13 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	}
 
 	// Find the line containing the JSON path.
-	outputLines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
-	if len(outputLines) == 0 {
+	output := strings.TrimSpace(stdout.String())
+	if output == "" {
 		d.Channel.Log().D(3, "Full stdout: %s", stdout.String())
 		d.Channel.Log().D(3, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("no output lines found for %s", d.Video.URL)
 	}
+	outputLines := strings.Split(output, "\n")
 
 	var jsonPath string
 

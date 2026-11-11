@@ -105,10 +105,13 @@ func parseScrapeSelectorsFile(f, name string) ([]models.SiteScraper, error) {
 
 	sites := make([]models.SiteScraper, 0, len(raw.Sites))
 	for _, s := range raw.Sites {
-		// Domain is the site's hostname (e.g., "example.com"). It is required and must be unique.
-		domain := strings.ToLower(strings.TrimSpace(s.Domain))
+		// Domain is the site's hostname (e.g., "example.com"), covering its subdomains too. It is required and must be unique.
+		domain := strings.Trim(strings.ToLower(strings.TrimSpace(s.Domain)), ".")
 		if domain == "" {
 			return nil, fmt.Errorf("scrape config file %q: site entry missing domain", name)
+		}
+		if strings.ContainsAny(domain, "/:") {
+			return nil, fmt.Errorf("scrape config file %q: site domain %q must be a hostname, like example.com", name, domain)
 		}
 
 		// Impersonate is optional and intended to simulate a real browser if provided.

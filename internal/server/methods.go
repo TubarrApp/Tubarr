@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 	"tubarr/internal/app"
 	"tubarr/internal/blocking"
@@ -19,10 +18,8 @@ import (
 	"github.com/TubarrApp/gocommon/abstractions"
 )
 
-// startCrawlWatchdog constantly checks channels and runs crawls when they're due.
-//
-// This function blocks until the stop channel is signaled or context is canceled.
-func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Signal) {
+// startCrawlWatchdog constantly checks channels and runs crawls when they're due, until ctx is canceled.
+func (ss *serverStore) startCrawlWatchdog(ctx context.Context) {
 	const timeBetweenCheck = 10 * time.Second
 
 	// Start ticker
@@ -33,9 +30,6 @@ func (ss *serverStore) startCrawlWatchdog(ctx context.Context, stop <-chan os.Si
 
 	for {
 		select {
-		case <-stop:
-			logger.Pl.I("Crawl watchdog received stop signal, shutting down...")
-			return
 		case <-ctx.Done():
 			logger.Pl.I("Crawl watchdog context canceled, shutting down...")
 			return
@@ -70,13 +64,9 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 	now := time.Now()
 	for _, c := range freshChannels {
 		if c.LoadErr != nil {
-			if msg := c.LoadErr.Error(); reported[c.ID] != msg {
-				reported[c.ID] = msg
-				c.Log().E("Crawl watchdog: skipping crawls until fixed: %v", c.LoadErr)
-			}
+			reportLoadErr(c, reported)
 			continue
 		}
-		delete(reported, c.ID)
 
 		// Add jitter
 		var jitter time.Duration
@@ -93,6 +83,11 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 
 		// The config file may change what's due, or pause the channel.
 		file.UpdateFromConfigFile(ss.s.ChannelStore(), c)
+		if c.LoadErr != nil {
+			reportLoadErr(c, reported)
+			continue
+		}
+		delete(reported, c.ID)
 
 		// Skip paused channels
 		if c.ChanSettings.Paused {
@@ -127,6 +122,14 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 				ch.Log().S("Crawl watchdog: Completed crawl for channel %q", ch.Name)
 			}
 		}(&ch)
+	}
+}
+
+// reportLoadErr logs why a channel's crawls are skipped, once until the reason changes.
+func reportLoadErr(c *models.Channel, reported map[int64]string) {
+	if msg := c.LoadErr.Error(); reported[c.ID] != msg {
+		reported[c.ID] = msg
+		c.Log().E("Crawl watchdog: skipping crawls until fixed: %v", c.LoadErr)
 	}
 }
 

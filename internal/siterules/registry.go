@@ -9,6 +9,7 @@ import (
 	"tubarr/internal/domain/consts"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 )
 
 var (
@@ -86,17 +87,27 @@ func List() []models.SiteRules {
 	return list
 }
 
-// Match finds the registered site for a URL based on domain match, whose rules satisfy the filter.
-func Match(url string, filter func(models.SiteRules) bool) (models.SiteRules, bool) {
+// Match finds the most specific registered site whose domain is the URL's host or a parent of it, with rules satisfying the filter.
+func Match(rawURL string, filter func(models.SiteRules) bool) (models.SiteRules, bool) {
+	host := network.Hostname(rawURL)
+	if host == "" {
+		return models.SiteRules{}, false
+	}
+
 	sitesMu.RLock()
 	defer sitesMu.RUnlock()
 
+	// Find the most specific domain matching the host.
+	var best models.SiteRules
+	bestLen := 0
 	for domain, rules := range sites {
-		if strings.Contains(url, domain) && filter(rules) {
-			return rules, true
+		if len(domain) <= bestLen || (host != domain && !strings.HasSuffix(host, "."+domain)) || !filter(rules) {
+			continue
 		}
+		best = rules
+		bestLen = len(domain)
 	}
-	return models.SiteRules{}, false
+	return best, bestLen > 0
 }
 
 // MatchAny finds the registered site for a URL based on domain match.

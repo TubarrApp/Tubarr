@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/metadata"
 	"tubarr/internal/metarr"
 	"tubarr/internal/models"
+	"tubarr/internal/notify"
 	"tubarr/internal/parsing"
 )
 
@@ -165,6 +166,7 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 		mu    sync.Mutex
 		errs  []error
 		skips = map[int64]error{} // Channel URL ID -> why its videos can't run, checked once per URL.
+		moved []string            // Channel URLs whose videos Metarr finished, as it may have moved their files.
 	)
 
 	for _, v := range videos {
@@ -228,11 +230,27 @@ func (q *PostProcessingQueue) RunMetarr(ctx context.Context, c *models.Channel, 
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("video %q: %w", v.URL, err))
 				mu.Unlock()
+				return
+			}
+
+			// A canceled run returns no error without finishing.
+			if vCtx.Err() == nil {
+				mu.Lock()
+				if !slices.Contains(moved, cu.URL) {
+					moved = append(moved, cu.URL)
+				}
+				mu.Unlock()
 			}
 		})
 	}
 	wg.Wait()
 
+	// The channel URLs' notification services are told again, as their videos' files may have moved.
+	if len(moved) > 0 {
+		if err := notify.Services(q.store.ChannelStore(), c, moved); err != nil {
+			c.Log().E("Failed to notify services for channel %q: %v", c.Name, err)
+		}
+	}
 	return errors.Join(errs...)
 }
 

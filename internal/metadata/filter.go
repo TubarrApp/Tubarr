@@ -19,8 +19,8 @@ import (
 // errFilterFile marks a filter file that is set but can't be used.
 var errFilterFile = errors.New("filter file can't be used")
 
-// checkFilters determines whether a video matches the given filters.
-func checkFilters(v *models.Video, filters []models.Filters) bool {
+// checkFilters reports whether a video matches the given filters, or an error if one can't be checked.
+func checkFilters(v *models.Video, filters []models.Filters) (bool, error) {
 	mustTotal, mustPassed := 0, 0
 	anyTotal, anyPassed := 0, 0
 
@@ -28,8 +28,7 @@ func checkFilters(v *models.Video, filters []models.Filters) bool {
 	for _, filter := range filters {
 		matched, skipped, metaText, err := sharedfilters.Match(v.Metadata.Raw, filter)
 		if err != nil {
-			v.Log().E("Download filter error: Video %q: %v", v.URL, err)
-			return false
+			return false, fmt.Errorf("download filter %q: %w", sharedparsing.FormatFilter(filter, true), err)
 		}
 
 		// Numerical filters with an absent or empty field are skipped rather than failed,
@@ -60,14 +59,14 @@ func checkFilters(v *models.Video, filters []models.Filters) bool {
 	// Post-loop evaluation of must/any filters.
 	if mustPassed != mustTotal {
 		v.Log().D(2, "Download filter mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", v.URL, mustPassed, mustTotal)
-		return false
+		return false, nil
 	}
 	if anyTotal > 0 && anyPassed == 0 { // At least one 'any' filter must pass, whatever the 'must' filters did.
 		v.Log().D(2, "Download filter mismatch: Video %q did not pass any 'any' filters (passed %d out of %d)", v.URL, anyPassed, anyTotal)
-		return false
+		return false, nil
 	}
 
-	return true
+	return true, nil
 }
 
 // filteredMetaOpsMatches marks which filtered meta ops match the video, from levels given farthest first, keeping only

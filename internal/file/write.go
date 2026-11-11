@@ -5,17 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/models"
 )
 
 // WriteMetadataJSONFile writes the custom metadata file.
 func WriteMetadataJSONFile(metadata map[string]any, filename, outputDir string, v *models.Video) error {
-	filePath := fmt.Sprintf("%s/%s", strings.TrimRight(outputDir, "/"), filename)
+	filePath := filepath.Join(outputDir, filename)
 
 	// Create the file.
-	file, err := os.Create(filePath)
+	file, err := os.Create(filePath) //nolint:gosec // The JSON directory with a name made safe for a path.
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}

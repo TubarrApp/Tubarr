@@ -15,7 +15,6 @@ type ChannelURL struct {
 	Name              string                  `json:"name" db:"name"`
 	ChannelID         int64                   `json:"channel_id" db:"channel_id"`
 	ChannelName       string                  `json:"channel_name,omitempty" db:"-"` // Its channel's name, set when loaded.
-	Videos            []*Video                `json:"videos,omitempty"`
 	Login             ChannelURLAccessDetails `json:"login"`
 	Session           ChannelURLSession       `json:"-" db:"-"`
 	IsManual          bool                    `json:"is_manual" db:"is_manual"`

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -496,6 +498,140 @@ func TestCheckDestinationsOutputDirectoryTags(t *testing.T) {
 	o.OutputDir = "{{channel_output_directory}}/Once"
 	if err := CheckDestinations(c, cu, o); err == nil {
 		t.Error("Download As directory inside a missing channel output directory: got no error")
+	}
+}
+
+// TestAddRefusesBrokenConfigFile tests a channel whose config file can't be read queues nothing, rather than
+// downloading with its saved settings.
+func TestAddRefusesBrokenConfigFile(t *testing.T) {
+	store, _, c := newTestChannel(t)
+	c.ChannelConfigFile = filepath.Join(t.TempDir(), "broken.yaml")
+	if err := os.WriteFile(c.ChannelConfigFile, []byte("channel-name: [unclosed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dq := NewDownloadQueue(t.Context(), store, NewPostProcessingQueue(store))
+	v := &models.Video{URL: "https://example.com/v/1", ChannelURLID: c.URLModels[0].ID}
+	if queued, err := dq.Add(c, Request{Video: v, ByUser: true}); err == nil || len(queued) != 0 {
+		t.Errorf("Add = %d queued, %v; want nothing queued and the config file's error", len(queued), err)
+	}
+	if dq.Len() != 0 {
+		t.Errorf("%d video(s) in the queue, want none", dq.Len())
+	}
+}
+
+// TestClaimedAgainBetweenAttempts tests a video claimed again while its own download is between attempts is skipped,
+// leaving that download in the queue and its status alone.
+func TestClaimedAgainBetweenAttempts(t *testing.T) {
+	store, db, c := newTestChannel(t)
+	cu := c.URLModels[0]
+	dq := NewDownloadQueue(t.Context(), store, NewPostProcessingQueue(store))
+	dq.SetLimits(c)
+	takeSlot(t, &dq.lanes, c.ID, cu.ID)
+
+	v := &models.Video{URL: "https://example.com/v/1", ChannelURLID: cu.ID}
+	if queued, err := dq.Add(c, Request{Video: v}); err != nil || len(queued) != 1 {
+		t.Fatalf("Add = %d queued, %v; want 1", len(queued), err)
+	}
+
+	// Between attempts its status is Failed, so a crawl can claim it again.
+	if _, err := db.Exec("UPDATE "+consts.DBDownloads+" SET "+consts.QDLStatus+" = ? WHERE "+consts.QDLVidID+" = ?", consts.DLStatusFailed, v.ID); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := dq.Add(c, Request{Video: &models.Video{URL: v.URL, ChannelURLID: cu.ID}}); err != nil || len(again) != 0 {
+		t.Errorf("Add of a video between attempts = %d queued, %v; want it skipped", len(again), err)
+	}
+	if status, errMsg := storedStatus(t, db, v.ID); status == consts.DLStatusFailed {
+		t.Errorf("stored %q (%q), want the running download's status left alone", status, errMsg)
+	}
+	if dq.Len() != 1 {
+		t.Errorf("%d video(s) in the queue, want its own download still there", dq.Len())
+	}
+
+	// Cancel it rather than wait for a slot.
+	dq.Cancel(v.ID)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if !dq.Wait(ctx) {
+		t.Fatal("canceled video still in the queue")
+	}
+}
+
+// TestSessionPerHost tests videos on the channel URL's host share a session with its crawl cookies, while a video on
+// another host gets its own without them, leaving the channel's model alone.
+func TestSessionPerHost(t *testing.T) {
+	store, _, c := newTestChannel(t)
+	cu := c.URLModels[0]
+	cu.Session = models.ChannelURLSession{CookiePath: "crawl-cookies.txt"}
+	q := NewDownloadQueue(t.Context(), store, nil)
+	sessions := make(map[sessionKey]*session)
+	newSession := func(rawURL string) *session {
+		t.Helper()
+		d, err := q.newDownload(c, Request{Video: &models.Video{URL: rawURL, ChannelURLID: cu.ID}}, sessions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d.session
+	}
+
+	first := newSession("https://example.com/v/1")
+	second := newSession("https://example.com/v/2")
+	other := newSession("https://cdn.other.example/v/3")
+	if first != second || first.cu.Session.CookiePath != "crawl-cookies.txt" {
+		t.Errorf("channel URL's host: shared %t, cookies %q; want one session with the crawl's cookies", first == second, first.cu.Session.CookiePath)
+	}
+	if other == first || other.cu.Session.CookiePath != "" || other.videoURL != "https://cdn.other.example/v/3" {
+		t.Errorf("another host: shared %t, cookies %q, fetched for %q; want a session fetching its own", other == first, other.cu.Session.CookiePath, other.videoURL)
+	}
+	if cu.Session.CookiePath != "crawl-cookies.txt" {
+		t.Errorf("the channel URL's crawl cookies became %q", cu.Session.CookiePath)
+	}
+}
+
+// notifyServer returns the count of notifications a server set as the channel's notification URL has had.
+func notifyServer(t *testing.T, store contracts.Store, c *models.Channel) *atomic.Int32 {
+	t.Helper()
+	notified := &atomic.Int32{}
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { notified.Add(1) }))
+	t.Cleanup(srv.Close)
+	if err := store.ChannelStore().AddNotifyURLs(c.ID, []*models.Notification{{ChannelURL: c.URLModels[0].URL, NotifyURL: srv.URL}}); err != nil {
+		t.Fatal(err)
+	}
+	return notified
+}
+
+// TestNotifyAfterLastVideo tests a channel's notification services are told once its last running video has ended, and
+// only if one of its videos was new.
+func TestNotifyAfterLastVideo(t *testing.T) {
+	store, _, c := newTestChannel(t)
+	notified := notifyServer(t, store, c)
+	q := NewDownloadQueue(t.Context(), store, nil)
+	running := func(id int64) *download {
+		t.Helper()
+		d := &download{video: &models.Video{ID: id, URL: fmt.Sprintf("https://example.com/v/%d", id)}, c: c, cu: c.URLModels[0]}
+		if _, inserted := q.insert(d); !inserted {
+			t.Fatalf("video %d not inserted", id)
+		}
+		return d
+	}
+
+	// Two videos run, and the first is new.
+	first := running(1)
+	running(2)
+	q.addNewVideo(first)
+	q.notifyIfLast(c)
+	if n := notified.Load(); n != 0 {
+		t.Fatalf("notified %d time(s) with a video still running", n)
+	}
+	q.notifyIfLast(c)
+	if n := notified.Load(); n != 1 {
+		t.Fatalf("notified %d time(s) once the last video ended, want 1", n)
+	}
+
+	// A run without a new video tells no one.
+	running(3)
+	q.notifyIfLast(c)
+	if n := notified.Load(); n != 1 {
+		t.Errorf("notified %d time(s) after a run without new videos, want still 1", n)
 	}
 }
 
@@ -1318,5 +1454,38 @@ func TestAutoPostProcessOff(t *testing.T) {
 	_ = q.RunMetarr(context.Background(), loaded, nil, false) // The stand-in Metarr gives no final paths, so this fails after running.
 	if _, err := os.Stat(ran); err != nil {
 		t.Error("Post-Process didn't run Metarr with Post-Process After Download turned off")
+	}
+}
+
+// TestRunMetarrNotifiesAgain tests Run Metarr tells the channel URL's notification services again once Metarr is done,
+// as it may have moved the files.
+func TestRunMetarrNotifiesAgain(t *testing.T) {
+	// A metarr that answers --help, and reports the files where they are.
+	bin, dir := t.TempDir(), t.TempDir()
+	video, metaFile := filepath.Join(dir, "v.mp4"), filepath.Join(dir, "v.json")
+	script := fmt.Sprintf("#!/bin/sh\n[ \"$1\" = --help ] && exit 0\necho 'final video path: %s'\necho 'final json path: %s'\n", video, metaFile)
+	if err := os.WriteFile(filepath.Join(bin, sharedconsts.ProgramMetarr), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	store, db, c := newTestChannel(t)
+	notified := notifyServer(t, store, c)
+	for f, content := range map[string]string{video: "video", metaFile: `{"title":"One"}`} {
+		if err := os.WriteFile(f, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO videos (channel_id, channel_url_id, channel_url, finished, ignored, url, video_path, json_path, metarr_status)
+		VALUES (?, ?, ?, 1, 0, 'https://example.com/watch/1', ?, ?, ?)`,
+		c.ID, c.URLModels[0].ID, c.URLModels[0].URL, video, metaFile, consts.MetarrStatusPending); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewPostProcessingQueue(store).RunMetarr(context.Background(), c, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := notified.Load(); n != 1 {
+		t.Errorf("notified %d time(s) after Run Metarr, want 1", n)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"tubarr/internal/downloads/downloaders"
 	"tubarr/internal/file"
 	"tubarr/internal/siterules"
+	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
 )
@@ -118,10 +119,10 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	// Randomize requests (avoid detection as bot).
 	args = append(args, command.SleepRequests...)
 
-	// Additional user arguments.
-	extra, err := extraArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs, d.Video.URL)
+	// Additional user arguments, refused if one is a blocked option.
+	extra, err := validation.ValidateExtraYtdlpArgs(d.ChannelURL.ChanURLSettings.ExtraYTDLPVideoArgs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid extra yt-dlp video args: %w", err)
 	}
 	args = append(args, extra...)
 
@@ -149,6 +150,7 @@ func (d *VideoDownload) buildVideoCommand() (*exec.Cmd, error) {
 	}
 
 	// Combine command...
+	//nolint:gosec // yt-dlp with the args Tubarr builds, the user's checked against the blocked options.
 	cmd := exec.CommandContext(d.Context, sharedconsts.ProgramYTDLP, args...)
 	useProcessGroup(cmd)
 	return cmd, nil

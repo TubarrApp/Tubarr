@@ -25,6 +25,7 @@ import (
 	"tubarr/internal/file"
 	"tubarr/internal/limits"
 	"tubarr/internal/models"
+	"tubarr/internal/network"
 	"tubarr/internal/siterules"
 	"tubarr/internal/times"
 	"tubarr/internal/validation"
@@ -90,7 +91,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		}
 
 		// Get access details once per ChannelURL - delegated to CookieManager
-		cu.Session.Cookies, cu.Session.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
+		cu.Session.Cookies, cu.Session.CookiePath, err = s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu, cu.URL)
 		if err != nil {
 			crawlSem.Release()
 			if ctx.Err() != nil {
@@ -163,7 +164,6 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 					Duration:     lv.Duration,
 				},
 			}
-			cu.Videos = append(cu.Videos, video)
 			newRequests = append(newRequests, video)
 		}
 	}
@@ -246,9 +246,9 @@ func TestScrapeSite(ctx context.Context, urlStr string) (matched bool, site stri
 	return true, query.Site, metadata, nil
 }
 
-// ScraperURLCookies returns channel access details for a given video.
-func (s *Scraper) ScraperURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL) (cookies []*http.Cookie, cookieFilePath string, err error) {
-	return s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu)
+// ScraperURLCookies returns a channel URL's cookies for downloading the video at videoURL.
+func (s *Scraper) ScraperURLCookies(ctx context.Context, cs contracts.ChannelStore, c *models.Channel, cu *models.ChannelURL, videoURL string) (cookies []*http.Cookie, cookieFilePath string, err error) {
+	return s.cookieManager.GetChannelURLCookies(ctx, cs, c, cu, videoURL)
 }
 
 // newEpisodeURLs returns new episode URLs not yet downloaded, ignored, or Available, with what the listing shows of each.
@@ -308,30 +308,18 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		crawlArgs, browser = cu.ChanURLSettings.ExtraYTDLPCrawlArgs, cu.ChanURLSettings.CookiesFromBrowser
 	}
 
+	// Custom crawl arguments, refused if one is a blocked option.
+	extraArgs, err := validation.ValidateExtraYtdlpArgs(crawlArgs)
+	if err != nil {
+		return nil, fmt.Errorf("invalid extra yt-dlp crawl args: %w", err)
+	}
+
 	// Run yt-dlp, refreshing the FlareSolverr solve and retrying once if Cloudflare blocks a FlareSolverr site.
 	var j []byte
 	for retried := false; ; retried = true {
 		// Build argument
 		args := []string{command.YtDLPFlatPlaylist}
-
-		// Add custom crawl arguments.
-		if crawlArgs != "" {
-			extraArgs, err := sharedparsing.ShellSplit(crawlArgs)
-			if err != nil {
-				return nil, err
-			}
-
-			// Refuse extra yt-dlp arguments containing disallowed options.
-			if !sharedconsts.InsecureArgumentsAllowed() {
-				if blocked, blockedKey := sharedconsts.HasBlockedOptions(extraArgs, sharedconsts.BlockedYtdlpOptions); blocked {
-					cu.Log().W("Refusing extra YT-DLP arguments for channel URL %q: Option %q is not allowed for YT-DLP.", cu.URL, blockedKey)
-				} else {
-					args = append(args, extraArgs...)
-				}
-			} else {
-				args = append(args, extraArgs...)
-			}
-		}
+		args = append(args, extraArgs...)
 
 		// Cookie file and browser cookies, which yt-dlp combines (the file's winning where both set one).
 		if cu.Session.CookiePath != "" {
@@ -346,11 +334,11 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 
 		// Add -J and URL to finalize command
 		args = append(args, command.OutputJSON, command.EndOfOptions, channelURL)
+		//nolint:gosec // yt-dlp with the args Tubarr builds, the user's checked against the blocked options.
 		cmd := exec.CommandContext(ctx, sharedconsts.ProgramYTDLP, args...)
 
 		cu.Log().I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
 
-		var err error
 		if j, err = cmd.Output(); err == nil {
 			break
 		}
@@ -377,7 +365,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 	}
 
 	// Retrieve base domain for comparisons.
-	chanBaseDomain := limits.Hostname(channelURL)
+	chanBaseDomain := network.Domain(channelURL)
 
 	// Process entries and add to map.
 	for _, entry := range result.videoEntries() {
@@ -446,7 +434,7 @@ func (s *Scraper) visitPage(ctx context.Context, urlStr, channelName string, coo
 
 // visitPageOnce makes a single visitPage attempt, reporting whether Cloudflare challenged it.
 func (s *Scraper) visitPageOnce(ctx context.Context, urlStr, channelName string, cookies []*http.Cookie, query models.SiteRules, sol *flareSolverrSolution, setup func(c *colly.Collector)) (challenged bool, err error) {
-	c, err := initializeCollector(ctx, urlStr, channelName, s.cookieManager, query, sol, cookies)
+	c, err := initializeCollector(ctx, urlStr, query, sol, cookies)
 	if err != nil {
 		return false, err
 	}
@@ -477,27 +465,19 @@ func (s *Scraper) visitPageOnce(ctx context.Context, urlStr, channelName string,
 // initializeCollector initializes Colly with any cookies, using a TLS-impersonating transport and user agent if the site
 // sets them.
 //
-// Cookies are set in order, later ones replacing earlier ones with the same name: this crawl session's, then the caller's
-// (e.g. the channel URL's), then for FlareSolverr sites (sol set), the solution's, so a refreshed solve isn't undone by
-// older Cloudflare cookies. FlareSolverr sites impersonate Chrome with the solution's user agent. Requests are canceled with ctx.
-func initializeCollector(ctx context.Context, urlStr, channelName string, cm *CookieManager, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
+// Cookies are set in order, later ones replacing earlier ones with the same name: the caller's (e.g. the channel URL's),
+// then for FlareSolverr sites (sol set), the solution's, so a refreshed solve isn't undone by older Cloudflare cookies.
+// FlareSolverr sites impersonate Chrome with the solution's user agent. Requests are canceled with ctx.
+func initializeCollector(ctx context.Context, urlStr string, query models.SiteRules, sol *flareSolverrSolution, cookies []*http.Cookie) (c *colly.Collector, err error) {
 	jar, err := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookie jar: %w", err)
 	}
 
-	// Set cookies for the domain from this crawl session.
+	// Set the caller's cookies for the page's host.
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
-	}
-
-	// Get cookies from cookie manager for this crawl session.
-	if cached := cm.GetCachedCookies(parsedURL.Hostname(), channelName); cached != nil {
-		jar.SetCookies(parsedURL, cached)
-		logger.Pl.Channel(channelName).D(2, "Set %d cookies for scraper from this crawl session", len(cached))
-	} else {
-		logger.Pl.Channel(channelName).D(2, "No cookies available for scraper for hostname %q", parsedURL.Hostname())
 	}
 	if len(cookies) > 0 {
 		jar.SetCookies(parsedURL, cookies)

@@ -66,7 +66,10 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
 
 // writeText sends msg as a plain text response with status, logging a failure to write it.
 func writeText(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(status)
+	//nolint:gosec // Plain text, which browsers aren't let sniff as HTML.
 	if _, err := io.WriteString(w, msg); err != nil {
 		logger.Pl.E("Failed to write response message: %v", err)
 	}
@@ -959,8 +962,7 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 	}
 
 	// yt-dlp options, checked as saved settings are.
-	o.YtdlpOutputExt = strings.TrimSpace(l.YtdlpOutputExt)
-	if err := validation.ValidateYtdlpOutputExtension(o.YtdlpOutputExt); err != nil {
+	if o.YtdlpOutputExt, err = validation.ValidateYtdlpOutputExtension(l.YtdlpOutputExt); err != nil {
 		return nil, err
 	}
 	if o.MaxFilesize, err = validation.ValidateMaxFilesize(l.MaxFilesize); err != nil {
@@ -970,6 +972,9 @@ func parseOverrideLines(l *models.OverrideLines, m *metarrArgsInput) (o *models.
 		return nil, err
 	}
 	o.ExtraYTDLPVideoArgs = strings.TrimSpace(l.ExtraYTDLPVideoArgs)
+	if _, err := validation.ValidateExtraYtdlpArgs(o.ExtraYTDLPVideoArgs); err != nil {
+		return nil, fmt.Errorf("invalid extra yt-dlp video args: %w", err)
+	}
 	if o.YTDLPPreferredVideoCodecs, err = validation.ValidateYtdlpVideoCodecs(splitNonEmptyLines(l.YTDLPPreferredVideoCodecs)); err != nil {
 		return nil, fmt.Errorf("invalid preferred video codecs: %w", err)
 	}

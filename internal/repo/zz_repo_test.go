@@ -642,6 +642,56 @@ func TestURLSettingsInheritBlankFields(t *testing.T) {
 	}
 }
 
+// TestURLJSONDirFollowsVideoDir tests that a URL without a JSON directory saves metadata beside its own videos, through
+// both URL loaders, even when its channel has a JSON directory, which a URL without its own video directory uses.
+func TestURLJSONDirFollowsVideoDir(t *testing.T) {
+	const (
+		own      = "https://example.com/@own"
+		inherits = "https://example.com/@inherits"
+	)
+	for _, setJSONDir := range []bool{false, true} {
+		t.Run(fmt.Sprintf("channel JSON directory set %t", setJSONDir), func(t *testing.T) {
+			cs := newTestChannelStore(t)
+			c := testChannel(t, "JSON", own, inherits)
+			ownVideoDir := t.TempDir()
+			c.URLModels[0].ChanURLSettings = &models.Settings{VideoDir: ownVideoDir}
+			want := map[string]string{own: ownVideoDir, inherits: c.ChanSettings.VideoDir}
+			wantChannel := c.ChanSettings.VideoDir
+			if setJSONDir {
+				c.ChanSettings.JSONDir = t.TempDir()
+				want = map[string]string{own: ownVideoDir, inherits: c.ChanSettings.JSONDir}
+				wantChannel = c.ChanSettings.JSONDir
+			}
+			id, err := cs.AddChannel(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			loaded, _, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(id, 10), true)
+			if err != nil || loaded.LoadErr != nil {
+				t.Fatalf("GetChannelModel = %v, LoadErr %v", err, loaded.LoadErr)
+			}
+			if got := loaded.ChanSettings.JSONDir; got != wantChannel {
+				t.Errorf("channel JSON directory = %q, want %q", got, wantChannel)
+			}
+			for _, cu := range loaded.URLModels {
+				if got := cu.ChanURLSettings.JSONDir; got != want[cu.URL] {
+					t.Errorf("GetChannelURLModels: %s JSON directory = %q, want %q", cu.URL, got, want[cu.URL])
+				}
+			}
+			for u, dir := range want {
+				cu, _, err := cs.GetChannelURLModel(id, u, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := cu.ChanURLSettings.JSONDir; got != dir {
+					t.Errorf("GetChannelURLModel: %s JSON directory = %q, want %q", u, got, dir)
+				}
+			}
+		})
+	}
+}
+
 // ******************************** Config reload *************************************************************************************
 
 // writeChannelConfig writes a channel config file holding body, returning its path.
@@ -2189,6 +2239,42 @@ func TestIgnoredVideoReturnsToAvailable(t *testing.T) {
 	}
 }
 
+// TestFinishedVideoReturnsToAvailable tests a finished video downloaded again shows on the Available page if the new
+// download fails before its metadata is saved, rather than staying finished with a failed download.
+func TestFinishedVideoReturnsToAvailable(t *testing.T) {
+	cs, vs, ds, c, cuID := redownloadStores(t)
+	db := cs.GetDB()
+	videos := []*models.Video{{ChannelURLID: cuID, ChannelURL: redownloadChannelURL, URL: redownloadVideoURL, Metadata: models.VideoMetadata{Title: "One"}}}
+	if _, err := vs.AddAvailableVideos(videos, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("UPDATE videos SET finished = 1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("UPDATE downloads SET status = ?", consts.DLStatusCompleted); err != nil {
+		t.Fatal(err)
+	}
+
+	chosen := &models.Video{URL: redownloadVideoURL, ChannelURLID: cuID, ChannelURL: redownloadChannelURL}
+	if claimed, err := vs.QueueVideo(c.ID, chosen, true); err != nil || !claimed {
+		t.Fatalf("QueueVideo = %v, %v", claimed, err)
+	}
+	if err := ds.UpdateDownloadStatus(context.Background(), models.StatusUpdate{VideoID: chosen.ID, VideoURL: chosen.URL, Status: consts.DLStatusFailed, Error: errors.New("boom")}); err != nil {
+		t.Fatal(err)
+	}
+
+	available, err := vs.GetAvailableVideos(app.AvailableStatuses...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(available) != 1 || available[0].DownloadStatus.Status != consts.DLStatusFailed {
+		t.Errorf("Available videos = %+v, want the video with status %q", available, consts.DLStatusFailed)
+	}
+	if n, err := vs.CountFinishedVideos(t.Context(), c.ID); err != nil || n != 0 {
+		t.Errorf("finished count: got %d, %v, want 0", n, err)
+	}
+}
+
 // TestRestartRecoversRedownload tests a video re-downloaded when Tubarr was killed can be downloaded again after a restart.
 func TestRestartRecoversRedownload(t *testing.T) {
 	for _, tc := range []struct {
@@ -2392,6 +2478,53 @@ func TestAddChannelKeepsCodecOnlyURLSettings(t *testing.T) {
 	s := urls[0].ChanURLSettings
 	if !slices.Equal(s.YTDLPPreferredVideoCodecs, []string{"av1"}) || !slices.Equal(s.YTDLPPreferredAudioCodecs, []string{"opus"}) {
 		t.Errorf("URL's preferred codecs not saved, got video %v, audio %v", s.YTDLPPreferredVideoCodecs, s.YTDLPPreferredAudioCodecs)
+	}
+}
+
+// TestAddChannelKeepsURLSettingsAsGiven tests a URL's settings are saved as given when its channel is added, as an edit
+// saves them: a No under the channel's Yes, and values the same as the channel's.
+func TestAddChannelKeepsURLSettingsAsGiven(t *testing.T) {
+	const (
+		saysNo = "https://example.com/@no"
+		same   = "https://example.com/@same"
+	)
+	cs := newTestChannelStore(t)
+	yes := true
+	no := false
+	c := testChannel(t, "chan", saysNo, same)
+	c.ChanSettings.UseGlobalCookies = &yes
+	c.ChanSettings.Retries = 3
+	c.ChanMetarrArgs.OutputExt = "mkv"
+	c.URLModels[0].ChanURLSettings = &models.Settings{UseGlobalCookies: &no}
+	c.URLModels[1].ChanURLSettings = &models.Settings{Retries: 3}
+	c.URLModels[1].ChanURLMetarrArgs = &models.MetarrArgs{OutputExt: "mkv"}
+	if err := cs.AddChannelWithDetails(c, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Saved as given.
+	urls, err := cs.GetChannelURLModels(c, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := map[string]*models.ChannelURL{}
+	for _, cu := range urls {
+		saved[cu.URL] = cu
+	}
+	if got := saved[saysNo].ChanURLSettings.UseGlobalCookies; got == nil || *got {
+		t.Errorf("URL's Use Global Cookies = %s, want its No saved", showBool(got))
+	}
+	if s, m := saved[same].ChanURLSettings, saved[same].ChanURLMetarrArgs; s.Retries != 3 || m.OutputExt != "mkv" {
+		t.Errorf("URL's retries %d and output extension %q, want the 3 and mkv it was given", s.Retries, m.OutputExt)
+	}
+
+	// The No wins over the channel's Yes when run.
+	cu, _, err := cs.GetChannelURLModel(c.ID, saysNo, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cu.ChanURLSettings.UseGlobalCookies; got == nil || *got {
+		t.Errorf("merged Use Global Cookies = %s, want the URL's No", showBool(got))
 	}
 }
 
@@ -2936,6 +3069,38 @@ func TestFinishedVideoLists(t *testing.T) {
 	}
 	if len(counts) != 1 || counts[c.ID] != 2 {
 		t.Errorf("failed Metarr counts: got %v, want 2 for channel %d", counts, c.ID)
+	}
+}
+
+// TestAddURLToIgnore tests an ignored URL is stored as an ignore crawl stores one: skipped by crawls, with an Ignored
+// download status, and not counted as a finished video.
+func TestAddURLToIgnore(t *testing.T) {
+	cs := newTestChannelStore(t)
+	c := testChannel(t, "chan", "https://example.com/@a")
+	if err := cs.AddChannelWithDetails(c, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	const ignored = "https://example.com/v/skip"
+	if err := cs.AddURLToIgnore(c.ID, ignored); err != nil {
+		t.Fatal(err)
+	}
+
+	seen, _, err := cs.GetDownloadedOrIgnoredVideoURLs(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(seen, ignored) {
+		t.Errorf("crawl skip list %q doesn't hold the ignored URL", seen)
+	}
+	var status consts.DownloadStatus
+	if err := cs.db.QueryRow("SELECT d.status FROM downloads d JOIN videos v ON v.id = d.video_id WHERE v.url = ?", ignored).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != consts.DLStatusIgnored {
+		t.Errorf("download status = %q, want %q", status, consts.DLStatusIgnored)
+	}
+	if n, err := GetVideoStore(cs.db).CountFinishedVideos(t.Context(), c.ID); err != nil || n != 0 {
+		t.Errorf("finished count: got %d, %v, want 0", n, err)
 	}
 }
 

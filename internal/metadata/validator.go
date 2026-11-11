@@ -4,7 +4,6 @@ package metadata
 import (
 	"cmp"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -19,32 +18,20 @@ import (
 	"github.com/TubarrApp/gocommon/sharedtags"
 )
 
-// ValidateAndFilter parses JSON, applies filters, and checks move operations.
-//
-// Returns true if the video passes all filters and JSON validity checks.
+// ValidateAndFilter reads the video's metadata and checks its download filters, returning whether it passed and its filtered ops.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
 	cu.Log().I("Validating and filtering JSON file %q...", v.Files.JSONFilePath)
-	// Parse and store JSON.
-	jsonValid, err := parseAndStoreJSON(v)
-	if err != nil {
-		cu.Log().E("JSON parsing/storage failed for %q: %v", v.URL, err)
+
+	// A metadata file that can't be read is an error rather than a failed check, so the video isn't marked ignored.
+	if err := parseAndStoreJSON(v); err != nil {
+		return false, nil, nil, fmt.Errorf("metadata can't be used: %w", err)
 	}
 
-	// Apply filters.
-	passedFilters, useFilteredMetaOps, useFilteredFilenameOps, err := handleFilters(v, cu, dirParser)
-	if err != nil {
-		if errors.Is(err, errFilterFile) {
-			// An error rather than a failed check, so the video is skipped but not marked ignored, and is tried again once the file is fixed.
-			return false, useFilteredMetaOps, useFilteredFilenameOps, fmt.Errorf("skipping %q: %w", v.URL, err)
-		}
-		cu.Log().E("filter operation checks failed for %q: %v", v.URL, err)
+	// Apply filters. A filter or filter file that can't be used is an error too, so the video is tried again once it's fixed.
+	if passed, useFilteredMetaOps, useFilteredFilenameOps, err = handleFilters(v, cu, dirParser); err != nil {
+		return false, useFilteredMetaOps, useFilteredFilenameOps, fmt.Errorf("skipping %q: %w", v.URL, err)
 	}
-
-	if !jsonValid || !passedFilters {
-		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
-	}
-
-	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
+	return passed, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 
 // RefreshFromMetarr reloads v's metadata from the file Metarr finished with, taking the title, description and date it
@@ -119,14 +106,14 @@ func metadataDuration(m map[string]any) int {
 	return parsed
 }
 
-// parseAndStoreJSON checks if the JSON is valid and if it passes filter checks.
-func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
+// parseAndStoreJSON reads the video's metadata file, storing its title, date, description, duration and thumbnail.
+func parseAndStoreJSON(v *models.Video) error {
 	m, err := readJSONFile(v.Files.JSONFilePath)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if len(m) == 0 {
-		return false, nil
+		return fmt.Errorf("metadata file %q has no fields", v.Files.JSONFilePath)
 	}
 	v.Metadata.Raw = m
 
@@ -150,7 +137,7 @@ func parseAndStoreJSON(v *models.Video) (valid bool, err error) {
 	bestThumbnail(v, m)
 
 	v.Log().D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Metadata.Title)
-	return true, nil
+	return nil
 }
 
 // bestThumbnail sets the video's thumbnail URL from its metadata, if it has no thumbnail URL already set.
@@ -219,8 +206,8 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 		return false, useFilteredMetaOps, useFilteredFilenameOps, err
 	}
 
-	if !checkFilters(v, allFilters) {
-		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
+	if pass, err = checkFilters(v, allFilters); err != nil || !pass {
+		return false, useFilteredMetaOps, useFilteredFilenameOps, err
 	}
 
 	// Check upload date filter.

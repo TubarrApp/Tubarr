@@ -94,7 +94,7 @@ func newLaneLimits(c *models.Channel, channelLimit int) laneLimits {
 }
 
 // setURL sets a channel URL's limit, stored as 0 when it's the channel's so the URL shares the channel's lane.
-func (lim laneLimits) setURL(id int64, limit int) {
+func (lim *laneLimits) setURL(id int64, limit int) {
 	if limit == lim.channel {
 		limit = 0
 	}

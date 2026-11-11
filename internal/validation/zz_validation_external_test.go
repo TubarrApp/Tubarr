@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 	"tubarr/internal/models"
+	"tubarr/internal/parsing"
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedconsts"
@@ -602,17 +604,20 @@ func TestValidateNotifyURL(t *testing.T) {
 
 // TestValidateYtdlpOutputExtension ------------------------------------------------------------------------------------
 func TestValidateYtdlpOutputExtension(t *testing.T) {
-	var validExts = []string{
-		"mp4",
-		"mov",
-		"mkv",
-		".mp4",
-		".webm",
-	}
-
-	for _, v := range validExts {
-		if err := validation.ValidateYtdlpOutputExtension(v); err != nil {
-			t.Fatalf("valid YTDLP extension failed")
+	for in, want := range map[string]string{
+		"mp4":    "mp4",
+		"mov":    "mov",
+		"mkv":    "mkv",
+		".mp4":   "mp4",
+		".webm":  "webm",
+		" MP4 ":  "mp4",
+		".MKV":   "mkv",
+		"":       "",
+		"Same":   sharedconsts.ExtSame,
+		" same ": sharedconsts.ExtSame,
+	} {
+		if got, err := validation.ValidateYtdlpOutputExtension(in); err != nil || got != want {
+			t.Errorf("ValidateYtdlpOutputExtension(%q) = %q, %v; want %q", in, got, err, want)
 		}
 	}
 
@@ -622,17 +627,49 @@ func TestValidateYtdlpOutputExtension(t *testing.T) {
 	}
 
 	for _, v := range invalidExts {
-		if err := validation.ValidateYtdlpOutputExtension(v); err == nil {
+		if _, err := validation.ValidateYtdlpOutputExtension(v); err == nil {
 			t.Fatalf("invalid YTDLP extension passed")
 		}
+	}
+}
+
+// TestValidateExtraYtdlpArgs tests extra yt-dlp args are split, and refused if one is blocked or they can't be split.
+func TestValidateExtraYtdlpArgs(t *testing.T) {
+	if got, err := validation.ValidateExtraYtdlpArgs(`-f "bv*+ba" --no-mtime`); err != nil || !slices.Equal(got, []string{"-f", "bv*+ba", "--no-mtime"}) {
+		t.Errorf("got %q, %v; want the args split", got, err)
+	}
+	if got, err := validation.ValidateExtraYtdlpArgs(""); err != nil || len(got) != 0 {
+		t.Errorf("blank args: got %q, %v; want none", got, err)
+	}
+	for _, bad := range []string{"--exec 'rm -rf x'", "--no-mtime --config-location /tmp/x", `-f "unclosed`} {
+		if _, err := validation.ValidateExtraYtdlpArgs(bad); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+}
+
+// TestBlockedYtdlpArgsRefusedOnSave tests a settings save refuses extra yt-dlp args holding a blocked option.
+func TestBlockedYtdlpArgsRefusedOnSave(t *testing.T) {
+	blocked := "--exec 'touch x'"
+	for name, in := range map[string]models.SettingsInput{
+		"video":    {ExtraYTDLPVideoArgs: &blocked},
+		"metadata": {ExtraYTDLPMetaArgs: &blocked},
+		"crawl":    {ExtraYTDLPCrawlArgs: &blocked},
+	} {
+		if err := parsing.ApplySettingsInput(&models.Settings{}, &in); err == nil {
+			t.Errorf("%s args: a blocked option was accepted", name)
+		}
+	}
+	if err := validation.ValidateSettingsModel(&models.Settings{ExtraYTDLPCrawlArgs: blocked}, false); err == nil {
+		t.Error("loaded settings with a blocked crawl option passed validation")
 	}
 }
 
 // TestSameAndKeepChoices tests the 'Same as input' extensions and 'Keep' metadata files are accepted and kept as chosen.
 func TestSameAndKeepChoices(t *testing.T) {
 	// yt-dlp's extension.
-	if err := validation.ValidateYtdlpOutputExtension(sharedconsts.ExtSame); err != nil {
-		t.Errorf("yt-dlp extension %q: %v", sharedconsts.ExtSame, err)
+	if got, err := validation.ValidateYtdlpOutputExtension(sharedconsts.ExtSame); err != nil || got != sharedconsts.ExtSame {
+		t.Errorf("yt-dlp extension %q: got %q, %v", sharedconsts.ExtSame, got, err)
 	}
 
 	// Metarr's extension, with codecs, and metadata files.
@@ -834,6 +871,53 @@ func TestValidateMetarrArgsModelGPUNode(t *testing.T) {
 	}
 	if err := validation.ValidateMetarrArgsModel(m, true); err == nil {
 		t.Error("saving with a missing GPU node succeeded")
+	}
+}
+
+// TestValidateMetarrArgsModelUnsupportedGPU tests a GPU type this OS doesn't support is left out, as its warning says.
+func TestValidateMetarrArgsModelUnsupportedGPU(t *testing.T) {
+	for _, accel := range []string{sharedconsts.AccelTypeAMF, sharedconsts.AccelTypeVideoToolbox} {
+		if sharedvalidation.OSSupportsAccelType(accel) {
+			continue
+		}
+		m := &models.MetarrArgs{TranscodeGPU: accel}
+		if err := validation.ValidateMetarrArgsModel(m, false); err != nil {
+			t.Fatalf("%s: %v", accel, err)
+		}
+		if m.TranscodeGPU != "" {
+			t.Errorf("unsupported GPU %q kept as %q", accel, m.TranscodeGPU)
+		}
+	}
+}
+
+// TestBadSettingsKeptForTheirErrors tests a setting that fails validation is named in the error and left as it was, so
+// the edit page still shows it.
+func TestBadSettingsKeptForTheirErrors(t *testing.T) {
+	const bad = "bogus-value"
+	var s models.Settings
+	for name, field := range map[string]*string{
+		"from date":        &s.FromDate,
+		"to date":          &s.ToDate,
+		"max filesize":     &s.MaxFilesize,
+		"max resolution":   &s.MaxResolution,
+		"yt-dlp extension": &s.YtdlpOutputExt,
+	} {
+		s = models.Settings{}
+		*field = bad
+		if err := validation.ValidateSettingsModel(&s, false); err == nil || !strings.Contains(err.Error(), bad) {
+			t.Errorf("%s: got %v, want an error naming %q", name, err, bad)
+		}
+		if *field != bad {
+			t.Errorf("%s: left as %q, want %q kept", name, *field, bad)
+		}
+	}
+
+	m := &models.MetarrArgs{MetaPurge: bad}
+	if err := validation.ValidateMetarrArgsModel(m, false); err == nil || !strings.Contains(err.Error(), bad) {
+		t.Errorf("metadata purge: got %v, want an error naming %q", err, bad)
+	}
+	if m.MetaPurge != bad {
+		t.Errorf("metadata purge: left as %q, want %q kept", m.MetaPurge, bad)
 	}
 }
 

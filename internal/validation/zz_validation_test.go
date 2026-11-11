@@ -42,7 +42,12 @@ func FuzzValidateStrings(f *testing.F) {
 				t.Errorf("ValidateToFromDate(%q) = %q, but validating that gives %q, %v", s, out, again, err)
 			}
 		}
-		_ = ValidateYtdlpOutputExtension(s)
+		if out, err := ValidateYtdlpOutputExtension(s); err == nil {
+			if again, err := ValidateYtdlpOutputExtension(out); err != nil || again != out {
+				t.Errorf("ValidateYtdlpOutputExtension(%q) = %q, but validating that gives %q, %v", s, out, again, err)
+			}
+		}
+		_, _ = ValidateExtraYtdlpArgs(s)
 		_ = ValidateRenameFlag(s)
 		_, _ = ValidatePurgeMetafiles(s)
 		_, _ = ValidateGPUAcceleration(s)

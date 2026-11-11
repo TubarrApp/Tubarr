@@ -105,6 +105,7 @@ func solveFlareSolverr(ctx context.Context, baseURL, pageURL string, timeout tim
 
 	sol = &flareSolverrSolution{userAgent: fsResp.Solution.UserAgent}
 	for _, c := range fsResp.Solution.Cookies {
+		//nolint:gosec // A cookie FlareSolverr's browser got, with the attributes it gave, for the cookie file.
 		cookie := &http.Cookie{Name: c.Name, Value: c.Value, Domain: cmp.Or(c.Domain, pageHost), Path: c.Path, HttpOnly: c.HTTPOnly, Secure: c.Secure}
 		if c.Expires > 0 {
 			cookie.Expires = time.Unix(int64(c.Expires), 0)
@@ -231,12 +232,12 @@ func (cm *CookieManager) flareSolverrFailed(host, channelName string, statusCode
 	return err
 }
 
-// flareSolverrResolver returns a function that solves cu's URL through FlareSolverr again (unless already solved since
+// flareSolverrResolver returns a function that solves pageURL through FlareSolverr again (unless already solved since
 // staleGen), and rewrites cu's cookie file with the new cookies on top of baseCookies.
 //
 // The solves are made under ctx, the context of the crawl or download job the cookies are for.
-func (cm *CookieManager) flareSolverrResolver(ctx context.Context, cu *models.ChannelURL, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
-	pageURL, cookiePath := cu.URL, cu.Session.CookiePath
+func (cm *CookieManager) flareSolverrResolver(ctx context.Context, cu *models.ChannelURL, pageURL string, baseCookies []*http.Cookie) func(staleGen int) (models.FlareSolverrSolve, error) {
+	cookiePath := cu.Session.CookiePath
 	return func(staleGen int) (models.FlareSolverrSolve, error) {
 		sol, err := cm.flareSolverrSolution(ctx, pageURL, cu.ChannelName, staleGen)
 		if err != nil {
@@ -249,10 +250,10 @@ func (cm *CookieManager) flareSolverrResolver(ctx context.Context, cu *models.Ch
 	}
 }
 
-// flareSolverrNewer returns a function that, if a solve newer than gen has been made for cu's URL (e.g. by Tubarr's own
+// flareSolverrNewer returns a function that, if a solve newer than gen has been made for pageURL (e.g. by Tubarr's own
 // requests), rewrites cu's cookie file with its cookies on top of baseCookies and returns it. It never contacts FlareSolverr.
-func (cm *CookieManager) flareSolverrNewer(cu *models.ChannelURL, baseCookies []*http.Cookie) func(gen int) (models.FlareSolverrSolve, bool, error) {
-	pageURL, cookiePath := cu.URL, cu.Session.CookiePath
+func (cm *CookieManager) flareSolverrNewer(cu *models.ChannelURL, pageURL string, baseCookies []*http.Cookie) func(gen int) (models.FlareSolverrSolve, bool, error) {
+	cookiePath := cu.Session.CookiePath
 	return func(gen int) (models.FlareSolverrSolve, bool, error) {
 		u, err := url.Parse(pageURL)
 		if err != nil {
