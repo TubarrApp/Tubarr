@@ -199,37 +199,60 @@ func TestEncoderLinesForCopiedVideo(t *testing.T) {
 	}
 }
 
-// TestExtraFFmpegArgsOnCopiedAudio tests audio options are refused when audio is only ever copied, and left alone otherwise.
-func TestExtraFFmpegArgsOnCopiedAudio(t *testing.T) {
+// TestExtraFFmpegArgsAudioOptions tests audio filters and audio encoding options are refused in extra FFmpeg args, whatever
+// the audio codecs.
+func TestExtraFFmpegArgsAudioOptions(t *testing.T) {
 	for _, c := range []struct {
 		name  string
 		extra string
 		audio []string
-		ext   string
 		ok    bool
 	}{
 		{name: "filter with no codec", extra: "-af volume=0.5"},
 		{name: "filter with plain copy", extra: "-filter:a volume=0.5", audio: []string{"copy"}},
-		{name: "bitrate with no codec", extra: "-b:a 128k"},
+		{name: "filter with a codec", extra: "-af volume=0.5", audio: []string{"aac"}},
+		{name: "bitrate with a codec", extra: "-b:a 128k", audio: []string{"aac"}},
 		{name: "first stream's bitrate with no codec", extra: "-b:a:0 128k"},
 		{name: "channels with no codec", extra: "-ac 1"},
-		{name: "sample rate with plain copy and a container", extra: "-ar 44100", audio: []string{"copy"}, ext: ".mp4"},
+		{name: "sample rate with a pair", extra: "-ar 44100", audio: []string{"dts:ac3"}},
 		{name: "quality with no codec", extra: "-q:a 2"},
-
-		{name: "filter with a codec", extra: "-af volume=0.5", audio: []string{"aac"}, ok: true},
-		{name: "filter with a pair, which depends on the video", extra: "-af volume=0.5", audio: []string{"dts:ac3"}, ok: true},
-		{name: "filter when the container may force a codec", extra: "-af volume=0.5", ext: ".mp4", ok: true},
-		{name: "bitrate with a codec", extra: "-b:a 128k", audio: []string{"aac"}, ok: true},
 		{name: "settings that don't touch audio", extra: "-movflags +faststart -threads 1", ok: true},
 
 		// Fail on FFmpeg 9 with these builds, but that could change.
 		{name: "-vsync", extra: "-vsync cfr", ok: true},
-		{name: "Opus with a rate it refuses here", extra: "-ar 44100", audio: []string{"opus"}, ok: true},
-		{name: "Opus with a quality it refuses here", extra: "-q:a 2", audio: []string{"opus"}, ok: true},
 		{name: "AAC filter on AC-3", extra: "-bsf:a aac_adtstoasc", audio: []string{"ac3"}, ok: true},
 		{name: "HEVC tag", extra: "-tag:v hvc1", ok: true},
 	} {
-		m := &models.MetarrArgs{ExtraFFmpegArgs: c.extra, TranscodeAudioCodecs: c.audio, OutputExt: c.ext}
+		m := &models.MetarrArgs{ExtraFFmpegArgs: c.extra, TranscodeAudioCodecs: c.audio}
+		if err := validation.ValidateMetarrEncoderArgs(m); (err == nil) != c.ok {
+			t.Errorf("%s: got %v, want ok %t", c.name, err, c.ok)
+		}
+	}
+}
+
+// TestAudioEncoderArgs tests audio encoder args that can't work are refused, and anything that might work on some FFmpeg version saves.
+func TestAudioEncoderArgs(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		line  string
+		audio []string
+		ok    bool
+	}{
+		// Can't work.
+		{name: "copy line", line: "copy:-b:a 128k"},
+		{name: "line for copied audio", line: "aac:-b:a 128k", audio: []string{"copy"}},
+		{name: "no codec", line: "-b:a 128k"},
+		{name: "two filters", line: "aac:-af volume=2 -filter:a loudnorm"},
+
+		// Working values.
+		{name: "bitrate, channels and filter", line: "aac:-b:a 160k -ac 2 -af loudnorm", audio: []string{"aac"}, ok: true},
+		{name: "sample rate in kHz", line: "aac:-ar 44.1k", ok: true},
+
+		// Fail on FFmpeg 9 with these builds, but that could change.
+		{name: "Opus with a rate it refuses here", line: "opus:-ar 44100", audio: []string{"opus"}, ok: true},
+		{name: "Opus with a quality it refuses here", line: "opus:-q:a 2", audio: []string{"opus"}, ok: true},
+	} {
+		m := &models.MetarrArgs{TranscodeAudioArgs: []string{c.line}, TranscodeAudioCodecs: c.audio}
 		if err := validation.ValidateMetarrEncoderArgs(m); (err == nil) != c.ok {
 			t.Errorf("%s: got %v, want ok %t", c.name, err, c.ok)
 		}

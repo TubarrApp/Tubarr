@@ -262,6 +262,11 @@ starts, or download-as-cancel if Download As closes without starting. -->
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec:args (e.g., hevc:-crf 24)</p>
           </div>
           <div>
+            <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Audio Encoder Args</label>
+            <textarea x-model="form.metarr.metarr_transcode_audio_args" placeholder="None" rows="2" class="w-full rounded border px-2 py-1 text-xs font-mono dark:bg-gray-900 dark:border-gray-700 dark:text-white/90"></textarea>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: codec:args (e.g., aac:-b:a 160k)</p>
+          </div>
+          <div>
             <label class="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Extra FFmpeg Args</label>
             <input type="text" x-model="form.metarr.metarr_extra_ffmpeg_args" placeholder="None" class="w-full h-8 rounded border px-2 text-xs font-mono dark:bg-gray-900 dark:border-gray-700 dark:text-white/90" />
           </div>
@@ -334,11 +339,11 @@ starts, or download-as-cancel if Download As closes without starting. -->
       thumbError: null,
       metarrKeys: [
         'metarr_purge_metafile', 'metarr_purge_original_video', 'metarr_write_nfo', 'metarr_output_ext', 'metarr_rename_style', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
-        'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_video_args', 'metarr_transcode_video_transcode_codecs',
+        'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_video_args', 'metarr_transcode_audio_args', 'metarr_transcode_video_transcode_codecs',
         'metarr_transcode_audio_codecs', 'metarr_extra_ffmpeg_args'
       ],
       // Filled with the channel URL's, and replacing them, as the op boxes do.
-      metarrBoxes: ['metarr_transcode_video_args', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs', 'metarr_extra_ffmpeg_args'],
+      metarrBoxes: ['metarr_transcode_video_args', 'metarr_transcode_audio_args', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs', 'metarr_extra_ffmpeg_args'],
       loading: false,
       loaded: false, // Ops filled, so empty boxes mean the user cleared them.
       working: false,

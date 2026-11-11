@@ -528,6 +528,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		{keys.TranscodeCodec, "TranscodeVideoCodecs", true, []string{"h264"}, []string{}},
 		{keys.TranscodeAudioCodec, "TranscodeAudioCodecs", true, []string{"aac"}, []string{}},
 		{keys.TranscodeVideoArgs, "TranscodeVideoArgs", true, []string{"av1:-crf 35"}, []string{}},
+		{keys.TranscodeAudioArgs, "TranscodeAudioArgs", true, []string{"aac:-b:a 128k"}, []string{}},
 	}
 
 	must := func(err error) {
@@ -588,6 +589,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		TranscodeVideoCodecs:    []string{"h264"},
 		TranscodeAudioCodecs:    []string{"aac"},
 		TranscodeVideoArgs:      []string{"av1:-crf 35"},
+		TranscodeAudioArgs:      []string{"aac:-b:a 128k"},
 		ExtraFFmpegArgs:         "-map 0",
 
 		MetaOpsReplaceInherited:             true,

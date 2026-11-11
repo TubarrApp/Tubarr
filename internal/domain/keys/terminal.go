@@ -45,6 +45,7 @@ const (
 	TranscodeCodec      string = "metarr-transcode-video-codecs"
 	TranscodeAudioCodec string = "metarr-transcode-audio-codecs"
 	TranscodeVideoArgs  string = "metarr-transcode-video-args"
+	TranscodeAudioArgs  string = "metarr-transcode-audio-args"
 )
 
 // Downloading.

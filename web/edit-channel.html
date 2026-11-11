@@ -407,6 +407,7 @@
               metarr_transcode_video_transcode_codecs: '',
               metarr_transcode_audio_codecs: '',
               metarr_transcode_video_args: '',
+              metarr_transcode_audio_args: '',
               metarr_extra_ffmpeg_args: '',
               metarr_filename_ops: '',
               metarr_filename_ops_file: '',
@@ -498,7 +499,7 @@
 
           populateFormData(data) {
             const codecFields = this.codecFields;
-            const metarrLineFields = ['metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs', 'metarr_transcode_video_args'];
+            const metarrLineFields = ['metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs', 'metarr_transcode_video_args', 'metarr_transcode_audio_args'];
             const normalizeBool = (val) => {
               if (val === true || val === 'true') return true;
               if (val === false || val === 'false') return false;
@@ -685,6 +686,7 @@
               metarr_transcode_video_transcode_codecs: '',
               metarr_transcode_audio_codecs: '',
               metarr_transcode_video_args: '',
+              metarr_transcode_audio_args: '',
               metarr_extra_ffmpeg_args: '',
               metarr_meta_ops_file: '',
               metarr_meta_ops: '',
@@ -951,7 +953,7 @@
                   'metarr_output_directory', 'metarr_purge_metafile', 'metarr_output_ext', 'metarr_rename_style',
                   'metarr_concurrency', 'metarr_max_cpu_usage', 'metarr_min_free_mem',
                   'metarr_gpu', 'metarr_transcode_gpu_node', 'metarr_transcode_video_transcode_codecs', 'metarr_transcode_audio_codecs',
-                  'metarr_transcode_video_args',
+                  'metarr_transcode_video_args', 'metarr_transcode_audio_args',
                   'metarr_extra_ffmpeg_args', 'metarr_meta_ops', 'metarr_meta_ops_file',
                   'metarr_filename_ops', 'metarr_filename_ops_file',
                   'metarr_filtered_meta_ops', 'metarr_filtered_meta_ops_file',

@@ -995,7 +995,7 @@ func editPageForm(f channelFormFields, got channelDetails) url.Values {
 			switch {
 			case v == nil || v == "" || !slices.Contains(f.urlMetarr, k):
 			case k == "metarr_max_cpu_usage" && v == float64(0):
-			case k == "metarr_transcode_video_transcode_codecs" || k == "metarr_transcode_audio_codecs" || k == "metarr_transcode_video_args":
+			case k == "metarr_transcode_video_transcode_codecs" || k == "metarr_transcode_audio_codecs" || k == "metarr_transcode_video_args" || k == "metarr_transcode_audio_args":
 				metarr[k] = formValue(v) // The page shows Metarr codec and encoder arg lists as text, and sends them so.
 			default:
 				metarr[k] = v
@@ -2378,6 +2378,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		"metarr_transcode_video_transcode_codecs": {"h264:hevc", "vp9:h264"},
 		"metarr_transcode_audio_codecs":           {"aac:opus", "flac:mp3"},
 		"metarr_transcode_video_args":             {"hevc:-crf 23", "av1:-crf 35 -preset 6\nvp9:-crf 31"},
+		"metarr_transcode_audio_args":             {"opus:-b:a 96k", "mp3:-q:a 2\naac:-b:a 128k -ac 2"},
 		"metarr_extra_ffmpeg_args":                {"-threads 2", "-threads 4"},
 		"metarr_filename_ops":                     {"prefix:[CAT] ", "suffix: [DOG]"},
 		"metarr_filename_ops_file":                {file("filename-ops-a.txt", "prefix:[A] \n"), file("filename-ops-b.txt", "prefix:[B] \n")},
@@ -5123,7 +5124,7 @@ func TestCheckOverridesFit(t *testing.T) {
 		{ID: 1, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeVideoCodecs: []string{"h264"}}},
 		{ID: 2, ChanURLMetarrArgs: &models.MetarrArgs{OutputExt: "webm"}},
 		{ID: 3},
-		{ID: 4, ChanURLMetarrArgs: &models.MetarrArgs{ExtraFFmpegArgs: "-af volume=0.5", TranscodeAudioCodecs: []string{"aac"}}},
+		{ID: 4, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeAudioArgs: []string{"aac:-af volume=0.5"}, TranscodeAudioCodecs: []string{"aac"}}},
 		{ID: 5, ChanURLMetarrArgs: &models.MetarrArgs{TranscodeGPU: "cuda", TranscodeVideoArgs: []string{"av1:-preset p5"}}},
 	}}
 	tests := []struct {
@@ -5143,9 +5144,10 @@ func TestCheckOverridesFit(t *testing.T) {
 		{"an NVENC preset under the URL's GPU", 5, models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}}, true},
 		{"the URL's NVENC preset with the GPU turned off", 5, models.MetarrArgs{TranscodeGPU: "none", TranscodeVideoArgs: []string{"av1:-preset p5"}}, false},
 		{"the URL's NVENC preset removed with the GPU turned off", 5, models.MetarrArgs{TranscodeGPU: "none"}, true},
-		{"copied audio with the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}, ExtraFFmpegArgs: "-af volume=0.5"}, false},
-		{"copied audio with the URL's audio filter removed", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}}, true},
-		{"another audio codec with the URL's audio filter", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"ac3"}, ExtraFFmpegArgs: "-af volume=0.5"}, true},
+		{"copied audio with the URL's audio encoder args", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}, TranscodeAudioArgs: []string{"aac:-af volume=0.5"}}, false},
+		{"copied audio with the URL's audio encoder args removed", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"copy"}}, true},
+		{"an audio filter in audio encoder args", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"ac3"}, TranscodeAudioArgs: []string{"ac3:-af volume=0.5"}}, true},
+		{"an audio filter in extra args", 4, models.MetarrArgs{TranscodeAudioCodecs: []string{"ac3"}, ExtraFFmpegArgs: "-af volume=0.5"}, false},
 	}
 	for _, tt := range tests {
 		err := checkOverridesFit(c.URLByID(tt.urlID), &models.VideoOverrides{MetarrArgs: tt.o})
@@ -5220,6 +5222,7 @@ func TestMatchesChannelURL(t *testing.T) {
 		{"preferred video codecs", models.VideoOverrides{YTDLPPreferredVideoCodecs: []string{"av1"}}, false},
 		{"another output extension", models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputExt: "mkv"}}, false},
 		{"video encoder args", models.VideoOverrides{MetarrArgs: models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-crf 35"}}}, false},
+		{"audio encoder args", models.VideoOverrides{MetarrArgs: models.MetarrArgs{TranscodeAudioArgs: []string{"aac:-b:a 128k"}}}, false},
 		{"the channel URL's output directory, which beats move ops", models.VideoOverrides{MetarrArgs: models.MetarrArgs{OutputDir: "/out"}}, false},
 	}
 	yes, no := true, false
@@ -5300,30 +5303,36 @@ func TestMatchesChannelURL(t *testing.T) {
 	videoCodecs := []string{"h264:av1"}
 	audioCodecs := []string{"aac"}
 	videoArgs := []string{"av1:-pix_fmt yuv420p10le"}
+	audioArgs := []string{"aac:-b:a 128k"}
 	extraArgs := "-map_metadata 0"
 	cu.ChanURLMetarrArgs.TranscodeVideoCodecs = videoCodecs
 	cu.ChanURLMetarrArgs.TranscodeAudioCodecs = audioCodecs
 	cu.ChanURLMetarrArgs.TranscodeVideoArgs = videoArgs
+	cu.ChanURLMetarrArgs.TranscodeAudioArgs = audioArgs
 	cu.ChanURLMetarrArgs.ExtraFFmpegArgs = extraArgs
 	for _, tt := range []struct {
-		name    string
-		video   []string
-		audio   []string
-		args    []string
-		extra   string
-		matches bool
+		name      string
+		video     []string
+		audio     []string
+		videoArgs []string
+		audioArgs []string
+		extra     string
+		matches   bool
 	}{
-		{"sent back as loaded", videoCodecs, audioCodecs, videoArgs, extraArgs, true},
-		{"video codecs emptied", nil, audioCodecs, videoArgs, extraArgs, false},
-		{"audio codecs emptied", videoCodecs, nil, videoArgs, extraArgs, false},
-		{"encoder args emptied", videoCodecs, audioCodecs, nil, extraArgs, false},
-		{"extra args emptied", videoCodecs, audioCodecs, videoArgs, "", false},
-		{"encoder args edited", videoCodecs, audioCodecs, []string{"av1:-crf 40"}, extraArgs, false},
+		{"sent back as loaded", videoCodecs, audioCodecs, videoArgs, audioArgs, extraArgs, true},
+		{"video codecs emptied", nil, audioCodecs, videoArgs, audioArgs, extraArgs, false},
+		{"audio codecs emptied", videoCodecs, nil, videoArgs, audioArgs, extraArgs, false},
+		{"video encoder args emptied", videoCodecs, audioCodecs, nil, audioArgs, extraArgs, false},
+		{"audio encoder args emptied", videoCodecs, audioCodecs, videoArgs, nil, extraArgs, false},
+		{"extra args emptied", videoCodecs, audioCodecs, videoArgs, audioArgs, "", false},
+		{"video encoder args edited", videoCodecs, audioCodecs, []string{"av1:-crf 40"}, audioArgs, extraArgs, false},
+		{"audio encoder args edited", videoCodecs, audioCodecs, videoArgs, []string{"aac:-b:a 96k"}, extraArgs, false},
 	} {
 		o := *sent
 		o.TranscodeVideoCodecs = tt.video
 		o.TranscodeAudioCodecs = tt.audio
-		o.TranscodeVideoArgs = tt.args
+		o.TranscodeVideoArgs = tt.videoArgs
+		o.TranscodeAudioArgs = tt.audioArgs
 		o.ExtraFFmpegArgs = tt.extra
 		if got := matchesChannelURL(cu, defaults, &o); got != tt.matches {
 			t.Errorf("transcode boxes, %s: got match %t, want %t", tt.name, got, tt.matches)
@@ -6196,6 +6205,7 @@ func TestWebSettingsRefused(t *testing.T) {
 		{"metarr_purge_metafile", "bogus"},
 		{"metarr_min_free_mem", "lots"},
 		{"metarr_transcode_video_args", "av1:-crf high"},
+		{"metarr_transcode_audio_args", "copy:-b:a 128k"},
 		{"metarr_extra_ffmpeg_args", "-vf scale=1280:-2"},
 		{"metarr_transcode_audio_codecs", "bogus"},
 		{"metarr_meta_ops", "nonsense"},

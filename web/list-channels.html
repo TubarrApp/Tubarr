@@ -385,6 +385,10 @@
                               <span class="text-gray-500 dark:text-gray-400">Video Encoder Args:</span>
                               <span :class="channel.metarr?.metarr_transcode_video_args?.length ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="Array.isArray(channel.metarr?.metarr_transcode_video_args) && channel.metarr.metarr_transcode_video_args.length > 0 ? channel.metarr.metarr_transcode_video_args.join(', ') : 'Not set'"></span>
                             </div>
+                            <div>
+                              <span class="text-gray-500 dark:text-gray-400">Audio Encoder Args:</span>
+                              <span :class="channel.metarr?.metarr_transcode_audio_args?.length ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="Array.isArray(channel.metarr?.metarr_transcode_audio_args) && channel.metarr.metarr_transcode_audio_args.length > 0 ? channel.metarr.metarr_transcode_audio_args.join(', ') : 'Not set'"></span>
+                            </div>
                             <div class="md:col-span-2">
                               <span class="text-gray-500 dark:text-gray-400">Extra FFmpeg Args:</span>
                               <span :class="channel.metarr?.metarr_extra_ffmpeg_args ? 'font-mono' : ''" class="ml-2 text-gray-900 dark:text-white text-sm break-words" x-text="channel.metarr?.metarr_extra_ffmpeg_args || 'Not set'"></span>

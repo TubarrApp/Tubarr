@@ -1017,6 +1017,17 @@ func TestKnownBadEncoderArgsRefusedOnSave(t *testing.T) {
 	if err := cs.AddChannelWithDetails(c, nil, nil); err == nil {
 		t.Error("added a channel with a URL's x265 option on VP8")
 	}
+	c = testChannel(t, "new", "https://example.com/@new")
+	c.ChanMetarrArgs.TranscodeAudioArgs = []string{"copy:-b:a 128k"}
+	if err := cs.AddChannelWithDetails(c, nil, nil); err == nil {
+		t.Error("added a channel with an audio copy line")
+	}
+	c = testChannel(t, "new", "https://example.com/@new")
+	c.ChanMetarrArgs.ExtraFFmpegArgs = "-b:a 128k"
+	c.ChanMetarrArgs.TranscodeAudioCodecs = []string{"aac"}
+	if err := cs.AddChannelWithDetails(c, nil, nil); err == nil {
+		t.Error("added a channel with an audio option in its extra FFmpeg args")
+	}
 
 	// A channel's line every URL replaces, which later URLs would still inherit.
 	c = testChannel(t, "new", "https://example.com/@new")
@@ -1105,6 +1116,41 @@ func TestStoredBadEncoderArgsStillLoad(t *testing.T) {
 	}
 }
 
+// TestStoredExtraArgsAudioOptionsStillLoad tests extra FFmpeg args holding an audio option, saved before those were refused,
+// still come back from the database, and save again once the option moves to audio encoder args.
+func TestStoredExtraArgsAudioOptionsStillLoad(t *testing.T) {
+	cs := newTestChannelStore(t)
+	id, err := cs.AddChannel(testChannel(t, "chan", "https://example.com/@a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := []byte(`{"metarr_extra_ffmpeg_args":"-b:a 128k","metarr_transcode_audio_codecs":["aac"]}`)
+	if _, err := cs.db.Exec(`UPDATE channels SET metarr = ? WHERE id = ?`, stored, id); err != nil {
+		t.Fatal(err)
+	}
+
+	// It loads, with the option there to move.
+	c, found, err := cs.GetChannelModel(consts.QChanID, strconv.FormatInt(id, 10), true)
+	if err != nil || !found {
+		t.Fatalf("GetChannelModel = found %t, %v", found, err)
+	}
+	if c.LoadErr != nil {
+		t.Errorf("LoadErr = %v", c.LoadErr)
+	}
+
+	// Saving Metarr args, until the option moves.
+	if err := setChannelOutputExt(cs, "mp4"); err == nil {
+		t.Error("saved Metarr args still holding -b:a in extra FFmpeg args")
+	}
+	if _, err := cs.UpdateChannelMetarrArgsJSON(consts.QChanName, "chan", func(m *models.MetarrArgs) error {
+		m.ExtraFFmpegArgs = ""
+		m.TranscodeAudioArgs = []string{"aac:-b:a 128k"}
+		return nil
+	}); err != nil {
+		t.Errorf("refused -b:a moved to audio encoder args: %v", err)
+	}
+}
+
 // TestProfileEncoderArgsJudgedWithChannelGPU tests a profile alone is only refused for what no GPU could change, with the rest
 // judged by the channels using it, as a value bad on software encoders may suit their GPU's.
 func TestProfileEncoderArgsJudgedWithChannelGPU(t *testing.T) {
@@ -1113,6 +1159,9 @@ func TestProfileEncoderArgsJudgedWithChannelGPU(t *testing.T) {
 	// Alone.
 	if err := cs.AddProfile(&models.Profile{Name: "copy", ProfileMetarrArgs: &models.MetarrArgs{TranscodeVideoArgs: []string{"copy:-crf 20"}}}); err == nil {
 		t.Error("added a profile with a copy line")
+	}
+	if err := cs.AddProfile(&models.Profile{Name: "audio-copy", ProfileMetarrArgs: &models.MetarrArgs{TranscodeAudioArgs: []string{"copy:-b:a 128k"}}}); err == nil {
+		t.Error("added a profile with an audio copy line")
 	}
 	nvenc := addTestProfile(t, cs, "nvenc", nil, &models.MetarrArgs{TranscodeVideoArgs: []string{"av1:-preset p5"}})
 	nvenc.ProfileMetarrArgs.TranscodeVideoArgs = []string{"copy:-crf 20"}
@@ -1209,6 +1258,7 @@ func fullMetarrArgs() *models.MetarrArgs {
 		TranscodeVideoCodecs:    []string{"h264"},
 		TranscodeAudioCodecs:    []string{"aac"},
 		TranscodeVideoArgs:      []string{"hevc:-crf 23"},
+		TranscodeAudioArgs:      []string{"aac:-b:a 128k"},
 		ExtraFFmpegArgs:         "-x",
 
 		MetaOpsReplaceInherited:             true,

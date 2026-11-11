@@ -183,6 +183,7 @@ type metarrArgsResponse struct {
 	VideoCodecs             []string `json:"metarr_transcode_video_transcode_codecs,omitempty"`
 	AudioCodecs             []string `json:"metarr_transcode_audio_codecs,omitempty"`
 	VideoArgs               []string `json:"metarr_transcode_video_args,omitempty"`
+	AudioArgs               []string `json:"metarr_transcode_audio_args,omitempty"`
 	ExtraFFmpegArgs         string   `json:"metarr_extra_ffmpeg_args,omitempty"`
 	FilenameOpsFile         string   `json:"metarr_filename_ops_file,omitempty"`
 	FilteredFilenameOpsFile string   `json:"metarr_filtered_filename_ops_file,omitempty"`
@@ -220,6 +221,7 @@ func newMetarrArgsResponse(m *models.MetarrArgs) *metarrArgsResponse {
 		VideoCodecs:             m.TranscodeVideoCodecs,
 		AudioCodecs:             m.TranscodeAudioCodecs,
 		VideoArgs:               m.TranscodeVideoArgs,
+		AudioArgs:               m.TranscodeAudioArgs,
 		ExtraFFmpegArgs:         m.ExtraFFmpegArgs,
 		FilenameOpsFile:         m.FilenameOpsFile,
 		FilteredFilenameOpsFile: m.FilteredFilenameOpsFile,
@@ -502,6 +504,7 @@ type metarrArgsInput struct {
 	VideoCodecs             *string  `json:"metarr_transcode_video_transcode_codecs"` // Newline-separated, as in the main form.
 	AudioCodecs             *string  `json:"metarr_transcode_audio_codecs"`
 	VideoArgs               *string  `json:"metarr_transcode_video_args"` // Newline-separated, as in the main form.
+	AudioArgs               *string  `json:"metarr_transcode_audio_args"`
 	MetarrConcurrency       *int     `json:"metarr_concurrency"`
 	MaxCPU                  *float64 `json:"metarr_max_cpu_usage"`
 	FilenameOps             *string  `json:"metarr_filename_ops"`
@@ -715,6 +718,7 @@ func (in *metarrArgsInput) input() *models.MetarrArgsInput {
 		TranscodeGPU:            in.GPU,
 		TranscodeGPUNode:        in.GPUNode,
 		TranscodeVideoArgs:      linesInput(in.VideoArgs, splitNonEmptyLines),
+		TranscodeAudioArgs:      linesInput(in.AudioArgs, splitNonEmptyLines),
 		TranscodeVideoCodec:     linesInput(in.VideoCodecs, splitNonEmptyLines),
 		TranscodeAudioCodec:     linesInput(in.AudioCodecs, splitNonEmptyLines),
 		MinFreeMem:              in.MinFreeMem,
@@ -892,6 +896,7 @@ func metarrArgsFromForm(r *http.Request) (*models.MetarrArgs, error) {
 		TranscodeGPU:            formString(r, jsonkeys.MetarrGPU),
 		TranscodeGPUNode:        formString(r, jsonkeys.MetarrGPUNode),
 		TranscodeVideoArgs:      linesInput(formString(r, jsonkeys.MetarrTranscodeVideoArgs), splitNonEmptyLines),
+		TranscodeAudioArgs:      linesInput(formString(r, jsonkeys.MetarrTranscodeAudioArgs), splitNonEmptyLines),
 		TranscodeVideoCodec:     linesInput(formString(r, jsonkeys.MetarrVideoCodecs), splitNonEmptyLines),
 		TranscodeAudioCodec:     linesInput(formString(r, jsonkeys.MetarrAudioCodecs), splitNonEmptyLines),
 		MinFreeMem:              formString(r, jsonkeys.MetarrMinFreeMem),
@@ -1098,7 +1103,8 @@ func matchesChannelURL(cu *models.ChannelURL, defaults models.OverrideLines, o *
 		o.ExtraFFmpegArgs == m.ExtraFFmpegArgs &&
 		slices.Equal(o.TranscodeVideoCodecs, m.TranscodeVideoCodecs) &&
 		slices.Equal(o.TranscodeAudioCodecs, m.TranscodeAudioCodecs) &&
-		slices.Equal(o.TranscodeVideoArgs, m.TranscodeVideoArgs)
+		slices.Equal(o.TranscodeVideoArgs, m.TranscodeVideoArgs) &&
+		slices.Equal(o.TranscodeAudioArgs, m.TranscodeAudioArgs)
 }
 
 // splitNonEmptyLines splits a string by newlines and filters out empty lines.

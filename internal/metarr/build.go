@@ -33,12 +33,14 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	videoCodecs := m.TranscodeVideoCodecs
 	audioCodecs := m.TranscodeAudioCodecs
 	videoArgs := m.TranscodeVideoArgs
+	audioArgs := m.TranscodeAudioArgs
 	extraArgs := m.ExtraFFmpegArgs
 	if v.Overrides != nil {
 		o = v.Overrides.MetarrArgs
 		videoCodecs = o.TranscodeVideoCodecs
 		audioCodecs = o.TranscodeAudioCodecs
 		videoArgs = o.TranscodeVideoArgs
+		audioArgs = o.TranscodeAudioArgs
 		extraArgs = o.ExtraFFmpegArgs
 	}
 	gpu, gpuNode := cmp.Or(o.TranscodeGPU, m.TranscodeGPU), cmp.Or(o.TranscodeGPUNode, m.TranscodeGPUNode)
@@ -111,6 +113,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	addEach(metkeys.TranscodeVideoCodecs, videoCodecs)
 	addEach(metkeys.TranscodeVideoArgs, videoArgs)
 	addEach(metkeys.TranscodeAudioCodecs, audioCodecs)
+	addEach(metkeys.TranscodeAudioArgs, audioArgs)
 
 	// Other.
 	// (Send Tubarr's current debug level to Metarr, so it can log more verbosely if needed).

@@ -59,6 +59,7 @@ const (
 	MetarrVideoCodecs             = "metarr_transcode_video_transcode_codecs"
 	MetarrAudioCodecs             = "metarr_transcode_audio_codecs"
 	MetarrTranscodeVideoArgs      = "metarr_transcode_video_args"
+	MetarrTranscodeAudioArgs      = "metarr_transcode_audio_args"
 	MetarrConcurrency             = "metarr_concurrency"
 	MetarrMaxCPU                  = "metarr_max_cpu_usage"
 	MetarrFilenameOps             = "metarr_filename_ops"

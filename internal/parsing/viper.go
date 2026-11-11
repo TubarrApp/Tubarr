@@ -397,6 +397,11 @@ func ApplyMetarrArgsInput(dst *models.MetarrArgs, in *models.MetarrArgsInput, le
 			return fmt.Errorf("invalid %s: %w", keys.TranscodeVideoArgs, err)
 		}
 	}
+	if v := in.TranscodeAudioArgs; v != nil {
+		if dst.TranscodeAudioArgs, err = validation.ValidateAudioEncoderArgs(*v); err != nil {
+			return fmt.Errorf("invalid %s: %w", keys.TranscodeAudioArgs, err)
+		}
+	}
 	return nil
 }
 

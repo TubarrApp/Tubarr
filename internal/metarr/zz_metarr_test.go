@@ -91,6 +91,7 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 	c := &models.Channel{ID: 1, Name: "Cats"}
 	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{
 		OutputExt: "mp4", RenameStyle: "spaces", TranscodeVideoArgs: []string{"hevc:-crf 23"}, TranscodeVideoCodecs: []string{"h264:hevc"}, MaxCPU: 50,
+		TranscodeAudioArgs: []string{"aac:-b:a 128k"},
 	}}
 	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
 	values := func(key string) []string {
@@ -114,6 +115,7 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 		{metkeys.MaxCPU, []string{"50.00"}, []string{"80.00"}},
 		{metkeys.RenameStyle, []string{"spaces"}, []string{"spaces"}},
 		{metkeys.TranscodeVideoArgs, []string{"hevc:-crf 23"}, []string{"av1:-crf 35"}},
+		{metkeys.TranscodeAudioArgs, []string{"aac:-b:a 128k"}, []string{"opus:-b:a 96k"}},
 	} {
 		v.Overrides = nil
 		if got := values(tc.key); !slices.Equal(got, tc.plain) {
@@ -121,6 +123,7 @@ func TestMakeMetarrCommandOverrideArgs(t *testing.T) {
 		}
 		v.Overrides = &models.VideoOverrides{MetarrArgs: models.MetarrArgs{
 			OutputExt: "mkv", TranscodeVideoCodecs: []string{"av1"}, TranscodeVideoArgs: []string{"av1:-crf 35"}, MaxCPU: 80,
+			TranscodeAudioArgs: []string{"opus:-b:a 96k"},
 		}}
 		if got := values(tc.key); !slices.Equal(got, tc.own) {
 			t.Errorf("%s with overrides: got %q, want %q", tc.key, got, tc.own)
@@ -208,7 +211,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 	channelArgs := &models.MetarrArgs{
 		OutputExt: "mp4", RenameStyle: "spaces", MinFreeMem: "1G", ExtraFFmpegArgs: "-x", OutputDir: "/out", MaxCPU: 50,
 		MetaOps: metaOps, TranscodeGPU: "vaapi", TranscodeGPUNode: "/dev/dri/renderD128", TranscodeVideoArgs: []string{"hevc:-crf 23"},
-		TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"},
+		TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeAudioCodecs: []string{"aac"}, TranscodeAudioArgs: []string{"aac:-b:a 128k"},
 	}
 	files := []string{metkeys.VideoFile, "/videos/v.mp4", metkeys.MetaFile, "/videos/v.json"}
 	no := false
@@ -236,11 +239,13 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeVideoCodecs, "h264:hevc",
 			metkeys.TranscodeVideoArgs, "hevc:-crf 23",
 			metkeys.TranscodeAudioCodecs, "aac",
+			metkeys.TranscodeAudioArgs, "aac:-b:a 128k",
 		})},
 		{"Download As", 2, channelArgs, &models.VideoOverrides{
 			MetarrArgs: models.MetarrArgs{
 				OutputExt: "webm", TranscodeGPU: validation.GPUNone, MaxCPU: 80, ExtraFFmpegArgs: "-x",
 				TranscodeVideoCodecs: []string{"h264:hevc"}, TranscodeVideoArgs: []string{"hevc:-crf 23"}, TranscodeAudioCodecs: []string{"aac"},
+				TranscodeAudioArgs: []string{"aac:-b:a 96k"},
 			},
 			Thumbnail: "/thumb.png",
 		}, slices.Concat(files, []string{
@@ -255,6 +260,7 @@ func TestMakeMetarrCommandArgs(t *testing.T) {
 			metkeys.TranscodeVideoCodecs, "h264:hevc",
 			metkeys.TranscodeVideoArgs, "hevc:-crf 23",
 			metkeys.TranscodeAudioCodecs, "aac",
+			metkeys.TranscodeAudioArgs, "aac:-b:a 96k",
 			metkeys.Debug, "2",
 		})},
 		{"transcode boxes emptied in Download As", 0, channelArgs, &models.VideoOverrides{}, slices.Concat(files, []string{

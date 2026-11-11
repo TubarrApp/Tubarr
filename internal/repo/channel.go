@@ -387,9 +387,10 @@ func (cs *ChannelStore) videoFilePaths(channelID int64, urls []string) ([]string
 				paths = append(paths, p)
 			}
 		}
-		// Metarr's NFO file isn't saved, but is named for the video.
+		// Metarr's NFO file and thumbnail sidecars aren't saved, but are named for the video.
 		if videoPath.String != "" {
-			paths = append(paths, strings.TrimSuffix(videoPath.String, filepath.Ext(videoPath.String))+sharedconsts.MExtNFO)
+			base := strings.TrimSuffix(videoPath.String, filepath.Ext(videoPath.String))
+			paths = append(paths, base+sharedconsts.MExtNFO, base+"-poster.jpg", base+"-poster.png", base+"-poster.webp")
 		}
 	}
 	return paths, rows.Err()
@@ -1767,6 +1768,7 @@ func displayMetarrArgsStruct(m *models.MetarrArgs) {
 	fmt.Printf("Video Codec: %v\n", m.TranscodeVideoCodecs)
 	fmt.Printf("Audio Codec: %v\n", m.TranscodeAudioCodecs)
 	fmt.Printf("Video Encoder Args: %v\n", m.TranscodeVideoArgs)
+	fmt.Printf("Audio Encoder Args: %v\n", m.TranscodeAudioArgs)
 	fmt.Printf("Rename Style: %s\n", m.RenameStyle)
 	fmt.Printf("Meta Operations: %v\n", m.MetaOps)
 	fmt.Printf("Meta Operations File: %v\n", m.MetaOpsFile)

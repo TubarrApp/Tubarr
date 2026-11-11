@@ -105,6 +105,15 @@ func ValidateVideoEncoderArgs(lines []string) (validLines []string, err error) {
 	return dedupLines, nil
 }
 
+// ValidateAudioEncoderArgs validates "codec:args" lines for audio codecs as Metarr will read them, returning them deduplicated as typed.
+func ValidateAudioEncoderArgs(lines []string) (validLines []string, err error) {
+	dedupLines := dedupSlice(lines)
+	if _, err := sharedparsing.ParseAudioEncoderArgs(dedupLines); err != nil {
+		return nil, err
+	}
+	return dedupLines, nil
+}
+
 // ValidateExtraFFmpegArgs refuses extra FFmpeg args holding a blocked option, or one that only works when encoding.
 func ValidateExtraFFmpegArgs(a string) error {
 	args, err := sharedparsing.ShellSplit(a)

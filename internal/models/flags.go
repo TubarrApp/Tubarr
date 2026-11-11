@@ -73,6 +73,7 @@ type ChannelFlagValues struct {
 	TranscodeGPU        string
 	TranscodeGPUNode    string
 	TranscodeVideoArgs  []string
+	TranscodeAudioArgs  []string
 	TranscodeVideoCodec []string
 	TranscodeAudioCodec []string
 

@@ -99,6 +99,7 @@ type MetarrArgs struct {
 	TranscodeVideoCodecs []string `json:"metarr_transcode_video_codecs"`
 	TranscodeAudioCodecs []string `json:"metarr_transcode_audio_codecs"`
 	TranscodeVideoArgs   []string `json:"metarr_transcode_video_args"`
+	TranscodeAudioArgs   []string `json:"metarr_transcode_audio_args"`
 	ExtraFFmpegArgs      string   `json:"metarr_extra_ffmpeg_args"`
 }
 
@@ -410,6 +411,9 @@ func ChildMetarrArgsMatchParent(parent *MetarrArgs, child *MetarrArgs) bool {
 	if len(child.TranscodeVideoArgs) > 0 && !slices.Equal(parent.TranscodeVideoArgs, child.TranscodeVideoArgs) {
 		return false
 	}
+	if len(child.TranscodeAudioArgs) > 0 && !slices.Equal(parent.TranscodeAudioArgs, child.TranscodeAudioArgs) {
+		return false
+	}
 	return true
 }
 
@@ -512,6 +516,9 @@ func MetarrArgsAllZero(m *MetarrArgs) bool {
 		return false
 	}
 	if len(m.TranscodeVideoArgs) > 0 {
+		return false
+	}
+	if len(m.TranscodeAudioArgs) > 0 {
 		return false
 	}
 	if m.ExtraFFmpegArgs != "" {

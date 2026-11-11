@@ -104,6 +104,7 @@ type MetarrArgsInput struct {
 	TranscodeGPU        *string   `viper:"metarr-transcode-gpu"`
 	TranscodeGPUNode    *string   `viper:"metarr-transcode-gpu-node"`
 	TranscodeVideoArgs  *[]string `viper:"metarr-transcode-video-args"`
+	TranscodeAudioArgs  *[]string `viper:"metarr-transcode-audio-args"`
 	TranscodeVideoCodec *[]string `viper:"metarr-transcode-video-codecs"`
 	TranscodeAudioCodec *[]string `viper:"metarr-transcode-audio-codecs"`
 

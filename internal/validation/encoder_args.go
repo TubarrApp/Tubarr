@@ -31,6 +31,7 @@ func ValidateEncoderArgLines(lines []string) error {
 func ValidateMetarrEncoderArgs(m *models.MetarrArgs) error {
 	return sharedparsing.CheckEncoderSettings(sharedmodels.EncoderSettings{
 		VideoArgs:   m.TranscodeVideoArgs,
+		AudioArgs:   m.TranscodeAudioArgs,
 		VideoCodecs: m.TranscodeVideoCodecs,
 		AudioCodecs: m.TranscodeAudioCodecs,
 		ExtraArgs:   m.ExtraFFmpegArgs,

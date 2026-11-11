@@ -40,4 +40,5 @@ const (
 	TranscodeVideoCodecs = "--transcode-video-codecs"
 	TranscodeAudioCodecs = "--transcode-audio-codecs"
 	TranscodeVideoArgs   = "--transcode-video-args"
+	TranscodeAudioArgs   = "--transcode-audio-args"
 )

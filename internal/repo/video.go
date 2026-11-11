@@ -944,6 +944,7 @@ func (vs *VideoStore) ReconnectOrphanedVideos() (reconnected int64, err error) {
 		return 0, fmt.Errorf("failed to read videos without a channel URL: %w", err)
 	}
 
+	//nolint:gosec // SQL identifiers are trusted constants.
 	update := fmt.Sprintf("UPDATE %s SET %s = ?, %s = ? WHERE %s = ?", consts.DBVideos, consts.QVidChanURLID, consts.QVidChanURL, consts.QVidID)
 	for _, o := range orphans {
 		t := targets[channelURLKey{o.channelID, matchKey(o.addr)}]

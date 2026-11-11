@@ -545,6 +545,7 @@ func mergeMetarrArgs(u, ch *models.MetarrArgs) {
 	u.TranscodeVideoCodecs = inheritSlice(u.TranscodeVideoCodecs, ch.TranscodeVideoCodecs)
 	u.TranscodeAudioCodecs = inheritSlice(u.TranscodeAudioCodecs, ch.TranscodeAudioCodecs)
 	u.TranscodeVideoArgs = inheritSlice(u.TranscodeVideoArgs, ch.TranscodeVideoArgs)
+	u.TranscodeAudioArgs = inheritSlice(u.TranscodeAudioArgs, ch.TranscodeAudioArgs)
 	u.ExtraFFmpegArgs = cmp.Or(u.ExtraFFmpegArgs, ch.ExtraFFmpegArgs)
 }
 

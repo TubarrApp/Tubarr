@@ -231,6 +231,11 @@ func ValidateMetarrArgsModel(m *models.MetarrArgs, checkPaths bool) error {
 			return fmt.Errorf("invalid video encoder args in Metarr settings: %w", err)
 		}
 	}
+	if m.TranscodeAudioArgs != nil {
+		if _, err := ValidateAudioEncoderArgs(m.TranscodeAudioArgs); err != nil {
+			return fmt.Errorf("invalid audio encoder args in Metarr settings: %w", err)
+		}
+	}
 	if m.ExtraFFmpegArgs != "" {
 		if err := ValidateExtraFFmpegArgs(m.ExtraFFmpegArgs); err != nil {
 			return fmt.Errorf("invalid extra FFmpeg args in Metarr settings: %w", err)
