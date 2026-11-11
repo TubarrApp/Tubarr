@@ -7,6 +7,15 @@ FROM ubuntu:24.04 AS build-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Intel's kobuk-team PPA carries the current Intel media stack; Ubuntu 24.04's is from early 2024.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && \
+    mkdir -p /etc/apt/keyrings && \
+    wget -qO /etc/apt/keyrings/kobuk-team-intel-graphics.asc \
+        "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x0C0E6AF955CE463C03FC51574D098D70AFBE5E1F" && \
+    echo "deb [signed-by=/etc/apt/keyrings/kobuk-team-intel-graphics.asc] https://ppa.launchpadcontent.net/kobuk-team/intel-graphics/ubuntu noble main" \
+        > /etc/apt/sources.list.d/kobuk-team-intel-graphics.list && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core build deps + Go toolchain deps
     ca-certificates \
@@ -26,7 +35,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Video codecs
     libx264-dev \
     libvpx-dev \
-    libsvtav1-dev \
     libdav1d-dev \
     libmp3lame-dev \
     libopus-dev \
@@ -46,6 +54,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libbz2-dev \
     libxml2-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Fail if apt fell back to Ubuntu's older Intel headers (the PPA has renamed packages before).
+RUN for p in libvpl-dev libva-dev; do \
+        dpkg-query -W -f='${Version}' "$p" | grep -q '~ppa' || { echo "$p is not from the kobuk-team PPA" >&2; exit 1; }; \
+    done
 
 # Install Go manually (Ubuntu’s golang-go is too old)
 RUN wget https://go.dev/dl/go1.27.4.linux-amd64.tar.gz && \
@@ -187,6 +200,12 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Same Intel PPA as the build stage, so the runtime libraries match the headers FFmpeg was built against.
+# ca-certificates goes in first, as apt needs it to reach the PPA over HTTPS.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build-base /etc/apt/keyrings/kobuk-team-intel-graphics.asc /etc/apt/keyrings/
+COPY --from=build-base /etc/apt/sources.list.d/kobuk-team-intel-graphics.list /etc/apt/sources.list.d/
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # External downloaders for yt-dlp (ffmpeg is built above, httpie is installed below)
     aria2 \
@@ -235,10 +254,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libva-drm2 \
     mesa-va-drivers \
     libdrm2 \
-    libze-intel-gpu1 \
     libmfx-gen1.2 \
+    # Media SDK runtime: the VPL dispatcher uses it for QSV on Broadwell to Ice Lake iGPUs, which libmfx-gen1.2 doesn't cover
+    libmfx1 \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
+
+# Fail if apt fell back to Ubuntu's older Intel packages (the PPA has renamed packages before).
+RUN for p in intel-media-va-driver-non-free libmfx-gen1.2 libvpl2 libva2 libva-drm2 libigdgmm12; do \
+        dpkg-query -W -f='${Version}' "$p" | grep -q '~ppa' || { echo "$p is not from the kobuk-team PPA" >&2; exit 1; }; \
+    done
 
 # The NVIDIA Container Toolkit mounts the host driver's NVENC/NVDEC libraries when the video capability is requested.
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
