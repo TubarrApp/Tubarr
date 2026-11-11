@@ -12,7 +12,7 @@ Tubarr is a Go-powered companion to Metarr that keeps long-form video libraries 
 - **Choose what to download** – channels (or channel URLs) that don't download automatically list new videos under **Available** in the web UI for you to pick from.
 - **Web dashboard** – start Tubarr in web mode (`tubarr --web`) for a UI that manages channels, downloads, transcodes, logs, and settings, and crawls channels on schedule.
 - **Notifications & hooks** – call arbitrary URLs (e.g., Plex library refresh) when new videos land.
-- **Docker-friendly** – ships with a Dockerfile, Compose files, and a Podman Quadlet example for unattended deployments.
+- **Docker-friendly** – ships with a Dockerfile, a Compose file, and a Podman Quadlet example for unattended deployments.
 
 ---
 
@@ -79,8 +79,9 @@ For a login on every URL, use `--auth-username`, `--auth-password` and `--auth-u
 
 Templates are resolved per channel or per video:
 
-- **Any directory:** `{{channel_name}}`, `{{channel_id}}`, `{{channel_url}}`.
+- **Any directory:** `{{channel_name}}`, `{{channel_id}}`, `{{channel_url}}`, `{{channel_url_name}}`.
 - **`--metarr-output-directory` only:** also `{{video_title}}`, `{{video_url}}`, `{{year}}`, `{{month}}`, `{{day}}`, `{{author}}`, `{{director}}`, `{{domain}}`. These are filled from each video's metadata by Metarr, so they're rejected in other directories.
+- **Move ops:** also `{{channel_url_output_directory}}`, the channel URL's `--metarr-output-directory` (or its video directory if it has none), and `{{channel_output_directory}}`, the channel's.
 
 Date tags take an optional format after a colon:
 
@@ -247,7 +248,7 @@ For hardware-accelerated transcoding, pass the GPU through with `devices: - /dev
 ## Contributing
 
 1. Fork the repo, create a feature branch, and open a PR.
-2. Run `go test ./...` plus linting defined in `.golangci.yaml`. Tests that download from the internet need yt-dlp, FFmpeg and Metarr, and only run when asked: `TUBARR_LIVE_TESTS=1 go test -timeout 20m ./internal/downloads ./internal/server`.
+2. Run `go test ./...`, and lint with `custom-gcl run ./...` (golangci-lint built with the nilaway plugin that `.golangci.yml` needs; plain `golangci-lint` fails on that config). Tests that download from the internet need yt-dlp, FFmpeg and Metarr, and only run when asked: `TUBARR_LIVE_TESTS=1 go test -timeout 20m ./internal/downloads ./internal/server`.
 3. Document new CLI flags or config keys.
 
 ---

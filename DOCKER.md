@@ -94,6 +94,7 @@ podman run -d \
 | `TZ` | `UTC` | Timezone for logs and scheduling |
 | `PUID` | `1000` | User ID for running Tubarr (matches host user to avoid permission issues) |
 | `PGID` | `1000` | Group ID for running Tubarr (matches host group to avoid permission issues) |
+| `UMASK` | `022` | Permissions for new files and folders, e.g. `002` to let your group write |
 | `TUBARR_WEB_ADDRESS` | `:8827` | Address the web interface listens on inside the container |
 | `TUBARR_WEB_AUTH` | (Settings page) | Overrides the login mode in Settings: `required`, `local` (no login from inside the container) or `none`, e.g. behind a reverse proxy with its own login |
 | `TUBARR_WEB_HTTPS` | | `true` or `false`, overriding the **Use HTTPS** setting. Uses a self-signed certificate unless one is set below or in Settings |
@@ -101,7 +102,7 @@ podman run -d \
 | `TUBARR_WEB_TLS_KEY` | | Path to the PEM private key, if not combined with the certificate |
 | `TUBARR_WEB_USERNAME` / `TUBARR_WEB_PASSWORD` | | Sets the web login at every start while set, e.g. to reset a forgotten password. The password alone keeps the saved username, but both are needed when no login exists yet |
 | `TUBARR_WEB_ALLOWED_HOSTS` | | Comma-separated hostnames allowed alongside those under **Settings > Web Interface Access**, e.g. a reverse proxy's when the login is off |
-| `ALLOW_INSECURE_ARGUMENTS` | | `1` or `true` turns off the blocklist on extra yt-dlp arguments, Extra FFmpeg Args and Video Encoder Args. **Insecure:** anyone who can edit these settings can run commands in the container through options like yt-dlp's `--exec` |
+| `ALLOW_INSECURE_ARGUMENTS` | | `1` or `true` turns off the blocklist on extra yt-dlp arguments, Extra FFmpeg Args, Video Encoder Args and Audio Encoder Args. **Insecure:** anyone who can edit these settings can run commands in the container through options like yt-dlp's `--exec` |
 
 ## Port Mapping
 
