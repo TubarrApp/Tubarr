@@ -1,10 +1,10 @@
 module tubarr
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/TubarrApp/gocommon v0.0.0-20261111124955-866d1e0ad3f1
+	github.com/TubarrApp/gocommon v0.0.0-20261111133410-1534e6b4b977
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
 	github.com/browserutils/kooky v0.2.2
