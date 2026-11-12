@@ -16,15 +16,15 @@ func setRequestHeaders(h fhttp.Header, impersonate consts.Impersonate, fsHeaders
 	switch {
 	case len(fsHeaders) > 0:
 		setFlareSolverrHeaders(h, fsHeaders)
-		logger.Pl.D(1, "Sending FlareSolverr's browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
+		logger.Pl.D(4, "Sending FlareSolverr's browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
 	case impersonate == consts.ImpersonateChrome:
 		setChromeHeaders(h)
-		logger.Pl.D(1, "Sending built in Chrome browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
+		logger.Pl.D(4, "Sending built in Chrome browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
 	case impersonate == consts.ImpersonateFirefox:
 		setFirefoxHeaders(h)
-		logger.Pl.D(1, "Sending built in Firefox browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
+		logger.Pl.D(4, "Sending built in Firefox browser headers for impersonate %q:\n\n%s", impersonate, describeHeaders(h))
 	default:
-		logger.Pl.D(1, "No browser headers for impersonate %q, sending only the user agent and Colly's defaults:\n\n%s", impersonate, describeHeaders(h))
+		logger.Pl.D(4, "No browser headers for impersonate %q, sending only the user agent and Colly's defaults:\n\n%s", impersonate, describeHeaders(h))
 	}
 }
 

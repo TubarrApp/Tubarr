@@ -533,8 +533,8 @@ func (ss *serverStore) handleDeleteChannelVideos(w http.ResponseWriter, r *http.
 
 	// Get video URLs from form array.
 	urls := values["urls[]"]
-	logger.Pl.D(1, "Parsed form data: %+v", values)
-	logger.Pl.D(1, "Video URLs to delete: %v", urls)
+	logger.Pl.D(4, "Parsed form data: %+v", values)
+	logger.Pl.D(2, "Video URLs to delete: %v", urls)
 
 	if len(urls) == 0 {
 		http.Error(w, "no video URLs provided", http.StatusBadRequest)

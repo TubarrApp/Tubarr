@@ -77,7 +77,7 @@ func (l *DomainLimiter) Init(limits map[string]int) {
 			l.sems[network.NormalizeDomain(hostname)] = NewSemaphore(limit)
 		}
 	}
-	logger.Pl.I("Initialized %d domain %s limit(s).", len(l.sems), l.kind)
+	logger.Pl.D(2, "Initialized %d domain %s limit(s).", len(l.sems), l.kind)
 }
 
 // Set updates the limit for one domain at runtime (0 removes it). Waiters get slots the new limit frees straight away.
@@ -128,6 +128,6 @@ func AcquireSlot(ctx context.Context, sem *Semaphore, limitDesc, target string) 
 	if err := sem.Acquire(ctx); err != nil {
 		return err
 	}
-	logger.Pl.D(1, "Got a %s slot for %q", limitDesc, target)
+	logger.Pl.D(2, "Got a %s slot for %q", limitDesc, target)
 	return nil
 }

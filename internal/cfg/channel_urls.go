@@ -128,7 +128,7 @@ func updateChannelURLSettingsCmd(cs contracts.ChannelStore) *cobra.Command {
 					continue
 				}
 
-				c.Log().D(1, "Updated settings for URL: %s", cu.URL)
+				c.Log().D(3, "Updated settings for URL: %s", cu.URL)
 				updatedCount++
 			}
 

@@ -17,8 +17,6 @@ func NewJSONDownload(procCtx context.Context, video *models.Video, channelURL *m
 		return nil, fmt.Errorf("invalid nil parameter (video: %v, channel URL: %v, channel: %v)", video == nil, channelURL == nil, channel == nil)
 	}
 
-	video.Log().D(1, "JSON download called with video URL: %q", video.URL)
-
 	dl := &JSONDownload{
 		Video:      video,
 		Channel:    channel,
@@ -52,9 +50,9 @@ func (d *JSONDownload) Execute() error {
 			return err
 		}
 
-		d.Channel.Log().I("Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
+		d.Channel.Log().D(2, "Starting JSON download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
 		if d.Context.Err() != nil {
-			d.Channel.Log().W("Download canceled: %v", d.Context.Err())
+			d.Channel.Log().W("Metadata download of %q canceled", d.Video.URL)
 			return d.cancelJSONDownload()
 		}
 
@@ -80,7 +78,7 @@ func (d *JSONDownload) Execute() error {
 
 		// Other errors - retry, unless that was the last attempt.
 		lastErr = err
-		d.Channel.Log().E("Download attempt %d failed: %v", attempt, err)
+		d.Channel.Log().E("Metadata download attempt %d for %q failed: %v", attempt, d.Video.URL, err)
 		if attempt == d.Options.MaxAttempts {
 			break
 		}
@@ -92,7 +90,7 @@ func (d *JSONDownload) Execute() error {
 		d.Channel.Log().I("Waiting %.0f seconds before retrying JSON download for %q...", randWait.Seconds(), d.Video.URL)
 		select {
 		case <-d.Context.Done():
-			d.Channel.Log().W("Download canceled: %v", d.Context.Err())
+			d.Channel.Log().W("Metadata download of %q canceled", d.Video.URL)
 			return d.cancelJSONDownload()
 		case <-time.After(randWait):
 		}

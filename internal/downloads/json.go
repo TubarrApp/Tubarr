@@ -77,7 +77,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	d.Channel.Log().I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
+	d.Channel.Log().D(2, "Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	err := cmd.Run()
 	killProcessGroup(cmd)
 	if err != nil {
@@ -87,8 +87,8 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	// Find the line containing the JSON path.
 	output := strings.TrimSpace(stdout.String())
 	if output == "" {
-		d.Channel.Log().D(3, "Full stdout: %s", stdout.String())
-		d.Channel.Log().D(3, "Full stderr: %s", stderr.String())
+		d.Channel.Log().D(4, "Full stdout: %s", stdout.String())
+		d.Channel.Log().D(4, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("no output lines found for %s", d.Video.URL)
 	}
 	outputLines := strings.Split(output, "\n")
@@ -96,22 +96,17 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	var jsonPath string
 
 	fileLine := outputLines[len(outputLines)-1]
-	d.Channel.Log().D(1, "File line captured as: %v", fileLine)
+	d.Channel.Log().D(3, "File line captured as: %v", fileLine)
 
 	_, jsonPath, found := strings.Cut(fileLine, ": ")
 	if !found || jsonPath == "" {
-		d.Channel.Log().D(1, "Full stdout: %s", stdout.String())
-		d.Channel.Log().D(1, "Full stderr: %s", stderr.String())
+		d.Channel.Log().D(4, "Full stdout: %s", stdout.String())
+		d.Channel.Log().D(4, "Full stderr: %s", stderr.String())
 		return fmt.Errorf("could not find JSON file path in output for %s", d.Video.URL)
 	}
 
 	d.Video.Files.JSONFilePath = jsonPath
 
 	// Verify the file exists.
-	if err := verifyJSONDownload(d.Video.Files.JSONFilePath); err != nil {
-		return err
-	}
-
-	d.Channel.Log().I("Successfully saved JSON file to %q", d.Video.Files.JSONFilePath)
-	return nil
+	return verifyJSONDownload(d.Video.Files.JSONFilePath)
 }

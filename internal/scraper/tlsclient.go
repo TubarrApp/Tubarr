@@ -136,7 +136,7 @@ func clientProfile(impersonate consts.Impersonate, maxMajor int) (profiles.Clien
 		}
 	}
 
-	logger.Pl.I("Using TLS client profile %q for impersonation type %q", chosen, impersonate)
+	logger.Pl.D(2, "Using TLS client profile %q for impersonation type %q", chosen, impersonate)
 	return profiles.MappedTLSClients[chosen], profileVersion(chosen, prefix)
 }
 

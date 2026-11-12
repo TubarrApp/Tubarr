@@ -72,7 +72,7 @@ func Services(cs contracts.ChannelStore, c *models.Channel, channelURLsWithNew [
 
 	// Check if any valid URLs.
 	if len(urls) == 0 {
-		c.Log().D(2, "No notification URLs matched for channel %q (ID: %d)", c.Name, c.ID)
+		c.Log().D(1, "No notification URLs matched for channel %q (ID: %d)", c.Name, c.ID)
 		return nil
 	}
 
@@ -119,7 +119,7 @@ func notify(c *models.Channel, notifyURLs []string) []error {
 			errs = append(errs, fmt.Errorf("invalid notification URL for channel %q", c.Name))
 			continue
 		}
-		c.Log().D(1, "Notifying %q for channel %q", parsed.Host, c.Name)
+		c.Log().D(2, "Notifying %q for channel %q", parsed.Host, c.Name)
 
 		regClient, lanClient := newNotifyHTTPClients((30 * time.Second), (10 * time.Second))
 		client := regClient

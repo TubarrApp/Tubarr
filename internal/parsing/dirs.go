@@ -69,7 +69,7 @@ func (dp *DirectoryParser) ParseDirectory(dir string, name string) (parsedDir st
 		return parsed, err
 	}
 
-	dp.C.Log().D(1, "Parsed %s as %q", name, parsed)
+	dp.C.Log().D(3, "Parsed %s as %q", name, parsed)
 	return parsed, nil
 }
 

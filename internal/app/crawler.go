@@ -202,7 +202,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 	// Filter out any URLs that are blocked globally for their authentication context.
 	var hasAllowed bool
 	if c.URLModels, hasAllowed = filterAllowedValidURLs(c); !hasAllowed {
-		c.Log().D(4, "No URLs for channel %q can be crawled (blocked, or destination unavailable), skipping crawl", c.Name)
+		c.Log().D(1, "No URLs for channel %q can be crawled (blocked, or destination unavailable), skipping crawl", c.Name)
 		// Counts as a scan, so the URLs wait for their next crawl instead of being retried every check.
 		if err := markScanned(); err != nil {
 			return false, fmt.Errorf("failed to update last scan time: %w", err)
@@ -240,7 +240,7 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 	}
 
 	fmt.Println()
-	c.Log().I("%sINITIALIZING CRAWL:%s Channel %q:\n", sharedconsts.ColorGreen, sharedconsts.ColorReset, c.Name)
+	c.Log().I("Crawling channel %q", c.Name)
 
 	// Get new releases for channel.
 	scrape := scraper.New()
@@ -287,8 +287,6 @@ func CrawlChannel(ctx context.Context, s contracts.Store, dq *queue.DownloadQueu
 			procError = errors.Join(procError, ctx.Err())
 			break
 		}
-
-		c.Log().I("Got %d video(s) for URL %q %s(Channel: %s)%s", len(vRequests), cu.URL, sharedconsts.ColorGreen, c.Name, sharedconsts.ColorReset)
 
 		// Leave for the user to choose from if not auto downloading.
 		if !c.AutoDownloads(cu) {
@@ -377,7 +375,7 @@ func CrawlChannelIgnore(ctx context.Context, s contracts.Store, c *models.Channe
 		toIgnore := make([]*models.Video, 0, len(videos))
 		for _, v := range videos {
 			if v.URL == "" {
-				c.Log().D(5, "Skipping invalid video entry with no URL in channel %q", c.Name)
+				c.Log().D(3, "Skipping invalid video entry with no URL in channel %q", c.Name)
 				continue
 			}
 			v.MarkVideoAsIgnored()
@@ -409,7 +407,7 @@ func filterAllowedValidURLs(c *models.Channel) ([]*models.ChannelURL, bool) {
 
 		// Check if this URL is blocked globally for its authentication context.
 		if err := queue.DomainBlocked(cu); err != nil {
-			c.Log().D(2, "Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
+			c.Log().D(1, "Skipping URL %q for channel %q: %v", cu.URL, c.Name, err)
 			continue
 		}
 

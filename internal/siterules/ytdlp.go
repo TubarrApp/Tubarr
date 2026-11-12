@@ -31,7 +31,7 @@ func AddSiteRulesToYTDLP(pageURL string, fs *models.FlareSolverrSolution, args [
 	// Overrides the above site rule impersonation and user agent to prioritize FlareSolverr's since its cookies
 	// only work with its user agent and a Chrome fingerprint.
 	if fs != nil {
-		logger.Pl.D(1, "FlareSolverr solution found for %q, using its user agent and headers", pageURL)
+		logger.Pl.D(2, "FlareSolverr solution found for %q, using its user agent and headers", pageURL)
 		solve := fs.Current()
 		userAgent, fsHeaders, fsGen = solve.UserAgent, solve.Headers, solve.Gen
 		impersonate = consts.ImpersonateChrome

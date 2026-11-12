@@ -21,6 +21,7 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedparsing"
 	"github.com/TubarrApp/gocommon/sharedtags"
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 	"github.com/spf13/viper"
 )
 
@@ -280,7 +281,7 @@ func FuzzParseFilterOps(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, s string, requireMustAny bool) {
 		ops, err := ParseFilterOps(fuzzOps(s), requireMustAny)
 		if err == nil {
-			_ = validation.ValidateFilterOps(ops)
+			_ = sharedvalidation.ValidateFilterOps(ops)
 		}
 	})
 }

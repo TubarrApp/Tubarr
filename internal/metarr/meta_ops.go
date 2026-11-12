@@ -56,7 +56,7 @@ func LoadMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.Met
 		return nil, fmt.Errorf("failed to parse meta ops file path %q: %w", path, err)
 	}
 
-	dp.C.Log().D(1, "Adding meta ops from file %q...", metaOpsFile)
+	dp.C.Log().D(2, "Adding meta ops from file %q...", metaOpsFile)
 	ops, err := file.ReadOpLines(metaOpsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read meta ops file: %w", err)
@@ -67,8 +67,6 @@ func LoadMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.Met
 	if err != nil {
 		return nil, fmt.Errorf("invalid meta ops in %q: %w", metaOpsFile, err)
 	}
-
-	dp.C.Log().D(1, "Loaded %d meta ops from file", len(parsedOps))
 	return parsedOps, nil
 }
 
@@ -77,7 +75,7 @@ func applyFilteredMetaOps(ops []models.MetaOps, filteredOps []models.FilteredMet
 	matchedFilteredOps := extractMatchedFilteredMetaOps(filteredOps)
 	result := models.FilterConflictingMetaOps(matchedFilteredOps, ops)
 	for _, op := range result {
-		logger.Pl.Channel(channelName).D(2, "Added operation %q for video URL %q (Channel: %q)", sharedparsing.FormatMetaOp(op), videoURL, channelName)
+		logger.Pl.Channel(channelName).D(3, "Added operation %q for video URL %q (Channel: %q)", sharedparsing.FormatMetaOp(op), videoURL, channelName)
 	}
 	return append(result, matchedFilteredOps...)
 }

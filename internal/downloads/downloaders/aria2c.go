@@ -17,7 +17,7 @@ func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, cur
 			logger.Pl.E("Failed to parse Aria2 batch count from line %q: %v", line, err)
 			count = 0
 		}
-		logger.Pl.D(1, "New aria2 batch detected: %d item(s)", count)
+		logger.Pl.D(3, "New aria2 batch detected: %d item(s)", count)
 		return true, count, 0, 0.0
 	}
 
@@ -28,10 +28,9 @@ func Aria2OutputParser(line string, totalItemCount, downloadedItemCount int, cur
 		if matches := regex.AriaProgressCompile().FindStringSubmatch(line); len(matches) == 2 {
 
 			if parsedPct, err := strconv.ParseFloat(matches[1], 64); err == nil { // If err IS nil
-				logger.Pl.D(1, "Parsed progress %.1f%% from line: %q", parsedPct, line)
 				return true, totalItemCount, 0, parsedPct
 			}
-			logger.Pl.D(1, "Failed to parse percentage from line: %q", line)
+			logger.Pl.D(5, "Failed to parse percentage from line: %q", line)
 		}
 
 		// Multiple items, track by matching "Download complete" messages against total count.

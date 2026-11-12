@@ -28,7 +28,7 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 	}
 
 	if s.Filters != nil {
-		if err = ValidateFilterOps(s.Filters); err != nil {
+		if err = sharedvalidation.ValidateFilterOps(s.Filters); err != nil {
 			return fmt.Errorf("invalid filter ops in settings: %w", err)
 		}
 	}

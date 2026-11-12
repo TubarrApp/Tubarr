@@ -107,7 +107,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 	}
 
 	for i := range cookies {
-		c.Log().D(3, "Got cookie for URL %q: %v", pageURL, cookies[i])
+		c.Log().D(4, "Got cookie for URL %q: %v", pageURL, cookies[i])
 	}
 
 	// Save cookies to file for yt-dlp.
@@ -124,7 +124,7 @@ func (cm *CookieManager) GetChannelURLCookies(ctx context.Context, cs contracts.
 
 // GetGlobalCookies returns browser store cookies for a URL's site and its own host, reading each domain once per crawl session.
 func (cm *CookieManager) GetGlobalCookies(u, channelName string) ([]*http.Cookie, error) {
-	logger.Pl.Channel(channelName).I("Retrieving global cookies for URL: %q", u)
+	logger.Pl.Channel(channelName).D(2, "Retrieving global cookies for URL: %q", u)
 	baseDomain := network.Domain(u)
 	if baseDomain == "" {
 		return nil, fmt.Errorf("error extracting base domain in cookie grab from URL %q", u)
@@ -222,14 +222,14 @@ func saveCookiesToFile(cookies []*http.Cookie, cookieFilePath, channelName strin
 	}
 
 	// Log the cookies for debugging.
-	logger.Pl.Channel(channelName).D(1, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
+	logger.Pl.Channel(channelName).D(2, "Saving %d cookies to file %s...", len(cookies), cookieFilePath)
 
 	// Write each cookie in Netscape format.
 	for _, cookie := range cookies {
 		// Domains are set where cookies are obtained (from the host that sent them), so a missing one can't be guessed here.
 		domain := cookie.Domain
 		if domain == "" {
-			logger.Pl.Channel(channelName).D(2, "Skipping cookie %q: it has no domain", cookie.Name)
+			logger.Pl.Channel(channelName).D(3, "Skipping cookie %q: it has no domain", cookie.Name)
 			continue
 		}
 

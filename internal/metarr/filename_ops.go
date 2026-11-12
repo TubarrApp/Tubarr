@@ -65,7 +65,7 @@ func LoadFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models
 		return nil, fmt.Errorf("failed to parse filename ops file path %q: %w", path, err)
 	}
 
-	dp.C.Log().D(1, "Adding filename ops from file %q...", filenameOpsFile)
+	dp.C.Log().D(2, "Adding filename ops from file %q...", filenameOpsFile)
 	ops, err := file.ReadOpLines(filenameOpsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read filename ops file: %w", err)
@@ -76,8 +76,6 @@ func LoadFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models
 	if err != nil {
 		return nil, fmt.Errorf("invalid filename ops in %q: %w", filenameOpsFile, err)
 	}
-
-	dp.C.Log().D(1, "Loaded %d filename ops from file", len(parsedOps))
 	return parsedOps, nil
 }
 
@@ -86,7 +84,7 @@ func applyFilteredFilenameOps(ops []models.FilenameOps, filteredOps []models.Fil
 	matchedFilteredOps := extractMatchedFilteredFilenameOps(filteredOps)
 	result := models.FilterConflictingFilenameOps(matchedFilteredOps, ops)
 	for _, op := range result {
-		logger.Pl.Channel(channelName).D(2, "Added filename operation %q for video URL %q (Channel: %q)", sharedparsing.FormatFilenameOp(op), videoURL, channelName)
+		logger.Pl.Channel(channelName).D(3, "Added filename operation %q for video URL %q (Channel: %q)", sharedparsing.FormatFilenameOp(op), videoURL, channelName)
 	}
 	return append(result, matchedFilteredOps...)
 }

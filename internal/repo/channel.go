@@ -275,7 +275,6 @@ func (cs *ChannelStore) GetAuth(channelID int64, url string) (username, password
 	)
 
 	if err = cs.q.QueryRow(query, channelID, url).Scan(&u, &p, &l); err != nil {
-		logger.Pl.I("No auth details found in database for channel ID: %d, URL: %s", channelID, url)
 		return "", "", "", err
 	}
 
@@ -404,11 +403,10 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 
 	cfgFile := c.ChannelConfigFile
 	if cfgFile == "" {
-		c.Log().D(2, "No config file path, nothing to apply")
 		return nil
 	}
 
-	c.Log().D(1, "Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
+	c.Log().D(2, "Applying configurations to channel %q from config file %q...", c.Name, cfgFile)
 	if _, _, err := sharedvalidation.ValidateFile(cfgFile, false, sharedtemplates.NoTemplateTags); err != nil {
 		return err
 	}
@@ -455,7 +453,7 @@ func (cs *ChannelStore) UpdateChannelFromConfig(c *models.Channel) (err error) {
 
 	// Return early if unchanged.
 	if !channelChanged && !profileChanged && len(changedURLs) == 0 {
-		c.Log().D(1, "No changes to channel from config file.")
+		c.Log().D(2, "No changes to channel from config file.")
 		return nil
 	}
 
@@ -628,7 +626,7 @@ func (cs *ChannelStore) DeleteNotifyURLs(channelID int64, urls []string) error {
 	if len(urls) > 0 {
 		logger.Pl.S("Deleted %d notify URL(s) for channel with ID '%d'.", len(urls), channelID)
 	} else {
-		logger.Pl.S("No notify URLs to delete.")
+		logger.Pl.I("No notify URLs to delete.")
 	}
 	return nil
 }
@@ -652,7 +650,6 @@ func (cs *ChannelStore) AddAuth(chanID int64, authDetails map[string]*models.Cha
 	}
 
 	if authDetails == nil {
-		logger.Pl.D(1, "No authorization details to add for channel with ID %d", chanID)
 		return nil
 	}
 
@@ -870,10 +867,7 @@ func (cs *ChannelStore) AddChannel(c *models.Channel) (int64, error) {
 		return 0, err
 	}
 
-	cURLs := c.GetURLs()
-	c.Log().S("Successfully added channel (ID: %d)\n\nName: %s\nURLs: %v\nCrawl Frequency: %d minutes\nFilters: %v\nSettings: %+v\nMetarr Operations: %+v",
-		id, c.Name, cURLs, c.ChanSettings.CrawlFreq, c.ChanSettings.Filters, c.ChanSettings, c.ChanMetarrArgs)
-
+	c.Log().S("Added channel %q (ID %d) with URLs %v", c.Name, id, c.GetURLs())
 	return id, nil
 }
 
@@ -919,10 +913,8 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 	cs.touch(id)
 
 	// Insert URLs into the channel_urls table.
-	c.Log().D(1, "Inserting %d channel URLs for channel ID %d", len(c.URLModels), id)
-	for i, cu := range c.URLModels {
+	for _, cu := range c.URLModels {
 		cu.ChannelName = c.Name
-		c.Log().D(1, "Inserting URL %d: %q", i+1, cu.URL)
 
 		// Validate URL format (skip empty URLs and the special "manual-downloads" URL).
 		if cu.URL != "" && cu.URL != consts.ManualDownloadsCol {
@@ -999,7 +991,7 @@ func (cs *ChannelStore) insertChannel(c *models.Channel, settingsJSON, metarrJSO
 		cu.ID = urlID
 		cu.ChannelID = id
 
-		c.Log().D(1, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
+		c.Log().D(3, "Successfully inserted URL %q with ID %d", cu.URL, urlID)
 	}
 	return id, nil
 }
@@ -1183,7 +1175,6 @@ func validateLoadedURLSettings(c *models.Channel) error {
 // setLoadErr marks a loaded channel with invalid saved settings, so it's kept but can't run until they're fixed.
 func setLoadErr(c *models.Channel, err error) {
 	c.LoadErr = fmt.Errorf("channel %q has invalid saved settings, fix them on its edit page: %w", c.Name, err)
-	c.Log().D(1, c.LoadErr.Error())
 }
 
 // GetAllChannels retrieves all channels in the database.
@@ -1289,8 +1280,7 @@ func (cs *ChannelStore) updateChannelMetarrArgsJSON(key, val string, updateFn fu
 		return 0, fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
-	// Print the updated settings.
-	logger.Pl.S("Updated MetarrArgs for channel %q (ID %d): %s", channelName, channelID, string(updatedArgs))
+	logger.Pl.Channel(channelName).S("Updated Metarr settings for channel %q", channelName)
 
 	// Update the database with the new settings.
 	//nolint:gosec // Key validated above.
@@ -1381,8 +1371,7 @@ func (cs *ChannelStore) updateChannelSettingsJSON(key, val string, updateFn func
 		return 0, fmt.Errorf("failed to marshal updated settings: %w", err)
 	}
 
-	// Print the updated settings.
-	logger.Pl.S("Updated ChannelSettings for channel %q (ID %d): %s", channelName, channelID, string(updatedSettings))
+	logger.Pl.Channel(channelName).S("Updated settings for channel %q", channelName)
 
 	// Update the database with the new settings.
 	//nolint:gosec // Key validated above.
@@ -1425,11 +1414,6 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, updateWithVal a
 		key,
 	)
 
-	// Print SQL query.
-	if logging.Level() > 1 {
-		logger.Pl.P("Executing SQL: %s with args: %v\n", query, []any{updateWithVal, val})
-	}
-
 	// Execute query.
 	res, err := cs.q.Exec(query, updateWithVal, val)
 	if err != nil {
@@ -1447,7 +1431,7 @@ func (cs *ChannelStore) UpdateChannelValue(key, val, col string, updateWithVal a
 	}
 
 	if col != consts.QChanNewVideoNotification {
-		logger.Pl.S("Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, updateWithVal)
+		logger.Pl.D(3, "Successfully updated channel [%s=%s]: %q column was set to value %+v", key, val, col, updateWithVal)
 	} else {
 		logger.Pl.D(3, "Channel [%s=%s]: Set %q to %+v", key, val, consts.QChanNewVideoNotification, updateWithVal)
 	}
@@ -1479,8 +1463,6 @@ func (cs *ChannelStore) UpdateLastScan(channelID int64) error {
 	if rows == 0 {
 		return fmt.Errorf("no channel found with ID %d", channelID)
 	}
-
-	logger.Pl.D(1, "Updated last scan time for channel ID %d", channelID)
 	return nil
 }
 
@@ -1570,14 +1552,14 @@ func (cs *ChannelStore) GetDownloadedOrIgnoredVideoURLs(c *models.Channel) (urls
 			continue
 		}
 		urls = append(urls, url)
-		c.Log().D(2, "Found downloaded video: %s", url)
+		c.Log().D(3, "Found downloaded video: %s", url)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, nil, fmt.Errorf("row iteration error: %w", err)
 	}
 
-	c.Log().I("Found %d previously downloaded videos for channel %q", len(urls), c.Name)
+	c.Log().D(2, "Found %d previously downloaded videos for channel %q", len(urls), c.Name)
 	return urls, failedURLs, nil
 }
 

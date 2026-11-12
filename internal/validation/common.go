@@ -188,25 +188,18 @@ func ValidateMaxFilesize(input string) (string, error) {
 	return "", fmt.Errorf("invalid max filesize format: %s", input)
 }
 
-// ValidateFilterOps validates filter operation models.
-func ValidateFilterOps(filters []models.Filters) error {
-	logger.Pl.D(5, "Validating %d filter operations...", len(filters))
-	return sharedvalidation.ValidateFilterOps(filters)
-}
-
 // ValidateMetaFilterMoveOps validates meta filter move operation models. checkPaths checks their output directories,
 // as for ValidateSettingsModel.
 func ValidateMetaFilterMoveOps(moveOps []models.MetaFilterMoveOps, checkPaths bool) error {
 	if len(moveOps) == 0 {
 		return nil
 	}
-	logger.Pl.D(5, "Validating %d meta filter move operations...", len(moveOps))
 
 	for i, op := range moveOps {
 		if len(op.Filters) == 0 {
 			return fmt.Errorf("move operation at position %d has no filters", i)
 		}
-		if err := ValidateFilterOps(op.Filters); err != nil {
+		if err := sharedvalidation.ValidateFilterOps(op.Filters); err != nil {
 			return fmt.Errorf("move operation at position %d: %w", i, err)
 		}
 
@@ -305,10 +298,7 @@ func ValidateToFromDate(d string) (string, error) {
 		return "", fmt.Errorf("invalid day in yyyy-mm-dd date %q: day must be between 01-31", d)
 	}
 
-	output := year + month + day
-	logger.Pl.D(1, "Made from/to date %q", output)
-
-	return output, nil
+	return year + month + day, nil
 }
 
 // ValidateYtdlpVideoCodecs validates video codec preferences.

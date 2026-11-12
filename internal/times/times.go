@@ -83,7 +83,7 @@ func WaitTime(ctx context.Context, stagger time.Duration, channelName, channelUR
 	}
 
 	if abstractions.GetBool(keys.SkipAllWaits) {
-		logger.Pl.D(3, "Skipping wait time call for %s", target)
+		logger.Pl.Channel(channelName).D(3, "Skipping wait time call for %s", target)
 		return nil
 	}
 

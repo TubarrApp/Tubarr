@@ -332,7 +332,15 @@ The download statuses are the `consts.DLStatus*` constants and the Metarr status
 - Pages: `StaticHandler` serves `web/` from beside the binary. Each `.html` page goes through `fillIncludes`, which replaces `<!-- include:name key="value" -->` with `web/partials/name.html`, filling its `{{key}}` placeholders. The settings fields shared by the add channel, edit channel and profile pages are [web/partials/settings-fields.html](web/partials/settings-fields.html).
 - The pages poll `/api/v1/channels/activity` (which channels are crawling, downloading, stopping or in Metarr), `/api/v1/downloads` and `/api/v1/post-processing`.
 - Metarr's logs: `metarr.InitMetarr` starts Metarr with `TUBARR_LOG_URL` and `TUBARR_LOG_TOKEN` set, and Metarr posts its log lines to `/metarr-logs` (`handlePostMetarrLogs`) every 2 seconds, which the Logs page shows. The reply is Tubarr's debug level, which Metarr switches to, so a level change reaches Metarr runs already going.
-- Channel logs: work done for a channel logs through `logger.Pl.Channel(name)`, which adds a `channel` field to the JSON line. Metarr's lines get the same field from the `channel` query parameter `InitMetarr` puts on `TUBARR_LOG_URL` (`withLogChannel`). The Logs page filters on the field in the browser, and `logs.html?channel=Name` opens it filtered. Log through `Channel` in new crawl, download and post-processing code.
+- Channel logs: work done for a channel logs through `logger.Pl.Channel(name)`, which adds a `channel` field to the JSON line. Metarr's lines get the same field from the `channel` query parameter `InitMetarr` puts on `TUBARR_LOG_URL`: Metarr reads it at startup and tags its own lines with `logging.SetChannel`, so its log file keeps the channel too, and `withLogChannel` tags any line that arrives without one. The Logs page filters on the field in the browser, and `logs.html?channel=Name` opens it filtered. Log through `Channel` in new crawl, download and post-processing code.
+- Debug levels, in Tubarr, Metarr and gocommon. Each level also shows the levels below it, and 0 shows no debug lines.
+  1. Why did it skip or change something? A video failing a filter, a crawl that didn't start, a blocked URL, a file left unrenamed, a video being transcoded.
+  2. What is it doing? Each stage of a crawl, download or Metarr run: a file loaded, cookies saved, an op applied, a rename, a notification sent.
+  3. What did it go through? Every video entry, cookie, metadata field and database row a stage handles. A big crawl writes hundreds.
+  4. What came back? The whole output from yt-dlp, a website or FFprobe, scraped metadata, headers and form data. Lines are long and can hold cookies and tokens.
+  5. Everything, nonstop: a line on every watchdog check (every 10 seconds), every line of download output, and the full metadata after each Metarr edit.
+
+  Validation and parsing that run whenever a channel loads don't log, since the crawl watchdog loads every channel every 10 seconds. Don't log that a function was entered or that nothing is configured.
 
 ---
 

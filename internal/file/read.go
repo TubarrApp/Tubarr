@@ -137,7 +137,7 @@ func ScanDirectoryForConfigFiles(dirPath string) ([]string, error) {
 	for _, entry := range entries {
 		// Skip directories.
 		if entry.IsDir() {
-			logger.Pl.D(5, "Skipping entry %q in directory %q during config file scan: is directory", entry.Name(), dirPath)
+			logger.Pl.D(3, "Skipping entry %q in directory %q during config file scan: is directory", entry.Name(), dirPath)
 			continue
 		}
 

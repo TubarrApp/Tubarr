@@ -256,8 +256,6 @@ func (v *Video) StoreFilenamesFromMetarr(cmdOut string) error {
 	if !gotVideo {
 		return fmt.Errorf("metarr did not return the final video path for %q. Got lines: %v", v.URL, lines)
 	}
-
-	v.Log().I("Video %q got file paths from Metarr:\n\nVideo: %q\nJSON: %q", v.URL, v.Files.VideoFilePath, v.Files.JSONFilePath)
 	return nil
 }
 

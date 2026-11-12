@@ -63,7 +63,7 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails, channelName s
 	if token != "" {
 		data.Set("_token", token)
 	}
-	logger.Pl.Channel(channelName).D(1, "Sending token %q", data.Get("_token"))
+	logger.Pl.Channel(channelName).D(4, "Sending token %q", data.Get("_token"))
 
 	// 'POST' auth details to the login form
 	req, err = http.NewRequestWithContext(ctx, http.MethodPost, a.LoginURL, strings.NewReader(data.Encode()))
@@ -118,7 +118,7 @@ func login(ctx context.Context, a *models.ChannelURLAccessDetails, channelName s
 	}
 	if logging.Level() > 1 {
 		for _, cookie := range cookies {
-			logger.Pl.Channel(channelName).I("Cookie received: %s; Expires=%s", cookie.Name, cookie.Expires) // Value omitted, it's a session secret.
+			logger.Pl.Channel(channelName).D(3, "Cookie received: %s; Expires=%s", cookie.Name, cookie.Expires) // Value omitted, it's a session secret.
 		}
 	}
 

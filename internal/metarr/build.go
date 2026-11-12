@@ -61,7 +61,7 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 
 	// Metarr takes each path whole, so commas and quotes in file names need no escaping.
 	metaFile := cmp.Or(v.Files.JSONCustomFile, v.Files.JSONFilePath)
-	c.Log().I("Making Metarr argument for video %q and JSON file %q.", v.Files.VideoFilePath, metaFile)
+	c.Log().D(2, "Making Metarr argument for video %q and JSON file %q.", v.Files.VideoFilePath, metaFile)
 	args := []string{metkeys.VideoFile, v.Files.VideoFilePath, metkeys.MetaFile, metaFile}
 
 	// add adds the flag with val, unless val is blank.
@@ -81,7 +81,6 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	addEach(metkeys.FilenameOps, filenameOps)
 	addEach(metkeys.MetaOps, metaOps)
 	if len(metaOps) > 0 {
-		c.Log().D(3, "User set meta ops, will set meta overwrite key...")
 		args = append(args, metkeys.MetaOW)
 	}
 	if maxCPU := cmp.Or(o.MaxCPU, m.MaxCPU); maxCPU > 0 {

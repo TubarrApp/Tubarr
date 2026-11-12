@@ -68,7 +68,7 @@ type flareSolverrResponse struct {
 // ValidateFlareSolverrURL checks a FlareSolverr base URL is a usable http(s) URL.
 func ValidateFlareSolverrURL(baseURL string) error {
 	u, err := flareSolverrEndpoint(baseURL)
-	logger.Pl.D(5, "FlareSolverr URL %q validated as %q", baseURL, u)
+	logger.Pl.D(3, "FlareSolverr URL %q validated as %q", baseURL, u)
 	return err
 }
 
@@ -209,7 +209,7 @@ func (cm *CookieManager) flareSolverrSolution(ctx context.Context, pageURL, chan
 		if cm.fsHeaders, err = flareSolverrBrowserHeaders(ctx, baseURL); err != nil {
 			logger.Pl.Channel(channelName).W("Could not copy FlareSolverr's browser headers, so Tubarr will send its own Chrome headers: %v", err)
 		} else {
-			logger.Pl.Channel(channelName).I("Copied %d request headers from FlareSolverr's browser", len(cm.fsHeaders))
+			logger.Pl.Channel(channelName).D(2, "Copied %d request headers from FlareSolverr's browser", len(cm.fsHeaders))
 		}
 	}
 	sol.headers = cm.fsHeaders

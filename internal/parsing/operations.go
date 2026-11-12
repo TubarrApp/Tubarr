@@ -21,7 +21,6 @@ func ParseFilenameOps(filenameOps []string) ([]models.FilenameOps, error) {
 	if err != nil {
 		return nil, err
 	}
-	logger.Pl.D(1, "Parsed %d filename operations from %v", len(parsed), filenameOps)
 	return parsed, nil
 }
 
@@ -34,7 +33,6 @@ func ParseMetaOps(metaOps []string) ([]models.MetaOps, error) {
 	if err != nil {
 		return nil, err
 	}
-	logger.Pl.D(1, "Parsed %d meta operations from %v", len(parsed), metaOps)
 	return parsed, nil
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/TubarrApp/gocommon/sharedfilters"
 	"github.com/TubarrApp/gocommon/sharedparsing"
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // errFilterFile marks a filter file that is set but can't be used.
@@ -58,11 +59,11 @@ func checkFilters(v *models.Video, filters []models.Filters) (bool, error) {
 
 	// Post-loop evaluation of must/any filters.
 	if mustPassed != mustTotal {
-		v.Log().D(2, "Download filter mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", v.URL, mustPassed, mustTotal)
+		v.Log().D(1, "Download filter mismatch: Video %q did not pass all 'must' filters (passed %d out of %d)", v.URL, mustPassed, mustTotal)
 		return false, nil
 	}
 	if anyTotal > 0 && anyPassed == 0 { // At least one 'any' filter must pass, whatever the 'must' filters did.
-		v.Log().D(2, "Download filter mismatch: Video %q did not pass any 'any' filters (passed %d out of %d)", v.URL, anyPassed, anyTotal)
+		v.Log().D(1, "Download filter mismatch: Video %q did not pass any 'any' filters (passed %d out of %d)", v.URL, anyPassed, anyTotal)
 		return false, nil
 	}
 
@@ -121,10 +122,10 @@ func filteredMetaOpsMatches(v *models.Video, cu *models.ChannelURL, levels [][]m
 	result := slices.Concat(byLevel...)
 
 	if logging.Level() >= 2 {
-		cu.Log().P("Filtered meta op results for channel %q:", v.ChannelName)
+		cu.Log().D(2, "Filtered meta op results for channel %q:", v.ChannelName)
 		for _, fmo := range result {
 			for _, mo := range fmo.MetaOps {
-				cu.Log().P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatMetaOp(mo), fmo.FiltersMatched)
+				cu.Log().D(2, "%q [FILTERS MATCHED?: %v]", sharedparsing.FormatMetaOp(mo), fmo.FiltersMatched)
 			}
 		}
 	}
@@ -182,10 +183,10 @@ func filteredFilenameOpsMatches(v *models.Video, cu *models.ChannelURL, levels [
 	result := slices.Concat(byLevel...)
 
 	if logging.Level() >= 2 {
-		cu.Log().P("Filtered filename op results for channel %q:", v.ChannelName)
+		cu.Log().D(2, "Filtered filename op results for channel %q:", v.ChannelName)
 		for _, ffo := range result {
 			for _, fo := range ffo.FilenameOps {
-				cu.Log().P("%q [FILTERS MATCHED?: %v]", sharedparsing.FormatFilenameOp(fo), ffo.FiltersMatched)
+				cu.Log().D(2, "%q [FILTERS MATCHED?: %v]", sharedparsing.FormatFilenameOp(fo), ffo.FiltersMatched)
 			}
 		}
 	}
@@ -232,7 +233,7 @@ func applyFromDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum i
 		return false, nil
 	}
 
-	cu.Log().S("Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, v.ChannelName)
+	cu.Log().D(2, "Video %q passed 'from date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.FromDate, uploadDateNum, v.ChannelName)
 	return true, nil
 }
 
@@ -252,7 +253,7 @@ func applyToDateFilter(v *models.Video, cu *models.ChannelURL, uploadDateNum int
 		return false, nil
 	}
 
-	cu.Log().S("Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.ToDate, uploadDateNum, v.ChannelName)
+	cu.Log().D(2, "Video %q passed 'to date' (%q) filter, upload date is \"%d\" (Channel: %q)", v.URL, cu.ChanURLSettings.ToDate, uploadDateNum, v.ChannelName)
 	return true, nil
 }
 
@@ -331,7 +332,7 @@ func loadFilterOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.F
 		return nil, fmt.Errorf("%w: failed to parse path %q: %w", errFilterFile, path, err)
 	}
 
-	dp.C.Log().D(1, "Adding filters from file %q...", filterFile)
+	dp.C.Log().D(2, "Adding filters from file %q...", filterFile)
 	filters, err := file.ReadFileLines(filterFile)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errFilterFile, err)
@@ -349,11 +350,11 @@ func loadFilterOpsFromFile(path string, dp *parsing.DirectoryParser) ([]models.F
 	}
 
 	// Validate the parsed filters
-	if err := validation.ValidateFilterOps(parsedFilters); err != nil {
+	if err := sharedvalidation.ValidateFilterOps(parsedFilters); err != nil {
 		return nil, fmt.Errorf("%w: invalid filters in %q: %w", errFilterFile, filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		dp.C.Log().D(1, "Found following filters in file:\n\n%v", parsedFilters)
+		dp.C.Log().D(4, "Found following filters in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters, nil
@@ -372,7 +373,7 @@ func LoadFilteredMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]mo
 		return nil, fmt.Errorf("failed to parse filtered meta ops file path %q: %w", path, err)
 	}
 
-	dp.C.Log().D(1, "Adding filtered meta ops from file %q...", filterFile)
+	dp.C.Log().D(2, "Adding filtered meta ops from file %q...", filterFile)
 	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read filtered meta ops file: %w", err)
@@ -389,7 +390,7 @@ func LoadFilteredMetaOpsFromFile(path string, dp *parsing.DirectoryParser) ([]mo
 		return nil, fmt.Errorf("invalid filtered meta ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		dp.C.Log().D(1, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
+		dp.C.Log().D(4, "Found following filtered meta ops in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters, nil
@@ -408,7 +409,7 @@ func LoadFilteredFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) (
 		return nil, fmt.Errorf("failed to parse filtered filename ops file path %q: %w", path, err)
 	}
 
-	dp.C.Log().D(1, "Adding filtered filename ops from file %q...", filterFile)
+	dp.C.Log().D(2, "Adding filtered filename ops from file %q...", filterFile)
 	filters, err := file.ReadOpLines(filterFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read filtered filename ops file: %w", err)
@@ -425,7 +426,7 @@ func LoadFilteredFilenameOpsFromFile(path string, dp *parsing.DirectoryParser) (
 		return nil, fmt.Errorf("invalid filtered filename ops in %q: %w", filterFile, err)
 	}
 	if len(parsedFilters) > 0 {
-		dp.C.Log().D(1, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
+		dp.C.Log().D(4, "Found following filtered filename ops in file:\n\n%v", parsedFilters)
 	}
 
 	return parsedFilters, nil
@@ -443,7 +444,7 @@ func loadMoveOpsFromFile(path string, dp *parsing.DirectoryParser) []models.Meta
 		return nil
 	}
 
-	dp.C.Log().D(1, "Adding filter move operations from file %q...", moveOpFile)
+	dp.C.Log().D(2, "Adding filter move operations from file %q...", moveOpFile)
 	moves, err := file.ReadFileLines(moveOpFile)
 	if err != nil {
 		dp.C.Log().E("Error loading filter move operations from file %q: %v", moveOpFile, err)
@@ -467,7 +468,7 @@ func loadMoveOpsFromFile(path string, dp *parsing.DirectoryParser) []models.Meta
 		return nil
 	}
 	if len(parsedMoves) > 0 {
-		dp.C.Log().D(1, "Found following filter move operations in file:\n\n%v", parsedMoves)
+		dp.C.Log().D(4, "Found following filter move operations in file:\n\n%v", parsedMoves)
 	}
 
 	return parsedMoves

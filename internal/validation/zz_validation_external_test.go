@@ -687,7 +687,7 @@ func TestSameAndKeepChoices(t *testing.T) {
 
 // TestValidateFilterOps --------------------------------------------------------------------------------------
 func TestValidateFilterOps_EmptySliceOK(t *testing.T) {
-	if err := validation.ValidateFilterOps(nil); err != nil {
+	if err := sharedvalidation.ValidateFilterOps(nil); err != nil {
 		t.Fatalf("expected nil error for empty slice, got %v", err)
 	}
 }
@@ -714,7 +714,7 @@ func TestValidateFilterOps_Valid(t *testing.T) {
 		},
 	}
 
-	if err := validation.ValidateFilterOps(filters); err != nil {
+	if err := sharedvalidation.ValidateFilterOps(filters); err != nil {
 		t.Fatalf("expected filters to be valid, got %v", err)
 	}
 }
@@ -729,7 +729,7 @@ func TestValidateFilterOps_InvalidFilterType(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilterOps(filters)
+	err := sharedvalidation.ValidateFilterOps(filters)
 	if err == nil {
 		t.Fatalf("expected error for invalid FilterType")
 	}
@@ -748,7 +748,7 @@ func TestValidateFilterOps_InvalidMustAny(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilterOps(filters)
+	err := sharedvalidation.ValidateFilterOps(filters)
 	if err == nil {
 		t.Fatalf("expected error for invalid MustAny")
 	}
@@ -767,7 +767,7 @@ func TestValidateFilterOps_EmptyField(t *testing.T) {
 		},
 	}
 
-	err := validation.ValidateFilterOps(filters)
+	err := sharedvalidation.ValidateFilterOps(filters)
 	if err == nil {
 		t.Fatalf("expected error for empty field")
 	}

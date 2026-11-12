@@ -20,7 +20,7 @@ import (
 
 // ValidateAndFilter reads the video's metadata and checks its download filters, returning whether it passed and its filtered ops.
 func ValidateAndFilter(v *models.Video, cu *models.ChannelURL, dirParser *parsing.DirectoryParser) (passed bool, useFilteredMetaOps []models.FilteredMetaOps, useFilteredFilenameOps []models.FilteredFilenameOps, err error) {
-	cu.Log().I("Validating and filtering JSON file %q...", v.Files.JSONFilePath)
+	cu.Log().D(2, "Validating and filtering JSON file %q...", v.Files.JSONFilePath)
 
 	// A metadata file that can't be read is an error rather than a failed check, so the video isn't marked ignored.
 	if err := parseAndStoreJSON(v); err != nil {
@@ -136,7 +136,7 @@ func parseAndStoreJSON(v *models.Video) error {
 	// Select thumbnail
 	bestThumbnail(v, m)
 
-	v.Log().D(1, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Metadata.Title)
+	v.Log().D(2, "Successfully validated and stored metadata for video: %q (Title: %q)", v.URL, v.Metadata.Title)
 	return nil
 }
 
@@ -180,7 +180,7 @@ func bestThumbnail(v *models.Video, m map[string]any) {
 	}
 	if best != "" {
 		v.Metadata.ThumbnailURL = best
-		v.Log().D(2, "Selected thumbnail from array: %s", best)
+		v.Log().D(3, "Selected thumbnail from array: %s", best)
 	}
 }
 
@@ -219,7 +219,7 @@ func handleFilters(v *models.Video, cu *models.ChannelURL, dirParser *parsing.Di
 		return false, useFilteredMetaOps, useFilteredFilenameOps, nil
 	}
 
-	cu.Log().S("Video %q for channel %q passed all filter checks", v.URL, v.ChannelName)
+	cu.Log().D(2, "Video %q for channel %q passed all filter checks", v.URL, v.ChannelName)
 	return true, useFilteredMetaOps, useFilteredFilenameOps, nil
 }
 

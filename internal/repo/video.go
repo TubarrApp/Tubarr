@@ -125,7 +125,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 
 	// Check if video already exists
 	if id, exists := vs.VideoExists(v, channelID); exists {
-		v.Log().D(1, "Video %q already exists in the database with ID %d", v.URL, id)
+		v.Log().D(3, "Video %q already exists in the database with ID %d", v.URL, id)
 		v.ID = id // UpdateVideo sets the download status by ID.
 		if err := vs.UpdateVideo(v, channelID); err != nil {
 			return id, fmt.Errorf("failed to update existing video: %w", err)
@@ -146,8 +146,6 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 	v.ID = videoID
 
 	// Insert into downloads table
-	v.Log().D(1, "Inserting download status for video %d: status=%q, pct=%.2f", videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent)
-
 	//nolint:gosec // SQL identifiers are trusted constants.
 	dlSQL := fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s) VALUES (?, ?, ?)",
@@ -157,9 +155,6 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		consts.QDLPct,
 	)
 	dlArgs := []any{videoID, v.DownloadStatus.Status, v.DownloadStatus.Percent}
-
-	v.Log().D(1, "Download insert SQL: %s (args: %v)", dlSQL, dlArgs)
-
 	if _, err := tx.Exec(dlSQL, dlArgs...); err != nil {
 		return 0, fmt.Errorf("failed to insert download status for video %d: %w", videoID, err)
 	}
@@ -169,7 +164,7 @@ func (vs *VideoStore) AddVideo(v *models.Video, channelID, channelURLID int64) (
 		return 0, fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
 
-	v.Log().D(1, "Inserted video %q with ID %d successfully", v.URL, videoID)
+	v.Log().D(3, "Inserted video %q with ID %d successfully", v.URL, videoID)
 	return videoID, nil
 }
 
@@ -281,8 +276,6 @@ func (vs *VideoStore) UpdateVideo(v *models.Video, channelID int64) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction for video %q: %w", v.URL, err)
 	}
-
-	v.Log().S("Updated video with URL: %s", v.URL)
 	return nil
 }
 
@@ -297,7 +290,6 @@ func (vs *VideoStore) GetVideoURLByID(videoID int64) (videoURL string, err error
 	)
 
 	if err = vs.DB.QueryRow(query, videoID).Scan(&videoURL); err != nil {
-		logger.Pl.I("Could not scan video URL from database for video ID: %d, URL: %q", videoID, videoURL)
 		return "", err
 	}
 
@@ -1204,7 +1196,6 @@ func videoExists(q querier, videoURL string, channelID int64) (int64, bool) {
 		return 0, false
 	}
 
-	logger.Pl.D(1, "Video with URL %q already exists in the database with ID %d", videoURL, id)
 	return id, true
 }
 

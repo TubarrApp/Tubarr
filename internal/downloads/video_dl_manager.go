@@ -49,9 +49,9 @@ func (d *VideoDownload) Execute() error {
 			return err
 		}
 
-		d.Channel.Log().I("Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
+		d.Channel.Log().D(2, "Starting video download attempt %d/%d for URL: %s", attempt, d.Options.MaxAttempts, d.Video.URL)
 		if d.Context.Err() != nil {
-			d.Channel.Log().W("Download canceled: %v", d.Context.Err())
+			d.Channel.Log().W("Video download of %q canceled", d.Video.URL)
 			return d.cancelVideoDownload()
 		}
 
@@ -78,7 +78,7 @@ func (d *VideoDownload) Execute() error {
 
 		// Other errors - retry, unless that was the last attempt.
 		lastErr = err
-		d.Channel.Log().E("Download attempt %d failed: %v", attempt, err)
+		d.Channel.Log().E("Video download attempt %d for %q failed: %v", attempt, d.Video.URL, err)
 		d.DLTracker.SetStatus(d.Video, consts.DLStatusFailed, d.Video.DownloadStatus.Percent, "", err)
 		if attempt == d.Options.MaxAttempts {
 			break
@@ -93,7 +93,7 @@ func (d *VideoDownload) Execute() error {
 			fmt.Sprintf("Retrying in %.0fs (attempt %d/%d)", randWait.Seconds(), attempt+1, d.Options.MaxAttempts), nil)
 		select {
 		case <-d.Context.Done():
-			d.Channel.Log().W("Download canceled: %v", d.Context.Err())
+			d.Channel.Log().W("Video download of %q canceled", d.Video.URL)
 			return d.cancelVideoDownload()
 		case <-time.After(randWait):
 		}

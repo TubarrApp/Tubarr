@@ -36,7 +36,7 @@ type headerEcho struct {
 // flareSolverrBrowserHeaders has FlareSolverr's browser load the header echo page, and returns the headers it sent,
 // in order (leaving out ones that differ per request, like the host and cookies).
 func flareSolverrBrowserHeaders(ctx context.Context, baseURL string) ([][2]string, error) {
-	logger.Pl.I("Requesting FlareSolverr's browser headers from %q...", flareSolverrHeaderEchoURL)
+	logger.Pl.D(2, "Requesting FlareSolverr's browser headers from %q...", flareSolverrHeaderEchoURL)
 	fsResp, err := flareSolverrGet(ctx, baseURL, flareSolverrHeaderEchoURL, consts.FlareSolverrDefaultTimeout)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func flareSolverrBrowserHeaders(ctx context.Context, baseURL string) ([][2]strin
 	}
 
 	// Log the copied headers.
-	logger.Pl.I("Got FlareSolverr's browser headers from FlareSolverr at %q:\n\n%v", baseURL, headers)
+	logger.Pl.D(4, "Got FlareSolverr's browser headers from FlareSolverr at %q:\n\n%v", baseURL, headers)
 	return headers, nil
 }
 

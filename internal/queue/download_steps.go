@@ -372,7 +372,6 @@ func processJSON(
 	// Will download this video (passed checks).
 	v.DownloadStatus.Status = consts.DLStatusQueued
 	v.DownloadStatus.Percent = 0.0
-	c.Log().D(1, "Setting video %q to Queued status before saving to DB", v.URL)
 
 	// Save video to database.
 	if v.ID, err = vs.AddVideo(v, c.ID, cu.ID); err != nil {
@@ -389,8 +388,6 @@ func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c
 		return fmt.Errorf("invalid nil parameter (video: %v, channelURL: %v, channel: %v)", v == nil, cu == nil, c == nil)
 	}
 
-	c.Log().I("Processing video download for URL: %s", v.URL)
-
 	dl, err := downloads.NewVideoDownload(ctx, v, cu, c, ds, tracker, downloads.Options{
 		MaxAttempts:      downloadAttempts(cu),
 		RetryMaxInterval: 20,
@@ -403,7 +400,7 @@ func processVideo(ctx context.Context, v *models.Video, cu *models.ChannelURL, c
 		return err
 	}
 
-	c.Log().D(1, "Successfully processed and marked as downloaded: %s", v.URL)
+	c.Log().D(2, "Successfully processed and marked as downloaded: %s", v.URL)
 	return nil
 }
 

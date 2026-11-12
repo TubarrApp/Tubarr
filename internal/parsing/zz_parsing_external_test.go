@@ -14,6 +14,7 @@ import (
 	"tubarr/internal/validation"
 
 	"github.com/TubarrApp/gocommon/sharedparsing"
+	"github.com/TubarrApp/gocommon/sharedvalidation"
 )
 
 // TestMain gives the global logger a console writer, since the zero value has none and
@@ -168,7 +169,7 @@ func TestChannelURLRejected(t *testing.T) {
 		"filter": func(s string) error {
 			filters, err := parsing.ParseFilterOps([]string{s}, true)
 			if err == nil {
-				err = validation.ValidateFilterOps(filters)
+				err = sharedvalidation.ValidateFilterOps(filters)
 			}
 			return err
 		},

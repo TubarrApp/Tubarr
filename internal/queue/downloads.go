@@ -561,11 +561,14 @@ func (d *download) SendUpdate(v *models.Video) {
 	d.q.mu.Unlock()
 
 	// Status changes are logged at info level, progress only when debugging.
-	const statusFmt = "Status update for video with URL %q:\n\nStatus: %s\nPercentage: %.1f\nError: %v\n"
+	line := fmt.Sprintf("Video %q: %s (%.1f%%)", v.URL, s.Status, s.Percent)
+	if s.Error != nil {
+		line += ": " + s.Error.Error()
+	}
 	if s.Status != prev.Status {
-		d.c.Log().I(statusFmt, v.URL, s.Status, s.Percent, s.Error)
+		d.c.Log().I("%s", line)
 	} else if s.Percent != prev.Percent || s.Stage != prev.Stage {
-		d.c.Log().D(2, statusFmt, v.URL, s.Status, s.Percent, s.Error)
+		d.c.Log().D(5, "%s", line)
 	}
 
 	// Status changes are stored, as is reaching 100%.

@@ -53,7 +53,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 		return
 	}
 	if !hasRows || len(freshChannels) == 0 {
-		logger.Pl.D(3, "Crawl watchdog: No channels found in database")
+		logger.Pl.D(5, "Crawl watchdog: No channels found in database")
 		return
 	}
 
@@ -79,7 +79,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 		if len(due) == 0 {
 			continue
 		}
-		c.Log().D(4, "channel %q - %d URL(s) due", c.Name, len(due))
+		c.Log().D(5, "channel %q - %d URL(s) due", c.Name, len(due))
 
 		// The config file may change what's due, or pause the channel.
 		file.UpdateFromConfigFile(ss.s.ChannelStore(), c)
@@ -91,7 +91,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 
 		// Skip paused channels
 		if c.ChanSettings.Paused {
-			c.Log().D(3, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
+			c.Log().D(5, "Crawl watchdog: Channel %q is paused, skipping", c.Name)
 			continue
 		}
 		if due, _ = c.DueURLs(now, jitter, true); len(due) == 0 {
@@ -115,7 +115,7 @@ func (ss *serverStore) crawlDueChannels(ctx context.Context, reported map[int64]
 			}
 			defer limits.GlobalCrawls.Release()
 
-			ch.Log().D(3, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
+			ch.Log().D(2, "Crawl watchdog: Triggering scheduled crawl for channel %q", ch.Name)
 			if performedCrawls, err := app.CrawlChannel(crawlCtx, ss.s, ss.dq, ch); err != nil {
 				ch.Log().E("Crawl watchdog: Error crawling channel %q: %v", ch.Name, err)
 			} else if performedCrawls {

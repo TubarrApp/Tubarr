@@ -74,7 +74,7 @@ func (s *Scraper) GetNewReleases(ctx context.Context, cs contracts.ChannelStore,
 		if cu.IsManual || (!ignoreCrawl && cu.Paused()) {
 			continue
 		}
-		c.Log().D(1, "Processing channel URL %q", cu.URL)
+		c.Log().D(2, "Processing channel URL %q", cu.URL)
 
 		// Stagger crawls of the channel's URLs (the channel already waited before the first).
 		if crawledAny {
@@ -190,7 +190,7 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 	// Find a registered rule set (built-in or user-supplied) based on URL domain.
 	query, ok := siterules.MatchMetadata(v.URL)
 	if !ok {
-		v.Log().D(1, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
+		v.Log().D(2, "No custom scraping rules found for URL: %s - will use yt-dlp", v.URL)
 		return nil // Not a custom site.
 	}
 
@@ -204,7 +204,7 @@ func (s *Scraper) ScrapeCustomSite(ctx context.Context, urlStr, outputDir string
 
 	// Validate required fields.
 	if v.Metadata.Title == "" {
-		v.Log().D(3, "Scraped metadata: %+v", metadata)
+		v.Log().D(4, "Scraped metadata: %+v", metadata)
 		return fmt.Errorf("missing required metadata fields (title: %q)", v.Metadata.Title)
 	}
 
@@ -337,7 +337,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		//nolint:gosec // yt-dlp with the args Tubarr builds, the user's checked against the blocked options.
 		cmd := exec.CommandContext(ctx, sharedconsts.ProgramYTDLP, args...)
 
-		cu.Log().I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
+		cu.Log().D(2, "Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
 
 		if j, err = cmd.Output(); err == nil {
 			break
@@ -357,7 +357,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		}
 	}
 
-	cu.Log().D(5, "Retrieved command output from yt-dlp for channel %q:\n\n%s", channelURL, string(j))
+	cu.Log().D(4, "Retrieved command output from yt-dlp for channel %q:\n\n%s", channelURL, string(j))
 
 	var result ytDlpEntry
 	if err := json.Unmarshal(j, &result); err != nil {
@@ -383,7 +383,7 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 			if isValidRumbleVideoURL(entry.URL) {
 				entry.URL = removeQueryParams(entry.URL)
 			} else {
-				cu.Log().D(2, "Rumble URL %q is not a valid video link, skipping...", entry.URL)
+				cu.Log().D(3, "Rumble URL %q is not a valid video link, skipping...", entry.URL)
 				continue
 			}
 		}
@@ -582,7 +582,7 @@ func setupFieldScraping(c *colly.Collector, fieldName, channelName string, rules
 			}
 
 			if value != "" {
-				logger.Pl.Channel(channelName).S("Grabbed value %q for field %q using selector %q", value, fieldName, rule.Selector)
+				logger.Pl.Channel(channelName).D(3, "Grabbed value %q for field %q using selector %q", value, fieldName, rule.Selector)
 				*result = value
 			}
 		})
@@ -784,7 +784,7 @@ func (s *Scraper) ScrapeWithRules(urlStr string, collector *colly.Collector, v *
 		for _, fieldName := range uploadDatePrecedence {
 			if t, ok := parsedDates[fieldName]; ok {
 				v.Metadata.UploadDate = t
-				v.Log().I("Extracted upload date %q from field %q", v.Metadata.UploadDate.String(), fieldName)
+				v.Log().D(3, "Extracted upload date %q from field %q", v.Metadata.UploadDate.String(), fieldName)
 				break
 			}
 		}

@@ -127,7 +127,7 @@ func (cs *ChannelStore) addChannelURL(channelID int64, cu *models.ChannelURL, is
 		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
 	}
 
-	cu.Log().D(1, "Added channel URL %q (ID: %d, is_manual: %v) to channel ID %d", cu.URL, id, isManual, channelID)
+	cu.Log().D(3, "Added channel URL %q (ID: %d, is_manual: %v) to channel ID %d", cu.URL, id, isManual, channelID)
 	return id, nil
 }
 
@@ -255,7 +255,7 @@ func (cs *ChannelStore) updateChannelURLSettings(cu *models.ChannelURL) error {
 		return err
 	}
 
-	cu.Log().S("Updated channel URL %q:\n\nMetarr Arguments:\n%v\n\nSettings:\n%v", cu.URL, cu.ChanURLMetarrArgs, cu.ChanURLSettings)
+	cu.Log().S("Updated channel URL %q", cu.URL)
 	return nil
 }
 

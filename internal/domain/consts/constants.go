@@ -1,6 +1,8 @@
 // Package consts holds various global, unchanging values.
 package consts
 
+import "github.com/TubarrApp/gocommon/sharedconsts"
+
 // BotTimeoutMap holds the cooldown times in minutes for popular domains (used if a domain blocks Tubarr).
 var BotTimeoutMap = map[string]float64{
 
@@ -33,7 +35,7 @@ const (
 	WebParamProfileID  = "id"
 	WebParamURLID      = "urlID"
 	WebParamLogLevel   = "level"
-	WebParamLogChannel = "channel" // Also the field the logger tags a channel's log lines with.
+	WebParamLogChannel = sharedconsts.TubarrLogURLChannelParam // Also the field the logger tags a channel's log lines with.
 	WebParamDomain     = "domain"
 	WebParamHostname   = "hostname"
 	WebParamContext    = "context"

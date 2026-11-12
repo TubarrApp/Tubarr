@@ -57,7 +57,6 @@ func (s *Scraper) crawlChannelURLs(ctx context.Context, channelURL, channelName 
 	if !ok {
 		return "", nil, false, nil
 	}
-	logger.Pl.Channel(channelName).I("Using crawl rule for %q", query.Site)
 	urls, err = s.crawlWithRule(ctx, channelURL, channelName, cookies, query)
 	return "crawl rule for " + query.Site, urls, true, err
 }

@@ -87,11 +87,11 @@ func IsPrivateNetworkFallback(h string) bool {
 	if err == nil { // If err IS nil.
 		for _, ip := range ips {
 			if isPrivateIP(ip) {
-				logger.Pl.I("Host %q resolved to private IP address %q.", h, ip)
+				logger.Pl.D(3, "Host %q resolved to private IP address %q.", h, ip)
 				return true
 			}
 		}
-		logger.Pl.I("Host %q resolved to public IP address(es) %v.", h, ips)
+		logger.Pl.D(3, "Host %q resolved to public IP address(es) %v.", h, ips)
 		return false
 	}
 	logger.Pl.E("Unable to perform DNS lookup for %q: %v", h, err)

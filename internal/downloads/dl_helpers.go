@@ -171,7 +171,7 @@ func CheckIfAvoidURL(v *models.Video, cu *models.ChannelURL, db *sql.DB) error {
 
 	siteHost := network.Hostname(v.URL)
 	if siteHost == "" {
-		cu.Log().E("Could not parse URL %q, will check against full URL instead", v.URL)
+		cu.Log().W("Could not parse URL %q, will check against full URL instead", v.URL)
 		siteHost = v.URL
 	}
 

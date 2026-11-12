@@ -65,7 +65,7 @@ func RemoveUnusedThumbnails(overrides map[int64]models.VideoOverrides) {
 			logger.Pl.W("Failed to remove unused thumbnail %q: %v", path, err)
 			continue
 		}
-		logger.Pl.I("Removed unused thumbnail %q", path)
+		logger.Pl.D(3, "Removed unused thumbnail %q", path)
 	}
 }
 

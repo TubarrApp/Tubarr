@@ -188,7 +188,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 
 	lineChan := make(chan string, 100)
 
-	d.Channel.Log().I("Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
+	d.Channel.Log().D(2, "Running video download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
@@ -204,7 +204,6 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 				select {
 				case lineChan <- scanner.Text():
 				case <-d.Context.Done():
-					d.Channel.Log().W("Download canceled: %v", d.Context.Err())
 					return
 				}
 			}
@@ -231,7 +230,7 @@ func (d *VideoDownload) executeVideoDownload(cmd *exec.Cmd) error {
 	waitErr := cmd.Wait()
 
 	if err := d.Context.Err(); err != nil {
-		d.Channel.Log().W("Download canceled: %v", err)
+		d.Channel.Log().W("Video download of %q canceled", d.Video.URL)
 		return err
 	}
 	if result.err != nil {
@@ -269,7 +268,7 @@ func (d *VideoDownload) scanVideoCmdOutput(lineChan <-chan string) videoParseRes
 	)
 	for line := range lineChan {
 		if line != "" {
-			d.Channel.Log().D(4, "Video %d download terminal output: %q", d.Video.ID, line)
+			d.Channel.Log().D(5, "Video %d download terminal output: %q", d.Video.ID, line)
 		}
 
 		// Keep draining after completion so the pipe readers can reach EOF before cmd.Wait.
