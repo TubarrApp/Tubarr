@@ -77,7 +77,7 @@ func (d *JSONDownload) executeJSONDownload(cmd *exec.Cmd) error {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	d.Channel.Log().D(2, "Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
+	d.Channel.Log().I("Running metadata download command for video %q (Channel: %q):\n\n%v\n", d.Video.URL, d.Channel.Name, cmd.String())
 	err := cmd.Run()
 	killProcessGroup(cmd)
 	if err != nil {

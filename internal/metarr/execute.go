@@ -141,7 +141,7 @@ func runWithProgress(cmd *exec.Cmd, videoID int64) (string, error) {
 
 // runMetarr runs a Metarr command with a built argument list.
 func runMetarr(cmd *exec.Cmd, v *models.Video) error {
-	v.Log().D(2, "Running Metarr command:\n\n%s\n", cmd.String())
+	v.Log().I("Running Metarr command:\n\n%s\n", cmd.String())
 
 	cmd.Stderr = os.Stderr
 
