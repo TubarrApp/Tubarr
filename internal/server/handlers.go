@@ -616,32 +616,8 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// An optional body picks which URLs to crawl; picked paused URLs are crawled too.
-	var requestBody struct {
-		URLIDs []int64 `json:"url_ids"`
-	}
-	if err := decodeJSON(r, &requestBody); err != nil && !errors.Is(err, io.EOF) {
-		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+	if !pickCrawlURLs(w, r, c) {
 		return
-	}
-	if requestBody.URLIDs != nil {
-		selected := make([]*models.ChannelURL, 0, len(requestBody.URLIDs))
-		for _, cu := range c.URLModels {
-			if cu.IsManual || !slices.Contains(requestBody.URLIDs, cu.ID) {
-				continue
-			}
-			if cu.Paused() {
-				unpaused := *cu.ChanURLSettings // Copied, so the URL stays paused.
-				unpaused.Paused = false
-				cu.ChanURLSettings = &unpaused
-			}
-			selected = append(selected, cu)
-		}
-		if len(selected) == 0 {
-			http.Error(w, "no channel URLs selected to crawl", http.StatusBadRequest)
-			return
-		}
-		c.URLModels = selected
 	}
 
 	// Start crawl in background.
@@ -668,6 +644,56 @@ func (ss *serverStore) handleCrawlChannel(w http.ResponseWriter, r *http.Request
 	}
 	c.Log().I("Channel %q is already being crawled, skipping crawl...", c.Name)
 	writeJSON(w, r, http.StatusConflict, map[string]string{"message": "The channel is already being crawled. Try again once it finishes."})
+}
+
+// crawlRequest is a web crawl's optional body: the URLs to crawl, and the videos to check on each (0 uses their setting).
+type crawlRequest struct {
+	URLIDs []int64 `json:"url_ids"`
+	CrawlN int     `json:"crawl_n"`
+}
+
+// pickCrawlURLs applies a web crawl's optional body to c: only the URLs it picks, paused ones included, each checking the
+// videos it gives in place of its own setting. It writes an error response if the body is invalid or picks no URLs.
+func pickCrawlURLs(w http.ResponseWriter, r *http.Request, c *models.Channel) bool {
+	var req crawlRequest
+	if err := decodeJSON(r, &req); err != nil && !errors.Is(err, io.EOF) {
+		http.Error(w, fmt.Sprintf("invalid request body: %v", err), http.StatusBadRequest)
+		return false
+	}
+
+	// Only the URLs picked, if it picks any.
+	if req.URLIDs != nil {
+		selected := make([]*models.ChannelURL, 0, len(req.URLIDs))
+		for _, cu := range c.URLModels {
+			if cu.IsManual || !slices.Contains(req.URLIDs, cu.ID) {
+				continue
+			}
+			if cu.Paused() {
+				unpaused := *cu.ChanURLSettings // Copied, so the URL stays paused.
+				unpaused.Paused = false
+				cu.ChanURLSettings = &unpaused
+			}
+			selected = append(selected, cu)
+		}
+		if len(selected) == 0 {
+			http.Error(w, "no channel URLs selected to crawl", http.StatusBadRequest)
+			return false
+		}
+		c.URLModels = selected
+	}
+
+	// The videos to check for this crawl only.
+	if req.CrawlN != 0 {
+		for _, cu := range c.URLModels {
+			var s models.Settings
+			if cu.ChanURLSettings != nil {
+				s = *cu.ChanURLSettings // Copied, so the URL keeps its own setting.
+			}
+			s.CrawlN = max(req.CrawlN, models.CrawlNAll)
+			cu.ChanURLSettings = &s
+		}
+	}
+	return true
 }
 
 // handleStopQueue stops a channel's crawl, and its queued downloads and post-processing from starting, letting in-progress
@@ -810,9 +836,12 @@ func (ss *serverStore) handleIgnoreCrawlChannel(w http.ResponseWriter, r *http.R
 	if !ok {
 		return
 	}
-	file.UpdateFromConfigFile(ss.cs, c)
+	file.UpdateFromConfigFile(ss.cs, c) // Before the URLs are picked, as a reload replaces them.
 	if c.LoadErr != nil {
 		http.Error(w, c.LoadErr.Error(), http.StatusConflict)
+		return
+	}
+	if !pickCrawlURLs(w, r, c) {
 		return
 	}
 

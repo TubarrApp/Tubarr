@@ -385,6 +385,7 @@
                   extra_ytdlp_video_args: '',
                   extra_ytdlp_meta_args: '',
                   extra_ytdlp_crawl_args: '',
+                  crawl_n: '',
                   move_ops_file: '',
                   move_ops: '',
                   ytdlp_preferred_video_codecs: '',
@@ -430,6 +431,7 @@
               json_directory: '',
               download_concurrency: '',
               crawl_freq: '',
+              crawl_n: '',
               download_retries: '',
               max_filesize: '',
               max_resolution: '',
@@ -557,6 +559,7 @@
                 extra_ytdlp_video_args: '',
                 extra_ytdlp_meta_args: '',
                 extra_ytdlp_crawl_args: '',
+                crawl_n: '',
                 move_ops_file: '',
                 move_ops: '',
                 ytdlp_preferred_video_codecs: '',
@@ -773,7 +776,7 @@
               if (urlEntry.hasCustomSettings && urlEntry.custom) {
                 // Process basic/advanced settings
                 const settingsFields = [
-                  'video_directory', 'json_directory', 'download_concurrency', 'crawl_freq',
+                  'video_directory', 'json_directory', 'download_concurrency', 'crawl_freq', 'crawl_n',
                   'download_retries', 'max_filesize', 'max_resolution', 'from_date', 'to_date',
                   'filter_file', 'filters',
                   'ytdlp_output_ext', 'cookies_from_browser',

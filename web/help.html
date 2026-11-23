@@ -563,6 +563,15 @@ mc_h264:hevc</code></pre>
                   <strong>Preferred Video Codecs</strong>, so a preferred codec only offered above the limit still wins.
                 </li>
                 <li><strong>Extra YT-DLP Video Args</strong> are added to the download command, <strong>Meta Args</strong> to the metadata fetch and <strong>Crawl Args</strong> to channel crawls. A channel URL's own extra args replace the channel's rather than adding to them, and Download As's replace the channel URL's.</li>
+                <li>
+                  <strong>Videos to Crawl</strong> set to <strong>Newest</strong> makes each crawl check only that many
+                  videos from the top of a URL's list, usually its newest, so very large channels crawl faster. Videos
+                  further down aren't found: failed ones there aren't retried, and if more come out between crawls than
+                  it checks, the rest are missed. <strong>All</strong> checks every video, even where a profile or the
+                  channel sets a number. Where a URL lists several tabs, such as a YouTube channel's home page, it counts
+                  per tab. Custom crawl rules don't use it. <strong>Crawl Now</strong> and <strong>Ignore to
+                  Date</strong> ask for a number for that run only, blank checking every video.
+                </li>
                 <li><strong>External Downloader</strong> hands the transfer to aria2c, axel, curl and the like, with its own <strong>Args</strong>.</li>
               </ul>
 

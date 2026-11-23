@@ -218,13 +218,17 @@ func SetFileDirFlags(cmd *cobra.Command, configFile, jsonDir, videoDir *string) 
 }
 
 // SetProgramRelatedFlags sets flags for the Tubarr instance.
-func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq *int, downloadArgs, downloadCmd, moveOpsFile *string, moveOps *[]string, pause *bool) {
+func SetProgramRelatedFlags(cmd *cobra.Command, concurrency, crawlFreq, crawlN *int, downloadArgs, downloadCmd, moveOpsFile *string, moveOps *[]string, pause *bool) {
 	if concurrency != nil {
 		cmd.Flags().IntVar(concurrency, keys.DownloadConcurrency, 0, "Maximum videos this channel downloads at once (0 = 1)")
 	}
 
 	if crawlFreq != nil {
 		cmd.Flags().IntVar(crawlFreq, keys.CrawlFreq, -1, "New crawl frequency in minutes")
+	}
+
+	if crawlN != nil {
+		cmd.Flags().IntVar(crawlN, keys.CrawlN, 0, "Newest videos a yt-dlp crawl checks per URL (-1 = all, even over a profile's or channel's number; 0 = unset)")
 	}
 
 	if downloadCmd != nil {

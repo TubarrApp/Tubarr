@@ -1253,6 +1253,7 @@ func fullSettings() *models.Settings {
 		DownloadConcurrency:       2,
 		CookiesFromBrowser:        "firefox",
 		CrawlFreq:                 30,
+		CrawlN:                    50,
 		ExternalDownloader:        "aria2c",
 		ExternalDownloaderArgs:    "-x 4",
 		MaxFilesize:               "1G",
@@ -1384,6 +1385,22 @@ func TestMergeSettingsKeepsOwn(t *testing.T) {
 	want.MetaFilterMoveOps = []models.MetaFilterMoveOps{ownMove}
 	if !reflect.DeepEqual(*child, want) {
 		t.Errorf("merged settings differ:\ngot  %+v\nwant %+v", *child, want)
+	}
+}
+
+// TestMergeSettingsCrawlNAll tests a channel URL set to check every video keeps that over its channel's number, and one
+// left unset inherits its channel's all.
+func TestMergeSettingsCrawlNAll(t *testing.T) {
+	own := &models.Settings{CrawlN: models.CrawlNAll}
+	mergeSettings(own, &models.Settings{CrawlN: 50})
+	if own.CrawlN != models.CrawlNAll {
+		t.Errorf("URL set to all = %d after merging a channel's 50, want %d", own.CrawlN, models.CrawlNAll)
+	}
+
+	unset := &models.Settings{}
+	mergeSettings(unset, &models.Settings{CrawlN: models.CrawlNAll})
+	if unset.CrawlN != models.CrawlNAll {
+		t.Errorf("unset URL = %d after merging a channel set to all, want %d", unset.CrawlN, models.CrawlNAll)
 	}
 }
 

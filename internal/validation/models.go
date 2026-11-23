@@ -20,6 +20,7 @@ func ValidateSettingsModel(s *models.Settings, checkPaths bool) error {
 
 	s.DownloadConcurrency = max(s.DownloadConcurrency, 0)
 	s.CrawlFreq = max(s.CrawlFreq, 0)
+	s.CrawlN = max(s.CrawlN, models.CrawlNAll)
 
 	if checkPaths && s.FilterFile != "" {
 		if _, _, err := sharedvalidation.ValidateFile(s.FilterFile, false, sharedtemplates.TubarrTemplateTags); err != nil {

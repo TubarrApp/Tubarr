@@ -211,6 +211,8 @@ func clearURLSettings(s *models.Settings, m *models.MetarrArgs, names []string) 
 			s.ExtraYTDLPCrawlArgs = ""
 		case keys.CrawlFreq:
 			s.CrawlFreq = 0
+		case keys.CrawlN:
+			s.CrawlN = 0
 		case keys.DownloadConcurrency:
 			s.DownloadConcurrency = 0
 		case keys.DLRetries:

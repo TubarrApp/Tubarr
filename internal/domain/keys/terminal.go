@@ -97,6 +97,7 @@ const (
 	MoveOps        string = "move-ops"
 	MoveOpsFile    string = "move-ops-file"
 	CrawlFreq      string = "crawl-freq"
+	CrawlN         string = "crawl-n"
 
 	// Replace the profile's or channel's filters or move ops instead of adding to them.
 	FilterOpsReplaceInherited string = "filter-ops-replace-inherited"

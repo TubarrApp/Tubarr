@@ -505,6 +505,7 @@ func mergeSettings(u, ch *models.Settings) {
 	u.DownloadConcurrency = cmp.Or(u.DownloadConcurrency, ch.DownloadConcurrency)
 	u.CookiesFromBrowser = cmp.Or(u.CookiesFromBrowser, ch.CookiesFromBrowser)
 	u.CrawlFreq = cmp.Or(u.CrawlFreq, ch.CrawlFreq) // A blank field saves as 0.
+	u.CrawlN = cmp.Or(u.CrawlN, ch.CrawlN)
 	u.ExternalDownloader = cmp.Or(u.ExternalDownloader, ch.ExternalDownloader)
 	u.ExternalDownloaderArgs = cmp.Or(u.ExternalDownloaderArgs, ch.ExternalDownloaderArgs)
 	u.MaxFilesize = cmp.Or(u.MaxFilesize, ch.MaxFilesize)

@@ -645,6 +645,9 @@ pre[class*="language-"] {
   .top-10 {
     top: calc(var(--spacing) * 10);
   }
+  .top-12 {
+    top: calc(var(--spacing) * 12);
+  }
   .top-\[60\%\] {
     top: 60%;
   }
@@ -3093,6 +3096,14 @@ pre[class*="language-"] {
     --tw-tracking: calc(0.2px * -1);
     letter-spacing: calc(0.2px * -1);
   }
+  .tracking-wide {
+    --tw-tracking: 0.025em;
+    letter-spacing: 0.025em;
+  }
+  .tracking-wider {
+    --tw-tracking: 0.05em;
+    letter-spacing: 0.05em;
+  }
   .break-all {
     word-break: break-all;
   }
@@ -4164,6 +4175,11 @@ pre[class*="language-"] {
       --tw-ring-color: color-mix(in oklab, var(--color-brand-500) 10%, transparent);
     }
   }
+  .focus\:ring-brand-500\/50 {
+    &:focus {
+      --tw-ring-color: color-mix(in oklab, var(--color-brand-500) 50%, transparent);
+    }
+  }
   .focus\:ring-error-500\/10 {
     &:focus {
       --tw-ring-color: color-mix(in oklab, var(--color-error-500) 10%, transparent);
@@ -4879,6 +4895,18 @@ pre[class*="language-"] {
     @media (width >= 640px) {
       font-size: var(--text-title-sm);
       line-height: var(--tw-leading, var(--text-title-sm--line-height));
+    }
+  }
+  .md\:hidden {
+    @media (width >= 768px) {
+      display: none;
+    }
+  }
+  .md\:inline-flex {
+    @media (width >= 768px) {
+      display: -webkit-inline-box;
+      display: -ms-inline-flexbox;
+      display: inline-flex;
     }
   }
   .md\:w-\[668px\] {
@@ -5679,6 +5707,11 @@ pre[class*="language-"] {
   .dark\:border-brand-500 {
     &:is(.dark *) {
       border-color: var(--color-brand-500);
+    }
+  }
+  .dark\:border-brand-600 {
+    &:is(.dark *) {
+      border-color: var(--color-brand-600);
     }
   }
   .dark\:border-error-500\/30 {
@@ -6499,6 +6532,15 @@ pre[class*="language-"] {
       &:hover {
         @media (hover: hover) {
           color: var(--color-gray-200);
+        }
+      }
+    }
+  }
+  .dark\:hover\:text-gray-100 {
+    &:is(.dark *) {
+      &:hover {
+        @media (hover: hover) {
+          color: var(--color-gray-100);
         }
       }
     }

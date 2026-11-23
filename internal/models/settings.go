@@ -23,6 +23,7 @@ type Settings struct {
 	// Download-related operations.
 	CookiesFromBrowser        string   `json:"cookies_from_browser"`
 	CrawlFreq                 int      `json:"crawl_freq"`
+	CrawlN                    int      `json:"crawl_n"` // Newest videos a yt-dlp crawl checks per URL, or CrawlNAll for every one.
 	ExternalDownloader        string   `json:"external_downloader"`
 	ExternalDownloaderArgs    string   `json:"external_downloader_args"`
 	MaxFilesize               string   `json:"max_filesize"`
@@ -58,6 +59,9 @@ type Settings struct {
 	Paused       bool  `json:"paused"`
 	AutoDownload *bool `json:"auto_download,omitempty"` // Nil inherits (channel URLs) or means false (channels).
 }
+
+// CrawlNAll is CrawlN set to check every video, which unlike 0 (unset) wins over a parent's number.
+const CrawlNAll = -1
 
 // MetarrArgs are the arguments used when calling the Metarr external program.
 type MetarrArgs struct {
@@ -235,6 +239,9 @@ func ChildSettingsMatchParent(parent *Settings, child *Settings) bool {
 		return false
 	}
 	if child.CrawlFreq != 0 && child.CrawlFreq != parent.CrawlFreq {
+		return false
+	}
+	if child.CrawlN != 0 && child.CrawlN != parent.CrawlN {
 		return false
 	}
 	if child.Retries != 0 && child.Retries != parent.Retries {
@@ -544,6 +551,9 @@ func SettingsAllZero(s *Settings) bool {
 		return false
 	}
 	if s.CrawlFreq != 0 {
+		return false
+	}
+	if s.CrawlN != 0 {
 		return false
 	}
 	if s.ExternalDownloader != "" {

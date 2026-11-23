@@ -25,6 +25,7 @@ const (
 	SettingsToDate                    = "to_date"
 	SettingsMaxConcurrency            = "download_concurrency"
 	SettingsCrawlFreq                 = "crawl_freq"
+	SettingsCrawlN                    = "crawl_n"
 	SettingsDownloadRetries           = "download_retries"
 	SettingsUseGlobalCookies          = "use_global_cookies"
 	SettingsPaused                    = "paused"

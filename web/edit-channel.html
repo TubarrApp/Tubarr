@@ -366,6 +366,7 @@
               json_directory: '',
               download_concurrency: '',
               crawl_freq: '',
+              crawl_n: '',
               download_retries: '',
               max_filesize: '',
               max_resolution: '',
@@ -653,6 +654,7 @@
               json_directory: '',
               download_concurrency: null,
               crawl_freq: null,
+              crawl_n: '',
               download_retries: null,
               max_filesize: '',
               max_resolution: '',
@@ -918,7 +920,7 @@
               if (urlEntry.hasCustomSettings && urlEntry.custom) {
                 // Process basic/advanced settings
                 const settingsFields = [
-                  'video_directory', 'json_directory', 'download_concurrency', 'crawl_freq',
+                  'video_directory', 'json_directory', 'download_concurrency', 'crawl_freq', 'crawl_n',
                   'download_retries', 'max_filesize', 'max_resolution', 'from_date', 'to_date',
                   'filter_file', 'filters',
                   'ytdlp_output_ext', 'cookies_from_browser',

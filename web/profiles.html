@@ -243,6 +243,9 @@
           boolHint() {
             return 'Not set';
           },
+          crawlNHint() {
+            return 'Not set';
+          },
 
           // A profile needs a video directory while channels without their own rely on it.
           videoDirRequired() {
@@ -390,6 +393,7 @@
             json_directory: '',
             download_concurrency: '',
             crawl_freq: '',
+            crawl_n: '',
             download_retries: '',
             max_filesize: '',
             max_resolution: '',

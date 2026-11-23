@@ -52,6 +52,7 @@ const (
 	SkipVideo     = "--skip-download"
 	WriteInfoJSON = "--write-info-json"
 	OutputJSON    = "-J"
+	CrawlN        = "-I"
 )
 
 // Sleep yt-dlp commands.

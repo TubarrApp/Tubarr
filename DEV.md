@@ -104,7 +104,7 @@ Everything starts in [cmd/tubarr/main.go](cmd/tubarr/main.go):
 2. With `mergeURLsWithParent` true (what every job uses), the channel's profile fills in the settings the channel leaves blank (`mergeSettings`, `mergeMetarrArgs`), the list settings are stacked (`stackLists`), and output directory tags are filled (`parsing.FillChannelOutputDirectory`).
 3. `GetChannelURLModels` ([internal/repo/channel_urls.go](internal/repo/channel_urls.go)) loads the URLs. Merged, each URL's blank settings are filled first from its own profile, then from its channel (`inheritChannelSettings`). A URL without a JSON directory saves metadata beside its own video directory if it has one, else in the channel's JSON directory. A channel without one saves metadata in its video directory.
 
-Single values come from the nearest level that sets them: **URL → URL's profile → channel → channel's profile**. Lists (download filters, move ops, meta ops, filename ops and both filtered op lists) are added together across the levels instead, unless a level's `*ReplaceInherited` flag drops its parent's list (`withoutReplacedSettings`, `withoutReplacedMetarrArgs`). Each level's lists are kept in `Channel.Levels` and `ChannelURL.Levels`, so run-time code can add each level's ops file in its place.
+Single values come from the nearest level that sets them: **URL → URL's profile → channel → channel's profile**. A number left at 0 is unset, so `CrawlN` saves All as `models.CrawlNAll` (-1), which beats a parent's number. Lists (download filters, move ops, meta ops, filename ops and both filtered op lists) are added together across the levels instead, unless a level's `*ReplaceInherited` flag drops its parent's list (`withoutReplacedSettings`, `withoutReplacedMetarrArgs`). Each level's lists are kept in `Channel.Levels` and `ChannelURL.Levels`, so run-time code can add each level's ops file in its place.
 
 Load with `mergeURLsWithParent` false when you want only what's saved for that level, such as on an edit page.
 
@@ -136,7 +136,7 @@ A channel can point at a YAML, TOML or JSON file holding its settings. `file.Upd
 | Trigger | Path |
 |---|---|
 | Web, on schedule | `serverStore.startCrawlWatchdog` ([internal/server/methods.go](internal/server/methods.go)) ticks every 10 seconds and calls `crawlDueChannels`. That reloads every channel, applies their limits to the queues, and for each channel works out which URLs are due (`Channel.DueURLs`, with `times.CalculateJitter` added: a random few minutes picked once per crawl, cleared when the crawl marks its URLs scanned). It reloads the config file, skips paused channels, takes the channel's crawl lock (`state.TryLockCrawl`) and a global crawl slot (`limits.GlobalCrawls`), then calls `app.CrawlChannel` with only the due URLs. |
-| Web, Crawl button | `handleCrawlChannel`. An optional `url_ids` body picks the URLs, paused ones included. |
+| Web, Crawl Now | `handleCrawlChannel`. Its optional body (`pickCrawlURLs`) picks the URLs in `url_ids`, paused ones included, and `crawl_n` replaces their Videos to Crawl setting for this crawl. |
 | Terminal, bare `tubarr` | `app.CheckChannels` ([internal/app/crawler.go](internal/app/crawler.go)) does the same as the watchdog, once, with its own semaphore sized by the crawl concurrency setting and no jitter. |
 | Terminal, `tubarr channel crawl` | `crawlChannelCmd` takes the crawl lock and calls `app.CrawlChannel`. |
 
@@ -149,7 +149,7 @@ A URL is due when its crawl frequency (its own, else the channel's, `Channel.URL
 3. `Scraper.GetNewReleases` ([internal/scraper/scrape.go](internal/scraper/scrape.go)) finds the new videos:
    1. `ChannelStore.GetDownloadedOrIgnoredVideoURLs` returns the URLs the channel has already **seen** (finished, ignored, Available, Canceled, queued, downloading, or Failed with no crawl retries left), and the failed ones a crawl can still retry.
    2. For each URL, after a wait between URLs: a per-domain crawl slot (`limits.DomainCrawls`), then cookies and any login (`CookieManager.GetChannelURLCookies`, kept in `cu.Session`). Each URL's cookies are its own: the crawl only shares the browser cookies it read for a domain, and FlareSolverr solves for a host.
-   3. `newEpisodeURLs` lists the URL's videos. Site crawl rules come first (`crawlChannelURLs`, matched with `siterules.MatchCrawl`), else yt-dlp (`ytDlpURLFetch`, running `yt-dlp --flat-playlist -J`). Seen URLs are dropped (`ignoreDownloadedURLs`).
+   3. `newEpisodeURLs` lists the URL's videos. Site crawl rules come first (`crawlChannelURLs`, matched with `siterules.MatchCrawl`), else yt-dlp (`ytDlpURLFetch`, running `yt-dlp --flat-playlist -J`, with `-I :N` when the URL's `CrawlN` is above 0). Seen URLs are dropped (`ignoreDownloadedURLs`).
    4. Crawl retries: on a URL that downloads automatically, each failed video found again uses one retry (`ChannelStore.AddCrawlDLRetries`), up to `consts.MaxCrawlDLRetries`. On a URL that doesn't, failed videos are left to the user (`ChannelStore.UseUpCrawlDLRetries`).
    5. Each new URL becomes a `models.Video`, in the channel's listing order, with the title, thumbnail, date and duration the listing showed.
 4. For each channel URL with new videos:
@@ -159,7 +159,7 @@ A URL is due when its crawl frequency (its own, else the channel's, `Channel.URL
 
 ### Ignore crawls
 
-An ignore crawl marks everything a channel lists now as done, so only videos after it are new. `app.CrawlChannelIgnore` calls `GetNewReleases` with `ignoreCrawl` true, marks each video ignored (`Video.MarkVideoAsIgnored`) and stores them with `VideoStore.AddVideos`. It runs from the web's Ignore Crawl button (`handleIgnoreCrawlChannel`), when a channel is added with "ignore run" set, and from `tubarr channel ignore-crawl`. `tubarr channel ignore-video-url` stores one URL the same way (`ChannelStore.AddURLToIgnore`).
+An ignore crawl marks everything a channel lists now as done, so only videos after it are new. `app.CrawlChannelIgnore` calls `GetNewReleases` with `ignoreCrawl` true, marks each video ignored (`Video.MarkVideoAsIgnored`) and stores them with `VideoStore.AddVideos`. It runs from the web's Ignore to Date dialog (`handleIgnoreCrawlChannel`, which takes the same body as Crawl Now), when a channel is added with "ignore run" set, and from `tubarr channel ignore-crawl`. `tubarr channel ignore-video-url` stores one URL the same way (`ChannelStore.AddURLToIgnore`).
 
 ---
 

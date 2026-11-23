@@ -346,6 +346,32 @@
 
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Videos to Crawl
+                        </label>
+                        <div class="flex gap-2">
+                          <select
+                            :value="crawlNChoice(formData.settings)"
+                            @change="setCrawlN(formData.settings, $event.target.value)"
+                            class="min-w-0 flex-1 h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                          >
+                            <option value="" x-text="crawlNHint()"></option>
+                            <template x-if="page !== 'profiles'">
+                              <option value="all">All</option>
+                            </template>
+                            <option value="newest">Newest</option>
+                          </select>
+                          <input
+                            type="number"
+                            x-show="crawlNChoice(formData.settings) === 'newest'"
+                            x-model.number="formData.settings.crawl_n"
+                            class="w-32 shrink-0 h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                          />
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Newest checks only that many videos from the top of each URL's list, so very large channels crawl faster, but videos further down aren't found. Custom crawl rules don't use it.</p>
+                      </div>
+
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Extra YT-DLP Crawl Args
                         </label>
                         <input
@@ -906,6 +932,31 @@
     return typeof value === 'boolean' ? `${value ? on : off} (from ${profile.name})` : fallback;
   }
 
+  // profileCrawlNHint returns the label of the Videos to Crawl blank choice: the profile's setting, else fallback.
+  function profileCrawlNHint(profile, fallback) {
+    const n = profile?.settings?.crawl_n;
+    if (n === -1) return `All (from ${profile.name})`;
+    return n > 0 ? `Newest ${n} (from ${profile.name})` : fallback;
+  }
+
+  // crawlNChoice returns the Videos to Crawl choice settings s hold: all (-1), blank (unset), else newest, whose emptied
+  // box holds null.
+  function crawlNChoice(s) {
+    if (s.crawl_n === -1) return 'all';
+    return s.crawl_n === '' || s.crawl_n === undefined ? '' : 'newest';
+  }
+
+  // setCrawlN sets settings s to a Videos to Crawl choice, keeping a number already typed for newest.
+  function setCrawlN(s, choice) {
+    if (choice === 'all') {
+      s.crawl_n = -1;
+    } else if (choice === 'newest') {
+      s.crawl_n = s.crawl_n > 0 ? s.crawl_n : null;
+    } else {
+      s.crawl_n = '';
+    }
+  }
+
   // profileFields returns what a channel page's fields need from the profiles its channel and URLs can choose.
   function profileFields() {
     return {
@@ -936,6 +987,12 @@
       },
       urlBoolHint(urlEntry, key, on, off) {
         return profileBoolHint(this.profileByID(urlEntry.profile_id), key, on, off, 'Use channel setting');
+      },
+      crawlNHint() {
+        return profileCrawlNHint(this.profileByID(this.formData.profile_id), 'Default (All)');
+      },
+      urlCrawlNHint(urlEntry) {
+        return profileCrawlNHint(this.profileByID(urlEntry.profile_id), 'Use channel setting');
       },
 
       // A channel needs a video directory of its own unless its profile has one.

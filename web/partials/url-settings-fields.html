@@ -28,7 +28,7 @@
                           <p class="font-medium">This URL can override ANY channel setting.</p>
                           <ul class="list-disc list-inside space-y-1 ml-2">
                             <li><strong>Basic:</strong> Directories, concurrency, crawl frequency, retries, global cookies, dates, filters</li>
-                            <li><strong>Yt-dlp:</strong> Output extension, browser cookies, external downloaders, max filesize, extra args, preferred codecs</li>
+                            <li><strong>Yt-dlp:</strong> Output extension, browser cookies, external downloaders, max filesize, videos to crawl, extra args, preferred codecs</li>
                             <li><strong>Post-processing:</strong> Whether to post-process after download, Metarr output directory, move operations, transcoding, meta/filename operations</li>
                           </ul>
                           <p class="mt-2 text-brand-600 dark:text-brand-400">💡 Any field left empty uses this URL's profile, if it sets one, else the channel setting.</p>
@@ -145,6 +145,17 @@
                               <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">External Downloader Args</label>
                               <input type="text" x-model="urlEntry.custom.external_downloader_args" :placeholder="urlHint(urlEntry, 'settings', 'external_downloader_args', 'Use channel setting')" class="w-full h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono" />
                               <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Passed to the chosen external downloader, e.g. <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">-x 16 -s 16</code> for aria2c.</p>
+                            </div>
+                            <div>
+                              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Videos to Crawl</label>
+                              <div class="flex gap-2">
+                                <select :value="crawlNChoice(urlEntry.custom)" @change="setCrawlN(urlEntry.custom, $event.target.value)" class="min-w-0 flex-1 h-11 rounded-lg border border-gray-300 bg-transparent pl-4 pr-10 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                                  <option value="" x-text="urlCrawlNHint(urlEntry)"></option>
+                                  <option value="all">All</option>
+                                  <option value="newest">Newest</option>
+                                </select>
+                                <input type="number" x-show="crawlNChoice(urlEntry.custom) === 'newest'" x-model.number="urlEntry.custom.crawl_n" class="w-32 shrink-0 h-11 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                              </div>
                             </div>
                           </div>
                           <div>

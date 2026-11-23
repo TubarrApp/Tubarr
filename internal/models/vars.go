@@ -65,6 +65,7 @@ type SettingsInput struct {
 
 	// Concurrency and performance settings.
 	CrawlFreq           *int `viper:"crawl-freq"`
+	CrawlN              *int `viper:"crawl-n"`
 	DownloadConcurrency *int `viper:"download-concurrency"`
 	Retries             *int `viper:"dl-retries"`
 

@@ -815,7 +815,7 @@ func ignoreCrawl(ctx context.Context, cs contracts.ChannelStore, s contracts.Sto
 	}
 
 	// Primary channel elements.
-	cmd.SetPrimaryChannelFlags(ignoreCrawlCmd, &name, nil, nil)
+	cmd.SetPrimaryChannelFlags(ignoreCrawlCmd, &name, nil, &id)
 
 	return ignoreCrawlCmd
 }

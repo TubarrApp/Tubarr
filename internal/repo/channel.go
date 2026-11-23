@@ -1734,9 +1734,19 @@ func displaySettingsStruct(s *models.Settings) {
 		}
 	}
 
+	// Videos to crawl, blank when unset.
+	var crawlN string
+	switch {
+	case s.CrawlN == models.CrawlNAll:
+		crawlN = "All"
+	case s.CrawlN > 0:
+		crawlN = fmt.Sprintf("Newest %d", s.CrawlN)
+	}
+
 	fmt.Printf("Video Directory: %s\n", s.VideoDir)
 	fmt.Printf("JSON Directory: %s\n", s.JSONDir)
 	fmt.Printf("Crawl Frequency: %d minutes\n", s.CrawlFreq)
+	fmt.Printf("Videos to Crawl: %s\n", crawlN)
 	fmt.Printf("Download Concurrency: %d\n", s.DownloadConcurrency)
 	fmt.Printf("Cookie Source: %s\n", s.CookiesFromBrowser)
 	fmt.Printf("Retries: %d\n", s.Retries)

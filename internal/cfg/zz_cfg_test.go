@@ -24,6 +24,7 @@ import (
 	"tubarr/internal/repo"
 	"tubarr/internal/siterules"
 
+	"github.com/TubarrApp/gocommon/sharedconsts"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -59,6 +60,37 @@ func TestParsePicks(t *testing.T) {
 		if !tt.wantErr && !slices.Equal(got, tt.want) {
 			t.Errorf("parsePicks(%q) = %v, want %v", tt.input, got, tt.want)
 		}
+	}
+}
+
+// ******************************** Channel commands **********************************************************************************
+
+// TestIgnoreCrawlByChannelID tests ignore-crawl finds a channel by its ID, as crawl does.
+func TestIgnoreCrawlByChannelID(t *testing.T) {
+	cs := newSettingsTestStore(t)
+	store, err := repo.InitStores(cs.GetDB())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := addSettingsChannel(t, cs, "ignorebyid", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// yt-dlp records that it ran and finds nothing.
+	bin := t.TempDir()
+	runs := filepath.Join(bin, "runs")
+	script := "#!/bin/sh\necho run >> '" + runs + "'\necho '{\"entries\":[]}'\n"
+	if err := os.WriteFile(filepath.Join(bin, sharedconsts.ProgramYTDLP), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	if err := runSettingsCmd(ignoreCrawl(t.Context(), cs, store), keys.ChannelID, fmt.Sprint(c.ID), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(runs); err != nil {
+		t.Errorf("ignore-crawl --%s=%d didn't crawl the channel: %v", keys.ChannelID, c.ID, err)
 	}
 }
 
@@ -445,6 +477,27 @@ func TestSettingsInputEmptyValues(t *testing.T) {
 	}
 }
 
+// TestCrawlNNegativeIsAll tests that a negative crawl-n in a config file is saved as checking every video, on a channel
+// and on a URL.
+func TestCrawlNNegativeIsAll(t *testing.T) {
+	cs := newSettingsTestStore(t)
+	in := []settingsKey{{key: keys.CrawlN, field: "CrawlN", val: -5}}
+	c, err := addSettingsChannel(t, cs, "negative", in, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ChanSettings.CrawlN != models.CrawlNAll {
+		t.Errorf("channel %s = %d, want %d", keys.CrawlN, c.ChanSettings.CrawlN, models.CrawlNAll)
+	}
+	s, _, err := urlSettings(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.CrawlN != models.CrawlNAll {
+		t.Errorf("URL %s = %d, want %d", keys.CrawlN, s.CrawlN, models.CrawlNAll)
+	}
+}
+
 // TestClearSettingNamesEveryFlag tests that --clear-setting accepts every URL settings flag, with or without "--".
 func TestClearSettingNamesEveryFlag(t *testing.T) {
 	c := &cobra.Command{}
@@ -551,6 +604,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		{keys.DownloadConcurrency, "DownloadConcurrency", false, 3, 0},
 		{keys.CookiesFromBrowser, "CookiesFromBrowser", false, "firefox", ""},
 		{keys.CrawlFreq, "CrawlFreq", false, 45, 0},
+		{keys.CrawlN, "CrawlN", false, 25, 0},
 		{keys.ExternalDownloader, "ExternalDownloader", false, "aria2c", ""},
 		{keys.ExternalDownloaderArgs, "ExternalDownloaderArgs", false, "-x 4", ""},
 		{keys.MaxFilesize, "MaxFilesize", false, "100MB", ""},
@@ -616,6 +670,7 @@ func settingsFixture(t *testing.T) ([]settingsKey, *models.Settings, *models.Met
 		DownloadConcurrency:       3,
 		CookiesFromBrowser:        "firefox",
 		CrawlFreq:                 45,
+		CrawlN:                    25,
 		ExternalDownloader:        "aria2c",
 		ExternalDownloaderArgs:    "-x 4",
 		MaxFilesize:               "100m",

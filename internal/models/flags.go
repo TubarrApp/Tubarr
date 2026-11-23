@@ -85,6 +85,7 @@ type ChannelFlagValues struct {
 
 	// Concurrency and performance settings
 	CrawlFreq           int
+	CrawlN              int
 	DownloadConcurrency int
 	MetarrConcurrency   int
 	Retries             int

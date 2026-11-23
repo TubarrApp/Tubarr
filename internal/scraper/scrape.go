@@ -304,8 +304,10 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 	uniqueEpisodeURLs := make(map[string]*listedVideo)
 	channelURL, fs := cu.URL, cu.Session.FlareSolverr
 	var crawlArgs, browser string
+	var crawlN int
 	if cu.ChanURLSettings != nil {
 		crawlArgs, browser = cu.ChanURLSettings.ExtraYTDLPCrawlArgs, cu.ChanURLSettings.CookiesFromBrowser
+		crawlN = cu.ChanURLSettings.CrawlN
 	}
 
 	// Custom crawl arguments, refused if one is a blocked option.
@@ -332,12 +334,18 @@ func ytDlpURLFetch(ctx context.Context, cu *models.ChannelURL) (map[string]*list
 		// Site rule impersonation, and FlareSolverr's user agent (its cookies are in the cookie file).
 		args, fsGen := siterules.AddSiteRulesToYTDLP(channelURL, fs, args)
 
+		// Crawl only first 'N'
+		if crawlN > 0 {
+			args = append(args, command.CrawlN, fmt.Sprintf(":%d", crawlN))
+		}
+
 		// Add -J and URL to finalize command
 		args = append(args, command.OutputJSON, command.EndOfOptions, channelURL)
+
 		//nolint:gosec // yt-dlp with the args Tubarr builds, the user's checked against the blocked options.
 		cmd := exec.CommandContext(ctx, sharedconsts.ProgramYTDLP, args...)
 
-		cu.Log().D(2, "Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
+		cu.Log().I("Executing YT-DLP playlist fetch command for channel %q URL %q:\n\n%s\n", cu.ChannelName, channelURL, cmd.String())
 
 		if j, err = cmd.Output(); err == nil {
 			break

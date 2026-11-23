@@ -2359,6 +2359,7 @@ func formSamples(t *testing.T) map[string][2]string {
 		"json_directory":               {sub("json-a"), sub("json-b")},
 		"download_concurrency":         {"2", "3"},
 		"crawl_freq":                   {"45", "60"},
+		"crawl_n":                      {"50", "-1"},
 		"download_retries":             {"2", "4"},
 		"max_filesize":                 {"100m", "2g"},
 		"max_resolution":               {"1080", "720"},
@@ -3053,7 +3054,7 @@ func pageRequests() []pageRequest {
 				t.Errorf("dismissed video's status = %q (%v), want %q", status, err, consts.DLStatusIgnored)
 			}
 		}},
-		{path: "/api/v1/channels/{}/crawl", keys: []string{"url_ids"}, replay: routed(post, "/api/v1/channels/999999/crawl", http.StatusNotFound)},
+		{path: "/api/v1/channels/{}/crawl", keys: []string{"url_ids", "crawl_n"}, replay: routed(post, "/api/v1/channels/999999/crawl", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/delete", replay: routed(del, "/api/v1/channels/999999/delete", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/delete-videos", keys: []string{"urls[]", "delete_files"}, replay: func(t *testing.T) {
 			vs := repo.GetVideoStore(fuzzServer.db)
@@ -3132,7 +3133,7 @@ func pageRequests() []pageRequest {
 			}
 			checkUnknownKeyRefused(t, post, "/api/v1/channels/1/available-urls", body)
 		}},
-		{path: "/api/v1/channels/{}/ignore-crawl", replay: routed(post, "/api/v1/channels/999999/ignore-crawl", http.StatusNotFound)},
+		{path: "/api/v1/channels/{}/ignore-crawl", keys: []string{"url_ids", "crawl_n"}, replay: routed(post, "/api/v1/channels/999999/ignore-crawl", http.StatusNotFound)},
 		{path: "/api/v1/channels/{}/latest-downloads", replay: readsJSON("/api/v1/channels/1/latest-downloads")},
 		{path: "/api/v1/channels/{}/notification-seen", replay: routed(post, "/api/v1/channels/1/notification-seen", http.StatusOK)},
 		{path: "/api/v1/channels/{}/run-metarr", keys: []string{"video_ids", "overrides", "metarr", "rerun"}, replay: strictJSON(post, "/api/v1/channels/999999/run-metarr", `{"video_ids":[1]}`, http.StatusNotFound)},
@@ -4864,6 +4865,107 @@ func FuzzLiveChannel(f *testing.F) {
 			}
 		}
 	})
+}
+
+// ******************************** Manual crawls *************************************************************************************
+
+// manualCrawlChannel adds a channel with URLs a and b, the channel checking its newest 9 videos and b its newest 3, with
+// a fake yt-dlp recording each run's arguments and finding nothing. It returns the channel's ID, its URLs' IDs by name
+// and the run record's path.
+func manualCrawlChannel(t *testing.T, name string) (id int64, urlIDs map[string]int64, runs string) {
+	t.Helper()
+	setupFuzzServer(t)
+
+	// yt-dlp records its arguments and finds nothing.
+	bin := t.TempDir()
+	runs = filepath.Join(bin, "runs")
+	script := "#!/bin/sh\necho \"$*\" >> '" + runs + "'\necho '{\"entries\":[]}'\n"
+	if err := os.WriteFile(filepath.Join(bin, sharedconsts.ProgramYTDLP), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	abstractions.Set(keys.SkipAllWaits, true)
+	t.Cleanup(func() { abstractions.Set(keys.SkipAllWaits, nil) })
+
+	base := "https://example.com/@" + strings.ToLower(name)
+	form := webChannelForm(t, name, base+"-a "+base+"-b")
+	form.Set("crawl_n", "9")
+	setURLSettings(t, form, base+"-b", map[string]any{"crawl_n": 3})
+	id = addWebChannel(t, form)
+
+	urlIDs = map[string]int64{}
+	for _, n := range []string{"a", "b"} {
+		var urlID int64
+		if err := fuzzServer.db.QueryRow("SELECT id FROM channel_urls WHERE channel_id = ? AND url = ?", id, base+"-"+n).Scan(&urlID); err != nil {
+			t.Fatal(err)
+		}
+		urlIDs[n] = urlID
+	}
+	return id, urlIDs, runs
+}
+
+// manualCrawl sends a crawl or ignore crawl as the home page's dialog does, returning yt-dlp's arguments for each URL it
+// crawled, by the URL's name.
+func manualCrawl(t *testing.T, id int64, runs, action string, body map[string]any) map[string]string {
+	t.Helper()
+	if err := os.Remove(runs); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	if w := sendJSON(t, http.MethodPost, fmt.Sprintf("/api/v1/channels/%d/%s", id, action), body); w.Code != http.StatusAccepted {
+		t.Fatalf("%s = %d %s", action, w.Code, w.Body.String())
+	}
+	waitForCrawl(t, id, runs)
+
+	data, err := os.ReadFile(runs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		args[line[strings.LastIndex(line, "-")+1:]] = line // The URL, last, ends in its name.
+	}
+	return args
+}
+
+// TestCrawlUsesEachURLsVideosToCrawl tests a crawl checks the newest videos set on each URL, else on its channel.
+func TestCrawlUsesEachURLsVideosToCrawl(t *testing.T) {
+	id, urlIDs, runs := manualCrawlChannel(t, "CrawlNSettings")
+	args := manualCrawl(t, id, runs, "crawl", map[string]any{"url_ids": []int64{urlIDs["a"], urlIDs["b"]}})
+	if !strings.Contains(args["a"], "-I :9 ") {
+		t.Errorf("URL a's crawl = %q, want the channel's -I :9", args["a"])
+	}
+	if !strings.Contains(args["b"], "-I :3 ") {
+		t.Errorf("URL b's crawl = %q, want its own -I :3", args["b"])
+	}
+}
+
+// TestCrawlDialogVideosToCrawl tests the crawl dialog's number replaces the URLs' own for that crawl, -1 checking every
+// video, and only the URLs picked are crawled.
+func TestCrawlDialogVideosToCrawl(t *testing.T) {
+	id, urlIDs, runs := manualCrawlChannel(t, "CrawlNDialog")
+	args := manualCrawl(t, id, runs, "crawl", map[string]any{"url_ids": []int64{urlIDs["b"]}, "crawl_n": 5})
+	if _, crawled := args["a"]; crawled || !strings.Contains(args["b"], "-I :5 ") {
+		t.Errorf("crawling b with 5 = %v, want only b, with -I :5", args)
+	}
+
+	args = manualCrawl(t, id, runs, "crawl", map[string]any{"url_ids": []int64{urlIDs["a"], urlIDs["b"]}, "crawl_n": models.CrawlNAll})
+	if len(args) != 2 {
+		t.Errorf("crawling both = %v, want both crawled", args)
+	}
+	for n, a := range args {
+		if strings.Contains(a, " -I ") {
+			t.Errorf("URL %s's crawl checking all = %q, want no -I", n, a)
+		}
+	}
+}
+
+// TestIgnoreDialogPicksURLs tests Ignore to Date's dialog ignore crawls only the URLs picked, checking the number given.
+func TestIgnoreDialogPicksURLs(t *testing.T) {
+	id, urlIDs, runs := manualCrawlChannel(t, "CrawlNIgnore")
+	args := manualCrawl(t, id, runs, "ignore-crawl", map[string]any{"url_ids": []int64{urlIDs["a"]}, "crawl_n": 4})
+	if _, crawled := args["b"]; crawled || !strings.Contains(args["a"], "-I :4 ") {
+		t.Errorf("ignoring a with 4 = %v, want only a, with -I :4", args)
+	}
 }
 
 // ******************************** Max CPU *******************************************************************************************

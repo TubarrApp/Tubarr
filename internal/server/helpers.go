@@ -261,6 +261,7 @@ type settingsResponse struct {
 	JSONDir                string   `json:"json_directory,omitempty"`
 	DownloadConcurrency    int      `json:"download_concurrency,omitempty"`
 	CrawlFreq              int      `json:"crawl_freq,omitempty"`
+	CrawlN                 int      `json:"crawl_n,omitempty"`
 	DownloadRetries        int      `json:"download_retries,omitempty"`
 	MaxFilesize            string   `json:"max_filesize,omitempty"`
 	MaxResolution          string   `json:"max_resolution,omitempty"`
@@ -298,6 +299,7 @@ func newSettingsResponse(s *models.Settings) *settingsResponse {
 		JSONDir:                s.JSONDir,
 		DownloadConcurrency:    max(s.DownloadConcurrency, 0),
 		CrawlFreq:              max(s.CrawlFreq, 0),
+		CrawlN:                 max(s.CrawlN, models.CrawlNAll),
 		DownloadRetries:        max(s.Retries, 0),
 		MaxFilesize:            s.MaxFilesize,
 		MaxResolution:          s.MaxResolution,
@@ -473,6 +475,7 @@ type settingsInput struct {
 	ToDate                    *string  `json:"to_date"`
 	MaxConcurrency            *int     `json:"download_concurrency"`
 	CrawlFreq                 *int     `json:"crawl_freq"`
+	CrawlN                    *int     `json:"crawl_n"`
 	DownloadRetries           *int     `json:"download_retries"`
 	UseGlobalCookies          *bool    `json:"use_global_cookies"`
 	Paused                    *bool    `json:"paused"`
@@ -694,6 +697,7 @@ func (in *settingsInput) input() *models.SettingsInput {
 		ExtraYTDLPMetaArgs:        in.ExtraYTDLPMetaArgs,
 		ExtraYTDLPCrawlArgs:       in.ExtraYTDLPCrawlArgs,
 		CrawlFreq:                 in.CrawlFreq,
+		CrawlN:                    in.CrawlN,
 		DownloadConcurrency:       in.MaxConcurrency,
 		Retries:                   in.DownloadRetries,
 		Pause:                     in.Paused,
@@ -820,6 +824,10 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert crawl frequency: %w", err)
 	}
+	crawlN, err := formInt(r, jsonkeys.SettingsCrawlN)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert videos to crawl: %w", err)
+	}
 	retries, err := formInt(r, jsonkeys.SettingsDownloadRetries)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert retries: %w", err)
@@ -849,6 +857,7 @@ func settingsFromForm(r *http.Request) (*models.Settings, error) {
 		ExtraYTDLPMetaArgs:        formString(r, jsonkeys.SettingsExtraYtdlpMetaArgs),
 		ExtraYTDLPCrawlArgs:       formString(r, jsonkeys.SettingsExtraYtdlpCrawlArgs),
 		CrawlFreq:                 &crawlFreq,
+		CrawlN:                    &crawlN,
 		DownloadConcurrency:       &downloadConcurrency,
 		Retries:                   &retries,
 		Pause:                     &paused,

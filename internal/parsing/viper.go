@@ -140,6 +140,9 @@ func ApplySettingsInput(dst *models.Settings, in *models.SettingsInput) (err err
 	if v := in.CrawlFreq; v != nil {
 		dst.CrawlFreq = max(*v, 0)
 	}
+	if v := in.CrawlN; v != nil {
+		dst.CrawlN = max(*v, models.CrawlNAll)
+	}
 	if v := in.ExternalDownloader; v != nil {
 		dst.ExternalDownloader = *v
 	}
