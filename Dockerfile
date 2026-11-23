@@ -7,6 +7,9 @@ FROM ubuntu:24.04 AS build-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Retry downloads, so a flapping Launchpad (it returned 503s for hours on 2026-11-23) doesn't fail the build.
+RUN echo 'Acquire::Retries "10";' > /etc/apt/apt.conf.d/80-retries
+
 # Intel's kobuk-team PPA carries the current Intel media stack; Ubuntu 24.04's is from early 2024.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates wget && \
     mkdir -p /etc/apt/keyrings && \
@@ -16,7 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
         > /etc/apt/sources.list.d/kobuk-team-intel-graphics.list && \
     rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# --error-on=any fails here if the PPA's index can't be fetched, rather than apt carrying on without it.
+RUN apt-get update --error-on=any && apt-get install -y --no-install-recommends \
     # Core build deps + Go toolchain deps
     ca-certificates \
     git \
@@ -205,8 +209,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build-base /etc/apt/keyrings/kobuk-team-intel-graphics.asc /etc/apt/keyrings/
 COPY --from=build-base /etc/apt/sources.list.d/kobuk-team-intel-graphics.list /etc/apt/sources.list.d/
+COPY --from=build-base /etc/apt/apt.conf.d/80-retries /etc/apt/apt.conf.d/
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update --error-on=any && apt-get install -y --no-install-recommends \
     # External downloaders for yt-dlp (ffmpeg is built above, httpie is installed below)
     aria2 \
     axel \
