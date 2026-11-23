@@ -74,9 +74,9 @@ WORKDIR /build
 FROM build-base AS ffmpeg-builder
 
 ############ NVENC headers ############
-# Pinned: newer headers raise the minimum host driver (n13.1 needs 610+, dropping Maxwell/Pascal/Volta cards).
-# n13.0.19.1 needs driver 570+ (Maxwell/Pascal/Volta run up to 580), and newer drivers keep supporting it.
-RUN git clone --depth 1 --branch n13.0.19.1 https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
+# Pinned: n12.1.14.0 needs host driver 530.41+, so NVENC works with Debian 12 and 13's own drivers (535, 550).
+# Newer headers raise that minimum (n12.2 550+, n13.0 570+, n13.1 610+) for NVENC options Metarr doesn't use.
+RUN git clone --depth 1 --branch n12.1.14.0 https://github.com/FFmpeg/nv-codec-headers.git /tmp/nv && \
     make -C /tmp/nv install && rm -rf /tmp/nv
 
 ############ Build SVT-AV1 ############
@@ -257,6 +257,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmfx-gen1.2 \
     # Media SDK runtime: the VPL dispatcher uses it for QSV on Broadwell to Ice Lake iGPUs, which libmfx-gen1.2 doesn't cover
     libmfx1 \
+    # Legacy VAAPI driver for Intel iGPUs before Broadwell, and Bay Trail and Braswell, which the iHD driver doesn't cover
+    i965-va-driver-shaders \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
