@@ -273,10 +273,23 @@ func TestEncoderArgLinesAlone(t *testing.T) {
 		{line: "av1:-preset p5", ok: true},
 		{line: "vp9:-profile:v main", ok: true},
 		{line: "h264:-crf 20", ok: true},
+		{line: "h264[1080]:-x265-params log-level=error"},
+		{line: "av1[4k]:-preset p5", ok: true},
 	} {
 		if err := validation.ValidateEncoderArgLines([]string{c.line}); (err == nil) != c.ok {
 			t.Errorf("%q: got %v, want ok %t", c.line, err, c.ok)
 		}
+	}
+}
+
+// TestVideoEncoderArgsSizesSaved tests each size is saved in pixels, whichever way it was typed, and the rest as typed.
+func TestVideoEncoderArgsSizesSaved(t *testing.T) {
+	got, err := validation.ValidateVideoEncoderArgs([]string{"av1:-crf 30", "av1[1080p]:-preset 8", "x265[4K]:-crf 26", "av1[720i]:-preset 10"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"av1:-crf 30", "av1[1080]:-preset 8", "x265[2160]:-crf 26", "av1[720]:-preset 10"}; !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 

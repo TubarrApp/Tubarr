@@ -188,7 +188,7 @@ func SetTranscodeFlags(cmd *cobra.Command, gpu, gpuNode *string, videoArgs, audi
 	}
 
 	if videoArgs != nil {
-		cmd.Flags().StringArrayVar(videoArgs, keys.TranscodeVideoArgs, nil, "FFmpeg arguments used when encoding to a video codec, one codec per flag (e.g. 'av1:-crf 35 -preset 6').")
+		cmd.Flags().StringArrayVar(videoArgs, keys.TranscodeVideoArgs, nil, "FFmpeg arguments used when encoding to a video codec, one codec per flag, or one codec and size for videos that size and up (e.g. 'av1:-crf 35 -preset 6', 'av1[4k]:-preset 8').")
 	}
 
 	if audioArgs != nil {

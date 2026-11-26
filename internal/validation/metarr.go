@@ -91,13 +91,14 @@ func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs 
 	return dedupPairs, nil
 }
 
-// ValidateVideoEncoderArgs validates "codec:args" lines as Metarr will read them, returning them deduplicated as typed.
+// ValidateVideoEncoderArgs validates "codec:args" lines as Metarr will read them, returning them deduplicated as typed
+// but for sizes, which are saved in pixels (e.g. "av1[1080]:" from "av1[1080p]:").
 func ValidateVideoEncoderArgs(lines []string) (validLines []string, err error) {
 	dedupLines := dedupSlice(lines)
 	if _, err := sharedparsing.ParseVideoEncoderArgs(dedupLines); err != nil {
 		return nil, err
 	}
-	return dedupLines, nil
+	return sharedparsing.NormalizeVideoArgSizes(dedupLines), nil
 }
 
 // ValidateAudioEncoderArgs validates "codec:args" lines for audio codecs as Metarr will read them, returning them deduplicated as typed.

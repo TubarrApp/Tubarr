@@ -506,12 +506,22 @@ mc_h264:hevc</code></pre>
                 </li>
                 <li>
                   <code>-b:v</code> in Video Encoder Args is the target bitrate, written with <code>k</code>, <code>M</code>
-                  or <code>G</code>: one for every video, e.g. <code>av1:-b:v 3M</code>, or one per resolution, e.g.
-                  <code>av1:-b:v 720=1.5M,1080=3M,2160=10M</code>. A video gets the bitrate for the largest resolution
-                  at or below its own, going by the shorter side, or the smallest one listed if it's smaller than all of
-                  them. The resolution is the downloaded video's, before any <code>-vf</code> scaling. A target above the
-                  downloaded video's own bitrate is lowered to it, as encoding at more than the source has makes a
-                  bigger file, not a better one. The lowest target is <code>1k</code>, and <code>0</code> means none.
+                  or <code>G</code>, e.g. <code>av1:-b:v 3M</code>. A target above the downloaded video's own bitrate is
+                  lowered to it, as encoding at more than the source has makes a bigger file, not a better one. The
+                  lowest target is <code>1k</code>, and <code>0</code> means none.
+                </li>
+                <li>
+                  A line with a size in square brackets after the codec is for videos that size and up, e.g.
+                  <code>av1[1080]:-preset 8</code> or <code>av1[4k]:-b:v 12M</code>. The size is the shorter side, so
+                  <code>1080</code> covers 1920×1080. <code>1080p</code>, <code>4k</code> and <code>8k</code> work too,
+                  and are saved as <code>1080</code>, <code>2160</code> and <code>4320</code>. A video gets the line for
+                  the largest size at or below its own, on top of the plain <code>av1:</code> line: what the size line
+                  sets replaces the plain line's, and the rest of the plain line still applies. A video smaller than every
+                  size gets just the plain line. For H.264, HEVC and AV1, a size line's <code>-crf</code> or
+                  <code>-b:v</code> replaces whichever of the two the plain line has, so <code>av1:-crf 30</code> with
+                  <code>av1[4k]:-b:v 12M</code> gives 4K videos a bitrate and smaller ones a quality. The size is the
+                  downloaded video's, before any <code>-vf</code> scaling, so <code>av1[4k]:-vf scale=-2:1080</code>
+                  brings 4K videos down to 1080p.
                 </li>
                 <li>
                   H.264, HEVC and AV1 aim for a quality or a bitrate, not both, so give them <code>-crf</code> or
