@@ -317,7 +317,7 @@
                         @click="hasJob(channel) ? stopQueue(channel) : openCrawlDialog(channel)"
                         :disabled="crawling === channel.id || isStopping(channel)"
                         :title="hasJob(channel) ? 'Start nothing new for this channel, letting in-progress downloads and transcodes finish' : ''"
-                        :class="hasJob(channel) ? 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500' : 'bg-brand-500 hover:bg-brand-600 text-white'"
+                        :class="hasJob(channel) ? 'bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 dark:hover:bg-error-500/30' : 'bg-brand-500 hover:bg-brand-600 text-white'"
                         class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg x-show="crawling !== channel.id && !hasJob(channel)" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -335,9 +335,9 @@
                         @click="abortAll(channel)"
                         :disabled="aborting === channel.id"
                         title="Stop everything for this channel now, including in-progress downloads and transcodes"
-                        class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded-lg transition-colors bg-error-500 hover:bg-error-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 dark:hover:bg-error-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <svg x-show="aborting !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <svg x-show="aborting !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke-linejoin="round" stroke-width="2"></rect></svg>
                         <span x-text="aborting === channel.id ? 'Aborting...' : 'Abort All'"></span>
                       </button>
                       <a
@@ -349,12 +349,13 @@
                         Post-processing
                       </a>
                       <button
+                        x-show="!hasJob(channel)"
                         @click="openCrawlDialog(channel, true)"
-                        :disabled="ignoring === channel.id || hasJob(channel)"
+                        :disabled="ignoring === channel.id"
                         class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-warning-500 hover:bg-warning-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg x-show="ignoring !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5l10 7-10 7V5zM19 5v14"></path>
                         </svg>
                         <svg x-show="ignoring === channel.id" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -412,7 +413,7 @@
                             title="Stop everything for this channel now, including in-progress downloads and transcodes"
                             class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-error-500 dark:hover:bg-gray-700 md:hidden"
                           >
-                            <svg x-show="aborting !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            <svg x-show="aborting !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke-linejoin="round" stroke-width="2"></rect></svg>
                             <span x-text="aborting === channel.id ? 'Aborting...' : 'Abort All'"></span>
                           </button>
                           <a
@@ -424,12 +425,13 @@
                             <span>Post-processing</span>
                           </a>
                           <button
+                            x-show="!hasJob(channel)"
                             @click="openCrawlDialog(channel, true); actionsMenuOpen = null"
-                            :disabled="ignoring === channel.id || hasJob(channel)"
+                            :disabled="ignoring === channel.id"
                             class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed dark:text-gray-300 dark:hover:bg-gray-700 md:hidden"
                           >
                             <svg x-show="ignoring !== channel.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5l10 7-10 7V5zM19 5v14"></path>
                             </svg>
                             <svg x-show="ignoring === channel.id" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

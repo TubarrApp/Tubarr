@@ -6392,6 +6392,15 @@ pre[class*="language-"] {
       }
     }
   }
+  .dark\:hover\:bg-error-500\/30 {
+    &:is(.dark *) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: color-mix(in oklab, var(--color-error-500) 30%, transparent);
+        }
+      }
+    }
+  }
   .dark\:hover\:bg-gray-700 {
     &:is(.dark *) {
       &:hover {

@@ -101,7 +101,7 @@
                     @click="stopMetarr()"
                     :disabled="stoppingMetarr"
                     title="Stop post-processing this channel's videos (running Metarr transcodes)"
-                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500 dark:hover:bg-error-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg x-show="!stoppingMetarr" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     <span x-text="stoppingMetarr ? 'Stopping...' : 'Stop Post-Processing'"></span>
