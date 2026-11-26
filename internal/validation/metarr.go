@@ -69,13 +69,14 @@ func ValidateAudioTranscodeCodecSlice(pairs []string) (validPairs []string, err 
 	dedupPairs := dedupSlice(pairs)
 
 	// Check the plain codec and pairs as Metarr will read them.
-	if _, _, err = sharedparsing.ParseCodecMappings(dedupPairs, sharedvalidation.ValidateAudioCodec); err != nil {
+	if _, _, err = sharedparsing.ParseAudioCodecMappings(dedupPairs); err != nil {
 		return nil, err
 	}
 	return dedupPairs, nil
 }
 
-// ValidateVideoTranscodeCodecSlice validates video codec entries, returning them deduplicated as typed.
+// ValidateVideoTranscodeCodecSlice validates video codec entries, returning them deduplicated as typed but for
+// resolutions, which are saved in pixels (e.g. "h264[720-2160]:hevc" from "h264[720p-4k]:hevc").
 func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs []string, err error) {
 	dedupPairs := dedupSlice(pairs)
 
@@ -88,17 +89,17 @@ func ValidateVideoTranscodeCodecSlice(pairs []string, accel string) (validPairs 
 	if _, _, err = sharedparsing.ParseCodecMappings(dedupPairs, validate); err != nil {
 		return nil, err
 	}
-	return dedupPairs, nil
+	return sharedparsing.NormalizeResolutions(dedupPairs), nil
 }
 
 // ValidateVideoEncoderArgs validates "codec:args" lines as Metarr will read them, returning them deduplicated as typed
-// but for sizes, which are saved in pixels (e.g. "av1[1080]:" from "av1[1080p]:").
+// but for resolutions, which are saved in pixels (e.g. "av1[1080]:" from "av1[1080p]:").
 func ValidateVideoEncoderArgs(lines []string) (validLines []string, err error) {
 	dedupLines := dedupSlice(lines)
 	if _, err := sharedparsing.ParseVideoEncoderArgs(dedupLines); err != nil {
 		return nil, err
 	}
-	return sharedparsing.NormalizeVideoArgSizes(dedupLines), nil
+	return sharedparsing.NormalizeResolutions(dedupLines), nil
 }
 
 // ValidateAudioEncoderArgs validates "codec:args" lines for audio codecs as Metarr will read them, returning them deduplicated as typed.

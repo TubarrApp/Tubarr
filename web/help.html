@@ -399,7 +399,8 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
               <h2 id="transcoding">Transcoding</h2>
               <p>
                 <strong>Video Transcode Codecs</strong> and <strong>Audio Transcode Codecs</strong> say which codecs Metarr
-                converts the finished video to, one line each. Anything not mentioned is copied as it is.
+                converts the finished video to, one line each. Anything no line covers is kept as it is, or converted to
+                a codec the output container can hold if it can't hold its own.
               </p>
               <div class="table-wrap">
                 <table>
@@ -419,7 +420,7 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
 vp9:av1</code></pre>
               <p>
                 converts everything to HEVC, except VP9, which becomes AV1. Only one plain codec is allowed, and each
-                source codec can only be named once.
+                source codec can only be named once, or once for each resolution as below.
               </p>
               <p>
                 <code>lc_</code>, <code>mc_</code> or <code>hc_</code> in front of a source codec makes a line apply only
@@ -466,6 +467,35 @@ mc_h264:hevc</code></pre>
                 Metarr works it out by reading the whole file. That's quick for most videos, but can take a few minutes
                 for very long ones on a slow drive or network share.
               </p>
+              <p>
+                A resolution in square brackets after a source codec makes a video line apply only to videos of that
+                resolution:
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Line</th><th>Means</th></tr>
+                  <tr><td><code>h264[1080]:hevc</code></td><td>Convert only 1080p H.264 to HEVC.</td></tr>
+                  <tr><td><code>h264[720-1080]:hevc</code></td><td>Convert 720p and 1080p H.264 to HEVC.</td></tr>
+                  <tr><td><code>h264[1440+]:av1</code></td><td>Convert H.264 at 1440p and up to AV1.</td></tr>
+                  <tr><td><code>[720+]:av1</code></td><td>Convert every codec at 720p and up to AV1 (AV1 itself is kept).</td></tr>
+                </table>
+              </div>
+              <p>
+                The resolutions are 144, 240, 360, 480, 720, 1080, 1440, 2160 (<code>4k</code>) and 4320 (<code>8k</code>),
+                going by the shorter side, and a video counts as the largest it reaches: 1920×1200 is 1080p, a 1080×1920
+                vertical video is 1080p, and a 1920×800 widescreen video is 720p. <code>1080p</code> and <code>4K</code>
+                work too, and are saved as <code>1080</code> and <code>2160</code>. With
+              </p>
+              <pre><code>copy
+[720+]:av1</code></pre>
+              <p>
+                videos below 720p are copied and the rest become AV1. When several lines cover a video, the one naming
+                the most about it wins: its codec first, then its compression level, then its resolution. So
+                <code>lc_h264:av1</code> beats <code>h264[1080]:hevc</code> for a low-compression 1080p H.264 video, and
+                <code>h264[1080]:hevc</code> beats <code>[720+]:av1</code>. Lines for the same source can't send the same
+                resolution to different codecs, e.g. <code>h264[720-1080]:hevc</code> and <code>h264[1080+]:av1</code>
+                both cover 1080p. Audio lines take no resolution.
+              </p>
               <ul>
                 <li>Video codecs: <code>av1</code>, <code>h264</code>, <code>hevc</code>, <code>mpeg2</code>, <code>vp8</code>, <code>vp9</code>. Audio codecs: <code>aac</code>, <code>ac3</code>, <code>alac</code>, <code>dts</code>, <code>eac3</code>, <code>flac</code>, <code>mp2</code>, <code>mp3</code>, <code>opus</code>, <code>pcm</code>, <code>truehd</code>, <code>vorbis</code>, <code>wav</code>. Common other names work too (<code>h265</code>, <code>x264</code>, <code>libmp3lame</code>).</li>
                 <li><strong>GPU Acceleration</strong> encodes on the graphics card (<code>auto</code>, <code>cuda</code>, <code>qsv</code> or <code>vaapi</code>, with <strong>GPU Node Path</strong> for VA-API, e.g. <code>/dev/dri/renderD128</code>).</li>
@@ -511,16 +541,15 @@ mc_h264:hevc</code></pre>
                   lowest target is <code>1k</code>, and <code>0</code> means none.
                 </li>
                 <li>
-                  A line with a size in square brackets after the codec is for videos that size and up, e.g.
-                  <code>av1[1080]:-preset 8</code> or <code>av1[4k]:-b:v 12M</code>. The size is the shorter side, so
-                  <code>1080</code> covers 1920×1080. <code>1080p</code>, <code>4k</code> and <code>8k</code> work too,
-                  and are saved as <code>1080</code>, <code>2160</code> and <code>4320</code>. A video gets the line for
-                  the largest size at or below its own, on top of the plain <code>av1:</code> line: what the size line
-                  sets replaces the plain line's, and the rest of the plain line still applies. A video smaller than every
-                  size gets just the plain line. For H.264, HEVC and AV1, a size line's <code>-crf</code> or
-                  <code>-b:v</code> replaces whichever of the two the plain line has, so <code>av1:-crf 30</code> with
-                  <code>av1[4k]:-b:v 12M</code> gives 4K videos a bitrate and smaller ones a quality. The size is the
-                  downloaded video's, before any <code>-vf</code> scaling, so <code>av1[4k]:-vf scale=-2:1080</code>
+                  A line with a resolution in square brackets after the codec is for encoding videos of that resolution
+                  to that codec, written as in Video Transcode Codecs, e.g. <code>av1[1080]:-preset 8</code>,
+                  <code>av1[720-1080]:-crf 32</code> or <code>av1[1440+]:-b:v 12M</code>. It goes on top of the plain
+                  <code>av1:</code> line: what it sets replaces the plain line's, and the rest of the plain line still
+                  applies. A video no resolution line covers gets just the plain line, and one codec's resolution lines
+                  can't overlap. For H.264, HEVC and AV1, a resolution line's <code>-crf</code> or <code>-b:v</code>
+                  replaces whichever of the two the plain line has, so <code>av1:-crf 30</code> with
+                  <code>av1[2160+]:-b:v 12M</code> gives 4K videos a bitrate and smaller ones a quality. The resolution is
+                  the downloaded video's, before any <code>-vf</code> scaling, so <code>av1[2160+]:-vf scale=-2:1080</code>
                   brings 4K videos down to 1080p.
                 </li>
                 <li>

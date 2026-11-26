@@ -282,14 +282,28 @@ func TestEncoderArgLinesAlone(t *testing.T) {
 	}
 }
 
-// TestVideoEncoderArgsSizesSaved tests each size is saved in pixels, whichever way it was typed, and the rest as typed.
-func TestVideoEncoderArgsSizesSaved(t *testing.T) {
-	got, err := validation.ValidateVideoEncoderArgs([]string{"av1:-crf 30", "av1[1080p]:-preset 8", "x265[4K]:-crf 26", "av1[720i]:-preset 10"})
+// TestResolutionsSaved tests each resolution is saved in pixels, whichever way it was typed, in encoder args lines and
+// video codec entries, and the rest as typed.
+func TestResolutionsSaved(t *testing.T) {
+	args, err := validation.ValidateVideoEncoderArgs([]string{"av1:-crf 30", "av1[1080p]:-preset 8", "x265[4K+]:-crf 26", "av1[480i-720P]:-preset 10"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"av1:-crf 30", "av1[1080]:-preset 8", "x265[2160]:-crf 26", "av1[720]:-preset 10"}; !slices.Equal(got, want) {
-		t.Errorf("got %q, want %q", got, want)
+	if want := []string{"av1:-crf 30", "av1[1080]:-preset 8", "x265[2160+]:-crf 26", "av1[480-720]:-preset 10"}; !slices.Equal(args, want) {
+		t.Errorf("args: got %q, want %q", args, want)
+	}
+
+	codecs, err := validation.ValidateVideoTranscodeCodecSlice([]string{"copy", "[720p+]:av1", "lc_h264[1080P-4k]:hevc"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"copy", "[720+]:av1", "lc_h264[1080-2160]:hevc"}; !slices.Equal(codecs, want) {
+		t.Errorf("codecs: got %q, want %q", codecs, want)
+	}
+
+	// Audio entries take no resolution.
+	if _, err := validation.ValidateAudioTranscodeCodecSlice([]string{"aac[1080]:opus"}); err == nil {
+		t.Error("audio: took a resolution")
 	}
 }
 

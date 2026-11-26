@@ -20,8 +20,8 @@ func ValidateEncoderArgLines(lines []string) error {
 
 	// Check each codec's lines, in a set order so the same settings always give the same error.
 	for _, codec := range slices.Sorted(maps.Keys(parsed)) {
-		for _, size := range slices.Sorted(maps.Keys(parsed[codec])) {
-			if err := sharedvalidation.ValidateEncoderArgsUsed(codec, parsed[codec][size]); err != nil {
+		for _, resolution := range slices.Sorted(maps.Keys(parsed[codec])) {
+			if err := sharedvalidation.ValidateEncoderArgsUsed(codec, parsed[codec][resolution]); err != nil {
 				return err
 			}
 		}
