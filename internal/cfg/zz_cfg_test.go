@@ -121,11 +121,20 @@ func preRun(t *testing.T, args ...string) (contracts.TubarrSettingsStore, error)
 	for _, k := range []string{keys.ScrapeConfigFile, keys.FlareSolverrURL} {
 		viper.Set(k, c.Flags().Lookup(k).Value.String())
 	}
+	for _, k := range []string{keys.VideoCompressionThresholds, keys.AudioCompressionThresholds} {
+		lines, err := c.Flags().GetStringArray(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		viper.Set(k, lines)
+	}
 	settingsStore = store.TubarrSettingsStore()
 	t.Cleanup(func() {
 		settingsStore = nil
 		viper.Set(keys.ScrapeConfigFile, nil)
 		viper.Set(keys.FlareSolverrURL, nil)
+		viper.Set(keys.VideoCompressionThresholds, nil)
+		viper.Set(keys.AudioCompressionThresholds, nil)
 		siterules.Reset()
 	})
 	return settingsStore, rootCmd.PersistentPreRunE(c, nil)
@@ -162,6 +171,49 @@ func TestBrokenScrapeRulesFileKeepsCommandsRunning(t *testing.T) {
 	}
 	if _, ok := siterules.MatchAny("https://rumble.com/c/cats"); !ok {
 		t.Error("built-in scrape rules not registered")
+	}
+}
+
+// TestCompressionThresholdsFromSettings tests saved compression thresholds are used unless a flag sets them for the run,
+// and a flag's are checked.
+func TestCompressionThresholdsFromSettings(t *testing.T) {
+	// A flag's crossed thresholds are refused.
+	if _, err := preRun(t, "--"+keys.VideoCompressionThresholds+"=h264:hc<7M,lc>3M"); err == nil {
+		t.Error("crossed thresholds from a flag were accepted")
+	}
+
+	// Saved thresholds are loaded for the next run.
+	tss, err := preRun(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tss.SetSetting(keys.VideoCompressionThresholds, "h264:lc>7M\nav1:hc<2M"); err != nil {
+		t.Fatal(err)
+	}
+	c := &cobra.Command{Use: "tubarr"}
+	cmd.InitProgramFlags(c)
+	if err := c.ParseFlags(nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := rootCmd.PersistentPreRunE(c, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := viper.GetStringSlice(keys.VideoCompressionThresholds); !slices.Equal(got, []string{"h264:lc>7M", "av1:hc<2M"}) {
+		t.Errorf("saved thresholds loaded as %q", got)
+	}
+
+	// A flag's replace them for its run.
+	c = &cobra.Command{Use: "tubarr"}
+	cmd.InitProgramFlags(c)
+	if err := c.ParseFlags([]string{"--" + keys.VideoCompressionThresholds + "=hevc:lc>5M"}); err != nil {
+		t.Fatal(err)
+	}
+	viper.Set(keys.VideoCompressionThresholds, []string{"hevc:lc>5M"})
+	if err := rootCmd.PersistentPreRunE(c, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := viper.GetStringSlice(keys.VideoCompressionThresholds); !slices.Equal(got, []string{"hevc:lc>5M"}) {
+		t.Errorf("thresholds with a flag set = %q, want the flag's", got)
 	}
 }
 

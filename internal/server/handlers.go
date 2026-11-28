@@ -1863,6 +1863,38 @@ func (ss *serverStore) handleSetPostProcessConcurrency(w http.ResponseWriter, r 
 	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Post-processing concurrency updated", "limit": limit})
 }
 
+// handleGetCompressionThresholds returns the compression thresholds Metarr gets for every video.
+func (ss *serverStore) handleGetCompressionThresholds(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, r, http.StatusOK, map[string][]string{
+		"video": viper.GetStringSlice(keys.VideoCompressionThresholds),
+		"audio": viper.GetStringSlice(keys.AudioCompressionThresholds),
+	})
+}
+
+// handleSetCompressionThresholds checks and saves the compression thresholds Metarr gets for every video.
+func (ss *serverStore) handleSetCompressionThresholds(w http.ResponseWriter, r *http.Request) {
+	video, err := validation.ValidateVideoCompressionThresholds(splitNonEmptyLines(r.FormValue("video")))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid video compression thresholds: %v", err), http.StatusBadRequest)
+		return
+	}
+	audio, err := validation.ValidateAudioCompressionThresholds(splitNonEmptyLines(r.FormValue("audio")))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid audio compression thresholds: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Save them, one per line, for Metarr runs from now on.
+	for k, lines := range map[string][]string{keys.VideoCompressionThresholds: video, keys.AudioCompressionThresholds: audio} {
+		if err := ss.tss.SetSetting(k, strings.Join(lines, "\n")); err != nil {
+			http.Error(w, fmt.Sprintf("failed to save setting %q: %v", k, err), http.StatusInternalServerError)
+			return
+		}
+		viper.Set(k, lines)
+	}
+	writeJSON(w, r, http.StatusOK, map[string]any{"message": "Compression thresholds updated", "video": video, "audio": audio})
+}
+
 // handleGetDomainLimits returns all per-domain download and crawl concurrency limits.
 func (ss *serverStore) handleGetDomainLimits(w http.ResponseWriter, r *http.Request) {
 	limits, err := ss.tss.GetDomainLimits()

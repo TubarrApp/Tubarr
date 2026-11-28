@@ -34,6 +34,10 @@ func InitProgramFlags(rootCmd *cobra.Command) {
 	// FlareSolverr instance for scrape sites set to use it (global, applies to all channels)
 	rootCmd.PersistentFlags().String(keys.FlareSolverrURL, "", "URL of a FlareSolverr instance (e.g. http://localhost:8191) for scrape sites set to use it")
 
+	// Compression thresholds for Metarr (global, applies to all channels)
+	rootCmd.PersistentFlags().StringArray(keys.VideoCompressionThresholds, nil, "Bitrates where a source video codec's compression levels change, one codec per flag, or one codec and resolution (e.g. 'h264:hc<2.5M,lc>5M', 'av1[2160]:lc>10M')")
+	rootCmd.PersistentFlags().StringArray(keys.AudioCompressionThresholds, nil, "Bitrates where a source audio codec's compression levels change, one codec per flag (e.g. 'aac:hc<96k,lc>192k')")
+
 	// Debug level
 	rootCmd.PersistentFlags().Int(keys.DebugLevel, -1, "Debugging level (0 - 5)")
 }

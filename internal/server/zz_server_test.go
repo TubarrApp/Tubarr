@@ -3178,6 +3178,24 @@ func pageRequests() []pageRequest {
 		{path: "/api/v1/settings/crawl-concurrency", keys: []string{"limit"}, replay: limitSetting("/api/v1/settings/crawl-concurrency")},
 		{path: "/api/v1/settings/global-download-concurrency", keys: []string{"limit"}, replay: limitSetting("/api/v1/settings/global-download-concurrency")},
 		{path: "/api/v1/settings/post-process-concurrency", keys: []string{"limit"}, replay: limitSetting("/api/v1/settings/post-process-concurrency")},
+		{path: "/api/v1/settings/compression-thresholds", keys: []string{"video", "audio"}, replay: func(t *testing.T) {
+			path := "/api/v1/settings/compression-thresholds"
+			if w := sendForm(t, put, path, url.Values{"video": {"h264[1080p]:hc<3M,lc>7M"}, "audio": {"aac:lc>192k"}}); w.Code != http.StatusOK {
+				t.Fatalf("setting compression thresholds = %d %s", w.Code, w.Body.String())
+			}
+			defer sendForm(t, put, path, url.Values{"video": {""}, "audio": {""}})
+			var got struct {
+				Video []string `json:"video"`
+				Audio []string `json:"audio"`
+			}
+			fetchJSON(t, path, &got)
+			if !slices.Equal(got.Video, []string{"h264[1080]:hc<3M,lc>7M"}) || !slices.Equal(got.Audio, []string{"aac:lc>192k"}) {
+				t.Errorf("compression thresholds read back as %q and %q", got.Video, got.Audio)
+			}
+			if w := sendForm(t, put, path, url.Values{"video": {"h264:hc<7M,lc>3M"}}); w.Code != http.StatusBadRequest {
+				t.Errorf("crossed thresholds = %d %s, want %d", w.Code, w.Body.String(), http.StatusBadRequest)
+			}
+		}},
 		{path: "/api/v1/settings/domain-limits", keys: []string{"hostname", "download", "crawl"}, replay: func(t *testing.T) {
 			if w := sendForm(t, put, "/api/v1/settings/domain-limits", url.Values{"hostname": {"media.wiring-limit.example"}, "download": {"2"}, "crawl": {"1"}}); w.Code != http.StatusOK {
 				t.Fatalf("setting a domain limit = %d %s", w.Code, w.Body.String())

@@ -272,6 +272,59 @@
               </div>
             </div>
 
+            <!-- Compression Thresholds Card -->
+            <div class="rounded-2xl border border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-white/[0.03]">
+              <h3 class="text-base font-semibold text-gray-800 dark:text-white/90 mb-1">Compression Thresholds</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Set the bitrates which decide whether a video or its audio track count as <code>hc_</code> (high compression), <code>mc_</code> (medium compression)
+                or <code>lc_</code> (low compression).
+                <br>
+                <br>
+                Your custom entries will override the built-in defaults.
+              </p>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Video
+                  <a href="help.html#compression-thresholds" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                </label>
+                <textarea
+                  x-model="videoThresholds"
+                  placeholder="Leave empty for the default thresholds"
+                  rows="3"
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                ></textarea>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  One codec per line. Example: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">h264[1080]:hc&lt;3M,lc&gt;7M</code>
+                  (1080p H.264 below 3 Mbps is high compression, above 7 Mbps low, and medium between). Either one alone changes only that threshold.
+                </p>
+              </div>
+              <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Audio
+                  <a href="help.html#compression-thresholds" target="_blank" title="How to write these" class="ml-2 text-brand-500 hover:underline">?</a>
+                </label>
+                <textarea
+                  x-model="audioThresholds"
+                  placeholder="Leave empty for the default thresholds"
+                  rows="3"
+                  class="w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 font-mono"
+                ></textarea>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  One codec per line. Example: <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">aac:hc&lt;96k,lc&gt;192k</code>
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <button
+                  @click="saveCompressionThresholds()"
+                  class="inline-flex items-center h-11 px-4 text-sm font-medium text-white bg-brand-500 rounded-lg hover:bg-brand-600 focus:ring-3 focus:ring-brand-500/50"
+                >
+                  Save
+                </button>
+                <span x-show="thresholdsSaved" x-transition class="text-sm text-gray-500 dark:text-gray-400">Saved!</span>
+              </div>
+              <p x-show="thresholdsError" x-text="thresholdsError" class="mt-1 text-xs text-error-600 dark:text-error-500"></p>
+            </div>
+
             <!-- Domain Limits Card -->
             <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
               <div class="border-b border-gray-200 p-5 sm:px-6 dark:border-gray-700 flex items-center justify-between">
@@ -522,6 +575,12 @@
           savingPostProcess: false,
           postProcessSaved: false,
 
+          // Compression thresholds
+          videoThresholds: '',
+          audioThresholds: '',
+          thresholdsSaved: false,
+          thresholdsError: '',
+
           // Domain limits
           domainLimits: {},
           loadingLimits: true,
@@ -551,6 +610,7 @@
             this.loadCrawlConcurrency();
             this.loadGlobalDownloadLimit();
             this.loadPostProcessConcurrency();
+            this.loadCompressionThresholds();
             this.loadDomainLimits();
             this.loadTLS();
           },
@@ -642,6 +702,42 @@
               console.error('Error saving post-processing concurrency:', err);
             } finally {
               this.savingPostProcess = false;
+            }
+          },
+
+          async loadCompressionThresholds() {
+            try {
+              const response = await fetch('/api/v1/settings/compression-thresholds');
+              if (!response.ok) return;
+              const data = await response.json();
+              this.videoThresholds = (data.video ?? []).join('\n');
+              this.audioThresholds = (data.audio ?? []).join('\n');
+            } catch (err) {
+              console.error('Error loading compression thresholds:', err);
+            }
+          },
+
+          async saveCompressionThresholds() {
+            this.thresholdsSaved = false;
+            this.thresholdsError = '';
+            try {
+              const response = await fetch('/api/v1/settings/compression-thresholds', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ video: this.videoThresholds, audio: this.audioThresholds })
+              });
+              if (!response.ok) {
+                this.thresholdsError = await response.text() || 'Failed to update compression thresholds';
+                return;
+              }
+              const data = await response.json();
+              this.videoThresholds = (data.video ?? []).join('\n');
+              this.audioThresholds = (data.audio ?? []).join('\n');
+              this.thresholdsSaved = true;
+              setTimeout(() => { this.thresholdsSaved = false; }, 2000);
+            } catch (err) {
+              this.thresholdsError = 'Failed to update compression thresholds';
+              console.error('Error saving compression thresholds:', err);
             }
           },
 

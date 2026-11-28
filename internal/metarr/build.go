@@ -4,6 +4,7 @@ package metarr
 import (
 	"cmp"
 	"strconv"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/models"
 	"tubarr/internal/parsing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/TubarrApp/gocommon/logging"
 	"github.com/TubarrApp/gocommon/sharedconsts"
+	"github.com/spf13/viper"
 )
 
 // makeMetarrCommand returns Metarr's arguments for the video, from its Download As options and its channel URL's settings.
@@ -113,6 +115,10 @@ func makeMetarrCommand(v *models.Video, cu *models.ChannelURL, c *models.Channel
 	addEach(metkeys.TranscodeVideoArgs, videoArgs)
 	addEach(metkeys.TranscodeAudioCodecs, audioCodecs)
 	addEach(metkeys.TranscodeAudioArgs, audioArgs)
+
+	// The Settings page's compression thresholds apply to every video.
+	addEach(metkeys.VideoCompressionThresholds, viper.GetStringSlice(keys.VideoCompressionThresholds))
+	addEach(metkeys.AudioCompressionThresholds, viper.GetStringSlice(keys.AudioCompressionThresholds))
 
 	// Other.
 	// (Send Tubarr's current debug level to Metarr, so it can log more verbosely if needed).

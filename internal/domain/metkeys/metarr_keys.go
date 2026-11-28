@@ -32,13 +32,15 @@ const (
 
 // FFmpeg related commands.
 const (
-	ExtraFFmpegArgs      = "--extra-ffmpeg-args"
-	StripThumbnail       = "--strip-thumbnail"
-	Thumbnail            = "--thumbnail"
-	TranscodeGPU         = "--transcode-gpu"
-	TranscodeGPUNode     = "--transcode-gpu-node"
-	TranscodeVideoCodecs = "--transcode-video-codecs"
-	TranscodeAudioCodecs = "--transcode-audio-codecs"
-	TranscodeVideoArgs   = "--transcode-video-args"
-	TranscodeAudioArgs   = "--transcode-audio-args"
+	ExtraFFmpegArgs            = "--extra-ffmpeg-args"
+	StripThumbnail             = "--strip-thumbnail"
+	Thumbnail                  = "--thumbnail"
+	TranscodeGPU               = "--transcode-gpu"
+	TranscodeGPUNode           = "--transcode-gpu-node"
+	TranscodeVideoCodecs       = "--transcode-video-codecs"
+	TranscodeAudioCodecs       = "--transcode-audio-codecs"
+	TranscodeVideoArgs         = "--transcode-video-args"
+	TranscodeAudioArgs         = "--transcode-audio-args"
+	VideoCompressionThresholds = "--video-compression-thresholds"
+	AudioCompressionThresholds = "--audio-compression-thresholds"
 )

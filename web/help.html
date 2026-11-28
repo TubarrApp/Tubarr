@@ -122,7 +122,7 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
                   and values are, since metadata field names are.
                 </li>
                 <li>
-                  <strong>Entered one op per line</strong>. In an ops file, a line starting with <code>#</code> is a comment.
+                  <strong>One op per line.</strong> In an ops file, a line starting with <code>#</code> is a comment.
                 </li>
                 <li>
                   <strong>Values can use the video's metadata</strong> with <code>{{field}}</code>, e.g.
@@ -250,8 +250,8 @@ prefix:[Archive]             a filename op: operation, value</code></pre>
               <!-- ===== Date tags ===== -->
               <h2 id="date-tags">Date tags</h2>
               <p>
-                A date tag is the video's date in brackets, made from its release or upload date. It goes at the
-                <code>prefix</code> or <code>suffix</code>; adding one replaces a date tag already in that place, so
+                A date tag is the video's date in brackets, made from its release or upload date. It goes at the start
+                (<code>prefix</code>) or end (<code>suffix</code>); adding one replaces a date tag already in that place, so
                 running the ops again doesn't stack them. <code>delete-date-tag</code> removes date tags from anywhere in the
                 field, in any of the formats below.
               </p>
@@ -356,7 +356,7 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
                   custom settings do this more simply.)
                 </li>
                 <li>A <code>|</code> at the end of the filter's value is written <code>\|</code> to distinguish it from the filter/operation <code>||</code> separator. For example, <code>title:contains:|CATS\|||description:suffix: - Cat videos.</code> would look for <code>|cats|</code> in the title field and, if found, suffix the description field with <code> - Cat videos.</code></li>
-                <li>Likewise, a <code>&amp;&amp;</code> in a filter's value is written <code>\&amp;&amp;</code>, and a <code>&amp;</code> at the end of it <code>\&amp;</code>, so they aren't read as joining two filters. For example, <code>title:contains:Tom \&amp;&amp; Jerry||genre:set:Cartoons</code> looks for <code>tom &amp;&amp; jerry</code> in the title field.</li>
+                <li>Likewise, a <code>&amp;&amp;</code> in a filter's value is written <code>\&amp;&amp;</code>, and a <code>&amp;</code> at the end of the value is written <code>\&amp;</code>, so they aren't read as joining two filters. For example, <code>title:contains:Tom \&amp;&amp; Jerry||genre:set:Cartoons</code> looks for <code>tom &amp;&amp; jerry</code> in the title field.</li>
               </ul>
 
               <!-- ===== Move ops ===== -->
@@ -372,10 +372,10 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
               </p>
               <p>
                 In a move op, <code>{{channel_url_output_directory}}</code> is the channel URL's Metarr
-                <strong>Output Directory</strong>, or its video directory if it has none, e.g.
-                <code>title:contains:podcast||{{channel_url_output_directory}}/Podcasts</code> puts podcasts in a folder inside it,
-                so changing the output directory changes where podcasts go too. <code>{{channel_output_directory}}</code> does the same
-                with the channel's directories.
+                <strong>Output Directory</strong>, or its video directory if it has none. For example,
+                <code>title:contains:podcast||{{channel_url_output_directory}}/Podcasts</code> puts podcasts in a Podcasts
+                folder inside it, so they follow if the output directory changes. <code>{{channel_output_directory}}</code>
+                does the same with the channel's directories.
               </p>
               <p>Where a finished video goes, first match first:</p>
               <ol>
@@ -391,8 +391,9 @@ title:contains:lion||set:{{fulltitle}}&amp;&amp;prefix:[Animals] &amp;&amp;suffi
               <p>
                 Tubarr never creates download folders: a video or JSON directory must already exist, so an unmounted
                 drive isn't filled by mistake. A directory using <a href="#templates">template tags</a> needs its fixed
-                part to exist. Metarr creates its own output folders, so when downloading, an Output Directory or move op
-                folder inside a video or Output Directory only needs that directory to exist.
+                part to exist. Metarr creates its own output folders, so if an Output Directory or move op folder sits
+                inside a video directory or another Output Directory, only that outer directory has to exist when
+                downloading.
               </p>
 
               <!-- ===== Transcoding ===== -->
@@ -431,8 +432,8 @@ vp9:av1</code></pre>
 mc_h264:hevc</code></pre>
               <p>
                 converts low-compression H.264 to AV1 and medium-compression H.264 to HEVC, and copies high-compression
-                H.264 as it is. A line with a level comes before one for the same codec without, which comes before the
-                plain codec. A prefix needs a target codec, and if a video's level can't be worked out, only lines
+                H.264 as it is. A line with a level takes priority over a line for the same codec without one, which in
+                turn takes priority over the plain codec. A prefix needs a target codec, and if a video's level can't be worked out, only lines
                 without a prefix apply to it.
               </p>
               <p>
@@ -449,8 +450,9 @@ mc_h264:hevc</code></pre>
                 </table>
               </div>
               <p>
-                The video borders grow with the picture size and frame rate: a 1080p video at 60 frames a second gets
-                twice these, and a 4K one at 30 frames a second four times. For stereo audio:
+                The video borders grow with the picture size and frame rate, but not in proportion: a 1080p video at 60
+                frames a second gets 1.5 times these, a 4K one at 30 frames a second about 2.8 times, and a 720p one about
+                half. For stereo audio:
               </p>
               <div class="table-wrap">
                 <table>
@@ -503,29 +505,31 @@ mc_h264:hevc</code></pre>
                 <li>
                   <strong>Video Encoder Args</strong> are FFmpeg options used only when Metarr encodes to a codec, one
                   <code>codec:args</code> line per target codec, e.g. <code>av1:-crf 35 -preset 6</code>. A codec without a
-                  line uses its encoder's defaults. Metarr adjusts three of them to suit GPU encoders too:
-                  <code>-crf</code> sets the quality (lower is better and larger, up to 51 for H.264 and HEVC and 63 for AV1,
-                  VP8 and VP9, with VP8 starting at 4), <code>-pix_fmt</code> sets the pixel format (e.g. <code>yuv420p10le</code> for 10-bit, or
-                  <code>yuv420p</code> to keep 8-bit for older devices), and <code>-vf</code> sets filters, e.g.
-                  <code>hevc:-vf scale=1280:-2</code> to scale the video to 1280 pixels wide. If the encoder can't take
-                  the pixel format, Metarr uses the same format in the form it does take, or stops with an error naming
-                  the formats it can.
+                  line uses its encoder's defaults. Metarr converts three options to suit each encoder, GPU ones
+                  included: <code>-crf</code> sets the quality (lower is better and larger: 0 to 51 for H.264 and HEVC,
+                  0 to 63 for AV1 and VP9, and 4 to 63 for VP8), <code>-pix_fmt</code> sets the pixel format (e.g.
+                  <code>yuv420p10le</code> for 10-bit, or <code>yuv420p</code> to keep 8-bit for older devices), and
+                  <code>-vf</code> sets filters, e.g. <code>hevc:-vf scale=1280:-2</code> to scale the video to 1280
+                  pixels wide. If the encoder doesn't take that pixel format, Metarr uses one it does take with the same
+                  bit depth and chroma subsampling, such as <code>nv12</code> for <code>yuv420p</code>, or stops with an
+                  error listing the formats it can take.
                 </li>
                 <li>
                   <strong>Audio Encoder Args</strong> work the same way for audio codecs, e.g. <code>aac:-b:a 160k -ac 2</code>
-                  for 160 kbps stereo AAC. An <code>-af</code> filter runs before the channel layout filter Metarr gives Opus,
-                  and an <code>-ar</code> sample rate replaces the 48 kHz Metarr gives AC-3, E-AC-3 and DTS.
+                  for 160 kbps stereo AAC. Metarr adds a channel layout filter for Opus, and any <code>-af</code> runs
+                  before it. An <code>-ar</code> replaces the 48 kHz sample rate Metarr sets for AC-3, E-AC-3 and DTS.
                 </li>
                 <li>
-                  A video already in a codec is kept as it is, so that codec's args don't run on it, with two exceptions.
-                  A line such as <code>hevc:hevc</code> encodes it again every time it's processed. A <code>-pix_fmt</code>
-                  it isn't in encodes it once, e.g. <code>hevc:-pix_fmt yuv420p10le</code> with an 8-bit HEVC video, unless
-                  <code>hevc:copy</code> or a plain <code>copy</code> is set. Other args, such as <code>-crf</code>, can't be
-                  checked on a finished video, so they never start an encode, and a <code>-vf</code> left out this way logs
-                  a warning. Audio works the same way, with <code>-ac</code> and <code>-ar</code> in place of
-                  <code>-pix_fmt</code> and <code>-af</code> in place of <code>-vf</code>: <code>aac:aac</code> encodes AAC
-                  again every time, and <code>aac:-ac 2</code> encodes 5.1 AAC once. Opus always reads back as 48 kHz, so its
-                  <code>-ar</code> never starts an encode.
+                  A video that's already in the target codec is copied, not encoded, so that codec's args aren't used.
+                  There are two exceptions. A line such as <code>hevc:hevc</code> encodes it again every time it's
+                  processed. A <code>-pix_fmt</code> the video isn't already in encodes it once, e.g.
+                  <code>hevc:-pix_fmt yuv420p10le</code> with an 8-bit HEVC video, unless <code>hevc:copy</code> or a
+                  plain <code>copy</code> is set. Other args, such as <code>-crf</code>, can't be checked on a finished
+                  video, so they never cause an encode on their own. If a <code>-vf</code> is skipped because the video
+                  is copied, Metarr logs a warning. Audio works the same way, with <code>-ac</code> and <code>-ar</code>
+                  in place of <code>-pix_fmt</code>, and <code>-af</code> in place of <code>-vf</code>:
+                  <code>aac:aac</code> encodes AAC again every time, and <code>aac:-ac 2</code> encodes 5.1 AAC once.
+                  Opus files always report 48 kHz, so an <code>-ar</code> for Opus never causes an encode.
                 </li>
                 <li>
                   <code>-pass</code> in Video Encoder Args is the number of encoding passes, e.g.
@@ -584,6 +588,26 @@ mc_h264:hevc</code></pre>
                   <strong>Edit &amp; Post-Process Selected</strong>. Download As options are kept and used then.
                 </li>
               </ul>
+              <h3 id="compression-thresholds">Compression thresholds</h3>
+              <p>
+                <strong>Compression Thresholds</strong> on the Settings page change the <code>hc_</code>, <code>mc_</code>
+                and <code>lc_</code> borders above for every channel, one codec per line. <code>hc&lt;</code> sets the
+                bitrate below which a video counts as high compression, and <code>lc&gt;</code> the bitrate above which
+                it counts as low compression:
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Line</th><th>Means</th></tr>
+                  <tr><td><code>h264:hc&lt;3M,lc&gt;7M</code></td><td>H.264 below 3 Mbps is <code>hc_</code>, 3 to 7 Mbps <code>mc_</code>, and above 7 Mbps <code>lc_</code>.</td></tr>
+                  <tr><td><code>h264[1080]:lc&gt;7M</code></td><td>1080p H.264 above 7 Mbps is <code>lc_</code>, and its <code>hc_</code> border stays as above.</td></tr>
+                  <tr><td><code>av1[2160]:hc&lt;10M,mc&lt;20M</code></td><td><code>mc&lt;</code> can be used instead of <code>lc&gt;</code>, so 4K AV1 from 20 Mbps up is <code>lc_</code>.</td></tr>
+                  <tr><td><code>aac:hc&lt;96k,lc&gt;192k</code></td><td>AAC audio, going by the whole track's bitrate.</td></tr>
+                </table>
+              </div>
+              <p>
+                Leave out <code>hc&lt;</code> or <code>lc&gt;</code> to keep the default for it. A line with a resolution
+                beats one without, and audio lines can't have a resolution.
+              </p>
 
               <!-- ===== yt-dlp ===== -->
               <h2 id="ytdlp">yt-dlp download options</h2>
@@ -599,18 +623,20 @@ mc_h264:hevc</code></pre>
                 <li>
                   <strong>Max Resolution</strong> downloads the largest size up to this, e.g. <code>1080</code>,
                   <code>720p</code> or <code>4k</code>, or the smallest above it when a video has nothing that small. It
-                  goes by the shorter side, so a vertical 1080×1920 video counts as 1080p. It picks within the
-                  <strong>Preferred Video Codecs</strong>, so a preferred codec only offered above the limit still wins.
+                  goes by the shorter side, so a vertical 1080×1920 video counts as 1080p. <strong>Preferred Video
+                  Codecs</strong> are picked first and the size second, so if a preferred codec is only offered above the
+                  limit, that codec is still downloaded, at its smallest size.
                 </li>
                 <li><strong>Extra YT-DLP Video Args</strong> are added to the download command, <strong>Meta Args</strong> to the metadata fetch and <strong>Crawl Args</strong> to channel crawls. A channel URL's own extra args replace the channel's rather than adding to them, and Download As's replace the channel URL's.</li>
                 <li>
-                  <strong>Videos to Crawl</strong> set to <strong>Newest</strong> makes each crawl check only that many
-                  videos from the top of a URL's list, usually its newest, so very large channels crawl faster. Videos
-                  further down aren't found: failed ones there aren't retried, and if more come out between crawls than
-                  it checks, the rest are missed. <strong>All</strong> checks every video, even where a profile or the
-                  channel sets a number. Where a URL lists several tabs, such as a YouTube channel's home page, it counts
-                  per tab. Custom crawl rules don't use it. <strong>Crawl Now</strong> and <strong>Ignore to
-                  Date</strong> ask for a number for that run only, blank checking every video.
+                  <strong>Videos to Crawl</strong> set to <strong>Newest</strong>, with a number, makes each crawl check
+                  only that many videos from the top of a URL's list, usually its newest, so very large channels crawl
+                  faster. Videos further down aren't found: failed ones there aren't retried, and if more videos come out
+                  between two crawls than it checks, the extra ones are missed. <strong>All</strong> checks every video,
+                  even where a profile or the channel sets a number. Where a URL lists several tabs, such as a YouTube
+                  channel's home page, the number counts per tab. Custom crawl rules don't use it.
+                  <strong>Crawl Now</strong> and <strong>Ignore to Date</strong> ask for a number for that run only;
+                  leave it blank to check every video.
                 </li>
                 <li><strong>External Downloader</strong> hands the transfer to aria2c, axel, curl and the like, with its own <strong>Args</strong>.</li>
               </ul>
@@ -637,7 +663,7 @@ mc_h264:hevc</code></pre>
                 videos in their own folder.
               </p>
               <p>
-                Two more tags build a Metarr output directory on another one, e.g.
+                Two more tags let one Metarr output directory sit inside another, e.g.
                 <code>{{channel_output_directory}}/Shorts</code> as a channel URL's Output Directory. Video and JSON
                 directories can't use them, as they can hold tags like <code>{{year}}</code> that aren't known until after
                 the download. What they fill with depends on where they're used:
@@ -675,10 +701,10 @@ mc_h264:hevc</code></pre>
                 part of its level: a nearer level's ops, typed or in a file, still beat a farther level's file.
               </p>
               <p>
-                <strong>Replace the channel's</strong>, under a URL's filters, move ops or one of its op lists, uses
-                only the URL's own list and file for it, with its profile's, leaving out the channel's. A channel's
-                <strong>Replace the profile's</strong> does the same with its profile's. Ticked with the list empty,
-                there are none of that kind.
+                Ticking <strong>Replace the channel's</strong> under a URL's filters, move ops or one of its op lists
+                means that list only uses the URL's own entries and file, plus those from the URL's profile. The
+                channel's and the channel profile's are left out. A channel's <strong>Replace the profile's</strong>
+                does the same with its profile. If the box is ticked and the URL's list is empty, there are none at all.
               </p>
 
               <!-- ===== Profiles ===== -->
@@ -707,21 +733,32 @@ mc_h264:hevc</code></pre>
               <h2 id="download-as">Download As</h2>
               <p>
                 <strong>Download As…</strong> downloads one video with its own filename, directories, thumbnail, ops,
-                yt-dlp options and post-processing options, starting from its channel URL's. They're kept with the video,
-                which Available marks <strong>Customized</strong>: downloading it again from there, e.g. after it fails
-                or is canceled, uses them too, and <strong>Edit &amp; Post-Process</strong> and
-                <strong>Edit &amp; Re-Process</strong> open with them later. Those two only run Metarr on files already
-                downloaded, so they have no download options. A <strong>Login</strong> entered in Download As is used
-                for that one download and never saved. <strong>Revert to Defaults</strong> goes back to the channel
-                URL's. Options left the same as the channel URL's aren't kept, so the video then isn't customized and
-                follows later changes to the channel URL. Each time the dialog opens, the channel URL's ops, including its
-                ops files, are filled in fresh, keeping any lines you added or deleted for that video. To give several
-                videos from one channel URL the same options,
-                select them on Available and choose <strong>Download As…</strong> above the list, or for downloaded
-                videos, select them on the channel's downloaded videos and choose
-                <strong>Edit &amp; Post-Process Selected</strong> or <strong>Edit &amp; Re-Process Selected</strong>.
-                A filename or custom thumbnail is for one video only.
+                yt-dlp options and post-processing options, starting from its channel URL's.
               </p>
+              <ul>
+                <li>
+                  The options are kept with the video, which Available marks <strong>Customized</strong>. Downloading it
+                  again from there, e.g. after it fails or is canceled, uses them too, and
+                  <strong>Edit &amp; Post-Process</strong> and <strong>Edit &amp; Re-Process</strong> open with them
+                  later. Those two only run Metarr on files already downloaded, so they have no download options.
+                </li>
+                <li>
+                  Options left the same as the channel URL's aren't kept, so they follow later changes to the channel
+                  URL, and a video with none changed isn't marked Customized. <strong>Revert to Defaults</strong> goes
+                  back to the channel URL's.
+                </li>
+                <li>
+                  Each time the dialog opens, the channel URL's ops, including its ops files, are filled in fresh,
+                  keeping any lines you added or deleted for that video.
+                </li>
+                <li>A <strong>Login</strong> entered in Download As is used for that one download and never saved.</li>
+                <li>
+                  To give several videos from one channel URL the same options, select them on Available and choose
+                  <strong>Download As…</strong> above the list. For downloaded videos, select them on the channel's
+                  downloaded videos and choose <strong>Edit &amp; Post-Process Selected</strong> or
+                  <strong>Edit &amp; Re-Process Selected</strong>. A filename or custom thumbnail is for one video only.
+                </li>
+              </ul>
 
               <!-- ===== Queue ===== -->
               <h2 id="queue">Downloads and concurrency</h2>
@@ -747,8 +784,9 @@ mc_h264:hevc</code></pre>
                 short random wait. If the site flags Tubarr as a bot, it stops at once. yt-dlp also retries dropped
                 connections itself within each run. On channel URLs that download new videos automatically, a video that
                 still fails is tried again by up to 3 later crawls, then waits on the Available page for you to retry.
-                Crawls don't retry videos you downloaded yourself. A crawl while the URL doesn't download automatically
-                leaves its failed videos to you as well, so turning automatic downloads back on only downloads new videos.
+                Crawls don't retry videos you downloaded yourself. A crawl that runs while the URL isn't downloading
+                automatically also leaves the URL's failed videos for you to retry, so turning automatic downloads back
+                on only downloads new videos.
               </p>
 
               <!-- ===== Notifications ===== -->

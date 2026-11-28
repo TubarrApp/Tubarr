@@ -219,6 +219,8 @@ func NewRouter(ss serverStore) (http.Handler, error) {
 		r.Put("/settings/global-download-concurrency", ss.handleSetGlobalDownloadConcurrency)
 		r.Get("/settings/post-process-concurrency", ss.handleGetPostProcessConcurrency)
 		r.Put("/settings/post-process-concurrency", ss.handleSetPostProcessConcurrency)
+		r.Get("/settings/compression-thresholds", ss.handleGetCompressionThresholds)
+		r.Put("/settings/compression-thresholds", ss.handleSetCompressionThresholds)
 		r.Get("/settings/domain-limits", ss.handleGetDomainLimits)
 		r.Put("/settings/domain-limits", ss.handleSetDomainLimit)
 		r.Delete("/settings/domain-limits/{hostname}", ss.handleDeleteDomainLimit)

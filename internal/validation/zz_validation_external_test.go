@@ -301,9 +301,20 @@ func TestResolutionsSaved(t *testing.T) {
 		t.Errorf("codecs: got %q, want %q", codecs, want)
 	}
 
-	// Audio entries take no resolution.
+	thresholds, err := validation.ValidateVideoCompressionThresholds([]string{"h264:lc>7M", "av1[1080p]:hc<2M,lc>4M", "h264:lc>7M"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"h264:lc>7M", "av1[1080]:hc<2M,lc>4M"}; !slices.Equal(thresholds, want) {
+		t.Errorf("thresholds: got %q, want %q", thresholds, want)
+	}
+
+	// Audio entries and thresholds take no resolution.
 	if _, err := validation.ValidateAudioTranscodeCodecSlice([]string{"aac[1080]:opus"}); err == nil {
 		t.Error("audio: took a resolution")
+	}
+	if _, err := validation.ValidateAudioCompressionThresholds([]string{"aac[1080]:lc>192k"}); err == nil {
+		t.Error("audio thresholds: took a resolution")
 	}
 }
 

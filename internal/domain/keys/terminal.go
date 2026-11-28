@@ -40,12 +40,14 @@ const (
 
 // Transcoding.
 const (
-	TranscodeGPU        string = "metarr-transcode-gpu"
-	TranscodeGPUNode    string = "metarr-transcode-gpu-node"
-	TranscodeCodec      string = "metarr-transcode-video-codecs"
-	TranscodeAudioCodec string = "metarr-transcode-audio-codecs"
-	TranscodeVideoArgs  string = "metarr-transcode-video-args"
-	TranscodeAudioArgs  string = "metarr-transcode-audio-args"
+	TranscodeGPU               string = "metarr-transcode-gpu"
+	TranscodeGPUNode           string = "metarr-transcode-gpu-node"
+	TranscodeCodec             string = "metarr-transcode-video-codecs"
+	TranscodeAudioCodec        string = "metarr-transcode-audio-codecs"
+	TranscodeVideoArgs         string = "metarr-transcode-video-args"
+	TranscodeAudioArgs         string = "metarr-transcode-audio-args"
+	VideoCompressionThresholds string = "metarr-video-compression-thresholds"
+	AudioCompressionThresholds string = "metarr-audio-compression-thresholds"
 )
 
 // Downloading.

@@ -111,6 +111,25 @@ func ValidateAudioEncoderArgs(lines []string) (validLines []string, err error) {
 	return dedupLines, nil
 }
 
+// ValidateVideoCompressionThresholds validates "codec:hc<X,lc>Y" lines as Metarr will read them, returning them deduplicated
+// as typed but for resolutions, which are saved in pixels (e.g. "av1[1080]:" from "av1[1080p]:").
+func ValidateVideoCompressionThresholds(lines []string) (validLines []string, err error) {
+	dedupLines := dedupSlice(lines)
+	if _, err := sharedparsing.ParseVideoCompressionThresholds(dedupLines); err != nil {
+		return nil, err
+	}
+	return sharedparsing.NormalizeResolutions(dedupLines), nil
+}
+
+// ValidateAudioCompressionThresholds validates "codec:hc<X,lc>Y" lines for audio codecs as Metarr will read them, returning them deduplicated as typed.
+func ValidateAudioCompressionThresholds(lines []string) (validLines []string, err error) {
+	dedupLines := dedupSlice(lines)
+	if _, err := sharedparsing.ParseAudioCompressionThresholds(dedupLines); err != nil {
+		return nil, err
+	}
+	return dedupLines, nil
+}
+
 // ValidateExtraFFmpegArgs refuses extra FFmpeg args holding a blocked option, or one that only works when encoding.
 func ValidateExtraFFmpegArgs(a string) error {
 	args, err := sharedparsing.ShellSplit(a)

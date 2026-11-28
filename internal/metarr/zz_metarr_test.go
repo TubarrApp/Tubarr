@@ -13,6 +13,7 @@ import (
 	"testing"
 	"tubarr/internal/database"
 	"tubarr/internal/domain/consts"
+	"tubarr/internal/domain/keys"
 	"tubarr/internal/domain/logger"
 	"tubarr/internal/domain/metkeys"
 	"tubarr/internal/domain/paths"
@@ -171,6 +172,33 @@ func TestMakeMetarrCommandExtSame(t *testing.T) {
 	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
 	if args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags)); slices.Contains(args, metkeys.Ext) {
 		t.Errorf("%q passed an extension to Metarr: %q", sharedconsts.ExtSame, args)
+	}
+}
+
+// TestMakeMetarrCommandCompressionThresholds tests the Settings page's compression thresholds are passed to Metarr for every video.
+func TestMakeMetarrCommandCompressionThresholds(t *testing.T) {
+	logger.Pl.Console = io.Discard
+	t.Cleanup(viper.Reset)
+	viper.Set(keys.VideoCompressionThresholds, []string{"h264:lc>7M", "av1[2160]:hc<10M,mc<20M"})
+	viper.Set(keys.AudioCompressionThresholds, []string{"aac:hc<96k,lc>192k"})
+	c := &models.Channel{ID: 1, Name: "Cats"}
+	cu := &models.ChannelURL{URL: "https://example.com/@a", ChanURLSettings: &models.Settings{}, ChanURLMetarrArgs: &models.MetarrArgs{}}
+	v := &models.Video{URL: "https://example.com/v/1", Files: models.VideoFiles{VideoFilePath: "/videos/v.mp4", JSONFilePath: "/videos/v.json"}}
+	args := makeMetarrCommand(v, cu, c, parsing.NewDirectoryParser(c, cu, parsing.AllTags))
+
+	// Each threshold line follows its flag.
+	pairs := make(map[string]bool, len(args))
+	for i := 0; i+1 < len(args); i++ {
+		pairs[args[i]+" "+args[i+1]] = true
+	}
+	for _, want := range []string{
+		metkeys.VideoCompressionThresholds + " h264:lc>7M",
+		metkeys.VideoCompressionThresholds + " av1[2160]:hc<10M,mc<20M",
+		metkeys.AudioCompressionThresholds + " aac:hc<96k,lc>192k",
+	} {
+		if !pairs[want] {
+			t.Errorf("Metarr args %q don't hold %q", args, want)
+		}
 	}
 }
 

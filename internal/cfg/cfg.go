@@ -3,8 +3,10 @@ package cfg
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"tubarr/internal/cmd"
 	"tubarr/internal/contracts"
 	"tubarr/internal/domain/keys"
@@ -82,6 +84,30 @@ var rootCmd = &cobra.Command{
 				} else if found {
 					viper.Set(k, val)
 				}
+			}
+
+			// Compression thresholds for Metarr, one per line, unless set by flag for this run.
+			for _, k := range []string{keys.VideoCompressionThresholds, keys.AudioCompressionThresholds} {
+				if cmd.Flags().Changed(k) {
+					continue
+				}
+				if val, found, err := settingsStore.GetSetting(k); err != nil {
+					logger.Pl.W("Failed to load setting %q from DB: %v", k, err)
+				} else if found && val != "" {
+					viper.Set(k, strings.Split(val, "\n"))
+				}
+			}
+		}
+
+		// Compression thresholds set by flag are checked before any Metarr run.
+		if cmd.Flags().Changed(keys.VideoCompressionThresholds) {
+			if _, err := validation.ValidateVideoCompressionThresholds(viper.GetStringSlice(keys.VideoCompressionThresholds)); err != nil {
+				return fmt.Errorf("invalid --%s: %w", keys.VideoCompressionThresholds, err)
+			}
+		}
+		if cmd.Flags().Changed(keys.AudioCompressionThresholds) {
+			if _, err := validation.ValidateAudioCompressionThresholds(viper.GetStringSlice(keys.AudioCompressionThresholds)); err != nil {
+				return fmt.Errorf("invalid --%s: %w", keys.AudioCompressionThresholds, err)
 			}
 		}
 

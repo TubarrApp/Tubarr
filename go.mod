@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/TubarrApp/gocommon v0.0.0-20261126040557-74e203673296
+	github.com/TubarrApp/gocommon v0.0.0-20261128032856-dbca7e8a238a
 	github.com/bogdanfinn/fhttp v0.6.9
 	github.com/bogdanfinn/tls-client v1.16.0
 	github.com/browserutils/kooky v0.2.2
